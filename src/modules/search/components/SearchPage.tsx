@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Search, Code, ExternalLink } from 'lucide-react'
+import { Search, Code, ExternalLink, Bookmark, Save, X } from 'lucide-react'
 import { Input } from '~/components/ui'
 
 interface Builder {
@@ -20,6 +20,10 @@ export function SearchPage() {
   const [results, setResults] = React.useState<Builder[]>([])
   const [loading, setLoading] = React.useState(false)
   const [searched, setSearched] = React.useState(false)
+  const [showSave, setShowSave] = React.useState(false)
+  const [saveName, setSaveName] = React.useState('')
+  const [saving, setSaving] = React.useState(false)
+  const [saveMsg, setSaveMsg] = React.useState('')
 
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -27,6 +31,7 @@ export function SearchPage() {
 
     setLoading(true)
     setSearched(true)
+    setShowSave(false)
     try {
       const res = await fetch('/api/search/builders', {
         method: 'POST',
@@ -39,6 +44,33 @@ export function SearchPage() {
       setResults([])
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSaveSearch = async () => {
+    if (!saveName.trim() || !query.trim()) return
+    setSaving(true)
+    setSaveMsg('')
+    try {
+      const keywords = query.split(/[,\s]+/).filter(Boolean)
+      const res = await fetch('/api/queries', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: saveName, keywords }),
+      })
+      if (res.ok) {
+        setSaveMsg('Search saved!')
+        setSaveName('')
+        setShowSave(false)
+        setTimeout(() => setSaveMsg(''), 2000)
+      } else {
+        setSaveMsg('Failed to save. Make sure you are signed in.')
+      }
+    } catch {
+      setSaveMsg('Failed to save search.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -57,20 +89,67 @@ export function SearchPage() {
       <p className="text-bh-text-muted mb-8">Find active builders by keyword across multiple platforms</p>
 
       {/* Search bar */}
-      <form onSubmit={handleSearch} className="flex gap-3 mb-8">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bh-text-muted" />
-          <input
-            type="text"
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="e.g. react, rust, machine learning..."
-            className="input-field pl-10"
-          />
+      <form onSubmit={handleSearch} className="space-y-3 mb-8">
+        <div className="flex gap-3">
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-bh-text-muted" />
+            <input
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="e.g. react, rust, machine learning..."
+              className="input-field pl-10"
+            />
+          </div>
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? 'Searching...' : 'Search'}
+          </button>
+          {searched && results.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowSave(v => !v)}
+              className="btn-secondary flex items-center gap-2"
+              title="Save this search"
+            >
+              <Bookmark className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <button type="submit" disabled={loading} className="btn-primary">
-          {loading ? 'Searching...' : 'Search'}
-        </button>
+
+        {showSave && (
+          <div className="flex gap-3 items-center">
+            <input
+              type="text"
+              value={saveName}
+              onChange={e => setSaveName(e.target.value)}
+              placeholder="Name for this search..."
+              className="input-field flex-1"
+              onKeyDown={e => e.key === 'Enter' && handleSaveSearch()}
+            />
+            <button
+              type="button"
+              onClick={handleSaveSearch}
+              disabled={saving || !saveName.trim()}
+              className="btn-primary flex items-center gap-2"
+            >
+              <Save className="w-4 h-4" />
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowSave(false); setSaveName('') }}
+              className="btn-secondary p-2"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {saveMsg && (
+          <p className={`text-sm ${saveMsg.includes('Saved') ? 'text-green-400' : 'text-red-400'}`}>
+            {saveMsg}
+          </p>
+        )}
       </form>
 
       {/* Results */}

@@ -11,6 +11,15 @@ import { fileURLToPath } from 'node:url';
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
 
+console.error('[server] Starting with env:', {
+  PORT, HOST,
+  DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[MISSING]',
+  NODE_ENV: process.env.NODE_ENV,
+  AUTH_SECRET: process.env.AUTH_SECRET ? '[SET]' : '[MISSING]',
+  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? '[SET]' : '[MISSING]',
+  APP_URL: process.env.APP_URL,
+});
+
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const CLIENT_DIR = resolve(__dirname, 'dist/client');
 
@@ -57,14 +66,20 @@ if (!app || typeof app.fetch !== 'function') {
   console.error('ERROR: dist/server/server.js did not export a valid fetch handler');
   process.exit(1);
 }
+console.error('[server] App handler loaded OK');
 
 const server = createServer(async (req, res) => {
   const protocol = 'http';
   const host = req.headers.host ?? `localhost:${PORT}`;
   const url = new URL(req.url ?? '/', `${protocol}://${host}`);
 
+  console.error('[server] Incoming request:', req.method, url.pathname);
+
   if (req.method === 'GET' || req.method === 'HEAD') {
-    if (tryServeStatic(url.pathname, res)) return;
+    if (tryServeStatic(url.pathname, res)) {
+      console.error('[server] Served static file:', url.pathname);
+      return;
+    }
   }
 
   const headers = new Headers();
@@ -86,9 +101,9 @@ const server = createServer(async (req, res) => {
   try {
     webResponse = await app.fetch(webRequest);
   } catch (err) {
-    console.error('[server] Handler error:', err);
-    res.writeHead(500, { 'Content-Type': 'text/plain' });
-    res.end('Internal Server Error');
+    console.error('[server] Handler error:', err.message, err.stack?.split('\n').slice(0,3).join(' | '));
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 500, message: err.message }));
     return;
   }
 
@@ -113,7 +128,7 @@ const server = createServer(async (req, res) => {
   res.end();
 });
 
-server.listen(PORT, HOST, () => console.log(`[server] Listening on http://${HOST}:${PORT}`));
+server.listen(PORT, HOST, () => console.error(`[server] Listening on http://${HOST}:${PORT}`));
 server.on('error', (err) => {
   console.error('[server] Fatal:', err);
   process.exit(1);

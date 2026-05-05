@@ -15,12 +15,17 @@ import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
+import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
+import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
+import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
+import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
 
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
@@ -50,6 +55,11 @@ const AuthSignInRoute = AuthSignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
+  id: '/api/queries/',
+  path: '/api/queries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
   id: '/search/',
   path: '/search/',
@@ -70,6 +80,21 @@ const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   path: '/api/search/builders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
+  id: '/api/export/builders',
+  path: '/api/export/builders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
+  id: '/api/dashboard/stats',
+  path: '/api/dashboard/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
+  id: '/api/builders/$builderId',
+  path: '/api/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
@@ -81,6 +106,12 @@ const DashboardBuilderBuilderIdIndexRoute =
     path: '/builder/$builderId/',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
+const ApiBuildersBuilderIdNotesRoute =
+  ApiBuildersBuilderIdNotesRouteImport.update({
+    id: '/notes',
+    path: '/notes',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -88,10 +119,15 @@ export interface FileRoutesByFullPath {
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
+  '/api/queries/': typeof ApiQueriesIndexRoute
+  '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -100,10 +136,15 @@ export interface FileRoutesByTo {
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/search': typeof DashboardSearchIndexRoute
+  '/api/queries': typeof ApiQueriesIndexRoute
+  '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
 }
 export interface FileRoutesById {
@@ -115,10 +156,15 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/_landing/': typeof LandingIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
+  '/api/queries/': typeof ApiQueriesIndexRoute
+  '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -129,10 +175,15 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/api/auth/$'
+    | '/api/builders/$builderId'
+    | '/api/dashboard/stats'
+    | '/api/export/builders'
     | '/api/search/builders'
     | '/dashboard/'
     | '/exports/'
     | '/search/'
+    | '/api/queries/'
+    | '/api/builders/$builderId/notes'
     | '/builder/$builderId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -141,10 +192,15 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/api/auth/$'
+    | '/api/builders/$builderId'
+    | '/api/dashboard/stats'
+    | '/api/export/builders'
     | '/api/search/builders'
     | '/dashboard'
     | '/exports'
     | '/search'
+    | '/api/queries'
+    | '/api/builders/$builderId/notes'
     | '/builder/$builderId'
   id:
     | '__root__'
@@ -155,10 +211,15 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/_landing/'
     | '/api/auth/$'
+    | '/api/builders/$builderId'
+    | '/api/dashboard/stats'
+    | '/api/export/builders'
     | '/api/search/builders'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/search/'
+    | '/api/queries/'
+    | '/api/builders/$builderId/notes'
     | '/_dashboard/builder/$builderId/'
   fileRoutesById: FileRoutesById
 }
@@ -167,7 +228,11 @@ export interface RootRouteChildren {
   LandingRouteRoute: typeof LandingRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
+  ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
+  ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
+  ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -214,6 +279,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignInRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/api/queries/': {
+      id: '/api/queries/'
+      path: '/api/queries'
+      fullPath: '/api/queries/'
+      preLoaderRoute: typeof ApiQueriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/search/': {
       id: '/_dashboard/search/'
       path: '/search'
@@ -242,6 +314,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/export/builders': {
+      id: '/api/export/builders'
+      path: '/api/export/builders'
+      fullPath: '/api/export/builders'
+      preLoaderRoute: typeof ApiExportBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dashboard/stats': {
+      id: '/api/dashboard/stats'
+      path: '/api/dashboard/stats'
+      fullPath: '/api/dashboard/stats'
+      preLoaderRoute: typeof ApiDashboardStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/builders/$builderId': {
+      id: '/api/builders/$builderId'
+      path: '/api/builders/$builderId'
+      fullPath: '/api/builders/$builderId'
+      preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -255,6 +348,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/builder/$builderId/'
       preLoaderRoute: typeof DashboardBuilderBuilderIdIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/api/builders/$builderId/notes': {
+      id: '/api/builders/$builderId/notes'
+      path: '/notes'
+      fullPath: '/api/builders/$builderId/notes'
+      preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
     }
   }
 }
@@ -303,12 +403,27 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
+interface ApiBuildersBuilderIdRouteChildren {
+  ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
+}
+
+const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
+  ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
+}
+
+const ApiBuildersBuilderIdRouteWithChildren =
+  ApiBuildersBuilderIdRoute._addFileChildren(ApiBuildersBuilderIdRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
+  ApiDashboardStatsRoute: ApiDashboardStatsRoute,
+  ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
+  ApiQueriesIndexRoute: ApiQueriesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

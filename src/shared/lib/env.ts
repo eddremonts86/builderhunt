@@ -1,15 +1,16 @@
 import { z } from 'zod'
 
 const zodEnv = z.object({
-  DATABASE_URL: z.string(),
-  AUTH_SECRET: z.string().default('dev-secret-change-in-production'),
-  APP_URL: z.string().default('http://localhost:3000'),
-  VITE_APP_URL: z.string().default('http://localhost:3000'),
+  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  AUTH_SECRET: z.string().min(1, 'AUTH_SECRET is required - generate with: openssl rand -hex 32'),
+  APP_URL: z.string().min(1, 'APP_URL is required'),
+  VITE_APP_URL: z.string().min(1, 'VITE_APP_URL is required'),
   GITHUB_TOKEN: z.string().optional(),
   REDDIT_CLIENT_ID: z.string().optional(),
   REDDIT_CLIENT_SECRET: z.string().optional(),
-  HACKERNEWS_API_URL: z.string().default('https://hacker-news.firebaseio.com/v0'),
+  HACKERNEWS_API_URL: z.string().default('https://hn.algolia.com/api/v1'),
   DEVTO_API_URL: z.string().default('https://dev.to/api'),
+  RESEND_API_KEY: z.string().optional(),
 })
 
 export const env = zodEnv.parse(process.env)
