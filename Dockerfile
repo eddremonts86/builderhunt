@@ -24,11 +24,9 @@ ENV HOST=0.0.0.0
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
-COPY server.prod.mjs ./
 COPY .env.docker .env.docker
-COPY start.sh start.sh
-RUN chmod +x start.sh
+COPY server.prod.mjs ./
 
 EXPOSE 3000
 
-CMD ["/app/start.sh"]
+CMD ["node", "server.prod.mjs"]

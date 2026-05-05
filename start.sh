@@ -1,8 +1,11 @@
 #!/bin/sh
-# Load .env.docker if it exists (for self-contained deployment)
+# Load environment from .env.docker with automatic export
 if [ -f /app/.env.docker ]; then
-  set -a
-  . /app/.env.docker
-  set +a
+  while IFS='=' read -r key val; do
+    case "$key" in
+      ''|\#*) continue ;;
+    esac
+    export "$key=$val"
+  done < /app/.env.docker
 fi
 exec node /app/server.prod.mjs

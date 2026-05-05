@@ -8,6 +8,26 @@ import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Load .env.docker before any other modules (must happen before the dynamic import)
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const envPath = join(__dirname, '.env.docker');
+try {
+  const envContent = await import('node:fs').then(fs => fs.readFileSync(envPath, 'utf8'));
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx < 0) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+    if (key && !Object.prototype.hasOwnProperty.call(process.env, key)) {
+      process.env[key] = val;
+    }
+  }
+} catch {
+  // .env.docker not found — rely on injected env vars
+}
+
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
 
@@ -16,11 +36,10 @@ console.error('[server] Starting with env:', {
   DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[MISSING]',
   NODE_ENV: process.env.NODE_ENV,
   AUTH_SECRET: process.env.AUTH_SECRET ? '[SET]' : '[MISSING]',
-  BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET ? '[SET]' : '[MISSING]',
   APP_URL: process.env.APP_URL,
+  VITE_APP_URL: process.env.VITE_APP_URL,
 });
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const CLIENT_DIR = resolve(__dirname, 'dist/client');
 
 const MIME = {
@@ -40,7 +59,7 @@ const MIME = {
   '.ttf': 'font/ttf',
   '.txt': 'text/plain',
   '.webmanifest': 'application/manifest+json',
-}
+};
 
 function tryServeStatic(pathname, res) {
   const safePath = pathname.replace(/\.\./g, '');
