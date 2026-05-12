@@ -4,18 +4,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "dev:all": "pnpm db:up && pnpm dev",
+    "dev:all": "pnpm db:up && pnpm db:migrate && pnpm db:seed:admin && pnpm dev",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc --noEmit",
-    "db:up": "docker compose up -d",
+    "db:up": "docker inspect workspace-postgres --format '{{.State.Running}}' 2>/dev/null | grep -q true || docker compose --profile standalone up -d db",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "tsx --env-file=.env scripts/db/create-db.ts && drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:seed": "tsx scripts/db/seed.ts"
+    "db:seed": "tsx scripts/db/seed.ts",
+    "db:seed:admin": "tsx --env-file=.env scripts/db/seed-admin.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.9",

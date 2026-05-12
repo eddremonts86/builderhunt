@@ -13,7 +13,8 @@ export const auth = betterAuth({
     },
   }),
   emailAndPassword: { enabled: true },
-  secret: process.env.AUTH_SECRET ?? 'dev-secret-change-in-production',
+  // BETTER_AUTH_SECRET is the canonical name
+  secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production',
   baseURL: process.env.APP_URL ?? 'http://localhost:3000',
   // Cookies are handled via standard browser cookie mechanism
 })

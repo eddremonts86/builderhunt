@@ -1,7 +1,14 @@
 node_modules
 dist
 .env
+.env.*
 .env.local
-.env.production
+.env.development.local
+.env.test.local
+.env.production.local
 *.log
 .DS_Store
+
+# Only these env files are tracked:
+!.env.example
+!.env.production.example

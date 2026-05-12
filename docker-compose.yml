@@ -1,16 +1,25 @@
-version: '3.9'
+# Profiles:
+#   standalone — start just the DB when workspace-postgres is not running
+#                (handled automatically by `pnpm db:up`)
 
 services:
   db:
+    profiles: ['standalone']
     image: postgres:16-alpine
+    container_name: builderhunt-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: builderhunt
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - builderhunt_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
 volumes:
-  postgres_data:
+  builderhunt_postgres_data:
