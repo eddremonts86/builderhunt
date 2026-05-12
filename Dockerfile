@@ -27,6 +27,12 @@ COPY --from=build /app/package.json ./package.json
 RUN touch .env.docker
 COPY server.prod.mjs ./
 
+# Runtime files for drizzle-kit migrate + tsx seeds (Coolify post_deployment_command)
+COPY drizzle ./drizzle
+COPY drizzle.config.ts ./drizzle.config.ts
+COPY tsconfig.json ./tsconfig.json
+COPY scripts ./scripts
+
 EXPOSE 3000
 
 CMD ["node", "server.prod.mjs"]
