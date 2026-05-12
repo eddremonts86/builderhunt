@@ -6,7 +6,7 @@ RUN corepack enable
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml .npmrc ./
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 RUN pnpm install
 
 FROM base AS build
@@ -24,7 +24,7 @@ ENV HOST=0.0.0.0
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
-COPY .env.docker .env.docker
+RUN touch .env.docker
 COPY server.prod.mjs ./
 
 EXPOSE 3000
