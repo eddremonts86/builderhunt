@@ -2,6 +2,9 @@ FROM node:22-bookworm-slim AS base
 
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
+# CI=true so pnpm's deps-status check can purge node_modules non-interactively
+# (avoids ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY).
+ENV CI=true
 RUN corepack enable
 
 WORKDIR /app

@@ -31,6 +31,23 @@ try {
 } catch (e: any) {
   if (e.code === '42P04') {
     console.log(`ℹ️   Database "${dbName}" already exists`)
+  } else if (e.code === '42501') {
+    // No CREATEDB privilege — verify the DB was already created (e.g. by db-init)
+    const checkSql = postgres(adminUrl, { max: 1, prepare: false })
+    try {
+      const rows = await checkSql.unsafe(
+        `SELECT 1 FROM pg_database WHERE datname = '${dbName}'`
+      )
+      if (rows.length > 0) {
+        console.log(`ℹ️   Database "${dbName}" already exists (no CREATEDB needed)`)
+      } else {
+        throw new Error(
+          `Database "${dbName}" does not exist and the user has no CREATEDB privilege. Grant CREATEDB to the role or run db-init first.`
+        )
+      }
+    } finally {
+      await checkSql.end({ timeout: 5 })
+    }
   } else {
     throw e
   }
