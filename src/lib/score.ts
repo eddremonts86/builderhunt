@@ -4,43 +4,89 @@ interface ScoredBuilder extends RawBuilder {
   score: number
 }
 
+/**
+ * Score each builder / repo on a 0-100 scale.
+ *
+ * Composition (caps shown):
+ *  - Popularity (log of followers/stargazers): up to 30 pts
+ *  - Recency (last activity): up to 30 pts
+ *  - Topic match (number of topics): up to 15 pts
+ *  - Quality metadata (bio, avatar, profile): up to 10 pts
+ *  - Community activity (Reddit active users, HN karma, etc.): up to 15 pts
+ *
+ * Final score is clamped to 0..100 and rounded to an integer.
+ */
 export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
   const now = Date.now()
 
   return builders.map(builder => {
     const metadata = builder.metadata ?? {}
+    const source = builder.source
     let score = 0
 
-    // Base: followers
-    score += (builder.followersCount ?? 0) * 1.5
+    // ---------- Popularity (0-30 pts) ----------
+    // Logarithmic so a 100k-follower account doesn't drown a 1k one.
+    // followersCount holds either user followers (GitHub users) or
+    // stargazer count (GitHub repos) depending on `kind`.
+    const followers = builder.followersCount ?? 0
+    score += Math.log1p(followers) * 3.0 // 0-30 pts at log1p(10000)*3
 
-    // Recency bonus (mocked from lastSeen in metadata)
-    const lastSeen = (metadata.lastSeen as number | undefined) ?? now
-    const daysSinceLastSeen = (now - lastSeen) / (1000 * 60 * 60 * 24)
-    if (daysSinceLastSeen < 1) score += 50
-    else if (daysSinceLastSeen < 7) score += 30
-    else if (daysSinceLastSeen < 30) score += 10
+    // ---------- Recency (0-30 pts) ----------
+    // How recently was this builder / repo active?
+    // For users: last commit / last post / last comment.
+    // For repos: last push / last release.
+    // Sources that don't expose `lastSeen` skip this branch.
+    const lastSeen = (metadata.lastSeen as number | undefined) ?? null
+    if (lastSeen !== null) {
+      const daysSince = (now - lastSeen) / (1000 * 60 * 60 * 24)
+      if (daysSince < 1) score += 30
+      else if (daysSince < 7) score += 22
+      else if (daysSince < 30) score += 12
+      else if (daysSince < 90) score += 5
+      else if (daysSince < 365) score += 1
+      // else: 0 — old, not actively shipping
+    } else {
+      // No recency data — give a neutral 5 pts so we don't unfairly
+      // rank these at 0 (HN / DEV.to / Reddit don't always expose it).
+      score += 5
+    }
 
-    // Topics relevance
-    score += (builder.topics?.length ?? 0) * 5
+    // ---------- Topics (0-15 pts) ----------
+    // More topics = more match surface, but cap so spam doesn't dominate.
+    const topicCount = builder.topics?.length ?? 0
+    score += Math.min(topicCount * 2, 15)
 
-    // GitHub stars bonus
-    const stars = (metadata.stars as number | undefined) ?? 0
-    score += Math.log1p(stars) * 10
+    // ---------- Source-specific signals (0-15 pts) ----------
+    if (source === 'github') {
+      // Repo star count was already counted in `followers` (stargazers).
+      // We use metadata.stars as a tiny tiebreaker for repos with very
+      // recent activity to avoid double-counting.
+      const stars = (metadata.stars as number | undefined) ?? 0
+      if (stars > 0 && followers > 0) {
+        // Only count the marginal effect (ratio, not raw).
+        const ratio = stars / Math.max(followers, 1)
+        if (ratio > 1.5) score += 4 // way more stars than watchers = strong signal
+      }
+    } else if (source === 'reddit') {
+      const activeUsers = (metadata.activeUsers as number | undefined) ?? 0
+      score += Math.log1p(activeUsers) * 1.5 // 0-15 pts
+    } else if (source === 'hn') {
+      const submitted = (metadata.submittedCount as number | undefined) ?? 0
+      score += Math.log1p(submitted) * 1.2 // 0-15 pts
+    } else if (source === 'devto') {
+      const articles = (metadata.articlesCount as number | undefined) ?? 0
+      score += Math.log1p(articles) * 1.5 // 0-15 pts
+    }
 
-    // Quality metadata
-    if (builder.bio) score += 5
-    if (builder.avatarUrl) score += 3
+    // ---------- Quality signals (0-10 pts) ----------
+    if (builder.bio) score += 4
+    if (builder.avatarUrl) score += 2
     if (builder.profileUrl) score += 1
+    if (builder.displayName) score += 3
 
-    // Reddit active users bonus
-    const activeUsers = (metadata.activeUsers as number | undefined) ?? 0
-    score += Math.log1p(activeUsers) * 2
-
-    // HN karma bonus
-    score += Math.log1p(builder.followersCount ?? 0) * 3
-
-    return { ...builder, score: Math.round(score) }
+    // Clamp 0-100
+    const final = Math.max(0, Math.min(100, Math.round(score)))
+    return { ...builder, score: final }
   })
 }
 

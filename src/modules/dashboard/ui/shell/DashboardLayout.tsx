@@ -1,67 +1,114 @@
 import * as React from 'react'
-import { Outlet, Link, useNavigate } from '@tanstack/react-router'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
-  LayoutDashboard, Search, Users, Download, GitBranch,
+  LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell, Settings,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 
-export function DashboardLayout() {
+function LogoMark({ size = 22 }: { size?: number }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center rounded-md shrink-0"
+      style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+      aria-hidden="true"
+    >
+      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
+        <path d="M5 4h7a4 4 0 0 1 4 4v1" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M16 4h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-7a4 4 0 0 0-4 4v3" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
+        <path d="M8 20H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h7a4 4 0 0 0 4-4V7" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
+        <circle cx="11" cy="12" r="1.9" fill="#06b6d4" />
+      </svg>
+    </span>
+  )
+}
+
+const NAV = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
+  { to: '/search', icon: Search, label: 'Search' },
+  { to: '/exports', icon: Download, label: 'Exports' },
+] as const
+
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = React.useState(false)
 
   const handleSignOut = async () => {
     setSigningOut(true)
-    await signOut()
-    navigate({ to: '/auth/sign-in' })
+    try {
+      await signOut()
+    } finally {
+      navigate({ to: '/auth/sign-in' })
+    }
   }
 
   return (
-    <div className="flex h-screen bg-bh-bg">
+    <div className="flex h-screen bg-app">
       {/* Sidebar */}
-      <aside className="w-64 border-r border-bh-border flex flex-col">
+      <aside
+        className="w-60 shrink-0 border-r border-bh-border flex flex-col bg-bh-bg-alt/40"
+        aria-label="Main navigation"
+      >
         {/* Logo */}
-        <div className="px-6 py-5 border-b border-bh-border">
-          <Link to="/_dashboard/dashboard/" className="flex items-center gap-2">
-            <GitBranch className="w-5 h-5 text-bh-accent" />
-            <span className="text-bh-text font-semibold text-lg">BuilderHunt</span>
+        <div className="px-5 py-5 border-b border-bh-border">
+          <Link to="/" className="flex items-center gap-2.5" aria-label="BuilderHunt home">
+            <LogoMark />
+            <span className="font-bold text-base tracking-tight">BuilderHunt</span>
           </Link>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {[
-            { to: '/_dashboard/dashboard/', icon: LayoutDashboard, label: 'Dashboard' },
-            { to: '/_dashboard/search/', icon: Search, label: 'Search' },
-            { to: '/_dashboard/exports/', icon: Download, label: 'Exports' },
-          ].map(({ to, icon: Icon, label }) => (
-            <Link
-              key={to}
-              to={to}
-              className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/5 transition-colors text-sm"
-              activeClassName="!text-bh-accent !bg-bh-accent/10"
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </Link>
-          ))}
+        <nav className="flex-1 px-3 py-4">
+          <ul className="space-y-1">
+            {NAV.map((n) => (
+              <li key={n.to}>
+                <Link
+                  to={n.to}
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm font-medium"
+                  activeProps={{
+                    className:
+                      'flex items-center gap-3 px-3 py-2 rounded-lg text-bh-accent bg-bh-accent/10 text-sm font-semibold',
+                  }}
+                >
+                  <n.icon className="w-4 h-4" aria-hidden="true" />
+                  {n.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
         </nav>
 
-        {/* Footer */}
-        <div className="px-3 py-4 border-t border-bh-border">
+        {/* Footer / account */}
+        <div className="px-3 py-4 border-t border-bh-border space-y-1">
+          <Link
+            to="/exports"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+          >
+            <Settings className="w-4 h-4" aria-hidden="true" />
+            Settings
+          </Link>
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/5 transition-colors text-sm"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
           >
-            <Users className="w-4 h-4" />
-            {signingOut ? 'Signing out...' : 'Sign out'}
+            {signingOut ? (
+              <>
+                <span className="spinner" aria-hidden="true" />
+                Signing out...
+              </>
+            ) : (
+              <>
+                <LogOut className="w-4 h-4" aria-hidden="true" />
+                Sign out
+              </>
+            )}
           </button>
         </div>
       </aside>
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
+      <main id="main-content" className="flex-1 overflow-y-auto">
+        {children}
       </main>
     </div>
   )

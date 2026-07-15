@@ -2,6 +2,7 @@ import { env } from '~/shared/lib/env'
 
 export interface RawBuilder {
   id: string
+  kind: 'person'
   source: 'hn'
   sourceId: string
   username: string
@@ -24,22 +25,27 @@ interface HNUser {
   created: number
 }
 
-export async function searchHN(keywords: string[]): Promise<RawBuilder[]> {
+export async function searchHN(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
   const baseUrl = env.HACKERNEWS_API_URL
   const query = keywords.join(' ').toLowerCase()
   if (!query) return []
 
+  const { page = 1, perPage = 30 } = options
+  // HN doesn't support real search. We sample top stories; pagination
+  // by shifting the slice.
+  const sampleSize = 100 * page
+
   try {
     // Search for users who submitted items matching keywords
-    // HN doesn't have a real search API, so we search top stories
     const topStoriesRes = await fetch(`${baseUrl}/topstories.json`)
     const topIds: number[] = await topStoriesRes.json()
-    const sampleIds = topIds.slice(0, 100)
+    const sampleIds = topIds.slice(0, sampleSize)
 
     const usersMap = new Map<string, { id: string; karma: number; about?: string }>()
 
-    // Collect authors from top stories
-    const storyPromises = sampleIds.slice(0, 50).map(async (id: number) => {
+    // Collect authors from top stories (with offset for pagination)
+    const startIdx = (page - 1) * 50
+    const storyPromises = sampleIds.slice(startIdx, startIdx + 50).map(async (id: number) => {
       try {
         const res = await fetch(`${baseUrl}/item/${id}.json`)
         const item = await res.json()
@@ -56,7 +62,7 @@ export async function searchHN(keywords: string[]): Promise<RawBuilder[]> {
     // Fetch user details for karma
     const users = Array.from(usersMap.values())
     const userDetails = await Promise.all(
-      users.slice(0, 20).map(async (u) => {
+      users.slice(0, perPage).map(async (u) => {
         try {
           const res = await fetch(`${baseUrl}/user/${u.id}.json`)
           return res.json() as Promise<HNUser>
@@ -70,6 +76,7 @@ export async function searchHN(keywords: string[]): Promise<RawBuilder[]> {
       .filter((u): u is HNUser => u !== null)
       .map(user => ({
         id: `hn-${user.id}`,
+        kind: 'person' as const,
         source: 'hn' as const,
         sourceId: user.id,
         username: user.id,

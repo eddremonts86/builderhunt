@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { db } from '~/shared/lib/db/index'
 import { builders, savedQueries, builderNotes } from '~/shared/lib/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, gte, sql } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 
 export const Route = createFileRoute('/api/dashboard/stats')({
@@ -16,8 +16,7 @@ export const Route = createFileRoute('/api/dashboard/stats')({
           }
           const userId = session.user.id
 
-          const now = new Date()
-          const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+          const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
 
           const [totalResult] = await db
             .select({ count: sql<number>`count(*)::int` })
@@ -27,7 +26,7 @@ export const Route = createFileRoute('/api/dashboard/stats')({
           const [activeResult] = await db
             .select({ count: sql<number>`count(*)::int` })
             .from(builders)
-            .where(sql`${builders.userId} = ${userId} AND ${builders.lastSeen} >= ${weekAgo}`)
+            .where(and(eq(builders.userId, userId), gte(builders.lastSeen, weekAgo)))
 
           const [queriesResult] = await db
             .select({ count: sql<number>`count(*)::int` })

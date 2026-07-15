@@ -91,7 +91,7 @@ export function BuilderProfilePage() {
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <Link
-          to="/_dashboard/search/"
+          to="/search"
           className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to search
@@ -106,7 +106,7 @@ export function BuilderProfilePage() {
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <Link
-        to="/_dashboard/search/"
+        to="/search"
         className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors"
       >
         <ArrowLeft className="w-4 h-4" /> Back to search

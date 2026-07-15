@@ -1,3 +1,5 @@
 export { Button } from './button'
 export { Input, Textarea } from './input'
 export { LinkComponent, LinkButton } from './link'
+export { ScoreRing, getScoreBreakdown } from './score-ring'
+export type { ScoreBreakdownItem } from './score-ring'

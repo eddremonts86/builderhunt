@@ -39,7 +39,9 @@ export const authAccounts = pgTable('auth_accounts', {
   password: text('password'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+}, (t) => ({
+  providerAccountUnique: unique('auth_accounts_provider_account_unique').on(t.accountId, t.providerId),
+}))
 
 export const authVerifications = pgTable('auth_verifications', {
   id: text('id').primaryKey(),

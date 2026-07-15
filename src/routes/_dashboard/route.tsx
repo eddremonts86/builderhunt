@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 
 export const Route = createFileRoute('/_dashboard')({
   beforeLoad: async () => {
@@ -9,5 +10,9 @@ export const Route = createFileRoute('/_dashboard')({
     }
     return { user }
   },
-  component: () => <Outlet />,
+  component: () => (
+    <DashboardLayout>
+      <Outlet />
+    </DashboardLayout>
+  ),
 })

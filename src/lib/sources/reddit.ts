@@ -2,6 +2,7 @@ import { env } from '~/shared/lib/env'
 
 export interface RawBuilder {
   id: string
+  kind: 'person'
   source: 'reddit'
   sourceId: string
   username: string
@@ -38,11 +39,17 @@ interface RedditListing {
   after?: string
 }
 
-export async function searchReddit(keywords: string[]): Promise<RawBuilder[]> {
+export async function searchReddit(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
   const clientId = env.REDDIT_CLIENT_ID
   const clientSecret = env.REDDIT_CLIENT_SECRET
   const query = keywords.join(' ')
   if (!query) return []
+
+  const { page = 1, perPage = 20 } = options
+  // Reddit uses cursor-based pagination via `after`
+  // We compute the `after` as a positional offset (not ideal but works
+  // because reddit returns roughly consistent results for short windows)
+  const after = page > 1 ? `t3_after_${(page - 1) * perPage}` : ''
 
   let accessToken = ''
   try {
@@ -73,16 +80,27 @@ export async function searchReddit(keywords: string[]): Promise<RawBuilder[]> {
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     }
 
-    const res = await fetch(
-      `https://oauth.reddit.com/search/users?q=${encodeURIComponent(query)}&restrict_sr=false&include_overlap=false&sort=relevance&t=month&limit=20`,
-      { headers },
-    )
+    const url = new URL(`https://oauth.reddit.com/search/users`)
+    url.searchParams.set('q', query)
+    url.searchParams.set('restrict_sr', 'false')
+    url.searchParams.set('include_overlap', 'false')
+    url.searchParams.set('sort', 'relevance')
+    url.searchParams.set('t', 'month')
+    url.searchParams.set('limit', String(perPage))
+    if (after) url.searchParams.set('after', after)
+
+    const res = await fetch(url.toString(), { headers })
     if (!res.ok) {
-      // Fallback to public endpoint
-      const publicRes = await fetch(
-        `https://www.reddit.com/search/users.json?q=${encodeURIComponent(query)}&restrict_sr=false&sort=relevance&t=month&limit=20`,
-        { headers: { 'User-Agent': 'BuilderHunt/1.0' } },
-      )
+      const publicUrl = new URL('https://www.reddit.com/search/users.json')
+      publicUrl.searchParams.set('q', query)
+      publicUrl.searchParams.set('restrict_sr', 'false')
+      publicUrl.searchParams.set('sort', 'relevance')
+      publicUrl.searchParams.set('t', 'month')
+      publicUrl.searchParams.set('limit', String(perPage))
+      if (after) publicUrl.searchParams.set('after', after)
+      const publicRes = await fetch(publicUrl.toString(), {
+        headers: { 'User-Agent': 'BuilderHunt/1.0' },
+      })
       if (!publicRes.ok) return []
       const publicData = await publicRes.json() as { data: RedditListing }
       return normalizeResults(publicData.data)
@@ -98,6 +116,7 @@ export async function searchReddit(keywords: string[]): Promise<RawBuilder[]> {
 function normalizeResults(data: RedditListing): RawBuilder[] {
   return data.children.map(user => ({
     id: `reddit-${user.data.id}`,
+    kind: 'person' as const,
     source: 'reddit' as const,
     sourceId: user.data.id,
     username: user.data.display_name,

@@ -11,6 +11,8 @@ export interface SearchOptions {
   sources?: string[]
   language?: string
   country?: string
+  page?: number
+  perPage?: number
 }
 
 export type ScoredBuilder = ReturnType<typeof scoreBuilders>[number]
@@ -19,11 +21,11 @@ const cache = new Map<string, { results: RawBuilder[]; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 function cacheKey(opts: SearchOptions): string {
-  return `${opts.keywords.sort().join(',')}-${(opts.sources ?? []).sort().join(',')}`
+  return `${opts.keywords.sort().join(',')}-${(opts.sources ?? []).sort().join(',')}-${opts.country ?? ''}-${opts.language ?? ''}-${opts.page ?? 1}-${opts.perPage ?? 30}`
 }
 
 export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder[]> {
-  const { keywords, sources = ['github', 'hn', 'devto', 'reddit'], language, country } = opts
+  const { keywords, sources = ['github', 'hn', 'devto', 'reddit'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
 
   // Check cache
@@ -34,18 +36,20 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
 
   const tasks: Promise<RawBuilder[]>[] = []
 
-  if (sources.includes('github')) tasks.push(searchGitHub(keywords))
-  if (sources.includes('hn')) tasks.push(searchHN(keywords))
-  if (sources.includes('devto')) tasks.push(searchDevTo(keywords))
-  if (sources.includes('reddit')) tasks.push(searchReddit(keywords))
+  if (sources.includes('github')) tasks.push(searchGitHub(keywords, { country, language, page, perPage }))
+  if (sources.includes('hn')) tasks.push(searchHN(keywords, { page, perPage }))
+  if (sources.includes('devto')) tasks.push(searchDevTo(keywords, { page, perPage }))
+  if (sources.includes('reddit')) tasks.push(searchReddit(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()
 
-  // Filter by language/country if specified
+  // Post-filter: HN/DevTo/Reddit don't have location/language fields,
+  // so the filter only applies to results that have those fields populated.
+  // GitHub already filters at the source via its API qualifiers.
   const filtered = all.filter(b => {
-    if (language && b.language?.toLowerCase() !== language.toLowerCase()) return false
-    if (country && b.country?.toLowerCase() !== country.toLowerCase()) return false
+    if (language && b.language && b.language.toLowerCase() !== language.toLowerCase()) return false
+    if (country && b.country && b.country.toLowerCase() !== country.toLowerCase()) return false
     return true
   })
 

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { db } from '~/shared/lib/db/index'
 import { savedQueries } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
 
@@ -74,10 +74,15 @@ export const Route = createFileRoute('/api/queries/')({
           const body = await request.json()
           const { id } = body
 
-          await db
+          // Verify ownership: only delete if the query belongs to the current user
+          const result = await db
             .delete(savedQueries)
-            .where(eq(savedQueries.id, id))
+            .where(and(eq(savedQueries.id, id), eq(savedQueries.userId, userId)))
+            .returning({ id: savedQueries.id })
 
+          if (result.length === 0) {
+            return Response.json({ error: 'Query not found or not yours' }, { status: 404 })
+          }
           return Response.json({ success: true })
         } catch (err) {
           console.error('Query delete error:', err)

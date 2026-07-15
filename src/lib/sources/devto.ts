@@ -2,6 +2,7 @@ import { env } from '~/shared/lib/env'
 
 export interface RawBuilder {
   id: string
+  kind: 'person'
   source: 'devto'
   sourceId: string
   username: string
@@ -31,14 +32,16 @@ interface DevToUser {
   articles_count: number
 }
 
-export async function searchDevTo(keywords: string[]): Promise<RawBuilder[]> {
+export async function searchDevTo(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
   const baseUrl = env.DEVTO_API_URL
   const query = keywords.join(' ')
   if (!query) return []
 
+  const { page = 1, perPage = 20 } = options
+
   try {
     const res = await fetch(
-      `${baseUrl}/search/users?per_page=20&q=${encodeURIComponent(query)}`,
+      `${baseUrl}/search/users?per_page=${perPage}&page=${page}&q=${encodeURIComponent(query)}`,
       { headers: { 'User-Agent': 'BuilderHunt/1.0' } },
     )
     if (!res.ok) return []
@@ -46,6 +49,7 @@ export async function searchDevTo(keywords: string[]): Promise<RawBuilder[]> {
 
     return users.map(user => ({
       id: `devto-${user.id}`,
+      kind: 'person' as const,
       source: 'devto' as const,
       sourceId: String(user.id),
       username: user.username,

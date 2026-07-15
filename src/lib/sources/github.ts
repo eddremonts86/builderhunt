@@ -1,7 +1,10 @@
 import { env } from '~/shared/lib/env'
 
+export type BuilderKind = 'person' | 'repo'
+
 export interface RawBuilder {
   id: string
+  kind: BuilderKind
   source: 'github'
   sourceId: string
   username: string
@@ -43,15 +46,22 @@ interface GitHubSearchRepo {
   updated_at: string
 }
 
-async function searchUsers(query: string, token?: string): Promise<RawBuilder[]> {
+async function searchUsers(query: string, options: { country?: string; language?: string; token?: string; page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
+  const { country, language, token, page = 1, perPage = 20 } = options
   const headers: HeadersInit = {
     Accept: 'application/vnd.github.v3+json',
     'User-Agent': 'BuilderHunt/1.0',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   }
 
+  // Build query with qualifiers. GitHub supports `location:` and `language:` natively.
+  const qualifiers: string[] = [`${query}`, 'type:user']
+  if (country) qualifiers.push(`location:${country}`)
+  if (language) qualifiers.push(`language:${language}`)
+  const q = qualifiers.join('+')
+
   const res = await fetch(
-    `https://api.github.com/search/users?q=${encodeURIComponent(query)}+type:user&per_page=20`,
+    `https://api.github.com/search/users?q=${encodeURIComponent(q).replace(/%2B/g, '+')}&per_page=${perPage}&page=${page}`,
     { headers },
   )
   if (!res.ok) return []
@@ -59,6 +69,7 @@ async function searchUsers(query: string, token?: string): Promise<RawBuilder[]>
 
   return data.items.map(user => ({
     id: `gh-${user.id}`,
+    kind: 'person' as const,
     source: 'github',
     sourceId: String(user.id),
     username: user.login,
@@ -74,7 +85,8 @@ async function searchUsers(query: string, token?: string): Promise<RawBuilder[]>
   }))
 }
 
-async function searchRepos(query: string, token?: string): Promise<RawBuilder[]> {
+async function searchRepos(query: string, options: { token?: string; page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
+  const { token, page = 1, perPage = 20 } = options
   const headers: HeadersInit = {
     Accept: 'application/vnd.github.v3+json',
     'User-Agent': 'BuilderHunt/1.0',
@@ -82,7 +94,7 @@ async function searchRepos(query: string, token?: string): Promise<RawBuilder[]>
   }
 
   const res = await fetch(
-    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&per_page=20`,
+    `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&per_page=${perPage}&page=${page}`,
     { headers },
   )
   if (!res.ok) return []
@@ -90,6 +102,7 @@ async function searchRepos(query: string, token?: string): Promise<RawBuilder[]>
 
   return data.items.map(repo => ({
     id: `gh-repo-${repo.id}`,
+    kind: 'repo' as const,
     source: 'github',
     sourceId: String(repo.id),
     username: repo.full_name,
@@ -101,15 +114,25 @@ async function searchRepos(query: string, token?: string): Promise<RawBuilder[]>
     language: repo.language ?? undefined,
     country: undefined,
     topics: repo.topics,
-    metadata: { stars: repo.stargazers_count, issues: repo.open_issues_count },
+    metadata: { stars: repo.stargazers_count, issues: repo.open_issues_count, watchers: repo.watchers_count },
   }))
 }
 
-export async function searchGitHub(keywords: string[]): Promise<RawBuilder[]> {
+export interface SearchGitHubOptions {
+  country?: string
+  language?: string
+  page?: number
+  perPage?: number
+}
+
+export async function searchGitHub(keywords: string[], options: SearchGitHubOptions = {}): Promise<RawBuilder[]> {
   const token = env.GITHUB_TOKEN
   const query = keywords.join(' ')
   if (!query) return []
 
-  const [users, repos] = await Promise.all([searchUsers(query, token), searchRepos(query, token)])
+  const [users, repos] = await Promise.all([
+    searchUsers(query, { ...options, token }),
+    searchRepos(query, { ...options, token }),
+  ])
   return [...users, ...repos]
 }
