@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { RecommendationsSection } from './RecommendationsSection'
 import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
@@ -149,6 +150,9 @@ export function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* For you — proactive recommendations */}
+      <RecommendationsSection />
 
       {/* Stats */}
       <section aria-labelledby="stats-heading" className="mb-10">

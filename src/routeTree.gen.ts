@@ -16,6 +16,7 @@ import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
 import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
@@ -61,6 +62,11 @@ const AuthSignInRoute = AuthSignInRouteImport.update({
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRecommendationsIndexRoute = ApiRecommendationsIndexRouteImport.update({
+  id: '/api/recommendations/',
+  path: '/api/recommendations/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/exports/': typeof DashboardExportsIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
+  '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/exports': typeof DashboardExportsIndexRoute
   '/search': typeof DashboardSearchIndexRoute
   '/api/queries': typeof ApiQueriesIndexRoute
+  '/api/recommendations': typeof ApiRecommendationsIndexRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
@@ -190,6 +198,7 @@ export interface FileRoutesById {
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
+  '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
@@ -212,6 +221,7 @@ export interface FileRouteTypes {
     | '/exports/'
     | '/search/'
     | '/api/queries/'
+    | '/api/recommendations/'
     | '/api/builders/$builderId/notes'
     | '/builder/$builderId/'
     | '/api/builders/recent/'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/exports'
     | '/search'
     | '/api/queries'
+    | '/api/recommendations'
     | '/api/builders/$builderId/notes'
     | '/builder/$builderId'
     | '/api/builders/recent'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/_dashboard/exports/'
     | '/_dashboard/search/'
     | '/api/queries/'
+    | '/api/recommendations/'
     | '/api/builders/$builderId/notes'
     | '/_dashboard/builder/$builderId/'
     | '/api/builders/recent/'
@@ -271,6 +283,7 @@ export interface RootRouteChildren {
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
+  ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
 }
 
@@ -323,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/api/health'
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/recommendations/': {
+      id: '/api/recommendations/'
+      path: '/api/recommendations'
+      fullPath: '/api/recommendations/'
+      preLoaderRoute: typeof ApiRecommendationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/queries/': {
@@ -486,6 +506,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
+  ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
 }
 export const routeTree = rootRouteImport
