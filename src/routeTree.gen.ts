@@ -21,6 +21,7 @@ import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/se
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
@@ -87,6 +88,11 @@ const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   path: '/api/search/builders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
+  id: '/api/feeds/$searchId',
+  path: '/api/feeds/$searchId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
   id: '/api/export/builders',
   path: '/api/export/builders',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
+  '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
+  '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -176,6 +184,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
+  '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
+    | '/api/feeds/$searchId'
     | '/api/search/builders'
     | '/dashboard/'
     | '/exports/'
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
+    | '/api/feeds/$searchId'
     | '/api/search/builders'
     | '/dashboard'
     | '/exports'
@@ -237,6 +248,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
+    | '/api/feeds/$searchId'
     | '/api/search/builders'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -256,6 +268,7 @@ export interface RootRouteChildren {
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
+  ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/api/search/builders'
       fullPath: '/api/search/builders'
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/feeds/$searchId': {
+      id: '/api/feeds/$searchId'
+      path: '/api/feeds/$searchId'
+      fullPath: '/api/feeds/$searchId'
+      preLoaderRoute: typeof ApiFeedsSearchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/export/builders': {
@@ -463,6 +483,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
+  ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,

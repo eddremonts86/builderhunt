@@ -359,7 +359,7 @@ function SavedSearchRow({
   }, [])
 
   const runUrl = `/search?q=${encodeURIComponent(query.keywords.join(' '))}`
-  const rssUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/${query.id}.xml`
+  const rssUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/${query.id}?format=rss`
 
   const handleExport = async (kind: 'people' | 'resources') => {
     setExporting(kind)
