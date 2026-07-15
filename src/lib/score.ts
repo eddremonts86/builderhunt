@@ -85,6 +85,15 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       score += Math.log1p(stories) * 1.5 // 0-15 pts based on activity
       // Bonus for high total story score (community quality proxy)
       if (totalScore > 100) score += 3
+    } else if (source === 'stackoverflow') {
+      // followersCount holds reputation; popularity is covered.
+      // Boost for matching multiple keywords in top-answerers (multi-tag expert)
+      const matched = (metadata.matchedTags as string[] | undefined) ?? []
+      if (matched.length >= 2) score += 5
+      if (matched.length >= 3) score += 5
+      // Boost for high post count in the query's tag (high engagement)
+      const postCount = (metadata.postCount as number | undefined) ?? 0
+      score += Math.min(Math.log1p(postCount) * 1.5, 10)
     }
 
     // ---------- Quality signals (0-10 pts) ----------

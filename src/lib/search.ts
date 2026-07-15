@@ -3,6 +3,7 @@ import { searchHN } from '~/lib/sources/hn'
 import { searchDevTo } from '~/lib/sources/devto'
 import { searchReddit } from '~/lib/sources/reddit'
 import { searchLobsters } from '~/lib/sources/lobsters'
+import { searchStackOverflow } from '~/lib/sources/stackoverflow'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/github'
@@ -42,6 +43,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('devto')) tasks.push(searchDevTo(keywords, { page, perPage }))
   if (sources.includes('reddit')) tasks.push(searchReddit(keywords, { page, perPage }))
   if (sources.includes('lobsters')) tasks.push(searchLobsters(keywords, { page, perPage }))
+  if (sources.includes('stackoverflow')) tasks.push(searchStackOverflow(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()

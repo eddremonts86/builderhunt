@@ -42,3 +42,12 @@ export function LobstersIcon({ className, title }: { className?: string; title?:
     </svg>
   )
 }
+
+export function StackOverflowIcon({ className, title }: { className?: string; title?: string }) {
+  // Classic Stack Overflow logo — bracket stack
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M17.36 20.2v-5.4h1.8v7.2H2.4v-7.2h1.8v5.4h13.16M4.6 14.45l.4 1.8 10.4-2.3-.4-1.8-10.4 2.3zm1.4-4.3.8 1.7 9.7-4.6-.8-1.7-9.7 4.6zm2.6-4 1.2 1.4 8.2-6.8-1.2-1.4-8.2 6.8zM14.7 1.6l-1.5 1 5.8 8.4 1.5-1-5.8-8.4zM4.8 18.4h11.3v-1.8H4.8v1.8z"/>
+    </svg>
+  )
+}

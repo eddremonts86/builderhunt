@@ -5,7 +5,7 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -15,7 +15,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow'
   username: string
   displayName?: string
   avatarUrl?: string
@@ -33,7 +33,10 @@ type Source = Builder['source']
 type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
+/** All supported sources. Visible in the source-pills UI. */
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow']
+/** Sources that are ON by default. SO is opt-in due to API quota (300 req/day/IP without key). */
+const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
 const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }> = {
   github: { label: 'GitHub', color: 'badge-github', Icon: GithubIcon },
@@ -41,6 +44,7 @@ const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.Co
   hn: { label: 'Hacker News', color: 'badge-hn', Icon: HackerNewsIcon },
   devto: { label: 'DEV.to', color: 'badge-devto', Icon: DevToIcon },
   lobsters: { label: 'Lobsters', color: 'badge-lobsters', Icon: LobstersIcon },
+  stackoverflow: { label: 'Stack Overflow', color: 'badge-stackoverflow', Icon: StackOverflowIcon },
 }
 
 /* -------------------------------------------------------------------------- */
@@ -82,7 +86,7 @@ export function SearchPage() {
   const sentinelRef = React.useRef<HTMLDivElement>(null)
   const [searched, setSearched] = React.useState(false)
   const [activeSources, setActiveSources] = React.useState<Set<Source>>(
-    new Set(ALL_SOURCES),
+    new Set(DEFAULT_ACTIVE_SOURCES),
   )
   const [sortBy, setSortBy] = React.useState<SortBy>('score')
   const [activeTab, setActiveTab] = React.useState<ResultTab>('people')
