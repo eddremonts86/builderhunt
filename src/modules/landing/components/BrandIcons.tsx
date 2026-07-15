@@ -51,3 +51,12 @@ export function StackOverflowIcon({ className, title }: { className?: string; ti
     </svg>
   )
 }
+
+export function NpmIcon({ className, title }: { className?: string; title?: string }) {
+  // Classic npm "N" logo
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M0 7.334v8h6.666v1.332H12v-1.332h12v-8H0zm6.666 6.664H5.334v-4H3.999v4H1.335V8.667h5.331v5.331zm4 0v1.336H8V8.667h8.666v8H12V13.998H10.666zm6.665 0H14.666V8.667h2.665v5.331zM21.334 14h-1.333V8.667h1.333V14z"/>
+    </svg>
+  )
+}

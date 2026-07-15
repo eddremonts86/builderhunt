@@ -5,7 +5,7 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -15,7 +15,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm'
   username: string
   displayName?: string
   avatarUrl?: string
@@ -34,8 +34,8 @@ type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
 /** All supported sources. Visible in the source-pills UI. */
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow']
-/** Sources that are ON by default. SO is opt-in due to API quota (300 req/day/IP without key). */
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm']
+/** Sources that are ON by default. SO + npm are opt-in (quota / opt-in for niche). */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
 const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }> = {
@@ -45,6 +45,7 @@ const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.Co
   devto: { label: 'DEV.to', color: 'badge-devto', Icon: DevToIcon },
   lobsters: { label: 'Lobsters', color: 'badge-lobsters', Icon: LobstersIcon },
   stackoverflow: { label: 'Stack Overflow', color: 'badge-stackoverflow', Icon: StackOverflowIcon },
+  npm: { label: 'npm', color: 'badge-npm', Icon: NpmIcon },
 }
 
 /* -------------------------------------------------------------------------- */

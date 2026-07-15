@@ -94,6 +94,15 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // Boost for high post count in the query's tag (high engagement)
       const postCount = (metadata.postCount as number | undefined) ?? 0
       score += Math.min(Math.log1p(postCount) * 1.5, 10)
+    } else if (source === 'npm') {
+      // For maintainers: totalScore is sum of package scores; packageCount
+      // shows how broadly they're active. For packages: npms.io score
+      // is already encoded in followersCount.
+      const packageCount = (metadata.packageCount as number | undefined) ?? 0
+      if (packageCount > 0) {
+        // Multi-package maintainers get a small bonus
+        score += Math.min(Math.log1p(packageCount) * 2, 8)
+      }
     }
 
     // ---------- Quality signals (0-10 pts) ----------
