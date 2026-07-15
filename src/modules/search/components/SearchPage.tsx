@@ -5,7 +5,7 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -15,7 +15,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg' | 'hashnode'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg' | 'hashnode' | 'sourcehut'
   username: string
   displayName?: string
   avatarUrl?: string
@@ -34,7 +34,7 @@ type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
 /** All supported sources. Visible in the source-pills UI. */
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode']
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'sourcehut']
 /** Sources that are ON by default. Niche sources are opt-in. */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
@@ -50,6 +50,7 @@ const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.Co
   gitlab: { label: 'GitLab', color: 'badge-gitlab', Icon: GitLabIcon },
   codeberg: { label: 'Codeberg', color: 'badge-codeberg', Icon: CodebergIcon },
   hashnode: { label: 'Hashnode', color: 'badge-hashnode', Icon: HashnodeIcon },
+  sourcehut: { label: 'SourceHut', color: 'badge-sourcehut', Icon: SourceHutIcon },
 }
 
 /* -------------------------------------------------------------------------- */

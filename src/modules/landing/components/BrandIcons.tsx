@@ -96,3 +96,12 @@ export function HashnodeIcon({ className, title }: { className?: string; title?:
     </svg>
   )
 }
+
+export function SourceHutIcon({ className, title }: { className?: string; title?: string }) {
+  // SourceHut stylized "S" mark
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M2 4h20v3H2zm0 6.5h20v3H2zm0 6.5h20v3H2z"/>
+    </svg>
+  )
+}

@@ -128,6 +128,12 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // (active writers = active community members).
       const posts = (metadata.postCount as number | undefined) ?? 0
       if (posts > 0) score += Math.min(Math.log1p(posts) * 1.5, 10)
+    } else if (source === 'sourcehut') {
+      // SourceHut has no followers/follows in their schema. Bonus for
+      // description length (longer bio = more invested in the platform).
+      const bio = builder.bio ?? ''
+      if (bio.length > 50) score += 2
+      if (bio.length > 200) score += 3
     }
 
     // ---------- Quality signals (0-10 pts) ----------
