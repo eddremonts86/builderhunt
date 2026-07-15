@@ -13,6 +13,7 @@ const zodEnv = z.object({
   DEVTO_API_URL: z.string().default('https://dev.to/api'),
   STACKOVERFLOW_API_KEY: z.string().optional(),
   HUGGINGFACE_TOKEN: z.string().optional(),
+  GITLAB_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 }).refine(
   (data) => !!data.BETTER_AUTH_SECRET,

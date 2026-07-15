@@ -69,3 +69,12 @@ export function HuggingFaceIcon({ className, title }: { className?: string; titl
     </svg>
   )
 }
+
+export function GitLabIcon({ className, title }: { className?: string; title?: string }) {
+  // GitLab tanuki — simplified silhouette
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M23.6 10.5l-1.4-4.3-2.7-8.4c-.1-.4-.7-.4-.8 0L15.9 6.1H8.1L4.3-2.2c-.1-.4-.7-.4-.8 0L.8 6.1l-1 3.1c-.2.6 0 1.3.5 1.7L12 23l11.1-12.1c.5-.4.7-1.1.5-.4z"/>
+    </svg>
+  )
+}

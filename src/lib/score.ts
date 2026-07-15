@@ -111,6 +111,11 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
         // Bonus scaled by log downloads, capped at 12
         score += Math.min(Math.log1p(totalDownloads) * 0.8, 12)
       }
+    } else if (source === 'gitlab') {
+      // No followers; followersCount holds totalStars. Bonus for forks
+      // (people who depend on the code) and topic diversity.
+      const totalForks = (metadata.totalForks as number | undefined) ?? 0
+      if (totalForks > 0) score += Math.min(Math.log1p(totalForks) * 1.2, 8)
     }
 
     // ---------- Quality signals (0-10 pts) ----------
