@@ -123,6 +123,11 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       const forks = (metadata.forks as number | undefined) ?? 0
       if (stars > 0) score += Math.min(Math.log1p(stars) * 1.0, 8)
       if (forks > 0) score += Math.min(Math.log1p(forks) * 1.0, 6)
+    } else if (source === 'hashnode') {
+      // followersCount is real Hashnode followers. Bonus for post count
+      // (active writers = active community members).
+      const posts = (metadata.postCount as number | undefined) ?? 0
+      if (posts > 0) score += Math.min(Math.log1p(posts) * 1.5, 10)
     }
 
     // ---------- Quality signals (0-10 pts) ----------

@@ -16,6 +16,7 @@ const zodEnv = z.object({
   GITLAB_TOKEN: z.string().optional(),
   CODEBERG_API_URL: z.string().optional(),
   CODEBERG_TOKEN: z.string().optional(),
+  HASHNODE_API_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 }).refine(
   (data) => !!data.BETTER_AUTH_SECRET,

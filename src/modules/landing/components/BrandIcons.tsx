@@ -87,3 +87,12 @@ export function CodebergIcon({ className, title }: { className?: string; title?:
     </svg>
   )
 }
+
+export function HashnodeIcon({ className, title }: { className?: string; title?: string }) {
+  // Hashnode simplified "H" mark
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M21 7v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4zm-9 4.5L8 7H5l5 6.5v3.5h2v-3.5L17 7h-3l-2 4.5z"/>
+    </svg>
+  )
+}
