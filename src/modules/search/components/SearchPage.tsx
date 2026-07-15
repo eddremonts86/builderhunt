@@ -5,7 +5,7 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -15,7 +15,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters'
   username: string
   displayName?: string
   avatarUrl?: string
@@ -33,13 +33,14 @@ type Source = Builder['source']
 type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto']
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
 const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }> = {
   github: { label: 'GitHub', color: 'badge-github', Icon: GithubIcon },
   reddit: { label: 'Reddit', color: 'badge-reddit', Icon: RedditIcon },
   hn: { label: 'Hacker News', color: 'badge-hn', Icon: HackerNewsIcon },
   devto: { label: 'DEV.to', color: 'badge-devto', Icon: DevToIcon },
+  lobsters: { label: 'Lobsters', color: 'badge-lobsters', Icon: LobstersIcon },
 }
 
 /* -------------------------------------------------------------------------- */

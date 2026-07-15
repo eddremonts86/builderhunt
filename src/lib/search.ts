@@ -2,6 +2,7 @@ import { searchGitHub } from '~/lib/sources/github'
 import { searchHN } from '~/lib/sources/hn'
 import { searchDevTo } from '~/lib/sources/devto'
 import { searchReddit } from '~/lib/sources/reddit'
+import { searchLobsters } from '~/lib/sources/lobsters'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/github'
@@ -25,7 +26,7 @@ function cacheKey(opts: SearchOptions): string {
 }
 
 export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder[]> {
-  const { keywords, sources = ['github', 'hn', 'devto', 'reddit'], language, country, page = 1, perPage = 30 } = opts
+  const { keywords, sources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
 
   // Check cache
@@ -40,6 +41,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('hn')) tasks.push(searchHN(keywords, { page, perPage }))
   if (sources.includes('devto')) tasks.push(searchDevTo(keywords, { page, perPage }))
   if (sources.includes('reddit')) tasks.push(searchReddit(keywords, { page, perPage }))
+  if (sources.includes('lobsters')) tasks.push(searchLobsters(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()

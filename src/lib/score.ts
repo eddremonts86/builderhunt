@@ -76,6 +76,15 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
     } else if (source === 'devto') {
       const articles = (metadata.articlesCount as number | undefined) ?? 0
       score += Math.log1p(articles) * 1.5 // 0-15 pts
+    } else if (source === 'lobsters') {
+      // Lobsters has no followers/karma via JSON; use story count and
+      // total score as quality signals. followersCount was already
+      // populated with maxScore, so popularity is covered.
+      const stories = (metadata.storyCount as number | undefined) ?? 0
+      const totalScore = (metadata.totalScore as number | undefined) ?? 0
+      score += Math.log1p(stories) * 1.5 // 0-15 pts based on activity
+      // Bonus for high total story score (community quality proxy)
+      if (totalScore > 100) score += 3
     }
 
     // ---------- Quality signals (0-10 pts) ----------

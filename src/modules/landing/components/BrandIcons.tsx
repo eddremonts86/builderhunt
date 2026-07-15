@@ -33,3 +33,12 @@ export function DevToIcon({ className, title }: { className?: string; title?: st
     </svg>
   )
 }
+
+export function LobstersIcon({ className, title }: { className?: string; title?: string }) {
+  // Stylized "L" inside a circle — instantly recognizable as Lobsters brand
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H7V8h2v6h2v2zm6-4c0 1.1-.45 2.1-1.18 2.82L13.5 17H11l2.71-2.71c.18-.18.29-.43.29-.71 0-.55-.45-1-1-1h-1.71L13.5 10.5h.5c.83 0 1.5.67 1.5 1.5 0 .55-.45 1-1 1h-.71L13.5 13.21l.21-.21h.29c.55 0 1-.45 1-1s-.45-1-1-1h-1.5L11 12.5l1.5 1.5h1c1.66 0 3-1.34 3-3s-1.34-3-3-3h-1.5L11 9.5l1.5 1.5h.5c.55 0 1 .45 1 1z"/>
+    </svg>
+  )
+}
