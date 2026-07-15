@@ -5,6 +5,7 @@ import { searchReddit } from '~/lib/sources/reddit'
 import { searchLobsters } from '~/lib/sources/lobsters'
 import { searchStackOverflow } from '~/lib/sources/stackoverflow'
 import { searchNpm } from '~/lib/sources/npm'
+import { searchHuggingFace } from '~/lib/sources/huggingface'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/github'
@@ -46,6 +47,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('lobsters')) tasks.push(searchLobsters(keywords, { page, perPage }))
   if (sources.includes('stackoverflow')) tasks.push(searchStackOverflow(keywords, { page, perPage }))
   if (sources.includes('npm')) tasks.push(searchNpm(keywords, { page, perPage }))
+  if (sources.includes('huggingface')) tasks.push(searchHuggingFace(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()

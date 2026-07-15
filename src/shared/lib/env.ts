@@ -12,6 +12,7 @@ const zodEnv = z.object({
   HACKERNEWS_API_URL: z.string().default('https://hn.algolia.com/api/v1'),
   DEVTO_API_URL: z.string().default('https://dev.to/api'),
   STACKOVERFLOW_API_KEY: z.string().optional(),
+  HUGGINGFACE_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 }).refine(
   (data) => !!data.BETTER_AUTH_SECRET,

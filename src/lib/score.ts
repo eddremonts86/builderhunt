@@ -103,6 +103,14 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
         // Multi-package maintainers get a small bonus
         score += Math.min(Math.log1p(packageCount) * 2, 8)
       }
+    } else if (source === 'huggingface') {
+      // For models: downloads is followersCount (already counted). For
+      // authors: totalDownloads signals impact. Likes are quality signal.
+      const totalDownloads = (metadata.totalDownloads as number | undefined) ?? 0
+      if (totalDownloads > 0) {
+        // Bonus scaled by log downloads, capped at 12
+        score += Math.min(Math.log1p(totalDownloads) * 0.8, 12)
+      }
     }
 
     // ---------- Quality signals (0-10 pts) ----------
