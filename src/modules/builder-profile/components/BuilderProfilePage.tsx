@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useParams, Link } from '@tanstack/react-router'
-import { ArrowLeft, ExternalLink, Code, Save } from 'lucide-react'
+import { useParams, Link, useNavigate } from '@tanstack/react-router'
+import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock } from 'lucide-react'
 
 interface Builder {
   id: string
@@ -16,6 +16,12 @@ interface Builder {
   topics?: string[]
   metadata?: Record<string, unknown>
   score?: number
+  isClaimed?: boolean
+  isVerified?: boolean
+  claimedByUserId?: string | null
+  claimedAt?: string | null
+  openToStatus?: string[]
+  claimedTopics?: string[]
 }
 
 interface Note {
@@ -25,21 +31,30 @@ interface Note {
 }
 
 export function BuilderProfilePage() {
-  const { builderId } = useParams()
+  const params = useParams({ strict: false }) as { builderId?: string }
+  const builderId = params.builderId
+  const navigate = useNavigate()
   const [builder, setBuilder] = React.useState<Builder | null>(null)
   const [notes, setNotes] = React.useState<Note[]>([])
   const [loading, setLoading] = React.useState(true)
   const [noteText, setNoteText] = React.useState('')
   const [savingNote, setSavingNote] = React.useState(false)
+  const [meId, setMeId] = React.useState<string | null>(null)
+  const [claimOpen, setClaimOpen] = React.useState(false)
+  const [claimEmail, setClaimEmail] = React.useState('')
+  const [claimSending, setClaimSending] = React.useState(false)
+  const [claimMsg, setClaimMsg] = React.useState<{ ok: boolean; text: string; devLink?: string } | null>(null)
 
   React.useEffect(() => {
     if (!builderId) return
     Promise.all([
-      fetch(`/api/builders/${builderId}`, { credentials: 'include' }).then(r => r.json()),
-      fetch(`/api/builders/${builderId}/notes`, { credentials: 'include' }).then(r => r.json()),
-    ]).then(([b, n]) => {
+      fetch(`/api/builders/${builderId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : null),
+      fetch(`/api/builders/${builderId}/notes`, { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
+      fetch('/api/auth/get-session', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([b, n, session]) => {
       setBuilder(b)
       setNotes(Array.isArray(n) ? n : [])
+      setMeId(session?.user?.id ?? null)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [builderId])
@@ -64,20 +79,32 @@ export function BuilderProfilePage() {
     }
   }
 
-  const score = builder?.metadata && typeof builder.metadata === 'object'
-    ? (builder.metadata as Record<string, unknown>).score as number ?? 0
-    : 0
-
-  const scorePercent = Math.min(score, 100)
-
-  const sourceBadge = (source: string) => {
-    const cls = source === 'github' ? 'badge-github'
-      : source === 'reddit' ? 'badge-reddit'
-      : source === 'hn' ? 'badge-hn'
-      : source === 'devto' ? 'badge-devto'
-      : 'badge'
-    return <span className={cls}>{source}</span>
+  const handleClaim = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!claimEmail.trim()) return
+    setClaimSending(true)
+    setClaimMsg(null)
+    try {
+      const res = await fetch(`/api/builders/${builderId}/claim`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: claimEmail.trim() }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setClaimMsg({ ok: true, text: data.message ?? 'Check your email for the verification link.', devLink: data.devLink })
+      } else {
+        setClaimMsg({ ok: false, text: data.error ?? 'Failed to start claim' })
+      }
+    } catch {
+      setClaimMsg({ ok: false, text: 'Network error' })
+    } finally {
+      setClaimSending(false)
+    }
   }
+
+  const isMyProfile = builder?.claimedByUserId && meId && builder.claimedByUserId === meId
 
   if (loading) {
     return (
@@ -127,32 +154,64 @@ export function BuilderProfilePage() {
           )}
 
           <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-2xl font-bold text-bh-text">
                 {builder.displayName ?? builder.username}
               </h1>
-              {sourceBadge(builder.source)}
+              {builder.isVerified && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-bh-success/10 text-bh-success border border-bh-success/30"
+                  title="This profile is verified and maintained by the builder."
+                >
+                  <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                  Verified
+                </span>
+              )}
+              <SourceBadge source={builder.source} />
             </div>
 
             {builder.bio && (
               <p className="text-bh-text-muted mb-3">{builder.bio}</p>
             )}
 
-            <div className="flex items-center gap-4 text-sm text-bh-text-muted mb-4">
+            <div className="flex items-center gap-4 text-sm text-bh-text-muted mb-4 flex-wrap">
               {builder.country && <span>{builder.country}</span>}
               {builder.language && <span>{builder.language}</span>}
               {builder.followersCount != null && (
-                <span>{builder.followersCount.toLocaleString()} followers</span>
+                <span>{(builder.followersCount ?? 0).toLocaleString()} followers</span>
+              )}
+              {builder.isClaimed && builder.claimedAt && (
+                <span className="inline-flex items-center gap-1 text-xs">
+                  <Users className="w-3 h-3" />
+                  Claimed {new Date(builder.claimedAt).toLocaleDateString()}
+                </span>
               )}
             </div>
 
-            {builder.topics?.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {builder.topics.map(t => (
-                  <span key={t} className="badge">{t}</span>
-                ))}
+            {/* Open to status (claimed builders only) */}
+            {builder.isClaimed && builder.openToStatus && builder.openToStatus.length > 0 && (
+              <div className="mb-3 p-2.5 rounded-lg bg-bh-success/5 border border-bh-success/20">
+                <p className="text-xs font-semibold text-bh-success inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-bh-success inline-block" />
+                  Open to: {builder.openToStatus.join(', ')}
+                </p>
               </div>
             )}
+
+            {/* Topics (claimed topics take precedence over scraped) */}
+            {(() => {
+              const topics = (builder.claimedTopics?.length ?? 0) > 0
+                ? builder.claimedTopics
+                : builder.topics
+              if (!topics || topics.length === 0) return null
+              return (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {topics.map(t => (
+                    <span key={t} className="badge">{t}</span>
+                  ))}
+                </div>
+              )
+            })()}
 
             <a
               href={builder.profileUrl}
@@ -164,66 +223,163 @@ export function BuilderProfilePage() {
               {builder.username} <ExternalLink className="w-3 h-3" />
             </a>
           </div>
-
-          {/* Score circle */}
-          <div className="flex flex-col items-center">
-            <div className="relative w-20 h-20">
-              <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--bh-border)" strokeWidth="3" />
-                <circle
-                  cx="18" cy="18" r="15.9" fill="none"
-                  stroke="var(--bh-accent)" strokeWidth="3"
-                  strokeDasharray={`${scorePercent}, 100`}
-                  strokeDashoffset="25"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xl font-bold text-bh-text">{Math.round(score)}</span>
-              </div>
-            </div>
-            <span className="text-xs text-bh-text-muted mt-1">score</span>
-          </div>
         </div>
       </div>
 
-      {/* Notes section */}
+      {/* Action bar — varies based on auth + claim state */}
+      <div className="card mb-6">
+        {isMyProfile ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/me" className="btn-primary">
+              <Sparkles className="w-4 h-4" /> Manage your profile
+            </Link>
+            <span className="text-xs text-bh-text-muted">
+              You claimed this profile on {builder.claimedAt ? new Date(builder.claimedAt).toLocaleDateString() : '—'}.
+            </span>
+          </div>
+        ) : meId ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
+            <Lock className="w-4 h-4" />
+            Save and notes are in the dashboard. Claim below if this is you.
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
+            <Lock className="w-4 h-4" />
+            <Link to="/auth/sign-in" className="text-bh-accent hover:underline">Sign in</Link>
+            {' '}to save this profile to a list.
+          </div>
+        )}
+
+        {!builder.isClaimed && !isMyProfile && (
+          <div className="mt-4 pt-4 border-t border-bh-border">
+            {!claimOpen ? (
+              <button
+                onClick={() => setClaimOpen(true)}
+                className="btn-secondary"
+                data-event="claim_cta_click"
+              >
+                <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
+              </button>
+            ) : (
+              <form onSubmit={handleClaim} className="space-y-3">
+                <p className="text-sm text-bh-text-muted">
+                  Enter the email associated with this profile. We'll send a verification link.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    type="email"
+                    value={claimEmail}
+                    onChange={e => setClaimEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    required
+                    className="input-field flex-1 min-w-[200px]"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={claimSending}
+                    className="btn-primary"
+                  >
+                    {claimSending ? 'Sending…' : 'Send verification email'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
+                    className="btn-ghost"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                {claimMsg && (
+                  <div
+                    className={`text-sm p-3 rounded-lg border ${
+                      claimMsg.ok
+                        ? 'border-bh-success/30 bg-bh-success/10 text-bh-success'
+                        : 'border-bh-danger/30 bg-bh-danger/10 text-bh-danger'
+                    }`}
+                    role={claimMsg.ok ? 'status' : 'alert'}
+                  >
+                    <p>{claimMsg.text}</p>
+                    {claimMsg.devLink && (
+                      <p className="mt-2 text-xs">
+                        <strong>Dev mode:</strong>{' '}
+                        <a href={claimMsg.devLink} className="underline break-all">
+                          {claimMsg.devLink}
+                        </a>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </form>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Notes section — auth required */}
       <div className="card">
         <h2 className="text-lg font-semibold text-bh-text mb-4">Notes</h2>
 
-        {notes.length > 0 ? (
-          <div className="space-y-3 mb-4">
-            {notes.map(note => (
-              <div key={note.id} className="bg-bh-bg-alt border border-bh-border rounded-lg p-3">
-                <p className="text-sm text-bh-text">{note.content}</p>
-                <p className="text-xs text-bh-text-muted mt-1">
-                  {new Date(note.createdAt).toLocaleDateString()}
-                </p>
+        {meId ? (
+          <>
+            {notes.length > 0 ? (
+              <div className="space-y-3 mb-4">
+                {notes.map(note => (
+                  <div key={note.id} className="bg-bh-bg-alt border border-bh-border rounded-lg p-3">
+                    <p className="text-sm text-bh-text">{note.content}</p>
+                    <p className="text-xs text-bh-text-muted mt-1">
+                      {new Date(note.createdAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-bh-text-muted mb-4">No notes yet.</p>
-        )}
+            ) : (
+              <p className="text-sm text-bh-text-muted mb-4">No notes yet.</p>
+            )}
 
-        <div className="flex gap-2">
-          <textarea
-            value={noteText}
-            onChange={e => setNoteText(e.target.value)}
-            placeholder="Add a note about this builder..."
-            className="input-field flex-1 resize-none"
-            rows={2}
-          />
-          <button
-            onClick={handleSaveNote}
-            disabled={savingNote || !noteText.trim()}
-            className="btn-primary flex items-center gap-2 h-fit"
-          >
-            <Save className="w-4 h-4" />
-            {savingNote ? 'Saving...' : 'Save'}
-          </button>
-        </div>
+            <div className="flex gap-2">
+              <textarea
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                placeholder="Add a note about this builder..."
+                className="input-field flex-1 resize-none"
+                rows={2}
+              />
+              <button
+                onClick={handleSaveNote}
+                disabled={savingNote || !noteText.trim()}
+                className="btn-primary flex items-center gap-2 h-fit"
+              >
+                <Save className="w-4 h-4" />
+                {savingNote ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-bh-text-muted">
+            <Link to="/auth/sign-in" className="text-bh-accent hover:underline">Sign in</Link>
+            {' '}to add private notes about this builder.
+          </p>
+        )}
       </div>
     </div>
   )
+}
+
+function SourceBadge({ source }: { source: string }) {
+  const cls = source === 'github' ? 'badge-github'
+    : source === 'reddit' ? 'badge-reddit'
+    : source === 'hn' ? 'badge-hn'
+    : source === 'devto' ? 'badge-devto'
+    : source === 'lobsters' ? 'badge-lobsters'
+    : source === 'stackoverflow' ? 'badge-stackoverflow'
+    : source === 'npm' ? 'badge-npm'
+    : source === 'huggingface' ? 'badge-huggingface'
+    : source === 'gitlab' ? 'badge-gitlab'
+    : source === 'codeberg' ? 'badge-codeberg'
+    : source === 'hashnode' ? 'badge-hashnode'
+    : source === 'sourcehut' ? 'badge-sourcehut'
+    : 'badge'
+  const label = source === 'hn' ? 'Hacker News' : source
+  return <span className={cls}>{label}</span>
 }
