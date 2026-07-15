@@ -5,7 +5,7 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -15,7 +15,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg'
   username: string
   displayName?: string
   avatarUrl?: string
@@ -34,7 +34,7 @@ type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
 /** All supported sources. Visible in the source-pills UI. */
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab']
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg']
 /** Sources that are ON by default. Niche sources are opt-in. */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
@@ -48,6 +48,7 @@ const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.Co
   npm: { label: 'npm', color: 'badge-npm', Icon: NpmIcon },
   huggingface: { label: 'Hugging Face', color: 'badge-huggingface', Icon: HuggingFaceIcon },
   gitlab: { label: 'GitLab', color: 'badge-gitlab', Icon: GitLabIcon },
+  codeberg: { label: 'Codeberg', color: 'badge-codeberg', Icon: CodebergIcon },
 }
 
 /* -------------------------------------------------------------------------- */

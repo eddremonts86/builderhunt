@@ -116,6 +116,13 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // (people who depend on the code) and topic diversity.
       const totalForks = (metadata.totalForks as number | undefined) ?? 0
       if (totalForks > 0) score += Math.min(Math.log1p(totalForks) * 1.2, 8)
+    } else if (source === 'codeberg') {
+      // Gitea exposes full follower counts, so followersCount is honest.
+      // Bonus for starred repos and forks (engagement signal).
+      const stars = (metadata.stars as number | undefined) ?? 0
+      const forks = (metadata.forks as number | undefined) ?? 0
+      if (stars > 0) score += Math.min(Math.log1p(stars) * 1.0, 8)
+      if (forks > 0) score += Math.min(Math.log1p(forks) * 1.0, 6)
     }
 
     // ---------- Quality signals (0-10 pts) ----------

@@ -14,6 +14,8 @@ const zodEnv = z.object({
   STACKOVERFLOW_API_KEY: z.string().optional(),
   HUGGINGFACE_TOKEN: z.string().optional(),
   GITLAB_TOKEN: z.string().optional(),
+  CODEBERG_API_URL: z.string().optional(),
+  CODEBERG_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
 }).refine(
   (data) => !!data.BETTER_AUTH_SECRET,

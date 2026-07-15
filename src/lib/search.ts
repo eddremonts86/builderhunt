@@ -7,6 +7,7 @@ import { searchStackOverflow } from '~/lib/sources/stackoverflow'
 import { searchNpm } from '~/lib/sources/npm'
 import { searchHuggingFace } from '~/lib/sources/huggingface'
 import { searchGitLab } from '~/lib/sources/gitlab'
+import { searchCodeberg } from '~/lib/sources/codeberg'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/github'
@@ -50,6 +51,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('npm')) tasks.push(searchNpm(keywords, { page, perPage }))
   if (sources.includes('huggingface')) tasks.push(searchHuggingFace(keywords, { page, perPage }))
   if (sources.includes('gitlab')) tasks.push(searchGitLab(keywords, { page, perPage }))
+  if (sources.includes('codeberg')) tasks.push(searchCodeberg(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()
