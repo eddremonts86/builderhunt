@@ -106,6 +106,29 @@ export const alerts = pgTable('alerts', {
   enabled: boolean('enabled').default(true),
   lastTriggeredAt: timestamp('last_triggered_at'),
   createdAt: timestamp('created_at').defaultNow(),
+  // Plan: smart-alerts
+  triggerConditions: jsonb('trigger_conditions')
+    .$type<{
+      eventType: 'new_repo' | 'new_product' | 'keyword_match' | 'any_activity'
+      minStars?: number
+      minFollowers?: number
+      keywords?: string[]
+      builderId?: string
+    }>()
+    .notNull()
+    .default({ eventType: 'any_activity' }),
+  deliveryChannel: text('delivery_channel').default('email'),
+})
+
+export const alertTriggers = pgTable('alert_triggers', {
+  id: text('id').primaryKey(),
+  alertId: text('alert_id').notNull().references(() => alerts.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  builderId: text('builder_id').references(() => builders.id, { onDelete: 'set null' }),
+  eventType: text('event_type').notNull(),
+  payload: jsonb('payload').$type<Record<string, unknown>>().default({}).notNull(),
+  matchedAt: timestamp('matched_at', { withTimezone: true }).notNull().defaultNow(),
+  readAt: timestamp('read_at', { withTimezone: true }),
 })
 
 export const builderNotes = pgTable('builder_notes', {

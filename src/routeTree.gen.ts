@@ -37,6 +37,7 @@ import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
@@ -61,6 +62,7 @@ import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/st
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
@@ -73,6 +75,7 @@ import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/del
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
+import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
 import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
 import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admin/plan-requests/index'
@@ -85,6 +88,7 @@ import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/build
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
+import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
@@ -228,6 +232,11 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
   id: '/api/status/',
   path: '/api/status/',
@@ -348,6 +357,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
+  id: '/api/alerts/test-trigger',
+  path: '/api/alerts/test-trigger',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSettingsPrivacyRoute =
   DashboardSettingsPrivacyRouteImport.update({
     id: '/settings/privacy',
@@ -409,6 +423,11 @@ const ApiMeBuilderIndexRoute = ApiMeBuilderIndexRouteImport.update({
 const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
   id: '/api/builders/recent/',
   path: '/api/builders/recent/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsTriggersIndexRoute = ApiAlertsTriggersIndexRouteImport.update({
+  id: '/api/alerts/triggers/',
+  path: '/api/alerts/triggers/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminUsersIndexRoute = ApiAdminUsersIndexRouteImport.update({
@@ -475,6 +494,11 @@ const ApiBuildersBuilderIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
+  id: '/api/alerts/triggers/$id',
+  path: '/api/alerts/triggers/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
   id: '/api/admin/users/$userId',
   path: '/api/admin/users/$userId',
@@ -505,6 +529,7 @@ export interface FileRoutesByFullPath {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
+  '/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
@@ -531,6 +556,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -559,6 +585,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -571,6 +598,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
+  '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -584,6 +612,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
+  '/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
@@ -610,6 +639,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -638,6 +668,7 @@ export interface FileRoutesByTo {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -650,6 +681,7 @@ export interface FileRoutesByTo {
   '/api/admin/plan-requests': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/users': typeof ApiAdminUsersIndexRoute
+  '/api/alerts/triggers': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
@@ -666,6 +698,7 @@ export interface FileRoutesById {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
+  '/_dashboard/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
@@ -693,6 +726,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -721,6 +755,7 @@ export interface FileRoutesById {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -733,6 +768,7 @@ export interface FileRoutesById {
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
+  '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -749,6 +785,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/status'
+    | '/alerts'
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
@@ -775,6 +812,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/changelog/$slug'
@@ -803,6 +841,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
+    | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -815,6 +854,7 @@ export interface FileRouteTypes {
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/users/'
+    | '/api/alerts/triggers/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
     | '/api/me/data-export/'
@@ -828,6 +868,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/status'
+    | '/alerts'
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
@@ -854,6 +895,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/changelog/$slug'
@@ -882,6 +924,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
+    | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -894,6 +937,7 @@ export interface FileRouteTypes {
     | '/api/admin/plan-requests'
     | '/api/admin/roadmap'
     | '/api/admin/users'
+    | '/api/alerts/triggers'
     | '/api/builders/recent'
     | '/api/me/builder'
     | '/api/me/data-export'
@@ -909,6 +953,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/status'
+    | '/_dashboard/alerts'
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
@@ -936,6 +981,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
+    | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/changelog/$slug'
@@ -964,6 +1010,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
+    | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -976,6 +1023,7 @@ export interface FileRouteTypes {
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/users/'
+    | '/api/alerts/triggers/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
     | '/api/me/data-export/'
@@ -1006,6 +1054,7 @@ export interface RootRouteChildren {
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   BlogIndexRoute: typeof BlogIndexRoute
   ExploreIndexRoute: typeof ExploreIndexRoute
+  ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
@@ -1030,6 +1079,7 @@ export interface RootRouteChildren {
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
+  ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRoute
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
@@ -1039,6 +1089,7 @@ export interface RootRouteChildren {
   ApiAdminPlanRequestsIndexRoute: typeof ApiAdminPlanRequestsIndexRoute
   ApiAdminRoadmapIndexRoute: typeof ApiAdminRoadmapIndexRoute
   ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
+  ApiAlertsTriggersIndexRoute: typeof ApiAlertsTriggersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
@@ -1243,6 +1294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/alerts': {
+      id: '/_dashboard/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof DashboardAlertsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/api/status/': {
       id: '/api/status/'
       path: '/api/status'
@@ -1411,6 +1469,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/alerts/test-trigger': {
+      id: '/api/alerts/test-trigger'
+      path: '/api/alerts/test-trigger'
+      fullPath: '/api/alerts/test-trigger'
+      preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/settings/privacy': {
       id: '/_dashboard/settings/privacy'
       path: '/settings/privacy'
@@ -1493,6 +1558,13 @@ declare module '@tanstack/react-router' {
       path: '/api/builders/recent'
       fullPath: '/api/builders/recent/'
       preLoaderRoute: typeof ApiBuildersRecentIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/triggers/': {
+      id: '/api/alerts/triggers/'
+      path: '/api/alerts/triggers'
+      fullPath: '/api/alerts/triggers/'
+      preLoaderRoute: typeof ApiAlertsTriggersIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/users/': {
@@ -1579,6 +1651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/alerts/triggers/$id': {
+      id: '/api/alerts/triggers/$id'
+      path: '/api/alerts/triggers/$id'
+      fullPath: '/api/alerts/triggers/$id'
+      preLoaderRoute: typeof ApiAlertsTriggersIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/users/$userId': {
       id: '/api/admin/users/$userId'
       path: '/api/admin/users/$userId'
@@ -1611,6 +1690,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface DashboardRouteRouteChildren {
+  DashboardAlertsRoute: typeof DashboardAlertsRoute
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
@@ -1627,6 +1707,7 @@ interface DashboardRouteRouteChildren {
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
+  DashboardAlertsRoute: DashboardAlertsRoute,
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
@@ -1723,6 +1804,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   BlogIndexRoute: BlogIndexRoute,
   ExploreIndexRoute: ExploreIndexRoute,
+  ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
@@ -1747,6 +1829,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
+  ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRoute,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
@@ -1756,6 +1839,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminPlanRequestsIndexRoute: ApiAdminPlanRequestsIndexRoute,
   ApiAdminRoadmapIndexRoute: ApiAdminRoadmapIndexRoute,
   ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
+  ApiAlertsTriggersIndexRoute: ApiAlertsTriggersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell, Settings,
-  AlertTriangle, BookOpen, Map, Activity, Shield, Inbox, CreditCard,
+  AlertTriangle, BookOpen, Map, Activity, Shield, Inbox, CreditCard, Mail,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 
@@ -96,6 +96,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             <Settings className="w-4 h-4" aria-hidden="true" />
             Settings
+          </Link>
+          <Link
+            to="/alerts"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+            data-testid="nav-alerts"
+          >
+            <Mail className="w-4 h-4" aria-hidden="true" />
+            Smart alerts
           </Link>
           <Link
             to="/settings/privacy"
