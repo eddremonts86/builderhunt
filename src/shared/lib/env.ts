@@ -24,4 +24,20 @@ const zodEnv = z.object({
   { message: 'BETTER_AUTH_SECRET is required — generate with: openssl rand -hex 32' },
 )
 
-export const env = zodEnv.parse(process.env)
+// In the browser, the server-only env vars aren't available. Provide safe
+// defaults so importing this module on the client doesn't crash. The actual
+// server runtime always has these set (see .env).
+const isBrowser = typeof window !== 'undefined'
+
+const safeProcessEnv = isBrowser
+  ? {
+      // Non-empty placeholders so zod's .min(1) check passes. The real values
+      // are never read on the client; server functions go over the wire.
+      DATABASE_URL: 'postgres://placeholder:placeholder@localhost:5432/placeholder',
+      APP_URL: window.location.origin,
+      VITE_APP_URL: window.location.origin,
+      BETTER_AUTH_SECRET: 'browser-stub-not-used',
+    }
+  : process.env
+
+export const env = zodEnv.parse(safeProcessEnv)

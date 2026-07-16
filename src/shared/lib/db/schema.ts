@@ -242,3 +242,37 @@ export const deletionRequests = pgTable('deletion_requests', {
   completedAt: timestamp('completed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// ---------------------------------------------------------------------------
+// Pricing & Plans (Plan: pricing-and-billing, admin-managed, no Stripe)
+// ---------------------------------------------------------------------------
+
+export const plans = pgTable('plans', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  plan: text('plan').notNull().default('free'), // 'free' | 'pro' | 'team'
+  status: text('status').notNull().default('active'), // 'active' | 'past_due' | 'canceled' | 'trialing'
+  planEndsAt: timestamp('plan_ends_at', { withTimezone: true }),
+  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const planChanges = pgTable('plan_changes', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  fromPlan: text('from_plan'),
+  toPlan: text('to_plan').notNull(),
+  changedBy: text('changed_by').notNull(), // admin userId
+  reason: text('reason'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const planRequests = pgTable('plan_requests', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  requestedPlan: text('requested_plan').notNull(), // 'pro' | 'team'
+  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'declined'
+  message: text('message'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})

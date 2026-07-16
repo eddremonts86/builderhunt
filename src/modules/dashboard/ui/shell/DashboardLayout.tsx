@@ -2,7 +2,7 @@ import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell, Settings,
-  AlertTriangle, BookOpen, Map, Activity, Shield,
+  AlertTriangle, BookOpen, Map, Activity, Shield, Inbox, CreditCard,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 
@@ -105,11 +105,35 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             <Shield className="w-4 h-4" aria-hidden="true" />
             Privacy &amp; data
           </Link>
+          <Link
+            to="/settings/billing"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+            data-testid="nav-billing"
+          >
+            <CreditCard className="w-4 h-4" aria-hidden="true" />
+            Billing
+          </Link>
           {isAdmin && (
             <>
               <div className="pt-2 pb-1 px-3 text-[10px] uppercase tracking-wider text-bh-text-dim font-semibold">
                 Admin
               </div>
+              <Link
+                to="/admin/users"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-users"
+              >
+                <Users className="w-4 h-4" aria-hidden="true" />
+                Users
+              </Link>
+              <Link
+                to="/admin/plan-requests"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-plan-requests"
+              >
+                <Inbox className="w-4 h-4" aria-hidden="true" />
+                Plan requests
+              </Link>
               <Link
                 to="/admin/incidents"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"

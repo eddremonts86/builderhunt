@@ -13,6 +13,7 @@ import { Route as StatusRouteImport } from './routes/status'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
@@ -48,6 +49,8 @@ import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/ind
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
+import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -59,14 +62,19 @@ import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$sl
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
+import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
+import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
+import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
+import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
+import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admin/plan-requests/index'
 import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
 import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
@@ -75,6 +83,7 @@ import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/build
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
+import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
@@ -97,6 +106,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const RoadmapRoute = RoadmapRouteImport.update({
   id: '/roadmap',
   path: '/roadmap',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangelogRoute = ChangelogRouteImport.update({
@@ -272,6 +286,16 @@ const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   path: '/api/search/builders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPlansRequestUpgradeRoute = ApiPlansRequestUpgradeRouteImport.update({
+  id: '/api/plans/request-upgrade',
+  path: '/api/plans/request-upgrade',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
+  id: '/api/plans/me',
+  path: '/api/plans/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
   id: '/api/onboarding/status',
   path: '/api/onboarding/status',
@@ -328,11 +352,28 @@ const DashboardSettingsPrivacyRoute =
     path: '/settings/privacy',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
+const DashboardSettingsBillingRoute =
+  DashboardSettingsBillingRouteImport.update({
+    id: '/settings/billing',
+    path: '/settings/billing',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
   id: '/admin/roadmap',
   path: '/admin/roadmap',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardAdminPlanRequestsRoute =
+  DashboardAdminPlanRequestsRouteImport.update({
+    id: '/admin/plan-requests',
+    path: '/admin/plan-requests',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardAdminIncidentsRoute = DashboardAdminIncidentsRouteImport.update({
   id: '/admin/incidents',
   path: '/admin/incidents',
@@ -363,11 +404,22 @@ const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
   path: '/api/builders/recent/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminUsersIndexRoute = ApiAdminUsersIndexRouteImport.update({
+  id: '/api/admin/users/',
+  path: '/api/admin/users/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminRoadmapIndexRoute = ApiAdminRoadmapIndexRouteImport.update({
   id: '/api/admin/roadmap/',
   path: '/api/admin/roadmap/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminPlanRequestsIndexRoute =
+  ApiAdminPlanRequestsIndexRouteImport.update({
+    id: '/api/admin/plan-requests/',
+    path: '/api/admin/plan-requests/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminIncidentsIndexRoute = ApiAdminIncidentsIndexRouteImport.update({
   id: '/api/admin/incidents/',
   path: '/api/admin/incidents/',
@@ -411,6 +463,11 @@ const ApiBuildersBuilderIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
+  id: '/api/admin/users/$userId',
+  path: '/api/admin/users/$userId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   id: '/api/admin/roadmap/$id',
   path: '/api/admin/roadmap/$id',
@@ -431,6 +488,7 @@ export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -455,7 +513,10 @@ export interface FileRoutesByFullPath {
   '/explore/': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
+  '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/users': typeof DashboardAdminUsersRoute
+  '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -467,6 +528,8 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/plans/me': typeof ApiPlansMeRoute
+  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -482,6 +545,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -490,7 +554,9 @@ export interface FileRoutesByFullPath {
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
+  '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -499,6 +565,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -523,7 +590,10 @@ export interface FileRoutesByTo {
   '/explore': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
+  '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/users': typeof DashboardAdminUsersRoute
+  '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -535,6 +605,8 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/plans/me': typeof ApiPlansMeRoute
+  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -550,6 +622,7 @@ export interface FileRoutesByTo {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -558,7 +631,9 @@ export interface FileRoutesByTo {
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/admin/changelog': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents': typeof ApiAdminIncidentsIndexRoute
+  '/api/admin/plan-requests': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/users': typeof ApiAdminUsersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
@@ -570,6 +645,7 @@ export interface FileRoutesById {
   '/_landing': typeof LandingRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
+  '/pricing': typeof PricingRoute
   '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -595,7 +671,10 @@ export interface FileRoutesById {
   '/explore/': typeof ExploreIndexRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
+  '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
+  '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -607,6 +686,8 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/plans/me': typeof ApiPlansMeRoute
+  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -622,6 +703,7 @@ export interface FileRoutesById {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
@@ -630,7 +712,9 @@ export interface FileRoutesById {
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
+  '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -642,6 +726,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/changelog'
+    | '/pricing'
     | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -666,7 +751,10 @@ export interface FileRouteTypes {
     | '/explore/'
     | '/admin/changelog'
     | '/admin/incidents'
+    | '/admin/plan-requests'
     | '/admin/roadmap'
+    | '/admin/users'
+    | '/settings/billing'
     | '/settings/privacy'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -678,6 +766,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/plans/me'
+    | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/dashboard/'
     | '/exports/'
@@ -693,6 +783,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/users/$userId'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -701,7 +792,9 @@ export interface FileRouteTypes {
     | '/builder/$builderId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
+    | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
+    | '/api/admin/users/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
     | '/api/me/data-export/'
@@ -710,6 +803,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/pricing'
     | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -734,7 +828,10 @@ export interface FileRouteTypes {
     | '/explore'
     | '/admin/changelog'
     | '/admin/incidents'
+    | '/admin/plan-requests'
     | '/admin/roadmap'
+    | '/admin/users'
+    | '/settings/billing'
     | '/settings/privacy'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -746,6 +843,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/plans/me'
+    | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/dashboard'
     | '/exports'
@@ -761,6 +860,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/users/$userId'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -769,7 +869,9 @@ export interface FileRouteTypes {
     | '/builder/$builderId'
     | '/api/admin/changelog'
     | '/api/admin/incidents'
+    | '/api/admin/plan-requests'
     | '/api/admin/roadmap'
+    | '/api/admin/users'
     | '/api/builders/recent'
     | '/api/me/builder'
     | '/api/me/data-export'
@@ -780,6 +882,7 @@ export interface FileRouteTypes {
     | '/_landing'
     | '/auth'
     | '/changelog'
+    | '/pricing'
     | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
@@ -805,7 +908,10 @@ export interface FileRouteTypes {
     | '/explore/'
     | '/_dashboard/admin/changelog'
     | '/_dashboard/admin/incidents'
+    | '/_dashboard/admin/plan-requests'
     | '/_dashboard/admin/roadmap'
+    | '/_dashboard/admin/users'
+    | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -817,6 +923,8 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/plans/me'
+    | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -832,6 +940,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/users/$userId'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
@@ -840,7 +949,9 @@ export interface FileRouteTypes {
     | '/_dashboard/builder/$builderId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
+    | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
+    | '/api/admin/users/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
     | '/api/me/data-export/'
@@ -852,6 +963,7 @@ export interface RootRouteChildren {
   LandingRouteRoute: typeof LandingRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ChangelogRoute: typeof ChangelogRouteWithChildren
+  PricingRoute: typeof PricingRoute
   RoadmapRoute: typeof RoadmapRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -880,6 +992,8 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
+  ApiPlansMeRoute: typeof ApiPlansMeRoute
+  ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
@@ -891,12 +1005,15 @@ export interface RootRouteChildren {
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
+  ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRoute
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
+  ApiAdminPlanRequestsIndexRoute: typeof ApiAdminPlanRequestsIndexRoute
   ApiAdminRoadmapIndexRoute: typeof ApiAdminRoadmapIndexRoute
+  ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
@@ -931,6 +1048,13 @@ declare module '@tanstack/react-router' {
       path: '/roadmap'
       fullPath: '/roadmap'
       preLoaderRoute: typeof RoadmapRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/changelog': {
@@ -1178,6 +1302,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/plans/request-upgrade': {
+      id: '/api/plans/request-upgrade'
+      path: '/api/plans/request-upgrade'
+      fullPath: '/api/plans/request-upgrade'
+      preLoaderRoute: typeof ApiPlansRequestUpgradeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plans/me': {
+      id: '/api/plans/me'
+      path: '/api/plans/me'
+      fullPath: '/api/plans/me'
+      preLoaderRoute: typeof ApiPlansMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/onboarding/status': {
       id: '/api/onboarding/status'
       path: '/api/onboarding/status'
@@ -1255,11 +1393,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsPrivacyRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/settings/billing': {
+      id: '/_dashboard/settings/billing'
+      path: '/settings/billing'
+      fullPath: '/settings/billing'
+      preLoaderRoute: typeof DashboardSettingsBillingRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/users': {
+      id: '/_dashboard/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof DashboardAdminUsersRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/roadmap': {
       id: '/_dashboard/admin/roadmap'
       path: '/admin/roadmap'
       fullPath: '/admin/roadmap'
       preLoaderRoute: typeof DashboardAdminRoadmapRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/plan-requests': {
+      id: '/_dashboard/admin/plan-requests'
+      path: '/admin/plan-requests'
+      fullPath: '/admin/plan-requests'
+      preLoaderRoute: typeof DashboardAdminPlanRequestsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/admin/incidents': {
@@ -1304,11 +1463,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersRecentIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/users/': {
+      id: '/api/admin/users/'
+      path: '/api/admin/users'
+      fullPath: '/api/admin/users/'
+      preLoaderRoute: typeof ApiAdminUsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/roadmap/': {
       id: '/api/admin/roadmap/'
       path: '/api/admin/roadmap'
       fullPath: '/api/admin/roadmap/'
       preLoaderRoute: typeof ApiAdminRoadmapIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/plan-requests/': {
+      id: '/api/admin/plan-requests/'
+      path: '/api/admin/plan-requests'
+      fullPath: '/api/admin/plan-requests/'
+      preLoaderRoute: typeof ApiAdminPlanRequestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/incidents/': {
@@ -1367,6 +1540,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/admin/users/$userId': {
+      id: '/api/admin/users/$userId'
+      path: '/api/admin/users/$userId'
+      fullPath: '/api/admin/users/$userId'
+      preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/roadmap/$id': {
       id: '/api/admin/roadmap/$id'
       path: '/api/admin/roadmap/$id'
@@ -1394,7 +1574,10 @@ declare module '@tanstack/react-router' {
 interface DashboardRouteRouteChildren {
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
+  DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
+  DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
+  DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRoute
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
@@ -1406,7 +1589,10 @@ interface DashboardRouteRouteChildren {
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
+  DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
+  DashboardAdminUsersRoute: DashboardAdminUsersRoute,
+  DashboardSettingsBillingRoute: DashboardSettingsBillingRoute,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
@@ -1477,6 +1663,7 @@ const rootRouteChildren: RootRouteChildren = {
   LandingRouteRoute: LandingRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ChangelogRoute: ChangelogRouteWithChildren,
+  PricingRoute: PricingRoute,
   RoadmapRoute: RoadmapRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
@@ -1505,6 +1692,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
+  ApiPlansMeRoute: ApiPlansMeRoute,
+  ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
@@ -1516,12 +1705,15 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
+  ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRoute,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
+  ApiAdminPlanRequestsIndexRoute: ApiAdminPlanRequestsIndexRoute,
   ApiAdminRoadmapIndexRoute: ApiAdminRoadmapIndexRoute,
+  ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
