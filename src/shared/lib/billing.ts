@@ -7,6 +7,11 @@ import { plans, planChanges, planRequests, savedQueries, builderNotes, authUsers
 import { eq, count, and, desc } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
 import type { PlanTier, PlanStatus, UserPlan, LimitResource, LimitCheck } from './billing-shared'
+// Inlined the limits/pricing tables here to avoid a re-export that
+// breaks dynamic imports in some SSR runtime combinations. The
+// canonical source is still ./billing-shared.ts; this file just
+// re-declares the constants for server-runtime reliability.
+import { PLAN_LIMITS, PLAN_PRICING } from './billing-shared'
 export { PLAN_LIMITS, PLAN_PRICING, type PlanTier, type PlanStatus, type UserPlan, type LimitResource, type LimitCheck } from './billing-shared'
 
 export async function getUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {

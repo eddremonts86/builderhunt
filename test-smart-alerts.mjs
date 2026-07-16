@@ -32,6 +32,15 @@ async function signIn(page, email, password) {
 }
 
 async function run() {
+  // Clean up previous test runs (alert triggers and alerts owned by admin)
+  try {
+    const { execSync } = await import('child_process')
+    execSync(
+      `docker exec builderhunt-db psql -U postgres -d builderhunt -c "DELETE FROM alert_triggers; DELETE FROM alerts WHERE name LIKE 'e2e%';" 2>/dev/null`,
+      { stdio: 'ignore' },
+    )
+  } catch {}
+
   const browser = await chromium.launch()
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   const page = await context.newPage()

@@ -23,6 +23,16 @@ function check(name, cond, detail) {
 }
 
 async function run() {
+  // Clean up the test changelog entry from previous runs to avoid the
+  // unique constraint on slug.
+  try {
+    const { execSync } = await import('child_process')
+    execSync(
+      `docker exec builderhunt-db psql -U postgres -d builderhunt -c "DELETE FROM changelog WHERE slug = 'e2e-test-entry';" 2>/dev/null`,
+      { stdio: 'ignore' },
+    )
+  } catch {}
+
   const browser = await chromium.launch()
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   const page = await context.newPage()

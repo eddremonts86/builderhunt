@@ -44,6 +44,22 @@ export const Route = createFileRoute('/api/queries/')({
             return Response.json({ error: 'Name and keywords are required' }, { status: 400 })
           }
 
+          // Plan limit check
+          const { checkLimit } = await import('~/shared/lib/billing')
+          const limit = await checkLimit(userId, 'savedSearches')
+          if (!limit.allowed) {
+            return Response.json(
+              {
+                error: `You've reached the ${limit.plan} plan limit of ${limit.limit} saved searches. Upgrade to save more.`,
+                limit: limit.limit,
+                current: limit.current,
+                plan: limit.plan,
+                upgradeUrl: '/pricing',
+              },
+              { status: 402 },
+            )
+          }
+
           const query = await db
             .insert(savedQueries)
             .values({

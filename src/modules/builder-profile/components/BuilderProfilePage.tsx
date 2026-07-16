@@ -119,13 +119,17 @@ export function BuilderProfilePage() {
     return (
       <div className="p-8 max-w-4xl mx-auto">
         <Link
-          to="/search"
+          to="/explore"
           className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" /> Back to search
+          <ArrowLeft className="w-4 h-4" /> Back to explore
         </Link>
-        <div className="card">
-          <p className="text-bh-text-muted">Builder not found</p>
+        <div className="card text-center py-12" data-testid="builder-not-found">
+          <p className="text-bh-text-muted mb-2">This builder isn't in the public directory yet.</p>
+          <p className="text-xs text-bh-text-dim">
+            Try the <Link to="/explore" className="text-bh-accent hover:underline">explorer</Link> to
+            find active builders, or check back soon — claimed profiles are added regularly.
+          </p>
         </div>
       </div>
     )

@@ -34,9 +34,22 @@ async function signIn(page, email, password) {
 }
 
 async function run() {
+  // Clean up test data before running so the 24h throttle doesn't make
+  // us flaky. The data export endpoint enforces 1 export per 24h per user.
+  try {
+    const { execSync } = await import('child_process')
+    execSync('docker exec builderhunt-db psql -U postgres -d builderhunt -c "DELETE FROM data_export_requests;" 2>/dev/null', { stdio: 'ignore' })
+  } catch {
+    // docker not available — proceed anyway, test may flake on re-runs
+  }
+
   const browser = await chromium.launch()
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   const page = await context.newPage()
+
+  // ====================================================================
+  // PUBLIC: legal pages
+  // ====================================================================
 
   // ====================================================================
   // PUBLIC: legal pages

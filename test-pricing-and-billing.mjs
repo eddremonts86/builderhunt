@@ -194,14 +194,18 @@ async function run() {
   }
 
   // ====================================================================
-  // /settings/billing — user view (deferred: SSR has a re-export issue
-  // with the dynamic-import pattern; the page works in client-only mode
-  // but the SSR render hits a re-export ordering bug in TanStack Start.
-  // Documented as known limitation, page is reachable via /pricing.)
+  // /settings/billing — user view
   // ====================================================================
-  console.log('\n🔧 /settings/billing — user billing view (skipped: SSR re-export issue)')
-  // Skip the page test for now — admin pages + pricing all work
-  check('billing page reachable via /pricing (manual)', true)
+  console.log('\n🔧 /settings/billing — user billing view')
+  await page.goto(`${BASE}/settings/billing`, { waitUntil: 'networkidle' })
+  await page.waitForSelector('[data-testid="billing-settings-page"]', { timeout: 5000 })
+  const currentPlan = await page.$('[data-testid="current-plan"]')
+  check('billing page shows current plan', !!currentPlan)
+  const usage = await page.$('[data-testid="usage-section"]')
+  check('billing page shows usage section', !!usage)
+  const usageSavedSearches = await page.$('[data-testid="usage-savedSearches"]')
+  check('billing page shows saved searches usage', !!usageSavedSearches)
+  await page.screenshot({ path: '/tmp/builderhunt-billing-settings.png', fullPage: true })
 
   // ====================================================================
   // Non-admin gets 403

@@ -112,14 +112,16 @@ export function PersonResultCard({ builder }: { builder: PersonCardData }) {
         )}
       </div>
       <ScoreRing score={builder.score} />
-      <Link
-        to="/builders/$builderId"
-        params={{ builderId: builder.id }}
+      <a
+        href={builder.profileUrl}
+        target="_blank"
+        rel="noopener noreferrer"
         className="btn-ghost btn-sm shrink-0"
         data-testid={`person-card-link-${builder.id}`}
+        data-builder-id={builder.id}
       >
         View
-      </Link>
+      </a>
     </article>
   )
 }

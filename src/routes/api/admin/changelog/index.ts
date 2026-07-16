@@ -57,13 +57,37 @@ export const Route = createFileRoute('/api/admin/changelog/')({
           }
           const slug = parsed.data.slug || slugify(parsed.data.title)
           const id = randomId()
-          await db.insert(changelog).values({
-            id,
-            title: parsed.data.title,
-            content: parsed.data.content,
-            slug,
-            tags: parsed.data.tags,
-          })
+          try {
+            await db.insert(changelog).values({
+              id,
+              title: parsed.data.title,
+              content: parsed.data.content,
+              slug,
+              tags: parsed.data.tags,
+            })
+          } catch (err) {
+            // DrizzleQueryError wraps the underlying Postgres error in `.cause`.
+            // The wrapper's `.message` says "Failed query: ..." — not helpful.
+            // Walk the chain to find the actual error.
+            let cur: unknown = err
+            let isDuplicate = false
+            while (cur && typeof cur === 'object') {
+              const m = (cur as { message?: string; code?: string }).message ?? ''
+              const c = (cur as { code?: string }).code
+              if (m.includes('duplicate key') || c === '23505') {
+                isDuplicate = true
+                break
+              }
+              cur = (cur as { cause?: unknown }).cause
+            }
+            if (isDuplicate) {
+              return Response.json(
+                { error: 'A changelog entry with that slug already exists.', slug },
+                { status: 409 },
+              )
+            }
+            throw err
+          }
           return Response.json({ ok: true, id, slug })
         } catch (err) {
           console.error('admin changelog create error:', err)

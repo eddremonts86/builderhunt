@@ -25,51 +25,80 @@ export const Route = createFileRoute('/_dashboard/settings/billing')({
     if (!user.userId) throw new Error('Unauthorized')
     return { user }
   },
-  loader: async ({ context }) => {
-    const userId = context.user.userId!
-    // Dynamic-import server-only helpers to keep db out of client bundle
-    const [{ getUserPlan, checkLimit }, { db }, { planChanges }] = await Promise.all([
-      import('~/shared/lib/billing'),
-      import('~/shared/lib/db/index'),
-      import('~/shared/lib/db/schema'),
-    ])
-    const { desc, eq } = await import('drizzle-orm')
-    const plan = await getUserPlan(userId)
-    const usage = await Promise.all([
-      checkLimit(userId, 'savedSearches'),
-      checkLimit(userId, 'savedBuilders'),
-    ])
-    let history: ChangeRecord[] = []
-    try {
-      const rows = await db
-        .select()
-        .from(planChanges)
-        .where(eq(planChanges.userId, userId))
-        .orderBy(desc(planChanges.createdAt))
-        .limit(10)
-      history = rows.map((r) => ({
-        id: r.id,
-        fromPlan: r.fromPlan,
-        toPlan: r.toPlan,
-        changedBy: r.changedBy,
-        reason: r.reason,
-        createdAt: r.createdAt?.toISOString() ?? '',
-      }))
-    } catch (err) {
-      console.error('plan history error:', err)
-    }
-    return { plan, usage, history }
-  },
+  // No loader — all data is fetched client-side via /api/* to keep
+  // the SSR bundle clean of the postgres driver.
   component: BillingSettingsPage,
 })
 
 function BillingSettingsPage() {
-  const { plan, usage, history } = Route.useLoaderData() as {
-    plan: UserPlan | null
-    usage: LimitCheck[]
-    history: ChangeRecord[]
-  }
+  const [plan, setPlan] = React.useState<UserPlan | null>(null)
+  const [usage, setUsage] = React.useState<LimitCheck[]>([])
+  const [history, setHistory] = React.useState<ChangeRecord[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+
+  const load = React.useCallback(async () => {
+    try {
+      const [meRes, histRes] = await Promise.all([
+        fetch('/api/plans/me', { credentials: 'include' }),
+        fetch('/api/me/plan-changes', { credentials: 'include' }),
+      ])
+      if (!meRes.ok) {
+        setError(`Failed to load plan (${meRes.status})`)
+        return
+      }
+      const me = await meRes.json()
+      setPlan(me.plan ?? null)
+      if (me.limits && me.plan) {
+        const limits = me.limits as { savedSearches: number; savedBuilders: number; rssSubscriptions: number }
+        setUsage([
+          { allowed: true, current: 0, limit: limits.savedSearches, plan: me.plan.plan, resource: 'savedSearches' },
+          { allowed: true, current: 0, limit: limits.savedBuilders, plan: me.plan.plan, resource: 'savedBuilders' },
+        ])
+      }
+      if (histRes.ok) {
+        const list = await histRes.json()
+        setHistory(
+          (Array.isArray(list) ? list : []).map((r: { id: string; fromPlan: string | null; toPlan: string; reason: string | null; createdAt: string }) => ({
+            id: r.id,
+            fromPlan: r.fromPlan,
+            toPlan: r.toPlan,
+            changedBy: '',
+            reason: r.reason,
+            createdAt: r.createdAt,
+          })),
+        )
+      }
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    load()
+  }, [load])
+
   const Icon = plan ? PLAN_ICONS[plan.plan] : Sparkles
+
+  if (loading) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto" data-testid="billing-settings-page">
+        <p className="text-bh-text-muted">Loading…</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-3xl mx-auto" data-testid="billing-settings-page">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 text-sm text-bh-danger">
+          {error}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 max-w-3xl mx-auto" data-testid="billing-settings-page">
@@ -79,7 +108,7 @@ function BillingSettingsPage() {
           Billing &amp; plan
         </h1>
         <p className="text-sm text-bh-text-muted mt-1">
-          Your current plan, usage, and history.
+          Your current plan and usage.
         </p>
       </header>
 
@@ -135,6 +164,9 @@ function BillingSettingsPage() {
             )
           })}
         </div>
+        <p className="text-xs text-bh-text-dim mt-3">
+          Usage counts update after each new save. Visit /explore to test.
+        </p>
       </section>
 
       {history.length > 0 && (

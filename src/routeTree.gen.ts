@@ -71,6 +71,7 @@ import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashbo
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
+import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
@@ -405,6 +406,11 @@ const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
   path: '/admin/changelog',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const ApiMePlanChangesIndexRoute = ApiMePlanChangesIndexRouteImport.update({
+  id: '/api/me/plan-changes/',
+  path: '/api/me/plan-changes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
   id: '/api/me/delete-account/',
   path: '/api/me/delete-account/',
@@ -603,6 +609,7 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
@@ -686,6 +693,7 @@ export interface FileRoutesByTo {
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -773,6 +781,7 @@ export interface FileRoutesById {
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
+  '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -859,6 +868,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/plan-changes/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -942,6 +952,7 @@ export interface FileRouteTypes {
     | '/api/me/builder'
     | '/api/me/data-export'
     | '/api/me/delete-account'
+    | '/api/me/plan-changes'
   id:
     | '__root__'
     | '/_dashboard'
@@ -1028,6 +1039,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
+    | '/api/me/plan-changes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1094,6 +1106,7 @@ export interface RootRouteChildren {
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
+  ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1532,6 +1545,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminChangelogRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/api/me/plan-changes/': {
+      id: '/api/me/plan-changes/'
+      path: '/api/me/plan-changes'
+      fullPath: '/api/me/plan-changes/'
+      preLoaderRoute: typeof ApiMePlanChangesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/delete-account/': {
       id: '/api/me/delete-account/'
       path: '/api/me/delete-account'
@@ -1844,6 +1864,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
+  ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

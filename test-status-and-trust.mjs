@@ -40,6 +40,15 @@ async function signOut(page) {
 }
 
 async function run() {
+  // Clean up test data from previous runs
+  try {
+    const { execSync } = await import('child_process')
+    execSync(
+      `docker exec builderhunt-db psql -U postgres -d builderhunt -c "DELETE FROM incidents WHERE title LIKE 'E2E%'; DELETE FROM changelog WHERE title LIKE 'E2E%' OR slug LIKE 'e2e%'; DELETE FROM roadmap_items WHERE title LIKE 'E2E%';" 2>/dev/null`,
+      { stdio: 'ignore' },
+    )
+  } catch {}
+
   const browser = await chromium.launch()
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
   const page = await context.newPage()
