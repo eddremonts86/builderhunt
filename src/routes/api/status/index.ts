@@ -18,11 +18,15 @@ async function checkDb(): Promise<CheckResult> {
 }
 
 async function checkRedis(): Promise<CheckResult> {
-  // Try Redis if configured; if not configured, return ok (degraded mode)
+  // Try Redis if configured; if not configured, return ok (degraded mode).
+  // Use a fully-dynamic import so Vite doesn't try to resolve 'ioredis'
+  // at build time when the package isn't installed.
   const url = process.env.REDIS_URL
   if (!url) return { name: 'redis', ok: true, message: 'not configured' }
   try {
-    const { default: Redis } = await import('ioredis')
+    // @ts-expect-error — optional dep, only loaded when REDIS_URL is set
+    const RedisMod = await import(/* @vite-ignore */ 'ioredis')
+    const Redis = RedisMod.default ?? RedisMod
     const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 })
     await client.connect()
     await client.ping()

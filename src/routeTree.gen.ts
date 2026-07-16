@@ -19,6 +19,7 @@ import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
+import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
@@ -30,6 +31,8 @@ import { Route as LegalImprintRouteImport } from './routes/legal/imprint'
 import { Route as LegalCookiesRouteImport } from './routes/legal/cookies'
 import { Route as ChangelogSlugRouteImport } from './routes/changelog/$slug'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
+import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
+import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
@@ -124,6 +127,11 @@ const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ChangelogRoute,
 } as any)
+const BlogIndexRoute = BlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -177,6 +185,16 @@ const ChangelogSlugRoute = ChangelogSlugRouteImport.update({
 const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   id: '/builders/$builderId',
   path: '/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogAtomDotxmlRoute = BlogAtomDotxmlRouteImport.update({
+  id: '/blog/atom.xml',
+  path: '/blog/atom.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BlogSlugRoute = BlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignUpRoute = AuthSignUpRouteImport.update({
@@ -420,6 +438,8 @@ export interface FileRoutesByFullPath {
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/legal/cookies': typeof LegalCookiesRoute
@@ -430,6 +450,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/blog/': typeof BlogIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -485,6 +506,8 @@ export interface FileRoutesByTo {
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/legal/cookies': typeof LegalCookiesRoute
@@ -495,6 +518,7 @@ export interface FileRoutesByTo {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/blog': typeof BlogIndexRoute
   '/changelog': typeof ChangelogIndexRoute
   '/explore': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -553,6 +577,8 @@ export interface FileRoutesById {
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
+  '/blog/$slug': typeof BlogSlugRoute
+  '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
   '/legal/cookies': typeof LegalCookiesRoute
@@ -564,6 +590,7 @@ export interface FileRoutesById {
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
+  '/blog/': typeof BlogIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
   '/explore/': typeof ExploreIndexRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -622,6 +649,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/blog/$slug'
+    | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -632,6 +661,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/blog/'
     | '/changelog/'
     | '/explore/'
     | '/admin/changelog'
@@ -687,6 +717,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/blog/$slug'
+    | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -697,6 +729,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/blog'
     | '/changelog'
     | '/explore'
     | '/admin/changelog'
@@ -754,6 +787,8 @@ export interface FileRouteTypes {
     | '/api/health'
     | '/auth/sign-in'
     | '/auth/sign-up'
+    | '/blog/$slug'
+    | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -765,6 +800,7 @@ export interface FileRouteTypes {
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/_landing/'
+    | '/blog/'
     | '/changelog/'
     | '/explore/'
     | '/_dashboard/admin/changelog'
@@ -821,6 +857,8 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   StatusRoute: typeof StatusRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  BlogSlugRoute: typeof BlogSlugRoute
+  BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
   LegalCookiesRoute: typeof LegalCookiesRoute
   LegalImprintRoute: typeof LegalImprintRoute
@@ -830,6 +868,7 @@ export interface RootRouteChildren {
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
+  BlogIndexRoute: typeof BlogIndexRoute
   ExploreIndexRoute: typeof ExploreIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
@@ -936,6 +975,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChangelogIndexRouteImport
       parentRoute: typeof ChangelogRoute
     }
+    '/blog/': {
+      id: '/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof BlogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_landing/': {
       id: '/_landing/'
       path: '/'
@@ -1011,6 +1057,20 @@ declare module '@tanstack/react-router' {
       path: '/builders/$builderId'
       fullPath: '/builders/$builderId'
       preLoaderRoute: typeof BuildersBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/atom.xml': {
+      id: '/blog/atom.xml'
+      path: '/blog/atom.xml'
+      fullPath: '/blog/atom.xml'
+      preLoaderRoute: typeof BlogAtomDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/blog/$slug': {
+      id: '/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/sign-up': {
@@ -1422,6 +1482,8 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   StatusRoute: StatusRoute,
   ApiHealthRoute: ApiHealthRoute,
+  BlogSlugRoute: BlogSlugRoute,
+  BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
   LegalCookiesRoute: LegalCookiesRoute,
   LegalImprintRoute: LegalImprintRoute,
@@ -1431,6 +1493,7 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
+  BlogIndexRoute: BlogIndexRoute,
   ExploreIndexRoute: ExploreIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,

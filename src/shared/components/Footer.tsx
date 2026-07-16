@@ -32,6 +32,7 @@ export function Footer() {
             <h3 className="font-semibold mb-3 text-sm">Product</h3>
             <ul className="space-y-2 text-sm text-bh-text-muted">
               <li><Link to="/explore" className="hover:text-bh-text transition-colors" data-testid="footer-explore">Explore</Link></li>
+              <li><Link to="/blog" className="hover:text-bh-text transition-colors" data-testid="footer-blog">Blog</Link></li>
               <li><a href="/#how-it-works" className="hover:text-bh-text transition-colors">How it works</a></li>
               <li><a href="/#use-cases" className="hover:text-bh-text transition-colors">Use cases</a></li>
               <li><a href="/#sources" className="hover:text-bh-text transition-colors">Sources</a></li>
