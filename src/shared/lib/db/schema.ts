@@ -212,3 +212,33 @@ export const roadmapVotes = pgTable(
     itemUserUnique: unique('roadmap_votes_item_user').on(t.itemId, t.userId),
   }),
 )
+
+// ---------------------------------------------------------------------------
+// Legal & Compliance (Plan: legal-and-compliance)
+// ---------------------------------------------------------------------------
+
+export const userConsents = pgTable('user_consents', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  document: text('document').notNull(), // 'tos' | 'privacy' | 'cookies'
+  version: text('version').notNull(), // e.g. 'v1.0'
+  acceptedAt: timestamp('accepted_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const dataExportRequests = pgTable('data_export_requests', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'), // 'pending' | 'ready' | 'failed' | 'expired'
+  payload: jsonb('payload').$type<Record<string, unknown>>(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const deletionRequests = pgTable('deletion_requests', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique().references(() => authUsers.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'cancelled'
+  gracePeriodEndsAt: timestamp('grace_period_ends_at', { withTimezone: true }).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})

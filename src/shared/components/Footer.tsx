@@ -60,9 +60,11 @@ export function Footer() {
           <div>
             <h3 className="font-semibold mb-3 text-sm">Legal</h3>
             <ul className="space-y-2 text-sm text-bh-text-muted">
-              <li><a href="/privacy" className="hover:text-bh-text transition-colors">Privacy</a></li>
-              <li><a href="/terms" className="hover:text-bh-text transition-colors">Terms</a></li>
-              <li><a href="https://github.com/builderhunt" className="hover:text-bh-text transition-colors">GitHub</a></li>
+              <li><Link to="/legal/terms" className="hover:text-bh-text transition-colors" data-testid="footer-terms">Terms of Service</Link></li>
+              <li><Link to="/legal/privacy" className="hover:text-bh-text transition-colors" data-testid="footer-privacy">Privacy Policy</Link></li>
+              <li><Link to="/legal/cookies" className="hover:text-bh-text transition-colors" data-testid="footer-cookies">Cookie Policy</Link></li>
+              <li><Link to="/legal/imprint" className="hover:text-bh-text transition-colors" data-testid="footer-imprint">Imprint</Link></li>
+              <li><a href="mailto:privacy@builderhunt.dev" className="hover:text-bh-text transition-colors" data-testid="footer-do-not-sell">Do Not Sell My Info</a></li>
             </ul>
           </div>
         </div>

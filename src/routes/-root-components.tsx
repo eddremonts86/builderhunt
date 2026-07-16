@@ -1,5 +1,7 @@
 import * as React from 'react'
 import { HeadContent, Scripts } from '@tanstack/react-router'
+import { CookieBanner } from '~/shared/components/CookieBanner'
+import { TosModal } from '~/shared/components/TosModal'
 
 export function RootDocument({ children }: { children: React.ReactNode }) {
   return (
@@ -10,6 +12,8 @@ export function RootDocument({ children }: { children: React.ReactNode }) {
       <body suppressHydrationWarning className="bg-app min-h-screen">
         <a href="#main-content" className="skip-link">Skip to main content</a>
         {children}
+        <CookieBanner />
+        <TosModal />
         <Scripts />
       </body>
     </html>
