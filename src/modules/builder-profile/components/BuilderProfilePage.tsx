@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock } from 'lucide-react'
+import { HygieneCard } from '~/shared/components/HygieneCard'
 
 interface Builder {
   id: string
@@ -224,6 +225,18 @@ export function BuilderProfilePage() {
             </a>
           </div>
         </div>
+      </div>
+
+      {/* Project Hygiene — quality signals */}
+      <div className="mb-6">
+        <HygieneCard
+          builder={{
+            followersCount: builder.followersCount,
+            topics: builder.topics,
+            language: builder.language,
+            metadata: builder.metadata as Record<string, unknown> | undefined,
+          }}
+        />
       </div>
 
       {/* Action bar — varies based on auth + claim state */}
