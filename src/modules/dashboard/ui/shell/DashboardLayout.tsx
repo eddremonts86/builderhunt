@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
   LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell, Settings,
+  AlertTriangle, BookOpen, Map, Activity,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 
@@ -31,6 +32,16 @@ const NAV = [
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = React.useState(false)
+  const [isAdmin, setIsAdmin] = React.useState(false)
+
+  React.useEffect(() => {
+    // Check admin status via the me endpoint or a known admin status
+    const adminIds = ((typeof window !== 'undefined' && (window as { __ADMIN_IDS__?: string }).__ADMIN_IDS__) || '').split(',').filter(Boolean)
+    // We can't read env vars in the client, so rely on a fetch
+    fetch('/api/admin/incidents', { credentials: 'include' })
+      .then((r) => setIsAdmin(r.ok))
+      .catch(() => setIsAdmin(false))
+  }, [])
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -85,6 +96,45 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           >
             <Settings className="w-4 h-4" aria-hidden="true" />
             Settings
+          </Link>
+          {isAdmin && (
+            <>
+              <div className="pt-2 pb-1 px-3 text-[10px] uppercase tracking-wider text-bh-text-dim font-semibold">
+                Admin
+              </div>
+              <Link
+                to="/admin/incidents"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-incidents"
+              >
+                <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+                Incidents
+              </Link>
+              <Link
+                to="/admin/changelog"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-changelog"
+              >
+                <BookOpen className="w-4 h-4" aria-hidden="true" />
+                Changelog
+              </Link>
+              <Link
+                to="/admin/roadmap"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-roadmap"
+              >
+                <Map className="w-4 h-4" aria-hidden="true" />
+                Roadmap
+              </Link>
+            </>
+          )}
+          <Link
+            to="/status"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+            data-testid="nav-status"
+          >
+            <Activity className="w-4 h-4 text-bh-success" aria-hidden="true" />
+            Status
           </Link>
           <button
             onClick={handleSignOut}

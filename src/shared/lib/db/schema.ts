@@ -159,3 +159,56 @@ export const onboardingProgress = pgTable('onboarding_progress', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// Status & Trust (Plan: status-and-trust)
+// ---------------------------------------------------------------------------
+
+export const incidents = pgTable('incidents', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: text('status').notNull().default('investigating'), // investigating | identified | monitoring | resolved
+  severity: text('severity').notNull().default('minor'), // minor | major | critical
+  affectedComponents: jsonb('affected_components').$type<string[]>().default([]).notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  identifiedAt: timestamp('identified_at', { withTimezone: true }),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const changelog = pgTable('changelog', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  content: text('content').notNull(), // markdown
+  slug: text('slug').notNull().unique(),
+  tags: jsonb('tags').$type<string[]>().default([]).notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const roadmapItems = pgTable('roadmap_items', {
+  id: text('id').primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: text('status').notNull().default('planned'), // planned | in_progress | shipped
+  shipEstimate: text('ship_estimate'), // free text: "Q3 2026", "Aug 2026", etc.
+  category: text('category').default('general'), // integrations | features | infrastructure
+  sortOrder: integer('sort_order').notNull().default(0),
+  shippedAt: timestamp('shipped_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+export const roadmapVotes = pgTable(
+  'roadmap_votes',
+  {
+    id: text('id').primaryKey(),
+    itemId: text('item_id').notNull().references(() => roadmapItems.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    itemUserUnique: unique('roadmap_votes_item_user').on(t.itemId, t.userId),
+  }),
+)

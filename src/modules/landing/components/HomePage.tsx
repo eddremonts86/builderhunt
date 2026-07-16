@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useSession, signOut } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
+import { Footer } from '~/shared/components/Footer'
 
 /* -------------------------------------------------------------------------- */
 /*  Logo component (inline SVG so we don't depend on the public file at first  */
@@ -519,49 +520,7 @@ export function HomePage() {
       </main>
 
       {/* ───────────────────────── FOOTER ──────────────────────── */}
-      <footer className="border-t border-bh-border bg-bh-bg-alt/40">
-        <div className="container py-12">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mb-8">
-            <div>
-              <Link to="/" className="flex items-center gap-2.5 mb-3">
-                <Logo size={24} />
-                <span className="font-bold">BuilderHunt</span>
-              </Link>
-              <p className="text-sm text-bh-text-muted max-w-xs">
-                Find active open-source builders across the open web. Free during public beta.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3 text-sm">Product</h3>
-              <ul className="space-y-2 text-sm text-bh-text-muted">
-                <li><a href="#how-it-works" className="hover:text-bh-text transition-colors">How it works</a></li>
-                <li><a href="#use-cases" className="hover:text-bh-text transition-colors">Use cases</a></li>
-                <li><a href="#sources" className="hover:text-bh-text transition-colors">Sources</a></li>
-                <li><a href="#faq" className="hover:text-bh-text transition-colors">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3 text-sm">Account</h3>
-              <ul className="space-y-2 text-sm text-bh-text-muted">
-                <li><Link to="/auth/sign-in" className="hover:text-bh-text transition-colors">Sign in</Link></li>
-                <li><Link to="/auth/sign-up" className="hover:text-bh-text transition-colors">Create account</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3 text-sm">Legal</h3>
-              <ul className="space-y-2 text-sm text-bh-text-muted">
-                <li><a href="/privacy" className="hover:text-bh-text transition-colors">Privacy</a></li>
-                <li><a href="/terms" className="hover:text-bh-text transition-colors">Terms</a></li>
-                <li><a href="https://github.com/builderhunt" className="hover:text-bh-text transition-colors">GitHub</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="pt-8 border-t border-bh-border flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-bh-text-dim">
-            <p>© {new Date().getFullYear()} BuilderHunt. Built for builders, by builders.</p>
-            <p>Made with ☕ in Barcelona, Madrid &amp; remote.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </>
   )
 }
