@@ -36,7 +36,16 @@ export function SignUpPage() {
     try {
       const result = await signUpEmail({ email, password, name: name || undefined })
       if (result.data?.user) {
-        navigate({ to: '/dashboard' })
+        // Ensure onboarding row exists, then redirect to the tour
+        try {
+          await fetch('/api/onboarding/complete', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step: 0 }),
+          })
+        } catch {}
+        navigate({ to: '/onboarding/welcome' })
       } else {
         setError(result.error?.message ?? 'Sign up failed. Try again or use a different email.')
       }

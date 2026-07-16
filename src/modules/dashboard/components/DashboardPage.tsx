@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { RecommendationsSection } from './RecommendationsSection'
+import { OnboardingBanner } from './OnboardingBanner'
 import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
@@ -150,6 +151,9 @@ export function DashboardPage() {
           </div>
         </div>
       </header>
+
+      {/* Onboarding banner — only for eligible users */}
+      <OnboardingBanner />
 
       {/* For you — proactive recommendations */}
       <RecommendationsSection />

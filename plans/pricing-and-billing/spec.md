@@ -1,218 +1,162 @@
-# Feature: Pricing & Billing (Stripe)
+# Feature: Pricing & Plans (Admin-Managed, No Paid Services)
 
-## Problem
+## Scope (v1: bootstrap mode)
 
-BuilderHunt hoy es 100% gratis sin modelo de monetización. Para crear una empresa necesitas revenue. Sin pricing:
+**No external paid services.** No Stripe, no Paddle, no Lemonsqueezy.
 
-1. **No podés pagar hosting, dominios, Sentry, Resend, etc.** a escala
-2. **No hay alignment con el usuario**: los free riders se van a frustrar cuando llegue el momento de cobrar
-3. **No podés invertir en growth** sin revenue
-4. **Sin plan limits**, los heavy users pueden abusar (correr 1000 saved queries × infinite scroll = API bills enormes)
+v1 uses **admin-managed plans**: an admin flips a switch in the DB to upgrade/downgrade a user. Real billing integrations come later when there's revenue to pay for them.
 
-## Goal
+This is intentional: at 0 paying customers, integrating a payment processor is a multi-day investment that doesn't pay back. We can validate the tier model with manual plan grants first, then automate when volume justifies it.
 
-Pricing tiers simples con Stripe como payment processor:
+## Tiers (same as the original plan)
 
-| Tier       | Precio     | Destinado a                         | Límites                          |
-|------------|-----------|-------------------------------------|----------------------------------|
-| **Free**    | $0         | Curiosos, devs que exploran        | 3 saved searches, 50 saved builders, RSS público |
-| **Pro**     | $19/mo    | Recruiters / founders activos       | 50 saved searches, unlimited saved builders, smart alerts, semantic search, code fingerprinting |
-| **Team**    | $99/mo    | Equipos de sourcing (3-10 seats)   | Todo Pro + team-synergy, work-sample, shared lists |
+| Tier       | Price     | Audience                         | Limits                          |
+|------------|-----------|----------------------------------|----------------------------------|
+| **Free**    | $0         | Curious, exploring              | 3 saved searches, 50 saved builders, basic RSS |
+| **Pro**     | $19/mo    | Active recruiters/founders       | 50 saved searches, unlimited builders, smart alerts, semantic search, code fingerprinting |
+| **Team**    | $99/mo    | Sourcing teams (3-10 seats)     | Everything in Pro + team-synergy, work-sample, shared lists |
 
-**Anual: 20% off** ($182/yr Pro, $950/yr Team)
+## How users actually upgrade (v1)
 
-## Non-goals
+1. User clicks "Get Pro" on `/pricing`
+2. Modal: "Contact us at hello@builderhunt.dev to upgrade"
+3. Admin sees the request (logged in DB), confirms payment manually (bank transfer, crypto, whatever)
+4. Admin goes to `/admin/users`, finds the user, sets their `plan` to `pro` and `plan_ends_at` to now + 30 days
+5. User's session refreshes, sees Pro features unlocked
 
-- **No es enterprise SSO.** v1 — el team plan asume shared login o Google OAuth
-- **No es self-serve B2B contracts.** Sales-led solo si Team > 10 seats
-- **No es metered pricing.** Hard caps, no "pay per search"
-- **No es multi-currency.** USD v1
-- **No es tax-inclusive.** Stripe Tax v2
-
-## Pricing strategy (why these numbers)
-
-- **$19/mo Pro**: alineado con productos similares (Hunter.io $49, Snov.io $39, Apollo $49). $19 es el sweet spot para un indie dev / solo recruiter que necesita 2-3 features clave.
-- **$99/mo Team**: alineado con Team tiers de Linear ($8/seat), Pitch ($25/seat for 5+). 5 seats incluidos, $20/seat adicional.
-- **Anual 20% off**: estándar SaaS; mejora LTV/cash ratio.
-
-## User stories
-
-1. **Como free user**, quiero ver mis límites actuales claramente y saber qué obtengo al upgrade
-2. **Como usuario en el límite de saved searches**, quiero un paywall que me diga exactamente qué gano con Pro
-3. **Como paid user**, quiero gestionar mi suscripción (cancel, upgrade, change card)
-4. **Como team admin**, quiero invitar miembros, asignar roles, gestionar billing
-5. **Como paid user en trial**, quiero un countdown y un email reminder antes de que termine
+When volume justifies it (50+ paying customers or $1k MRR), we integrate Stripe and automate the upgrade flow.
 
 ## Data model
 
-**New table: `subscriptions`**
+**New table: `plans`** (subscription state per user)
 
 ```sql
-CREATE TABLE subscriptions (
-  id text PRIMARY KEY,
-  user_id text NOT NULL REFERENCES auth_users(id) UNIQUE,
-  stripe_customer_id text NOT NULL,
-  stripe_subscription_id text,
-  plan text NOT NULL,  -- 'free' | 'pro' | 'team'
-  status text NOT NULL, -- 'active' | 'trialing' | 'past_due' | 'canceled'
-  current_period_end timestamp with time zone,
-  cancel_at_period_end boolean DEFAULT false,
+CREATE TABLE plans (
+  user_id text PRIMARY KEY REFERENCES auth_users(id),
+  plan text NOT NULL DEFAULT 'free',  -- 'free' | 'pro' | 'team'
+  status text NOT NULL DEFAULT 'active',  -- 'active' | 'past_due' | 'canceled'
+  plan_ends_at timestamp with time zone,
   trial_ends_at timestamp with time zone,
+  notes text,  -- admin notes (e.g., "paid via bank transfer 2026-08")
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now()
 );
-
-CREATE INDEX idx_subscriptions_user_id ON subscriptions(user_id);
-CREATE INDEX idx_subscriptions_stripe_customer_id ON subscriptions(stripe_customer_id);
 ```
 
-**New table: `team_memberships`** (Team plan)
+**New table: `plan_changes`** (audit log)
 
 ```sql
-CREATE TABLE team_memberships (
+CREATE TABLE plan_changes (
   id text PRIMARY KEY,
-  team_owner_id text NOT NULL REFERENCES auth_users(id),
-  member_id text NOT NULL REFERENCES auth_users(id),
-  role text NOT NULL DEFAULT 'member',  -- 'owner' | 'admin' | 'member'
-  created_at timestamp with time zone DEFAULT now(),
-  UNIQUE(team_owner_id, member_id)
+  user_id text NOT NULL REFERENCES authUsers(id),
+  from_plan text,
+  to_plan text NOT NULL,
+  changed_by text NOT NULL,  -- userId of admin who made the change
+  reason text,
+  created_at timestamp with time zone DEFAULT now()
 );
 ```
 
-## UX flow
+**New table: `plan_requests`** (user clicks "Get Pro" — admin sees a queue)
 
-### Pricing page (`/pricing`)
-
-- **3 tier cards** side by side
-- Free card: "Current plan" if applicable
-- Pro/Team cards: "Get Pro" / "Start free trial" CTA
-- Bottom: comparison table with all features
-- FAQ section: "Can I cancel anytime?", "What happens to my saved builders if I downgrade?"
-
-### Upgrade modal (in-app paywall)
-
-When user hits a limit:
-```
-┌──────────────────────────────────────────────┐
-│  You've used all 3 saved searches.            │
-│                                              │
-│  Pro gives you:                              │
-│  ✓ 50 saved searches                         │
-│  ✓ Unlimited saved builders                  │
-│  ✓ Smart email alerts                        │
-│  ✓ Semantic search                           │
-│  ✓ Code fingerprinting                       │
-│                                              │
-│  [ Start 14-day free trial ]                 │
-│  [ Maybe later ]                             │
-└──────────────────────────────────────────────┘
+```sql
+CREATE TABLE plan_requests (
+  id text PRIMARY KEY,
+  user_id text NOT NULL REFERENCES authUsers(id),
+  requested_plan text NOT NULL,  -- 'pro' | 'team'
+  status text NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'declined'
+  message text,
+  created_at timestamp with time zone DEFAULT now()
+);
 ```
 
-### Stripe checkout
+**New env var**: `ADMIN_USER_IDS` (comma-separated list of user IDs that can access /admin)
 
-- Click "Get Pro" → redirect to Stripe Checkout (hosted, PCI-compliant)
-- Webhook updates `subscriptions` table on `customer.subscription.*` events
-- User redirected to `/dashboard?upgraded=1` with success toast
+## Limits enforcement
 
-### Customer portal
-
-- `/settings/billing` — view current plan, manage subscription via Stripe Customer Portal link
-- Cancel, update card, download invoices — all via Stripe's hosted portal
-
-## Enforcement (server-side)
-
-**Hard limits enforced in API:**
+Same as the original plan, but enforced server-side via a `checkLimit()` helper:
 
 ```ts
-const FREE_LIMITS = { savedSearches: 3, savedBuilders: 50 }
-const PRO_LIMITS = { savedSearches: 50, savedBuilders: Infinity }
+// src/shared/lib/limits.ts
+const FREE_LIMITS = { savedSearches: 3, savedBuilders: 50, rssSubscriptions: 3 }
+const PRO_LIMITS = { savedSearches: 50, savedBuilders: Infinity, rssSubscriptions: Infinity }
+const TEAM_LIMITS = PRO_LIMITS // same as Pro for v1
 
-async function checkLimit(userId, resource) {
-  const sub = await getSubscription(userId)
-  const limits = sub.plan === 'pro' || sub.plan === 'team' ? PRO_LIMITS : FREE_LIMITS
+export async function checkLimit(userId, resource) {
+  const plan = await getUserPlan(userId)
+  const limits = plan === 'team' ? TEAM_LIMITS : plan === 'pro' ? PRO_LIMITS : FREE_LIMITS
   const current = await countResource(userId, resource)
-  return current < limits[resource]
+  return { allowed: current < limits[resource], current, limit: limits[resource], plan }
 }
 ```
 
-**Resources affected:**
-- POST /api/queries — check savedSearches limit
-- POST /api/builders (save) — check savedBuilders limit
-- /api/recommendations — only Pro+ sees the "For you" section
-- /api/alerts (smart alerts, when implemented) — Pro+ only
-- /api/semantic-search — Pro+ only
-- RSS feeds — Free, public; Pro+ get rich content
+**Resources affected**:
+- POST `/api/queries` — savedSearches limit
+- POST `/api/builders/:id/save` — savedBuilders limit
+- RSS subscriptions — rssSubscriptions limit
+- Smart alerts — Pro+ only
 - Code fingerprinting — Pro+ only
-- Project hygiene signals — Pro+ only
+- Team-synergy — Team only
 
-**Soft limits** (warning, not blocked): exports > 100 builders, saved searches > 10
+## API endpoints
 
-**No enforcement needed for:**
-- Public read endpoints (search, profile pages)
-- RSS feeds (public by design)
-- Auth
+- `GET /api/plans/me` — current user's plan
+- `POST /api/plans/request-upgrade` — user requests upgrade (creates `plan_request`)
+- `GET /api/admin/plan-requests` — admin sees queue
+- `POST /api/admin/plans/:userId` — admin sets plan (creates `plan_changes` entry)
+- `GET /api/admin/users` — list users with their plans
+- `GET /api/admin/plans` — all subscriptions
 
-## Webhook events
+## UX
 
-```ts
-// POST /api/stripe/webhook
-async function handleWebhook(event) {
-  switch (event.type) {
-    case 'customer.subscription.created':
-    case 'customer.subscription.updated':
-      await upsertSubscription(event.data.object)
-      break
-    case 'customer.subscription.deleted':
-      await markCanceled(event.data.object)
-      break
-    case 'invoice.paid':
-      await extendPeriod(event.data.object)
-      break
-    case 'invoice.payment_failed':
-      await markPastDue(event.data.object)
-      break
-  }
-  return new Response('ok')
-}
-```
+### /pricing (public)
+
+- 3 tier cards
+- Monthly/Annual toggle
+- Free card: "Current plan" if applicable
+- Pro/Team cards: "Get Pro" / "Contact us" button (mailto or modal)
+- Comparison table
+- FAQ
+
+### /admin (admin only, gated by `ADMIN_USER_IDS` env)
+
+- `/admin/users` — table of all users with their current plan
+  - Click user → modal to set plan
+- `/admin/plan-requests` — pending upgrade requests, with user contact info
+- `/admin/incidents`, `/admin/changelog` — other admin tasks (separate plan)
+
+## Migration path (when ready to add Stripe)
+
+The `plans` table is already shaped to match what Stripe would sync:
+- `status` = Stripe `subscription.status`
+- `plan_ends_at` = Stripe `current_period_end`
+- `plan` = Stripe `price.lookup_key`
+
+When Stripe is added later:
+- Add a `stripe_customer_id` and `stripe_subscription_id` column
+- Webhook updates the same `plans` table
+- Admin UI is unchanged
+- Manual `POST /api/admin/plans/:userId` is replaced with auto-sync
+
+The limits enforcement and UI work today; only the billing integration is deferred.
 
 ## Success metrics
 
-- **Primary**: Free → Pro conversion rate. Target: 3% within 30 days of launch
-- **Secondary**: MRR (monthly recurring revenue). Target: $1k MRR by month 2, $10k by month 6
-- **Tertiary**: Churn rate. Target: < 5% monthly
-- **Guardrail**: % of users who hit the free limit and bounce (without upgrading). Target: < 50% (if too high, the limits are too aggressive)
+- **Primary**: Free → Pro conversion (admin-granted). Track in `plan_changes`.
+- **Secondary**: # of plan_requests per week (proxy for "intent to pay")
+- **Tertiary**: Churn (# of `pro` users downgraded back to `free` in a month)
 
 ## Out of scope (v1)
 
-- Multi-currency
-- Tax compliance (Stripe Tax)
-- Annual plan auto-renewal emails (Stripe handles)
-- Custom team plans (>10 seats, sales-led)
-- Coupons / promo codes (Stripe handles, but no UI)
-- Refund handling (manual via Stripe dashboard)
+- Self-serve payment (no Stripe)
+- Subscription auto-renewal (admin renews manually)
+- Tax compliance
+- Coupons / promo codes
+- Refund handling
 
 ## Open questions
 
-- **Free tier limits**: 3 saved searches seems low. Should it be 5? Trade-off: lower = more conversions; higher = less pressure to upgrade.
-- **Trial length**: 14 days is standard. 7 days forces faster conversion. 30 days is generous.
-- **Team plan seats**: 5 included, $20/extra? Or 3 + $25/extra?
+- **How do we price in v1 if we can't take money?** Validation: do people upgrade when we ask them to email us? This is the real test.
+- **Should we use Stripe Atlas to incorporate?** That's a separate plan (legal-and-compliance).
 
-## Dependencies
-
-- New package: `stripe` (Node SDK)
-- New env var: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PRO_MONTHLY`, `STRIPE_PRICE_ID_PRO_ANNUAL`, `STRIPE_PRICE_ID_TEAM_MONTHLY`
-- New tables: `subscriptions`, `team_memberships`
-- Schema migrations: 2 new tables
-
-## Estimated effort
-
-| Phase | Effort |
-|-------|--------|
-| 1 — Data model + Stripe SDK | S (3-4h) |
-| 2 — Pricing page UI | S (3-4h) |
-| 3 — Checkout + webhooks | M (4-6h) |
-| 4 — Limit enforcement | M (4-6h) |
-| 5 — Customer portal + settings | S (2-3h) |
-| 6 — Team plan (members, roles) | M (4-6h) |
-| **Total** | **~3-4 days** |
+## Estimated effort: 1-2 days (much less than the Stripe version)

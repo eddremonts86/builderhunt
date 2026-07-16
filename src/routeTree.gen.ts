@@ -13,6 +13,10 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
+import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
+import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
+import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
+import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
@@ -24,6 +28,9 @@ import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/ind
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
+import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
+import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
@@ -54,6 +61,26 @@ const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => LandingRouteRoute,
+} as any)
+const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
+  id: '/onboarding/welcome',
+  path: '/onboarding/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingSuccessRoute = OnboardingSuccessRouteImport.update({
+  id: '/onboarding/success',
+  path: '/onboarding/success',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingSearchRoute = OnboardingSearchRouteImport.update({
+  id: '/onboarding/search',
+  path: '/onboarding/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
+  id: '/onboarding/save',
+  path: '/onboarding/save',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   id: '/builders/$builderId',
@@ -108,6 +135,21 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
 const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   id: '/api/search/builders',
   path: '/api/search/builders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
+  id: '/api/onboarding/status',
+  path: '/api/onboarding/status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingSkipRoute = ApiOnboardingSkipRouteImport.update({
+  id: '/api/onboarding/skip',
+  path: '/api/onboarding/skip',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnboardingCompleteRoute = ApiOnboardingCompleteRouteImport.update({
+  id: '/api/onboarding/complete',
+  path: '/api/onboarding/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
@@ -181,11 +223,18 @@ export interface FileRoutesByFullPath {
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/save': typeof OnboardingSaveRoute
+  '/onboarding/search': typeof OnboardingSearchRoute
+  '/onboarding/success': typeof OnboardingSuccessRoute
+  '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
+  '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
+  '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -208,11 +257,18 @@ export interface FileRoutesByTo {
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/save': typeof OnboardingSaveRoute
+  '/onboarding/search': typeof OnboardingSearchRoute
+  '/onboarding/success': typeof OnboardingSuccessRoute
+  '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
+  '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
+  '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -237,12 +293,19 @@ export interface FileRoutesById {
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
+  '/onboarding/save': typeof OnboardingSaveRoute
+  '/onboarding/search': typeof OnboardingSearchRoute
+  '/onboarding/success': typeof OnboardingSuccessRoute
+  '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
+  '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
+  '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -267,11 +330,18 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/builders/$builderId'
+    | '/onboarding/save'
+    | '/onboarding/search'
+    | '/onboarding/success'
+    | '/onboarding/welcome'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/onboarding/complete'
+    | '/api/onboarding/skip'
+    | '/api/onboarding/status'
     | '/api/search/builders'
     | '/dashboard/'
     | '/exports/'
@@ -294,11 +364,18 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/builders/$builderId'
+    | '/onboarding/save'
+    | '/onboarding/search'
+    | '/onboarding/success'
+    | '/onboarding/welcome'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/onboarding/complete'
+    | '/api/onboarding/skip'
+    | '/api/onboarding/status'
     | '/api/search/builders'
     | '/dashboard'
     | '/exports'
@@ -322,12 +399,19 @@ export interface FileRouteTypes {
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/builders/$builderId'
+    | '/onboarding/save'
+    | '/onboarding/search'
+    | '/onboarding/success'
+    | '/onboarding/welcome'
     | '/_landing/'
     | '/api/auth/$'
     | '/api/builders/$builderId'
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/onboarding/complete'
+    | '/api/onboarding/skip'
+    | '/api/onboarding/status'
     | '/api/search/builders'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -350,11 +434,18 @@ export interface RootRouteChildren {
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ApiHealthRoute: typeof ApiHealthRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
+  OnboardingSaveRoute: typeof OnboardingSaveRoute
+  OnboardingSearchRoute: typeof OnboardingSearchRoute
+  OnboardingSuccessRoute: typeof OnboardingSuccessRoute
+  OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
+  ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
+  ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
+  ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
@@ -393,6 +484,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof LandingIndexRouteImport
       parentRoute: typeof LandingRouteRoute
+    }
+    '/onboarding/welcome': {
+      id: '/onboarding/welcome'
+      path: '/onboarding/welcome'
+      fullPath: '/onboarding/welcome'
+      preLoaderRoute: typeof OnboardingWelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/success': {
+      id: '/onboarding/success'
+      path: '/onboarding/success'
+      fullPath: '/onboarding/success'
+      preLoaderRoute: typeof OnboardingSuccessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/search': {
+      id: '/onboarding/search'
+      path: '/onboarding/search'
+      fullPath: '/onboarding/search'
+      preLoaderRoute: typeof OnboardingSearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding/save': {
+      id: '/onboarding/save'
+      path: '/onboarding/save'
+      fullPath: '/onboarding/save'
+      preLoaderRoute: typeof OnboardingSaveRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/builders/$builderId': {
       id: '/builders/$builderId'
@@ -469,6 +588,27 @@ declare module '@tanstack/react-router' {
       path: '/api/search/builders'
       fullPath: '/api/search/builders'
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/status': {
+      id: '/api/onboarding/status'
+      path: '/api/onboarding/status'
+      fullPath: '/api/onboarding/status'
+      preLoaderRoute: typeof ApiOnboardingStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/skip': {
+      id: '/api/onboarding/skip'
+      path: '/api/onboarding/skip'
+      fullPath: '/api/onboarding/skip'
+      preLoaderRoute: typeof ApiOnboardingSkipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/onboarding/complete': {
+      id: '/api/onboarding/complete'
+      path: '/api/onboarding/complete'
+      fullPath: '/api/onboarding/complete'
+      preLoaderRoute: typeof ApiOnboardingCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/feeds/$searchId': {
@@ -623,11 +763,18 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ApiHealthRoute: ApiHealthRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
+  OnboardingSaveRoute: OnboardingSaveRoute,
+  OnboardingSearchRoute: OnboardingSearchRoute,
+  OnboardingSuccessRoute: OnboardingSuccessRoute,
+  OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
+  ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
+  ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
+  ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,

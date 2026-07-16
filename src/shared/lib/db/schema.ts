@@ -142,3 +142,20 @@ export const builderProfileViews = pgTable(
     builderIdx: index('builder_views_builder_idx').on(t.builderId),
   }),
 )
+
+// ---------------------------------------------------------------------------
+// Onboarding (Plan: onboarding-flow)
+// ---------------------------------------------------------------------------
+
+export const onboardingProgress = pgTable('onboarding_progress', {
+  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+  step: integer('step').notNull().default(0), // 0..3
+  completed: boolean('completed').notNull().default(false),
+  skipped: boolean('skipped').notNull().default(false),
+  skippedCount: integer('skipped_count').notNull().default(0),
+  firstQueryId: text('first_query_id'),
+  firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
