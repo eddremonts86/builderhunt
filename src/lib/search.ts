@@ -36,10 +36,27 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   const { keywords, sources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
 
-  // Check cache
+  // Check in-memory cache first
   const cached = cache.get(cacheKeyStr)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return sortByScore(scoreBuilders(cached.results))
+  }
+
+  // Check Redis cache (if available)
+  try {
+    const { getRedis } = await import('~/shared/lib/redis')
+    const redis = await getRedis()
+    if (redis) {
+      const redisKey = `search:${cacheKeyStr}`
+      const cachedRaw = await redis.get(redisKey)
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw) as RawBuilder[]
+        cache.set(cacheKeyStr, { results: parsed, timestamp: Date.now() })
+        return sortByScore(scoreBuilders(parsed))
+      }
+    }
+  } catch {
+    // Redis unavailable — fall through to live search
   }
 
   const tasks: Promise<RawBuilder[]>[] = []
@@ -71,6 +88,19 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
 
   const deduped = deduplicateBuilders(filtered)
   cache.set(cacheKeyStr, { results: deduped, timestamp: Date.now() })
+
+  // Write-through to Redis (best-effort, fire-and-forget)
+  try {
+    const { getRedis } = await import('~/shared/lib/redis')
+    const redis = await getRedis()
+    if (redis) {
+      const redisKey = `search:${cacheKeyStr}`
+      // 5 minute TTL — matches in-memory CACHE_TTL
+      await redis.set(redisKey, JSON.stringify(deduped), 'EX', 300).catch(() => null)
+    }
+  } catch {
+    // Redis unavailable — in-memory cache is enough
+  }
 
   return sortByScore(scoreBuilders(deduped))
 }

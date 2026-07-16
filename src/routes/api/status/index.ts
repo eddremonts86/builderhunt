@@ -17,6 +17,17 @@ async function checkDb(): Promise<CheckResult> {
   }
 }
 
+async function checkMemory(): Promise<CheckResult> {
+  const mem = process.memoryUsage()
+  const rssMB = mem.rss / 1024 / 1024
+  // Flag if RSS > 1GB
+  return {
+    name: 'memory',
+    ok: rssMB < 1024,
+    message: rssMB < 1024 ? `${rssMB.toFixed(0)}MB rss` : `${rssMB.toFixed(0)}MB rss — high`,
+  }
+}
+
 async function checkRedis(): Promise<CheckResult> {
   // Try Redis if configured; if not configured, return ok (degraded mode).
   // Use a fully-dynamic import so Vite doesn't try to resolve 'ioredis'
@@ -42,14 +53,18 @@ export const Route = createFileRoute('/api/status/')({
   server: {
     handlers: {
       GET: async () => {
-        const [db, redis] = await Promise.all([checkDb(), checkRedis()])
-        const allOk = [db, redis].every((c) => c.ok)
+        const [db, redis, memory] = await Promise.all([
+          checkDb(),
+          checkRedis(),
+          checkMemory(),
+        ])
+        const allOk = [db, redis, memory].every((c) => c.ok)
         return Response.json(
           {
             status: allOk ? 'ok' : 'degraded',
             version: '1.0.0',
             uptime: process.uptime(),
-            checks: { db, redis },
+            checks: { db, redis, memory },
             timestamp: new Date().toISOString(),
           },
           { status: allOk ? 200 : 503 },

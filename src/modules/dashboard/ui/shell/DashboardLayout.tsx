@@ -119,6 +119,14 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 Admin
               </div>
               <Link
+                to="/admin/metrics"
+                className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
+                data-testid="admin-nav-metrics"
+              >
+                <Activity className="w-4 h-4" aria-hidden="true" />
+                Metrics
+              </Link>
+              <Link
                 to="/admin/users"
                 className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
                 data-testid="admin-nav-users"
