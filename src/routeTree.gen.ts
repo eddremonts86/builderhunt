@@ -10,11 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StatusRouteImport } from './routes/status'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as RoadmapRouteImport } from './routes/roadmap'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
+import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
@@ -45,6 +48,7 @@ import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/build
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
+import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
@@ -77,6 +81,16 @@ const StatusRoute = StatusRouteImport.update({
   path: '/status',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
+  id: '/robots.txt',
+  path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RoadmapRoute = RoadmapRouteImport.update({
   id: '/roadmap',
   path: '/roadmap',
@@ -98,6 +112,11 @@ const LandingRouteRoute = LandingRouteRouteImport.update({
 } as any)
 const DashboardRouteRoute = DashboardRouteRouteImport.update({
   id: '/_dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExploreIndexRoute = ExploreIndexRouteImport.update({
+  id: '/explore/',
+  path: '/explore/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
@@ -250,6 +269,11 @@ const ApiOnboardingCompleteRoute = ApiOnboardingCompleteRouteImport.update({
   path: '/api/onboarding/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
+  id: '/api/og/explore',
+  path: '/api/og/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
   id: '/api/feeds/$searchId',
   path: '/api/feeds/$searchId',
@@ -390,6 +414,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
   '/roadmap': typeof RoadmapRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -405,6 +431,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/changelog/': typeof ChangelogIndexRoute
+  '/explore/': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -415,6 +442,7 @@ export interface FileRoutesByFullPath {
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
@@ -451,6 +479,8 @@ export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/roadmap': typeof RoadmapRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -466,6 +496,7 @@ export interface FileRoutesByTo {
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/changelog': typeof ChangelogIndexRoute
+  '/explore': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -476,6 +507,7 @@ export interface FileRoutesByTo {
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
@@ -515,6 +547,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
   '/roadmap': typeof RoadmapRoute
+  '/robots.txt': typeof RobotsDottxtRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/status': typeof StatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/sign-in': typeof AuthSignInRoute
@@ -531,6 +565,7 @@ export interface FileRoutesById {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
+  '/explore/': typeof ExploreIndexRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -541,6 +576,7 @@ export interface FileRoutesById {
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
@@ -580,6 +616,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/changelog'
     | '/roadmap'
+    | '/robots.txt'
+    | '/sitemap.xml'
     | '/status'
     | '/api/health'
     | '/auth/sign-in'
@@ -595,6 +633,7 @@ export interface FileRouteTypes {
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/changelog/'
+    | '/explore/'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/roadmap'
@@ -605,6 +644,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
@@ -641,6 +681,8 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/roadmap'
+    | '/robots.txt'
+    | '/sitemap.xml'
     | '/status'
     | '/api/health'
     | '/auth/sign-in'
@@ -656,6 +698,7 @@ export interface FileRouteTypes {
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/changelog'
+    | '/explore'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/roadmap'
@@ -666,6 +709,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
@@ -704,6 +748,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/changelog'
     | '/roadmap'
+    | '/robots.txt'
+    | '/sitemap.xml'
     | '/status'
     | '/api/health'
     | '/auth/sign-in'
@@ -720,6 +766,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/_landing/'
     | '/changelog/'
+    | '/explore/'
     | '/_dashboard/admin/changelog'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/roadmap'
@@ -730,6 +777,7 @@ export interface FileRouteTypes {
     | '/api/dashboard/stats'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
@@ -769,6 +817,8 @@ export interface RootRouteChildren {
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ChangelogRoute: typeof ChangelogRouteWithChildren
   RoadmapRoute: typeof RoadmapRoute
+  RobotsDottxtRoute: typeof RobotsDottxtRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   StatusRoute: typeof StatusRoute
   ApiHealthRoute: typeof ApiHealthRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
@@ -780,12 +830,14 @@ export interface RootRouteChildren {
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
+  ExploreIndexRoute: typeof ExploreIndexRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
+  ApiOgExploreRoute: typeof ApiOgExploreRoute
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
@@ -821,6 +873,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StatusRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/robots.txt': {
+      id: '/robots.txt'
+      path: '/robots.txt'
+      fullPath: '/robots.txt'
+      preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/roadmap': {
       id: '/roadmap'
       path: '/roadmap'
@@ -854,6 +920,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof DashboardRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/explore/': {
+      id: '/explore/'
+      path: '/explore'
+      fullPath: '/explore/'
+      preLoaderRoute: typeof ExploreIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/changelog/': {
@@ -1064,6 +1137,13 @@ declare module '@tanstack/react-router' {
       path: '/api/onboarding/complete'
       fullPath: '/api/onboarding/complete'
       preLoaderRoute: typeof ApiOnboardingCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og/explore': {
+      id: '/api/og/explore'
+      path: '/api/og/explore'
+      fullPath: '/api/og/explore'
+      preLoaderRoute: typeof ApiOgExploreRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/feeds/$searchId': {
@@ -1338,6 +1418,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ChangelogRoute: ChangelogRouteWithChildren,
   RoadmapRoute: RoadmapRoute,
+  RobotsDottxtRoute: RobotsDottxtRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   StatusRoute: StatusRoute,
   ApiHealthRoute: ApiHealthRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
@@ -1349,12 +1431,14 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
+  ExploreIndexRoute: ExploreIndexRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
+  ApiOgExploreRoute: ApiOgExploreRoute,
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
