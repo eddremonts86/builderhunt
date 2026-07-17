@@ -34,7 +34,7 @@ export function SignUpPage() {
     setError('')
     setLoading(true)
     try {
-      const result = await signUpEmail({ email, password, name: name || undefined })
+      const result = await signUpEmail({ email, password, name })
       if (result.data?.user) {
         // Ensure onboarding row exists, then redirect to the tour
         try {
@@ -49,7 +49,7 @@ export function SignUpPage() {
       } else {
         setError(result.error?.message ?? 'Sign up failed. Try again or use a different email.')
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)

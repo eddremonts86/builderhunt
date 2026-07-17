@@ -1,5 +1,4 @@
 import * as React from 'react'
-import { Link } from '@tanstack/react-router'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon } from '~/modules/landing/components/BrandIcons'
 
 export interface PersonCardData {

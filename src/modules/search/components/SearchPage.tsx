@@ -1,7 +1,7 @@
 import * as React from 'react'
 import {
   Search, X, Bookmark, ExternalLink, Code, Filter, Clock, Hash,
-  TrendingUp, Activity, Save, Lightbulb, ChevronDown, Sparkles,
+  TrendingUp, Save, Lightbulb, ChevronDown, Sparkles,
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { useSearch } from '@tanstack/react-router'
@@ -101,9 +101,11 @@ export function SearchPage() {
       initialQAppliedRef.current = true
       setQuery(search.q)
       // Defer to next tick so state is set
+      // eslint-disable-next-line react-hooks/immutability -- runSearch is defined below but only invoked async after mount, once all bindings are initialized
       setTimeout(() => runSearch(search.q), 0)
     }
-  }, []) // run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
+  }, [])
   const [activeSources, setActiveSources] = React.useState<Set<Source>>(
     new Set(DEFAULT_ACTIVE_SOURCES),
   )
@@ -222,8 +224,8 @@ export function SearchPage() {
       const data = await res.json()
       setResults(data.builders ?? [])
       setHasMore(Boolean(data.hasMore) && (data.builders?.length ?? 0) > 0)
-    } catch (e: any) {
-      setError(e.message ?? 'Search failed. Please try again.')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Search failed. Please try again.')
       setResults([])
       setHasMore(false)
     } finally {
@@ -1224,17 +1226,4 @@ function SortMenu({ value, onChange }: { value: SortBy; onChange: (v: SortBy) =>
       )}
     </div>
   )
-}
-
-function formatRelativeDate(iso: string): string {
-  const date = Date.parse(iso)
-  if (isNaN(date)) return ''
-  const diff = Date.now() - date
-  const day = 24 * 60 * 60 * 1000
-  if (diff < day) return 'today'
-  if (diff < 2 * day) return 'yesterday'
-  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`
-  if (diff < 30 * day) return `${Math.floor(diff / (7 * day))} weeks ago`
-  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))} months ago`
-  return `${Math.floor(diff / (365 * day))} years ago`
 }

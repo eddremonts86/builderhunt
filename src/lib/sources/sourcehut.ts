@@ -1,5 +1,5 @@
 import { env } from '~/shared/lib/env'
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 /**
  * SourceHut source — small-but-loyal OSS forge.
@@ -21,15 +21,6 @@ interface SHUser {
   description?: string
   location?: string
   url?: string
-}
-
-interface SHRepo {
-  name: string
-  description?: string
-  visibility: string
-  created?: string
-  updated?: string
-  owner: { canonicalName: string }
 }
 
 const SH_GQL = 'https://meta.sr.ht/query'

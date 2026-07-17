@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Sparkles, ExternalLink, Bookmark, X, Search, ArrowRight } from 'lucide-react'
+import { Sparkles, ExternalLink, X, Search, ArrowRight } from 'lucide-react'
 
 interface Recommendation {
   builder: {
@@ -242,7 +242,6 @@ function RecommendationCard({
         <div className="flex items-start gap-2.5">
           {/* Avatar */}
           {builder.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={builder.avatarUrl}
               alt=""

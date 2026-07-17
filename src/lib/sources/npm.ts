@@ -1,4 +1,4 @@
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 /**
  * npm registry source — package maintainers as a class of builders that

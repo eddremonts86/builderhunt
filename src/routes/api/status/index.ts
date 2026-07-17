@@ -35,7 +35,6 @@ async function checkRedis(): Promise<CheckResult> {
   const url = process.env.REDIS_URL
   if (!url) return { name: 'redis', ok: true, message: 'not configured' }
   try {
-    // @ts-expect-error — optional dep, only loaded when REDIS_URL is set
     const RedisMod = await import(/* @vite-ignore */ 'ioredis')
     const Redis = RedisMod.default ?? RedisMod
     const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 })

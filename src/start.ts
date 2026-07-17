@@ -1,3 +1,3 @@
 import { createStart } from '@tanstack/react-start'
 
-export const startInstance = createStart(() => ({ ssr: true }))
+export const startInstance = createStart(() => ({ defaultSsr: true }))

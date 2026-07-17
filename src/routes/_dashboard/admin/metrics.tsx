@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Activity, Users, Database, Cpu, RefreshCw } from 'lucide-react'
+import { Activity, Database, Cpu, RefreshCw } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 interface MetricsResponse {

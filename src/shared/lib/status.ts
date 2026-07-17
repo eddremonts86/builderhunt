@@ -1,5 +1,3 @@
-import type { ScoredBuilder } from '~/lib/search'
-
 /**
  * Status page aggregator. Pure functions, testable.
  */

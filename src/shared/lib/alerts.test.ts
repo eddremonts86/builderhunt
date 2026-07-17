@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evaluateMatch, type TriggerConditions } from './alerts'
+import { evaluateMatch } from './alerts'
 
 describe('evaluateMatch', () => {
   it('matches any_activity always when no other filters', () => {

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { Sparkles, X } from 'lucide-react'
 
 interface OnboardingStatus {
@@ -15,7 +15,6 @@ const DISMISS_KEY = 'bh_onboarding_banner_dismissed'
 export function OnboardingBanner() {
   const [status, setStatus] = React.useState<OnboardingStatus | null>(null)
   const [dismissed, setDismissed] = React.useState<boolean>(false)
-  const navigate = useNavigate()
 
   React.useEffect(() => {
     try {

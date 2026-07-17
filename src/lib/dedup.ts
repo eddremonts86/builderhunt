@@ -1,9 +1,4 @@
-import { RawBuilder } from '~/lib/sources/github'
-
-interface DeduplicationKey {
-  username: string
-  source: string
-}
+import type { RawBuilder } from '~/lib/sources/types'
 
 export function deduplicateBuilders(builders: RawBuilder[]): RawBuilder[] {
   const seen = new Map<string, RawBuilder>()

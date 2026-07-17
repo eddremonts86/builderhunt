@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { writeFileSync, mkdirSync, rmSync } from 'fs'
 import { join } from 'path'
 
@@ -26,8 +26,9 @@ More content here.
     )
   })
 
-  // Clean up after the run (but the test might run multiple times in watch)
-  // Using process.exit isn't ideal in tests; just leave the file
+  afterAll(() => {
+    rmSync(testFile, { force: true })
+  })
 
   it('loads a post by slug', async () => {
     const { getPostBySlug } = await import('./blog')

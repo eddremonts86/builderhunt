@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { db } from '~/shared/lib/db/index'
 import { builders } from '~/shared/lib/db/schema'
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 
 export const Route = createFileRoute('/api/builders/recent/')({
   component: () => null,

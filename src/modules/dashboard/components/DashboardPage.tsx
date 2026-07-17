@@ -407,31 +407,6 @@ function StatCard({
   )
 }
 
-function EmptyState({
-  icon: Icon,
-  title,
-  body,
-  cta,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  title: string
-  body: string
-  cta: { to: string; label: string }
-}) {
-  return (
-    <div className="card text-center py-10">
-      <div className="inline-flex w-12 h-12 rounded-xl bg-bh-surface-2 border border-bh-border items-center justify-center mb-4">
-        <Icon className="w-6 h-6 text-bh-text-muted" aria-hidden="true" />
-      </div>
-      <p className="font-semibold text-bh-text mb-1">{title}</p>
-      <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-4">{body}</p>
-      <Link to={cta.to} className="btn-secondary btn-sm inline-flex">
-        {cta.label} <ArrowRight className="w-3 h-3" aria-hidden="true" />
-      </Link>
-    </div>
-  )
-}
-
 /* -------------------------------------------------------------------------- */
 /*  SavedSearchRow — Run / Export / RSS / Delete actions per query              */
 /* -------------------------------------------------------------------------- */
@@ -488,8 +463,8 @@ function SavedSearchRow({
       downloadBlob(csv, filename, 'text/csv')
       setExportMsg({ ok: true, text: `Exported ${filtered.length} ${kind} to ${filename}` })
       setTimeout(() => setExportMsg(null), 5000)
-    } catch (e: any) {
-      setExportMsg({ ok: false, text: e.message ?? 'Export failed' })
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Export failed' })
       setTimeout(() => setExportMsg(null), 5000)
     } finally {
       setExporting(null)
@@ -522,8 +497,8 @@ function SavedSearchRow({
         throw new Error(err.error ?? `HTTP ${res.status}`)
       }
       await onDeleted()
-    } catch (e: any) {
-      setExportMsg({ ok: false, text: e.message ?? 'Delete failed' })
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Delete failed' })
       setTimeout(() => setExportMsg(null), 5000)
     } finally {
       setDeleting(false)

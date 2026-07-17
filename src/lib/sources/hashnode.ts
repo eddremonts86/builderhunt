@@ -1,5 +1,5 @@
 import { env } from '~/shared/lib/env'
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 /**
  * Hashnode source — GraphQL API.

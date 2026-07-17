@@ -10,7 +10,7 @@ function log(category, name, status, detail = '') {
 }
 
 async function testPage(page, path, expected = [200], opts = {}) {
-  const resp = await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(e => null);
+  const resp = await page.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => null);
   if (!resp) { log(opts.category || 'page', path, 'fail', 'no response'); return null; }
   const status = resp.status();
   const text = await page.evaluate(() => document.body?.innerText?.slice(0, 500) || '').catch(() => '');
@@ -23,7 +23,7 @@ async function testApi(page, method, path, body = null, opts = {}) {
   const resp = await page.request.fetch(BASE + path, {
     method, data: body ? JSON.stringify(body) : undefined,
     headers: { 'Content-Type': 'application/json' }, failOnStatusCode: false,
-  }).catch(e => null);
+  }).catch(() => null);
   if (!resp) { log(opts.category || 'api', `${method} ${path}`, 'fail', 'no response'); return null; }
   const status = resp.status();
   const text = await resp.text().catch(() => '');

@@ -1,21 +1,5 @@
 import { env } from '~/shared/lib/env'
-
-export interface RawBuilder {
-  id: string
-  kind: 'person'
-  source: 'reddit'
-  sourceId: string
-  username: string
-  displayName?: string
-  avatarUrl?: string
-  bio?: string
-  profileUrl: string
-  followersCount?: number
-  language?: string
-  country?: string
-  topics: string[]
-  metadata: Record<string, unknown>
-}
+import type { RawBuilder } from '~/lib/sources/types'
 
 interface RedditSearchResult {
   kind: 't2'

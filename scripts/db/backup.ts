@@ -41,7 +41,7 @@ async function main() {
 
   // Compress and write
   const compressed = gzipSync(dump)
-  await Bun?.write?.(outPath, compressed) ?? writeFile(outPath, compressed)
+  await writeFile(outPath, compressed)
 
   const sizeMB = (compressed.length / 1024 / 1024).toFixed(2)
   console.log(`[backup] wrote ${outPath} (${sizeMB} MB)`)

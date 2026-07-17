@@ -12,7 +12,7 @@ import { searchHashnode } from '~/lib/sources/hashnode'
 import { searchSourceHut } from '~/lib/sources/sourcehut'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
 

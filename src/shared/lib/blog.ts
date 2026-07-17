@@ -32,7 +32,7 @@ async function loadPosts(): Promise<BlogPost[]> {
   const { marked } = await import('marked')
 
   const postsDir = join(process.cwd(), 'content', 'posts')
-  let files: string[] = []
+  let files: string[]
   try {
     files = await readdir(postsDir)
   } catch {

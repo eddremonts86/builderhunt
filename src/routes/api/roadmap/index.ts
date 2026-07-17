@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { db } from '~/shared/lib/db/index'
 import { roadmapItems, roadmapVotes } from '~/shared/lib/db/schema'
-import { eq, sql, asc, and, ne } from 'drizzle-orm'
+import { eq, sql, asc, and } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 
 export const Route = createFileRoute('/api/roadmap/')({

@@ -1,4 +1,4 @@
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 interface ScoredBuilder extends RawBuilder {
   score: number

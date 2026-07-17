@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router'
-import { Search, X, ArrowRight, Sparkles } from 'lucide-react'
+import { Search, X, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { STARTER_QUERIES } from '~/shared/lib/onboarding'
 

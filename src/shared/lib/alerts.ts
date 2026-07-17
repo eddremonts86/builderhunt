@@ -1,8 +1,8 @@
 // Server-only smart alerts helpers. Lazy-imports db.
 
 import { db } from '~/shared/lib/db/index'
-import { alerts, alertTriggers, builders } from '~/shared/lib/db/schema'
-import { eq, and, gte, desc, sql } from 'drizzle-orm'
+import { alerts, alertTriggers } from '~/shared/lib/db/schema'
+import { eq, and, desc, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
 import { log } from './log'
 
@@ -142,11 +142,12 @@ export async function listTriggersForUser(userId: string, limit = 50): Promise<A
 }
 
 export async function markTriggerRead(triggerId: string, userId: string): Promise<boolean> {
-  const result = await db
+  const [updated] = await db
     .update(alertTriggers)
     .set({ readAt: new Date() })
     .where(and(eq(alertTriggers.id, triggerId), eq(alertTriggers.userId, userId)))
-  return true
+    .returning()
+  return Boolean(updated)
 }
 
 export async function unreadTriggerCount(userId: string): Promise<number> {

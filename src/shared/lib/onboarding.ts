@@ -40,7 +40,7 @@ async function getDb() {
 }
 
 export async function getOnboardingStatus(userId: string): Promise<OnboardingStatus> {
-  const { db, onboardingProgress, savedQueries, builders, eq, sql } = await getDb()
+  const { db, onboardingProgress, eq } = await getDb()
 
   const [row] = await db
     .select()
@@ -73,10 +73,14 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
 
 async function isEligibleForOnboarding(
   userId: string,
-  row: { completed: boolean; skippedCount: number } | null,
+  row: { completed: boolean; skippedCount: number; createdAt: Date } | null,
 ): Promise<boolean> {
   if (row?.completed) return false
   if (row && row.skippedCount >= MAX_SKIPS) return false
+  if (row) {
+    const windowMs = ONBOARDING_WINDOW_DAYS * 24 * 60 * 60 * 1000
+    if (Date.now() - row.createdAt.getTime() > windowMs) return false
+  }
 
   const { db, savedQueries, builders, eq, sql } = await getDb()
 

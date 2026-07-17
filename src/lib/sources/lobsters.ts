@@ -1,5 +1,4 @@
-import { env } from '~/shared/lib/env'
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 /**
  * Lobsters source — community-curated tech news (programming, security,

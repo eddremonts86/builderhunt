@@ -4,7 +4,7 @@
 import { db } from '~/shared/lib/db/index'
 import {
   authUsers, savedQueries, builderNotes, alerts, userConsents,
-  dataExportRequests, builderProfileViews, builderClaimRequests,
+  builderProfileViews, builderClaimRequests,
   deletionRequests, onboardingProgress, authSessions, authAccounts,
   authVerifications,
 } from '~/shared/lib/db/schema'

@@ -53,7 +53,7 @@ export function SignInPage() {
       } else {
         setError(result.error?.message ?? 'Sign in failed. Check your credentials and try again.')
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setLoading(false)

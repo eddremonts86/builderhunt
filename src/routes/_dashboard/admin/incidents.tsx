@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { AlertTriangle, Plus, Save, X, Trash2 } from 'lucide-react'
+import { AlertTriangle, Plus, Save, X } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'

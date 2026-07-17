@@ -7,6 +7,7 @@ interface ClaimedBuilder {
   id: string
   username: string
   displayName?: string | null
+  avatarUrl?: string | null
   source: string
   bio?: string | null
   topics?: string[]
@@ -165,7 +166,6 @@ function MePage() {
               <div key={b.id} className="card">
                 <div className="flex items-start gap-4 mb-4">
                   {b.avatarUrl || b.metadata?.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={(b.avatarUrl ?? b.metadata?.avatarUrl) as string}
                       alt={b.username}

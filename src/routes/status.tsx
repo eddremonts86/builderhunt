@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock, ExternalLink } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock } from 'lucide-react'
 import { useSession } from '~/shared/lib/auth/client'
 import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 
@@ -38,7 +38,6 @@ function StatusIcon({ ok }: { ok: boolean }) {
 function StatusPage() {
   const [status, setStatus] = React.useState<StatusResponse | null>(null)
   const [incidents, setIncidents] = React.useState<Incident[]>([])
-  const [loading, setLoading] = React.useState(true)
   const [lastUpdated, setLastUpdated] = React.useState<string>('')
 
   const load = React.useCallback(async () => {
@@ -58,8 +57,6 @@ function StatusPage() {
       }
     } catch {
       // ignore
-    } finally {
-      setLoading(false)
     }
   }, [])
 

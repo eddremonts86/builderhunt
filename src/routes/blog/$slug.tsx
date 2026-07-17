@@ -82,7 +82,6 @@ function BlogPostPage() {
       <div
         className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed"
         data-testid="blog-post-body"
-        // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{ __html: post.html }}
       />
 

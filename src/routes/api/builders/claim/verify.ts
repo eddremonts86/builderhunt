@@ -27,7 +27,7 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
           const url = new URL(request.url)
           const token = url.searchParams.get('token')
           if (!token) {
-            return errorResponse('Missing token', 400)
+            return errorResponse('Missing token')
           }
 
           // 1. Look up the claim request (not expired, not used)
@@ -44,7 +44,7 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
             .limit(1)
 
           if (!claim) {
-            return errorResponse('This claim link is invalid or has expired.', 410)
+            return errorResponse('This claim link is invalid or has expired.')
           }
 
           // 2. Find or create the user
@@ -114,14 +114,14 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
           })
         } catch (err) {
           console.error('Verify claim error:', err)
-          return errorResponse('Failed to verify claim', 500)
+          return errorResponse('Failed to verify claim')
         }
       },
     },
   },
 })
 
-function errorResponse(message: string, status: number): Response {
+function errorResponse(message: string): Response {
   const params = new URLSearchParams({ claimError: message })
   return new Response(null, {
     status: 302,

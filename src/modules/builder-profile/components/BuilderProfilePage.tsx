@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { useParams, Link, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock, FileText } from 'lucide-react'
+import { useParams, Link } from '@tanstack/react-router'
+import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, Sparkles, Users, Lock, FileText } from 'lucide-react'
 import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
@@ -36,7 +36,6 @@ interface Note {
 export function BuilderProfilePage() {
   const params = useParams({ strict: false }) as { builderId?: string }
   const builderId = params.builderId
-  const navigate = useNavigate()
   const [builder, setBuilder] = React.useState<Builder | null>(null)
   const [notes, setNotes] = React.useState<Note[]>([])
   const [loading, setLoading] = React.useState(true)

@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { db } from '~/shared/lib/db/index'
-import { builders, savedQueries, builderNotes } from '~/shared/lib/db/schema'
-import { and, desc, eq, inArray, sql } from 'drizzle-orm'
+import { builders, savedQueries } from '~/shared/lib/db/schema'
+import { desc, eq } from 'drizzle-orm'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit } from '~/shared/lib/rate-limit'
 
@@ -64,7 +64,6 @@ interface Recommendation {
 const MAX_QUERIES_TO_RUN = 3
 const PER_QUERY_LIMIT = 20
 const MAX_RECOMMENDATIONS = 8
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 export const Route = createFileRoute('/api/recommendations/')({
   component: () => null,

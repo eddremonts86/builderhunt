@@ -1,5 +1,5 @@
 import { env } from '~/shared/lib/env'
-import type { RawBuilder } from '~/lib/sources/github'
+import type { RawBuilder } from '~/lib/sources/types'
 
 /**
  * Codeberg (Gitea-compatible) source — EU-friendly, OSS-focused forge.
@@ -66,7 +66,6 @@ interface GiteaRepo {
 }
 
 const CB_BASE = env.CODEBERG_API_URL?.replace(/\/$/, '') ?? 'https://codeberg.org/api/v1'
-const CB_WEB = CB_BASE.replace(/\/api\/v1\/?$/, '')
 
 function authHeaders(): HeadersInit {
   if (env.CODEBERG_TOKEN) {

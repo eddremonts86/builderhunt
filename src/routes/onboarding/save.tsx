@@ -7,6 +7,7 @@ interface Builder {
   id: string
   username: string
   displayName?: string | null
+  kind?: 'person' | 'repo'
   source: string
   profileUrl: string
   bio?: string | null

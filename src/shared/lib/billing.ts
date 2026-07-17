@@ -11,7 +11,7 @@ import type { PlanTier, PlanStatus, UserPlan, LimitResource, LimitCheck } from '
 // breaks dynamic imports in some SSR runtime combinations. The
 // canonical source is still ./billing-shared.ts; this file just
 // re-declares the constants for server-runtime reliability.
-import { PLAN_LIMITS, PLAN_PRICING } from './billing-shared'
+import { PLAN_LIMITS } from './billing-shared'
 export { PLAN_LIMITS, PLAN_PRICING, type PlanTier, type PlanStatus, type UserPlan, type LimitResource, type LimitCheck } from './billing-shared'
 
 export async function getUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {

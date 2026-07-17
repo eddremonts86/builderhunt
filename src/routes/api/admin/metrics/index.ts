@@ -3,7 +3,7 @@ import { auth } from '~/shared/lib/auth/better-auth'
 import { metrics } from '~/shared/lib/metrics'
 import { db } from '~/shared/lib/db/index'
 import { authUsers, savedQueries, builders, builderNotes } from '~/shared/lib/db/schema'
-import { count, sql, gte, desc } from 'drizzle-orm'
+import { count, gte } from 'drizzle-orm'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 function isAdmin(userId: string) {

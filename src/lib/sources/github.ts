@@ -1,23 +1,5 @@
 import { env } from '~/shared/lib/env'
-
-export type BuilderKind = 'person' | 'repo'
-
-export interface RawBuilder {
-  id: string
-  kind: BuilderKind
-  source: 'github'
-  sourceId: string
-  username: string
-  displayName?: string
-  avatarUrl?: string
-  bio?: string
-  profileUrl: string
-  followersCount?: number
-  language?: string
-  country?: string
-  topics: string[]
-  metadata: Record<string, unknown>
-}
+import type { RawBuilder } from '~/lib/sources/types'
 
 interface GitHubSearchUser {
   login: string
