@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
-import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock, FileText } from 'lucide-react'
 import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
@@ -119,17 +119,17 @@ export function BuilderProfilePage() {
 
   if (!builder) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="p-8 max-w-5xl mx-auto">
         <Link
           to="/explore"
-          className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors"
+          className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
         >
           <ArrowLeft className="w-4 h-4" /> Back to explore
         </Link>
         <div className="card text-center py-12" data-testid="builder-not-found">
           <p className="text-bh-text-muted mb-2">This builder isn't in the public directory yet.</p>
           <p className="text-xs text-bh-text-dim">
-            Try the <Link to="/explore" className="text-bh-accent hover:underline">explorer</Link> to
+            Try the <Link to="/explore" className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5">explorer</Link> to
             find active builders, or check back soon — claimed profiles are added regularly.
           </p>
         </div>
@@ -138,15 +138,15 @@ export function BuilderProfilePage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8 max-w-5xl mx-auto">
       <Link
         to="/search"
-        className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors"
+        className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
       >
         <ArrowLeft className="w-4 h-4" /> Back to search
       </Link>
 
-      <div className="card mb-6">
+      <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm mb-6">
         <div className="flex items-start gap-5">
           {builder.avatarUrl ? (
             <img
@@ -224,7 +224,7 @@ export function BuilderProfilePage() {
               href={builder.profileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-bh-accent hover:underline"
+              className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
             >
               <Code className="w-4 h-4" />
               {builder.username} <ExternalLink className="w-3 h-3" />
@@ -233,181 +233,198 @@ export function BuilderProfilePage() {
         </div>
       </div>
 
-      {/* Project Hygiene — quality signals */}
-      <div className="mb-6">
-        <HygieneCard
-          builder={{
-            followersCount: builder.followersCount,
-            topics: builder.topics,
-            language: builder.language,
-            metadata: builder.metadata as Record<string, unknown> | undefined,
-          }}
-        />
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* Left Column: Hygiene & Code Style */}
+        <div className="space-y-6">
+          <HygieneCard
+            builder={{
+              followersCount: builder.followersCount,
+              topics: builder.topics,
+              language: builder.language,
+              metadata: builder.metadata as Record<string, unknown> | undefined,
+            }}
+          />
+          <CodeStyleCard
+            builder={{
+              language: builder.language,
+              topics: builder.topics,
+              followersCount: builder.followersCount,
+              metadata: builder.metadata as Record<string, unknown> | undefined,
+            }}
+          />
+        </div>
 
-      {/* Code-style fingerprint */}
-      <div className="mb-6">
-        <CodeStyleCard
-          builder={{
-            language: builder.language,
-            topics: builder.topics,
-            followersCount: builder.followersCount,
-            metadata: builder.metadata as Record<string, unknown> | undefined,
-          }}
-        />
-      </div>
+        {/* Right Column: Outreach Copilot, Action Bar & Notes */}
+        <div className="space-y-6">
+          <OutreachCopilot
+            builder={{
+              username: builder.username,
+              displayName: builder.displayName,
+              bio: builder.bio,
+              topics: builder.topics,
+              language: builder.language,
+              followersCount: builder.followersCount,
+              profileUrl: builder.profileUrl,
+              source: builder.source,
+            }}
+          />
 
-      {/* Outreach Copilot — recruiter draft generator */}
-      <div className="mb-6">
-        <OutreachCopilot
-          builder={{
-            username: builder.username,
-            displayName: builder.displayName,
-            bio: builder.bio,
-            topics: builder.topics,
-            language: builder.language,
-            followersCount: builder.followersCount,
-            profileUrl: builder.profileUrl,
-            source: builder.source,
-          }}
-        />
-      </div>
-
-      {/* Action bar — varies based on auth + claim state */}
-      <div className="card mb-6">
-        {isMyProfile ? (
-          <div className="flex flex-wrap items-center gap-2">
-            <Link to="/me" className="btn-primary">
-              <Sparkles className="w-4 h-4" /> Manage your profile
-            </Link>
-            <span className="text-xs text-bh-text-muted">
-              You claimed this profile on {builder.claimedAt ? new Date(builder.claimedAt).toLocaleDateString() : '—'}.
-            </span>
-          </div>
-        ) : meId ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
-            <Lock className="w-4 h-4" />
-            Save and notes are in the dashboard. Claim below if this is you.
-          </div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
-            <Lock className="w-4 h-4" />
-            <Link to="/auth/sign-in" className="text-bh-accent hover:underline">Sign in</Link>
-            {' '}to save this profile to a list.
-          </div>
-        )}
-
-        {!builder.isClaimed && !isMyProfile && (
-          <div className="mt-4 pt-4 border-t border-bh-border">
-            {!claimOpen ? (
-              <button
-                onClick={() => setClaimOpen(true)}
-                className="btn-secondary"
-                data-event="claim_cta_click"
-              >
-                <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
-              </button>
-            ) : (
-              <form onSubmit={handleClaim} className="space-y-3">
-                <p className="text-sm text-bh-text-muted">
-                  Enter the email associated with this profile. We'll send a verification link.
-                </p>
-                <div className="flex gap-2 flex-wrap">
-                  <input
-                    type="email"
-                    value={claimEmail}
-                    onChange={e => setClaimEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    required
-                    className="input-field flex-1 min-w-[200px]"
-                    autoFocus
-                  />
-                  <button
-                    type="submit"
-                    disabled={claimSending}
-                    className="btn-primary"
-                  >
-                    {claimSending ? 'Sending…' : 'Send verification email'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
-                    className="btn-ghost"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                {claimMsg && (
-                  <div
-                    className={`text-sm p-3 rounded-lg border ${
-                      claimMsg.ok
-                        ? 'border-bh-success/30 bg-bh-success/10 text-bh-success'
-                        : 'border-bh-danger/30 bg-bh-danger/10 text-bh-danger'
-                    }`}
-                    role={claimMsg.ok ? 'status' : 'alert'}
-                  >
-                    <p>{claimMsg.text}</p>
-                    {claimMsg.devLink && (
-                      <p className="mt-2 text-xs">
-                        <strong>Dev mode:</strong>{' '}
-                        <a href={claimMsg.devLink} className="underline break-all">
-                          {claimMsg.devLink}
-                        </a>
-                      </p>
-                    )}
-                  </div>
-                )}
-              </form>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Notes section — auth required */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-bh-text mb-4">Notes</h2>
-
-        {meId ? (
-          <>
-            {notes.length > 0 ? (
-              <div className="space-y-3 mb-4">
-                {notes.map(note => (
-                  <div key={note.id} className="bg-bh-bg-alt border border-bh-border rounded-lg p-3">
-                    <p className="text-sm text-bh-text">{note.content}</p>
-                    <p className="text-xs text-bh-text-muted mt-1">
-                      {new Date(note.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                ))}
+          {/* Action bar — varies based on auth + claim state */}
+          <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm p-6">
+            {isMyProfile ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  to="/me"
+                  className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                >
+                  <Sparkles className="w-4 h-4" /> Manage your profile
+                </Link>
+                <span className="text-xs text-bh-text-muted">
+                  You claimed this profile on {builder.claimedAt ? new Date(builder.claimedAt).toLocaleDateString() : '—'}.
+                </span>
+              </div>
+            ) : meId ? (
+              <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
+                <Lock className="w-4 h-4" />
+                Save and notes are in the dashboard. Claim below if this is you.
               </div>
             ) : (
-              <p className="text-sm text-bh-text-muted mb-4">No notes yet.</p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
+                <Lock className="w-4 h-4" />
+                <Link
+                  to="/auth/sign-in"
+                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                >
+                  Sign in
+                </Link>
+                {' '}to save this profile to a list.
+              </div>
             )}
 
-            <div className="flex gap-2">
-              <textarea
-                value={noteText}
-                onChange={e => setNoteText(e.target.value)}
-                placeholder="Add a note about this builder..."
-                className="input-field flex-1 resize-none"
-                rows={2}
-              />
-              <button
-                onClick={handleSaveNote}
-                disabled={savingNote || !noteText.trim()}
-                className="btn-primary flex items-center gap-2 h-fit"
-              >
-                <Save className="w-4 h-4" />
-                {savingNote ? 'Saving...' : 'Save'}
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="text-sm text-bh-text-muted">
-            <Link to="/auth/sign-in" className="text-bh-accent hover:underline">Sign in</Link>
-            {' '}to add private notes about this builder.
-          </p>
-        )}
+            {!builder.isClaimed && !isMyProfile && (
+              <div className="mt-4 pt-4 border-t border-bh-border">
+                {!claimOpen ? (
+                  <button
+                    onClick={() => setClaimOpen(true)}
+                    className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    data-event="claim_cta_click"
+                  >
+                    <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
+                  </button>
+                ) : (
+                  <form onSubmit={handleClaim} className="space-y-3">
+                    <p className="text-sm text-bh-text-muted">
+                      Enter the email associated with this profile. We'll send a verification link.
+                    </p>
+                    <div className="flex gap-2 flex-wrap">
+                      <input
+                        type="email"
+                        value={claimEmail}
+                        onChange={e => setClaimEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        required
+                        className="input-field flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                        autoFocus
+                      />
+                      <button
+                        type="submit"
+                        disabled={claimSending}
+                        className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                      >
+                        {claimSending ? 'Sending…' : 'Send verification email'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
+                        className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {claimMsg && (
+                      <div
+                        className={`text-sm p-3 rounded-lg border ${
+                          claimMsg.ok
+                            ? 'border-bh-success/30 bg-bh-success/10 text-bh-success'
+                            : 'border-bh-danger/30 bg-bh-danger/10 text-bh-danger'
+                        }`}
+                        role={claimMsg.ok ? 'status' : 'alert'}
+                      >
+                        <p>{claimMsg.text}</p>
+                        {claimMsg.devLink && (
+                          <p className="mt-2 text-xs">
+                            <strong>Dev mode:</strong>{' '}
+                            <a
+                              href={claimMsg.devLink}
+                              className="underline break-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                            >
+                              {claimMsg.devLink}
+                            </a>
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Notes Section Card */}
+          <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm p-6">
+            <h3 className="text-base font-semibold text-bh-text mb-4 flex items-center gap-2">
+              <FileText className="w-4 h-4" aria-hidden="true" />
+              Notes
+            </h3>
+
+            {meId ? (
+              <>
+                {notes.length > 0 ? (
+                  <div className="space-y-3 mb-4">
+                    {notes.map(note => (
+                      <div key={note.id} className="bg-bh-bg-alt border border-bh-border rounded-lg p-3">
+                        <p className="text-sm text-bh-text">{note.content}</p>
+                        <p className="text-xs text-bh-text-muted mt-1">
+                          {new Date(note.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-bh-text-muted mb-4">No notes yet.</p>
+                )}
+
+                <div className="flex gap-2">
+                  <textarea
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                    placeholder="Add a note about this builder..."
+                    className="input-field flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    rows={2}
+                  />
+                  <button
+                    onClick={handleSaveNote}
+                    disabled={savingNote || !noteText.trim()}
+                    className="btn-primary flex items-center gap-2 h-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                  >
+                    <Save className="w-4 h-4" />
+                    {savingNote ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-bh-text-muted">
+                <Link
+                  to="/auth/sign-in"
+                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                >
+                  Sign in
+                </Link>
+                {' '}to add private notes about this builder.
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )
