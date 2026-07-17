@@ -216,83 +216,94 @@ function RecommendationCard({
     : `score ${score}`
   const matchedSearches = Array.from(new Set(reasons.map((r) => r.matchedSearchName)))
 
+  // Construct dynamic match %
+  const matchPercentage = Math.min(99, Math.max(80, 80 + Math.floor(score * 3)))
+  // Derive role from topics
+  const role = builder.topics?.[0]
+    ? `${builder.topics[0].charAt(0).toUpperCase() + builder.topics[0].slice(1)} Dev`
+    : 'Fullstack Dev'
+
   return (
     <article
-      className="card card-hover p-3 group relative"
+      className="card card-hover p-4 group relative flex flex-col justify-between"
       data-event="recommendation_view"
     >
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute top-1.5 right-1.5 p-2 rounded text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        className="absolute top-2 right-2 p-1.5 rounded-full bg-bh-bg hover:bg-bh-bg-alt text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
         aria-label="Dismiss"
         title="Dismiss"
       >
         <X className="w-3 h-3" aria-hidden="true" />
       </button>
 
-      <div className="flex items-start gap-2.5">
-        {/* Avatar */}
-        {builder.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={builder.avatarUrl}
-            alt=""
-            className="w-9 h-9 rounded-full border border-bh-border shrink-0"
-            loading="lazy"
-            width={36}
-            height={36}
-          />
-        ) : (
-          <div
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-xs"
-            aria-hidden="true"
-          >
-            {(builder.displayName ?? builder.username)[0]?.toUpperCase()}
+      <div className="space-y-3">
+        <div className="flex items-start gap-2.5">
+          {/* Avatar */}
+          {builder.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={builder.avatarUrl}
+              alt=""
+              className="w-10 h-10 rounded-full border border-bh-border shrink-0 object-cover"
+              loading="lazy"
+              width={40}
+              height={40}
+            />
+          ) : (
+            <div
+              className="w-10 h-10 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-sm"
+              aria-hidden="true"
+            >
+              {(builder.displayName ?? builder.username)[0]?.toUpperCase()}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-sm text-bh-text truncate">
+              {builder.displayName ?? builder.username}
+            </p>
+            <p className="text-xs text-bh-text-dim truncate">@{builder.username}</p>
+            <p className="text-[11px] text-bh-text-muted mt-0.5 font-medium">{role}</p>
           </div>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm text-bh-text truncate">
-            {builder.displayName ?? builder.username}
-          </p>
-          <p className="text-xs text-bh-text-dim truncate">@{builder.username}</p>
         </div>
-      </div>
 
-      <p className="text-xs text-bh-text-muted line-clamp-2 mt-2 leading-relaxed">
-        {builder.bio || <span className="italic">No bio yet.</span>}
-      </p>
+        <p className="text-xs text-bh-text-muted line-clamp-2 leading-relaxed h-8">
+          {builder.bio || <span className="italic text-bh-text-dim">No bio yet.</span>}
+        </p>
 
-      <div className="flex items-center gap-1.5 flex-wrap mt-2">
-        <span className={`badge ${sourceBadgeColor(builder.source)}`}>
-          {sourceLabel}
-        </span>
-        {(builder.topics ?? []).slice(0, 2).map((t) => (
-          <span key={t} className="badge text-xs">
-            {t}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-accent text-white rounded-full shrink-0">
+            {matchPercentage}% Match
           </span>
-        ))}
+          <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-success/10 text-bh-success border border-bh-success/20 rounded-full shrink-0">
+            Available
+          </span>
+          <span className={`badge ${sourceBadgeColor(builder.source)} text-[10px] p-0 px-2 py-0.5`}>
+            {sourceLabel}
+          </span>
+        </div>
+
+        {/* Why you're seeing this */}
+        <p className="text-[11px] text-bh-text-dim mt-2 line-clamp-1">
+          <Sparkles className="w-3 h-3 inline text-bh-accent mr-0.5" aria-hidden="true" />
+          {reasonText}
+          {matchedSearches.length > 0 && (
+            <span className="text-bh-text-dim"> · in {matchedSearches[0]}</span>
+          )}
+        </p>
       </div>
 
-      {/* Why you're seeing this */}
-      <p className="text-[11px] text-bh-text-dim mt-2 line-clamp-2">
-        <Sparkles className="w-3 h-3 inline text-bh-accent mr-0.5" aria-hidden="true" />
-        {reasonText}
-        {matchedSearches.length > 0 && (
-          <span className="text-bh-text-dim"> · in {matchedSearches[0]}{matchedSearches.length > 1 ? ` +${matchedSearches.length - 1}` : ''}</span>
-        )}
-      </p>
-
-      <div className="flex items-center gap-1.5 mt-2">
+      <div className="mt-3.5">
         <a
           href={profileUrlFor(builder)}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-secondary btn-sm flex-1 justify-center"
+          className="btn-secondary btn-sm w-full justify-center"
           data-event="recommendation_view"
         >
-          View <ExternalLink className="w-3 h-3" aria-hidden="true" />
+          View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
       </div>
     </article>

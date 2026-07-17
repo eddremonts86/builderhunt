@@ -21,6 +21,8 @@ interface SavedQuery {
   keywords: string[]
   sources: string[]
   createdAt: string
+  country?: string
+  language?: string
 }
 
 interface RecentBuilder {
@@ -130,13 +132,54 @@ export function DashboardPage() {
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       {/* Header */}
-      <header className="mb-8">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+      <header className="mb-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          {/* Navigation Pill Element */}
+          <nav className="inline-flex items-center gap-1 p-1 bg-bh-bg-alt rounded-full border border-bh-border">
+            <Link
+              to="/dashboard"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold bg-bh-text text-white shadow-sm transition-all"
+            >
+              Dashboard
+            </Link>
+            <Link
+              to="/search"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors"
+            >
+              Hunts
+            </Link>
+            <Link
+              to="/alerts"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors"
+            >
+              Alerts
+            </Link>
+          </nav>
+
+          {/* Filter Pills on the Right */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer"
+            >
+              Filter Location
+            </button>
+            <button
+              type="button"
+              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer"
+            >
+              Filter Date
+            </button>
+          </div>
+        </div>
+
+        {/* Title block */}
+        <div className="flex flex-wrap items-end justify-between gap-4 pt-2">
           <div>
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">
-              Welcome back<span className="text-bh-accent">.</span>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 text-bh-text">
+              Overview
             </h1>
-            <p className="text-bh-text-muted">
+            <p className="text-bh-text-muted text-sm font-light">
               Here's what your hunts turned up.
               {stats?.activeThisWeek ? ` ${stats.activeThisWeek} builder${stats.activeThisWeek === 1 ? '' : 's'} active this week.` : ''}
             </p>
@@ -152,123 +195,166 @@ export function DashboardPage() {
         </div>
       </header>
 
-      {/* Onboarding banner — only for eligible users */}
-      <OnboardingBanner />
-
-      {/* For you — proactive recommendations */}
-      <RecommendationsSection />
-
       {/* Stats */}
-      <section aria-labelledby="stats-heading" className="mb-10">
+      <section aria-labelledby="stats-heading" className="mb-8">
         <h2 id="stats-heading" className="sr-only">Your stats</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statsData.map((s) => (
             <StatCard key={s.label} {...s} />
           ))}
         </div>
       </section>
 
-      {/* Quick actions */}
-      {(!stats || stats.totalBuilders === 0) && !error && (
-        <section className="card-glow mb-10 animate-fade-in">
-          <div className="p-8 md:p-10 text-center">
-            <div className="inline-flex w-14 h-14 rounded-2xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-5">
-              <Sparkles className="w-7 h-7 text-bh-accent" aria-hidden="true" />
-            </div>
-            <h3 className="text-2xl font-semibold mb-2">Run your first hunt</h3>
-            <p className="text-bh-text-muted max-w-md mx-auto mb-6">
-              Pick a topic you care about — a framework, a stack, a community — and we'll surface
-              the people actively shipping in it across GitHub, Reddit, Hacker News and DEV.to.
-            </p>
-            <Link to="/search" className="btn-primary btn-lg">
-              Start your first hunt <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
-          </div>
-        </section>
-      )}
+      {/* Bento Grid layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column (2/3) */}
+        <div className="lg:col-span-2 space-y-6">
+          <OnboardingBanner />
 
-      {/* Saved searches */}
-      <section aria-labelledby="queries-heading" className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 id="queries-heading" className="text-lg font-semibold flex items-center gap-2">
-            <Bookmark className="w-5 h-5 text-bh-warning" aria-hidden="true" />
-            Saved searches
-          </h2>
-          {queries.length > 0 && (
-            <Link to="/search" className="text-sm text-bh-accent hover:underline flex items-center gap-1">
-              New search <ArrowRight className="w-3 h-3" aria-hidden="true" />
-            </Link>
-          )}
-        </div>
-        {queries.length === 0 ? (
-          <EmptyState
-            icon={Bookmark}
-            title="No saved searches yet"
-            body="Saved searches let you re-run the same hunt with one click. Set one up from the Search page."
-            cta={{ to: '/search', label: 'Set up a search' }}
-          />
-        ) : (
-          <ul className="card divide-y divide-bh-border p-0">
-            {queries.map((q) => (
-              <SavedSearchRow key={q.id} query={q} onDeleted={refetchQueries} />
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* Recent builders */}
-      <section aria-labelledby="builders-heading">
-        <div className="flex items-center justify-between mb-4">
-          <h2 id="builders-heading" className="text-lg font-semibold flex items-center gap-2">
-            <Activity className="w-5 h-5 text-bh-success" aria-hidden="true" />
-            Recent builders
-          </h2>
-          {recent.length > 0 && (
-            <Link to="/search" className="text-sm text-bh-accent hover:underline flex items-center gap-1">
-              See all <ArrowRight className="w-3 h-3" aria-hidden="true" />
-            </Link>
-          )}
-        </div>
-        {recent.length === 0 ? (
-          <EmptyState
-            icon={Users}
-            title="No builders tracked yet"
-            body="Once you save a builder from a search result, they'll show up here. Use the search to find people matching your stack."
-            cta={{ to: '/search', label: 'Run your first search' }}
-          />
-        ) : (
-          <ul className="grid sm:grid-cols-2 gap-4">
-            {recent.map((b) => (
-              <li key={b.id}>
-                <Link
-                  to="/builder/$builderId"
-                  params={{ builderId: b.id }}
-                  className="card card-hover flex items-start gap-3 h-full"
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0">
-                    {(b.displayName ?? b.username)[0]?.toUpperCase()}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-bh-text truncate">
-                        {b.displayName ?? b.username}
-                      </p>
-                      <span className={`badge badge-${b.source}`}>{b.source}</span>
-                    </div>
-                    {b.bio && <p className="text-xs text-bh-text-muted line-clamp-2 mb-2">{b.bio}</p>}
-                    <p className="text-xs text-bh-text-dim">
-                      {b.followersCount?.toLocaleString() ?? 0} followers
-                    </p>
-                  </div>
+          {/* Quick actions (empty state if no builders tracked) */}
+          {(!stats || stats.totalBuilders === 0) && !error && (
+            <div className="card-glow animate-fade-in">
+              <div className="p-6 text-center">
+                <div className="inline-flex w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 items-center justify-center mb-4">
+                  <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2 text-bh-text">Run your first hunt</h3>
+                <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4 font-light">
+                  Pick a topic you care about — a framework, a stack, a community — and we'll surface
+                  the people actively shipping in it.
+                </p>
+                <Link to="/search" className="btn-primary btn-sm">
+                  Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                 </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+              </div>
+            </div>
+          )}
+
+          <RecommendationsSection />
+
+          {/* Weekly Shipping Activity Bento Card */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-bh-text flex items-center gap-2">
+                <Activity className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+                Weekly Activity
+              </h3>
+              <span className="text-xs text-bh-text-dim font-light">Mockup Data</span>
+            </div>
+            <div className="flex items-end justify-between h-40 pt-4 px-2">
+              {[
+                { day: 'Mon', value: 45 },
+                { day: 'Tue', value: 75 },
+                { day: 'Wed', value: 60 },
+                { day: 'Thu', value: 90 },
+                { day: 'Fri', value: 50 },
+                { day: 'Sat', value: 30 },
+                { day: 'Sun', value: 20 },
+              ].map((d) => (
+                <div key={d.day} className="flex flex-col items-center flex-1 gap-2">
+                  <div className="w-full max-w-[28px] sm:max-w-[36px] bg-bh-bg-alt rounded-t-md h-28 relative flex items-end">
+                    <div
+                      className="w-full bg-[#e07338] rounded-t-md transition-all duration-500 ease-out"
+                      style={{ height: `${d.value}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-bh-text-dim font-medium">{d.day}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column (1/3) */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Saved searches Bento Card */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="queries-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
+                <Bookmark className="w-4 h-4 text-bh-warning" aria-hidden="true" />
+                Saved searches
+              </h2>
+              {queries.length > 0 && (
+                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1">
+                  New search <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+            {queries.length === 0 ? (
+              <div className="text-center py-6 bg-bh-bg-alt/50 rounded-xl border border-bh-border border-dashed p-4">
+                <Bookmark className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
+                <p className="font-semibold text-sm text-bh-text mb-1">No saved searches yet</p>
+                <p className="text-xs text-bh-text-muted mb-3 font-light">Saved searches let you re-run hunts with one click.</p>
+                <Link to="/search" className="btn-secondary btn-sm text-xs py-1">
+                  Set up a search
+                </Link>
+              </div>
+            ) : (
+              <ul className="divide-y divide-bh-border -mx-5 -mb-5 border-t border-bh-border">
+                {queries.map((q) => (
+                  <SavedSearchRow key={q.id} query={q} onDeleted={refetchQueries} />
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Recent builders Bento Card */}
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="builders-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
+                <Activity className="w-4 h-4 text-bh-success" aria-hidden="true" />
+                Recent builders
+              </h2>
+              {recent.length > 0 && (
+                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1">
+                  See all <ArrowRight className="w-3 h-3" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
+            {recent.length === 0 ? (
+              <div className="text-center py-6 bg-bh-bg-alt/50 rounded-xl border border-bh-border border-dashed p-4">
+                <Users className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
+                <p className="font-semibold text-sm text-bh-text mb-1">No builders tracked yet</p>
+                <p className="text-xs text-bh-text-muted mb-3 font-light">Save builders from searches to see them here.</p>
+                <Link to="/search" className="btn-secondary btn-sm text-xs py-1">
+                  Run a search
+                </Link>
+              </div>
+            ) : (
+              <ul className="divide-y divide-bh-border -mx-5 -mb-5 border-t border-bh-border">
+                {recent.map((b) => (
+                  <li key={b.id}>
+                    <Link
+                      to="/builder/$builderId"
+                      params={{ builderId: b.id }}
+                      className="flex items-start gap-3 p-4 hover:bg-bh-surface-2/50 transition-colors"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white text-xs font-semibold shrink-0">
+                        {(b.displayName ?? b.username)[0]?.toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="font-medium text-sm text-bh-text truncate">
+                            {b.displayName ?? b.username}
+                          </p>
+                          <span className={`badge badge-${b.source} text-[9px] px-1.5 py-0`}>{b.source}</span>
+                        </div>
+                        {b.bio && <p className="text-xs text-bh-text-muted line-clamp-1">{b.bio}</p>}
+                        <p className="text-[10px] text-bh-text-dim mt-0.5">
+                          {b.followersCount?.toLocaleString() ?? 0} followers
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      </div>
 
       {error && (
-        <div className="mt-6 p-4 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger">
+        <div className="mt-6 p-4 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger font-light">
           <strong>Heads up:</strong> {error}. Some data may be missing.
         </div>
       )}
