@@ -6,6 +6,7 @@ import {
   Cog, Users, Inbox, AlertTriangle, BookOpen, Map, CircleUser, LogOut,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
+import { BackToTop } from '~/shared/components/BackToTop'
 
 function LogoMark({ size = 22 }: { size?: number }) {
   return (
@@ -344,6 +345,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       <main id="main-content" className="pt-24 pb-8 px-4 lg:px-8">
         {children}
       </main>
+
+      <BackToTop />
     </div>
   )
 }

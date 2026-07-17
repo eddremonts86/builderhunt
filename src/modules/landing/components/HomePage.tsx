@@ -9,6 +9,7 @@ import { useSession, signOut } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { Footer } from '~/shared/components/Footer'
+import { BackToTop } from '~/shared/components/BackToTop'
 
 /* -------------------------------------------------------------------------- */
 /*  Logo component (inline SVG so we don't depend on the public file at first  */
@@ -479,6 +480,7 @@ export function HomePage() {
 
       {/* ───────────────────────── FOOTER ──────────────────────── */}
       <Footer />
+      <BackToTop />
     </>
   )
 }
