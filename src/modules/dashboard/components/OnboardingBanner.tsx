@@ -65,14 +65,14 @@ export function OnboardingBanner() {
       <div className="flex items-center gap-2 shrink-0">
         <Link
           to="/onboarding/welcome"
-          className="btn-primary btn-sm"
+          className="btn-primary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
           data-testid="onboarding-banner-cta"
         >
           Start tour
         </Link>
         <button
           onClick={skip}
-          className="btn-ghost btn-sm p-1.5"
+          className="btn-ghost btn-sm p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
           aria-label="Dismiss"
           title="Skip onboarding"
           data-testid="onboarding-banner-skip"

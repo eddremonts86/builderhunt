@@ -105,6 +105,7 @@ export function DashboardPage() {
       icon: Users,
       tone: 'accent' as const,
       hint: 'People saved to your lists',
+      badge: '12 Lists',
     },
     {
       label: 'Active this week',
@@ -112,6 +113,7 @@ export function DashboardPage() {
       icon: TrendingUp,
       tone: 'success' as const,
       hint: 'Shipped something in the last 7 days',
+      badge: '20 Closed',
     },
     {
       label: 'Saved searches',
@@ -119,6 +121,7 @@ export function DashboardPage() {
       icon: Bookmark,
       tone: 'warning' as const,
       hint: 'Hunts you can re-run anytime',
+      badge: '40 Open',
     },
     {
       label: 'Private notes',
@@ -126,33 +129,44 @@ export function DashboardPage() {
       icon: StickyNote,
       tone: 'cyan' as const,
       hint: 'Context you\'ve attached to builders',
+      badge: '20 Active',
     },
   ]
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
+      {/* Floating Sidebar Menu */}
+      <aside className="fixed left-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 py-4 shadow-lg flex flex-col gap-4 items-center border border-zinc-100/50 z-40 hidden md:flex">
+        <button className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2b1812] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Users className="w-4 h-4" /></button>
+        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Activity className="w-4 h-4" /></button>
+        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Bookmark className="w-4 h-4" /></button>
+        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Search className="w-4 h-4" /></button>
+      </aside>
+
       {/* Header */}
       <header className="mb-8 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           {/* Navigation Pill Element */}
-          <nav className="inline-flex items-center gap-1 p-1 bg-bh-bg-alt rounded-full border border-bh-border">
+          <nav className="flex items-center gap-2">
             <Link
               to="/dashboard"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold bg-bh-text text-white shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="px-5 py-2 rounded-full text-xs font-semibold bg-[#2b1812] text-white shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Dashboard
             </Link>
             <Link
               to="/search"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-zinc-500 hover:bg-zinc-50 border border-zinc-200 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              title="Hunts"
             >
-              Hunts
+              H
             </Link>
             <Link
               to="/alerts"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-zinc-500 hover:bg-zinc-50 border border-zinc-200 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              title="Alerts"
             >
-              Alerts
+              A
             </Link>
           </nav>
 
@@ -160,13 +174,13 @@ export function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="px-4 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-400 hover:text-zinc-600 text-xs font-medium rounded-full transition-colors shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Filter Location
             </button>
             <button
               type="button"
-              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="px-4 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-400 hover:text-zinc-600 text-xs font-medium rounded-full transition-colors shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Filter Date
             </button>
@@ -185,10 +199,10 @@ export function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/search" className="btn-secondary">
+            <Link to="/search" className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
               <Search className="w-4 h-4" aria-hidden="true" /> Search
             </Link>
-            <Link to="/search" className="btn-primary">
+            <Link to="/search" className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
               <Plus className="w-4 h-4" aria-hidden="true" /> New hunt
             </Link>
           </div>
@@ -223,7 +237,7 @@ export function DashboardPage() {
                   Pick a topic you care about — a framework, a stack, a community — and we'll surface
                   the people actively shipping in it.
                 </p>
-                <Link to="/search" className="btn-primary btn-sm">
+                <Link to="/search" className="btn-primary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
                 </Link>
               </div>
@@ -245,22 +259,36 @@ export function DashboardPage() {
               {[
                 { day: 'Mon', value: 45 },
                 { day: 'Tue', value: 75 },
-                { day: 'Wed', value: 60 },
+                { day: 'Wed', value: 80 },
                 { day: 'Thu', value: 90 },
                 { day: 'Fri', value: 50 },
                 { day: 'Sat', value: 30 },
                 { day: 'Sun', value: 20 },
-              ].map((d) => (
-                <div key={d.day} className="flex flex-col items-center flex-1 gap-2">
-                  <div className="w-full max-w-[28px] sm:max-w-[36px] bg-bh-bg-alt rounded-t-md h-28 relative flex items-end">
-                    <div
-                      className="w-full bg-[#e07338] rounded-t-md transition-all duration-500 ease-out"
-                      style={{ height: `${d.value}%` }}
-                    />
+              ].map((d) => {
+                const isWednesday = d.day === 'Wed';
+                return (
+                  <div key={d.day} className="flex flex-col items-center flex-1 gap-2">
+                    <div className="w-full max-w-[28px] sm:max-w-[36px] bg-bh-bg-alt rounded-t-md h-28 relative flex items-end">
+                      {isWednesday && (
+                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#2b1812] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-10">
+                          80%
+                          {/* Triangle indicator */}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#2b1812]" />
+                        </div>
+                      )}
+                      <div
+                        className={`w-full rounded-t-md transition-all duration-500 ease-out ${
+                          isWednesday
+                            ? 'bg-[#fbeee6] bg-striped-terracotta'
+                            : 'bg-zinc-50 bg-striped-neutral'
+                        }`}
+                        style={{ height: `${d.value}%` }}
+                      />
+                    </div>
+                    <span className="text-[11px] text-bh-text-dim font-medium">{d.day}</span>
                   </div>
-                  <span className="text-[11px] text-bh-text-dim font-medium">{d.day}</span>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -275,7 +303,7 @@ export function DashboardPage() {
                 Saved searches
               </h2>
               {queries.length > 0 && (
-                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1">
+                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5">
                   New search <ArrowRight className="w-3 h-3" aria-hidden="true" />
                 </Link>
               )}
@@ -285,7 +313,7 @@ export function DashboardPage() {
                 <Bookmark className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
                 <p className="font-semibold text-sm text-bh-text mb-1">No saved searches yet</p>
                 <p className="text-xs text-bh-text-muted mb-3 font-light">Saved searches let you re-run hunts with one click.</p>
-                <Link to="/search" className="btn-secondary btn-sm text-xs py-1">
+                <Link to="/search" className="btn-secondary btn-sm text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Set up a search
                 </Link>
               </div>
@@ -306,7 +334,7 @@ export function DashboardPage() {
                 Recent builders
               </h2>
               {recent.length > 0 && (
-                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1">
+                <Link to="/search" className="text-xs text-bh-accent hover:underline flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5">
                   See all <ArrowRight className="w-3 h-3" aria-hidden="true" />
                 </Link>
               )}
@@ -316,7 +344,7 @@ export function DashboardPage() {
                 <Users className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
                 <p className="font-semibold text-sm text-bh-text mb-1">No builders tracked yet</p>
                 <p className="text-xs text-bh-text-muted mb-3 font-light">Save builders from searches to see them here.</p>
-                <Link to="/search" className="btn-secondary btn-sm text-xs py-1">
+                <Link to="/search" className="btn-secondary btn-sm text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Run a search
                 </Link>
               </div>
@@ -379,25 +407,34 @@ function StatCard({
   hint,
   icon: Icon,
   tone,
+  badge,
 }: {
   label: string
   value: number
   hint: string
   icon: React.ComponentType<{ className?: string }>
   tone: 'accent' | 'success' | 'warning' | 'cyan'
+  badge?: string
 }) {
   return (
-    <div className="card card-hover">
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-10 h-10 rounded-lg border flex items-center justify-center ${TONE_ICON[tone]}`}>
-          <Icon className="w-5 h-5" aria-hidden="true" />
+    <div className="card card-hover p-5">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-light text-zinc-400">{label}</span>
+        <div className={`w-7 h-7 rounded-md border flex items-center justify-center ${TONE_ICON[tone]}`}>
+          <Icon className="w-3.5 h-3.5" aria-hidden="true" />
         </div>
       </div>
-      <p className="text-3xl font-bold tracking-tight text-bh-text mb-1">
-        {value.toLocaleString()}
-      </p>
-      <p className="text-sm font-medium text-bh-text">{label}</p>
-      <p className="text-xs text-bh-text-dim mt-1">{hint}</p>
+      <div className="flex items-baseline gap-2 mb-1">
+        <span className="text-3xl font-bold tracking-tight text-bh-text">
+          {value.toLocaleString()}
+        </span>
+        {badge && (
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
+            {badge}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-bh-text-dim">{hint}</p>
     </div>
   )
 }
@@ -547,7 +584,7 @@ function SavedSearchRow({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <a href={runUrl} className="btn-secondary btn-sm" title="Re-run this search">
+          <a href={runUrl} className="btn-secondary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2" title="Re-run this search">
             Run <ExternalLink className="w-3 h-3" aria-hidden="true" />
           </a>
 
@@ -556,7 +593,7 @@ function SavedSearchRow({
               type="button"
               onClick={() => setMenuOpen((o) => !o)}
               disabled={exporting !== null || deleting}
-              className="btn-secondary btn-sm p-1.5"
+              className="btn-secondary btn-sm p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-label="More actions"
@@ -574,7 +611,7 @@ function SavedSearchRow({
                   <button
                     role="menuitem"
                     onClick={() => handleExport('people')}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <Download className="w-3.5 h-3.5" aria-hidden="true" />
                     Export people (CSV)
@@ -584,7 +621,7 @@ function SavedSearchRow({
                   <button
                     role="menuitem"
                     onClick={() => handleExport('resources')}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <Download className="w-3.5 h-3.5" aria-hidden="true" />
                     Export resources (CSV)
@@ -597,7 +634,7 @@ function SavedSearchRow({
                   <button
                     role="menuitem"
                     onClick={copyRss}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <Rss className="w-3.5 h-3.5 text-bh-warning" aria-hidden="true" />
                     Copy RSS feed URL
@@ -612,7 +649,7 @@ function SavedSearchRow({
               type="button"
               onClick={() => setConfirming(true)}
               disabled={deleting || exporting !== null}
-              className="btn-ghost btn-sm p-1.5 text-bh-text-dim hover:text-bh-danger"
+              className="btn-ghost btn-sm p-1.5 text-bh-text-dim hover:text-bh-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-danger focus-visible:ring-offset-2"
               aria-label="Delete saved search"
               title="Delete"
             >
@@ -624,7 +661,7 @@ function SavedSearchRow({
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="btn-sm p-1.5 bg-bh-danger/20 text-bh-danger border border-bh-danger/30 rounded hover:bg-bh-danger/30"
+                className="btn-sm p-1.5 bg-bh-danger/20 text-bh-danger border border-bh-danger/30 rounded hover:bg-bh-danger/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-danger focus-visible:ring-offset-2"
                 aria-label="Confirm delete"
                 title="Confirm delete"
               >
@@ -634,7 +671,7 @@ function SavedSearchRow({
                 type="button"
                 onClick={() => setConfirming(false)}
                 disabled={deleting}
-                className="btn-ghost btn-sm p-1.5"
+                className="btn-ghost btn-sm p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                 aria-label="Cancel delete"
                 title="Cancel"
               >
