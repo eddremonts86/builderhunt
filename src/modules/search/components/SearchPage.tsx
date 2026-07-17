@@ -384,7 +384,7 @@ export function SearchPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. rust async runtime, indie hackers, AI agents..."
-              className="input-field !pl-14 pr-32 py-3.5 text-base"
+              className="input-field !pl-14 pr-32 py-3.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
               aria-label="Search keywords"
               autoComplete="off"
             />
@@ -392,7 +392,7 @@ export function SearchPage() {
               <button
                 type="button"
                 onClick={() => { setQuery(''); inputRef.current?.focus() }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-bh-text-dim hover:text-bh-text rounded"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-bh-text-dim hover:text-bh-text rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 aria-label="Clear search"
               >
                 <X className="w-4 h-4" />
@@ -409,7 +409,7 @@ export function SearchPage() {
             disabled={loading || !query.trim()}
             loading={loading}
             size="md"
-            className="px-6"
+            className="px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
           >
             {loading ? 'Searching' : 'Search'}
           </Button>
@@ -428,9 +428,9 @@ export function SearchPage() {
                 key={s}
                 type="button"
                 onClick={() => toggleSource(s)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
                   active
-                    ? `${meta.color} shadow-sm`
+                    ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
                     : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
                 }`}
                 aria-pressed={active}
@@ -445,7 +445,7 @@ export function SearchPage() {
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
-            className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
+            className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
               filtersOpen || location || language
                 ? 'bg-bh-accent-soft text-bh-accent border-bh-accent/30'
                 : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
@@ -479,7 +479,7 @@ export function SearchPage() {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. France, Spain, Brazil"
-                className="input-field"
+                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 autoComplete="off"
               />
               <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
@@ -496,7 +496,7 @@ export function SearchPage() {
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 placeholder="e.g. TypeScript, Rust, Go"
-                className="input-field"
+                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 autoComplete="off"
               />
             </div>
@@ -512,11 +512,11 @@ export function SearchPage() {
             value={saveName}
             onChange={(e) => setSaveName(e.target.value)}
             placeholder="Name this search..."
-            className="flex-1 min-w-[200px]"
+            className="flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
             autoFocus
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleSaveSearch())}
           />
-          <Button onClick={handleSaveSearch} loading={saving} disabled={!saveName.trim()} size="sm">
+          <Button onClick={handleSaveSearch} loading={saving} disabled={!saveName.trim()} size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
             <Save className="w-4 h-4" /> Save
           </Button>
           <Button
@@ -524,6 +524,7 @@ export function SearchPage() {
             variant="ghost"
             size="sm"
             aria-label="Cancel"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
           >
             <X className="w-4 h-4" />
           </Button>
@@ -567,7 +568,7 @@ export function SearchPage() {
             <div className="flex items-center gap-2">
               <SortMenu value={sortBy} onChange={setSortBy} />
               {searched && !showSave && (
-                <Button onClick={() => setShowSave(true)} variant="secondary" size="sm">
+                <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
                   <Bookmark className="w-4 h-4" /> Save search
                 </Button>
               )}
@@ -603,7 +604,7 @@ export function SearchPage() {
         >
           <p className="font-semibold mb-1">Search failed</p>
           <p className="text-sm">{error}</p>
-          <Button onClick={() => runSearch(query)} variant="secondary" size="sm" className="mt-3">
+          <Button onClick={() => runSearch(query)} variant="secondary" size="sm" className="mt-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
             Try again
           </Button>
         </div>
@@ -632,7 +633,7 @@ export function SearchPage() {
           {activeTab === 'people' && resources.length > 0 && (
             <button
               onClick={() => setActiveTab('resources')}
-              className="btn-secondary btn-sm mt-4"
+              className="btn-secondary btn-sm mt-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
             >
               View {resources.length} resource{resources.length === 1 ? '' : 's'}
             </button>
@@ -679,6 +680,7 @@ export function SearchPage() {
                 size="sm"
                 onClick={loadMore}
                 data-testid="load-more-button"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
               >
                 Load more results
               </Button>
@@ -728,7 +730,7 @@ function LandingState({
             <button
               key={p.label}
               onClick={() => onPickQuery(p.label)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-bh-surface border border-bh-border text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all"
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-bh-surface border border-bh-border text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
             >
               <span aria-hidden="true">{p.emoji}</span>
               {p.label}
@@ -746,7 +748,7 @@ function LandingState({
             </h2>
             <button
               onClick={onClearRecent}
-              className="text-xs text-bh-text-dim hover:text-bh-text-muted"
+              className="text-xs text-bh-text-dim hover:text-bh-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
             >
               Clear
             </button>
@@ -756,7 +758,7 @@ function LandingState({
               <li key={q}>
                 <button
                   onClick={() => onPickQuery(q)}
-                  className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors"
+                  className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
                 >
                   <Search className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
                   <span className="flex-1">{q}</span>
@@ -828,7 +830,7 @@ function NoResults({ query, onTryPopular }: { query: string; onTryPopular: (q: s
           <button
             key={p.label}
             onClick={() => onTryPopular(p.label)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bh-surface border border-bh-border text-xs text-bh-text-muted hover:border-bh-accent hover:text-bh-accent transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-bh-surface border border-bh-border text-xs text-bh-text-muted hover:border-bh-accent hover:text-bh-accent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
           >
             <span aria-hidden="true">{p.emoji}</span>
             {p.label}
@@ -903,7 +905,7 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
 
   return (
-    <article className="card card-hover group">
+    <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
       <div className="flex items-center gap-4">
         {/* Avatar */}
         {builder.avatarUrl ? (
@@ -993,7 +995,7 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
             href={builder.profileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-secondary btn-sm"
+            className="btn-secondary btn-sm rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
             title="Open profile"
           >
             View <ExternalLink className="w-3 h-3" aria-hidden="true" />
@@ -1012,7 +1014,7 @@ function ResourceResultCard({ builder, query }: { builder: Builder; query: strin
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
 
   return (
-    <article className="card card-hover group">
+    <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
       <div className="flex items-start gap-4">
         {/* Icon */}
         <div
@@ -1056,7 +1058,7 @@ function ResourceResultCard({ builder, query }: { builder: Builder; query: strin
               href={builder.profileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-bh-accent hover:underline"
+              className="inline-flex items-center gap-1 text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
             >
               <Code className="w-3 h-3" aria-hidden="true" />
               {builder.username}
@@ -1105,7 +1107,7 @@ function ResourceResultCard({ builder, query }: { builder: Builder; query: strin
             href={builder.profileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-secondary btn-sm"
+            className="btn-secondary btn-sm rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
           >
             View <ExternalLink className="w-3 h-3" aria-hidden="true" />
           </a>
@@ -1137,7 +1139,7 @@ function ResultTabButton({
       aria-selected={active}
       onClick={onClick}
       disabled={disabled}
-      className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
+      className={`relative inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
         active
           ? 'text-bh-text'
           : disabled
@@ -1188,7 +1190,7 @@ function SortMenu({ value, onChange }: { value: SortBy; onChange: (v: SortBy) =>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="btn-secondary btn-sm"
+        className="btn-secondary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -1207,7 +1209,7 @@ function SortMenu({ value, onChange }: { value: SortBy; onChange: (v: SortBy) =>
                 role="menuitemradio"
                 aria-checked={value === opt.value}
                 onClick={() => { onChange(opt.value); setOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm ${
+                className={`w-full flex items-center gap-2 px-3 py-2 rounded text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
                   value === opt.value
                     ? 'bg-bh-accent-soft text-bh-accent font-semibold'
                     : 'text-bh-text hover:bg-bh-surface-2'
