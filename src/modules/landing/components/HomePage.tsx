@@ -60,11 +60,15 @@ export function HomePage() {
       {/* ──────────────────────────────────────────────────────────────── */}
       {/*  Skip target for the "Skip to main content" link                */}
       {/* ──────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-40 border-b border-bh-border backdrop-blur-md bg-bh-bg/80">
-        <nav className="container flex h-16 items-center justify-between" aria-label="Primary">
-          <Link to="/" className="flex items-center gap-2.5 group" aria-label="BuilderHunt home">
+      {/* Floating topbar — same treatment as the dashboard shell (rounded
+          pill, shadow, bg-bh-surface), just wider: this nav carries a logo
+          wordmark + 4 links + auth actions, so it spans nearly the full
+          width instead of staying icon-width like the dashboard's. */}
+      <header className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg">
+        <nav className="flex h-14 items-center justify-between px-3 md:px-5" aria-label="Primary">
+          <Link to="/" className="flex items-center gap-2.5 group shrink-0" aria-label="BuilderHunt home">
             <Logo />
-            <span className="font-bold text-lg tracking-tight">BuilderHunt</span>
+            <span className="font-bold text-lg tracking-tight hidden sm:inline">BuilderHunt</span>
           </Link>
 
           <ul className="hidden md:flex items-center gap-1">
@@ -80,7 +84,7 @@ export function HomePage() {
             ))}
           </ul>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {isAuthed ? (
               <>
                 <LinkButton to="/dashboard" variant="secondary" className="btn-sm">
@@ -111,7 +115,7 @@ export function HomePage() {
         </nav>
       </header>
 
-      <main id="main-content">
+      <main id="main-content" className="pt-24">
         {/* ───────────────────────── HERO ───────────────────────── */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-grid" aria-hidden="true" />
