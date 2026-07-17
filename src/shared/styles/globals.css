@@ -41,31 +41,31 @@
     100% { background-position: 0% 50%; }
   }
 
-  /* Brand palette */
-  --color-bh-bg: #06080f;
-  --color-bh-bg-alt: #0a0e17;
-  --color-bh-surface: #0f1420;
-  --color-bh-surface-2: #141a28;
-  --color-bh-border: #1e293b;
-  --color-bh-border-strong: #334155;
-  --color-bh-text: #f1f5f9;
-  --color-bh-text-muted: #94a3b8;
-  --color-bh-text-dim: #64748b;
-  --color-bh-accent: #6366f1;
-  --color-bh-accent-hover: #4f46e5;
-  --color-bh-accent-soft: rgba(99, 102, 241, 0.12);
-  --color-bh-accent-glow: rgba(99, 102, 241, 0.35);
-  --color-bh-cyan: #06b6d4;
-  --color-bh-cyan-soft: rgba(6, 182, 212, 0.12);
-  --color-bh-success: #10b981;
-  --color-bh-warning: #f59e0b;
-  --color-bh-danger: #ef4444;
+  /* Brand palette — Minimalist Light Theme */
+  --color-bh-bg: #f4f4f5;
+  --color-bh-bg-alt: #f1f1f3;
+  --color-bh-surface: #ffffff;
+  --color-bh-surface-2: #fcfcfc;
+  --color-bh-border: #e4e4e7;
+  --color-bh-border-strong: #d4d4d8;
+  --color-bh-text: #18181b;
+  --color-bh-text-muted: #52525b;
+  --color-bh-text-dim: #71717a;
+  --color-bh-accent: #e07338;
+  --color-bh-accent-hover: #ca5d25;
+  --color-bh-accent-soft: rgba(224, 115, 56, 0.1);
+  --color-bh-accent-glow: rgba(224, 115, 56, 0.25);
+  --color-bh-cyan: #0891b2;
+  --color-bh-cyan-soft: rgba(8, 145, 178, 0.1);
+  --color-bh-success: #16a34a;
+  --color-bh-warning: #d97706;
+  --color-bh-danger: #dc2626;
 
-  /* Source-specific */
-  --color-bh-github: #f0f6fc;
+  /* Source-specific badges contrast adjusted for light background */
+  --color-bh-github: #24292f;
   --color-bh-reddit: #ff4500;
-  --color-bh-hn: #ff6600;
-  --color-bh-devto: #a8ff78;
+  --color-bh-hn: #d05300;
+  --color-bh-devto: #09090b;
 
   /* Semantic aliases */
   --color-surface: var(--color-bh-surface);
@@ -95,13 +95,10 @@ html {
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  font-feature-settings: 'cv11', 'ss01', 'ss03';
   background-color: var(--color-bh-bg);
   color: var(--color-bh-text);
   margin: 0;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
 }
 
 ::selection { background: var(--color-bh-accent); color: white; }
@@ -165,10 +162,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    Card
    ============================================================================= */
 .card {
-  background: linear-gradient(180deg, var(--color-bh-surface) 0%, var(--color-bh-bg-alt) 100%);
+  background: var(--color-bh-surface);
   border: 1px solid var(--color-bh-border);
-  border-radius: 12px;
+  border-radius: 24px; /* rounded-3xl equivalent */
   padding: 1.5rem;
+  box-shadow: 0 10px 30px -10px rgba(24, 24, 27, 0.04), 0 1px 3px rgba(24, 24, 27, 0.01);
   transition: border-color 0.2s, transform 0.2s;
 }
 .card-hover:hover {
