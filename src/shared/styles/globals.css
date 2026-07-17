@@ -163,10 +163,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    ============================================================================= */
 .card {
   background: var(--color-bh-surface);
-  border: 1px solid var(--color-bh-border);
+  border: 1px solid rgba(228, 228, 231, 0.4) !important;
   border-radius: 24px; /* rounded-3xl equivalent */
   padding: 1.5rem;
-  box-shadow: 0 10px 30px -10px rgba(24, 24, 27, 0.04), 0 1px 3px rgba(24, 24, 27, 0.01);
+  box-shadow: 0 10px 30px -15px rgba(24, 24, 27, 0.03), 0 1px 3px rgba(24, 24, 27, 0.01) !important;
   transition: border-color 0.2s, transform 0.2s;
 }
 .card-hover:hover {
@@ -418,4 +418,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   color: var(--color-bh-text-muted);
   font-size: 0.8125rem;
   font-weight: 500;
+}
+
+:root {
+  --color-bh-bg: #ececf0 !important;
+}
+
+.bg-striped-terracotta {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #e07338,
+    #e07338 10px,
+    transparent 10px,
+    transparent 20px
+  );
+}
+
+.bg-striped-neutral {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #e4e4e7,
+    #e4e4e7 10px,
+    transparent 10px,
+    transparent 20px
+  );
 }
