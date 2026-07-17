@@ -224,7 +224,7 @@ function RecommendationCard({
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute top-1.5 right-1.5 p-1 rounded text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        className="absolute top-1.5 right-1.5 p-2 rounded text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
         aria-label="Dismiss"
         title="Dismiss"
       >
