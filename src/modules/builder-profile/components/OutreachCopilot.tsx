@@ -55,7 +55,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center justify-between w-full text-left"
+        className="flex items-center justify-between w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded-lg"
         data-testid="outreach-copilot-toggle"
       >
         <span className="flex items-center gap-2 text-base font-semibold text-bh-text">
@@ -75,7 +75,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <input
               type="text"
-              className="input-field"
+              className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
               placeholder="Job title (e.g. Senior Rust Engineer)"
               value={jobTitle}
               onChange={e => setJobTitle(e.target.value)}
@@ -83,7 +83,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
             />
             <input
               type="text"
-              className="input-field"
+              className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
               placeholder="Company name"
               value={company}
               onChange={e => setCompany(e.target.value)}
@@ -92,7 +92,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
           </div>
 
           <textarea
-            className="input-field w-full resize-none"
+            className="input-field w-full resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
             rows={2}
             placeholder="Optional: short description of the role"
             value={description}
@@ -108,7 +108,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
                 role="radio"
                 aria-checked={tone === t.value}
                 onClick={() => setTone(t.value)}
-                className={tone === t.value ? 'btn-secondary' : 'btn-ghost'}
+                className={`${tone === t.value ? 'btn-secondary' : 'btn-ghost'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]`}
                 data-testid={`outreach-tone-${t.value}`}
               >
                 {t.label}
@@ -120,7 +120,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
             type="button"
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="btn-primary"
+            className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
             data-testid="outreach-generate"
           >
             <Sparkles className="w-4 h-4" aria-hidden="true" />
@@ -143,7 +143,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
               <button
                 type="button"
                 onClick={handleCopy}
-                className="btn-ghost mt-2"
+                className="btn-ghost mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
                 data-testid="outreach-copy"
               >
                 {copied ? (
