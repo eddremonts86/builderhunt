@@ -10,27 +10,7 @@ import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
 import { Footer } from '~/shared/components/Footer'
 import { BackToTop } from '~/shared/components/BackToTop'
-
-/* -------------------------------------------------------------------------- */
-/*  Logo component (inline SVG so we don't depend on the public file at first  */
-/*  paint — but the public file is the canonical asset)                        */
-/* -------------------------------------------------------------------------- */
-function Logo({ size = 28 }: { size?: number }) {
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-lg shrink-0"
-      style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
-      aria-hidden="true"
-    >
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <path d="M5 4h7a4 4 0 0 1 4 4v1" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M16 4h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-7a4 4 0 0 0-4 4v3" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M8 20H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h7a4 4 0 0 0 4-4V7" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <circle cx="11" cy="12" r="1.8" fill="#06b6d4" />
-      </svg>
-    </span>
-  )
-}
+import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 
 const NAV_LINKS = [
   { to: '/#how-it-works', label: 'How it works' },
@@ -60,59 +40,61 @@ export function HomePage() {
       {/* ──────────────────────────────────────────────────────────────── */}
       {/*  Skip target for the "Skip to main content" link                */}
       {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Floating topbar — same treatment as the dashboard shell (rounded
-          pill, shadow, bg-bh-surface), just wider: this nav carries a logo
-          wordmark + 4 links + auth actions, so it spans nearly the full
-          width instead of staying icon-width like the dashboard's. */}
-      <header className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg">
-        <nav className="flex h-14 items-center justify-between px-3 md:px-5" aria-label="Primary">
-          <Link to="/" className="flex items-center gap-2.5 group shrink-0" aria-label="BuilderHunt home">
-            <Logo />
-            <span className="font-bold text-lg tracking-tight hidden sm:inline">BuilderHunt</span>
-          </Link>
+      {/* Floating topbar — identical shell to the dashboard's: fixed,
+          inset-x-stretched, px-2 py-1.5, same 3-zone `justify-between`
+          layout (logo | links | auth). Padding lives on the header itself
+          here too (not on an inner nav with its own fixed height), so both
+          shells resolve to the same total height from the same rules. */}
+      <header
+        className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-1.5 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg px-2 py-1.5"
+        aria-label="Primary"
+      >
+        <Link to="/" className="flex items-center gap-2.5 group shrink-0 px-1.5" aria-label="BuilderHunt home">
+          <BrandLogoMark />
+          <span className="font-bold text-base tracking-tight hidden sm:inline">BuilderHunt</span>
+        </Link>
 
-          <ul className="hidden md:flex items-center gap-1">
-            {NAV_LINKS.map((l) => (
-              <li key={l.to}>
-                <a
-                  href={l.to.replace('/', '') || '/'}
-                  className="btn-ghost text-sm"
-                >
-                  {l.label}
-                </a>
-              </li>
-            ))}
-          </ul>
+        <ul className="hidden md:flex items-center gap-1">
+          {NAV_LINKS.map((l) => (
+            <li key={l.to}>
+              <a
+                href={l.to.replace('/', '') || '/'}
+                className="btn-ghost text-sm"
+              >
+                {l.label}
+              </a>
+            </li>
+          ))}
+        </ul>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {isAuthed ? (
-              <>
-                <LinkButton to="/dashboard" variant="secondary" className="btn-sm">
-                  <LayoutDashboard className="w-4 h-4" /> Dashboard
-                </LinkButton>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  disabled={signingOut}
-                  className="btn-ghost btn-sm"
-                  aria-label="Sign out"
-                >
-                  {signingOut ? (
-                    <span className="spinner" aria-hidden="true" />
-                  ) : (
-                    <LogOut className="w-4 h-4" aria-hidden="true" />
-                  )}
-                  <span className="hidden sm:inline">Sign out</span>
-                </button>
-              </>
-            ) : (
-              <>
-                <LinkButton to="/auth/sign-in" variant="ghost" className="hidden sm:inline-flex">Sign in</LinkButton>
-                <LinkButton to="/auth/sign-up" variant="primary" className="btn-sm">Get started</LinkButton>
-              </>
-            )}
-          </div>
-        </nav>
+        <div className="flex items-center gap-2 shrink-0">
+          {isAuthed ? (
+            <>
+              <LinkButton to="/dashboard" variant="secondary" className="btn-sm">
+                <LayoutDashboard className="w-4 h-4" /> Dashboard
+              </LinkButton>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={signingOut}
+                className="btn-ghost btn-sm"
+                aria-label="Sign out"
+              >
+                {signingOut ? (
+                  <span className="spinner" aria-hidden="true" />
+                ) : (
+                  <LogOut className="w-4 h-4" aria-hidden="true" />
+                )}
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <LinkButton to="/auth/sign-in" variant="ghost" className="hidden sm:inline-flex">Sign in</LinkButton>
+              <LinkButton to="/auth/sign-up" variant="primary" className="btn-sm">Get started</LinkButton>
+            </>
+          )}
+        </div>
       </header>
 
       <main id="main-content" className="pt-24">

@@ -7,23 +7,7 @@ import {
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
-
-function LogoMark({ size = 22 }: { size?: number }) {
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-md shrink-0"
-      style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
-      aria-hidden="true"
-    >
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <path d="M5 4h7a4 4 0 0 1 4 4v1" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M16 4h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-7a4 4 0 0 0-4 4v3" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M8 20H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h7a4 4 0 0 0 4-4V7" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <circle cx="11" cy="12" r="1.9" fill="#06b6d4" />
-      </svg>
-    </span>
-  )
-}
+import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 
 /** Primary sections — rendered as icon pills in the floating topbar. */
 const NAV = [
@@ -46,8 +30,8 @@ const ADMIN_NAV = [
   { to: '/admin/roadmap', icon: Map, label: 'Roadmap' },
 ] as const
 
-/** Local z-index scale for the floating shell (see layout.md — never arbitrary). */
-const Z_NAV = 40
+/** Local z-index scale for the floating shell (see layout.md — never arbitrary):
+ * topbar at z-40 (set directly in its className), flyouts/tooltips above it. */
 const Z_FLYOUT = 50
 
 /** Shared hover/focus micro-lift for every icon-only trigger in the shell. */
@@ -274,25 +258,24 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-app">
-      {/* Floating topbar — the single source for every dashboard nav link.
-          (There used to be a second floating rail duplicating Home/Account —
-          removed. One link, one place.) */}
+      {/* Floating topbar — same shell as the landing page's: fixed,
+          inset-x-stretched (not a content-hugging centered pill), same
+          px-2 py-1.5 padding, same 3-zone `justify-between` layout
+          (logo | sections | account). One link, one place — no second
+          rail duplicating Home/Account. */}
       <header
-        className="fixed top-4 inset-x-4 lg:left-1/2 lg:right-auto lg:-translate-x-1/2 flex items-center gap-1.5 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg px-2 py-1.5 overflow-x-auto max-w-[calc(100vw-2rem)]"
-        style={{ zIndex: Z_NAV }}
+        className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-1.5 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg px-2 py-1.5 overflow-x-auto"
         aria-label="Main navigation"
       >
         <Tooltip label="Back to home">
           <Link
             to="/"
             aria-label="BuilderHunt home"
-            className={`relative flex items-center px-1.5 ${ICON_TRANSITION}`}
+            className={`relative flex items-center px-1.5 shrink-0 ${ICON_TRANSITION}`}
           >
-            <LogoMark />
+            <BrandLogoMark />
           </Link>
         </Tooltip>
-
-        <span className="w-px h-5 bg-bh-border shrink-0 mx-0.5" aria-hidden="true" />
 
         {/* Primary sections + admin flyout share one sliding highlight. */}
         <div ref={pillRowRef} className="relative flex items-center gap-1.5">
@@ -313,32 +296,32 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           {isAdmin && <AdminFlyout pathname={location.pathname} />}
         </div>
 
-        <span className="w-px h-5 bg-bh-border shrink-0 mx-0.5" aria-hidden="true" />
-
-        <Tooltip label="Account">
-          <Link
-            to="/me"
-            aria-label="Account"
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center ${ICON_TRANSITION} ${
-              location.pathname === '/me'
-                ? 'bg-[#2b1812] text-white shadow-sm'
-                : 'text-bh-text-dim hover:text-bh-text hover:bg-bh-bg-alt'
-            }`}
-          >
-            <CircleUser className="w-4 h-4" aria-hidden="true" />
-          </Link>
-        </Tooltip>
-        <Tooltip label="Sign out">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={signingOut}
-            aria-label="Sign out"
-            className={`relative w-9 h-9 rounded-full flex items-center justify-center text-bh-text-dim hover:text-bh-danger hover:bg-bh-danger/10 disabled:opacity-50 ${ICON_TRANSITION}`}
-          >
-            {signingOut ? <span className="spinner" aria-hidden="true" /> : <LogOut className="w-4 h-4" aria-hidden="true" />}
-          </button>
-        </Tooltip>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Tooltip label="Account">
+            <Link
+              to="/me"
+              aria-label="Account"
+              className={`relative w-9 h-9 rounded-full flex items-center justify-center ${ICON_TRANSITION} ${
+                location.pathname === '/me'
+                  ? 'bg-[#2b1812] text-white shadow-sm'
+                  : 'text-bh-text-dim hover:text-bh-text hover:bg-bh-bg-alt'
+              }`}
+            >
+              <CircleUser className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          </Tooltip>
+          <Tooltip label="Sign out">
+            <button
+              type="button"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              aria-label="Sign out"
+              className={`relative w-9 h-9 rounded-full flex items-center justify-center text-bh-text-dim hover:text-bh-danger hover:bg-bh-danger/10 disabled:opacity-50 ${ICON_TRANSITION}`}
+            >
+              {signingOut ? <span className="spinner" aria-hidden="true" /> : <LogOut className="w-4 h-4" aria-hidden="true" />}
+            </button>
+          </Tooltip>
+        </div>
       </header>
 
       {/* Main */}
