@@ -138,19 +138,19 @@ export function DashboardPage() {
           <nav className="inline-flex items-center gap-1 p-1 bg-bh-bg-alt rounded-full border border-bh-border">
             <Link
               to="/dashboard"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold bg-bh-text text-white shadow-sm transition-all"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold bg-bh-text text-white shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Dashboard
             </Link>
             <Link
               to="/search"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Hunts
             </Link>
             <Link
               to="/alerts"
-              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors"
+              className="px-4 py-1.5 rounded-full text-xs font-semibold text-bh-text-muted hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Alerts
             </Link>
@@ -160,13 +160,13 @@ export function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer"
+              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Filter Location
             </button>
             <button
               type="button"
-              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer"
+              className="px-4 py-1.5 bg-white border border-bh-border hover:border-bh-border-strong text-bh-text-muted hover:text-bh-text text-xs font-semibold rounded-full transition-colors shadow-xs cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               Filter Date
             </button>
@@ -327,7 +327,7 @@ export function DashboardPage() {
                     <Link
                       to="/builder/$builderId"
                       params={{ builderId: b.id }}
-                      className="flex items-start gap-3 p-4 hover:bg-bh-surface-2/50 transition-colors"
+                      className="flex items-start gap-3 p-4 hover:bg-bh-surface-2/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     >
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white text-xs font-semibold shrink-0">
                         {(b.displayName ?? b.username)[0]?.toUpperCase()}

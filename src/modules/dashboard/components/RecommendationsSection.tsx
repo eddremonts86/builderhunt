@@ -89,7 +89,7 @@ export function RecommendationsSection() {
   return (
     <section
       aria-labelledby="for-you-heading"
-      className="card p-5 md:p-6 mb-6"
+      className="card p-5 md:p-6"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -231,7 +231,7 @@ function RecommendationCard({
       <button
         type="button"
         onClick={onDismiss}
-        className="absolute top-2 right-2 p-1.5 rounded-full bg-bh-bg hover:bg-bh-bg-alt text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer"
+        className="absolute top-2 right-2 p-1.5 rounded-full bg-bh-bg hover:bg-bh-bg-alt text-bh-text-dim hover:text-bh-text opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
         aria-label="Dismiss"
         title="Dismiss"
       >
@@ -300,7 +300,7 @@ function RecommendationCard({
           href={profileUrlFor(builder)}
           target="_blank"
           rel="noopener noreferrer"
-          className="btn-secondary btn-sm w-full justify-center"
+          className="btn-secondary btn-sm w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
           data-event="recommendation_view"
         >
           View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />

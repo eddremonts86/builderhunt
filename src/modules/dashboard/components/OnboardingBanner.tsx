@@ -51,7 +51,7 @@ export function OnboardingBanner() {
 
   return (
     <div
-      className="card p-4 mb-6 flex items-center gap-3 border-bh-accent/30 bg-bh-accent-soft/20"
+      className="card p-4 flex items-center gap-3 border-bh-accent/30 bg-bh-accent-soft/20"
       data-testid="onboarding-banner"
       role="status"
     >
