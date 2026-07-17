@@ -30,7 +30,7 @@ export const Route = createFileRoute('/api/search/builders')({
             : Array.isArray(keywords) ? keywords : []
           const results = await searchBuilders({
             keywords: keywordsArray,
-            sources: Array.isArray(sources) ? sources : ['github'],
+            sources: Array.isArray(sources) ? sources : undefined,
             language,
             country,
             page,

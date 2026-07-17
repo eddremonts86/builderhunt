@@ -76,6 +76,8 @@ const PRO_TIPS = [
 
 const RECENT_KEY = 'builderhunt.recent_searches'
 const MAX_RECENT = 5
+/** Query used to fetch a real preview before the user has searched anything. */
+const FEATURED_QUERY = 'open source maintainers'
 
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                       */
@@ -117,8 +119,25 @@ export function SearchPage() {
   const [saving, setSaving] = React.useState(false)
   const [saveMsg, setSaveMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
+  const [featured, setFeatured] = React.useState<Builder[]>([])
 
   const inputRef = React.useRef<HTMLInputElement>(null)
+
+  /* Mount: preview a few real, live results before the user has typed
+     anything — demonstrates real value instead of only showing tips. */
+  React.useEffect(() => {
+    fetch('/api/search/builders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keywords: FEATURED_QUERY, perPage: 6 }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { builders?: Builder[] } | null) => {
+        const people = (data?.builders ?? []).filter((b) => b.kind === 'person')
+        setFeatured(people.slice(0, 3))
+      })
+      .catch(() => {})
+  }, [])
 
   /* Mount: load recent searches from localStorage */
   React.useEffect(() => {
@@ -355,21 +374,24 @@ export function SearchPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <header className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1">
+      {/* Header — collapses to just a small title once results are on screen,
+          so a returning search doesn't repeat a full-height intro every time. */}
+      <header className={searched ? 'mb-4' : 'mb-8'}>
+        <h1 className={`font-bold tracking-tight ${searched ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl mb-1'}`}>
           Search builders
         </h1>
-        <p className="text-bh-text-muted">
-          Find active developers across{' '}
-          {ALL_SOURCES.map((s, i) => (
-            <React.Fragment key={s}>
-              <span className="text-bh-text font-medium">{SOURCE_META[s].label}</span>
-              {i < ALL_SOURCES.length - 1 && ', '}
-            </React.Fragment>
-          ))}
-          .
-        </p>
+        {!searched && (
+          <p className="text-bh-text-muted">
+            Find active developers across{' '}
+            {ALL_SOURCES.map((s, i) => (
+              <React.Fragment key={s}>
+                <span className="text-bh-text font-medium">{SOURCE_META[s].label}</span>
+                {i < ALL_SOURCES.length - 1 && ', '}
+              </React.Fragment>
+            ))}
+            .
+          </p>
+        )}
       </header>
 
       {/* Search input + filters */}
@@ -501,6 +523,9 @@ export function SearchPage() {
                 className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 autoComplete="off"
               />
+              <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
+                Only GitHub supports this. Other sources don't expose primary language.
+              </p>
             </div>
           </div>
         )}
@@ -550,6 +575,7 @@ export function SearchPage() {
       {!searched && (
         <LandingState
           recent={recent}
+          featured={featured}
           onPickQuery={(q) => { setQuery(q); runSearch(q) }}
           onClearRecent={clearRecent}
         />
@@ -713,85 +739,100 @@ export function SearchPage() {
 
 function LandingState({
   recent,
+  featured,
   onPickQuery,
   onClearRecent,
 }: {
   recent: string[]
+  featured: Builder[]
   onPickQuery: (q: string) => void
   onClearRecent: () => void
 }) {
   return (
-    <div className="space-y-8 mt-2">
-      {/* Popular queries */}
-      <section aria-labelledby="popular-heading">
-        <h2 id="popular-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-3 flex items-center gap-2">
-          <TrendingUp className="w-3.5 h-3.5" /> Popular searches
-        </h2>
-        <div className="flex flex-wrap gap-2">
-          {POPULAR_QUERIES.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => onPickQuery(p.label)}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-bh-surface border border-bh-border text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
-            >
-              <span aria-hidden="true">{p.emoji}</span>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Recent searches */}
-      {recent.length > 0 && (
-        <section aria-labelledby="recent-heading">
-          <div className="flex items-center justify-between mb-3">
-            <h2 id="recent-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2">
-              <Clock className="w-3.5 h-3.5" /> Your recent searches
+    <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-2">
+      <div className="space-y-8">
+        {/* Featured — a few real, live results before you've typed anything */}
+        {featured.length > 0 && (
+          <section aria-labelledby="featured-heading">
+            <h2 id="featured-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-3 flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5" /> See what's out there right now
             </h2>
-            <button
-              onClick={onClearRecent}
-              className="text-xs text-bh-text-dim hover:text-bh-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
-            >
-              Clear
-            </button>
-          </div>
-          <ul className="space-y-1">
-            {recent.map((q) => (
-              <li key={q}>
-                <button
-                  onClick={() => onPickQuery(q)}
-                  className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
-                >
-                  <Search className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
-                  <span className="flex-1">{q}</span>
-                  <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-bh-text-dim" aria-hidden="true" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+            <ul className="space-y-3" role="list">
+              {featured.map((b) => (
+                <li key={`${b.source}-${b.id}`}>
+                  <PersonResultCard builder={b} query={FEATURED_QUERY} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {/* Pro tips */}
-      <section
-        aria-labelledby="tips-heading"
-        className="card-glow"
-      >
-        <div className="p-6">
-          <h2 id="tips-heading" className="text-sm font-semibold text-bh-text flex items-center gap-2 mb-4">
-            <Lightbulb className="w-4 h-4 text-bh-warning" aria-hidden="true" />
-            Search tips
+        {/* Popular queries */}
+        <section aria-labelledby="popular-heading">
+          <h2 id="popular-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-3 flex items-center gap-2">
+            <TrendingUp className="w-3.5 h-3.5" /> Popular searches
           </h2>
-          <ul className="space-y-2.5">
-            {PRO_TIPS.map((tip, i) => (
-              <li key={i} className="flex items-start gap-3 text-sm text-bh-text-muted">
-                <tip.icon className="w-4 h-4 text-bh-text-dim shrink-0 mt-0.5" aria-hidden="true" />
-                <span>{tip.text}</span>
-              </li>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR_QUERIES.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => onPickQuery(p.label)}
+                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-bh-surface border border-bh-border text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+              >
+                <span aria-hidden="true">{p.emoji}</span>
+                {p.label}
+              </button>
             ))}
-          </ul>
-        </div>
-      </section>
+          </div>
+        </section>
+
+        {/* Recent searches */}
+        {recent.length > 0 && (
+          <section aria-labelledby="recent-heading">
+            <div className="flex items-center justify-between mb-3">
+              <h2 id="recent-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5" /> Your recent searches
+              </h2>
+              <button
+                onClick={onClearRecent}
+                className="text-xs text-bh-text-dim hover:text-bh-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
+              >
+                Clear
+              </button>
+            </div>
+            <ul className="space-y-1">
+              {recent.map((q) => (
+                <li key={q}>
+                  <button
+                    onClick={() => onPickQuery(q)}
+                    className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                  >
+                    <Search className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
+                    <span className="flex-1">{q}</span>
+                    <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-bh-text-dim" aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      {/* Sidebar tips — compact, secondary to the interactive content on wide screens */}
+      <aside aria-labelledby="tips-heading" className="card lg:self-start">
+        <h2 id="tips-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2 mb-3">
+          <Lightbulb className="w-3.5 h-3.5 text-bh-warning" aria-hidden="true" />
+          Search tips
+        </h2>
+        <ul className="space-y-2.5">
+          {PRO_TIPS.map((tip, i) => (
+            <li key={i} className="flex items-start gap-2.5 text-xs text-bh-text-muted leading-snug">
+              <tip.icon className="w-3.5 h-3.5 text-bh-text-dim shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{tip.text}</span>
+            </li>
+          ))}
+        </ul>
+      </aside>
     </div>
   )
 }
@@ -908,7 +949,7 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
 
   return (
     <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
-      <div className="flex items-center gap-4">
+      <div className="flex items-start gap-4">
         {/* Avatar */}
         {builder.avatarUrl ? (
           <img
@@ -928,80 +969,84 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
           </div>
         )}
 
-        {/* Single-line body: name + handle + source + tags + meta */}
-        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
-          {/* Name + handle */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <h3 className="font-semibold text-bh-text text-sm whitespace-nowrap">
-              {builder.displayName ?? builder.username}
-            </h3>
-            {builder.displayName && (
-              <span className="text-xs text-bh-text-dim whitespace-nowrap">@{builder.username}</span>
-            )}
+        <div className="flex-1 min-w-0">
+          {/* Row 1: name + handle (truncates) — score + view pinned right, always one line */}
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1 truncate">
+              <span className="font-semibold text-bh-text text-sm">
+                {builder.displayName ?? builder.username}
+              </span>
+              {builder.displayName && (
+                <span className="text-xs text-bh-text-dim ml-1.5">@{builder.username}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2.5 shrink-0">
+              {builder.score != null && (
+                <ScoreRing
+                  score={builder.score}
+                  size={36}
+                  showLabel={false}
+                  breakdown={getScoreBreakdown(builder)}
+                />
+              )}
+              <a
+                href={builder.profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-secondary btn-sm rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                title="Open profile"
+              >
+                View <ExternalLink className="w-3 h-3" aria-hidden="true" />
+              </a>
+            </div>
           </div>
 
-          <span className={`badge ${meta.color} inline-flex items-center gap-1 shrink-0`}>
-            <meta.Icon className="w-3 h-3" title={meta.label} />
-            {meta.label}
-          </span>
+          {/* Row 2: source + topics + meta + why-match — wraps freely at any width */}
+          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+            <span className={`badge ${meta.color} inline-flex items-center gap-1`}>
+              <meta.Icon className="w-3 h-3" title={meta.label} />
+              {meta.label}
+            </span>
 
-          {/* Matched topics — inline */}
-          {matchedTopics.slice(0, 2).map((t) => (
-            <span key={t} className="badge text-xs shrink-0">{t}</span>
-          ))}
+            {matchedTopics.slice(0, 2).map((t) => (
+              <span key={t} className="badge text-xs">{t}</span>
+            ))}
 
-          {/* Meta — followers / country / last seen, in muted text */}
-          <div className="flex items-center gap-3 text-xs text-bh-text-muted shrink min-w-0">
             {builder.followersCount != null && (
-              <span className="inline-flex items-center gap-1 shrink-0">
+              <span className="inline-flex items-center gap-1 text-xs text-bh-text-muted">
                 <Users className="w-3 h-3" aria-hidden="true" />
                 {(builder.followersCount ?? 0).toLocaleString()}
               </span>
             )}
             {builder.country && (
-              <span className="hidden sm:inline whitespace-nowrap">{builder.country}</span>
+              <span className="text-xs text-bh-text-muted">{builder.country}</span>
             )}
-          </div>
 
-          {/* Why this match — show what hit, taking remaining space */}
-          {matchedTerms.length > 0 && (
-            <span className="hidden md:inline-flex items-center gap-1 text-xs text-bh-text-dim ml-auto truncate">
-              <Sparkles className="w-3 h-3 text-bh-accent shrink-0" aria-hidden="true" />
-              <span className="truncate">
-                matches{' '}
-                {matchedTerms.slice(0, 3).map((t, i) => (
-                  <span key={t}>
-                    <span className="text-bh-text-muted font-medium">"{t}"</span>
-                    {i < Math.min(matchedTerms.length, 3) - 1 && ', '}
+            <span className="inline-flex items-center gap-1 text-xs text-bh-text-dim min-w-0">
+              {matchedTerms.length > 0 ? (
+                <>
+                  <Sparkles className="w-3 h-3 text-bh-accent shrink-0" aria-hidden="true" />
+                  <span>
+                    matches{' '}
+                    {matchedTerms.slice(0, 3).map((t, i) => (
+                      <span key={t}>
+                        <span className="text-bh-text-muted font-medium">"{t}"</span>
+                        {i < Math.min(matchedTerms.length, 3) - 1 && ', '}
+                      </span>
+                    ))}
+                    {matchedTerms.length > 3 && ` +${matchedTerms.length - 3}`}
+                    {' '}
+                    <span className="text-bh-text-dim">in {fields.join(' + ')}</span>
                   </span>
-                ))}
-                {matchedTerms.length > 3 && ` +${matchedTerms.length - 3}`}
-                {' '}
-                <span className="text-bh-text-dim">in {fields.join(' + ')}</span>
-              </span>
+                </>
+              ) : (
+                <>
+                  <TrendingUp className="w-3 h-3 text-bh-text-dim shrink-0" aria-hidden="true" />
+                  <span>ranked by reach &amp; recent activity, not a direct keyword hit</span>
+                </>
+              )}
             </span>
-          )}
-        </div>
-
-        {/* Score + action */}
-        <div className="flex items-center gap-3 shrink-0">
-          {builder.score != null && (
-            <ScoreRing
-              score={builder.score}
-              size={40}
-              showLabel={false}
-              breakdown={getScoreBreakdown(builder)}
-            />
-          )}
-          <a
-            href={builder.profileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary btn-sm rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
-            title="Open profile"
-          >
-            View <ExternalLink className="w-3 h-3" aria-hidden="true" />
-          </a>
+          </div>
         </div>
       </div>
     </article>
@@ -1075,25 +1120,32 @@ function ResourceResultCard({ builder, query }: { builder: Builder; query: strin
             {builder.language && <span>{builder.language}</span>}
           </div>
 
-          {/* Why this match */}
-          {matchedTerms.length > 0 && (
-            <p className="text-xs text-bh-text-dim flex items-start gap-1.5">
-              <Sparkles className="w-3 h-3 text-bh-accent shrink-0 mt-0.5" aria-hidden="true" />
-              <span>
-                Matches{' '}
-                {matchedTerms.slice(0, 4).map((t, i) => (
-                  <span key={t}>
-                    <span className="text-bh-text-muted font-medium">"{t}"</span>
-                    {i < Math.min(matchedTerms.length, 4) - 1 && ', '}
-                  </span>
-                ))}
-                {matchedTerms.length > 4 && ` +${matchedTerms.length - 4} more`}
-                {fields.length > 0 && (
-                  <span className="text-bh-text-dim"> · in {fields.join(' + ')}</span>
-                )}
-              </span>
-            </p>
-          )}
+          {/* Why this match — always show a reason */}
+          <p className="text-xs text-bh-text-dim flex items-start gap-1.5">
+            {matchedTerms.length > 0 ? (
+              <>
+                <Sparkles className="w-3 h-3 text-bh-accent shrink-0 mt-0.5" aria-hidden="true" />
+                <span>
+                  Matches{' '}
+                  {matchedTerms.slice(0, 4).map((t, i) => (
+                    <span key={t}>
+                      <span className="text-bh-text-muted font-medium">"{t}"</span>
+                      {i < Math.min(matchedTerms.length, 4) - 1 && ', '}
+                    </span>
+                  ))}
+                  {matchedTerms.length > 4 && ` +${matchedTerms.length - 4} more`}
+                  {fields.length > 0 && (
+                    <span className="text-bh-text-dim"> · in {fields.join(' + ')}</span>
+                  )}
+                </span>
+              </>
+            ) : (
+              <>
+                <TrendingUp className="w-3 h-3 text-bh-text-dim shrink-0 mt-0.5" aria-hidden="true" />
+                <span>Ranked by reach &amp; recent activity, not a direct keyword hit</span>
+              </>
+            )}
+          </p>
         </div>
 
         {/* Score + actions */}

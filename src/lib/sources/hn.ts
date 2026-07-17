@@ -1,6 +1,19 @@
 import { env } from '~/shared/lib/env'
 import type { RawBuilder } from '~/lib/sources/types'
 
+interface AlgoliaHit {
+  author: string
+  points: number | null
+  title?: string | null
+  story_title?: string | null
+  comment_text?: string | null
+  created_at: string
+}
+
+interface AlgoliaSearchResponse {
+  hits: AlgoliaHit[]
+}
+
 interface HNUser {
   id: string
   karma: number
@@ -9,47 +22,71 @@ interface HNUser {
   created: number
 }
 
+interface AuthorMatch {
+  matchCount: number
+  bestTitle: string
+  lastSeen: number
+  topPoints: number
+}
+
+/**
+ * HN's Firebase API (used previously) has no full-text search — it only
+ * exposes item/user lookups by id. Sampling the current front page and
+ * ignoring the query meant every search returned the same top-karma users
+ * regardless of relevance. HN's Algolia-backed Search API does real
+ * full-text search across stories and comments, so we use that to find
+ * users who actually posted something matching the query.
+ */
 export async function searchHN(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]> {
-  const baseUrl = env.HACKERNEWS_API_URL
-  const query = keywords.join(' ').toLowerCase()
+  const query = keywords.join(' ').trim()
   if (!query) return []
 
   const { page = 1, perPage = 30 } = options
-  // HN doesn't support real search. We sample top stories; pagination
-  // by shifting the slice.
-  const sampleSize = 100 * page
 
   try {
-    // Search for users who submitted items matching keywords
-    const topStoriesRes = await fetch(`${baseUrl}/topstories.json`)
-    const topIds: number[] = await topStoriesRes.json()
-    const sampleIds = topIds.slice(0, sampleSize)
+    const url = new URL('https://hn.algolia.com/api/v1/search')
+    url.searchParams.set('query', query)
+    url.searchParams.set('tags', '(story,comment)')
+    url.searchParams.set('hitsPerPage', '100')
+    url.searchParams.set('page', String(page - 1))
 
-    const usersMap = new Map<string, { id: string; karma: number; about?: string }>()
+    const res = await fetch(url.toString())
+    if (!res.ok) return []
+    const data = await res.json() as AlgoliaSearchResponse
 
-    // Collect authors from top stories (with offset for pagination)
-    const startIdx = (page - 1) * 50
-    const storyPromises = sampleIds.slice(startIdx, startIdx + 50).map(async (id: number) => {
-      try {
-        const res = await fetch(`${baseUrl}/item/${id}.json`)
-        const item = await res.json()
-        if (item && item.type === 'story' && item.by) {
-          usersMap.set(item.by, { id: item.by, karma: 0 })
+    // Aggregate matching items by author: how many items matched, the
+    // highest-points one (used as the visible "why"), and the most
+    // recent match (used for recency scoring).
+    const byAuthor = new Map<string, AuthorMatch>()
+    for (const hit of data.hits) {
+      if (!hit.author) continue
+      const title = hit.title ?? hit.story_title ?? hit.comment_text?.slice(0, 140) ?? ''
+      const points = hit.points ?? 0
+      const ts = Date.parse(hit.created_at) || 0
+      const existing = byAuthor.get(hit.author)
+      if (!existing) {
+        byAuthor.set(hit.author, { matchCount: 1, bestTitle: title, lastSeen: ts, topPoints: points })
+      } else {
+        existing.matchCount += 1
+        existing.lastSeen = Math.max(existing.lastSeen, ts)
+        if (points > existing.topPoints) {
+          existing.topPoints = points
+          existing.bestTitle = title
         }
-      } catch {
-        // skip
       }
-    })
+    }
 
-    await Promise.all(storyPromises)
+    const authors = Array.from(byAuthor.entries())
+      .sort((a, b) => b[1].topPoints - a[1].topPoints)
+      .slice(0, perPage)
 
-    // Fetch user details for karma
-    const users = Array.from(usersMap.values())
     const userDetails = await Promise.all(
-      users.slice(0, perPage).map(async (u) => {
+      authors.map(async ([username, match]) => {
         try {
-          const res = await fetch(`${baseUrl}/user/${u.id}.json`)
-          return res.json() as Promise<HNUser>
+          const userRes = await fetch(`${env.HACKERNEWS_API_URL}/user/${username}.json`)
+          const user = await userRes.json() as HNUser | null
+          if (!user) return null
+          return { user, match, username }
         } catch {
           return null
         }
@@ -57,22 +94,26 @@ export async function searchHN(keywords: string[], options: { page?: number; per
     )
 
     return userDetails
-      .filter((u): u is HNUser => u !== null)
-      .map(user => ({
-        id: `hn-${user.id}`,
-        kind: 'person' as const,
-        source: 'hn' as const,
-        sourceId: user.id,
-        username: user.id,
+      .filter((u): u is NonNullable<typeof u> => u !== null)
+      .map(({ user, match, username }): RawBuilder => ({
+        id: `hn-${username}`,
+        kind: 'person',
+        source: 'hn',
+        sourceId: username,
+        username,
         displayName: undefined,
         avatarUrl: undefined,
-        bio: user.about ?? undefined,
-        profileUrl: `https://news.ycombinator.com/user?id=${user.id}`,
+        bio: user.about ?? (match.bestTitle ? `Posted: "${match.bestTitle}"` : undefined),
+        profileUrl: `https://news.ycombinator.com/user?id=${username}`,
         followersCount: user.karma,
         language: undefined,
         country: undefined,
-        topics: [],
-        metadata: { submittedCount: user.submitted?.length ?? 0 },
+        topics: keywords,
+        metadata: {
+          submittedCount: user.submitted?.length ?? 0,
+          lastSeen: match.lastSeen || undefined,
+          matchCount: match.matchCount,
+        },
       }))
   } catch {
     return []

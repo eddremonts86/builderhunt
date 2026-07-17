@@ -40,13 +40,15 @@ export function ScoreRing({ score, size = 56, showLabel = true, breakdown }: Sco
   const circumference = 2 * Math.PI * radius // ≈ 100.5
   const clamped = Math.max(0, Math.min(100, score))
 
-  // Color: green >= 80, yellow >= 50, indigo otherwise.
-  // Hex values (not CSS vars) because inline SVG `stroke="var(...)"` doesn't
-  // resolve Tailwind v4's --color- prefixed names reliably.
-  const color =
-    clamped >= 80 ? '#10b981' :
-    clamped >= 50 ? '#f59e0b' :
-    '#6366f1'
+  // Continuous gradient (brand accent orange → success green) instead of a
+  // few wide buckets — real score distributions cluster tightly (e.g. most
+  // results land 45-67), and 3 buckets made a strong and a mediocre match
+  // look identical. HSL computed inline (not a CSS var) because inline SVG
+  // `stroke="var(...)"` doesn't resolve Tailwind v4's --color- names reliably.
+  const t = clamped / 100
+  const hue = 21 + t * 121 // 21° ≈ --color-bh-accent, 142° ≈ --color-bh-success
+  const lightness = 55 - t * 19
+  const color = `hsl(${hue.toFixed(0)} 74% ${lightness.toFixed(0)}%)`
 
   const dashArray = `${(clamped / 100) * circumference} ${circumference}`
 
