@@ -1,7 +1,27 @@
-import { createRootRoute } from '@tanstack/react-router'
-import { RootDocument, RootErrorBoundary } from './-root-components'
+import * as React from 'react'
+import { createRootRoute, Outlet, HeadContent, Scripts } from '@tanstack/react-router'
+import { RootErrorBoundary } from './-root-components'
 import { NotFoundPage } from '~/components/composite/NotFoundPage'
+import { CookieBanner } from '~/shared/components/CookieBanner'
+import { TosModal } from '~/shared/components/TosModal'
 import appCss from '~/shared/styles/globals.css?url'
+
+function RootDocument({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body suppressHydrationWarning className="bg-app min-h-screen">
+        <a href="#main-content" className="skip-link">Skip to main content</a>
+        {children}
+        <CookieBanner />
+        <TosModal />
+        <Scripts />
+      </body>
+    </html>
+  )
+}
 
 const SITE_URL = 'https://builderhunt.dev'
 const SITE_NAME = 'BuilderHunt'
@@ -171,6 +191,11 @@ export const Route = createRootRoute({
     ],
     }
   },
+  component: () => (
+    <main id="main-content">
+      <Outlet />
+    </main>
+  ),
   shellComponent: RootDocument,
   errorComponent: RootErrorBoundary,
   notFoundComponent: NotFoundPage,

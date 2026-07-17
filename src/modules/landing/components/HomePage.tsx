@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useSession, signOut } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
+import { FAQSection } from './FAQSection'
 import { Footer } from '~/shared/components/Footer'
 
 /* -------------------------------------------------------------------------- */
@@ -437,50 +438,7 @@ export function HomePage() {
               </h2>
             </div>
 
-            <div className="space-y-3">
-              {[
-                {
-                  q: 'What is BuilderHunt, in one sentence?',
-                  a: 'A radar for open-source builders: it aggregates public activity from GitHub, Reddit, Hacker News and DEV.to, scores it for recency, and lets you save searches, get alerts, and track the people behind the work.',
-                },
-                {
-                  q: 'Is it really free?',
-                  a: 'Yes during public beta. We\'ll introduce a paid tier eventually for team features (shared shortlists, custom score weights, larger alert volumes) but the core product stays free for individual use.',
-                },
-                {
-                  q: 'Do I need API tokens for the sources?',
-                  a: 'No. Everything works out of the box. Adding a GitHub personal access token (optional, free) lifts the rate limit so you can run larger or more frequent searches.',
-                },
-                {
-                  q: 'How is the activity score calculated?',
-                  a: 'A recency-weighted blend of public signals: stars, forks, PRs, upvotes, karma, posts. Recent activity is worth much more than old activity. The exact weights are visible in the dashboard so you can sanity-check any result.',
-                },
-                {
-                  q: 'Do you contact the builders on my behalf?',
-                  a: 'No. We don\'t send DMs, emails, or anything. You find them, you reach out. We just do the discovery and the tracking.',
-                },
-                {
-                  q: 'Can I export my data?',
-                  a: 'Yes. Any shortlist, saved search, or note collection can be exported to CSV or JSON with one click. Your data is yours.',
-                },
-              ].map((item) => (
-                <details
-                  key={item.q}
-                  className="card group [&[open]]:border-bh-border-strong"
-                >
-                  <summary className="cursor-pointer list-none flex items-center justify-between gap-4 font-semibold">
-                    <span>{item.q}</span>
-                    <span
-                      className="w-6 h-6 rounded-full border border-bh-border flex items-center justify-center text-bh-text-muted shrink-0 transition-transform group-open:rotate-45"
-                      aria-hidden="true"
-                    >
-                      +
-                    </span>
-                  </summary>
-                  <p className="mt-3 text-bh-text-muted leading-relaxed">{item.a}</p>
-                </details>
-              ))}
-            </div>
+            <FAQSection />
           </div>
         </section>
 
