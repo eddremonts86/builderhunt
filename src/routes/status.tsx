@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock, ExternalLink } from 'lucide-react'
+import { useSession } from '~/shared/lib/auth/client'
+import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 
 interface Incident {
   id: string
@@ -67,10 +69,11 @@ function StatusPage() {
     return () => clearInterval(id)
   }, [load])
 
+  const { data: session } = useSession()
   const allOk = status?.status === 'ok'
   const openIncidents = incidents.filter((i) => i.status !== 'resolved')
 
-  return (
+  const content = (
     <div className="min-h-[calc(100vh-4rem)] p-6 max-w-3xl mx-auto">
       <header className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
@@ -163,6 +166,12 @@ function StatusPage() {
       </footer>
     </div>
   )
+
+  // Reached from inside the dashboard's floating nav, this page still needs
+  // to work for signed-out visitors (public trust page) — so it can't live
+  // under `_dashboard/*` (auth-gated). Wrap in the same shell client-side
+  // when a session exists, so it doesn't feel like leaving the app.
+  return session?.user ? <DashboardLayout>{content}</DashboardLayout> : content
 }
 
 function ComponentRow({ name, check }: { name: string; check: { name: string; ok: boolean; message?: string } }) {

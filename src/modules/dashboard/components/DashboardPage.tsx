@@ -135,41 +135,9 @@ export function DashboardPage() {
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
-      {/* Floating Sidebar Menu */}
-      <aside className="fixed left-4 top-1/2 -translate-y-1/2 bg-white rounded-full p-2 py-4 shadow-lg flex flex-col gap-4 items-center border border-zinc-100/50 z-40 hidden md:flex">
-        <button className="w-8 h-8 rounded-full flex items-center justify-center bg-[#2b1812] text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Users className="w-4 h-4" /></button>
-        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Activity className="w-4 h-4" /></button>
-        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Bookmark className="w-4 h-4" /></button>
-        <button className="w-8 h-8 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"><Search className="w-4 h-4" /></button>
-      </aside>
-
       {/* Header */}
       <header className="mb-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          {/* Navigation Pill Element */}
-          <nav className="flex items-center gap-2">
-            <Link
-              to="/dashboard"
-              className="px-5 py-2 rounded-full text-xs font-semibold bg-[#2b1812] text-white shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-            >
-              Dashboard
-            </Link>
-            <Link
-              to="/search"
-              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-zinc-500 hover:bg-zinc-50 border border-zinc-200 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-              title="Hunts"
-            >
-              H
-            </Link>
-            <Link
-              to="/alerts"
-              className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-zinc-500 hover:bg-zinc-50 border border-zinc-200 text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-              title="Alerts"
-            >
-              A
-            </Link>
-          </nav>
-
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
           {/* Filter Pills on the Right */}
           <div className="flex items-center gap-2">
             <button
