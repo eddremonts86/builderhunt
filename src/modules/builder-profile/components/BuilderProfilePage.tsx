@@ -2,6 +2,8 @@ import * as React from 'react'
 import { useParams, Link, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, AlertCircle, Sparkles, Users, Lock } from 'lucide-react'
 import { HygieneCard } from '~/shared/components/HygieneCard'
+import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
+import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 
 interface Builder {
   id: string
@@ -239,6 +241,34 @@ export function BuilderProfilePage() {
             topics: builder.topics,
             language: builder.language,
             metadata: builder.metadata as Record<string, unknown> | undefined,
+          }}
+        />
+      </div>
+
+      {/* Code-style fingerprint */}
+      <div className="mb-6">
+        <CodeStyleCard
+          builder={{
+            language: builder.language,
+            topics: builder.topics,
+            followersCount: builder.followersCount,
+            metadata: builder.metadata as Record<string, unknown> | undefined,
+          }}
+        />
+      </div>
+
+      {/* Outreach Copilot — recruiter draft generator */}
+      <div className="mb-6">
+        <OutreachCopilot
+          builder={{
+            username: builder.username,
+            displayName: builder.displayName,
+            bio: builder.bio,
+            topics: builder.topics,
+            language: builder.language,
+            followersCount: builder.followersCount,
+            profileUrl: builder.profileUrl,
+            source: builder.source,
           }}
         />
       </div>

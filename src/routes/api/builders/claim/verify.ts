@@ -3,6 +3,7 @@ import { db } from '~/shared/lib/db/index'
 import { builders, builderClaimRequests, authUsers, authAccounts } from '~/shared/lib/db/schema'
 import { and, eq, gt, isNull } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
+import { hashPassword } from 'better-auth/crypto'
 
 /**
  * Claim verification endpoint.
@@ -65,13 +66,18 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
               email,
               emailVerified: true, // they verified via the claim link
             })
-            // Create the auth_account row so the user can sign in
+            // Create the auth_account row so the user can sign in. The
+            // password must be hashed the same way Better Auth hashes it
+            // internally — a raw/plaintext value here makes sign-in crash
+            // (verifyPassword() throws on a non-hash-shaped string) instead
+            // of cleanly rejecting. The user doesn't know this temp password
+            // anyway; they're expected to use "Forgot password?" to set one.
             await db.insert(authAccounts).values({
               id: randomId(),
               userId: newUserId,
               accountId: newUserId,
               providerId: 'credential',
-              password: tempPassword, // Better Auth will hash this
+              password: await hashPassword(tempPassword),
             })
             user = { id: newUserId }
           }

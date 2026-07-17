@@ -6,28 +6,13 @@ import { randomId, randomToken } from '~/lib/utils'
 import { sendClaimEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
 import { z } from 'zod'
+import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
 
 /**
  * Claim a builder profile.
  * POST /api/builders/:builderId/claim
  * Body: { email: string }
  */
-
-const RATE_BUCKET = new Map<string, { count: number; resetAt: number }>()
-const RATE_LIMIT = 5
-const RATE_WINDOW_MS = 24 * 60 * 60 * 1000
-
-function checkRate(ip: string): boolean {
-  const now = Date.now()
-  const b = RATE_BUCKET.get(ip)
-  if (!b || b.resetAt < now) {
-    RATE_BUCKET.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS })
-    return true
-  }
-  if (b.count >= RATE_LIMIT) return false
-  b.count++
-  return true
-}
 
 const Body = z.object({ email: z.string().email() })
 
@@ -37,11 +22,12 @@ export const Route = createFileRoute('/api/builders/$builderId/claim')({
     handlers: {
       POST: async ({ request, params }) => {
         try {
-          const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
-            ?? request.headers.get('x-real-ip')
-            ?? 'unknown'
-          if (!checkRate(ip)) {
-            return Response.json({ error: 'Rate limit exceeded. Try again tomorrow.' }, { status: 429 })
+          const rl = await rateLimit('builder-claim', getRateLimitId(request), 5, 24 * 60 * 60)
+          if (!rl.allowed) {
+            return Response.json(
+              { error: 'Rate limit exceeded. Try again tomorrow.' },
+              { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } },
+            )
           }
 
           const body = await request.json().catch(() => ({}))

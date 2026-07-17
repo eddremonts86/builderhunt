@@ -17,4 +17,13 @@ export default defineConfig(() => ({
     },
   },
   server: { port: 3000 },
+  // @resvg/resvg-js ships a native .node binary (used server-side only, to
+  // rasterize the OG image to PNG). Vite's dep optimizer tries to parse it
+  // as JS and crashes — keep it out of pre-bundling entirely.
+  optimizeDeps: {
+    exclude: ['@resvg/resvg-js'],
+  },
+  ssr: {
+    external: ['@resvg/resvg-js'],
+  },
 }))

@@ -15,13 +15,11 @@ export const Route = createFileRoute('/api/builders/$builderId')({
   component: () => null,
   server: {
     handlers: {
-      GET: async ({ request, params }) => {
+      GET: async ({ params }) => {
+        // Public profile page (Plan: claimable-profiles, Phase 2) — no auth
+        // required. Builder rows are a public directory once created; only
+        // mutations (claim, edit, notes) are auth-gated.
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
           const { builderId } = params
 
           const [builder] = await db
@@ -29,7 +27,7 @@ export const Route = createFileRoute('/api/builders/$builderId')({
             .from(builders)
             .where(eq(builders.id, builderId))
 
-          if (!builder || builder.userId !== userId) {
+          if (!builder) {
             return Response.json({ error: 'Builder not found' }, { status: 404 })
           }
 

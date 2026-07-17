@@ -4,6 +4,7 @@ import {
   TrendingUp, Activity, Save, Lightbulb, ChevronDown, Sparkles,
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
+import { useSearch } from '@tanstack/react-router'
 import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon } from '~/modules/landing/components/BrandIcons'
 
@@ -91,6 +92,18 @@ export function SearchPage() {
   const [hasMore, setHasMore] = React.useState(true)
   const sentinelRef = React.useRef<HTMLDivElement>(null)
   const [searched, setSearched] = React.useState(false)
+  // Read ?q= from URL on mount and auto-run the search
+  const search = useSearch({ from: '/_dashboard/search/' })
+  const initialQAppliedRef = React.useRef(false)
+  React.useEffect(() => {
+    if (initialQAppliedRef.current) return
+    if (search.q && search.q.length >= 2) {
+      initialQAppliedRef.current = true
+      setQuery(search.q)
+      // Defer to next tick so state is set
+      setTimeout(() => runSearch(search.q), 0)
+    }
+  }, []) // run once on mount
   const [activeSources, setActiveSources] = React.useState<Set<Source>>(
     new Set(DEFAULT_ACTIVE_SOURCES),
   )

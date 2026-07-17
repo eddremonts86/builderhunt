@@ -16,3 +16,27 @@ export const getAppAuthSession = createServerFn({ method: 'GET' }).handler(async
     return { userId: null, email: null, name: null, image: null }
   }
 })
+
+/**
+ * Admin routes' `beforeLoad` runs on BOTH the server (SSR / full page load)
+ * AND the client (SPA link navigation). `process.env.ADMIN_USER_IDS` only
+ * exists on the server — reading it directly in a route file makes every
+ * client-side navigation to an admin page compute an empty allow-list and
+ * throw a false "Forbidden", even for real admins (fixed after a manual
+ * refresh, since that re-runs beforeLoad via SSR with the real env).
+ * `createServerFn` guarantees this always executes on the server, however
+ * it's called.
+ */
+export const getIsAppAdmin = createServerFn({ method: 'GET' }).handler(async () => {
+  try {
+    const { getRequestHeaders } = await import('@tanstack/react-start/server')
+    const headers = getRequestHeaders()
+    const session = await auth.api.getSession({ headers })
+    const userId = session?.user?.id
+    if (!userId) return false
+    const adminIds = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
+    return adminIds.length > 0 && adminIds.includes(userId)
+  } catch {
+    return false
+  }
+})

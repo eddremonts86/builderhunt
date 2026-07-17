@@ -13,6 +13,8 @@ import { searchSourceHut } from '~/lib/sources/sourcehut'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/github'
+import { log } from '~/shared/lib/log'
+import { metrics } from '~/shared/lib/metrics'
 
 export interface SearchOptions {
   keywords: string[]
@@ -35,10 +37,14 @@ function cacheKey(opts: SearchOptions): string {
 export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder[]> {
   const { keywords, sources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
+  const start = Date.now()
+  metrics.increment('searches')
 
   // Check in-memory cache first
   const cached = cache.get(cacheKeyStr)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    metrics.increment('searchCacheHits')
+    log.info('search_executed', { keywords, sources, resultsCount: cached.results.length, durationMs: Date.now() - start, cache: 'memory' })
     return sortByScore(scoreBuilders(cached.results))
   }
 
@@ -52,6 +58,8 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
       if (cachedRaw) {
         const parsed = JSON.parse(cachedRaw) as RawBuilder[]
         cache.set(cacheKeyStr, { results: parsed, timestamp: Date.now() })
+        metrics.increment('searchCacheHits')
+        log.info('search_executed', { keywords, sources, resultsCount: parsed.length, durationMs: Date.now() - start, cache: 'redis' })
         return sortByScore(scoreBuilders(parsed))
       }
     }
@@ -102,5 +110,6 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
     // Redis unavailable — in-memory cache is enough
   }
 
+  log.info('search_executed', { keywords, sources, resultsCount: deduped.length, durationMs: Date.now() - start, cache: 'miss' })
   return sortByScore(scoreBuilders(deduped))
 }

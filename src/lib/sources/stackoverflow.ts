@@ -43,6 +43,33 @@ interface SOTopTag {
 
 const SO_BASE = 'https://api.stackexchange.com/2.3'
 
+/**
+ * Common query words don't match Stack Overflow's actual tag slugs
+ * (e.g. "react" is tagged `reactjs`, "node" is `node.js`). Without this
+ * map, `/tags/{tag}/top-answerers` 200s with an empty `items` array for
+ * any of these — no error, just silent zero results.
+ */
+const TAG_SYNONYMS: Record<string, string> = {
+  react: 'reactjs',
+  vue: 'vuejs3',
+  angular: 'angular',
+  node: 'node.js',
+  nodejs: 'node.js',
+  golang: 'go',
+  csharp: 'c#',
+  cplusplus: 'c++',
+  cpp: 'c++',
+  dotnet: '.net',
+  aspnet: 'asp.net',
+  nextjs: 'next.js',
+  next: 'next.js',
+  ml: 'machine-learning',
+}
+
+function toSOTag(term: string): string {
+  return TAG_SYNONYMS[term] ?? term
+}
+
 function authParams(): string {
   if (env.STACKOVERFLOW_API_KEY) {
     return `&key=${encodeURIComponent(env.STACKOVERFLOW_API_KEY)}`
@@ -101,7 +128,7 @@ export async function searchStackOverflow(
   if (terms.length === 0) return []
 
   // 1. For each query term, fetch top answerers for that tag (in parallel).
-  const perTagResults = await Promise.all(terms.map((t) => fetchTopAnswerersForTag(t)))
+  const perTagResults = await Promise.all(terms.map((t) => fetchTopAnswerersForTag(toSOTag(t))))
   const userScores = new Map<number, { user: SOTagTopUser['user']; matchedTags: string[]; postScore: number; postCount: number }>()
   for (let i = 0; i < terms.length; i++) {
     const tag = terms[i]

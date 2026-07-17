@@ -14,6 +14,7 @@ export const Route = createFileRoute('/blog/$slug')({
     if (!loaderData) return { meta: [{ title: 'Post not found — BuilderHunt' }] }
     const { post } = loaderData
     const title = `${post.title} — BuilderHunt Blog`
+    const url = `https://builderhunt.dev/blog/${post.slug}`
     return {
       meta: [
         { title },
@@ -21,9 +22,12 @@ export const Route = createFileRoute('/blog/$slug')({
         { property: 'og:title', content: post.title },
         { property: 'og:description', content: post.description },
         { property: 'og:type', content: 'article' },
+        { property: 'og:url', content: url },
         { property: 'article:published_time', content: post.date },
         { property: 'article:author', content: post.author },
         { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: post.title },
+        { name: 'twitter:description', content: post.description },
       ],
     }
   },

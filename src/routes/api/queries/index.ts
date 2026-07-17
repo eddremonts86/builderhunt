@@ -4,6 +4,7 @@ import { savedQueries } from '~/shared/lib/db/schema'
 import { and, eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
+import { rateLimit } from '~/shared/lib/rate-limit'
 
 export const Route = createFileRoute('/api/queries/')({
   component: () => null,
@@ -36,6 +37,14 @@ export const Route = createFileRoute('/api/queries/')({
             return Response.json({ error: 'Unauthorized' }, { status: 401 })
           }
           const userId = session.user.id
+
+          const rl = await rateLimit('saved-search-create', userId, 20, 24 * 60 * 60)
+          if (!rl.allowed) {
+            return Response.json(
+              { error: 'Too many saved searches created today. Try again tomorrow.' },
+              { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } },
+            )
+          }
 
           const body = await request.json()
           const { name, keywords, sources, language, country } = body

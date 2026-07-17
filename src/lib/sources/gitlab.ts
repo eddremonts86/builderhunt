@@ -70,9 +70,9 @@ function absoluteAvatar(url: string | null | undefined): string | undefined {
   return url
 }
 
-async function fetchTopProjects(perPage: number): Promise<GLProject[]> {
+async function fetchProjectsPage(page: number, perPage: number): Promise<GLProject[]> {
   try {
-    const url = `${GL_BASE}/projects?visibility=public&order_by=star_count&simple=false&per_page=${perPage}`
+    const url = `${GL_BASE}/projects?visibility=public&order_by=star_count&simple=false&per_page=${perPage}&page=${page}`
     const res = await fetch(url, {
       headers: { 'User-Agent': 'BuilderHunt/1.0 (gitlab source)', ...authHeaders() },
     })
@@ -81,6 +81,22 @@ async function fetchTopProjects(perPage: number): Promise<GLProject[]> {
   } catch {
     return []
   }
+}
+
+/**
+ * GitLab's own top-starred projects rarely mention common stack keywords
+ * (most high-star React/Rust/etc projects live on GitHub, not GitLab), so
+ * a single page of 100 misses most queries. Pull a few pages (still well
+ * within the 2000 req/h unauth quota) to give queries real surface to
+ * match against.
+ */
+async function fetchTopProjects(totalWanted: number): Promise<GLProject[]> {
+  const perPage = 100
+  const pages = Math.max(1, Math.ceil(totalWanted / perPage))
+  const results = await Promise.all(
+    Array.from({ length: pages }, (_, i) => fetchProjectsPage(i + 1, perPage)),
+  )
+  return results.flat()
 }
 
 function projectMatchesQuery(p: GLProject, terms: string[]): boolean {
@@ -209,9 +225,9 @@ export async function searchGitLab(
   const terms = keywords.map((k) => k.toLowerCase()).filter(Boolean)
   if (terms.length === 0) return []
 
-  // Fetch top 100 by stars. With this slice we have enough surface for
-  // any reasonable query to match something.
-  const all = await fetchTopProjects(100)
+  // Fetch top 500 by stars — enough surface for common stack keywords to
+  // match something (see fetchTopProjects doc comment).
+  const all = await fetchTopProjects(500)
   if (all.length === 0) return []
 
   // Filter by query

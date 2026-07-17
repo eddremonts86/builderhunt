@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Map, Plus, Save, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
-import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 type RoadmapStatus = 'planned' | 'in_progress' | 'shipped'
 
@@ -21,13 +21,11 @@ const STATUS_OPTIONS: Array<{ value: RoadmapStatus; label: string }> = [
   { value: 'shipped', label: 'Shipped' },
 ]
 const CATEGORIES = ['integrations', 'features', 'infrastructure', 'general'] as const
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-
 export const Route = createFileRoute('/_dashboard/admin/roadmap')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
-    if (ADMIN_IDS.length === 0 || !ADMIN_IDS.includes(user.userId)) {
+    if (!(await getIsAppAdmin())) {
       throw new Error('Forbidden')
     }
     return { user }

@@ -10,7 +10,11 @@ const OG_IMAGE = `${SITE_URL}/brand/og-image.png`
 const LOGO = `${SITE_URL}/brand/logo-mark.png`
 
 export const Route = createRootRoute({
-  head: () => ({
+  head: (ctx) => {
+    const leafMatch = ctx.matches[ctx.matches.length - 1]
+    const pathname = leafMatch?.pathname ?? '/'
+    const canonicalUrl = pathname === '/' ? SITE_URL : `${SITE_URL}${pathname}`
+    return {
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
@@ -39,7 +43,7 @@ export const Route = createRootRoute({
       { property: 'og:site_name', content: SITE_NAME },
       { property: 'og:title', content: `${SITE_NAME} — Discover Active Builders Across the Open Web` },
       { property: 'og:description', content: SITE_DESC },
-      { property: 'og:url', content: SITE_URL },
+      { property: 'og:url', content: canonicalUrl },
       { property: 'og:image', content: OG_IMAGE },
       { property: 'og:image:width', content: '1920' },
       { property: 'og:image:height', content: '1080' },
@@ -55,7 +59,7 @@ export const Route = createRootRoute({
       { name: 'twitter:image:alt', content: 'BuilderHunt — discover active builders across the open web' },
     ],
     links: [
-      { rel: 'canonical', href: SITE_URL },
+      { rel: 'canonical', href: canonicalUrl },
       { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon-32.png' },
       { rel: 'icon', type: 'image/png', sizes: '16x16', href: '/favicon-16.png' },
@@ -165,7 +169,8 @@ export const Route = createRootRoute({
         ]),
       },
     ],
-  }),
+    }
+  },
   shellComponent: RootDocument,
   errorComponent: RootErrorBoundary,
   notFoundComponent: NotFoundPage,

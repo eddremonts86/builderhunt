@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
 import {
-  LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell, Settings,
+  LayoutDashboard, Search, Users, Download, GitBranch, LogOut, Bell,
   AlertTriangle, BookOpen, Map, Activity, Shield, Inbox, CreditCard, Mail,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
@@ -90,13 +90,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* Footer / account */}
         <div className="px-3 py-4 border-t border-bh-border space-y-1">
-          <Link
-            to="/exports"
-            className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"
-          >
-            <Settings className="w-4 h-4" aria-hidden="true" />
-            Settings
-          </Link>
           <Link
             to="/alerts"
             className="flex items-center gap-3 px-3 py-2 rounded-lg text-bh-text-muted hover:text-bh-text hover:bg-white/[0.04] transition-colors text-sm"

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { BookOpen, Plus, Save, X, Trash2 } from 'lucide-react'
-import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 interface ChangelogEntry {
   id: string
@@ -13,13 +13,11 @@ interface ChangelogEntry {
 }
 
 const TAG_OPTIONS = ['feature', 'bugfix', 'breaking', 'improvement'] as const
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-
 export const Route = createFileRoute('/_dashboard/admin/changelog')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
-    if (ADMIN_IDS.length === 0 || !ADMIN_IDS.includes(user.userId)) {
+    if (!(await getIsAppAdmin())) {
       throw new Error('Forbidden')
     }
     return { user }

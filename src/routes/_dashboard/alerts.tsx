@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Bell, Check, Sparkles, ExternalLink, Clock } from 'lucide-react'
+import { Bell, Check, Sparkles, ExternalLink, Clock, Plus, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
 
@@ -14,6 +14,27 @@ interface Trigger {
   matchedAt: string
   readAt: string | null
 }
+
+interface AlertRow {
+  id: string
+  name: string
+  keywords: string[]
+  enabled: boolean
+  deliveryChannel: string
+  triggerConditions: {
+    eventType: string
+    minStars?: number
+    minFollowers?: number
+    keywords?: string[]
+  }
+}
+
+const EVENT_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'any_activity', label: 'A developer launches a new repo' },
+  { value: 'new_repo', label: 'A watched builder ships a new project' },
+  { value: 'keyword_match', label: 'A candidate posts about looking for roles' },
+  { value: 'new_product', label: 'A watched builder launches a product' },
+]
 
 const EVENT_LABELS: Record<string, string> = {
   new_repo: 'New repository',
@@ -40,18 +61,28 @@ export const Route = createFileRoute('/_dashboard/alerts')({
 
 function AlertsInboxPage() {
   const [triggers, setTriggers] = React.useState<Trigger[]>([])
+  const [userAlerts, setUserAlerts] = React.useState<AlertRow[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [showForm, setShowForm] = React.useState(false)
+  const [formError, setFormError] = React.useState<string | null>(null)
+  const [submitting, setSubmitting] = React.useState(false)
+  const [name, setName] = React.useState('')
+  const [eventType, setEventType] = React.useState('any_activity')
+  const [keywords, setKeywords] = React.useState('')
+  const [minStars, setMinStars] = React.useState('')
+  const [deliveryChannel, setDeliveryChannel] = React.useState<'email' | 'dashboard'>('email')
 
   const load = React.useCallback(async () => {
     try {
-      const res = await fetch('/api/alerts/triggers', { credentials: 'include' })
-      if (!res.ok) {
-        setTriggers([])
-        return
-      }
-      setTriggers(await res.json())
+      const [triggersRes, alertsRes] = await Promise.all([
+        fetch('/api/alerts/triggers', { credentials: 'include' }),
+        fetch('/api/alerts', { credentials: 'include' }),
+      ])
+      setTriggers(triggersRes.ok ? await triggersRes.json() : [])
+      setUserAlerts(alertsRes.ok ? await alertsRes.json() : [])
     } catch {
       setTriggers([])
+      setUserAlerts([])
     } finally {
       setLoading(false)
     }
@@ -65,6 +96,54 @@ function AlertsInboxPage() {
     await fetch(`/api/alerts/triggers/${id}`, {
       method: 'PATCH',
       credentials: 'include',
+    })
+    await load()
+  }
+
+  const createAlert = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setFormError(null)
+    setSubmitting(true)
+    try {
+      const keywordList = keywords.split(',').map((k) => k.trim()).filter(Boolean)
+      const res = await fetch('/api/alerts', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim() || 'Untitled alert',
+          keywords: keywordList,
+          deliveryChannel,
+          triggerConditions: {
+            eventType,
+            keywords: keywordList.length > 0 ? keywordList : undefined,
+            minStars: minStars ? Number(minStars) : undefined,
+          },
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFormError(data.error ?? 'Failed to create alert')
+        return
+      }
+      setName('')
+      setKeywords('')
+      setMinStars('')
+      setShowForm(false)
+      await load()
+    } catch (e) {
+      setFormError(String(e))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const deleteAlert = async (id: string) => {
+    await fetch('/api/alerts', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
     })
     await load()
   }
@@ -88,10 +167,133 @@ function AlertsInboxPage() {
             )}
           </p>
         </div>
-        <Link to="/dashboard" className="btn-ghost btn-sm">
-          Back to dashboard
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="btn-primary btn-sm inline-flex items-center gap-1"
+            data-testid="new-alert-button"
+            onClick={() => setShowForm((s) => !s)}
+          >
+            {showForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {showForm ? 'Cancel' : 'New alert'}
+          </button>
+          <Link to="/dashboard" className="btn-ghost btn-sm">
+            Back to dashboard
+          </Link>
+        </div>
       </header>
+
+      {showForm && (
+        <form
+          onSubmit={createAlert}
+          className="card p-5 mb-6 space-y-4"
+          data-testid="alert-create-form"
+        >
+          <div>
+            <label htmlFor="alert-name" className="block text-sm font-medium mb-1">Alert name</label>
+            <input
+              id="alert-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Rust async runtime builders"
+              className="input w-full"
+              data-testid="alert-name-input"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="alert-event-type" className="block text-sm font-medium mb-1">Notify me when…</label>
+            <select
+              id="alert-event-type"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+              className="input w-full"
+              data-testid="alert-event-type-select"
+            >
+              {EVENT_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="alert-keywords" className="block text-sm font-medium mb-1">Using tech… (comma-separated keywords)</label>
+            <input
+              id="alert-keywords"
+              type="text"
+              value={keywords}
+              onChange={(e) => setKeywords(e.target.value)}
+              placeholder="rust, async, webassembly"
+              className="input w-full"
+              data-testid="alert-keywords-input"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="alert-min-stars" className="block text-sm font-medium mb-1">With at least (stars/followers)</label>
+            <input
+              id="alert-min-stars"
+              type="number"
+              min={0}
+              value={minStars}
+              onChange={(e) => setMinStars(e.target.value)}
+              placeholder="0"
+              className="input w-full"
+              data-testid="alert-min-stars-input"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="alert-delivery" className="block text-sm font-medium mb-1">Delivery</label>
+            <select
+              id="alert-delivery"
+              value={deliveryChannel}
+              onChange={(e) => setDeliveryChannel(e.target.value as 'email' | 'dashboard')}
+              className="input w-full"
+              data-testid="alert-delivery-select"
+            >
+              <option value="email">Email digest + dashboard</option>
+              <option value="dashboard">Dashboard only</option>
+            </select>
+          </div>
+
+          {formError && (
+            <p className="text-sm text-bh-danger" data-testid="alert-form-error">{formError}</p>
+          )}
+
+          <button type="submit" disabled={submitting} className="btn-primary btn-sm" data-testid="alert-submit">
+            {submitting ? 'Creating…' : 'Create alert'}
+          </button>
+        </form>
+      )}
+
+      {userAlerts.length > 0 && (
+        <div className="mb-6 space-y-2" data-testid="alerts-config-list">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim">Your alerts</h2>
+          {userAlerts.map((a) => (
+            <div key={a.id} className="card p-3 flex items-center gap-3" data-testid={`alert-config-${a.id}`}>
+              <Bell className="w-4 h-4 text-bh-accent shrink-0" aria-hidden="true" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{a.name}</p>
+                <p className="text-xs text-bh-text-dim">
+                  {EVENT_TYPE_OPTIONS.find((o) => o.value === a.triggerConditions.eventType)?.label ?? a.triggerConditions.eventType}
+                  {a.triggerConditions.keywords?.length ? ` · ${a.triggerConditions.keywords.join(', ')}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => deleteAlert(a.id)}
+                className="btn-ghost btn-sm"
+                aria-label="Delete alert"
+                data-testid={`alert-delete-${a.id}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loading ? (
         <p className="text-bh-text-muted">Loading…</p>
@@ -135,14 +337,14 @@ function AlertsInboxPage() {
                       {formatDistanceToNow(new Date(t.matchedAt))}
                     </span>
                   </div>
-                  {t.payload?.description && typeof t.payload.description === 'string' && (
+                  {typeof t.payload?.description === 'string' && (
                     <p className="text-sm text-bh-text-muted line-clamp-2">
-                      {t.payload.description}
+                      {t.payload.description as string}
                     </p>
                   )}
-                  {t.payload?.name && typeof t.payload.name === 'string' && (
+                  {typeof t.payload?.name === 'string' && (
                     <p className="text-sm font-mono text-bh-text mt-1">
-                      {t.payload.name}
+                      {t.payload.name as string}
                     </p>
                   )}
                 </div>

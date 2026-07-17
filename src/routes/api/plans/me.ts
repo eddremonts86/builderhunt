@@ -13,11 +13,16 @@ export const Route = createFileRoute('/api/plans/me')({
             return Response.json({ plan: null, signedOut: true })
           }
           // Dynamic-import server-only helper to keep db out of the client bundle
-          const { getUserPlan } = await import('~/shared/lib/billing')
+          const { getUserPlan, checkLimit } = await import('~/shared/lib/billing')
           const userPlan = await getUserPlan(session.user.id)
+          const [savedSearches, savedBuilders] = await Promise.all([
+            checkLimit(session.user.id, 'savedSearches'),
+            checkLimit(session.user.id, 'savedBuilders'),
+          ])
           return Response.json({
             plan: userPlan,
             limits: userPlan ? PLAN_LIMITS[userPlan.plan] : PLAN_LIMITS.free,
+            usage: { savedSearches: savedSearches.current, savedBuilders: savedBuilders.current },
             pricing: PLAN_PRICING,
             signedOut: false,
           })

@@ -125,7 +125,7 @@ export function CookieBanner() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => accept({ functional: true, analytics: false })}
+            onClick={() => accept({ functional: true, analytics: true })}
             className="btn-primary btn-sm"
             data-testid="cookie-banner-accept-all"
           >

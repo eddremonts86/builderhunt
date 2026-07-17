@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
+import { useNavigate, Link, useSearch } from '@tanstack/react-router'
 import { signInEmail } from '~/shared/lib/auth/client'
 import { Input, Button } from '~/components/ui'
 import { ArrowLeft } from 'lucide-react'
@@ -23,10 +23,24 @@ function LogoMark({ size = 32 }: { size?: number }) {
 
 export function SignInPage() {
   const navigate = useNavigate()
-  const [email, setEmail] = React.useState('')
+  const search = useSearch({ from: '/auth/sign-in' })
+  const claimed = (search as { claimed?: string })?.claimed
+  const claimError = (search as { claimError?: string })?.claimError
+  const claimEmail = (search as { email?: string })?.email
+  const [email, setEmail] = React.useState(claimEmail ?? '')
   const [password, setPassword] = React.useState('')
   const [error, setError] = React.useState('')
   const [loading, setLoading] = React.useState(false)
+
+  // Where to send the user after a successful sign-in. Defaults to /dashboard
+  // but honors ?redirect=... so onboarding/admin/etc. deep-links work.
+  const safeRedirect = React.useMemo(() => {
+    const r = (search as { redirect?: unknown })?.redirect
+    if (typeof r !== 'string') return '/dashboard'
+    // Only allow same-origin paths (must start with "/" and not "//")
+    if (!r.startsWith('/') || r.startsWith('//')) return '/dashboard'
+    return r
+  }, [search])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +49,7 @@ export function SignInPage() {
     try {
       const result = await signInEmail({ email, password })
       if (result.data?.user) {
-        navigate({ to: '/dashboard' })
+        navigate({ to: safeRedirect })
       } else {
         setError(result.error?.message ?? 'Sign in failed. Check your credentials and try again.')
       }
@@ -62,6 +76,21 @@ export function SignInPage() {
                 <p className="text-sm text-bh-text-muted">Sign in to your BuilderHunt account</p>
               </div>
             </div>
+
+            {claimed && (
+              <div
+                role="status"
+                className="mb-4 p-3 rounded-lg border border-bh-success/30 bg-bh-success/10 text-sm text-bh-success"
+              >
+                Profile claimed and verified! We created an account for you — use{' '}
+                <Link to="/auth/forgot" className="underline">Forgot password?</Link> to set your password and sign in.
+              </div>
+            )}
+            {claimError && (
+              <div role="alert" className="mb-4 p-3 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-sm text-bh-danger">
+                {claimError}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router'
 import { Search, X, ArrowRight, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { STARTER_QUERIES } from '~/shared/lib/onboarding'
@@ -7,7 +7,9 @@ import { STARTER_QUERIES } from '~/shared/lib/onboarding'
 export const Route = createFileRoute('/onboarding/search')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
+    if (!user.userId) {
+      throw redirect({ to: '/auth/sign-in', search: { redirect: '/onboarding/search' } })
+    }
     return { user }
   },
   component: SearchStep,

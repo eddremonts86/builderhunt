@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Activity, Users, Database, Cpu, RefreshCw } from 'lucide-react'
-import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 interface MetricsResponse {
   inProcess: {
@@ -29,13 +29,11 @@ interface MetricsResponse {
   }
 }
 
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-
 export const Route = createFileRoute('/_dashboard/admin/metrics')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
-    if (ADMIN_IDS.length === 0 || !ADMIN_IDS.includes(user.userId)) {
+    if (!(await getIsAppAdmin())) {
       throw new Error('Forbidden')
     }
     return { user }

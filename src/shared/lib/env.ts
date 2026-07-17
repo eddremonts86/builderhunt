@@ -9,7 +9,7 @@ const zodEnv = z.object({
   GITHUB_TOKEN: z.string().optional(),
   REDDIT_CLIENT_ID: z.string().optional(),
   REDDIT_CLIENT_SECRET: z.string().optional(),
-  HACKERNEWS_API_URL: z.string().default('https://hn.algolia.com/api/v1'),
+  HACKERNEWS_API_URL: z.string().default('https://hacker-news.firebaseio.com/v0'),
   DEVTO_API_URL: z.string().default('https://dev.to/api'),
   STACKOVERFLOW_API_KEY: z.string().optional(),
   HUGGINGFACE_TOKEN: z.string().optional(),

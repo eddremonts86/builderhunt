@@ -36,6 +36,8 @@ import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
 import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
+import { Route as AuthResetRouteImport } from './routes/auth/reset'
+import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
@@ -45,6 +47,7 @@ import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
 import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
 import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
 import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
+import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
@@ -94,6 +97,7 @@ import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/user
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
+import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 
 const StatusRoute = StatusRouteImport.update({
   id: '/status',
@@ -228,6 +232,16 @@ const AuthSignInRoute = AuthSignInRouteImport.update({
   path: '/sign-in',
   getParentRoute: () => AuthRouteRoute,
 } as any)
+const AuthResetRoute = AuthResetRouteImport.update({
+  id: '/reset',
+  path: '/reset',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
+const AuthForgotRoute = AuthForgotRouteImport.update({
+  id: '/forgot',
+  path: '/forgot',
+  getParentRoute: () => AuthRouteRoute,
+} as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
@@ -271,6 +285,11 @@ const ApiConsentIndexRoute = ApiConsentIndexRouteImport.update({
 const ApiChangelogIndexRoute = ApiChangelogIndexRouteImport.update({
   id: '/api/changelog/',
   path: '/api/changelog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAlertsIndexRoute = ApiAlertsIndexRouteImport.update({
+  id: '/api/alerts/',
+  path: '/api/alerts/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
@@ -525,6 +544,11 @@ const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   path: '/api/admin/changelog/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
+  id: '/api/admin/alerts/run-worker',
+  path: '/api/admin/alerts/run-worker',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -537,6 +561,8 @@ export interface FileRoutesByFullPath {
   '/status': typeof StatusRoute
   '/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
+  '/auth/forgot': typeof AuthForgotRoute
+  '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -580,6 +606,7 @@ export interface FileRoutesByFullPath {
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
+  '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
@@ -587,6 +614,7 @@ export interface FileRoutesByFullPath {
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
@@ -621,6 +649,8 @@ export interface FileRoutesByTo {
   '/status': typeof StatusRoute
   '/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
+  '/auth/forgot': typeof AuthForgotRoute
+  '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -664,6 +694,7 @@ export interface FileRoutesByTo {
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
+  '/api/alerts': typeof ApiAlertsIndexRoute
   '/api/changelog': typeof ApiChangelogIndexRoute
   '/api/consent': typeof ApiConsentIndexRoute
   '/api/incidents': typeof ApiIncidentsIndexRoute
@@ -671,6 +702,7 @@ export interface FileRoutesByTo {
   '/api/recommendations': typeof ApiRecommendationsIndexRoute
   '/api/roadmap': typeof ApiRoadmapIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
+  '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
@@ -708,6 +740,8 @@ export interface FileRoutesById {
   '/status': typeof StatusRoute
   '/_dashboard/alerts': typeof DashboardAlertsRoute
   '/api/health': typeof ApiHealthRoute
+  '/auth/forgot': typeof AuthForgotRoute
+  '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/$slug': typeof BlogSlugRoute
@@ -752,6 +786,7 @@ export interface FileRoutesById {
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
+  '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
@@ -759,6 +794,7 @@ export interface FileRoutesById {
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
@@ -796,6 +832,8 @@ export interface FileRouteTypes {
     | '/status'
     | '/alerts'
     | '/api/health'
+    | '/auth/forgot'
+    | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/blog/$slug'
@@ -839,6 +877,7 @@ export interface FileRouteTypes {
     | '/exports/'
     | '/me/'
     | '/search/'
+    | '/api/alerts/'
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
@@ -846,6 +885,7 @@ export interface FileRouteTypes {
     | '/api/recommendations/'
     | '/api/roadmap/'
     | '/api/status/'
+    | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
@@ -880,6 +920,8 @@ export interface FileRouteTypes {
     | '/status'
     | '/alerts'
     | '/api/health'
+    | '/auth/forgot'
+    | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/blog/$slug'
@@ -923,6 +965,7 @@ export interface FileRouteTypes {
     | '/exports'
     | '/me'
     | '/search'
+    | '/api/alerts'
     | '/api/changelog'
     | '/api/consent'
     | '/api/incidents'
@@ -930,6 +973,7 @@ export interface FileRouteTypes {
     | '/api/recommendations'
     | '/api/roadmap'
     | '/api/status'
+    | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
@@ -966,6 +1010,8 @@ export interface FileRouteTypes {
     | '/status'
     | '/_dashboard/alerts'
     | '/api/health'
+    | '/auth/forgot'
+    | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
     | '/blog/$slug'
@@ -1010,6 +1056,7 @@ export interface FileRouteTypes {
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
+    | '/api/alerts/'
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
@@ -1017,6 +1064,7 @@ export interface FileRouteTypes {
     | '/api/recommendations/'
     | '/api/roadmap/'
     | '/api/status/'
+    | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
@@ -1080,6 +1128,7 @@ export interface RootRouteChildren {
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
+  ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
   ApiIncidentsIndexRoute: typeof ApiIncidentsIndexRoute
@@ -1087,6 +1136,7 @@ export interface RootRouteChildren {
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
   ApiRoadmapIndexRoute: typeof ApiRoadmapIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
+  ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
@@ -1300,6 +1350,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthSignInRouteImport
       parentRoute: typeof AuthRouteRoute
     }
+    '/auth/reset': {
+      id: '/auth/reset'
+      path: '/reset'
+      fullPath: '/auth/reset'
+      preLoaderRoute: typeof AuthResetRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
+    '/auth/forgot': {
+      id: '/auth/forgot'
+      path: '/forgot'
+      fullPath: '/auth/forgot'
+      preLoaderRoute: typeof AuthForgotRouteImport
+      parentRoute: typeof AuthRouteRoute
+    }
     '/api/health': {
       id: '/api/health'
       path: '/api/health'
@@ -1361,6 +1425,13 @@ declare module '@tanstack/react-router' {
       path: '/api/changelog'
       fullPath: '/api/changelog/'
       preLoaderRoute: typeof ApiChangelogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/': {
+      id: '/api/alerts/'
+      path: '/api/alerts'
+      fullPath: '/api/alerts/'
+      preLoaderRoute: typeof ApiAlertsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_dashboard/search/': {
@@ -1706,6 +1777,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/alerts/run-worker': {
+      id: '/api/admin/alerts/run-worker'
+      path: '/api/admin/alerts/run-worker'
+      fullPath: '/api/admin/alerts/run-worker'
+      preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1760,11 +1838,15 @@ const LandingRouteRouteWithChildren = LandingRouteRoute._addFileChildren(
 )
 
 interface AuthRouteRouteChildren {
+  AuthForgotRoute: typeof AuthForgotRoute
+  AuthResetRoute: typeof AuthResetRoute
   AuthSignInRoute: typeof AuthSignInRoute
   AuthSignUpRoute: typeof AuthSignUpRoute
 }
 
 const AuthRouteRouteChildren: AuthRouteRouteChildren = {
+  AuthForgotRoute: AuthForgotRoute,
+  AuthResetRoute: AuthResetRoute,
   AuthSignInRoute: AuthSignInRoute,
   AuthSignUpRoute: AuthSignUpRoute,
 }
@@ -1838,6 +1920,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
+  ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
   ApiIncidentsIndexRoute: ApiIncidentsIndexRoute,
@@ -1845,6 +1928,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
   ApiRoadmapIndexRoute: ApiRoadmapIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
+  ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,

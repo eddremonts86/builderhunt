@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.9",
+    "@resvg/resvg-js": "^2.6.2",
     "@tanstack/react-query": "^5.100.6",
     "@tanstack/react-router": "^1.168.25",
     "@tanstack/react-start": "^1.167.50",

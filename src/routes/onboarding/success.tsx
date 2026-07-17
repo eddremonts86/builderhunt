@@ -1,11 +1,13 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
 import { Sparkles, ArrowRight, ListChecks } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 
 export const Route = createFileRoute('/onboarding/success')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
+    if (!user.userId) {
+      throw redirect({ to: '/auth/sign-in', search: { redirect: '/onboarding/success' } })
+    }
     return { user }
   },
   component: SuccessStep,

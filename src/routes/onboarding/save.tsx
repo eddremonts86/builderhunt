@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { createFileRoute, useNavigate, Link, useSearch } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link, useSearch, redirect } from '@tanstack/react-router'
 import { Bookmark, ArrowRight, AlertCircle, Loader2, ExternalLink, Check } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 
@@ -18,7 +18,9 @@ interface Builder {
 export const Route = createFileRoute('/onboarding/save')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
-    if (!user.userId) throw new Error('Unauthorized')
+    if (!user.userId) {
+      throw redirect({ to: '/auth/sign-in', search: { redirect: '/onboarding/save' } })
+    }
     return { user }
   },
   validateSearch: (search: Record<string, unknown>) => ({
@@ -205,7 +207,7 @@ function SaveStep() {
             })}
           </div>
 
-          <div className="flex items-center justify-between sticky bottom-0 bg-bh-bg/80 backdrop-blur p-4 -mx-6 -mb-6 border-t border-bh-border">
+          <div className="flex items-center justify-between sticky bottom-0 z-50 bg-bh-bg/80 backdrop-blur p-4 -mx-6 -mb-6 border-t border-bh-border">
             <div className="text-sm text-bh-text-muted">
               {savedIds.size} of {REQUIRED_SAVES} builders saved
             </div>

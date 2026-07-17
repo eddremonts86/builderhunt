@@ -51,9 +51,10 @@ function BillingSettingsPage() {
       setPlan(me.plan ?? null)
       if (me.limits && me.plan) {
         const limits = me.limits as { savedSearches: number; savedBuilders: number; rssSubscriptions: number }
+        const usageCounts = (me.usage ?? {}) as { savedSearches?: number; savedBuilders?: number }
         setUsage([
-          { allowed: true, current: 0, limit: limits.savedSearches, plan: me.plan.plan, resource: 'savedSearches' },
-          { allowed: true, current: 0, limit: limits.savedBuilders, plan: me.plan.plan, resource: 'savedBuilders' },
+          { allowed: true, current: usageCounts.savedSearches ?? 0, limit: limits.savedSearches, plan: me.plan.plan, resource: 'savedSearches' },
+          { allowed: true, current: usageCounts.savedBuilders ?? 0, limit: limits.savedBuilders, plan: me.plan.plan, resource: 'savedBuilders' },
         ])
       }
       if (histRes.ok) {
@@ -140,8 +141,13 @@ function BillingSettingsPage() {
         <h2 className="font-semibold mb-3">Usage</h2>
         <div className="space-y-3">
           {usage.map((u) => {
-            const limit = u.limit === Infinity ? '∞' : u.limit
-            const pct = u.limit === Infinity ? 0 : Math.min(100, Math.round((u.current / u.limit) * 100))
+            // `Infinity` (pro/team's "unlimited") doesn't survive JSON —
+            // it round-trips through the API as `null`. Treat both the
+            // same so unlimited plans don't render a blank "/ " or a
+            // NaN-width progress bar.
+            const isUnlimited = u.limit === Infinity || u.limit == null
+            const limit = isUnlimited ? '∞' : u.limit
+            const pct = isUnlimited ? 0 : Math.min(100, Math.round((u.current / u.limit) * 100))
             return (
               <div key={u.resource} data-testid={`usage-${u.resource}`}>
                 <div className="flex items-center justify-between text-sm mb-1">
@@ -153,7 +159,7 @@ function BillingSettingsPage() {
                 <div className="h-1.5 rounded-full bg-bh-surface overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${
-                      u.limit === Infinity ? 'bg-bh-cyan/30' :
+                      isUnlimited ? 'bg-bh-cyan/30' :
                       pct >= 90 ? 'bg-bh-danger' :
                       pct >= 70 ? 'bg-bh-warning' : 'bg-bh-accent'
                     }`}

@@ -4,6 +4,7 @@ import { db } from '~/shared/lib/db/index'
 import { builders, savedQueries, builderNotes } from '~/shared/lib/db/schema'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { searchBuilders } from '~/lib/search'
+import { rateLimit } from '~/shared/lib/rate-limit'
 
 /**
  * Proactive Discovery — "For you" recommendations.
@@ -76,6 +77,14 @@ export const Route = createFileRoute('/api/recommendations/')({
             return Response.json({ error: 'Unauthorized' }, { status: 401 })
           }
           const userId = session.user.id
+
+          const rl = await rateLimit('recommendations', userId, 30, 60)
+          if (!rl.allowed) {
+            return Response.json(
+              { error: 'Too many requests. Please slow down.' },
+              { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } },
+            )
+          }
 
           // 1. Pull most recent saved queries
           const userQueries = await db

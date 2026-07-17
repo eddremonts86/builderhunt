@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Inbox, Check, X, Mail, Clock } from 'lucide-react'
-import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { PLAN_PRICING } from '~/shared/lib/billing-shared'
 
 interface PlanRequest {
@@ -15,13 +15,11 @@ interface PlanRequest {
   userEmail: string | null
 }
 
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-
 export const Route = createFileRoute('/_dashboard/admin/plan-requests')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
-    if (ADMIN_IDS.length === 0 || !ADMIN_IDS.includes(user.userId)) {
+    if (!(await getIsAppAdmin())) {
       throw new Error('Forbidden')
     }
     return { user }

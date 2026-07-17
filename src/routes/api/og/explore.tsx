@@ -2,7 +2,9 @@ import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import type { ScoredBuilder } from '~/lib/search'
 
-// Generate a simple OG image as SVG (no extra deps, no @vercel/og).
+// Render the OG image as SVG, then rasterize to PNG via @resvg/resvg-js.
+// Twitter/Facebook/LinkedIn/Slack link previews don't render `og:image`
+// unless it's a raster format — a raw SVG silently fails everywhere.
 // 1200×630, dark background, query + top 3 builder handles.
 
 const WIDTH = 1200
@@ -104,14 +106,35 @@ export const Route = createFileRoute('/api/og/explore')({
           }
         }
         const svg = renderOgsSvg(q, builders)
-        // Cache headers (24h) — but in dev, just fresh
-        return new Response(svg, {
-          status: 200,
-          headers: {
-            'Content-Type': 'image/svg+xml; charset=utf-8',
-            'Cache-Control': 'public, max-age=3600, s-maxage=3600',
-          },
-        })
+
+        try {
+          const { Resvg } = await import('@resvg/resvg-js')
+          const png = new Resvg(svg, {
+            fitTo: { mode: 'width', value: WIDTH },
+            font: { loadSystemFonts: true },
+          })
+            .render()
+            .asPng()
+          return new Response(new Uint8Array(png), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/png',
+              'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            },
+          })
+        } catch (err) {
+          console.error('og explore rasterize error:', err)
+          // Fall back to SVG rather than a hard failure — still renders
+          // fine as a direct <img>, just won't be picked up by crawlers
+          // that require a raster og:image.
+          return new Response(svg, {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/svg+xml; charset=utf-8',
+              'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            },
+          })
+        }
       },
     },
   },
