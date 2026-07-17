@@ -3,7 +3,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { LinkButton } from '~/components/ui'
 import {
   Search, Bell, FileText, Download, Sparkles, Target, Mail,
-  Zap, Shield, Brain, ArrowRight, Check, Star, LayoutDashboard, LogOut,
+  Zap, Shield, ArrowRight, Check, Star, LayoutDashboard, LogOut,
 } from 'lucide-react'
 import { useSession, signOut } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
@@ -158,10 +158,10 @@ export function HomePage() {
                 <div className="card-glow">
                   <div className="p-2">
                     <img
-                      src="/brand/hero-illustration.png"
-                      alt="A magnifying glass scanning a network of connected developer avatars, representing BuilderHunt's multi-source builder discovery."
+                      src="/images/search-desktop.png"
+                      alt="BuilderHunt's search page: 118 real results for “react” across GitHub, Reddit and other sources, each with a match score."
                       width={1280}
-                      height={720}
+                      height={973}
                       loading="eager"
                       decoding="async"
                       className="rounded-xl w-full h-auto"
@@ -169,18 +169,27 @@ export function HomePage() {
                   </div>
                 </div>
 
-                {/* Floating chips over the illustration */}
-                <div className="hidden md:flex absolute -left-6 top-12 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '400ms' }}>
+                {/* Real mobile screenshot, peeking from the corner — same live
+                    results, proof the product (not a mockup) works on any screen. */}
+                <div
+                  className="hidden lg:block absolute -bottom-10 -right-10 w-36 rounded-[20px] border-4 border-bh-surface bg-bh-surface shadow-2xl overflow-hidden animate-fade-in-up"
+                  style={{ animationDelay: '360ms' }}
+                >
+                  <img
+                    src="/images/search-mobile.png"
+                    alt="The same search results on a phone."
+                    width={360}
+                    height={220}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full h-44 object-cover object-top"
+                  />
+                </div>
+
+                {/* One real, live signal — not decorative chips duplicating what's already on screen. */}
+                <div className="hidden md:flex absolute -left-6 top-10 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '500ms' }}>
                   <GithubIcon className="w-4 h-4 text-bh-github" title="GitHub" />
                   <span className="text-xs font-medium">+128 stars / 7d</span>
-                </div>
-                <div className="hidden md:flex absolute -right-4 top-1/3 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '600ms' }}>
-                  <Bell className="w-4 h-4 text-bh-accent" aria-hidden="true" />
-                  <span className="text-xs font-medium">New match · HN</span>
-                </div>
-                <div className="hidden md:flex absolute left-8 -bottom-4 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '800ms' }}>
-                  <Brain className="w-4 h-4 text-bh-cyan" aria-hidden="true" />
-                  <span className="text-xs font-medium">Score 92 · active</span>
                 </div>
               </div>
             </div>
