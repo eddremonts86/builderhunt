@@ -11,18 +11,24 @@ import { FAQSection } from './FAQSection'
 import { Footer } from '~/shared/components/Footer'
 import { BackToTop } from '~/shared/components/BackToTop'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
+import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
+import { useScrollSpy } from '~/shared/lib/useScrollSpy'
 
 const NAV_LINKS = [
-  { to: '/#how-it-works', label: 'How it works' },
-  { to: '/#use-cases', label: 'Use cases' },
-  { to: '/#sources', label: 'Sources' },
-  { to: '/#faq', label: 'FAQ' },
+  { id: 'how-it-works', label: 'How it works' },
+  { id: 'use-cases', label: 'Use cases' },
+  { id: 'sources', label: 'Sources' },
+  { id: 'faq', label: 'FAQ' },
 ] as const
+const NAV_SECTION_IDS = NAV_LINKS.map((l) => l.id)
 
 export function HomePage() {
   const session = useSession()
   const navigate = useNavigate()
   const [signingOut, setSigningOut] = React.useState(false)
+  const pillRowRef = React.useRef<HTMLUListElement>(null)
+  const activeSection = useScrollSpy(NAV_SECTION_IDS)
+  const indicator = useSlidingIndicator(pillRowRef, [activeSection])
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -54,17 +60,27 @@ export function HomePage() {
           <span className="font-bold text-base tracking-tight hidden sm:inline">BuilderHunt</span>
         </Link>
 
-        <ul className="hidden md:flex items-center gap-1">
-          {NAV_LINKS.map((l) => (
-            <li key={l.to}>
-              <a
-                href={l.to.replace('/', '') || '/'}
-                className="btn-ghost text-sm"
-              >
-                {l.label}
-              </a>
-            </li>
-          ))}
+        {/* Anchor links to page sections, same sliding-highlight treatment
+            as the dashboard's route pills — "active" here means "currently
+            scrolled into view" (via scroll-spy) instead of "current route". */}
+        <ul ref={pillRowRef} className="relative hidden md:flex items-center gap-1">
+          <SlidingIndicator rect={indicator} />
+          {NAV_LINKS.map((l) => {
+            const active = activeSection === l.id
+            return (
+              <li key={l.id} className="relative z-10">
+                <a
+                  href={`#${l.id}`}
+                  data-active={active || undefined}
+                  className={`relative rounded-full flex items-center px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} ${
+                    active ? 'text-white' : 'text-bh-text-muted hover:text-bh-text'
+                  }`}
+                >
+                  {l.label}
+                </a>
+              </li>
+            )
+          })}
         </ul>
 
         <div className="flex items-center gap-2 shrink-0">

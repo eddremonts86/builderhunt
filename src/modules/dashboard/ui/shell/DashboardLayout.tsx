@@ -8,6 +8,8 @@ import {
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
+import { Tooltip, FLOATING_UI_Z } from '~/shared/components/Tooltip'
+import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
 
 /** Primary sections — rendered as icon pills in the floating topbar. */
 const NAV = [
@@ -29,94 +31,6 @@ const ADMIN_NAV = [
   { to: '/admin/changelog', icon: BookOpen, label: 'Changelog' },
   { to: '/admin/roadmap', icon: Map, label: 'Roadmap' },
 ] as const
-
-/** Local z-index scale for the floating shell (see layout.md — never arbitrary):
- * topbar at z-40 (set directly in its className), flyouts/tooltips above it. */
-const Z_FLYOUT = 50
-
-/** Shared hover/focus micro-lift for every icon-only trigger in the shell. */
-const ICON_TRANSITION =
-  'transition-[color,background-color,transform] duration-200 ease-out hover:scale-110 active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100'
-
-/**
- * Icon tooltip, portal + fixed-position — same reason as the admin flyout
- * panel: a `position: absolute` tooltip here would be clipped by the
- * topbar's own `overflow-x-auto` (CSS forces overflow-y to `auto` too the
- * moment overflow-x isn't `visible`, so there's no way to keep vertical
- * overflow visible on this element — see interaction-design.md).
- */
-function Tooltip({ label, children }: { label: string; children: React.ReactNode }) {
-  const [open, setOpen] = React.useState(false)
-  const [coords, setCoords] = React.useState({ top: 0, left: 0 })
-  const anchorRef = React.useRef<HTMLSpanElement>(null)
-
-  const show = () => {
-    const rect = anchorRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setCoords({ top: rect.bottom + 8, left: rect.left + rect.width / 2 })
-    setOpen(true)
-  }
-  const hide = () => setOpen(false)
-
-  return (
-    <span
-      ref={anchorRef}
-      className="relative inline-flex shrink-0"
-      onMouseEnter={show}
-      onMouseLeave={hide}
-      onFocus={show}
-      onBlur={hide}
-    >
-      {children}
-      {open && createPortal(
-        <span
-          role="tooltip"
-          aria-hidden="true"
-          className="fixed pointer-events-none whitespace-nowrap rounded-md bg-bh-text px-2 py-1 text-[11px] font-medium text-white animate-fade-in motion-reduce:animate-none"
-          style={{ top: coords.top, left: coords.left, transform: 'translateX(-50%)', zIndex: Z_FLYOUT }}
-        >
-          {label}
-        </span>,
-        document.body,
-      )}
-    </span>
-  )
-}
-
-/**
- * Measures the currently-active pill (marked `data-active="true"`) inside
- * `containerRef` and returns coordinates for a shared sliding background,
- * so switching sections morphs the pill instead of snapping between icons.
- * Runs in a layout effect so it settles before paint — no flash on mount.
- */
-function useSlidingIndicator(containerRef: React.RefObject<HTMLElement | null>, deps: React.DependencyList) {
-  const [rect, setRect] = React.useState({ left: 0, width: 0, visible: false })
-
-  React.useLayoutEffect(() => {
-    const container = containerRef.current
-    if (!container) return
-    const measure = () => {
-      const activeEl = container.querySelector<HTMLElement>('[data-active="true"]')
-      if (!activeEl) {
-        setRect((r) => ({ ...r, visible: false }))
-        return
-      }
-      const cRect = container.getBoundingClientRect()
-      const aRect = activeEl.getBoundingClientRect()
-      setRect({ left: aRect.left - cRect.left + container.scrollLeft, width: aRect.width, visible: true })
-    }
-    measure()
-    window.addEventListener('resize', measure)
-    container.addEventListener('scroll', measure)
-    return () => {
-      window.removeEventListener('resize', measure)
-      container.removeEventListener('scroll', measure)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps)
-
-  return rect
-}
 
 function NavPill({
   to, icon: Icon, label, active,
@@ -204,7 +118,7 @@ function AdminFlyout({ pathname }: { pathname: string }) {
           role="menu"
           aria-label="Admin"
           className="fixed min-w-[190px] bg-bh-surface border border-bh-border rounded-2xl shadow-lg p-1.5 animate-fade-in-up"
-          style={{ zIndex: Z_FLYOUT, top: coords.top, left: coords.left, transform: 'translateX(-50%)' }}
+          style={{ zIndex: FLOATING_UI_Z, top: coords.top, left: coords.left, transform: 'translateX(-50%)' }}
         >
           {ADMIN_NAV.map((n) => {
             const itemActive = pathname === n.to
@@ -279,11 +193,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
         {/* Primary sections + admin flyout share one sliding highlight. */}
         <div ref={pillRowRef} className="relative flex items-center gap-1.5">
-          <span
-            className="absolute inset-y-0 rounded-full bg-[#2b1812] shadow-sm transition-[left,width,opacity] duration-300 ease-out motion-reduce:transition-none"
-            style={{ left: indicator.left, width: indicator.width, opacity: indicator.visible ? 1 : 0 }}
-            aria-hidden="true"
-          />
+          <SlidingIndicator rect={indicator} />
           {NAV.map((n) => (
             <NavPill
               key={n.to}
