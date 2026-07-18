@@ -39,7 +39,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`card w-full max-w-lg max-h-[85vh] overflow-y-auto p-6 relative animate-fade-in-up ${className ?? ''}`}
+        className={`card w-full max-w-[40rem] min-h-[566px] max-h-[90vh] overflow-y-auto p-6 relative animate-fade-in-up ${className ?? ''}`}
       >
         <div className="flex items-center justify-between mb-4">
           <h2 id={titleId} className="text-lg font-semibold text-bh-text">{title}</h2>
