@@ -1,5 +1,10 @@
 # Plan: AI-Powered Semantic Search
 
+**Status:** Not yet implemented. Listed as a Pro-tier feature in
+[`billing-shared.ts`](../../src/shared/lib/billing-shared.ts) but there is currently no
+`embedding` column, no embedding service, and no semantic-query path anywhere in the
+codebase — this plan predates any of that work.
+
 ## Goal recap
 
 Enhance BuilderHunt's search dashboard by adding vector semantic search capabilities, using PostgreSQL's `pgvector` extension and text embedding APIs, allowing users to locate developers using natural language.

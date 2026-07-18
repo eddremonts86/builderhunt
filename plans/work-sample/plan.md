@@ -1,5 +1,10 @@
 # Plan: Interactive Work Sample Simulator
 
+**Status:** Not yet implemented. Listed as a Team-tier feature ("Work-sample analysis")
+in [`billing-shared.ts`](../../src/shared/lib/billing-shared.ts) but there is no
+`work_samples` table, no Monaco integration, and no `/challenges` route in the codebase
+yet — this plan predates any of that work.
+
 ## Goal recap
 
 Build a browser-based Monaco editor coding interface with a virtual filesystem, a streaming AI teammate chat sidebar, and an LLM-powered review engine to evaluate developer submissions based on practical projects.
