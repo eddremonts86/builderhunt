@@ -1,49 +1,94 @@
-# Plan: AI Talent Sourcing Sprints
+# Implementation Plan: Unified AI Sourcing Workspace
 
-## Goal recap
+This document outlines the step-by-step technical implementation phases for integrating the AI Sourcing Workspace in **BuilderHunt**.
 
-Build an asynchronous agentic sourcing pipeline where users can delegate talent searches to background-running agents that locate, screen, and review builders based on code analysis and project history.
+---
 
-## Why this is a valuable addition
+## Phase 1: Dependencies & Database Schema Migration
 
-1. **Passive Search Leverage**: Traditional talent tools require recruiters to be actively typing. Agentic search runs overnight, gathering and vetting profiles while the user is offline.
-2. **Deep Code-Level Vetting**: Normal candidate databases only check tags. By pulling actual repository files and analyzing code style with LLMs, BuilderHunt provides high-integrity code vetting that LinkedIn or conventional search engines cannot match.
-3. **Sticky Professional Retention**: Recruiters are willing to pay high subscription tiers for active sourcing reports delivered straight to their inbox.
+### 1.1 Package Installation
+Run the following package installations in the root directory:
+```bash
+pnpm add @edd_remonts/ai-schadcn-chat
+pnpm dlx shadcn@latest add @shadcn-map/map
+```
 
-## Phases
+### 1.2 Schema Update
+Add the Drizzle schema extensions inside `src/shared/db/schema.ts` (or corresponding database module files):
+- Define `sourcingBatches` table.
+- Define `sourcingSprints` table.
+- Define `sprintResults` table.
+- Export relations.
 
-### Phase 1: Database Setup
-- Add migrations for `sourcing_sprints` and `sprint_results` tables.
-- Establish relationships with `authUsers` and `builders` tables.
-- Update global Drizzle schema exports.
+### 1.3 DB Migration
+Generate and execute migrations:
+```bash
+pnpm db:generate
+pnpm db:migrate
+```
 
-### Phase 2: Sourcing Agent Worker (`src/lib/agents/sourcing-worker.ts`)
-- Implement a background task queue handler (using a lightweight library like `bullmq` or a native setInterval-based worker for simpler setups).
-- Implement the search query generator: prompt LLM to break down candidate persona into search queries (location filters, GitHub topics, StackOverflow tags).
-- Write the execution loop: fetch candidate arrays from our sources pipeline, insert raw results, and queue them for vetting.
+---
 
-### Phase 3: Code Vetting Engine (`src/lib/agents/vetting.ts`)
-- Implement code fetch utility: download `README.md` and top 3 technical source files (e.g. main engine files in `.ts` or `.rs`) of the candidate's top repositories.
-- Define LLM vetting prompt requesting structured scores and suitability review text.
-- Save the results inside `sprint_results`.
+## Phase 2: Backend Logic & LLM Integrations (`src/lib/agents/`)
 
-### Phase 4: UI & Report Page
-- Build the `/sprints` route and sub-routes in `src/routes/_dashboard/sprints/`.
-- Design the agent progress screen, showing log ticks (e.g. "Scanning GitLab...", "Vetting user @xyz...").
-- Render the completed Sprint Report list with expandable AI review panels.
+### 2.1 Batch Document Ingestion (`src/lib/agents/batch-analyzer.ts`)
+- Implement PDF and Word text parsing helpers.
+- Write parallel extraction scheduler:
+  - Take an array of files.
+  - Dispatch extraction queries to the Gemini API (using `Gemini 3.5 Flash`) in parallel (limit concurrency to 3 to respect rate limits).
+  - Extract structured JSON tags (Skills, Locations, Experience Level, Roles).
+  - Store results in `sourcing_batches`.
 
-### Phase 5: Verification & Safety
-- Mock embedding and completions APIs in unit tests.
-- Set strict API rate-limiting sleep cycles inside the worker to prevent GitHub/GitLab API blockages.
+### 2.2 Search Variant Generator (`src/lib/agents/search-generator.ts`)
+- Write an LLM generator that accepts aggregated batch tags and outputs 3 distinct Boolean query structures (Skills list + Location parameters + Seniority).
+- Save generated variants linked to the active `sourcing_batches`.
 
-## Risks
+### 2.3 Sourcing Worker & Vetting Loop (`src/lib/agents/sourcing-worker.ts`)
+- Implement background runner that:
+  - Takes a search variant.
+  - Queries local DB matches.
+  - Sequentially queries external APIs (GitHub, Devpost).
+  - Feeds candidate profiles to the vetting engine (`vetting.ts`) to calculate suitability scores.
+  - Populates `sprint_results`.
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **GitHub rate limit blocked during deep searches** | High | High | Implement a 2-second sleep delay between external API calls inside the background worker. Cache search hits aggressively. |
-| **High LLM token cost when reading source code** | Medium | Medium | Limit file content payload to the first 4,000 characters per source file. Truncate long repositories and only read technical files. |
-| **Worker execution termination due to server restarts** | Medium | Low | Use database-backed task state storage. When the server boots up, auto-resume tasks marked as `running`. |
+---
 
-## Rollback plan
+## Phase 3: Frontend Routes & Layout (`src/routes/_dashboard/sprints/`)
 
-- Keep the entire worker system modular. Sprints can be disabled in the UI by hiding the `/sprints` link, without impacting standard real-time searches.
+### 3.1 Workspace Router Setup
+- Create `src/routes/_dashboard/sprints/workspace.tsx` as a TanStack route.
+- Define state context:
+  ```ts
+  interface WorkspaceState {
+    step: 1 | 2 | 3 | 4;
+    batchId: string | null;
+    activeVariant: string | null;
+    selectedVariants: string[];
+    filters: SearchFilters;
+  }
+  ```
+
+### 3.2 Chat Sidebar Component (`@edd_remonts/ai-schadcn-chat`)
+- Implement collapsible left panel.
+- Sync message history to the current workspace session.
+- Implement callbacks to toggle candidate highlight state and location zooming on the map.
+
+### 3.3 Main Dashboard Views (1 -> 2 -> 3 -> 4)
+- **Step 1 View (Upload & Queue)**: Dropzone component + uploading/processing list with progress rings.
+- **Step 2 View (Variants Generator)**: Interactive tag cloud + checkbox list of suggested variant cards.
+- **Step 3 View (Active Sprints)**: Dual pane progress dashboard with status bars and console logs.
+- **Step 4 View (Results Map)**: Split screen. Left shows candidate list with circular match rings. Right shows the `@shadcn-map/map` Canvas/Leaflet instance.
+
+---
+
+## Phase 4: Verification & Quality Gates
+
+### 4.1 Unit Testing (`test/sprints/`)
+- Mock Gemini API responses for document tag extraction and variant generation.
+- Test `batch-analyzer.ts` parallel scheduling execution under concurrent pressure.
+- Test boolean parser and criteria aggregators.
+
+### 4.2 Integration Verification
+- Drag 5 sample resumes (PDF) into Step 1.
+- Confirm tags compile correctly and suggest variants in Step 2.
+- Execute search, and verify pins render with accurate latitude/longitude coordinates on the map in Step 4.
