@@ -1,11 +1,19 @@
 import { z } from 'zod'
 
+// Deploy platforms sometimes inject a protocol-relative URL (e.g. `//host`)
+// for their auto-generated domain variable. better-auth's baseURL requires a
+// scheme and throws an uncaught error otherwise, crash-looping the server —
+// so we always normalize to a full https URL rather than trust the raw value.
+export function ensureProtocol(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `https://${url.replace(/^\/+/, '')}`
+}
+
 const zodEnv = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
   // BETTER_AUTH_SECRET is the canonical name
   BETTER_AUTH_SECRET: z.string().optional(),
-  APP_URL: z.string().min(1, 'APP_URL is required'),
-  VITE_APP_URL: z.string().min(1, 'VITE_APP_URL is required'),
+  APP_URL: z.string().min(1, 'APP_URL is required').transform(ensureProtocol),
+  VITE_APP_URL: z.string().min(1, 'VITE_APP_URL is required').transform(ensureProtocol),
   GITHUB_TOKEN: z.string().optional(),
   REDDIT_CLIENT_ID: z.string().optional(),
   REDDIT_CLIENT_SECRET: z.string().optional(),

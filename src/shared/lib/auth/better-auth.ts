@@ -3,6 +3,7 @@ import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { db } from '~/shared/lib/db/index'
 import { authUsers, authSessions, authAccounts, authVerifications } from '~/shared/lib/db/schema'
 import { sendResetPasswordEmail } from '~/shared/lib/email'
+import { env } from '~/shared/lib/env'
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -21,8 +22,8 @@ export const auth = betterAuth({
     },
   },
   // BETTER_AUTH_SECRET is the canonical name
-  secret: process.env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production',
-  baseURL: process.env.APP_URL ?? 'http://localhost:3000',
+  secret: env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production',
+  baseURL: env.APP_URL,
   // Cookies are handled via standard browser cookie mechanism
   // Rate limiting: better-auth only enables this by default in production
   // (NODE_ENV === 'production'). We force it on everywhere so brute-force
