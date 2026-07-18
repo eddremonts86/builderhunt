@@ -48,7 +48,7 @@ async function run() {
 
   // Sample computation via Node to verify behavior
   const { computeHygiene, estimateRepoSignalsFromBuilder, hygieneGrade } = await import(
-    './src/shared/lib/hygiene.ts'
+    '../src/shared/lib/hygiene.ts'
   )
 
   const hotRepos = estimateRepoSignalsFromBuilder({ followersCount: 5000, topics: ['rust', 'wasm', 'async'] })
