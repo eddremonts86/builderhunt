@@ -1,4 +1,5 @@
 export { Button } from './button'
+export { Dialog } from './dialog'
 export { Input, Textarea } from './input'
 export { LinkComponent, LinkButton } from './link'
 export { ScoreRing, getScoreBreakdown } from './score-ring'

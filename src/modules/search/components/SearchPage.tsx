@@ -5,7 +5,8 @@ import {
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { useSearch } from '@tanstack/react-router'
-import { Input, Button, ScoreRing, getScoreBreakdown } from '~/components/ui'
+import { Input, Button, Dialog, ScoreRing, getScoreBreakdown } from '~/components/ui'
+import { Tooltip } from '~/shared/components/Tooltip'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
@@ -97,6 +98,8 @@ const RECENT_KEY = 'builderhunt.recent_searches'
 const MAX_RECENT = 5
 /** Query used to fetch a real preview before the user has searched anything. */
 const FEATURED_QUERY = 'open source maintainers'
+/** Sources/location/language selection persists across visits. */
+const FILTERS_KEY = 'builderhunt.search_filters'
 
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                       */
@@ -167,6 +170,40 @@ export function SearchPage() {
       // ignore
     }
   }, [])
+
+  /* Mount: restore sources/location/language from localStorage. A plain
+     useState initializer would run during SSR (no localStorage there), so
+     this loads post-mount instead — same pattern as recent searches above. */
+  React.useEffect(() => {
+    try {
+      const stored = localStorage.getItem(FILTERS_KEY)
+      if (!stored) return
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed.sources)) {
+        const valid = parsed.sources.filter((s: unknown): s is Source => (ALL_SOURCES as string[]).includes(s as string))
+        if (valid.length > 0) setActiveSources(new Set(valid))
+      }
+      if (typeof parsed.location === 'string') setLocation(parsed.location)
+      if (typeof parsed.language === 'string') setLanguage(parsed.language)
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  /* Persist sources/location/language on every change so they apply to
+     every future search (and survive a reload) without further plumbing —
+     runSearch/loadMore/handleSaveSearch already read these same states. */
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(FILTERS_KEY, JSON.stringify({
+        sources: Array.from(activeSources),
+        location,
+        language,
+      }))
+    } catch {
+      // ignore
+    }
+  }, [activeSources, location, language])
 
   /* ⌘K / Ctrl+K to focus search */
   React.useEffect(() => {
@@ -469,144 +506,138 @@ export function SearchPage() {
           >
             {loading ? 'Searching' : 'Search'}
           </Button>
-        </div>
 
-        {/* Sources & filters — one unified, collapsed-by-default control.
-            Previously an always-expanded 12-pill row (6 rows on mobile)
-            plus a separate Filters button/panel — merged into one so the
-            page isn't permanently occupied by controls most searches never
-            touch. */}
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((o) => !o)}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
-              filtersOpen
-                ? 'bg-bh-accent-soft text-bh-accent border-bh-accent'
-                : 'bg-transparent text-bh-text-muted border-bh-border hover:border-bh-border-strong hover:text-bh-text'
-            }`}
-            aria-expanded={filtersOpen}
-            aria-controls="search-filters-panel"
-          >
-            <Filter className="w-3.5 h-3.5" aria-hidden="true" />
-            Sources &amp; filters
-            <span className="text-xs text-bh-text-dim font-normal">
-              {activeSources.size} of {ALL_SOURCES.length} sources
-            </span>
-            {filtersActiveCount > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-bh-accent text-white text-[10px] font-bold">
-                {filtersActiveCount}
-              </span>
-            )}
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
-          </button>
-
-          {filtersOpen && (
-            <div
-              id="search-filters-panel"
-              className="mt-3 p-4 rounded-lg border border-bh-border bg-bh-bg-alt/40 animate-fade-in"
+          {/* Sources & filters — compact trigger next to Search, opens a
+              dialog instead of an inline panel so it stays out of the way
+              and has room to grow (more filters later) without reflowing
+              the page. */}
+          <Tooltip label={`Sources & filters — ${activeSources.size} of ${ALL_SOURCES.length} sources${filtersActiveCount > 0 ? ', customized' : ''}`}>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(true)}
+              aria-haspopup="dialog"
+              aria-label="Sources & filters"
+              className={`relative shrink-0 w-11 h-11 rounded-full border flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
+                filtersActiveCount > 0
+                  ? 'bg-bh-accent-soft text-bh-accent border-bh-accent/30'
+                  : 'bg-transparent text-bh-text-muted border-bh-border hover:border-bh-border-strong hover:text-bh-text'
+              }`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold text-bh-text-dim uppercase tracking-wider">
-                  Sources
+              <Filter className="w-4 h-4" aria-hidden="true" />
+              {filtersActiveCount > 0 && (
+                <span className="absolute -top-1 -right-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-bh-accent text-white text-[10px] font-bold">
+                  {filtersActiveCount}
                 </span>
-                <div className="flex items-center gap-3 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => setActiveSources(new Set(ALL_SOURCES))}
-                    className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
-                  >
-                    Select all
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveSources(new Set())}
-                    className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
-                  >
-                    Clear all
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {ALL_SOURCES.map((s) => {
-                  const meta = SOURCE_META[s]
-                  const active = activeSources.has(s)
-                  return (
-                    <button
-                      key={s}
-                      type="button"
-                      onClick={() => toggleSource(s)}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
-                        active
-                          ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
-                          : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
-                      }`}
-                      aria-pressed={active}
-                    >
-                      <meta.Icon className="w-3.5 h-3.5" title={meta.label} />
-                      {meta.label}
-                    </button>
-                  )
-                })}
-              </div>
-
-              {activeSources.size === 0 && (
-                <p className="text-xs text-bh-danger mt-2">
-                  Pick at least one source before searching.
-                </p>
               )}
-
-              <div className="grid sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-bh-border">
-                <div>
-                  <label htmlFor="location-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
-                    Location
-                  </label>
-                  <input
-                    id="location-input"
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. France, Spain, Brazil"
-                    className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
-                    autoComplete="off"
-                  />
-                  <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
-                    Only GitHub supports this. Other sources don't expose location.
-                  </p>
-                </div>
-                <div>
-                  <label htmlFor="language-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
-                    Primary language
-                  </label>
-                  <input
-                    id="language-input"
-                    type="text"
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    placeholder="e.g. TypeScript, Rust, Go"
-                    className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
-                    autoComplete="off"
-                  />
-                  <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
-                    Only GitHub supports this. Other sources don't expose primary language.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end mt-3 pt-3 border-t border-bh-border">
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="text-xs text-bh-text-dim hover:text-bh-text inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
-                >
-                  <RotateCcw className="w-3 h-3" aria-hidden="true" />
-                  Reset to defaults
-                </button>
-              </div>
-            </div>
-          )}
+            </button>
+          </Tooltip>
         </div>
+
+        <Dialog open={filtersOpen} onClose={() => setFiltersOpen(false)} title="Sources & filters">
+          {/* Sources & filters — one unified control. Previously an
+              always-expanded 12-pill row (6 rows on mobile) plus a separate
+              Filters button/panel — merged into one dialog so the page
+              isn't permanently occupied by controls most searches never
+              touch, and there's room to add more filters later. */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-semibold text-bh-text-dim uppercase tracking-wider">
+              Sources
+            </span>
+            <div className="flex items-center gap-3 text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveSources(new Set(ALL_SOURCES))}
+                className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSources(new Set())}
+                className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+              >
+                Clear all
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {ALL_SOURCES.map((s) => {
+              const meta = SOURCE_META[s]
+              const active = activeSources.has(s)
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => toggleSource(s)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
+                    active
+                      ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
+                      : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
+                  }`}
+                  aria-pressed={active}
+                >
+                  <meta.Icon className="w-3.5 h-3.5" title={meta.label} />
+                  {meta.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {activeSources.size === 0 && (
+            <p className="text-xs text-bh-danger mt-2">
+              Pick at least one source before searching.
+            </p>
+          )}
+
+          <div className="grid sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-bh-border">
+            <div>
+              <label htmlFor="location-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
+                Location
+              </label>
+              <input
+                id="location-input"
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="e.g. France, Spain, Brazil"
+                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                autoComplete="off"
+              />
+              <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
+                Only GitHub supports this. Other sources don't expose location.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="language-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
+                Primary language
+              </label>
+              <input
+                id="language-input"
+                type="text"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                placeholder="e.g. TypeScript, Rust, Go"
+                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                autoComplete="off"
+              />
+              <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
+                Only GitHub supports this. Other sources don't expose primary language.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-3 pt-3 border-t border-bh-border">
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="text-xs text-bh-text-dim hover:text-bh-text inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+            >
+              <RotateCcw className="w-3 h-3" aria-hidden="true" />
+              Reset to defaults
+            </button>
+          </div>
+        </Dialog>
       </form>
 
       {/* Inline save bar */}
