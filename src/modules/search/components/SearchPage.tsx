@@ -1,7 +1,7 @@
 import * as React from 'react'
 import {
   Search, X, Bookmark, ExternalLink, Code, Filter, Clock, Hash,
-  TrendingUp, Save, Lightbulb, ChevronDown, Sparkles,
+  TrendingUp, Save, Lightbulb, ChevronDown, Sparkles, RotateCcw, MapPin,
   Users, BookMarked, Star, GitFork, Loader2,
 } from 'lucide-react'
 import { useSearch } from '@tanstack/react-router'
@@ -28,6 +28,25 @@ interface Builder {
   lastSeen?: string
   language?: string
   country?: string
+  metadata?: Record<string, unknown>
+}
+
+/** Recency lives in `metadata.lastSeen` (a ms-epoch number set by each
+ * source), not the unused top-level `lastSeen` string field. */
+function getLastSeenMs(builder: Builder): number | null {
+  const ms = builder.metadata?.lastSeen
+  return typeof ms === 'number' ? ms : null
+}
+
+function formatRelativeDate(ms: number): string {
+  const diff = Date.now() - ms
+  const day = 24 * 60 * 60 * 1000
+  if (diff < day) return 'today'
+  if (diff < 2 * day) return 'yesterday'
+  if (diff < 7 * day) return `${Math.floor(diff / day)}d ago`
+  if (diff < 30 * day) return `${Math.floor(diff / (7 * day))}w ago`
+  if (diff < 365 * day) return `${Math.floor(diff / (30 * day))}mo ago`
+  return `${Math.floor(diff / (365 * day))}y ago`
 }
 
 type Source = Builder['source']
@@ -177,7 +196,7 @@ export function SearchPage() {
       initialSourcesRef.current = sig
       return
     }
-    if (initialSourcesRef.current !== sig && searched && query.trim()) {
+    if (initialSourcesRef.current !== sig && searched && query.trim() && activeSources.size > 0) {
       initialSourcesRef.current = sig
       runSearch(query)
     }
@@ -210,7 +229,7 @@ export function SearchPage() {
   const handleSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
     const q = query.trim()
-    if (!q) return
+    if (!q || activeSources.size === 0) return
     await runSearch(q)
   }
 
@@ -311,7 +330,7 @@ export function SearchPage() {
     const list = activeTab === 'people' ? people : resources
     const copy = [...list]
     if (sortBy === 'recency') {
-      copy.sort((a, b) => (b.lastSeen ? Date.parse(b.lastSeen) : 0) - (a.lastSeen ? Date.parse(a.lastSeen) : 0))
+      copy.sort((a, b) => (getLastSeenMs(b) ?? 0) - (getLastSeenMs(a) ?? 0))
     } else if (sortBy === 'followers') {
       copy.sort((a, b) => (b.followersCount ?? 0) - (a.followersCount ?? 0))
     } else {
@@ -320,12 +339,13 @@ export function SearchPage() {
     return copy
   }, [people, resources, sortBy, activeTab])
 
-  /* Source toggle */
+  /* Source toggle — individual clicks can't reduce to zero (that would
+     silently break Search); "Clear all" below is the deliberate way to
+     start a custom selection from scratch. */
   const toggleSource = (s: Source) => {
     setActiveSources((prev) => {
       const next = new Set(prev)
       if (next.has(s)) {
-        // Don't allow disabling all sources
         if (next.size === 1) return prev
         next.delete(s)
       } else {
@@ -333,6 +353,18 @@ export function SearchPage() {
       }
       return next
     })
+  }
+
+  const isDefaultSourceSet =
+    activeSources.size === DEFAULT_ACTIVE_SOURCES.length &&
+    DEFAULT_ACTIVE_SOURCES.every((s) => activeSources.has(s))
+  const filtersActiveCount =
+    (isDefaultSourceSet ? 0 : 1) + (location.trim() ? 1 : 0) + (language.trim() ? 1 : 0)
+
+  const resetFilters = () => {
+    setActiveSources(new Set(DEFAULT_ACTIVE_SOURCES))
+    setLocation('')
+    setLanguage('')
   }
 
   /* Save search */
@@ -430,7 +462,7 @@ export function SearchPage() {
           </div>
           <Button
             type="submit"
-            disabled={loading || !query.trim()}
+            disabled={loading || !query.trim() || activeSources.size === 0}
             loading={loading}
             size="md"
             className="px-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
@@ -439,96 +471,142 @@ export function SearchPage() {
           </Button>
         </div>
 
-        {/* Source filter pills */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <span className="text-xs font-semibold text-bh-text-dim uppercase tracking-wider mr-1">
-            Sources
-          </span>
-          {ALL_SOURCES.map((s) => {
-            const meta = SOURCE_META[s]
-            const active = activeSources.has(s)
-            return (
-              <button
-                key={s}
-                type="button"
-                onClick={() => toggleSource(s)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
-                  active
-                    ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
-                    : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
-                }`}
-                aria-pressed={active}
-              >
-                <meta.Icon className="w-3.5 h-3.5" title={meta.label} />
-                {meta.label}
-              </button>
-            )
-          })}
-
-          {/* Filters toggle */}
+        {/* Sources & filters — one unified, collapsed-by-default control.
+            Previously an always-expanded 12-pill row (6 rows on mobile)
+            plus a separate Filters button/panel — merged into one so the
+            page isn't permanently occupied by controls most searches never
+            touch. */}
+        <div className="mt-4">
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
-            className={`ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
-              filtersOpen || location || language
-                ? 'bg-bh-accent-soft text-bh-accent border-bh-accent/30'
-                : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
+              filtersOpen
+                ? 'bg-bh-accent-soft text-bh-accent border-bh-accent'
+                : 'bg-transparent text-bh-text-muted border-bh-border hover:border-bh-border-strong hover:text-bh-text'
             }`}
             aria-expanded={filtersOpen}
-            aria-controls="advanced-filters"
+            aria-controls="search-filters-panel"
           >
             <Filter className="w-3.5 h-3.5" aria-hidden="true" />
-            Filters
-            {(location || language) && (
+            Sources &amp; filters
+            <span className="text-xs text-bh-text-dim font-normal">
+              {activeSources.size} of {ALL_SOURCES.length} sources
+            </span>
+            {filtersActiveCount > 0 && (
               <span className="inline-flex items-center justify-center min-w-[18px] h-4 px-1 rounded-full bg-bh-accent text-white text-[10px] font-bold">
-                {(location ? 1 : 0) + (language ? 1 : 0)}
+                {filtersActiveCount}
               </span>
             )}
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${filtersOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
           </button>
-        </div>
 
-        {/* Advanced filters (Location, Language) */}
-        {filtersOpen && (
-          <div
-            id="advanced-filters"
-            className="mt-3 p-4 rounded-lg border border-bh-border bg-bh-bg-alt/40 grid sm:grid-cols-2 gap-3 animate-fade-in"
-          >
-            <div>
-              <label htmlFor="location-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
-                Location
-              </label>
-              <input
-                id="location-input"
-                type="text"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. France, Spain, Brazil"
-                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
-                autoComplete="off"
-              />
-              <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
-                Only GitHub supports this. Other sources don't expose location.
-              </p>
+          {filtersOpen && (
+            <div
+              id="search-filters-panel"
+              className="mt-3 p-4 rounded-lg border border-bh-border bg-bh-bg-alt/40 animate-fade-in"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-bh-text-dim uppercase tracking-wider">
+                  Sources
+                </span>
+                <div className="flex items-center gap-3 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setActiveSources(new Set(ALL_SOURCES))}
+                    className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+                  >
+                    Select all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSources(new Set())}
+                    className="text-bh-text-dim hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+                  >
+                    Clear all
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {ALL_SOURCES.map((s) => {
+                  const meta = SOURCE_META[s]
+                  const active = activeSources.has(s)
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => toggleSource(s)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
+                        active
+                          ? 'bg-bh-accent-soft text-bh-accent border-bh-accent shadow-sm'
+                          : 'bg-transparent text-bh-text-dim border-bh-border hover:border-bh-border-strong hover:text-bh-text-muted'
+                      }`}
+                      aria-pressed={active}
+                    >
+                      <meta.Icon className="w-3.5 h-3.5" title={meta.label} />
+                      {meta.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {activeSources.size === 0 && (
+                <p className="text-xs text-bh-danger mt-2">
+                  Pick at least one source before searching.
+                </p>
+              )}
+
+              <div className="grid sm:grid-cols-2 gap-3 mt-4 pt-4 border-t border-bh-border">
+                <div>
+                  <label htmlFor="location-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
+                    Location
+                  </label>
+                  <input
+                    id="location-input"
+                    type="text"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. France, Spain, Brazil"
+                    className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    autoComplete="off"
+                  />
+                  <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
+                    Only GitHub supports this. Other sources don't expose location.
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="language-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
+                    Primary language
+                  </label>
+                  <input
+                    id="language-input"
+                    type="text"
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    placeholder="e.g. TypeScript, Rust, Go"
+                    className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    autoComplete="off"
+                  />
+                  <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
+                    Only GitHub supports this. Other sources don't expose primary language.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end mt-3 pt-3 border-t border-bh-border">
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="text-xs text-bh-text-dim hover:text-bh-text inline-flex items-center gap-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded"
+                >
+                  <RotateCcw className="w-3 h-3" aria-hidden="true" />
+                  Reset to defaults
+                </button>
+              </div>
             </div>
-            <div>
-              <label htmlFor="language-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
-                Primary language
-              </label>
-              <input
-                id="language-input"
-                type="text"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                placeholder="e.g. TypeScript, Rust, Go"
-                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
-                autoComplete="off"
-              />
-              <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
-                Only GitHub supports this. Other sources don't expose primary language.
-              </p>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </form>
 
       {/* Inline save bar */}
@@ -584,42 +662,43 @@ export function SearchPage() {
       {/* Loading skeleton */}
       {loading && <SearchSkeleton />}
 
-      {/* Results header (sort + count) */}
+      {/* Results header — count, tabs, sort and save all on one line */}
       {searched && !loading && results.length > 0 && (
-        <div className="mb-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-            <p className="text-sm text-bh-text-muted">
+        <div className="mb-4 pb-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-bh-border">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            <p className="text-sm text-bh-text-muted whitespace-nowrap">
               <span className="font-semibold text-bh-text">{results.length}</span> result
               {results.length === 1 ? '' : 's'} matching{' '}
               <span className="font-medium text-bh-text">"{query}"</span>
             </p>
-            <div className="flex items-center gap-2">
-              <SortMenu value={sortBy} onChange={setSortBy} />
-              {searched && !showSave && (
-                <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
-                  <Bookmark className="w-4 h-4" /> Save search
-                </Button>
-              )}
+
+            {/* Tabs: People | Resources */}
+            <div role="tablist" aria-label="Result type" className="flex items-center gap-1">
+              <ResultTabButton
+                active={activeTab === 'people'}
+                onClick={() => setActiveTab('people')}
+                icon={Users}
+                label="People"
+                count={people.length}
+              />
+              <ResultTabButton
+                active={activeTab === 'resources'}
+                onClick={() => setActiveTab('resources')}
+                icon={BookMarked}
+                label="Resources"
+                count={resources.length}
+                disabled={resources.length === 0}
+              />
             </div>
           </div>
 
-          {/* Tabs: People | Resources */}
-          <div role="tablist" aria-label="Result type" className="flex items-center gap-1 border-b border-bh-border">
-            <ResultTabButton
-              active={activeTab === 'people'}
-              onClick={() => setActiveTab('people')}
-              icon={Users}
-              label="People"
-              count={people.length}
-            />
-            <ResultTabButton
-              active={activeTab === 'resources'}
-              onClick={() => setActiveTab('resources')}
-              icon={BookMarked}
-              label="Resources"
-              count={resources.length}
-              disabled={resources.length === 0}
-            />
+          <div className="flex items-center gap-2">
+            <SortMenu value={sortBy} onChange={setSortBy} />
+            {searched && !showSave && (
+              <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
+                <Bookmark className="w-4 h-4" /> Save search
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -946,6 +1025,12 @@ function getMatchHighlights(builder: Builder, query: string): {
 function PersonResultCard({ builder, query }: { builder: Builder; query: string }) {
   const meta = SOURCE_META[builder.source]
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
+  const lastSeenMs = getLastSeenMs(builder)
+
+  // Matched topics first (they explain the ranking), then whatever other
+  // topics we know about — as much signal for "who is this" as we have.
+  const otherTopics = (builder.topics ?? []).filter((t) => !matchedTopics.includes(t))
+  const displayTopics = [...matchedTopics.map((t) => ({ t, matched: true })), ...otherTopics.map((t) => ({ t, matched: false }))].slice(0, 6)
 
   return (
     <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
@@ -955,14 +1040,14 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
           <img
             src={builder.avatarUrl}
             alt={`${builder.displayName ?? builder.username} avatar`}
-            className="w-10 h-10 rounded-full border border-bh-border shrink-0"
+            className="w-11 h-11 rounded-full border border-bh-border shrink-0"
             loading="lazy"
-            width={40}
-            height={40}
+            width={44}
+            height={44}
           />
         ) : (
           <div
-            className="w-10 h-10 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-sm"
+            className="w-11 h-11 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-base"
             aria-hidden="true"
           >
             {(builder.displayName ?? builder.username)[0]?.toUpperCase()}
@@ -970,7 +1055,9 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
         )}
 
         <div className="flex-1 min-w-0">
-          {/* Row 1: name + handle (truncates) — score + view pinned right, always one line */}
+          {/* Row 1: name + handle (truncates) — score + view pinned right, always one line.
+              The source badge lives in the wrapping meta row below, not here — it doesn't
+              fit alongside score+view on narrow screens without squeezing the name to 0. */}
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1 truncate">
               <span className="font-semibold text-bh-text text-sm">
@@ -984,7 +1071,7 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
               {builder.score != null && (
                 <ScoreRing
                   score={builder.score}
-                  size={36}
+                  size={38}
                   showLabel={false}
                   breakdown={getScoreBreakdown(builder)}
                 />
@@ -1001,51 +1088,71 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
             </div>
           </div>
 
-          {/* Row 2: source + topics + meta + why-match — wraps freely at any width */}
-          <div className="flex flex-wrap items-center gap-2 mt-1.5">
+          {/* Row 2: bio — the single most useful "who is this" signal we have */}
+          {builder.bio && (
+            <p className="text-sm text-bh-text-muted mt-1.5 line-clamp-2 leading-relaxed">
+              {builder.bio}
+            </p>
+          )}
+
+          {/* Row 3: source, followers, location, last-active, topics */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mt-2 text-xs text-bh-text-muted">
             <span className={`badge ${meta.color} inline-flex items-center gap-1`}>
               <meta.Icon className="w-3 h-3" title={meta.label} />
               {meta.label}
             </span>
-
-            {matchedTopics.slice(0, 2).map((t) => (
-              <span key={t} className="badge text-xs">{t}</span>
-            ))}
-
             {builder.followersCount != null && (
-              <span className="inline-flex items-center gap-1 text-xs text-bh-text-muted">
+              <span className="inline-flex items-center gap-1">
                 <Users className="w-3 h-3" aria-hidden="true" />
                 {(builder.followersCount ?? 0).toLocaleString()}
               </span>
             )}
             {builder.country && (
-              <span className="text-xs text-bh-text-muted">{builder.country}</span>
+              <span className="inline-flex items-center gap-1">
+                <MapPin className="w-3 h-3" aria-hidden="true" />
+                {builder.country}
+              </span>
             )}
+            {lastSeenMs != null && (
+              <span className="inline-flex items-center gap-1">
+                <Clock className="w-3 h-3" aria-hidden="true" />
+                Active {formatRelativeDate(lastSeenMs)}
+              </span>
+            )}
+            {displayTopics.map(({ t, matched }) => (
+              <span
+                key={t}
+                className={matched ? 'badge text-xs border-bh-accent/30 bg-bh-accent-soft text-bh-accent' : 'badge text-xs'}
+              >
+                {t}
+              </span>
+            ))}
+          </div>
 
-            <span className="inline-flex items-center gap-1 text-xs text-bh-text-dim min-w-0">
-              {matchedTerms.length > 0 ? (
-                <>
-                  <Sparkles className="w-3 h-3 text-bh-accent shrink-0" aria-hidden="true" />
-                  <span>
-                    matches{' '}
-                    {matchedTerms.slice(0, 3).map((t, i) => (
-                      <span key={t}>
-                        <span className="text-bh-text-muted font-medium">"{t}"</span>
-                        {i < Math.min(matchedTerms.length, 3) - 1 && ', '}
-                      </span>
-                    ))}
-                    {matchedTerms.length > 3 && ` +${matchedTerms.length - 3}`}
-                    {' '}
-                    <span className="text-bh-text-dim">in {fields.join(' + ')}</span>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <TrendingUp className="w-3 h-3 text-bh-text-dim shrink-0" aria-hidden="true" />
-                  <span>ranked by reach &amp; recent activity, not a direct keyword hit</span>
-                </>
-              )}
-            </span>
+          {/* Row 4: why this match */}
+          <div className="flex items-center gap-1 text-xs text-bh-text-dim min-w-0 mt-1.5">
+            {matchedTerms.length > 0 ? (
+              <>
+                <Sparkles className="w-3 h-3 text-bh-accent shrink-0" aria-hidden="true" />
+                <span>
+                  matches{' '}
+                  {matchedTerms.slice(0, 3).map((t, i) => (
+                    <span key={t}>
+                      <span className="text-bh-text-muted font-medium">"{t}"</span>
+                      {i < Math.min(matchedTerms.length, 3) - 1 && ', '}
+                    </span>
+                  ))}
+                  {matchedTerms.length > 3 && ` +${matchedTerms.length - 3}`}
+                  {' '}
+                  <span className="text-bh-text-dim">in {fields.join(' + ')}</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <TrendingUp className="w-3 h-3 text-bh-text-dim shrink-0" aria-hidden="true" />
+                <span>ranked by reach &amp; recent activity, not a direct keyword hit</span>
+              </>
+            )}
           </div>
         </div>
       </div>

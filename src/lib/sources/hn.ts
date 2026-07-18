@@ -29,6 +29,23 @@ interface AuthorMatch {
   topPoints: number
 }
 
+/** HN bios and comment bodies are raw HTML (e.g. `<p>` paragraph breaks,
+ * `&#x2F;` for `/`) — strip tags and decode entities so they read as plain
+ * text wherever we display them. */
+function htmlToText(html: string): string {
+  return html
+    .replace(/<p>/gi, ' ')
+    .replace(/<\/?[^>]+(>|$)/g, '')
+    .replace(/&#x2F;/gi, '/')
+    .replace(/&#x27;/gi, '\'')
+    .replace(/&quot;/gi, '"')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 /**
  * HN's Firebase API (used previously) has no full-text search — it only
  * exposes item/user lookups by id. Sampling the current front page and
@@ -60,7 +77,7 @@ export async function searchHN(keywords: string[], options: { page?: number; per
     const byAuthor = new Map<string, AuthorMatch>()
     for (const hit of data.hits) {
       if (!hit.author) continue
-      const title = hit.title ?? hit.story_title ?? hit.comment_text?.slice(0, 140) ?? ''
+      const title = hit.title ?? hit.story_title ?? (hit.comment_text ? htmlToText(hit.comment_text).slice(0, 140) : '')
       const points = hit.points ?? 0
       const ts = Date.parse(hit.created_at) || 0
       const existing = byAuthor.get(hit.author)
@@ -103,7 +120,7 @@ export async function searchHN(keywords: string[], options: { page?: number; per
         username,
         displayName: undefined,
         avatarUrl: undefined,
-        bio: user.about ?? (match.bestTitle ? `Posted: "${match.bestTitle}"` : undefined),
+        bio: user.about ? htmlToText(user.about) : (match.bestTitle ? `Posted: "${match.bestTitle}"` : undefined),
         profileUrl: `https://news.ycombinator.com/user?id=${username}`,
         followersCount: user.karma,
         language: undefined,
