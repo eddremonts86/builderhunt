@@ -18,6 +18,7 @@ interface Builder {
   id: string
   kind: BuilderKind
   source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg' | 'hashnode' | 'sourcehut'
+  sourceId: string
   username: string
   displayName?: string
   avatarUrl?: string
@@ -30,6 +31,8 @@ interface Builder {
   language?: string
   country?: string
   metadata?: Record<string, unknown>
+  tracked?: boolean
+  trackedRowId?: string
 }
 
 /** Recency lives in `metadata.lastSeen` (a ms-epoch number set by each
@@ -439,6 +442,55 @@ export function SearchPage() {
     }
   }
 
+  /* Track / untrack a builder */
+  const [trackingIds, setTrackingIds] = React.useState<Set<string>>(new Set())
+  const handleToggleTrack = async (builder: Builder) => {
+    if (trackingIds.has(builder.id)) return
+    setTrackingIds((prev) => new Set(prev).add(builder.id))
+    const wasTracked = builder.tracked ?? false
+    setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, tracked: !wasTracked } : b)))
+    try {
+      if (wasTracked) {
+        if (!builder.trackedRowId) throw new Error('Missing tracked row id')
+        const res = await fetch(`/api/builders/${builder.trackedRowId}`, { method: 'DELETE', credentials: 'include' })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, trackedRowId: undefined } : b)))
+      } else {
+        const res = await fetch('/api/builders/track', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: builder.source,
+            sourceId: builder.sourceId,
+            username: builder.username,
+            displayName: builder.displayName,
+            avatarUrl: builder.avatarUrl,
+            bio: builder.bio,
+            profileUrl: builder.profileUrl,
+            followersCount: builder.followersCount,
+            language: builder.language,
+            country: builder.country,
+            topics: builder.topics,
+            score: builder.score,
+            metadata: builder.metadata,
+          }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data: { id: string } = await res.json()
+        setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, trackedRowId: data.id } : b)))
+      }
+    } catch {
+      setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, tracked: wasTracked } : b)))
+    } finally {
+      setTrackingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(builder.id)
+        return next
+      })
+    }
+  }
+
   /* ---------------------------------------------------------------------- */
 
   return (
@@ -687,6 +739,8 @@ export function SearchPage() {
           featured={featured}
           onPickQuery={(q) => { setQuery(q); runSearch(q) }}
           onClearRecent={clearRecent}
+          onToggleTrack={handleToggleTrack}
+          trackingIds={trackingIds}
         />
       )}
 
@@ -785,7 +839,12 @@ export function SearchPage() {
           <ul className="space-y-3" role="list">
             {sorted.map((builder) => (
               <li key={`${builder.source}-${builder.id}`}>
-                <BuilderResultCard builder={builder} query={query} />
+                <BuilderResultCard
+                  builder={builder}
+                  query={query}
+                  onToggleTrack={handleToggleTrack}
+                  tracking={trackingIds.has(builder.id)}
+                />
               </li>
             ))}
           </ul>
@@ -852,11 +911,15 @@ function LandingState({
   featured,
   onPickQuery,
   onClearRecent,
+  onToggleTrack,
+  trackingIds,
 }: {
   recent: string[]
   featured: Builder[]
   onPickQuery: (q: string) => void
   onClearRecent: () => void
+  onToggleTrack: (b: Builder) => void
+  trackingIds: Set<string>
 }) {
   return (
     <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-2">
@@ -870,7 +933,12 @@ function LandingState({
             <ul className="space-y-3" role="list">
               {featured.map((b) => (
                 <li key={`${b.source}-${b.id}`}>
-                  <PersonResultCard builder={b} query={FEATURED_QUERY} />
+                  <PersonResultCard
+                    builder={b}
+                    query={FEATURED_QUERY}
+                    onToggleTrack={onToggleTrack}
+                    tracking={trackingIds.has(b.id)}
+                  />
                 </li>
               ))}
             </ul>
@@ -994,11 +1062,11 @@ function NoResults({ query, onTryPopular }: { query: string; onTryPopular: (q: s
   )
 }
 
-function BuilderResultCard({ builder, query }: { builder: Builder; query: string }) {
+function BuilderResultCard({ builder, query, onToggleTrack, tracking }: { builder: Builder; query: string; onToggleTrack: (b: Builder) => void; tracking: boolean }) {
   if (builder.kind === 'repo') {
     return <ResourceResultCard builder={builder} query={query} />
   }
-  return <PersonResultCard builder={builder} query={query} />
+  return <PersonResultCard builder={builder} query={query} onToggleTrack={onToggleTrack} tracking={tracking} />
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1053,7 +1121,7 @@ function getMatchHighlights(builder: Builder, query: string): {
 /* -------------------------------------------------------------------------- */
 /*  PersonResultCard — compact single-line                                   */
 /* -------------------------------------------------------------------------- */
-function PersonResultCard({ builder, query }: { builder: Builder; query: string }) {
+function PersonResultCard({ builder, query, onToggleTrack, tracking }: { builder: Builder; query: string; onToggleTrack: (b: Builder) => void; tracking: boolean }) {
   const meta = SOURCE_META[builder.source]
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
   const lastSeenMs = getLastSeenMs(builder)
@@ -1107,6 +1175,17 @@ function PersonResultCard({ builder, query }: { builder: Builder; query: string 
                   breakdown={getScoreBreakdown(builder)}
                 />
               )}
+              <button
+                type="button"
+                onClick={() => onToggleTrack(builder)}
+                disabled={tracking}
+                className={builder.tracked ? 'btn-primary btn-sm rounded-full' : 'btn-secondary btn-sm rounded-full'}
+                title={builder.tracked ? 'Remove from your tracked builders' : 'Track this builder'}
+                data-testid={`track-button-${builder.id}`}
+              >
+                <Bookmark className="w-3 h-3" aria-hidden="true" />
+                {builder.tracked ? 'Tracked' : 'Track'}
+              </button>
               <a
                 href={builder.profileUrl}
                 target="_blank"
