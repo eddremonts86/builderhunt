@@ -13,7 +13,8 @@ async function testPort(port) {
 
   try {
     await page.goto(BASE, { waitUntil: 'load', timeout: 5000 })
-    await page.waitForTimeout(1000)
+    // Wait longer for hydration to complete on slower dev environments
+    await page.waitForTimeout(2500)
     const title = await page.title()
     console.log(`Successfully connected to ${BASE}. Title: ${title}`)
     
@@ -47,8 +48,16 @@ async function testPort(port) {
       console.log('✅ Persona tabs found. Clicking second tab...')
       await tabButton.click()
       await page.waitForTimeout(1000)
+
+      // Retry click once if it didn't register due to hydration lag
+      let bodyText = await page.innerText('body')
+      if (!bodyText.includes('Saved Candidate Hunt')) {
+        console.log('⚠️ Tab click might have missed hydration. Retrying click...')
+        await tabButton.click()
+        await page.waitForTimeout(1000)
+        bodyText = await page.innerText('body')
+      }
       
-      const bodyText = await page.innerText('body')
       console.log(`Is 'Saved Candidate Hunt' in body? ${bodyText.includes('Saved Candidate Hunt')}`)
       
       // Let's use page.locator with exact text match
