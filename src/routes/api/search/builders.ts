@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
+import { auth } from '~/shared/lib/auth/better-auth'
+import { getTrackedKeySet, trackedKey } from '~/shared/lib/tracked-builders'
 
 export const Route = createFileRoute('/api/search/builders')({
   component: () => null,
@@ -36,8 +38,18 @@ export const Route = createFileRoute('/api/search/builders')({
             page,
             perPage,
           })
+
+          const session = await auth.api.getSession({ headers: request.headers })
+          const trackedKeys = session?.user?.id
+            ? await getTrackedKeySet(session.user.id)
+            : new Set<string>()
+          const annotated = results.map((b) => ({
+            ...b,
+            tracked: trackedKeys.has(trackedKey(b.source, b.sourceId)),
+          }))
+
           return Response.json({
-            builders: results,
+            builders: annotated,
             page,
             perPage,
             hasMore: results.length >= perPage,
