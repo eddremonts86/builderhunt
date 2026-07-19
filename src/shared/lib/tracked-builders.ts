@@ -19,3 +19,17 @@ export async function getTrackedKeySet(userId: string): Promise<Set<string>> {
     .where(eq(builders.userId, userId))
   return new Set(rows.map((r) => trackedKey(r.source, r.sourceId)))
 }
+
+/**
+ * Same lookup as `getTrackedKeySet`, but keyed to each row's own `builders.id`
+ * instead of a plain Set — callers that need to *act* on an already-tracked
+ * result (e.g. offering an "untrack" action) need the row id, since
+ * `DELETE /api/builders/:builderId` operates on it, not on (source, sourceId).
+ */
+export async function getTrackedBuilderIds(userId: string): Promise<Map<string, string>> {
+  const rows = await db
+    .select({ id: builders.id, source: builders.source, sourceId: builders.sourceId })
+    .from(builders)
+    .where(eq(builders.userId, userId))
+  return new Map(rows.map((r) => [trackedKey(r.source, r.sourceId), r.id]))
+}

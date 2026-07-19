@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
 import { auth } from '~/shared/lib/auth/better-auth'
-import { getTrackedKeySet, trackedKey } from '~/shared/lib/tracked-builders'
+import { getTrackedBuilderIds, trackedKey } from '~/shared/lib/tracked-builders'
 
 export const Route = createFileRoute('/api/search/builders')({
   component: () => null,
@@ -40,20 +40,24 @@ export const Route = createFileRoute('/api/search/builders')({
           })
 
           const session = await auth.api.getSession({ headers: request.headers })
-          let trackedKeys = new Set<string>()
+          let trackedIds = new Map<string, string>()
           if (session?.user?.id) {
             try {
-              trackedKeys = await getTrackedKeySet(session.user.id)
+              trackedIds = await getTrackedBuilderIds(session.user.id)
             } catch (err) {
               // Best-effort: a tracked-state lookup failure shouldn't fail
               // the whole search — just show everyone as untracked.
-              console.error('getTrackedKeySet error:', err)
+              console.error('getTrackedBuilderIds error:', err)
             }
           }
-          const annotated = results.map((b) => ({
-            ...b,
-            tracked: trackedKeys.has(trackedKey(b.source, b.sourceId)),
-          }))
+          const annotated = results.map((b) => {
+            const trackedRowId = trackedIds.get(trackedKey(b.source, b.sourceId))
+            return {
+              ...b,
+              tracked: trackedRowId !== undefined,
+              trackedRowId,
+            }
+          })
 
           return Response.json({
             builders: annotated,
