@@ -56,34 +56,40 @@ export const authVerifications = pgTable('auth_verifications', {
 // App Tables
 // ---------------------------------------------------------------------------
 
-export const builders = pgTable('builders', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => authUsers.id),
-  source: text('source').notNull(), // github | reddit | hn | devto
-  sourceId: text('source_id').notNull(),
-  username: text('username').notNull(),
-  displayName: text('display_name'),
-  avatarUrl: text('avatar_url'),
-  bio: text('bio'),
-  profileUrl: text('profile_url').notNull(),
-  followersCount: integer('followers_count').default(0),
-  language: text('language'),
-  country: text('country'),
-  topics: jsonb('topics').$type<string[]>().default([]),
-  metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
-  firstSeen: timestamp('first_seen').defaultNow(),
-  lastSeen: timestamp('last_seen').defaultNow(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-  // Claimable profile fields (Plan 8)
-  isClaimed: boolean('is_claimed').default(false).notNull(),
-  claimedByUserId: text('claimed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
-  claimedAt: timestamp('claimed_at', { withTimezone: true }),
-  isVerified: boolean('is_verified').default(false).notNull(),
-  verifiedAt: timestamp('verified_at', { withTimezone: true }),
-  openToStatus: jsonb('open_to_status').$type<string[]>().default([]).notNull(),
-  claimedTopics: jsonb('claimed_topics').$type<string[]>().default([]).notNull(),
-})
+export const builders = pgTable(
+  'builders',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => authUsers.id),
+    source: text('source').notNull(), // github | reddit | hn | devto
+    sourceId: text('source_id').notNull(),
+    username: text('username').notNull(),
+    displayName: text('display_name'),
+    avatarUrl: text('avatar_url'),
+    bio: text('bio'),
+    profileUrl: text('profile_url').notNull(),
+    followersCount: integer('followers_count').default(0),
+    language: text('language'),
+    country: text('country'),
+    topics: jsonb('topics').$type<string[]>().default([]),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
+    firstSeen: timestamp('first_seen').defaultNow(),
+    lastSeen: timestamp('last_seen').defaultNow(),
+    createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
+    // Claimable profile fields (Plan 8)
+    isClaimed: boolean('is_claimed').default(false).notNull(),
+    claimedByUserId: text('claimed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    isVerified: boolean('is_verified').default(false).notNull(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    openToStatus: jsonb('open_to_status').$type<string[]>().default([]).notNull(),
+    claimedTopics: jsonb('claimed_topics').$type<string[]>().default([]).notNull(),
+  },
+  (table) => ({
+    userSourceUnique: unique('builders_user_source_unique').on(table.userId, table.source, table.sourceId),
+  }),
+)
 
 export const savedQueries = pgTable('saved_queries', {
   id: text('id').primaryKey(),
