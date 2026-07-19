@@ -3,7 +3,7 @@
 // billing-shared.ts for types and constants.
 
 import { db } from '~/shared/lib/db/index'
-import { plans, planChanges, planRequests, savedQueries, builderNotes, authUsers } from '~/shared/lib/db/schema'
+import { plans, planChanges, planRequests, savedQueries, builders, authUsers } from '~/shared/lib/db/schema'
 import { eq, count, and, desc } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
 import type { PlanTier, PlanStatus, UserPlan, LimitResource, LimitCheck } from './billing-shared'
@@ -117,7 +117,7 @@ export async function checkLimit(userId: string, resource: LimitResource): Promi
     const [r] = await db.select({ c: count() }).from(savedQueries).where(eq(savedQueries.userId, userId))
     current = Number(r?.c ?? 0)
   } else if (resource === 'savedBuilders') {
-    const [r] = await db.select({ c: count() }).from(builderNotes).where(eq(builderNotes.userId, userId))
+    const [r] = await db.select({ c: count() }).from(builders).where(eq(builders.userId, userId))
     current = Number(r?.c ?? 0)
   } else if (resource === 'rssSubscriptions') {
     const [r] = await db.select({ c: count() }).from(savedQueries).where(eq(savedQueries.userId, userId))
