@@ -78,6 +78,7 @@ import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard
 import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
+import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
 import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
@@ -446,6 +447,11 @@ const ApiMeDataExportIndexRoute = ApiMeDataExportIndexRouteImport.update({
   path: '/api/me/data-export/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMeBuildersIndexRoute = ApiMeBuildersIndexRouteImport.update({
+  id: '/api/me/builders/',
+  path: '/api/me/builders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeBuilderIndexRoute = ApiMeBuilderIndexRouteImport.update({
   id: '/api/me/builder/',
   path: '/api/me/builder/',
@@ -642,6 +648,7 @@ export interface FileRoutesByFullPath {
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
+  '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
@@ -731,6 +738,7 @@ export interface FileRoutesByTo {
   '/api/alerts/triggers': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
+  '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
@@ -824,6 +832,7 @@ export interface FileRoutesById {
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
+  '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
@@ -916,6 +925,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
+    | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
@@ -1005,6 +1015,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers'
     | '/api/builders/recent'
     | '/api/me/builder'
+    | '/api/me/builders'
     | '/api/me/data-export'
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
@@ -1097,6 +1108,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
     | '/api/me/builder/'
+    | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
@@ -1167,6 +1179,7 @@ export interface RootRouteChildren {
   ApiAlertsTriggersIndexRoute: typeof ApiAlertsTriggersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
+  ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
@@ -1657,6 +1670,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeDataExportIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/me/builders/': {
+      id: '/api/me/builders/'
+      path: '/api/me/builders'
+      fullPath: '/api/me/builders/'
+      preLoaderRoute: typeof ApiMeBuildersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/builder/': {
       id: '/api/me/builder/'
       path: '/api/me/builder'
@@ -1967,6 +1987,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlertsTriggersIndexRoute: ApiAlertsTriggersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
+  ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
