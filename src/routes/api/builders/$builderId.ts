@@ -85,6 +85,32 @@ export const Route = createFileRoute('/api/builders/$builderId')({
           return Response.json({ error: 'Failed to update builder' }, { status: 500 })
         }
       },
+      DELETE: async ({ request, params }) => {
+        try {
+          const session = await auth.api.getSession({ headers: request.headers })
+          if (!session?.user?.id) {
+            return Response.json({ error: 'Unauthorized' }, { status: 401 })
+          }
+          const userId = session.user.id
+          const { builderId } = params
+
+          const [existing] = await db
+            .select({ id: builders.id, userId: builders.userId })
+            .from(builders)
+            .where(eq(builders.id, builderId))
+
+          if (!existing || existing.userId !== userId) {
+            return Response.json({ error: 'Builder not found' }, { status: 404 })
+          }
+
+          await db.delete(builders).where(eq(builders.id, builderId))
+
+          return Response.json({ success: true })
+        } catch (err) {
+          console.error('Builder delete error:', err)
+          return Response.json({ error: 'Failed to delete builder' }, { status: 500 })
+        }
+      },
     },
   },
 })
