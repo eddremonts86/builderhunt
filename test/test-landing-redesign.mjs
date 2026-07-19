@@ -46,14 +46,18 @@ async function testPort(port) {
     if (tabButton) {
       console.log('✅ Persona tabs found. Clicking second tab...')
       await tabButton.click()
-      await page.waitForTimeout(500)
+      await page.waitForTimeout(1000)
       
-      // Check panel has updated
-      const updatedPane = await page.$('text=Saved Candidate Hunt')
-      if (updatedPane) {
+      const bodyText = await page.innerText('body')
+      console.log(`Is 'Saved Candidate Hunt' in body? ${bodyText.includes('Saved Candidate Hunt')}`)
+      
+      // Let's use page.locator with exact text match
+      const updatedPane = page.locator('text=Saved Candidate Hunt')
+      const count = await updatedPane.count()
+      if (count > 0) {
         console.log('✅ Persona interactive pane updated successfully on tab click!')
       } else {
-        throw new Error('❌ Interactive showcase did not update correctly!')
+        throw new Error(`❌ Interactive showcase did not update correctly! Found count: ${count}`)
       }
     } else {
       throw new Error('❌ Persona tabs not found!')
