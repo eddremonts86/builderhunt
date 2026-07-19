@@ -26,7 +26,7 @@ interface StatusResponse {
   timestamp: string
 }
 
-export const Route = createFileRoute('/status')({
+export const Route = createFileRoute('/_landing/status')({
   component: StatusPage,
 })
 
@@ -71,17 +71,17 @@ function StatusPage() {
   const openIncidents = incidents.filter((i) => i.status !== 'resolved')
 
   const content = (
-    <div className="min-h-[calc(100vh-4rem)] p-6 max-w-3xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
-          <Activity className="w-6 h-6 text-bh-accent" aria-hidden="true" />
-          System status
+    <div className="container py-12 max-w-4xl animate-fade-in" data-testid="status-page">
+      <header className="mb-10">
+        <h1 className="text-4xl font-extrabold tracking-tight mb-2 flex items-center gap-3 text-bh-text">
+          <Activity className="w-8 h-8 text-bh-accent" aria-hidden="true" />
+          System Status
         </h1>
-        <p className="text-bh-text-muted">Live status of BuilderHunt services.</p>
+        <p className="text-bh-text-muted text-base">Live status of BuilderHunt services and API latency.</p>
       </header>
 
       <div
-        className={`card p-5 mb-6 ${
+        className={`card p-6 mb-8 border rounded-2xl shadow-sm ${
           allOk
             ? 'border-bh-success/30 bg-bh-success/5'
             : 'border-bh-danger/30 bg-bh-danger/5'

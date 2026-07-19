@@ -9,36 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as StatusRouteImport } from './routes/status'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as RoadmapRouteImport } from './routes/roadmap'
-import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
-import { Route as ExploreIndexRouteImport } from './routes/explore/index'
 import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
-import { Route as BlogIndexRouteImport } from './routes/blog/index'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
 import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
-import { Route as LegalTermsRouteImport } from './routes/legal/terms'
-import { Route as LegalPrivacyRouteImport } from './routes/legal/privacy'
-import { Route as LegalImprintRouteImport } from './routes/legal/imprint'
-import { Route as LegalCookiesRouteImport } from './routes/legal/cookies'
 import { Route as ChangelogSlugRouteImport } from './routes/changelog/$slug'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
 import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
-import { Route as BlogSlugRouteImport } from './routes/blog/$slug'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
 import { Route as AuthSignInRouteImport } from './routes/auth/sign-in'
 import { Route as AuthResetRouteImport } from './routes/auth/reset'
 import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
+import { Route as LandingStatusRouteImport } from './routes/_landing/status'
+import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
+import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
@@ -48,6 +41,8 @@ import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/in
 import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
 import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
 import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
+import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
+import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
@@ -67,6 +62,11 @@ import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/trac
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
+import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
+import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
+import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
+import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
+import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
@@ -101,11 +101,6 @@ import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/inci
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 
-const StatusRoute = StatusRouteImport.update({
-  id: '/status',
-  path: '/status',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
@@ -114,16 +109,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RoadmapRoute = RoadmapRouteImport.update({
-  id: '/roadmap',
-  path: '/roadmap',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PricingRoute = PricingRouteImport.update({
-  id: '/pricing',
-  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChangelogRoute = ChangelogRouteImport.update({
@@ -144,20 +129,10 @@ const DashboardRouteRoute = DashboardRouteRouteImport.update({
   id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ExploreIndexRoute = ExploreIndexRouteImport.update({
-  id: '/explore/',
-  path: '/explore/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ChangelogRoute,
-} as any)
-const BlogIndexRoute = BlogIndexRouteImport.update({
-  id: '/blog/',
-  path: '/blog/',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
@@ -184,26 +159,6 @@ const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
   path: '/onboarding/save',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LegalTermsRoute = LegalTermsRouteImport.update({
-  id: '/legal/terms',
-  path: '/legal/terms',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LegalPrivacyRoute = LegalPrivacyRouteImport.update({
-  id: '/legal/privacy',
-  path: '/legal/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LegalImprintRoute = LegalImprintRouteImport.update({
-  id: '/legal/imprint',
-  path: '/legal/imprint',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LegalCookiesRoute = LegalCookiesRouteImport.update({
-  id: '/legal/cookies',
-  path: '/legal/cookies',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ChangelogSlugRoute = ChangelogSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -217,11 +172,6 @@ const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
 const BlogAtomDotxmlRoute = BlogAtomDotxmlRouteImport.update({
   id: '/blog/atom.xml',
   path: '/blog/atom.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BlogSlugRoute = BlogSlugRouteImport.update({
-  id: '/blog/$slug',
-  path: '/blog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthSignUpRoute = AuthSignUpRouteImport.update({
@@ -248,6 +198,21 @@ const ApiHealthRoute = ApiHealthRouteImport.update({
   id: '/api/health',
   path: '/api/health',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LandingStatusRoute = LandingStatusRouteImport.update({
+  id: '/status',
+  path: '/status',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingRoadmapRoute = LandingRoadmapRouteImport.update({
+  id: '/roadmap',
+  path: '/roadmap',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingPricingRoute = LandingPricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
 const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
   id: '/alerts',
@@ -293,6 +258,16 @@ const ApiAlertsIndexRoute = ApiAlertsIndexRouteImport.update({
   id: '/api/alerts/',
   path: '/api/alerts/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LandingExploreIndexRoute = LandingExploreIndexRouteImport.update({
+  id: '/explore/',
+  path: '/explore/',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
+  id: '/blog/',
+  path: '/blog/',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
   id: '/search/',
@@ -388,6 +363,31 @@ const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
   id: '/api/alerts/test-trigger',
   path: '/api/alerts/test-trigger',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LandingLegalTermsRoute = LandingLegalTermsRouteImport.update({
+  id: '/legal/terms',
+  path: '/legal/terms',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalPrivacyRoute = LandingLegalPrivacyRouteImport.update({
+  id: '/legal/privacy',
+  path: '/legal/privacy',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalImprintRoute = LandingLegalImprintRouteImport.update({
+  id: '/legal/imprint',
+  path: '/legal/imprint',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingLegalCookiesRoute = LandingLegalCookiesRouteImport.update({
+  id: '/legal/cookies',
+  path: '/legal/cookies',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
+  id: '/blog/$slug',
+  path: '/blog/$slug',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
 const DashboardSettingsPrivacyRoute =
   DashboardSettingsPrivacyRouteImport.update({
@@ -566,32 +566,25 @@ export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
-  '/pricing': typeof PricingRoute
-  '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/status': typeof StatusRoute
   '/alerts': typeof DashboardAlertsRoute
+  '/pricing': typeof LandingPricingRoute
+  '/roadmap': typeof LandingRoadmapRoute
+  '/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
-  '/legal/cookies': typeof LegalCookiesRoute
-  '/legal/imprint': typeof LegalImprintRoute
-  '/legal/privacy': typeof LegalPrivacyRoute
-  '/legal/terms': typeof LegalTermsRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/blog/': typeof BlogIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
-  '/explore/': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -600,6 +593,11 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/blog/$slug': typeof LandingBlogSlugRoute
+  '/legal/cookies': typeof LandingLegalCookiesRoute
+  '/legal/imprint': typeof LandingLegalImprintRoute
+  '/legal/privacy': typeof LandingLegalPrivacyRoute
+  '/legal/terms': typeof LandingLegalTermsRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -619,6 +617,8 @@ export interface FileRoutesByFullPath {
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
+  '/blog/': typeof LandingBlogIndexRoute
+  '/explore/': typeof LandingExploreIndexRoute
   '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
@@ -656,32 +656,25 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
-  '/pricing': typeof PricingRoute
-  '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/status': typeof StatusRoute
   '/alerts': typeof DashboardAlertsRoute
+  '/pricing': typeof LandingPricingRoute
+  '/roadmap': typeof LandingRoadmapRoute
+  '/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
-  '/legal/cookies': typeof LegalCookiesRoute
-  '/legal/imprint': typeof LegalImprintRoute
-  '/legal/privacy': typeof LegalPrivacyRoute
-  '/legal/terms': typeof LegalTermsRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/blog': typeof BlogIndexRoute
   '/changelog': typeof ChangelogIndexRoute
-  '/explore': typeof ExploreIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -690,6 +683,11 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/blog/$slug': typeof LandingBlogSlugRoute
+  '/legal/cookies': typeof LandingLegalCookiesRoute
+  '/legal/imprint': typeof LandingLegalImprintRoute
+  '/legal/privacy': typeof LandingLegalPrivacyRoute
+  '/legal/terms': typeof LandingLegalTermsRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -709,6 +707,8 @@ export interface FileRoutesByTo {
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
+  '/blog': typeof LandingBlogIndexRoute
+  '/explore': typeof LandingExploreIndexRoute
   '/api/alerts': typeof ApiAlertsIndexRoute
   '/api/changelog': typeof ApiChangelogIndexRoute
   '/api/consent': typeof ApiConsentIndexRoute
@@ -749,33 +749,26 @@ export interface FileRoutesById {
   '/_landing': typeof LandingRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
   '/changelog': typeof ChangelogRouteWithChildren
-  '/pricing': typeof PricingRoute
-  '/roadmap': typeof RoadmapRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/status': typeof StatusRoute
   '/_dashboard/alerts': typeof DashboardAlertsRoute
+  '/_landing/pricing': typeof LandingPricingRoute
+  '/_landing/roadmap': typeof LandingRoadmapRoute
+  '/_landing/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
   '/auth/reset': typeof AuthResetRoute
   '/auth/sign-in': typeof AuthSignInRoute
   '/auth/sign-up': typeof AuthSignUpRoute
-  '/blog/$slug': typeof BlogSlugRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
   '/changelog/$slug': typeof ChangelogSlugRoute
-  '/legal/cookies': typeof LegalCookiesRoute
-  '/legal/imprint': typeof LegalImprintRoute
-  '/legal/privacy': typeof LegalPrivacyRoute
-  '/legal/terms': typeof LegalTermsRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
-  '/blog/': typeof BlogIndexRoute
   '/changelog/': typeof ChangelogIndexRoute
-  '/explore/': typeof ExploreIndexRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -784,6 +777,11 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/_landing/blog/$slug': typeof LandingBlogSlugRoute
+  '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
+  '/_landing/legal/imprint': typeof LandingLegalImprintRoute
+  '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
+  '/_landing/legal/terms': typeof LandingLegalTermsRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -803,6 +801,8 @@ export interface FileRoutesById {
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
+  '/_landing/blog/': typeof LandingBlogIndexRoute
+  '/_landing/explore/': typeof LandingExploreIndexRoute
   '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
@@ -843,32 +843,25 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/changelog'
-    | '/pricing'
-    | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
-    | '/status'
     | '/alerts'
+    | '/pricing'
+    | '/roadmap'
+    | '/status'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
-    | '/blog/$slug'
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
-    | '/legal/cookies'
-    | '/legal/imprint'
-    | '/legal/privacy'
-    | '/legal/terms'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
-    | '/blog/'
     | '/changelog/'
-    | '/explore/'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -877,6 +870,11 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/blog/$slug'
+    | '/legal/cookies'
+    | '/legal/imprint'
+    | '/legal/privacy'
+    | '/legal/terms'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -896,6 +894,8 @@ export interface FileRouteTypes {
     | '/exports/'
     | '/me/'
     | '/search/'
+    | '/blog/'
+    | '/explore/'
     | '/api/alerts/'
     | '/api/changelog/'
     | '/api/consent/'
@@ -933,32 +933,25 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
-    | '/pricing'
-    | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
-    | '/status'
     | '/alerts'
+    | '/pricing'
+    | '/roadmap'
+    | '/status'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
-    | '/blog/$slug'
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
-    | '/legal/cookies'
-    | '/legal/imprint'
-    | '/legal/privacy'
-    | '/legal/terms'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
-    | '/blog'
     | '/changelog'
-    | '/explore'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -967,6 +960,11 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/blog/$slug'
+    | '/legal/cookies'
+    | '/legal/imprint'
+    | '/legal/privacy'
+    | '/legal/terms'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -986,6 +984,8 @@ export interface FileRouteTypes {
     | '/exports'
     | '/me'
     | '/search'
+    | '/blog'
+    | '/explore'
     | '/api/alerts'
     | '/api/changelog'
     | '/api/consent'
@@ -1025,33 +1025,26 @@ export interface FileRouteTypes {
     | '/_landing'
     | '/auth'
     | '/changelog'
-    | '/pricing'
-    | '/roadmap'
     | '/robots.txt'
     | '/sitemap.xml'
-    | '/status'
     | '/_dashboard/alerts'
+    | '/_landing/pricing'
+    | '/_landing/roadmap'
+    | '/_landing/status'
     | '/api/health'
     | '/auth/forgot'
     | '/auth/reset'
     | '/auth/sign-in'
     | '/auth/sign-up'
-    | '/blog/$slug'
     | '/blog/atom.xml'
     | '/builders/$builderId'
     | '/changelog/$slug'
-    | '/legal/cookies'
-    | '/legal/imprint'
-    | '/legal/privacy'
-    | '/legal/terms'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/_landing/'
-    | '/blog/'
     | '/changelog/'
-    | '/explore/'
     | '/_dashboard/admin/changelog'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
@@ -1060,6 +1053,11 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
+    | '/_landing/blog/$slug'
+    | '/_landing/legal/cookies'
+    | '/_landing/legal/imprint'
+    | '/_landing/legal/privacy'
+    | '/_landing/legal/terms'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -1079,6 +1077,8 @@ export interface FileRouteTypes {
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
+    | '/_landing/blog/'
+    | '/_landing/explore/'
     | '/api/alerts/'
     | '/api/changelog/'
     | '/api/consent/'
@@ -1119,25 +1119,15 @@ export interface RootRouteChildren {
   LandingRouteRoute: typeof LandingRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
   ChangelogRoute: typeof ChangelogRouteWithChildren
-  PricingRoute: typeof PricingRoute
-  RoadmapRoute: typeof RoadmapRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  StatusRoute: typeof StatusRoute
   ApiHealthRoute: typeof ApiHealthRoute
-  BlogSlugRoute: typeof BlogSlugRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
-  LegalCookiesRoute: typeof LegalCookiesRoute
-  LegalImprintRoute: typeof LegalImprintRoute
-  LegalPrivacyRoute: typeof LegalPrivacyRoute
-  LegalTermsRoute: typeof LegalTermsRoute
   OnboardingSaveRoute: typeof OnboardingSaveRoute
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
-  BlogIndexRoute: typeof BlogIndexRoute
-  ExploreIndexRoute: typeof ExploreIndexRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
@@ -1187,13 +1177,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/status': {
-      id: '/status'
-      path: '/status'
-      fullPath: '/status'
-      preLoaderRoute: typeof StatusRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
@@ -1206,20 +1189,6 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/roadmap': {
-      id: '/roadmap'
-      path: '/roadmap'
-      fullPath: '/roadmap'
-      preLoaderRoute: typeof RoadmapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/pricing': {
-      id: '/pricing'
-      path: '/pricing'
-      fullPath: '/pricing'
-      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/changelog': {
@@ -1250,26 +1219,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/explore/': {
-      id: '/explore/'
-      path: '/explore'
-      fullPath: '/explore/'
-      preLoaderRoute: typeof ExploreIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/changelog/': {
       id: '/changelog/'
       path: '/'
       fullPath: '/changelog/'
       preLoaderRoute: typeof ChangelogIndexRouteImport
       parentRoute: typeof ChangelogRoute
-    }
-    '/blog/': {
-      id: '/blog/'
-      path: '/blog'
-      fullPath: '/blog/'
-      preLoaderRoute: typeof BlogIndexRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/_landing/': {
       id: '/_landing/'
@@ -1306,34 +1261,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingSaveRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/legal/terms': {
-      id: '/legal/terms'
-      path: '/legal/terms'
-      fullPath: '/legal/terms'
-      preLoaderRoute: typeof LegalTermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/legal/privacy': {
-      id: '/legal/privacy'
-      path: '/legal/privacy'
-      fullPath: '/legal/privacy'
-      preLoaderRoute: typeof LegalPrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/legal/imprint': {
-      id: '/legal/imprint'
-      path: '/legal/imprint'
-      fullPath: '/legal/imprint'
-      preLoaderRoute: typeof LegalImprintRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/legal/cookies': {
-      id: '/legal/cookies'
-      path: '/legal/cookies'
-      fullPath: '/legal/cookies'
-      preLoaderRoute: typeof LegalCookiesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/changelog/$slug': {
       id: '/changelog/$slug'
       path: '/$slug'
@@ -1353,13 +1280,6 @@ declare module '@tanstack/react-router' {
       path: '/blog/atom.xml'
       fullPath: '/blog/atom.xml'
       preLoaderRoute: typeof BlogAtomDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/blog/$slug': {
-      id: '/blog/$slug'
-      path: '/blog/$slug'
-      fullPath: '/blog/$slug'
-      preLoaderRoute: typeof BlogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth/sign-up': {
@@ -1396,6 +1316,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/health'
       preLoaderRoute: typeof ApiHealthRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_landing/status': {
+      id: '/_landing/status'
+      path: '/status'
+      fullPath: '/status'
+      preLoaderRoute: typeof LandingStatusRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/roadmap': {
+      id: '/_landing/roadmap'
+      path: '/roadmap'
+      fullPath: '/roadmap'
+      preLoaderRoute: typeof LandingRoadmapRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/pricing': {
+      id: '/_landing/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof LandingPricingRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
     '/_dashboard/alerts': {
       id: '/_dashboard/alerts'
@@ -1459,6 +1400,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/alerts/'
       preLoaderRoute: typeof ApiAlertsIndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_landing/explore/': {
+      id: '/_landing/explore/'
+      path: '/explore'
+      fullPath: '/explore/'
+      preLoaderRoute: typeof LandingExploreIndexRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/blog/': {
+      id: '/_landing/blog/'
+      path: '/blog'
+      fullPath: '/blog/'
+      preLoaderRoute: typeof LandingBlogIndexRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
     '/_dashboard/search/': {
       id: '/_dashboard/search/'
@@ -1592,6 +1547,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/alerts/test-trigger'
       preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_landing/legal/terms': {
+      id: '/_landing/legal/terms'
+      path: '/legal/terms'
+      fullPath: '/legal/terms'
+      preLoaderRoute: typeof LandingLegalTermsRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/privacy': {
+      id: '/_landing/legal/privacy'
+      path: '/legal/privacy'
+      fullPath: '/legal/privacy'
+      preLoaderRoute: typeof LandingLegalPrivacyRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/imprint': {
+      id: '/_landing/legal/imprint'
+      path: '/legal/imprint'
+      fullPath: '/legal/imprint'
+      preLoaderRoute: typeof LandingLegalImprintRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/legal/cookies': {
+      id: '/_landing/legal/cookies'
+      path: '/legal/cookies'
+      fullPath: '/legal/cookies'
+      preLoaderRoute: typeof LandingLegalCookiesRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/blog/$slug': {
+      id: '/_landing/blog/$slug'
+      path: '/blog/$slug'
+      fullPath: '/blog/$slug'
+      preLoaderRoute: typeof LandingBlogSlugRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
     '/_dashboard/settings/privacy': {
       id: '/_dashboard/settings/privacy'
@@ -1866,11 +1856,31 @@ const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
 )
 
 interface LandingRouteRouteChildren {
+  LandingPricingRoute: typeof LandingPricingRoute
+  LandingRoadmapRoute: typeof LandingRoadmapRoute
+  LandingStatusRoute: typeof LandingStatusRoute
   LandingIndexRoute: typeof LandingIndexRoute
+  LandingBlogSlugRoute: typeof LandingBlogSlugRoute
+  LandingLegalCookiesRoute: typeof LandingLegalCookiesRoute
+  LandingLegalImprintRoute: typeof LandingLegalImprintRoute
+  LandingLegalPrivacyRoute: typeof LandingLegalPrivacyRoute
+  LandingLegalTermsRoute: typeof LandingLegalTermsRoute
+  LandingBlogIndexRoute: typeof LandingBlogIndexRoute
+  LandingExploreIndexRoute: typeof LandingExploreIndexRoute
 }
 
 const LandingRouteRouteChildren: LandingRouteRouteChildren = {
+  LandingPricingRoute: LandingPricingRoute,
+  LandingRoadmapRoute: LandingRoadmapRoute,
+  LandingStatusRoute: LandingStatusRoute,
   LandingIndexRoute: LandingIndexRoute,
+  LandingBlogSlugRoute: LandingBlogSlugRoute,
+  LandingLegalCookiesRoute: LandingLegalCookiesRoute,
+  LandingLegalImprintRoute: LandingLegalImprintRoute,
+  LandingLegalPrivacyRoute: LandingLegalPrivacyRoute,
+  LandingLegalTermsRoute: LandingLegalTermsRoute,
+  LandingBlogIndexRoute: LandingBlogIndexRoute,
+  LandingExploreIndexRoute: LandingExploreIndexRoute,
 }
 
 const LandingRouteRouteWithChildren = LandingRouteRoute._addFileChildren(
@@ -1927,25 +1937,15 @@ const rootRouteChildren: RootRouteChildren = {
   LandingRouteRoute: LandingRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
   ChangelogRoute: ChangelogRouteWithChildren,
-  PricingRoute: PricingRoute,
-  RoadmapRoute: RoadmapRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  StatusRoute: StatusRoute,
   ApiHealthRoute: ApiHealthRoute,
-  BlogSlugRoute: BlogSlugRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
-  LegalCookiesRoute: LegalCookiesRoute,
-  LegalImprintRoute: LegalImprintRoute,
-  LegalPrivacyRoute: LegalPrivacyRoute,
-  LegalTermsRoute: LegalTermsRoute,
   OnboardingSaveRoute: OnboardingSaveRoute,
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
-  BlogIndexRoute: BlogIndexRoute,
-  ExploreIndexRoute: ExploreIndexRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,

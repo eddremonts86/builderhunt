@@ -19,7 +19,6 @@ export async function getTrackedKeySet(userId: string): Promise<Set<string>> {
     .where(eq(builders.userId, userId))
   return new Set(rows.map((r) => trackedKey(r.source, r.sourceId)))
 }
-
 /**
  * Same lookup as `getTrackedKeySet`, but keyed to each row's own `builders.id`
  * instead of a plain Set — callers that need to *act* on an already-tracked

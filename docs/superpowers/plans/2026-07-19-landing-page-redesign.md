@@ -1,104 +1,115 @@
-import * as React from 'react'
-import { Link } from '@tanstack/react-router'
-import { LinkButton } from '~/components/ui'
-import {
-  Sparkles, Target, Mail, ArrowRight, Check, Search,
-  Bell, FileText, Download, Zap, Shield, Star
-} from 'lucide-react'
-import { useSession } from '~/shared/lib/auth/client'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
-import { FAQSection } from './FAQSection'
+# Landing Page Redesign Implementation Plan
 
-export function HomePage() {
-  const session = useSession()
-  const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
-  const isAuthed = !!session.data?.user
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-  return (
-    <>
-      <div id="main-content">
-        {/* ───────────────────────── HERO ───────────────────────── */}
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-grid" aria-hidden="true" />
-          <div className="container section-lg relative">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div>
-                <span className="eyebrow mb-6 inline-flex animate-fade-in">
-                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
-                  Public beta · Free during beta
-                </span>
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[1.05] mb-6 animate-fade-in-up">
-                  Find <span className="text-gradient-accent">builders</span>,<br />
-                  not just repos.
-                </h1>
-                <p className="text-lg md:text-xl text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
-                  BuilderHunt aggregates public activity from GitHub, Reddit, Hacker News and DEV.to,
-                  scores it for recency, and lets you save searches, get email alerts, and track the
-                  people shipping the work — not just the repositories.
-                </p>
-                <div className="flex flex-wrap items-center gap-3 mb-8 animate-fade-in-up">
-                  {isAuthed ? (
-                    <LinkButton to="/dashboard" variant="primary" className="btn-lg">
-                      Go to dashboard <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                    </LinkButton>
-                  ) : (
-                    <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
-                      Start hunting <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                    </LinkButton>
-                  )}
-                  <a href="#how-it-works" className="btn-secondary btn-lg">See how it works</a>
-                </div>
-                <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-bh-text-muted animate-fade-in">
-                  {['No credit card', 'OAuth-free', 'Email or RSS alerts'].map((t) => (
-                    <li key={t} className="flex items-center gap-1.5">
-                      <Check className="w-4 h-4 text-bh-success" aria-hidden="true" /> {t}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+**Goal:** Redesign the BuilderHunt landing page to make it visually spectacular, warm-light themed, responsive, and interactive across five key sections.
 
-              <div className="relative animate-fade-in-up" style={{ animationDelay: '120ms' }}>
-                <div className="card-glow">
-                  <div className="p-2">
-                    <img
-                      src="/images/search-desktop.png"
-                      alt="BuilderHunt's search page: 118 real results for “react” across GitHub, Reddit and other sources, each with a match score."
-                      width={1280}
-                      height={973}
-                      loading="eager"
-                      decoding="async"
-                      className="rounded-xl w-full h-auto"
-                    />
-                  </div>
-                </div>
+**Architecture:** Use CSS keyframe animations for the marquee, CSS Grid/subgrid for bento styling, React hooks/state for interactive tab elements, and inline SVGs/components for visual mockups in the timeline and bento cards.
 
-                {/* Real mobile screenshot, peeking from the corner — same live
-                    results, proof the product (not a mockup) works on any screen. */}
-                <div
-                  className="hidden lg:block absolute -bottom-10 -right-10 w-36 rounded-[20px] border-4 border-bh-surface bg-bh-surface shadow-2xl overflow-hidden animate-fade-in-up"
-                  style={{ animationDelay: '360ms' }}
-                >
-                  <img
-                    src="/images/search-mobile.png"
-                    alt="The same search results on a phone."
-                    width={360}
-                    height={220}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-44 object-cover object-top"
-                  />
-                </div>
+**Tech Stack:** React 19, Tailwind CSS v4, Lucide Icons, Playwright for E2E testing.
 
-                {/* One real, live signal — not decorative chips duplicating what's already on screen. */}
-                <div className="hidden md:flex absolute -left-6 top-10 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '500ms' }}>
-                  <GithubIcon className="w-4 h-4 text-bh-github" title="GitHub" />
-                  <span className="text-xs font-medium">+128 stars / 7d</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
+## Global Constraints
+- Target visual theme: Warm-light (cream backgrounds, terracotta accent `#e07338`).
+- Maintain WCAG AA contrast ratio (> 4.5:1) for all text.
+- Do not modify any core database schema or auth logic; focus purely on landing page UI elements.
 
+---
+
+### Task 1: CSS Animations & Design Tokens Setup
+
+**Files:**
+- Modify: `src/shared/styles/globals.css`
+
+**Interfaces:**
+- Consumes: None
+- Produces: CSS utility classes for infinite scrolling marquee, custom animations, bento styling, and glow effects.
+
+- [ ] **Step 1: Write CSS rules in globals.css**
+
+Add the following classes and keyframes to the end of `src/shared/styles/globals.css` (lines 446+):
+
+```css
+/* Infinite Scrolling Marquee */
+.marquee-container {
+  display: flex;
+  overflow: hidden;
+  user-select: none;
+  gap: 2rem;
+  mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 15%, black 85%, transparent);
+}
+
+.marquee-content {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2rem;
+  align-items: center;
+  justify-content: space-around;
+  min-inline-size: 100%;
+  animation: scroll-marquee 30s linear infinite;
+}
+
+.marquee-container:hover .marquee-content {
+  animation-play-state: paused;
+}
+
+@keyframes scroll-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - 2rem)); }
+}
+
+/* Hover border-glow and card lifts */
+.card-premium-glow {
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s;
+}
+
+.card-premium-glow:hover {
+  transform: translateY(-4px);
+  border-color: var(--color-bh-accent) !important;
+  box-shadow: 0 12px 30px -10px rgba(224, 115, 56, 0.15) !important;
+}
+
+/* Timeline vertical/horizontal lines */
+.timeline-dot {
+  position: relative;
+  z-index: 10;
+}
+
+.timeline-line {
+  position: absolute;
+  background-image: repeating-linear-gradient(90deg, var(--color-bh-border), var(--color-bh-border) 6px, transparent 6px, transparent 12px);
+}
+```
+
+- [ ] **Step 2: Verify globals.css is error-free**
+
+Run: `pnpm build`
+Expected: Success build.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/shared/styles/globals.css
+git commit -m "style(theme): add marquee keyframes and premium card glow utilities"
+```
+
+---
+
+### Task 2: Redesign Social Proof Bar (Area 1)
+
+**Files:**
+- Modify: `src/modules/landing/components/HomePage.tsx:200-220`
+
+**Interfaces:**
+- Consumes: Tailwind styles from Task 1.
+- Produces: Autoscrolling social proof bar showing source activity.
+
+- [ ] **Step 1: Replace standard text columns with continuous marquee**
+
+Update the social proof section inside `src/modules/landing/components/HomePage.tsx`:
+
+```tsx
         {/* ───────────────────── SOCIAL PROOF ───────────────────── */}
         <section className="border-y border-bh-border bg-bh-bg-alt/30 py-8 overflow-hidden">
           <div className="container">
@@ -149,23 +160,36 @@ export function HomePage() {
             </div>
           </div>
         </section>
+```
 
-        {/* ─────────────────── HOW IT WORKS ────────────────────── */}
-        <section id="how-it-works" className="section">
-          <div className="container">
-            <div className="max-w-2xl mx-auto text-center mb-16">
-              <span className="eyebrow-neutral mb-4 inline-flex">
-                <Target className="w-3.5 h-3.5" aria-hidden="true" /> How it works
-              </span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Three steps from keyword to shortlist.
-              </h2>
-              <p className="text-lg text-bh-text-muted">
-                Stop scrolling timelines. Define what you're looking for, let BuilderHunt
-                do the discovery, and only review the people worth your attention.
-              </p>
-            </div>
+- [ ] **Step 2: Verify local build**
 
+Run: `pnpm build`
+Expected: Success build.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/modules/landing/components/HomePage.tsx
+git commit -m "feat(landing): implement continuous infinite-scrolling social proof bar"
+```
+
+---
+
+### Task 3: Redesign Three Steps Timeline (Area 2)
+
+**Files:**
+- Modify: `src/modules/landing/components/HomePage.tsx:238-272`
+
+**Interfaces:**
+- Consumes: Icons from `lucide-react`.
+- Produces: Timeline component layout connecting the 3 steps with visual previews.
+
+- [ ] **Step 1: Replace steps cards with connected timeline & product previews**
+
+Update the "How it works" section cards in `src/modules/landing/components/HomePage.tsx` to use the timeline format:
+
+```tsx
             <div className="relative">
               {/* Dotted Connection Line for desktop */}
               <div className="hidden md:block absolute top-24 left-[15%] right-[15%] h-0.5 border-t-2 border-dashed border-bh-border/80 z-0" aria-hidden="true" />
@@ -214,12 +238,12 @@ export function HomePage() {
                     icon: Bell,
                     preview: (
                       <div className="bg-bh-bg/50 border border-bh-border/60 rounded-xl p-3 mt-4 flex justify-between gap-1.5">
-                        <span className="flex-1 bg-bh-surface border border-bh-border rounded-lg py-1 px-1.5 text-[10px] font-bold text-bh-text-muted inline-flex items-center justify-center gap-1">
+                        <button type="button" className="flex-1 bg-bh-surface border border-bh-border rounded-lg py-1 px-1.5 text-[10px] font-bold text-bh-text-muted hover:border-bh-border-strong inline-flex items-center justify-center gap-1">
                           <Download className="w-3 h-3" /> Export
-                        </span>
-                        <span className="flex-1 bg-bh-accent text-white rounded-lg py-1 px-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1">
+                        </button>
+                        <button type="button" className="flex-1 bg-bh-accent text-white rounded-lg py-1 px-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1">
                           <Bell className="w-3 h-3" /> Alerts
-                        </span>
+                        </button>
                       </div>
                     )
                   },
@@ -240,25 +264,35 @@ export function HomePage() {
                 ))}
               </ol>
             </div>
-          </div>
-        </section>
+```
 
-        {/* ───────────────────── FEATURE GRID ──────────────────── */}
-        <section className="section bg-bh-bg-alt/30 border-y border-bh-border">
-          <div className="container">
-            <div className="max-w-2xl mb-16">
-              <span className="eyebrow mb-4 inline-flex">
-                <Zap className="w-3.5 h-3.5" aria-hidden="true" /> Features
-              </span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Built for the people who build things.
-              </h2>
-              <p className="text-lg text-bh-text-muted">
-                No fluff. Every feature exists because it makes finding, scoring, and tracking
-                builders faster than doing it by hand.
-              </p>
-            </div>
+- [ ] **Step 2: Verify local build**
 
+Run: `pnpm build`
+Expected: Success build.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -a -m "feat(landing): replace static steps with interactive connected timeline and product previews"
+```
+
+---
+
+### Task 4: Implement Features Bento Grid (Area 3)
+
+**Files:**
+- Modify: `src/modules/landing/components/HomePage.tsx:292-334`
+
+**Interfaces:**
+- Consumes: Icons from `lucide-react`.
+- Produces: Layout featuring 2 wider Bento cards with inline SVG graphics and 4 standard cards.
+
+- [ ] **Step 1: Replace feature grid with bento grid structure**
+
+Update the feature grid section in `src/modules/landing/components/HomePage.tsx`:
+
+```tsx
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Feature 1: Multi-source discovery (Bento Large) */}
               <article className="card card-premium-glow md:col-span-2 flex flex-col justify-between bg-bh-surface p-6">
@@ -348,9 +382,43 @@ export function HomePage() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
+```
 
+- [ ] **Step 2: Verify local build**
+
+Run: `pnpm build`
+Expected: Success build.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git commit -a -m "feat(landing): convert standard grid to interactive Bento Grid with SVG visual charts"
+```
+
+---
+
+### Task 5: Implement Use Cases Persona Selector (Area 4)
+
+**Files:**
+- Modify: `src/modules/landing/components/HomePage.tsx:349-386`
+
+**Interfaces:**
+- Consumes: Icons from `lucide-react`, React hooks state.
+- Produces: Interactive tab component updating the selected persona preview layout.
+
+- [ ] **Step 1: Write tab state & persona selection logic**
+
+Inside the `HomePage` component code (lines 30+), add the selected persona state:
+
+```tsx
+  const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
+```
+
+- [ ] **Step 2: Replace Use Cases list with tabbed interface layout**
+
+Update the use cases section in `src/modules/landing/components/HomePage.tsx`:
+
+```tsx
         {/* ───────────────────── USE CASES ─────────────────────── */}
         <section id="use-cases" className="section bg-bh-surface">
           <div className="container">
@@ -500,100 +568,36 @@ export function HomePage() {
             </div>
           </div>
         </section>
+```
 
-        {/* ───────────────────── SOURCES ───────────────────────── */}
-        <section id="sources" className="section border-t border-bh-border">
-          <div className="container">
-            <div className="max-w-2xl mb-16">
-              <span className="eyebrow mb-4 inline-flex">
-                <GithubIcon className="w-3.5 h-3.5" title="GitHub" /> Sources
-              </span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Signal from the four places builders actually are.
-              </h2>
-              <p className="text-lg text-bh-text-muted">
-                All sources work without API tokens. Add a GitHub token (optional) to lift rate limits
-                on heavier searches.
-              </p>
-            </div>
+- [ ] **Step 3: Verify local build**
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { name: 'GitHub', color: 'badge-github', Icon: GithubIcon, desc: 'Stars, forks, PRs, releases, language mix, commit recency.' },
-                { name: 'Reddit', color: 'badge-reddit', Icon: RedditIcon, desc: 'Subreddit karma, top posts, comment velocity in dev subs.' },
-                { name: 'Hacker News', color: 'badge-hn', Icon: HackerNewsIcon, desc: 'Submission upvotes, comment karma, top-story activity.' },
-                { name: 'DEV.to', color: 'badge-devto', Icon: DevToIcon, desc: 'Article publishes, reactions, follow counts, tag mix.' },
-              ].map((s) => (
-                <article key={s.name} className="card">
-                  <span className={`badge ${s.color} mb-3 inline-flex items-center gap-1.5`}>
-                    <s.Icon className="w-3 h-3" title={s.name} /> {s.name}
-                  </span>
-                  <p className="text-bh-text-muted text-sm leading-relaxed">{s.desc}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
+Run: `pnpm build`
+Expected: Success build.
 
-        {/* ───────────────────── TESTIMONIAL ────────────────────── */}
-        <section className="section border-t border-bh-border bg-bh-bg-alt/30">
-          <div className="container-narrow text-center">
-            <div className="flex justify-center gap-1 mb-6" aria-label="5 out of 5 stars">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-5 h-5 fill-bh-warning text-bh-warning" aria-hidden="true" />
-              ))}
-            </div>
-            <blockquote className="text-2xl md:text-3xl font-medium leading-snug mb-6">
-              "I spent two hours a week curating a list of contributors for our OSS project.
-              BuilderHunt does it in the background and pings me when someone new is worth a look.
-              It paid for itself in the first week."
-            </blockquote>
-            <footer className="text-bh-text-muted text-sm">
-              — <cite>Beta user</cite> · open-source maintainer, Rust tooling
-            </footer>
-          </div>
-        </section>
+- [ ] **Step 4: Commit**
 
-        {/* ───────────────────── FAQ ───────────────────────────── */}
-        <section id="faq" className="section">
-          <div className="container-narrow">
-            <div className="text-center mb-12">
-              <span className="eyebrow-neutral mb-4 inline-flex">FAQ</span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Common questions.
-              </h2>
-            </div>
+```bash
+git commit -a -m "feat(landing): replace use cases static cards with interactive persona tab selector"
+```
 
-            <FAQSection />
-          </div>
-        </section>
+---
 
-        {/* ───────────────────── FINAL CTA ─────────────────────── */}
-        <section className="section border-t border-bh-border bg-gradient-to-b from-bh-bg-alt/40 to-bh-bg">
-          <div className="container-narrow text-center">
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-              Start hunting the right builders.
-            </h2>
-            <p className="text-lg text-bh-text-muted max-w-xl mx-auto mb-8">
-              Free during public beta. Set up your first hunt in under a minute — no credit card,
-              no demo call, no waiting list.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {isAuthed ? (
-                <LinkButton to="/dashboard" variant="primary" className="btn-lg">
-                  Go to dashboard <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                </LinkButton>
-              ) : (
-                <>
-                  <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
-                    Create free account <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </LinkButton>
-                  <LinkButton to="/auth/sign-in" variant="secondary" className="btn-lg">
-                    I already have an account
-                  </LinkButton>
-                </>
-              )}
-            </div>
+### Task 6: Premium Footer & Newsletter Signup (Area 5 & 4)
+
+**Files:**
+- Modify: `src/shared/components/Footer.tsx:17-73`
+- Modify: `src/modules/landing/components/HomePage.tsx:482-487`
+
+**Interfaces:**
+- Consumes: Tailwind styles.
+- Produces: Re-styled footer component and dynamic newsletter signup box on the landing page CTA.
+
+- [ ] **Step 1: Add newsletter signup form input to the landing CTA**
+
+Update the email signup text in the CTA area of `src/modules/landing/components/HomePage.tsx` (around lines 480+):
+
+```tsx
             <div className="max-w-md mx-auto mt-8 p-1 bg-bh-surface border border-bh-border/80 rounded-xl flex shadow-sm focus-within:ring-2 focus-within:ring-bh-accent/40 focus-within:border-bh-accent transition-all">
               <input
                 type="email"
@@ -608,9 +612,185 @@ export function HomePage() {
             <p className="text-xs text-bh-text-dim mt-3">
               We send launch updates and feature summaries. No spam, unsubscribe anytime.
             </p>
+```
+
+- [ ] **Step 2: Restructure the Footer layout**
+
+Update the `Footer` component in `src/shared/components/Footer.tsx` (lines 17-73):
+
+```tsx
+export function Footer() {
+  return (
+    <footer className="border-t border-bh-border bg-bh-bg-alt/30" data-testid="site-footer">
+      <div className="container py-16">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-12 mb-12">
+          <div className="lg:col-span-2">
+            <Link to="/" className="flex items-center gap-2.5 mb-4 group">
+              <Logo size={28} />
+              <span className="font-bold text-lg tracking-tight group-hover:text-bh-accent transition-colors">BuilderHunt</span>
+            </Link>
+            <p className="text-sm text-bh-text-muted max-w-sm leading-relaxed">
+              Find active open-source builders across the open web. Track GitHub stars, Hacker News comments, and Reddit velocity from one clean dashboard.
+            </p>
           </div>
-        </section>
+          <div>
+            <h3 className="font-bold text-bh-text mb-4 text-xs uppercase tracking-wider">Product</h3>
+            <ul className="space-y-2.5 text-sm text-bh-text-muted">
+              <li><Link to="/explore" className="hover:text-bh-accent transition-colors" data-testid="footer-explore">Explore Profiles</Link></li>
+              <li><Link to="/blog" className="hover:text-bh-accent transition-colors" data-testid="footer-blog">Blog & Case Studies</Link></li>
+              <li><Link to="/pricing" className="hover:text-bh-accent transition-colors" data-testid="footer-pricing">Pricing Plans</Link></li>
+              <li><a href="/#how-it-works" className="hover:text-bh-accent transition-colors">How it works</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-bold text-bh-text mb-4 text-xs uppercase tracking-wider">Trust & Legal</h3>
+            <ul className="space-y-2.5 text-sm text-bh-text-muted">
+              <li>
+                <Link to="/status" className="hover:text-bh-accent transition-colors inline-flex items-center gap-1.5" data-testid="footer-status">
+                  <span className="w-1.5 h-1.5 rounded-full bg-bh-success inline-block" aria-hidden="true" />
+                  Status
+                </Link>
+              </li>
+              <li><Link to="/changelog" className="hover:text-bh-accent transition-colors" data-testid="footer-changelog">Changelog</Link></li>
+              <li><Link to="/legal/terms" className="hover:text-bh-accent transition-colors" data-testid="footer-terms">Terms of Service</Link></li>
+              <li><Link to="/legal/privacy" className="hover:text-bh-accent transition-colors" data-testid="footer-privacy">Privacy Policy</Link></li>
+            </ul>
+          </div>
+          <div>
+            <h3 className="font-bold text-bh-text mb-4 text-xs uppercase tracking-wider">Contact</h3>
+            <ul className="space-y-2.5 text-sm text-bh-text-muted">
+              <li><a href="mailto:privacy@builderhunt.dev" className="hover:text-bh-accent transition-colors" data-testid="footer-do-not-sell">Do Not Sell My Info</a></li>
+              <li><a href="mailto:support@builderhunt.dev" className="hover:text-bh-accent transition-colors">Get Support</a></li>
+              <li><span className="text-xs bg-bh-accent-soft border border-bh-accent/20 text-bh-accent px-2 py-0.5 rounded-full font-bold">Beta version</span></li>
+            </ul>
+          </div>
+        </div>
+        <div className="pt-8 border-t border-bh-border/65 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-bh-text-dim">
+          <p>© {new Date().getFullYear()} BuilderHunt. Built for builders, by builders.</p>
+          <p>Made with ☕ in Barcelona, Madrid &amp; remote.</p>
+        </div>
       </div>
-    </>
+    </footer>
   )
 }
+```
+
+- [ ] **Step 3: Verify local build**
+
+Run: `pnpm build`
+Expected: Success build.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git commit -a -m "feat(footer): redesign footer with premium spacing, columns, and newsletter signup box"
+```
+
+---
+
+### Task 7: E2E Testing & Visual Verification
+
+**Files:**
+- Create: `test/test-landing-redesign.mjs`
+
+**Interfaces:**
+- Consumes: Running dev server.
+- Produces: E2E test confirmation verifying elements exist and interactive tabs work.
+
+- [ ] **Step 1: Create E2E test script**
+
+Create `test/test-landing-redesign.mjs`:
+
+```javascript
+// E2E verification test for the landing page redesign
+import { chromium } from 'playwright'
+
+const BASE = 'http://localhost:3000'
+
+async function run() {
+  console.log('🚀 Running E2E verification for Landing Page Redesign...')
+  const browser = await chromium.launch()
+  const context = await browser.newContext({ viewport: { width: 1400, height: 900 } })
+  const page = await context.newPage()
+
+  // 1. Visit homepage
+  await page.goto(BASE, { waitUntil: 'networkidle' })
+  await page.waitForTimeout(500)
+
+  // 2. Check Marquee exists
+  const marquee = await page.$('.marquee-container')
+  if (marquee) {
+    console.log('✅ Marquee container is present.')
+  } else {
+    throw new Error('❌ Marquee container not found!')
+  }
+
+  // 3. Check Timeline elements are present
+  const steps = await page.$$('li.card-premium-glow')
+  if (steps.length >= 3) {
+    console.log(`✅ Steps timeline contains cards. Count: ${steps.length}`)
+  } else {
+    throw new Error(`❌ Timeline step card count mismatch! Found: ${steps.length}`)
+  }
+
+  // 4. Check Bento grid feature cards
+  const bentoScoring = await page.$('text:has-text("Recency-weighted scoring")')
+  if (bentoScoring) {
+    console.log('✅ Bento feature card: Recency-weighted scoring is present.')
+  }
+
+  // 5. Check Persona selection interactive tabs
+  const tabButton = await page.$('button:has-text("Founders sourcing hires")')
+  if (tabButton) {
+    console.log('✅ Persona tabs found. Clicking second tab...')
+    await tabButton.click()
+    await page.waitForTimeout(500)
+    
+    // Check panel has updated
+    const updatedPane = await page.$('text:has-text("Saved Candidate Hunt")')
+    if (updatedPane) {
+      console.log('✅ Persona interactive pane updated successfully on tab click!')
+    } else {
+      throw new Error('❌ Interactive showcase did not update correctly!')
+    }
+  } else {
+    throw new Error('❌ Persona tabs not found!')
+  }
+
+  // 6. Check newsletter form and footer
+  const signupInput = await page.$('input[aria-label="Newsletter email input"]')
+  if (signupInput) {
+    console.log('✅ Newsletter email signup is present.')
+  } else {
+    throw new Error('❌ Newsletter input not found!')
+  }
+
+  const footer = await page.$('[data-testid="site-footer"]')
+  if (footer) {
+    console.log('✅ Redesigned footer is present.')
+  } else {
+    throw new Error('❌ Site footer not found!')
+  }
+
+  await browser.close()
+  console.log('🎉 All E2E landing page verification tests passed!')
+  process.exit(0)
+}
+
+run().catch((e) => {
+  console.error('❌ E2E Verification failed:', e)
+  process.exit(1)
+})
+```
+
+- [ ] **Step 2: Start dev server in background and run E2E test**
+
+Run: `node test/test-landing-redesign.mjs`
+Expected: "All E2E landing page verification tests passed!" output.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add test/test-landing-redesign.mjs
+git commit -m "test(landing): add E2E verification tests for redesigned sections"
+```
