@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { Scale } from 'lucide-react'
 
-export const Route = createFileRoute('/legal/terms')({
+export const Route = createFileRoute('/_landing/legal/terms')({
   component: TermsPage,
   head: () => ({
     meta: [
@@ -65,22 +65,23 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
 
 function TermsPage() {
   return (
-    <article className="min-h-[calc(100vh-4rem)] p-6 max-w-3xl mx-auto" data-testid="legal-terms">
-      <Link to="/" className="btn-ghost btn-sm mb-4 inline-flex">← Back to home</Link>
-      <header className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3 mb-2">
-          <Scale className="w-7 h-7 text-bh-accent" aria-hidden="true" />
-          Terms of Service
-        </h1>
-        <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-16</p>
-      </header>
-      <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
-        {SECTIONS.map((s) => (
-          <section key={s.heading}>
-            <h2 className="text-lg font-semibold text-bh-text mb-2">{s.heading}</h2>
-            <p className="whitespace-pre-line">{s.body}</p>
-          </section>
-        ))}
+    <article className="container py-12 max-w-4xl animate-fade-in" data-testid="legal-terms">
+      <div className="card p-8 md:p-12 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm">
+        <header className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight flex items-center gap-3 mb-2">
+            <Scale className="w-7 h-7 text-bh-accent" aria-hidden="true" />
+            Terms of Service
+          </h1>
+          <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-16</p>
+        </header>
+        <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
+          {SECTIONS.map((s) => (
+            <section key={s.heading} className="pt-6 border-t border-bh-border/40 first:border-0 first:pt-0">
+              <h2 className="text-lg font-bold text-bh-text mb-3">{s.heading}</h2>
+              <p className="whitespace-pre-line">{s.body}</p>
+            </section>
+          ))}
+        </div>
       </div>
     </article>
   )

@@ -1,120 +1,22 @@
 import * as React from 'react'
-import { Link, useNavigate } from '@tanstack/react-router'
+import { Link } from '@tanstack/react-router'
 import { LinkButton } from '~/components/ui'
 import {
-  Search, Bell, FileText, Download, Sparkles, Target, Mail,
-  Zap, Shield, ArrowRight, Check, Star, LayoutDashboard, LogOut,
+  Sparkles, Target, Mail, ArrowRight, Check, Search,
+  Bell, FileText, Download, Zap, Shield, Star
 } from 'lucide-react'
-import { useSession, signOut } from '~/shared/lib/auth/client'
+import { useSession } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
-import { Footer } from '~/shared/components/Footer'
-import { BackToTop } from '~/shared/components/BackToTop'
-import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
-import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
-import { useScrollSpy } from '~/shared/lib/useScrollSpy'
-
-const NAV_LINKS = [
-  { id: 'how-it-works', label: 'How it works' },
-  { id: 'use-cases', label: 'Use cases' },
-  { id: 'sources', label: 'Sources' },
-  { id: 'faq', label: 'FAQ' },
-] as const
-const NAV_SECTION_IDS = NAV_LINKS.map((l) => l.id)
 
 export function HomePage() {
   const session = useSession()
-  const navigate = useNavigate()
-  const [signingOut, setSigningOut] = React.useState(false)
-  const pillRowRef = React.useRef<HTMLUListElement>(null)
-  const activeSection = useScrollSpy(NAV_SECTION_IDS)
-  const indicator = useSlidingIndicator(pillRowRef, [activeSection])
   const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
-
-  const handleSignOut = async () => {
-    setSigningOut(true)
-    try {
-      await signOut()
-    } finally {
-      navigate({ to: '/' })
-    }
-  }
-
   const isAuthed = !!session.data?.user
 
   return (
     <>
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/*  Skip target for the "Skip to main content" link                */}
-      {/* ──────────────────────────────────────────────────────────────── */}
-      {/* Floating topbar — identical shell to the dashboard's: fixed,
-          inset-x-stretched, px-2 py-1.5, same 3-zone `justify-between`
-          layout (logo | links | auth). Padding lives on the header itself
-          here too (not on an inner nav with its own fixed height), so both
-          shells resolve to the same total height from the same rules. */}
-      <header
-        className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-1.5 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg px-2 py-1.5"
-        aria-label="Primary"
-      >
-        <Link to="/" className="flex items-center gap-2.5 group shrink-0 px-1.5" aria-label="BuilderHunt home">
-          <BrandLogoMark />
-          <span className="font-bold text-base tracking-tight hidden sm:inline">BuilderHunt</span>
-        </Link>
-
-        {/* Anchor links to page sections, same sliding-highlight treatment
-            as the dashboard's route pills — "active" here means "currently
-            scrolled into view" (via scroll-spy) instead of "current route". */}
-        <ul ref={pillRowRef} className="relative hidden md:flex items-center gap-1">
-          <SlidingIndicator rect={indicator} />
-          {NAV_LINKS.map((l) => {
-            const active = activeSection === l.id
-            return (
-              <li key={l.id} className="relative z-10">
-                <a
-                  href={`#${l.id}`}
-                  data-active={active || undefined}
-                  className={`relative rounded-full flex items-center px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} ${
-                    active ? 'text-white' : 'text-bh-text-muted hover:text-bh-text'
-                  }`}
-                >
-                  {l.label}
-                </a>
-              </li>
-            )
-          })}
-        </ul>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {isAuthed ? (
-            <>
-              <LinkButton to="/dashboard" variant="secondary" className="btn-sm">
-                <LayoutDashboard className="w-4 h-4" /> Dashboard
-              </LinkButton>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                disabled={signingOut}
-                className="btn-ghost btn-sm"
-                aria-label="Sign out"
-              >
-                {signingOut ? (
-                  <span className="spinner" aria-hidden="true" />
-                ) : (
-                  <LogOut className="w-4 h-4" aria-hidden="true" />
-                )}
-                <span className="hidden sm:inline">Sign out</span>
-              </button>
-            </>
-          ) : (
-            <>
-              <LinkButton to="/auth/sign-in" variant="ghost" className="hidden sm:inline-flex">Sign in</LinkButton>
-              <LinkButton to="/auth/sign-up" variant="primary" className="btn-sm">Get started</LinkButton>
-            </>
-          )}
-        </div>
-      </header>
-
-      <main id="main-content" className="pt-24">
+      <div id="main-content">
         {/* ───────────────────────── HERO ───────────────────────── */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-grid" aria-hidden="true" />
@@ -708,11 +610,7 @@ export function HomePage() {
             </p>
           </div>
         </section>
-      </main>
-
-      {/* ───────────────────────── FOOTER ──────────────────────── */}
-      <Footer />
-      <BackToTop />
+      </div>
     </>
   )
 }

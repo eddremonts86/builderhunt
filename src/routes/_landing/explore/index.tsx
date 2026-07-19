@@ -11,7 +11,7 @@ const SearchSchema = z.object({
   sources: z.string().optional(),
 })
 
-export const Route = createFileRoute('/explore/')({
+export const Route = createFileRoute('/_landing/explore/')({
   validateSearch: SearchSchema,
   loaderDeps: ({ search: { q, sources } }) => ({ q, sources }),
   loader: async ({ deps }) => {
