@@ -40,9 +40,16 @@ export const Route = createFileRoute('/api/search/builders')({
           })
 
           const session = await auth.api.getSession({ headers: request.headers })
-          const trackedKeys = session?.user?.id
-            ? await getTrackedKeySet(session.user.id)
-            : new Set<string>()
+          let trackedKeys = new Set<string>()
+          if (session?.user?.id) {
+            try {
+              trackedKeys = await getTrackedKeySet(session.user.id)
+            } catch (err) {
+              // Best-effort: a tracked-state lookup failure shouldn't fail
+              // the whole search — just show everyone as untracked.
+              console.error('getTrackedKeySet error:', err)
+            }
+          }
           const annotated = results.map((b) => ({
             ...b,
             tracked: trackedKeys.has(trackedKey(b.source, b.sourceId)),
