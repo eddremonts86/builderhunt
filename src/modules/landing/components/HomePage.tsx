@@ -29,6 +29,7 @@ export function HomePage() {
   const pillRowRef = React.useRef<HTMLUListElement>(null)
   const activeSection = useScrollSpy(NAV_SECTION_IDS)
   const indicator = useSlidingIndicator(pillRowRef, [activeSection])
+  const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
 
   const handleSignOut = async () => {
     setSigningOut(true)
@@ -197,24 +198,52 @@ export function HomePage() {
         </section>
 
         {/* ───────────────────── SOCIAL PROOF ───────────────────── */}
-        <section className="border-y border-bh-border bg-bh-bg-alt/40">
-          <div className="container py-10">
-            <p className="text-center text-xs uppercase tracking-widest text-bh-text-dim mb-6 font-semibold">
+        <section className="border-y border-bh-border bg-bh-bg-alt/30 py-8 overflow-hidden">
+          <div className="container">
+            <p className="text-center text-xs uppercase tracking-widest text-bh-text-dim mb-6 font-bold">
               Aggregating activity from the platforms builders already use
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-bh-text-muted">
-              {[
-                { name: 'GitHub', count: '420M+ profiles' },
-                { name: 'Reddit', count: '100K+ dev communities' },
-                { name: 'Hacker News', count: 'real-time signal' },
-                { name: 'DEV.to', count: '1M+ articles' },
-              ].map((s) => (
-                <div key={s.name} className="flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-bh-accent" aria-hidden="true" />
-                  <span className="font-semibold text-bh-text">{s.name}</span>
-                  <span className="text-sm">· {s.count}</span>
-                </div>
-              ))}
+            <div className="marquee-container">
+              <div className="marquee-content">
+                {[
+                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-[#24292f]' },
+                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-[#ff4500]' },
+                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-[#d05300]' },
+                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-[#09090b]' },
+                ].map((s, idx) => (
+                  <div key={`${s.name}-1-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
+                    <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
+                    <div>
+                      <div className="font-bold text-bh-text flex items-center gap-1.5">
+                        {s.name}
+                        <span className="w-1 h-1 rounded-full bg-bh-accent" />
+                        <span className="text-xs font-semibold text-bh-accent">{s.count}</span>
+                      </div>
+                      <div className="text-xs text-bh-text-muted">{s.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="marquee-content" aria-hidden="true">
+                {[
+                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-[#24292f]' },
+                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-[#ff4500]' },
+                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-[#d05300]' },
+                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-[#09090b]' },
+                ].map((s, idx) => (
+                  <div key={`${s.name}-2-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
+                    <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
+                    <div>
+                      <div className="font-bold text-bh-text flex items-center gap-1.5">
+                        {s.name}
+                        <span className="w-1 h-1 rounded-full bg-bh-accent" />
+                        <span className="text-xs font-semibold text-bh-accent">{s.count}</span>
+                      </div>
+                      <div className="text-xs text-bh-text-muted">{s.desc}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </section>
@@ -235,41 +264,80 @@ export function HomePage() {
               </p>
             </div>
 
-            <ol className="grid md:grid-cols-3 gap-6">
-              {[
-                {
-                  n: '01',
-                  title: 'Define your hunt',
-                  desc: 'Pick keywords, sources, language and country filters. Save as many searches as you like — one per topic, stack, or persona.',
-                  icon: Search,
-                },
-                {
-                  n: '02',
-                  title: 'Get scored matches',
-                  desc: 'A recency-weighted score surfaces builders who are shipping now, not who shipped three years ago. Open the profile to see all their signals in one place.',
-                  icon: Sparkles,
-                },
-                {
-                  n: '03',
-                  title: 'Alert, export, follow up',
-                  desc: 'New match? Get an email or RSS ping. Export the shortlist to CSV / JSON, attach private notes, share with your team.',
-                  icon: Bell,
-                },
-              ].map((step) => (
-                <li key={step.n} className="card card-hover relative overflow-hidden">
-                  <div className="absolute -top-4 -right-4 text-7xl font-extrabold text-bh-border/40 select-none" aria-hidden="true">
-                    {step.n}
-                  </div>
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-xl bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center mb-4">
-                      <step.icon className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+            <div className="relative">
+              {/* Dotted Connection Line for desktop */}
+              <div className="hidden md:block absolute top-24 left-[15%] right-[15%] h-0.5 border-t-2 border-dashed border-bh-border/80 z-0" aria-hidden="true" />
+              
+              <ol className="grid md:grid-cols-3 gap-8 relative z-10">
+                {[
+                  {
+                    n: '01',
+                    title: 'Define your hunt',
+                    desc: 'Pick keywords, sources, language and country filters. Save as many searches as you like — one per stack or persona.',
+                    icon: Search,
+                    preview: (
+                      <div className="bg-bh-bg/50 border border-bh-border/60 rounded-xl p-3 text-left font-sans mt-4">
+                        <div className="flex items-center gap-2 bg-bh-surface border border-bh-border rounded-lg px-2.5 py-1.5 text-xs text-bh-text-muted">
+                          <Search className="w-3.5 h-3.5 text-bh-accent" />
+                          <span>Keywords: <strong className="text-bh-text">React, TypeScript</strong></span>
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          <span className="text-[10px] bg-bh-accent-soft border border-bh-accent/20 text-bh-accent px-1.5 py-0.5 rounded-full font-bold">GitHub</span>
+                          <span className="text-[10px] bg-[#ff4500]/10 border border-[#ff4500]/20 text-[#c03600] px-1.5 py-0.5 rounded-full font-bold">Reddit</span>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    n: '02',
+                    title: 'Get scored matches',
+                    desc: 'A recency-weighted score surfaces builders shipping now. Open profiles to view cross-platform signals in one place.',
+                    icon: Sparkles,
+                    preview: (
+                      <div className="bg-bh-bg/50 border border-bh-border/60 rounded-xl p-3 mt-4 text-left">
+                        <div className="flex items-center justify-between bg-bh-surface border border-bh-border rounded-lg p-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center text-[10px] font-bold text-bh-accent">JD</div>
+                            <span className="text-xs font-bold text-bh-text">Jane Dev</span>
+                          </div>
+                          <span className="text-xs bg-bh-success/15 border border-bh-success/30 text-bh-success px-2 py-0.5 rounded font-mono font-bold">Score 98</span>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    n: '03',
+                    title: 'Alert, export, follow up',
+                    desc: 'New match? Get an email or RSS ping. Export your shortlist to CSV / JSON, attach private notes, and share.',
+                    icon: Bell,
+                    preview: (
+                      <div className="bg-bh-bg/50 border border-bh-border/60 rounded-xl p-3 mt-4 flex justify-between gap-1.5">
+                        <span className="flex-1 bg-bh-surface border border-bh-border rounded-lg py-1 px-1.5 text-[10px] font-bold text-bh-text-muted inline-flex items-center justify-center gap-1">
+                          <Download className="w-3 h-3" /> Export
+                        </span>
+                        <span className="flex-1 bg-bh-accent text-white rounded-lg py-1 px-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1">
+                          <Bell className="w-3 h-3" /> Alerts
+                        </span>
+                      </div>
+                    )
+                  },
+                ].map((step) => (
+                  <li key={step.n} className="card card-premium-glow relative overflow-hidden bg-bh-surface p-6 flex flex-col justify-between min-h-[300px]">
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="w-12 h-12 rounded-2xl bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center timeline-dot">
+                          <step.icon className="w-6 h-6 text-bh-accent" aria-hidden="true" />
+                        </div>
+                        <span className="text-4xl font-extrabold text-bh-accent/20 font-serif leading-none">{step.n}</span>
+                      </div>
+                      <h3 className="text-xl font-bold text-bh-text mb-2">{step.title}</h3>
+                      <p className="text-bh-text-muted text-sm leading-relaxed">{step.desc}</p>
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                    <p className="text-bh-text-muted">{step.desc}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+                    {step.preview}
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
         </section>
 
@@ -290,17 +358,62 @@ export function HomePage() {
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Feature 1: Multi-source discovery (Bento Large) */}
+              <article className="card card-premium-glow md:col-span-2 flex flex-col justify-between bg-bh-surface p-6">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
+                    <Search className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-xl font-bold text-bh-text mb-2">Multi-source discovery</h3>
+                  <p className="text-bh-text-muted text-sm leading-relaxed max-w-xl">
+                    GitHub stars, HN upvotes, Reddit karma, DEV.to posts — indexed and cross-referenced so you can see one person across all four signals.
+                  </p>
+                </div>
+                
+                {/* SVG Visual: Central Developer avatar connected to sources */}
+                <div className="mt-6 bg-bh-bg/40 border border-bh-border/50 rounded-xl p-4 flex items-center justify-center gap-6 h-28 relative overflow-hidden">
+                  <div className="flex items-center gap-1.5 bg-bh-surface border border-bh-border/60 shadow-sm rounded-lg px-3 py-1.5 z-10">
+                    <div className="w-6 h-6 rounded-full bg-bh-accent flex items-center justify-center text-white text-[10px] font-bold">JD</div>
+                    <span className="text-xs font-bold text-bh-text">Developer Profile</span>
+                  </div>
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
+                    <line x1="15%" y1="50%" x2="50%" y2="50%" stroke="var(--color-bh-accent)" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+                    <line x1="50%" y1="50%" x2="85%" y2="50%" stroke="var(--color-bh-cyan)" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" />
+                  </svg>
+                  <div className="flex gap-3 z-10">
+                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><GithubIcon className="w-4 h-4 text-bh-github" title="GitHub" /></span>
+                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><RedditIcon className="w-4 h-4 text-bh-reddit" title="Reddit" /></span>
+                    <span className="p-2 bg-bh-surface border border-bh-border rounded-lg shadow-sm"><HackerNewsIcon className="w-4 h-4 text-bh-hn" title="Hacker News" /></span>
+                  </div>
+                </div>
+              </article>
+
+              {/* Feature 2: Recency-weighted scoring (Bento Standard) */}
+              <article className="card card-premium-glow flex flex-col justify-between bg-bh-surface p-6">
+                <div>
+                  <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
+                    <Sparkles className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-lg font-bold text-bh-text mb-2">Recency-weighted scoring</h3>
+                  <p className="text-bh-text-muted text-sm leading-relaxed">
+                    A 7-day commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve so you see active shippers.
+                  </p>
+                </div>
+                {/* SVG Visual: Decay Curve */}
+                <div className="mt-4 bg-bh-bg/40 border border-bh-border/50 rounded-xl p-3 flex items-end justify-center h-20">
+                  <svg className="w-full h-12" viewBox="0 0 120 40" fill="none" aria-hidden="true">
+                    <path d="M10 5 Q 40 35 110 38" stroke="var(--color-bh-accent)" strokeWidth="2" />
+                    <circle cx="10" cy="5" r="3.5" fill="var(--color-bh-accent)" />
+                    <circle cx="45" cy="20" r="3" fill="var(--color-bh-cyan)" />
+                    <circle cx="108" cy="38" r="3" fill="var(--color-bh-text-dim)" />
+                    <text x="18" y="10" fill="var(--color-bh-text)" fontSize="8" fontWeight="bold">New commit</text>
+                    <text x="65" y="32" fill="var(--color-bh-text-dim)" fontSize="7">3 yr old stars</text>
+                  </svg>
+                </div>
+              </article>
+
+              {/* Standard grid items */}
               {[
-                {
-                  icon: Search,
-                  title: 'Multi-source discovery',
-                  desc: 'GitHub stars, HN upvotes, Reddit karma, DEV.to posts — indexed and cross-referenced so you can see one person across all four signals.',
-                },
-                {
-                  icon: Sparkles,
-                  title: 'Recency-weighted scoring',
-                  desc: 'A 7-day-old commit is worth more than a 3-year-old star pile. Scores decay on a half-life curve so the top of your results are the people shipping now.',
-                },
                 {
                   icon: Bell,
                   title: 'Keyword alerts',
@@ -322,12 +435,14 @@ export function HomePage() {
                   desc: 'We don\'t message builders on your behalf. We don\'t sell profile data. You find them, you reach out — the way it should be.',
                 },
               ].map((f) => (
-                <article key={f.title} className="card card-hover">
-                  <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
-                    <f.icon className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
+                <article key={f.title} className="card card-premium-glow bg-bh-surface p-6 flex flex-col justify-between">
+                  <div>
+                    <div className="w-10 h-10 rounded-lg bg-bh-cyan-soft border border-bh-cyan/20 flex items-center justify-center mb-4">
+                      <f.icon className="w-5 h-5 text-bh-cyan" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-lg font-bold text-bh-text mb-2">{f.title}</h3>
+                    <p className="text-bh-text-muted text-sm leading-relaxed">{f.desc}</p>
                   </div>
-                  <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
-                  <p className="text-bh-text-muted text-sm leading-relaxed">{f.desc}</p>
                 </article>
               ))}
             </div>
@@ -335,54 +450,151 @@ export function HomePage() {
         </section>
 
         {/* ───────────────────── USE CASES ─────────────────────── */}
-        <section id="use-cases" className="section">
+        <section id="use-cases" className="section bg-bh-surface">
           <div className="container">
-            <div className="max-w-2xl mb-16">
+            <div className="max-w-2xl mb-12">
               <span className="eyebrow-neutral mb-4 inline-flex">
                 <Target className="w-3.5 h-3.5" aria-hidden="true" /> Who it's for
               </span>
-              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+              <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4 text-bh-text">
                 Whoever you need to find, BuilderHunt finds first.
               </h2>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {[
-                {
-                  persona: 'Open-source maintainers',
-                  pain: 'You\'re shipping a popular repo and need a few good co-maintainers, but the bar is high and the pool is wide.',
-                  fix: 'Filter by language, country, and recent merged-PR velocity. Find people already shipping in your stack at the activity level you need.',
-                },
-                {
-                  persona: 'Founders sourcing early hires',
-                  pain: 'You need a senior engineer who actually writes, not just one who says they do. Resumes lie. Git history doesn\'t.',
-                  fix: 'Search by domain keywords, see public activity, attach private notes per candidate. Export the shortlist when you\'re ready to reach out.',
-                },
-                {
-                  persona: 'Recruiters & talent partners',
-                  pain: 'Boolean strings on LinkedIn are noisy. You want the people who are visibly building, right now.',
-                  fix: 'Set up a saved hunt per role, get an alert the moment someone matching the spec lights up across GitHub, HN, or Reddit.',
-                },
-                {
-                  persona: 'DevRel & community teams',
-                  pain: 'You want to invite the right people to your conference, your beta, or your program — but you can\'t read every timeline.',
-                  fix: 'Discover the active voices in your topic without DMs, scraping, or sending mass emails. Reach out to the ones worth your time.',
-                },
-              ].map((c) => (
-                <article key={c.persona} className="card">
-                  <h3 className="text-xl font-semibold mb-3">{c.persona}</h3>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-bh-text-dim font-semibold uppercase tracking-wider text-xs mb-1">Pain</p>
-                      <p className="text-bh-text-muted">{c.pain}</p>
-                    </div>
-                    <div>
-                      <p className="text-bh-accent font-semibold uppercase tracking-wider text-xs mb-1">How BuilderHunt helps</p>
-                      <p className="text-bh-text">{c.fix}</p>
-                    </div>
-                  </div>
-                </article>
-              ))}
+            {/* Persona Interactive tabs */}
+            <div className="grid lg:grid-cols-12 gap-8 items-start">
+              <div className="lg:col-span-4 flex flex-col gap-2">
+                {[
+                  { title: 'Open-source maintainers', icon: GithubIcon },
+                  { title: 'Founders sourcing hires', icon: Target },
+                  { title: 'Recruiters & talent partners', icon: Search },
+                  { title: 'DevRel & community teams', icon: Sparkles },
+                ].map((p, idx) => {
+                  const active = activePersonaIdx === idx
+                  return (
+                    <button
+                      key={p.title}
+                      type="button"
+                      onClick={() => setActivePersonaIdx(idx)}
+                      className={`flex items-center gap-3 w-full text-left px-5 py-4 rounded-xl border text-sm font-bold transition-all ${
+                        active
+                          ? 'bg-bh-accent-soft border-bh-accent/30 text-bh-accent shadow-sm'
+                          : 'bg-bh-surface border-bh-border/50 text-bh-text-muted hover:bg-bh-bg/50 hover:text-bh-text'
+                      }`}
+                    >
+                      <p.icon className="w-4 h-4" />
+                      <span>{p.title}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Persona Showcase Panel */}
+              <div className="lg:col-span-8">
+                {[
+                  {
+                    persona: 'Open-source maintainers',
+                    pain: 'You are shipping a popular repository and need a few good co-maintainers, but the bar is high and the pool is wide.',
+                    fix: 'Filter by language, country, and recent merged-PR velocity. Find people already shipping in your stack at the activity level you need.',
+                    preview: (
+                      <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
+                        <div className="flex items-center justify-between border-b border-bh-border/50 pb-2 mb-3">
+                          <span className="text-xs font-bold text-bh-text">Shortlisted Contributors</span>
+                          <span className="text-[10px] bg-bh-accent/10 text-bh-accent border border-bh-accent/25 px-1.5 py-0.5 rounded font-bold">24 Active</span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs">
+                            <span className="font-bold text-bh-text">@hugo_oss</span>
+                            <span className="text-bh-accent font-semibold font-mono">14 PRs merged / 14d</span>
+                          </div>
+                          <div className="flex justify-between items-center bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs">
+                            <span className="font-bold text-bh-text">@anna_codes</span>
+                            <span className="text-bh-accent font-semibold font-mono">8 PRs merged / 14d</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    persona: 'Founders sourcing early hires',
+                    pain: 'You need a senior engineer who actually writes code, not just one who says they do. Resumes lie. Git history does not.',
+                    fix: 'Search by domain keywords, see public activity, attach private notes per candidate. Export the shortlist when you are ready to reach out.',
+                    preview: (
+                      <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
+                        <div className="flex items-center justify-between border-b border-bh-border/50 pb-2 mb-3">
+                          <span className="text-xs font-bold text-bh-text">Saved Candidate Hunt</span>
+                          <span className="text-[10px] bg-bh-cyan-soft text-bh-cyan border border-bh-cyan/20 px-1.5 py-0.5 rounded font-bold">Senior TS/Rust</span>
+                        </div>
+                        <div className="bg-bh-surface border border-bh-border/60 rounded-lg p-3 text-xs">
+                          <div className="font-bold text-bh-text mb-1">Alex Miller (Shortlist candidate)</div>
+                          <div className="text-bh-text-muted text-[11px] italic">"Notes: Built the core rust-db driver. Prefers remote. Highly skilled."</div>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    persona: 'Recruiters & talent partners',
+                    pain: 'Boolean strings on LinkedIn are noisy. You want the people who are visibly building, right now.',
+                    fix: 'Set up a saved hunt per role, get an alert the moment someone matching the spec lights up across GitHub, HN, or Reddit.',
+                    preview: (
+                      <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
+                        <div className="flex items-center justify-between border-b border-bh-border/50 pb-2 mb-3">
+                          <span className="text-xs font-bold text-bh-text">Email / RSS Alert Stream</span>
+                          <span className="w-2.5 h-2.5 rounded-full bg-bh-success animate-pulse" />
+                        </div>
+                        <div className="flex gap-2 items-center bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs">
+                          <Bell className="w-3.5 h-3.5 text-bh-accent" />
+                          <div>
+                            <div className="font-semibold text-bh-text">New match: developer in Berlin</div>
+                            <div className="text-[10px] text-bh-text-dim">Matched keywords: Kubernetes, Go</div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    persona: 'DevRel & community teams',
+                    pain: 'You want to invite the right people to your conference, your beta, or your program — but you cannot read every timeline.',
+                    fix: 'Discover the active voices in your topic without DMs, scraping, or sending mass emails. Reach out to the ones worth your time.',
+                    preview: (
+                      <div className="border border-bh-border/60 rounded-xl p-4 bg-bh-bg/30 text-left font-sans">
+                        <div className="flex items-center justify-between border-b border-bh-border/50 pb-2 mb-3">
+                          <span className="text-xs font-bold text-bh-text">Active Subreddit/HN Voices</span>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs flex justify-between">
+                            <span className="font-bold text-bh-text">@r_coder</span>
+                            <span className="text-bh-accent text-[11px] font-mono">Top contributor (r/reactjs)</span>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  },
+                ].map((c, idx) => {
+                  if (activePersonaIdx !== idx) return null
+                  return (
+                    <article key={c.persona} className="card bg-bh-surface border border-bh-border p-8 grid md:grid-cols-2 gap-8 items-center animate-fade-in">
+                      <div>
+                        <h3 className="text-2xl font-bold text-bh-text mb-4">{c.persona}</h3>
+                        <div className="space-y-4">
+                          <div>
+                            <p className="text-bh-text-dim font-bold uppercase tracking-wider text-[10px] mb-1">The Problem</p>
+                            <p className="text-bh-text-muted text-sm leading-relaxed">{c.pain}</p>
+                          </div>
+                          <div>
+                            <p className="text-bh-accent font-bold uppercase tracking-wider text-[10px] mb-1">How BuilderHunt helps</p>
+                            <p className="text-bh-text text-sm leading-relaxed">{c.fix}</p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col justify-center h-full">
+                        <p className="text-bh-text-dim font-bold uppercase tracking-wider text-[10px] mb-2 text-center md:text-left">Interactive Showcase</p>
+                        {c.preview}
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </section>
@@ -480,10 +692,19 @@ export function HomePage() {
                 </>
               )}
             </div>
-            <p className="text-sm text-bh-text-dim mt-6 flex items-center justify-center gap-2">
-              <Mail className="w-3.5 h-3.5" aria-hidden="true" />
-              Or get the launch notes in your inbox
-              <span className="text-bh-text-muted">— coming soon</span>
+            <div className="max-w-md mx-auto mt-8 p-1 bg-bh-surface border border-bh-border/80 rounded-xl flex shadow-sm focus-within:ring-2 focus-within:ring-bh-accent/40 focus-within:border-bh-accent transition-all">
+              <input
+                type="email"
+                placeholder="Enter your email"
+                className="bg-transparent border-0 outline-none px-3 py-2 text-sm text-bh-text flex-grow placeholder:text-bh-text-dim"
+                aria-label="Newsletter email input"
+              />
+              <button type="submit" className="btn-primary btn-sm px-4 rounded-lg font-bold">
+                Join Alerts
+              </button>
+            </div>
+            <p className="text-xs text-bh-text-dim mt-3">
+              We send launch updates and feature summaries. No spam, unsubscribe anytime.
             </p>
           </div>
         </section>
