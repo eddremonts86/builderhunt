@@ -63,6 +63,7 @@ import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$search
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
+import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
@@ -367,6 +368,11 @@ const ApiChangelogSlugRoute = ApiChangelogSlugRouteImport.update({
   path: '/api/changelog/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBuildersTrackRoute = ApiBuildersTrackRouteImport.update({
+  id: '/api/builders/track',
+  path: '/api/builders/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
   id: '/api/builders/$builderId',
   path: '/api/builders/$builderId',
@@ -591,6 +597,7 @@ export interface FileRoutesByFullPath {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
@@ -679,6 +686,7 @@ export interface FileRoutesByTo {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
@@ -771,6 +779,7 @@ export interface FileRoutesById {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
+  '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
@@ -862,6 +871,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
+    | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
     | '/api/export/builders'
@@ -950,6 +960,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
+    | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
     | '/api/export/builders'
@@ -1041,6 +1052,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
+    | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
     | '/api/export/builders'
@@ -1117,6 +1129,7 @@ export interface RootRouteChildren {
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
+  ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
@@ -1539,6 +1552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiChangelogSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/builders/track': {
+      id: '/api/builders/track'
+      path: '/api/builders/track'
+      fullPath: '/api/builders/track'
+      preLoaderRoute: typeof ApiBuildersTrackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/$builderId': {
       id: '/api/builders/$builderId'
       path: '/api/builders/$builderId'
@@ -1909,6 +1929,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
+  ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
