@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { db } from '~/shared/lib/db/index'
-import { builders, savedQueries } from '~/shared/lib/db/schema'
+import { savedQueries } from '~/shared/lib/db/schema'
 import { desc, eq } from 'drizzle-orm'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit } from '~/shared/lib/rate-limit'
+import { getTrackedKeySet, trackedKey } from '~/shared/lib/tracked-builders'
 
 /**
  * Proactive Discovery — "For you" recommendations.
@@ -153,19 +154,12 @@ export const Route = createFileRoute('/api/recommendations/')({
             }
           }
 
-          // 5. Exclude builders the user has already saved (via notes or
-          //    their own saved list) — we use sourceId+source as the key
-          //    since builders.id is per-user
-          const userSavedRows = await db
-            .select({ id: builders.id, source: builders.source, sourceId: builders.sourceId })
-            .from(builders)
-            .where(eq(builders.userId, userId))
-          const savedKey = new Set(
-            userSavedRows.map((b) => `${b.source}:${b.sourceId}`),
-          )
+          // 5. Exclude builders the user has already tracked — sourceId+source
+          //    is the key since builders.id is per-user (see tracked-builders.ts)
+          const savedKey = await getTrackedKeySet(userId)
 
           const candidates = Array.from(aggregated.values()).filter(
-            (a) => !savedKey.has(`${a.builder.source}:${a.builder.sourceId}`),
+            (a) => !savedKey.has(trackedKey(a.builder.source, a.builder.sourceId)),
           )
 
           if (candidates.length === 0) {
