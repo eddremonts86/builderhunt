@@ -137,24 +137,6 @@ export function DashboardPage() {
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
       {/* Header */}
       <header className="mb-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
-          {/* Filter Pills on the Right */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="px-4 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-400 hover:text-zinc-600 text-xs font-medium rounded-full transition-colors shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-            >
-              Filter Location
-            </button>
-            <button
-              type="button"
-              className="px-4 py-1.5 bg-white border border-zinc-200 hover:border-zinc-300 text-zinc-400 hover:text-zinc-600 text-xs font-medium rounded-full transition-colors shadow-sm cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-            >
-              Filter Date
-            </button>
-          </div>
-        </div>
-
         {/* Title block */}
         <div className="flex flex-wrap items-end justify-between gap-4 pt-2">
           <div>
