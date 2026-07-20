@@ -1,4 +1,4 @@
-import { and, count, eq } from 'drizzle-orm'
+import { and, count, desc, eq } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { savedQueries } from '../db/schema'
 
@@ -17,6 +17,22 @@ export function listSavedQueries(transaction: TenantTransaction, organizationId:
   return transaction.select().from(savedQueries)
     .where(eq(savedQueries.organizationId, organizationId))
     .orderBy(savedQueries.createdAt)
+}
+
+export function listRecentSavedQueries(
+  transaction: TenantTransaction,
+  organizationId: string,
+  limit: number,
+) {
+  return transaction.select({
+    id: savedQueries.id,
+    name: savedQueries.name,
+    keywords: savedQueries.keywords,
+    sources: savedQueries.sources,
+  }).from(savedQueries)
+    .where(eq(savedQueries.organizationId, organizationId))
+    .orderBy(desc(savedQueries.createdAt))
+    .limit(limit)
 }
 
 export function listLegacySavedQueries(transaction: TenantTransaction, userId: string) {

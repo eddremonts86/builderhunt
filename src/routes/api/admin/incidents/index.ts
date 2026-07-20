@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { incidents } from '~/shared/lib/db/schema'
-import { desc } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
+import { createPlatformIncident, listPlatformIncidents } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -29,7 +27,7 @@ export const Route = createFileRoute('/api/admin/incidents/')({
           if (!session?.user?.id || !isAdmin(session.user.id)) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
-          const rows = await db.select().from(incidents).orderBy(desc(incidents.startedAt)).limit(100)
+          const rows = await listPlatformIncidents()
           return Response.json(rows)
         } catch (err) {
           console.error('admin incidents list error:', err)
@@ -47,7 +45,7 @@ export const Route = createFileRoute('/api/admin/incidents/')({
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
           const id = randomId()
-          await db.insert(incidents).values({
+          await createPlatformIncident({
             id,
             title: parsed.data.title,
             description: parsed.data.description ?? null,

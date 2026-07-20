@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getTrackedBuilderIds, trackedKey } from '~/shared/lib/tracked-builders'
 
 export const Route = createFileRoute('/api/search/builders')({
@@ -39,16 +40,15 @@ export const Route = createFileRoute('/api/search/builders')({
             perPage,
           })
 
-          const session = await auth.api.getSession({ headers: request.headers })
           let trackedIds = new Map<string, string>()
-          if (session?.user?.id) {
-            try {
-              trackedIds = await getTrackedBuilderIds(session.user.id)
-            } catch (err) {
-              // Best-effort: a tracked-state lookup failure shouldn't fail
-              // the whole search — just show everyone as untracked.
-              console.error('getTrackedBuilderIds error:', err)
-            }
+          try {
+            const principal = await requireTenantPrincipal(request)
+            trackedIds = await withTenantContext(principal, (tx) =>
+              getTrackedBuilderIds(tx, principal.organizationId),
+            )
+          } catch (err) {
+            // Best-effort for anonymous search and sessions without an active organization.
+            console.error('getTrackedBuilderIds error:', err)
           }
           const annotated = results.map((b) => {
             const trackedRowId = trackedIds.get(trackedKey(b.source, b.sourceId))

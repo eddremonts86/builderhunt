@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
-import { getDeletionRequest, requestDeletion, cancelDeletion } from '~/shared/lib/legal'
+import {
+  AccountDeletionOwnershipError,
+  cancelDeletion,
+  getDeletionRequest,
+  requestDeletion,
+} from '~/shared/lib/legal'
 
 export const Route = createFileRoute('/api/me/delete-account/')({
   component: () => null,
@@ -30,6 +35,9 @@ export const Route = createFileRoute('/api/me/delete-account/')({
           )
           return Response.json({ ok: true, ...result })
         } catch (err) {
+          if (err instanceof AccountDeletionOwnershipError) {
+            return Response.json({ error: err.message, organizationIds: err.organizationIds }, { status: err.status })
+          }
           console.error('delete account error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

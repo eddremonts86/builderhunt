@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { roadmapItems } from '~/shared/lib/db/schema'
-import { asc, desc } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
+import { createPlatformRoadmapItem, listPlatformRoadmap } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -31,10 +29,7 @@ export const Route = createFileRoute('/api/admin/roadmap/')({
           if (!session?.user?.id || !isAdmin(session.user.id)) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
-          const rows = await db
-            .select()
-            .from(roadmapItems)
-            .orderBy(asc(roadmapItems.sortOrder), desc(roadmapItems.createdAt))
+          const rows = await listPlatformRoadmap()
           return Response.json(rows)
         } catch (err) {
           console.error('admin roadmap list error:', err)
@@ -52,7 +47,7 @@ export const Route = createFileRoute('/api/admin/roadmap/')({
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
           const id = randomId()
-          await db.insert(roadmapItems).values({
+          await createPlatformRoadmapItem({
             id,
             title: parsed.data.title,
             description: parsed.data.description ?? null,

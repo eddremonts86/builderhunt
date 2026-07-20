@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { changelog } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { deletePlatformChangelog, updatePlatformChangelog } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -31,11 +29,7 @@ export const Route = createFileRoute('/api/admin/changelog/$id')({
           const body = await request.json().catch(() => ({}))
           const parsed = UpdateBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
-          const [updated] = await db
-            .update(changelog)
-            .set(parsed.data)
-            .where(eq(changelog.id, params.id))
-            .returning()
+          const updated = await updatePlatformChangelog(params.id, parsed.data)
           if (!updated) return Response.json({ error: 'Not found' }, { status: 404 })
           return Response.json(updated)
         } catch (err) {
@@ -49,7 +43,7 @@ export const Route = createFileRoute('/api/admin/changelog/$id')({
           if (!session?.user?.id || !isAdmin(session.user.id)) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
-          await db.delete(changelog).where(eq(changelog.id, params.id))
+          await deletePlatformChangelog(params.id)
           return Response.json({ ok: true })
         } catch (err) {
           console.error('admin changelog delete error:', err)

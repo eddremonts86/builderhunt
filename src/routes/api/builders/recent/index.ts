@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auth } from '~/shared/lib/auth/better-auth'
-import { db } from '~/shared/lib/db/index'
-import { builders } from '~/shared/lib/db/schema'
-import { desc, eq } from 'drizzle-orm'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { listRecentOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 
 export const Route = createFileRoute('/api/builders/recent/')({
   component: () => null,
@@ -10,33 +9,34 @@ export const Route = createFileRoute('/api/builders/recent/')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
+          const principal = await requireTenantPrincipal(request)
+          const rows = await withTenantContext(principal, (tx) =>
+            listRecentOrganizationBuilders(tx, principal.organizationId),
+          )
+          return Response.json(rows.map((row) => ({
+            id: row.id,
+            username: row.username,
+            displayName: row.displayName,
+            source: row.source,
+            bio: row.bio,
+            followersCount: row.followersCount,
+            topics: privateTopics(row.privateMetadata),
+            lastSeen: row.lastSeen,
+          })))
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
           }
-
-          const rows = await db
-            .select({
-              id: builders.id,
-              username: builders.username,
-              displayName: builders.displayName,
-              source: builders.source,
-              bio: builders.bio,
-              followersCount: builders.followersCount,
-              topics: builders.topics,
-              lastSeen: builders.lastSeen,
-            })
-            .from(builders)
-            .where(eq(builders.userId, session.user.id))
-            .orderBy(desc(builders.lastSeen))
-            .limit(6)
-
-          return Response.json(rows)
-        } catch (err) {
-          console.error('Recent builders error:', err)
-          return Response.json([], { status: 200 })
+          console.error('Recent builders error:', error)
+          return Response.json({ error: 'Failed to fetch recent builders' }, { status: 500 })
         }
       },
     },
   },
 })
+
+function privateTopics(metadata: Record<string, unknown>) {
+  return Array.isArray(metadata.topics)
+    ? metadata.topics.filter((value): value is string => typeof value === 'string')
+    : []
+}
