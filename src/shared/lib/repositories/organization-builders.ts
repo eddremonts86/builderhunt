@@ -149,6 +149,28 @@ export async function findOrganizationBuilderByIdentity(
   return row ?? null
 }
 
+/**
+ * Persists an AI enrichment artifact (plan: ai-profile-enrichment) into the
+ * tracked builder's `privateMetadata.aiEnrichment` key, alongside any
+ * existing topics/language/country overrides already stored there. Never
+ * overwrites the whole `privateMetadata` column. Returns the stored
+ * artifact, or `null` if the builder isn't tracked in this org.
+ */
+export async function setOrganizationBuilderEnrichment(
+  transaction: TenantTransaction,
+  organizationId: string,
+  builderIdentityId: string,
+  enrichment: Record<string, unknown>,
+) {
+  const existing = await findOrganizationBuilderByIdentity(transaction, organizationId, builderIdentityId)
+  if (!existing) return null
+  const privateMetadata = { ...existing.privateMetadata, aiEnrichment: enrichment }
+  await transaction.update(organizationBuilders)
+    .set({ privateMetadata, updatedAt: new Date() })
+    .where(and(eq(organizationBuilders.organizationId, organizationId), eq(organizationBuilders.id, existing.id)))
+  return enrichment
+}
+
 export async function trackOrganizationBuilder(
   transaction: TenantTransaction,
   input: TrackOrganizationBuilderInput,

@@ -97,6 +97,7 @@ import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-expo
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
+import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
@@ -550,6 +551,12 @@ const ApiBuildersBuilderIdNotesRoute =
     path: '/notes',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersBuilderIdEnrichmentRoute =
+  ApiBuildersBuilderIdEnrichmentRouteImport.update({
+    id: '/enrichment',
+    path: '/enrichment',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdClaimRoute =
   ApiBuildersBuilderIdClaimRouteImport.update({
     id: '/claim',
@@ -670,6 +677,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
@@ -765,6 +773,7 @@ export interface FileRoutesByTo {
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
@@ -864,6 +873,7 @@ export interface FileRoutesById {
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
@@ -962,6 +972,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
+    | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1057,6 +1068,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
+    | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1155,6 +1167,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
+    | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1858,6 +1871,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/$builderId/enrichment': {
+      id: '/api/builders/$builderId/enrichment'
+      path: '/enrichment'
+      fullPath: '/api/builders/$builderId/enrichment'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEnrichmentRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/claim': {
       id: '/api/builders/$builderId/claim'
       path: '/claim'
@@ -2022,11 +2042,13 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 
 interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
+  ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
 }
 
 const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdClaimRoute: ApiBuildersBuilderIdClaimRoute,
+  ApiBuildersBuilderIdEnrichmentRoute: ApiBuildersBuilderIdEnrichmentRoute,
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
 }
 

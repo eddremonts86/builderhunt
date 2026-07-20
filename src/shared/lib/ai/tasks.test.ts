@@ -75,6 +75,41 @@ describe('AI task registry', () => {
     expect(prompt).toContain('distributed systems in Rust')
   })
 
+  it('registers profile-enrich as server-only, 30-day-cached, with the persona output schema', () => {
+    const task = getTask('profile-enrich')
+    expect(task).not.toBeNull()
+    expect(task?.tier).toBe('server-only')
+    expect(task?.cacheTtlSeconds).toBe(2_592_000)
+    expect(task?.allowances).toEqual({ free: 5, pro: 100, team: 200 })
+
+    const validInput = {
+      username: 'alice',
+      source: 'github',
+      bio: 'Builds distributed systems in Rust and Go, focused on low-latency infra.',
+      topics: ['rust', 'go', 'distributed-systems'],
+      highlights: ['fast-parser: zero-copy parser combinators', 'tiny-router'],
+    }
+    expect(task?.inputSchema.safeParse(validInput).success).toBe(true)
+    expect(task?.inputSchema.safeParse({ ...validInput, topics: Array(31).fill('x') }).success).toBe(false)
+
+    const validOutput = {
+      summary: 'Builds fast, well-tested backend services with a focus on developer experience.',
+      estimatedSeniority: 'senior',
+      primaryFocus: 'Distributed systems',
+      strengths: ['Rust', 'Systems design'],
+      codingStyle: 'Small modules, test-first',
+    }
+    expect(task?.outputSchema.safeParse(validOutput).success).toBe(true)
+    expect(task?.outputSchema.safeParse({ ...validOutput, estimatedSeniority: 'god-tier' }).success).toBe(false)
+    expect(task?.outputSchema.safeParse({ ...validOutput, strengths: [] }).success).toBe(false)
+
+    // buildPrompt wraps the untrusted bio/topics/highlights block in <untrusted> tags.
+    const prompt = task!.buildPrompt(validInput)
+    expect(prompt).toContain('<untrusted>')
+    expect(prompt).toContain('</untrusted>')
+    expect(prompt).toContain('distributed systems in Rust')
+  })
+
   it('every registered task has a non-empty system prompt, full allowances, and positive maxOutputTokens', () => {
     for (const task of Object.values(AI_TASKS)) {
       expect(task.system.trim().length).toBeGreaterThan(0)

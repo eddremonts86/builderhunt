@@ -1,15 +1,26 @@
 # AI Profile Enrichment — Developer Persona Card (tasks)
 
-> **Status**: `pending`
+> **Status**: `partially-implemented` (Phases 1, 2, 4 shipped 2026-07-20; Phase 3 deferred)
 > **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (registry, cache, budget, `minimaxChat` implemented)
 > **Blocks**: nothing
 > **Reality check**: Touches `src/shared/lib/ai/tasks.ts`, `src/routes/api/builders/$builderId/*`, `claim/verify.ts`, `BuilderProfilePage.tsx`. Writes only the `metadata.aiEnrichment` jsonb key. No migrations.
+
+**2026-07-20 adaptation note**: the legacy `builders.metadata` per-user table this spec targets
+is no longer the live write path for newly tracked builders (security-and-multitenancy moved
+tracking to `organization_builders`/`builder_identities`). Delivered instead against
+`organization_builders.privateMetadata.aiEnrichment`, keyed by the requesting org's own
+tracked-builder row — same jsonb-merge discipline (never overwrites the whole column), same
+schemas/thresholds/cache TTL as spec'd. Phase 3 (claim-triggered auto-refresh) is deferred: a
+verified claim is global (`builder_claims`, keyed by `builder_identity_id`, not org-scoped), and
+`published_builder_profiles` has no jsonb metadata column to attach an artifact to without a
+schema migration — out of scope for this pass. Revisit once `portfolio-builder` needs its own
+`published_builder_profiles` metadata column anyway.
 
 Ordered so the app ships cleanly after every checkbox.
 
 ## Phase 1 — Pure lib + task registration
 
-- [ ] **Create the enrichment schemas and pure helpers**
+- [x] **Create the enrichment schemas and pure helpers**
   - Files: `src/shared/lib/ai/enrichment.ts`
   - Do: Export `builderAIEnrichmentModelSchema` and `builderAIEnrichmentSchema` (envelope:
     `enrichedAt` ISO string, `model`, `version: z.literal(1)`) per spec.md; pure
@@ -20,7 +31,7 @@ Ordered so the app ships cleanly after every checkbox.
     30 days).
   - Verify: `pnpm type-check`.
 
-- [ ] **Test the pure helpers**
+- [x] **Test the pure helpers**
   - Files: `src/shared/lib/ai/enrichment.test.ts`
   - Do: Threshold matrix for `hasEnrichableContent` (each criterion alone passes; all-empty
     fails; 39-char bio fails, 40 passes); `buildEnrichInput` extracts highlights from a
@@ -29,7 +40,7 @@ Ordered so the app ships cleanly after every checkbox.
     schema-invalid blobs.
   - Verify: `pnpm test enrichment`.
 
-- [ ] **Register the profile-enrich task**
+- [x] **Register the profile-enrich task**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
   - Do: Add `profile-enrich`: tier `server-only`; input/output schemas imported from
     `enrichment.ts`; `cacheTtlSeconds: 2_592_000`; allowances `{ free: 5, pro: 100,
@@ -41,7 +52,7 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
 
 ## Phase 2 — API endpoints
 
-- [ ] **Add GET /api/builders/$builderId/enrichment**
+- [x] **Add GET /api/builders/$builderId/enrichment**
   - Files: `src/routes/api/builders/$builderId/enrichment.ts`
   - Do: Auth required; load the row and authorize (row `userId` === session user, OR
     `claimedByUserId` === session user, OR admin) else 404/403 (mirror the ownership
@@ -57,15 +68,17 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
     schema-valid artifact; second call returns `cached: true` instantly; a bio-less,
     topic-less builder returns `{ insufficient: true }` and writes nothing.
 
-- [ ] **Add POST /api/builders/$builderId/enrichment/refresh**
-  - Files: `src/routes/api/builders/$builderId/enrichment.ts` (POST handler alongside GET, or sibling `refresh.ts`)
+- [x] **Add POST /api/builders/$builderId/enrichment/refresh**
+  - Files: `src/routes/api/builders/$builderId/enrichment.ts` (delivered as the same file's POST
+    handler, not a separate `refresh.ts` — mirrors this codebase's existing pattern of multiple
+    HTTP methods per route file, e.g. `$builderId.ts` itself)
   - Do: Same pipeline minus the freshness short-circuit; authorize only admins or the user
     who claimed this profile; `rateLimit('enrich-refresh', userId, 5, 3600)`; consumes
     budget normally.
   - Verify: Claimed-owner curl regenerates (new `enrichedAt`); non-owner non-admin gets 403;
     6th refresh in an hour gets 429.
 
-## Phase 3 — Claim hook
+## Phase 3 — Claim hook (DEFERRED — see adaptation note above)
 
 - [ ] **Trigger enrichment on successful claim**
   - Files: `src/routes/api/builders/claim/verify.ts` (or the claim lib it delegates to)
@@ -79,7 +92,7 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
 
 ## Phase 4 — UI
 
-- [ ] **Build PersonaCard**
+- [x] **Build PersonaCard**
   - Files: `src/modules/builder-profile/components/PersonaCard.tsx`
   - Do: Fetch `GET .../enrichment` on mount (async, non-blocking). States: skeleton;
     full card (summary, seniority pill, primaryFocus, strengths chips, codingStyle line,
@@ -91,7 +104,7 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
     (via `useAICapabilities`).
   - Verify: `pnpm type-check`; card renders all states by stubbing responses in dev.
 
-- [ ] **Wire PersonaCard into the profile page**
+- [x] **Wire PersonaCard into the profile page**
   - Files: `src/modules/builder-profile/components/BuilderProfilePage.tsx`
   - Do: Render `<PersonaCard builderId={...} isClaimedOwner={...} />` above
     `OutreachCopilot`; pass what the page already knows (row id, claim state, admin flag

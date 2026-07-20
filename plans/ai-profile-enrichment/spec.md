@@ -1,6 +1,6 @@
 # AI Profile Enrichment — Developer Persona Card (spec)
 
-> **Status**: `pending`
+> **Status**: `partially-implemented` (Persona Card shipped for tracked builders; claim-triggered auto-refresh deferred — see tasks.md)
 > **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (AI Platform — `minimaxChat`, task registry, cache, budgets must exist through Phase 3)
 > **Blocks**: nothing
 > **Reality check**: Builder detail view exists (`src/routes/_dashboard/builder/$builderId/index.tsx` → `src/modules/builder-profile/components/BuilderProfilePage.tsx`); claim flow exists (`src/routes/api/builders/$builderId/claim.ts`, `src/routes/api/builders/claim/verify.ts`); `builders.metadata` is a free-form jsonb column (`src/shared/lib/db/schema.ts`). No AI enrichment code exists. This plan **owns the `builders.metadata.aiEnrichment` key** (namespaced-key convention from `_meta/conventions.md`; `code-fingerprinting` and `project-hygiene` own their own keys).

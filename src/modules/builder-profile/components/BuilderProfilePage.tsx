@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, Sparkles, Users, Lock,
 import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
+import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 
 interface Builder {
   id: string
@@ -253,8 +254,10 @@ export function BuilderProfilePage() {
           />
         </div>
 
-        {/* Right Column: Outreach Copilot, Action Bar & Notes */}
+        {/* Right Column: Persona Card, Outreach Copilot, Action Bar & Notes */}
         <div className="space-y-6">
+          <PersonaCard builderId={builder.id} canRefresh={Boolean(isMyProfile)} />
+
           <OutreachCopilot
             builder={{
               username: builder.username,
