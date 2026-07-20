@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
+import { upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
 import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getTrackedBuilderIds, trackedKey } from '~/shared/lib/tracked-builders'
+import { log } from '~/shared/lib/log'
 
 export const Route = createFileRoute('/api/search/builders')({
   component: () => null,
@@ -58,6 +60,10 @@ export const Route = createFileRoute('/api/search/builders')({
               trackedRowId,
             }
           })
+
+          // Write-through indexing for semantic-search — fire-and-forget,
+          // never awaited on the response (see src/lib/semantic/index-writer.ts).
+          upsertEmbeddingStubs(results).catch((err) => log.error('embedding_writethrough_error', { error: err instanceof Error ? err.message : String(err) }))
 
           return Response.json({
             builders: annotated,

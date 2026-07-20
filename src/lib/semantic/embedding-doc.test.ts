@@ -8,6 +8,7 @@ const FULL_PROFILE = {
   bio: 'Building open source tools',
   profileUrl: 'https://github.com/octocat',
   source: 'github',
+  sourceId: '583231',
   followersCount: 4200,
   language: 'TypeScript',
   country: 'US',
@@ -33,6 +34,7 @@ describe('buildEmbeddingDoc', () => {
       username: 'jdoe',
       profileUrl: 'https://github.com/jdoe',
       source: 'github',
+      sourceId: 'jdoe',
     })
     expect(doc).toBe('Name: jdoe (@jdoe)\nSource: github')
   })
@@ -47,6 +49,7 @@ describe('buildEmbeddingDoc', () => {
       username: 'jdoe',
       profileUrl: 'https://github.com/jdoe',
       source: 'github',
+      sourceId: 'jdoe',
       bio: 'x'.repeat(10_000),
     })
     expect(doc.length).toBe(6000)
@@ -93,6 +96,7 @@ describe('toEmbeddedProfile', () => {
       username: 'jdoe',
       profileUrl: 'https://github.com/jdoe',
       source: 'github',
+      sourceId: 'jdoe',
       displayName: null,
       avatarUrl: null,
       bio: null,

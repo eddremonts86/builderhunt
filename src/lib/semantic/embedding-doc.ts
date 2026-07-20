@@ -28,12 +28,13 @@ export type EmbeddedProfile = z.infer<typeof embeddedProfileSchema>
  * a structural subset of `RawBuilder` (src/lib/sources/types.ts) so this
  * module never needs to import it (kept dependency-free/pure). */
 export interface EmbeddableSource {
+  source: string
+  sourceId: string
   username: string
   displayName?: string | null
   avatarUrl?: string | null
   bio?: string | null
   profileUrl: string
-  source: string
   followersCount?: number | null
   language?: string | null
   country?: string | null
