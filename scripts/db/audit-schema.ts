@@ -47,6 +47,8 @@ const classifications: Classification[] = [
   tenant('organization_builders', 'organization_id', ['security-and-multitenancy', 'shared-resources'], { organizationColumn: true }),
   account('builder_claims', 'subject_user_id', ['security-and-multitenancy', 'claimable-profiles']),
   global('published_builder_profiles', ['builder_identity_id', 'display_name', 'bio', 'open_to_status', 'topics', 'published_at'], ['security-and-multitenancy', 'claimable-profiles']),
+  operational('migration_backfill_runs', 'migration owner', ['security-and-multitenancy']),
+  operational('migration_backfill_conflicts', 'migration run', ['security-and-multitenancy']),
 ]
 
 const schemaSource = await readFile(new URL('../../src/shared/lib/db/schema.ts', import.meta.url), 'utf8')

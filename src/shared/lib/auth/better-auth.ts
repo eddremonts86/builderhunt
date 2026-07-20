@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { organization } from 'better-auth/plugins'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
-import { db } from '~/shared/lib/db/index'
+import { authDb } from '~/shared/lib/db/auth-db'
 import {
   authUsers,
   authSessions,
@@ -16,7 +16,7 @@ import { env } from '~/shared/lib/env'
 import { organizationOptions } from './organization-options'
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
+  database: drizzleAdapter(authDb, {
     provider: 'pg',
     schema: {
       user: authUsers,

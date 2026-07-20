@@ -539,3 +539,43 @@ export const organizationPlanChanges = pgTable(
     check('organization_plan_changes_to_tier_check', sql`${table.toTier} in ('free', 'pro', 'team')`),
   ],
 )
+
+export const migrationBackfillRuns = pgTable(
+  'migration_backfill_runs',
+  {
+    name: text('name').primaryKey(),
+    status: text('status').notNull().default('pending'),
+    cursor: text('cursor'),
+    processedCount: integer('processed_count').notNull().default(0),
+    migratedCount: integer('migrated_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    conflictCount: integer('conflict_count').notNull().default(0),
+    orphanCount: integer('orphan_count').notNull().default(0),
+    checksum: text('checksum'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('migration_backfill_runs_status_check', sql`${table.status} in ('pending', 'running', 'completed', 'failed')`),
+    check('migration_backfill_runs_counts_check', sql`${table.processedCount} >= 0 and ${table.migratedCount} >= 0 and ${table.skippedCount} >= 0 and ${table.conflictCount} >= 0 and ${table.orphanCount} >= 0`),
+  ],
+)
+
+export const migrationBackfillConflicts = pgTable(
+  'migration_backfill_conflicts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    runName: text('run_name').notNull().references(() => migrationBackfillRuns.name, { onDelete: 'cascade' }),
+    sourceTable: text('source_table').notNull(),
+    sourceId: text('source_id').notNull(),
+    reason: text('reason').notNull(),
+    checksum: text('checksum').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('migration_backfill_conflicts_source_reason_unique').on(table.runName, table.sourceTable, table.sourceId, table.reason),
+    index('migration_backfill_conflicts_unresolved_idx').on(table.runName, table.resolvedAt),
+  ],
+)

@@ -50,10 +50,10 @@ export async function resolveTenantPrincipal(
 }
 
 export async function requireTenantPrincipal(request: Request): Promise<TenantPrincipal> {
-  const [{ and, eq }, { auth }, { db }, { organizationMembers }] = await Promise.all([
+  const [{ and, eq }, { auth }, { authDb }, { organizationMembers }] = await Promise.all([
     import('drizzle-orm'),
     import('./better-auth'),
-    import('../db/index'),
+    import('../db/auth-db'),
     import('../db/schema'),
   ])
 
@@ -67,7 +67,7 @@ export async function requireTenantPrincipal(request: Request): Promise<TenantPr
       }
     },
     findMembership: async (userId, organizationId) => {
-      const [membership] = await db
+      const [membership] = await authDb
         .select({ role: organizationMembers.role })
         .from(organizationMembers)
         .where(and(

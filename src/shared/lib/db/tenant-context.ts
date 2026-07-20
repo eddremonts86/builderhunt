@@ -42,6 +42,7 @@ export function createTenantContextRunner<TTransaction extends TenantTransaction
           select
             set_config('app.user_id', ${principal.userId}, true),
             set_config('app.organization_id', ${principal.organizationId}, true),
+            set_config('app.organization_role', ${principal.role}, true),
             set_config('app.request_id', ${principal.requestId}, true)
         `)
         return storage.run({ principal, transaction }, () => operation(transaction))

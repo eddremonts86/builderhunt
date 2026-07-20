@@ -50,6 +50,8 @@ and support tooling.
 
 - No private database operation executes without a validated active membership and transaction-local
   organization context.
+- Better Auth uses a dedicated auth broker role that can access only auth/organization lifecycle
+  tables; it cannot query product tenant tables.
 - An absent tenant setting denies access; the web role never owns tables or bypasses RLS.
 - Every tenant child relation preserves `organization_id` in its foreign key.
 - Authorization attributes are normalized columns/relations, never mutable JSON.
@@ -63,4 +65,3 @@ The legacy schema remains user-scoped until backfill and cutover, so compatibili
 treated as temporary high risk. Re-review this model when adding a new principal, provider, public
 field, tenant table, worker command, export/deletion path, dynamic role, payment flow, or AI storage
 surface, and after any authentication or PostgreSQL major-version change.
-
