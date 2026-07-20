@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, count, desc, eq, gte } from 'drizzle-orm'
+import { and, count, desc, eq, gte, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   builderIdentities,
@@ -283,7 +283,7 @@ export async function getOrganizationDashboardStats(
   organizationId: string,
   activeSince: Date,
 ) {
-  const [[total], [active], [queries], [notes]] = await Promise.all([
+  const [[total], [active], [queries], [notes], dailyRows] = await Promise.all([
     transaction.select({ value: count() }).from(organizationBuilders)
       .where(eq(organizationBuilders.organizationId, organizationId)),
     transaction.select({ value: count() }).from(organizationBuilders)
@@ -293,12 +293,35 @@ export async function getOrganizationDashboardStats(
       .where(eq(savedQueries.organizationId, organizationId)),
     transaction.select({ value: count() }).from(builderNotes)
       .where(eq(builderNotes.organizationId, organizationId)),
+    // Real per-day breakdown of activity in the window, used to render the
+    // dashboard's weekly activity chart without resorting to mock data.
+    transaction.select({
+      day: sql<string>`to_char(date_trunc('day', ${builderIdentities.lastSeenAt}), 'YYYY-MM-DD')`,
+      value: sql<number>`count(*)::int`,
+    }).from(organizationBuilders)
+      .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+      .where(and(eq(organizationBuilders.organizationId, organizationId), gte(builderIdentities.lastSeenAt, activeSince)))
+      .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt})`),
   ])
+
+  const dailyCounts = new Map(dailyRows.map((row) => [row.day, row.value]))
+  const dailyActivity = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date()
+    date.setDate(date.getDate() - (6 - i))
+    const iso = date.toISOString().slice(0, 10)
+    return {
+      date: iso,
+      label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      count: dailyCounts.get(iso) ?? 0,
+    }
+  })
+
   return {
     totalBuilders: Number(total?.value ?? 0),
     activeThisWeek: Number(active?.value ?? 0),
     savedQueries: Number(queries?.value ?? 0),
     totalNotes: Number(notes?.value ?? 0),
+    dailyActivity,
   }
 }
 

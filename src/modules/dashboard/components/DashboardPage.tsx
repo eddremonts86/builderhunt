@@ -5,14 +5,16 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X,
+  MoreVertical, Loader2, Check, X, Clock,
 } from 'lucide-react'
+import { formatDistanceToNow } from '~/shared/lib/format'
 
 interface Stats {
   totalBuilders: number
   activeThisWeek: number
   savedQueries: number
   totalNotes: number
+  dailyActivity?: Array<{ date: string; label: string; count: number }>
 }
 
 interface SavedQuery {
@@ -98,6 +100,18 @@ export function DashboardPage() {
     )
   }
 
+  // Every badge below is derived from data we actually have — no placeholder
+  // counts that could contradict the headline number.
+  const latestQuery = [...queries].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )[0]
+  const activeSharePct = stats && stats.totalBuilders > 0
+    ? Math.round((stats.activeThisWeek / stats.totalBuilders) * 100)
+    : null
+  const notesPerBuilder = stats && stats.totalBuilders > 0 && stats.totalNotes > 0
+    ? (stats.totalNotes / stats.totalBuilders).toFixed(1)
+    : null
+
   const statsData = [
     {
       label: 'Builders tracked',
@@ -105,7 +119,7 @@ export function DashboardPage() {
       icon: Users,
       tone: 'accent' as const,
       hint: 'People saved to your lists',
-      badge: '12 Lists',
+      badge: stats && stats.activeThisWeek > 0 ? `${stats.activeThisWeek} active now` : undefined,
     },
     {
       label: 'Active this week',
@@ -113,7 +127,7 @@ export function DashboardPage() {
       icon: TrendingUp,
       tone: 'success' as const,
       hint: 'Shipped something in the last 7 days',
-      badge: '20 Closed',
+      badge: activeSharePct !== null ? `${activeSharePct}% of tracked` : undefined,
     },
     {
       label: 'Saved searches',
@@ -121,7 +135,7 @@ export function DashboardPage() {
       icon: Bookmark,
       tone: 'warning' as const,
       hint: 'Hunts you can re-run anytime',
-      badge: '40 Open',
+      badge: latestQuery ? `Latest: ${truncate(latestQuery.name, 16)}` : undefined,
     },
     {
       label: 'Private notes',
@@ -129,9 +143,16 @@ export function DashboardPage() {
       icon: StickyNote,
       tone: 'cyan' as const,
       hint: 'Context you\'ve attached to builders',
-      badge: '20 Active',
+      badge: notesPerBuilder !== null ? `${notesPerBuilder}/builder` : undefined,
     },
   ]
+
+  const dailyActivity = stats?.dailyActivity ?? []
+  const activityMax = Math.max(1, ...dailyActivity.map((d) => d.count))
+  const hasActivity = dailyActivity.some((d) => d.count > 0)
+  const peakIndex = hasActivity
+    ? dailyActivity.reduce((best, d, i, arr) => (d.count > arr[best].count ? i : best), 0)
+    : -1
 
   return (
     <div className="p-6 md:p-8 max-w-6xl mx-auto">
@@ -203,43 +224,49 @@ export function DashboardPage() {
                 <Activity className="w-4 h-4 text-bh-accent" aria-hidden="true" />
                 Weekly Activity
               </h3>
-              <span className="text-xs text-bh-text-dim font-light">Mockup Data</span>
+              <span className="text-xs text-bh-text-dim font-light">
+                {hasActivity ? 'Builders active per day' : 'Last 7 days'}
+              </span>
             </div>
-            <div className="flex items-end justify-between h-40 pt-4 px-2">
-              {[
-                { day: 'Mon', value: 45 },
-                { day: 'Tue', value: 75 },
-                { day: 'Wed', value: 80 },
-                { day: 'Thu', value: 90 },
-                { day: 'Fri', value: 50 },
-                { day: 'Sat', value: 30 },
-                { day: 'Sun', value: 20 },
-              ].map((d) => {
-                const isWednesday = d.day === 'Wed';
-                return (
-                  <div key={d.day} className="flex flex-col items-center flex-1 gap-2">
-                    <div className="w-full max-w-[28px] sm:max-w-[36px] bg-bh-bg-alt rounded-t-md h-28 relative flex items-end">
-                      {isWednesday && (
-                        <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#2b1812] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-10">
-                          80%
-                          {/* Triangle indicator */}
-                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#2b1812]" />
-                        </div>
-                      )}
-                      <div
-                        className={`w-full rounded-t-md transition-all duration-500 ease-out ${
-                          isWednesday
-                            ? 'bg-[#fbeee6] bg-striped-terracotta'
-                            : 'bg-zinc-50 bg-striped-neutral'
-                        }`}
-                        style={{ height: `${d.value}%` }}
-                      />
+            {hasActivity ? (
+              <div className="flex items-end justify-between h-40 pt-4 px-2">
+                {dailyActivity.map((d, i) => {
+                  const isPeak = i === peakIndex
+                  const heightPct = Math.max(6, Math.round((d.count / activityMax) * 100))
+                  return (
+                    <div key={d.date} className="flex flex-col items-center flex-1 gap-2">
+                      <div className="w-full max-w-[28px] sm:max-w-[36px] bg-bh-bg-alt rounded-t-md h-28 relative flex items-end">
+                        {isPeak && (
+                          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#2b1812] text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-10">
+                            {d.count}
+                            {/* Triangle indicator */}
+                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#2b1812]" />
+                          </div>
+                        )}
+                        <div
+                          className={`w-full rounded-t-md transition-all duration-500 ease-out ${
+                            isPeak
+                              ? 'bg-[#fbeee6] bg-striped-terracotta'
+                              : 'bg-zinc-50 bg-striped-neutral'
+                          }`}
+                          style={{ height: `${heightPct}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-bh-text-dim font-medium">{d.label}</span>
                     </div>
-                    <span className="text-[11px] text-bh-text-dim font-medium">{d.day}</span>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-sm text-bh-text-muted font-light">
+                  No tracked builders have shipped in the last 7 days yet.
+                </p>
+                <p className="text-xs text-bh-text-dim mt-1">
+                  This fills in once builders you're tracking are active again.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -318,9 +345,24 @@ export function DashboardPage() {
                           <span className={`badge badge-${b.source} text-[9px] px-1.5 py-0`}>{b.source}</span>
                         </div>
                         {b.bio && <p className="text-xs text-bh-text-muted line-clamp-1">{b.bio}</p>}
-                        <p className="text-[10px] text-bh-text-dim mt-0.5">
+                        <p className="text-[10px] text-bh-text-dim mt-0.5 flex items-center gap-1">
                           {b.followersCount?.toLocaleString() ?? 0} followers
+                          <span aria-hidden="true">·</span>
+                          <Clock className="w-2.5 h-2.5" aria-hidden="true" />
+                          active {formatDistanceToNow(new Date(b.lastSeen))}
                         </p>
+                        {b.topics.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {b.topics.slice(0, 2).map((topic) => (
+                              <span
+                                key={topic}
+                                className="text-[9px] px-1.5 py-0.5 rounded-full bg-bh-bg-alt text-bh-text-dim border border-bh-border"
+                              >
+                                {topic}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </Link>
                   </li>
@@ -338,6 +380,10 @@ export function DashboardPage() {
       )}
     </div>
   )
+}
+
+function truncate(text: string, max: number) {
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -500,6 +546,10 @@ function SavedSearchRow({
             {query.keywords.join(', ')} · {query.sources.length} source{query.sources.length === 1 ? '' : 's'}
             {query.country && ` · ${query.country}`}
             {query.language && ` · ${query.language}`}
+          </p>
+          <p className="text-[10px] text-bh-text-dim mt-1 flex items-center gap-1">
+            <Clock className="w-2.5 h-2.5" aria-hidden="true" />
+            saved {formatDistanceToNow(new Date(query.createdAt))}
           </p>
           {exportMsg && (
             <p
