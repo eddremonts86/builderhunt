@@ -4,6 +4,7 @@ import { Compass, Loader2, Sparkles, ArrowRight, ArrowLeft, Upload, X, Check, Al
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { ai } from '~/shared/lib/ai/client'
 import { AIDownloadPrompt } from '~/shared/components/AIDownloadPrompt'
+import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
 import {
   manualCriteriaToVariant,
   type ExtractedCriteria,
@@ -48,6 +49,14 @@ interface FileEntry {
 // Step 3 — each selected file becomes its own sprint draft (its own
 // criteria + variants + save action), since one saved sprint = one
 // criteria set. Batch upload produces up to MAX_FILES independent drafts.
+interface PreviewItem {
+  variant: string
+  source: string
+  sourceId: string
+  score: number
+  profile: { username: string; displayName?: string; bio?: string; profileUrl: string; topics: string[] }
+}
+
 interface SprintDraft {
   fileId: string
   fileName: string
@@ -56,7 +65,7 @@ interface SprintDraft {
   variantSelected: boolean[]
   previewing: boolean
   previewCounts: Record<string, number> | null
-  previewTotal: number | null
+  previewItems: PreviewItem[] | null
   name: string
   saving: boolean
   savedSprintId: string | null
@@ -181,7 +190,7 @@ function NewSprintWizard() {
         variantSelected: variants.map(() => true),
         previewing: false,
         previewCounts: null,
-        previewTotal: null,
+        previewItems: null,
         name: entry.name.replace(/\.(txt|md)$/i, ''),
         saving: false,
         savedSprintId: null,
@@ -195,7 +204,7 @@ function NewSprintWizard() {
 
   const toggleDraftVariant = (fileId: string, index: number) => {
     setDrafts((prev) => prev.map((d) => (d.fileId === fileId
-      ? { ...d, variantSelected: d.variantSelected.map((v, i) => (i === index ? !v : v)), previewCounts: null, previewTotal: null }
+      ? { ...d, variantSelected: d.variantSelected.map((v, i) => (i === index ? !v : v)), previewCounts: null, previewItems: null }
       : d)))
   }
 
@@ -221,11 +230,11 @@ function NewSprintWizard() {
         return
       }
       const counts: Record<string, number> = {}
-      for (const item of data.items as Array<{ variant: string }>) {
+      for (const item of data.items as PreviewItem[]) {
         counts[item.variant] = (counts[item.variant] ?? 0) + 1
       }
       setDrafts((prev) => prev.map((d) => (d.fileId === fileId
-        ? { ...d, previewCounts: counts, previewTotal: data.items.length }
+        ? { ...d, previewCounts: counts, previewItems: data.items }
         : d)))
     } finally {
       setDrafts((prev) => prev.map((d) => (d.fileId === fileId ? { ...d, previewing: false } : d)))
@@ -439,9 +448,9 @@ function NewSprintWizard() {
                     {draft.previewing ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     Preview results
                   </button>
-                  {draft.previewTotal != null && (
+                  {draft.previewItems != null && (
                     <span className="text-xs text-bh-text-dim" data-testid="sprint-preview-count">
-                      {draft.previewTotal} matching people found (not saved yet)
+                      {draft.previewItems.length} matching people found (not saved yet)
                     </span>
                   )}
                   <button
@@ -455,6 +464,32 @@ function NewSprintWizard() {
                     Save sprint
                   </button>
                 </div>
+              )}
+
+              {draft.previewItems != null && (
+                draft.previewItems.length === 0 ? (
+                  <p className="text-sm text-bh-text-dim">No matches yet for the selected variants — try enabling more variants above.</p>
+                ) : (
+                  <ul className="space-y-2 max-h-96 overflow-y-auto pr-1" data-testid="sprint-preview-list">
+                    {draft.previewItems.map((item) => {
+                      const cardData: PersonCardData = {
+                        id: `${item.source}:${item.sourceId}`,
+                        username: item.profile.username,
+                        displayName: item.profile.displayName,
+                        source: item.source,
+                        bio: item.profile.bio,
+                        profileUrl: item.profile.profileUrl,
+                        topics: item.profile.topics,
+                        score: item.score,
+                      }
+                      return (
+                        <li key={cardData.id}>
+                          <PersonResultCard builder={cardData} />
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )
               )}
             </div>
           ))}

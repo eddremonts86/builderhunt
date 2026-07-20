@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Compass, Plus, Trash2, Pause, Play } from 'lucide-react'
-import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { Compass, Plus, Trash2, Pause, Play, PlayCircle, Loader2 } from 'lucide-react'
+import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor } from '~/shared/lib/sprints-shared'
 
 interface SprintRow {
@@ -20,7 +20,8 @@ export const Route = createFileRoute('/_dashboard/sprints/')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
     if (!user.userId) throw new Error('Unauthorized')
-    return { user }
+    const isAdmin = await getIsAppAdmin()
+    return { user, isAdmin }
   },
   component: SprintsListPage,
 })
@@ -36,9 +37,12 @@ function sprintProgress(sprint: SprintRow): number {
 }
 
 function SprintsListPage() {
+  const { isAdmin } = Route.useRouteContext()
   const [sprints, setSprints] = React.useState<SprintRow[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [runningJob, setRunningJob] = React.useState(false)
+  const [runNote, setRunNote] = React.useState<string | null>(null)
 
   const load = React.useCallback(async () => {
     try {
@@ -54,6 +58,24 @@ function SprintsListPage() {
   React.useEffect(() => {
     load()
   }, [load])
+
+  const runJobNow = async () => {
+    setRunningJob(true)
+    setRunNote(null)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/sprints/run-worker', { method: 'POST', credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to run the sourcing job')
+        return
+      }
+      setRunNote('Job run triggered — refreshing results…')
+      await load()
+    } finally {
+      setRunningJob(false)
+    }
+  }
 
   const toggle = async (sprint: SprintRow) => {
     setError(null)
@@ -85,11 +107,27 @@ function SprintsListPage() {
           <Compass className="w-5 h-5 text-bh-accent" />
           <h1 className="text-xl font-bold text-bh-text">Sourcing sprints</h1>
         </div>
-        <Link to="/sprints/new" className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
-          <Plus className="w-4 h-4" /> New sprint
-        </Link>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={runJobNow}
+              disabled={runningJob}
+              className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              data-testid="sprint-run-job-button"
+              title="Manually run the sourcing worker now instead of waiting for the next scheduled run"
+            >
+              {runningJob ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+              Run job now
+            </button>
+          )}
+          <Link to="/sprints/new" className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
+            <Plus className="w-4 h-4" /> New sprint
+          </Link>
+        </div>
       </div>
 
+      {runNote && <p className="text-sm text-bh-text-dim mb-4">{runNote}</p>}
       {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
 
       {loading ? (
