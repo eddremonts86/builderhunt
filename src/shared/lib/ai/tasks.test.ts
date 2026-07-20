@@ -28,6 +28,53 @@ describe('AI task registry', () => {
     expect(task?.outputSchema.safeParse({ keywords: ['rust'], sources: ['not-a-real-source'] }).success).toBe(false)
   })
 
+  it('registers outreach-draft as local-first, no-cache, with the OutreachDraft output schema + banned-cliché refine', () => {
+    const task = getTask('outreach-draft')
+    expect(task).not.toBeNull()
+    expect(task?.tier).toBe('local-first')
+    expect(task?.cacheTtlSeconds).toBeNull()
+    expect(task?.allowances).toEqual({ free: 10, pro: 100, team: 200 })
+
+    const validInput = {
+      builder: {
+        username: 'alice',
+        bio: 'I build distributed systems in Rust',
+        topics: ['rust', 'distributed-systems'],
+        profileUrl: 'https://github.com/alice',
+        source: 'github',
+      },
+      job: { title: 'Senior Rust Engineer', company: 'Acme' },
+      tone: 'professional',
+    }
+    expect(task?.inputSchema.safeParse(validInput).success).toBe(true)
+    expect(task?.inputSchema.safeParse({ ...validInput, tone: 'sarcastic' }).success).toBe(false)
+
+    const revisionInput = {
+      ...validInput,
+      revision: { previousBody: 'Hi Alice, quick note about the role.', instruction: 'shorten' },
+    }
+    expect(task?.inputSchema.safeParse(revisionInput).success).toBe(true)
+
+    const cleanOutput = {
+      subject: 'Rust role at Acme',
+      body: 'Hi Alice, your work on distributed-systems caught my eye. We are hiring a Senior Rust Engineer at Acme and think you would be a strong fit. Open to a short chat this week?',
+      hookSource: 'topic: distributed-systems',
+    }
+    expect(task?.outputSchema.safeParse(cleanOutput).success).toBe(true)
+
+    const clicheOutput = { ...cleanOutput, body: `${cleanOutput.body} This is truly an exciting opportunity.` }
+    expect(task?.outputSchema.safeParse(clicheOutput).success).toBe(false)
+
+    const rockstarOutput = { ...cleanOutput, subject: 'Looking for a rockstar Rust engineer' }
+    expect(task?.outputSchema.safeParse(rockstarOutput).success).toBe(false)
+
+    // buildPrompt wraps the untrusted builder profile block (bio/topics) in <untrusted> tags.
+    const prompt = task!.buildPrompt(validInput)
+    expect(prompt).toContain('<untrusted>')
+    expect(prompt).toContain('</untrusted>')
+    expect(prompt).toContain('distributed systems in Rust')
+  })
+
   it('every registered task has a non-empty system prompt, full allowances, and positive maxOutputTokens', () => {
     for (const task of Object.values(AI_TASKS)) {
       expect(task.system.trim().length).toBeGreaterThan(0)

@@ -1,6 +1,6 @@
 # Outreach Generator v2 — AI Upgrade of the Outreach Copilot (spec)
 
-> **Status**: `partially-implemented` (v1 rule-based generator shipped; the AI upgrade is pending)
+> **Status**: `complete` (v1 rule-based generator + v2 AI upgrade both shipped, 2026-07-20)
 > **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (AI Platform — `ai()` client, task registry, `/api/ai/complete`, capabilities/download UX)
 > **Blocks**: nothing
 > **Reality check**: v1 exists and stays: `src/shared/lib/outreach.ts` (rule-based `generateOutreach`, tones `'casual' | 'professional' | 'geek'`, hook selection from bio/topics/language/followers, tested in `outreach.test.ts`) and `src/modules/builder-profile/components/OutreachCopilot.tsx` (panel with job inputs, tone radio group, draft render, copy button). This plan upgrades that panel to AI drafting; **v1 remains the final fallback rung** per `_meta/ai-policy.md` rule 7.
