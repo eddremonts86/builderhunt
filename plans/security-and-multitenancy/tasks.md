@@ -3,10 +3,14 @@
 > **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
-> **Reality check**: migrations `0001`–`0009` now provide the additive foundation and RLS has passed
-> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, and bootstrap checks. The 37
-> remaining legacy direct-db imports are tracked by `security:boundaries`; no destructive contract
-> migration or production credential switch is authorized until they reach zero and readiness passes.
+> **Reality check**: migrations `0000`–`0012` now provide the additive foundation and RLS has passed
+> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, bootstrap, worker/claim-policy,
+> and platform-role checks. `pnpm security:boundaries` now reports **0** tracked legacy direct-db
+> imports (down from 37) — verified 2026-07-20. No destructive contract migration or production
+> credential switch is authorized yet: `organization_id` is still nullable on most tenant tables,
+> `.env.example` still defaults both tenant migration modes to `legacy`, and `assessTenantReadiness`
+> still requires production-only evidence (24h zero-mismatch shadow window, restore rehearsal,
+> exact-role RLS/API/worker isolation runs) that has not been produced.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.

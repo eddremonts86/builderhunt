@@ -64,6 +64,9 @@ jobs:
           RESTORE_TEST_TARGET_URL=postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_restore \
           pnpm db:restore-test
       - run: pnpm security:boundaries
+      - name: Tenant schema classification (informational until contract phase)
+        continue-on-error: true
+        run: pnpm db:audit-schema
       - run: pnpm lint
       - run: pnpm type-check
       - run: pnpm test

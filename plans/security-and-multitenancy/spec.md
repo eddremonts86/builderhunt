@@ -4,10 +4,16 @@
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/spec.md), [`shared-resources`](../shared-resources/spec.md), [`activity-feed`](../activity-feed/spec.md), [`ai-expansion`](../ai-expansion/spec.md), [`semantic-search`](../semantic-search/spec.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/spec.md), [`production-infrastructure`](../production-infrastructure/spec.md)
 > **Reality check**: the additive organization, tenant-key, entitlement, normalized-builder,
-> auth-broker, backfill-state, bootstrap, and RLS layers are implemented through migration `0009`
-> and verified against local PostgreSQL. Product route/repository cutover and the remaining legacy
-> resource/builder backfills are still in progress; 37 direct global-db imports are ratcheted and
-> must reach zero before canonical mode.
+> auth-broker, backfill-state, bootstrap, RLS, worker/claim policies, and platform-role layers are
+> implemented through migration `0012` and verified against local PostgreSQL. The tenant-boundary
+> ratchet (`pnpm security:boundaries`) now tracks **0** legacy global-db imports (down from the
+> earlier 37) and dual-write/shadow-read/backfill/readiness modules exist with tests. Still **not**
+> done: `TENANT_READ_MODE`/`TENANT_WRITE_MODE` default to `legacy` in `.env.example` (canonical mode
+> is not enabled anywhere), most tenant tables still have a **nullable** `organization_id` (contract
+> phase/`NOT NULL` not applied), no contract migration has dropped legacy columns, and
+> `assessTenantReadiness` requires production-only evidence (24h zero-mismatch shadow window,
+> restore rehearsal, exact-role RLS/API/worker isolation runs) that has not been produced. Status
+> remains `in_progress` until canonical cutover and contract land.
 
 ## Problem
 

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getOnboardingStatus } from '~/shared/lib/onboarding'
 
 export const Route = createFileRoute('/api/onboarding/status')({
@@ -8,13 +9,14 @@ export const Route = createFileRoute('/api/onboarding/status')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const status = await getOnboardingStatus(session.user.id)
+          const principal = await requireTenantPrincipal(request)
+          const status = await withTenantContext(principal, (tx) =>
+            getOnboardingStatus(tx, principal.organizationId, principal.userId))
           return Response.json(status)
         } catch (err) {
+          if (err instanceof TenantAuthorizationError) {
+            return Response.json({ error: err.message }, { status: err.status })
+          }
           console.error('Onboarding status error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

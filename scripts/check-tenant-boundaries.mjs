@@ -11,18 +11,26 @@ const authDbAllowlist = new Set([
   'src/shared/lib/auth/tenant-principal.ts',
   'src/shared/lib/db/auth-db.ts',
 ])
+// Global-public data/health surfaces are explicitly allowed to read the
+// unscoped runtime db directly (static or dynamic import) — they never
+// touch tenant-private tables and select only allowlisted public columns.
+const globalDbAllowlist = new Set([
+  'src/routes/api/status/index.ts',
+  'src/shared/lib/public-data.ts',
+])
 
 const files = await sourceFiles(sourceRoot)
 const actualLegacy = new Set()
 const findings = []
+const globalDbImportPattern = /(?:from\s+['"]~\/shared\/lib\/db\/index['"]|import\(\s*['"]~\/shared\/lib\/db\/index['"]\s*\))/
 
 for (const absolutePath of files) {
   const path = relative(root, absolutePath)
   const source = await readFile(absolutePath, 'utf8')
-  const importsGlobalDb = /from\s+['"]~\/shared\/lib\/db\/index['"]/.test(source)
-  if (importsGlobalDb) {
+  const importsGlobalDb = globalDbImportPattern.test(source)
+  if (importsGlobalDb && !globalDbAllowlist.has(path)) {
     actualLegacy.add(path)
-    if (!legacyDirectDbImports.has(path)) findings.push(`${path}: new global db import`)
+    if (!legacyDirectDbImports.has(path)) findings.push(`${path}: new global db import (static or dynamic)`)
     if (path.includes('/repositories/')) findings.push(`${path}: tenant repository imports global db`)
   }
   if (/from\s+['"][^'"]*auth-db['"]/.test(source) && !authDbAllowlist.has(path)) {

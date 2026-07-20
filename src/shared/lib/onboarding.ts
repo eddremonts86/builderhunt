@@ -3,10 +3,13 @@
  *
  * Steps: 0 (not started) → 1 (welcome seen) → 2 (first search) → 3 (saved 3+ builders, completed)
  *
- * Server-only library: all DB calls are made via dynamic import of
- * `~/shared/lib/db/index` so the client bundle never imports the
- * `postgres` driver (which needs Node's `Buffer`).
+ * Tenant-scoped library: every call receives a `TenantTransaction` from
+ * `withTenantContext` so reads/writes run under the caller's RLS-scoped
+ * connection settings instead of a global unscoped `db` handle.
  */
+import { and, eq, sql } from 'drizzle-orm'
+import type { TenantTransaction } from '~/shared/lib/db/client'
+import { builders, onboardingProgress, savedQueries } from '~/shared/lib/db/schema'
 
 export const STARTER_QUERIES = [
   'rust async runtime',
@@ -32,20 +35,15 @@ export interface OnboardingStatus {
 const ONBOARDING_WINDOW_DAYS = 7
 const MAX_SKIPS = 3
 
-async function getDb() {
-  const { db } = await import('~/shared/lib/db/index')
-  const { onboardingProgress, savedQueries, builders } = await import('~/shared/lib/db/schema')
-  const { eq, sql } = await import('drizzle-orm')
-  return { db, onboardingProgress, savedQueries, builders, eq, sql }
-}
-
-export async function getOnboardingStatus(userId: string): Promise<OnboardingStatus> {
-  const { db, onboardingProgress, eq } = await getDb()
-
-  const [row] = await db
+export async function getOnboardingStatus(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+): Promise<OnboardingStatus> {
+  const [row] = await transaction
     .select()
     .from(onboardingProgress)
-    .where(eq(onboardingProgress.userId, userId))
+    .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
     .limit(1)
 
   if (!row) {
@@ -56,7 +54,7 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
       skippedCount: 0,
       firstQueryId: null,
       firstBuilderIds: [],
-      eligible: await isEligibleForOnboarding(userId, null),
+      eligible: await isEligibleForOnboarding(transaction, userId, null),
     }
   }
 
@@ -67,11 +65,12 @@ export async function getOnboardingStatus(userId: string): Promise<OnboardingSta
     skippedCount: row.skippedCount,
     firstQueryId: row.firstQueryId,
     firstBuilderIds: row.firstBuilderIds ?? [],
-    eligible: await isEligibleForOnboarding(userId, row),
+    eligible: await isEligibleForOnboarding(transaction, userId, row),
   }
 }
 
 async function isEligibleForOnboarding(
+  transaction: TenantTransaction,
   userId: string,
   row: { completed: boolean; skippedCount: number; createdAt: Date } | null,
 ): Promise<boolean> {
@@ -82,13 +81,11 @@ async function isEligibleForOnboarding(
     if (Date.now() - row.createdAt.getTime() > windowMs) return false
   }
 
-  const { db, savedQueries, builders, eq, sql } = await getDb()
-
-  const [{ count: searches }] = await db
+  const [{ count: searches }] = await transaction
     .select({ count: sql<number>`count(*)::int` })
     .from(savedQueries)
     .where(eq(savedQueries.userId, userId))
-  const [{ count: saved }] = await db
+  const [{ count: saved }] = await transaction
     .select({ count: sql<number>`count(*)::int` })
     .from(builders)
     .where(eq(builders.userId, userId))
@@ -100,20 +97,24 @@ async function isEligibleForOnboarding(
   return true
 }
 
-export async function ensureOnboardingRow(userId: string): Promise<void> {
-  const { db, onboardingProgress } = await getDb()
-  await db
+export async function ensureOnboardingRow(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+): Promise<void> {
+  await transaction
     .insert(onboardingProgress)
-    .values({ userId, step: 0 })
+    .values({ userId, organizationId, step: 0 })
     .onConflictDoNothing()
 }
 
 export async function advanceOnboarding(
+  transaction: TenantTransaction,
+  organizationId: string,
   userId: string,
   patch: { step?: number; firstQueryId?: string; addBuilderId?: string; completed?: boolean },
 ): Promise<OnboardingStatus> {
-  const { db, onboardingProgress, sql, eq } = await getDb()
-  await ensureOnboardingRow(userId)
+  await ensureOnboardingRow(transaction, organizationId, userId)
 
   const update: Record<string, unknown> = { updatedAt: new Date() }
 
@@ -128,20 +129,26 @@ export async function advanceOnboarding(
     update.firstBuilderIds = sql`COALESCE(${onboardingProgress.firstBuilderIds}, '[]'::jsonb) || ${JSON.stringify([patch.addBuilderId])}::jsonb`
   }
 
-  await db.update(onboardingProgress).set(update).where(eq(onboardingProgress.userId, userId))
-  return getOnboardingStatus(userId)
+  await transaction
+    .update(onboardingProgress)
+    .set(update)
+    .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
+  return getOnboardingStatus(transaction, organizationId, userId)
 }
 
-export async function skipOnboarding(userId: string): Promise<OnboardingStatus> {
-  const { db, onboardingProgress, sql, eq } = await getDb()
-  await ensureOnboardingRow(userId)
-  await db
+export async function skipOnboarding(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+): Promise<OnboardingStatus> {
+  await ensureOnboardingRow(transaction, organizationId, userId)
+  await transaction
     .update(onboardingProgress)
     .set({
       skipped: true,
       skippedCount: sql`${onboardingProgress.skippedCount} + 1`,
       updatedAt: new Date(),
     })
-    .where(eq(onboardingProgress.userId, userId))
-  return getOnboardingStatus(userId)
+    .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
+  return getOnboardingStatus(transaction, organizationId, userId)
 }

@@ -4,10 +4,14 @@
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/plan.md), [`shared-resources`](../shared-resources/plan.md), [`activity-feed`](../activity-feed/plan.md), [`ai-expansion`](../ai-expansion/plan.md), [`semantic-search`](../semantic-search/plan.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/plan.md), [`production-infrastructure`](../production-infrastructure/plan.md)
 > **Reality check**: roles, Better Auth organizations, tenant context, normalized expand schema,
-> personal-organization bootstrap, RLS, and local exact-role verification are implemented. The
-> runtime still has 37 explicitly baselined legacy global-db imports; canonical flags remain blocked
-> until resource backfills, shadow comparison, route/worker/privacy migration, restore evidence, and
-> the full readiness manifest pass.
+> personal-organization bootstrap, RLS, worker/claim policies, platform role, and local exact-role
+> verification are implemented, including dual-write/shadow-read/backfill/readiness code with tests.
+> The tenant-boundary ratchet is now at **0** baselined legacy global-db imports (verified via
+> `pnpm security:boundaries`), down from 37. Canonical flags remain blocked: `.env.example` still
+> defaults `TENANT_READ_MODE`/`TENANT_WRITE_MODE` to `legacy`, most tenant tables keep a nullable
+> `organization_id` (no contract migration yet), and `assessTenantReadiness` still requires
+> production evidence (24h zero-mismatch shadow window, restore rehearsal, exact-role RLS/API/worker
+> isolation runs) that has not been produced.
 
 ## Delivery principle
 
