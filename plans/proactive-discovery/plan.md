@@ -1,6 +1,7 @@
 # Proactive Discovery Worker (plan)
 
-> **Status**: `pending`
+> **Status**: `implemented` — Phases 1-3 shipped, tested (`pnpm test` 358/358, `pnpm lint`
+> 0 errors), and live-verified against the dev DB via Playwright (see tasks.md).
 > **Depends on**: [`semantic-search`](../semantic-search/spec.md) (hard — needs
 > `builder_embeddings` + `upsertEmbeddingStubs` from its Phases 1–2)
 > **Blocks**: nothing hard — enhances semantic-search cold start;

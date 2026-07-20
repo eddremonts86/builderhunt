@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { Activity, Database, Cpu, RefreshCw } from 'lucide-react'
+import { Activity, Database, Cpu, RefreshCw, Compass } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 
 interface MetricsResponse {
@@ -17,10 +17,16 @@ interface MetricsResponse {
     totalUsers: number
     newUsersLast24h: number
     newUsersLast7d: number
-    totalSavedQueries: number
-    totalBuilders: number
-    totalNotes: number
+    totalSavedQueries: number | null
+    totalBuilders: number | null
+    totalNotes: number | null
   }
+  discovery: {
+    cursor: number
+    lastCellKey: string | null
+    lastRunAt: string | null
+    stats: { runs: number; upserted: number; errors: number }
+  } | null
   server: {
     nodeVersion: string
     platform: string
@@ -145,6 +151,31 @@ function AdminMetricsPage() {
         </div>
       </section>
 
+      <section className="card p-5 mb-6" data-testid="metrics-discovery">
+        <h2 className="font-semibold mb-3 flex items-center gap-2">
+          <Compass className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+          Proactive discovery
+        </h2>
+        {data.discovery ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricCard label="Runs" value={data.discovery.stats.runs} />
+            <MetricCard label="Upserted" value={data.discovery.stats.upserted} />
+            <MetricCard label="Errors" value={data.discovery.stats.errors} />
+            <div className="card p-3">
+              <p className="text-xs text-bh-text-dim mb-1">Cursor / last cell</p>
+              <p className="font-mono text-xs">
+                {data.discovery.cursor} · {data.discovery.lastCellKey ?? '—'}
+              </p>
+              <p className="text-xs text-bh-text-dim mt-1">
+                {data.discovery.lastRunAt ? new Date(data.discovery.lastRunAt).toLocaleString() : 'never run'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-bh-text-muted">Worker has not run yet.</p>
+        )}
+      </section>
+
       <section className="card p-5" data-testid="metrics-server">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Cpu className="w-4 h-4 text-bh-accent" aria-hidden="true" />
@@ -189,11 +220,11 @@ function AdminMetricsPage() {
   )
 }
 
-function MetricCard({ label, value }: { label: string; value: number }) {
+function MetricCard({ label, value }: { label: string; value: number | null }) {
   return (
     <div className="card p-3" data-testid={`metric-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       <p className="text-xs text-bh-text-dim mb-1">{label}</p>
-      <p className="text-2xl font-bold text-bh-text">{value.toLocaleString()}</p>
+      <p className="text-2xl font-bold text-bh-text">{value === null ? '—' : value.toLocaleString()}</p>
     </div>
   )
 }

@@ -56,6 +56,10 @@
     "0013_polite_night_thrasher": {
       "sql": "08ee6ef558a3d7a061cd4c99b5a701bfc8fe747ec4bec258e46d501ac2c2fba4",
       "snapshot": "57ebeadaf8f2f0eefca835be98848e1f0e9ef96ee93d5dc455155f23d8d8aa37"
+    },
+    "0014_ambitious_whiplash": {
+      "sql": "d8be4ffc6337fe8ba6146b8a7bbddeb0da8eb970e72b153f93c4b9ce00cf205b",
+      "snapshot": "9304a03bfcedf418f93132dcd8f774ed455e50d93243601f5b3804cd81f4a10f"
     }
   }
 }

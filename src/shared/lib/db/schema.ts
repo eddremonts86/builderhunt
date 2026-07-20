@@ -615,3 +615,21 @@ export const builderEmbeddings = pgTable(
     index('builder_embeddings_pending_idx').on(table.embeddedAt),
   ],
 )
+
+// ---------------------------------------------------------------------------
+// Proactive Discovery (plan: proactive-discovery) — single-row cursor state
+// for the background worker that walks DISCOVERY_MATRIX
+// (src/lib/discovery/matrix.ts) and write-throughs into builder_embeddings
+// above. Postgres, not Redis, because the cursor must survive restarts.
+// ---------------------------------------------------------------------------
+
+export const discoveryState = pgTable('discovery_state', {
+  id: text('id').primaryKey(), // constant 'default'
+  cursor: integer('cursor').notNull().default(0),
+  lastCellKey: text('last_cell_key'),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+  stats: jsonb('stats')
+    .$type<{ runs: number; upserted: number; errors: number }>()
+    .notNull()
+    .default({ runs: 0, upserted: 0, errors: 0 }),
+})

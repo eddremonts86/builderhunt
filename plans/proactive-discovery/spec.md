@@ -1,6 +1,8 @@
 # Proactive Discovery Worker (spec)
 
-> **Status**: `pending`
+> **Status**: `implemented` — Phases 1-3 shipped and live-verified (see tasks.md for
+> evidence). The "Future (not scheduled)" `discovery-keywords` AI task remains
+> explicitly out of scope, pending an `ai-expansion` spec revision.
 > **Depends on**: [`semantic-search`](../semantic-search/spec.md) (hard — this plan writes
 > through its `builder_embeddings` upsert helper `src/lib/semantic/index-writer.ts`;
 > schema + Phase 2 of that plan must exist first). No direct dependency on

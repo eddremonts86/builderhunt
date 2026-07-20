@@ -45,6 +45,9 @@ const zodEnv = z.object({
   AI_EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   AI_DISABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED_TASKS: z.string().default(''),
+  // Plan: proactive-discovery
+  DISCOVERY_CELLS_PER_RUN: z.coerce.number().int().positive().default(2),
+  DISCOVERY_DAILY_STUB_CAP: z.coerce.number().int().positive().default(1500),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
