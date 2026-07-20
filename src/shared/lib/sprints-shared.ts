@@ -85,3 +85,19 @@ export function manualCriteriaToVariant(criteria: ExtractedCriteria): QueryVaria
     rationale: 'Deterministic fallback built directly from the reviewed skills list.',
   }
 }
+
+/**
+ * Real progress from the sprint's own worker cursor — never a fabricated
+ * "Searching..." live state. 100% once every variant/page cell has run at
+ * least once. `completed` sprints are always shown at 100%.
+ */
+export function sprintProgressPercent(
+  status: 'active' | 'paused' | 'completed',
+  cursor: SprintCursor,
+  variantCount: number,
+): number {
+  if (status === 'completed') return 100
+  const totalCells = Math.max(1, variantCount * MAX_VARIANTS_PER_CELL_PAGE)
+  const doneCells = cursor.variantIndex * MAX_VARIANTS_PER_CELL_PAGE + cursor.page
+  return Math.min(100, Math.round((doneCells / totalCells) * 100))
+}

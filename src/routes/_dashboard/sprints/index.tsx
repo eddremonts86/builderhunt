@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Compass, Plus, Trash2, Pause, Play } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { sprintProgressPercent, type QueryVariant, type SprintCursor } from '~/shared/lib/sprints-shared'
 
 interface SprintRow {
   id: string
@@ -10,6 +11,9 @@ interface SprintRow {
   quota: number
   lastRunAt: string | null
   createdAt: string
+  resultCount: number
+  variants: QueryVariant[]
+  cursor: SprintCursor
 }
 
 export const Route = createFileRoute('/_dashboard/sprints/')({
@@ -25,6 +29,10 @@ const STATUS_LABEL: Record<SprintRow['status'], string> = {
   active: 'Active',
   paused: 'Paused',
   completed: 'Completed',
+}
+
+function sprintProgress(sprint: SprintRow): number {
+  return sprintProgressPercent(sprint.status, sprint.cursor, sprint.variants.length)
 }
 
 function SprintsListPage() {
@@ -103,9 +111,15 @@ function SprintsListPage() {
               <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} className="min-w-0 flex-1">
                 <p className="font-medium text-bh-text truncate">{sprint.name}</p>
                 <p className="text-xs text-bh-text-dim">
-                  {STATUS_LABEL[sprint.status]} · quota {sprint.quota} · last run{' '}
+                  {STATUS_LABEL[sprint.status]} · {sprint.resultCount} candidates found · last run{' '}
                   {sprint.lastRunAt ? new Date(sprint.lastRunAt).toLocaleString() : 'never'}
                 </p>
+                <div className="mt-1.5 h-1 w-full max-w-xs rounded-full bg-bh-surface/60 overflow-hidden" data-testid="sprint-progress">
+                  <div
+                    className="h-full rounded-full bg-bh-accent transition-all"
+                    style={{ width: `${sprintProgress(sprint)}%` }}
+                  />
+                </div>
               </Link>
               <div className="flex items-center gap-2 shrink-0">
                 {sprint.status !== 'completed' && (

@@ -4,7 +4,7 @@ import { Compass, Loader2, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { ai } from '~/shared/lib/ai/client'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
-import type { SprintFilter } from '~/shared/lib/sprints-shared'
+import { sprintProgressPercent, type QueryVariant, type SprintCursor, type SprintFilter } from '~/shared/lib/sprints-shared'
 
 export const Route = createFileRoute('/_dashboard/sprints/$sprintId/')({
   beforeLoad: async () => {
@@ -21,6 +21,8 @@ interface SprintDetail {
   status: 'active' | 'paused' | 'completed'
   quota: number
   lastRunAt: string | null
+  cursor: SprintCursor
+  variants: QueryVariant[]
 }
 
 interface ResultItem {
@@ -36,6 +38,12 @@ interface ResultItem {
 
 interface Facet { location: string; count: number }
 
+// Chat-style history for filter-refine — client state only, not persisted.
+interface RefineTurn {
+  instruction: string
+  explanation: string
+}
+
 function SprintDossierPage() {
   const { sprintId } = Route.useParams()
   const [sprint, setSprint] = React.useState<SprintDetail | null>(null)
@@ -48,7 +56,7 @@ function SprintDossierPage() {
   const [minFollowersInput, setMinFollowersInput] = React.useState('')
   const [instruction, setInstruction] = React.useState('')
   const [refining, setRefining] = React.useState(false)
-  const [refineNote, setRefineNote] = React.useState<string | null>(null)
+  const [refineHistory, setRefineHistory] = React.useState<RefineTurn[]>([])
   const [loading, setLoading] = React.useState(true)
   const [trackedIds, setTrackedIds] = React.useState<Set<string>>(new Set())
 
@@ -95,17 +103,19 @@ function SprintDossierPage() {
 
   const refine = async () => {
     if (instruction.trim().length < 2) return
+    const submittedInstruction = instruction.trim()
     setRefining(true)
-    setRefineNote(null)
     try {
-      const result = await ai<{ filters: SprintFilter; explanation: string }>('filter-refine', { filters: filter, instruction })
+      const result = await ai<{ filters: SprintFilter; explanation: string }>('filter-refine', { filters: filter, instruction: submittedInstruction })
       setFilter(result.output.filters)
       setKeywordInput(result.output.filters.keywords.join(', '))
       setMinFollowersInput(result.output.filters.minFollowers != null ? String(result.output.filters.minFollowers) : '')
-      setRefineNote(result.output.explanation)
+      setRefineHistory((prev) => [...prev, { instruction: submittedInstruction, explanation: result.output.explanation }])
+      setInstruction('')
       load(result.output.filters, sort)
     } catch {
-      setRefineNote('AI refinement unavailable — use the manual filters above.')
+      setRefineHistory((prev) => [...prev, { instruction: submittedInstruction, explanation: 'AI refinement unavailable — use the manual filters above.' }])
+      setInstruction('')
     } finally {
       setRefining(false)
     }
@@ -139,9 +149,18 @@ function SprintDossierPage() {
         <h1 className="text-xl font-bold text-bh-text">{sprint?.name ?? 'Sprint'}</h1>
       </div>
       {sprint && (
-        <p className="text-xs text-bh-text-dim mb-6">
-          {sprint.status} · quota {sprint.quota} · {total} results
-        </p>
+        <>
+          <p className="text-xs text-bh-text-dim mb-1.5">
+            {sprint.status} · quota {sprint.quota} · {total} results · last run{' '}
+            {sprint.lastRunAt ? new Date(sprint.lastRunAt).toLocaleString() : 'never'}
+          </p>
+          <div className="h-1.5 w-full max-w-sm rounded-full bg-bh-surface/60 overflow-hidden mb-6" data-testid="sprint-progress">
+            <div
+              className="h-full rounded-full bg-bh-accent transition-all"
+              style={{ width: `${sprintProgressPercent(sprint.status, sprint.cursor, sprint.variants.length)}%` }}
+            />
+          </div>
+        </>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6">
@@ -174,20 +193,32 @@ function SprintDossierPage() {
               <input
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && refine()}
                 placeholder='Refine with AI, e.g. "only github, remote"'
                 className="flex-1 rounded-md border border-bh-border bg-bh-surface/40 p-2 text-sm text-bh-text"
+                data-testid="sprint-refine-input"
               />
               <button
                 type="button"
                 onClick={refine}
                 disabled={refining}
                 className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-sm"
+                data-testid="sprint-refine-button"
               >
                 {refining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 Refine
               </button>
             </div>
-            {refineNote && <p className="text-xs text-bh-text-dim">{refineNote}</p>}
+            {refineHistory.length > 0 && (
+              <ul className="space-y-2 max-h-48 overflow-y-auto" data-testid="sprint-refine-history">
+                {refineHistory.map((turn, i) => (
+                  <li key={i} className="text-xs">
+                    <p className="text-bh-text font-medium">“{turn.instruction}”</p>
+                    <p className="text-bh-text-dim">{turn.explanation}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {loading ? (

@@ -203,3 +203,83 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 
 - Team sharing after both team dependencies, with server-resolved `organizationId` and cross-org isolation tests.
 - PDF/DOCX extraction, normalized geocoding/MapLibre, and work-sample/code analysis as separate plans.
+
+## Phase 7 — v2 UI reconciliation with reference mockups
+
+> Reconciles the shipped v1 UI against `assets/*.jpg`. PDF/DOCX parsing and the map pane
+> are explicitly NOT in this phase (see Future above / spec.md v2 note).
+
+- [x] **Batch upload: up to 10 `.txt`/`.md` files, processed independently**
+  - Files: `src/routes/_dashboard/sprints/new.tsx`
+  - Do: Replace the single textarea with a drop/pick zone accepting up to 10 files with a
+    `.txt`/`.md` extension (reject others with a visible error, never silently). Each file
+    becomes its own queue row (name, status: pending/parsing/ready/error) and gets its own
+    independent `ai('jd-parse', { text })` call. Keep the existing paste-a-single-block
+    flow working (paste = a queue of exactly one item). Ready files each produce their own
+    editable criteria card (Step 2 as it exists today, repeated per file) with a checkbox
+    to select which ones proceed to Step 3. Daily `jd-parse` allowance exhaustion mid-batch
+    must show clearly per file ("daily AI limit reached" on the remaining pending rows),
+    never fail silently or fake success.
+  - Verify: manual browser test with 3 small `.txt` files — confirm 3 independent criteria
+    cards, a non-`.txt`/`.md` file is rejected with a visible message, and un-checking one
+    card excludes it from Step 3. — Done. Live Playwright test with 2 real `.txt` JDs +
+    1 rejected `.pdf`: the `.pdf` was rejected with a visible message
+    ("Only .txt and .md files are supported...") while both `.txt` files queued, parsed
+    sequentially via real MiniMax `jd-parse` calls, and produced two fully independent,
+    editable criteria cards with their own "Include" checkboxes. Since one saved sprint =
+    one criteria set, each selected file becomes its own sprint draft in Step 3 (not a
+    single merged sprint) — both were saved as two separate, real, independent sprints.
+
+- [x] **Per-variant candidate counts + variant-selection checkboxes**
+  - Files: `src/routes/_dashboard/sprints/new.tsx`
+  - Do: No backend change needed — `/api/sprints/preview` already tags every item with
+    `variant`. Group the existing preview `items` client-side by `variant` and render a
+    count per variant card ("~N candidates") plus a checkbox per variant so the user can
+    deselect variants before saving, instead of always saving all proposed variants.
+  - Verify: preview a real JD, confirm each variant card shows its own real count (sum of
+    per-variant counts ≥ the deduped total already shown), unchecking a variant excludes it
+    from the saved sprint. — Done. Live Playwright test: unchecked one of 4 proposed
+    variants, ran preview, and each remaining variant showed its own real per-variant count
+    (~60, ~0, ~30 candidates) summing to the real "90 matching people found" total; the
+    unchecked variant was excluded from the preview call and the saved sprint.
+
+- [x] **Sprint list surfaces a real result count**
+  - Files: `src/lib/sprints/service.ts`, `src/routes/api/sprints/index.ts`,
+    `src/routes/_dashboard/sprints/index.tsx`
+  - Do: Extend `listSprints` to include a real `resultCount` (count of `sprint_results` rows
+    per sprint, not fabricated) and render it on each list row.
+  - Verify: `pnpm type-check`; browser check that a sprint with real results shows its count.
+    — Done. `listSprints` now does a `leftJoin` + `count(sprint_results.id)` grouped by
+    sprint, exposed as `resultCount` on `SprintListItem`. `pnpm type-check`/`pnpm lint`
+    clean. Live browser check: freshly-saved sprints (no worker runs yet) correctly show
+    "0 candidates found", while an older sprint the worker had already run shows the real
+    "5 candidates found" — never a fabricated number.
+
+- [x] **Chat-style `filter-refine` history**
+  - Files: `src/routes/_dashboard/sprints/$sprintId/index.tsx`
+  - Do: Replace the single-line refine input with a scrollable message history (client
+    state only, not persisted) showing each instruction + the AI's `explanation`. The
+    underlying `filter-refine` call and its manual-filter fallback are unchanged.
+  - Verify: browser check that 2+ refine turns both appear in the history, oldest first.
+    — Done. Live Playwright test with 2 real sequential `filter-refine` calls against
+    MiniMax ("only people with more than 100 followers", then "only github, not gitlab") —
+    both turns rendered oldest-first with their real AI `explanation` text, input cleared
+    after each submit, underlying filter/results fetch unchanged.
+
+- [x] **Honest cursor-based progress indicator**
+  - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/routes/_dashboard/sprints/$sprintId/index.tsx`
+  - Do: Compute `(cursor.variantIndex * MAX_VARIANTS_PER_CELL_PAGE + cursor.page) /
+    (variants.length * MAX_VARIANTS_PER_CELL_PAGE)` from the sprint's real cursor/variants
+    and render it as a progress bar with "last run: Xm ago" — never a fabricated
+    "Searching..." live state.
+  - Verify: browser check against a sprint that has run ≥ 1 time; percentage matches the
+    real cursor position. — Done. Extracted the calc into a shared
+    `sprintProgressPercent()` helper in `sprints-shared.ts` (used by both the list and the
+    dossier, avoiding duplicate logic). Live browser/screenshot check: never-run sprints
+    show a near-empty bar, the one real sprint the worker had advanced shows a
+    proportionally longer bar, and the dossier header shows "last run: <real timestamp>"
+    (or "never") next to it — no fabricated live state anywhere.
+
+All five Phase 7 tasks verified together: `pnpm type-check` clean, `pnpm lint` 0 errors
+(same 29 pre-existing warnings, none new), `pnpm vitest run -t sprint` 11/11 passing. PDF/
+DOCX parsing and the map pane remain explicitly out of scope for this phase (see Future).

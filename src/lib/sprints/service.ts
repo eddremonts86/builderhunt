@@ -3,7 +3,7 @@
 // an explicit `organizationId` and scopes every query by it (defense in
 // depth alongside the composite FK), matching the `organization-alerts.ts`
 // convention. No cross-organization access is possible through this module.
-import { and, count, desc, eq } from 'drizzle-orm'
+import { and, count, desc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import { randomId } from '~/lib/utils'
 import { sourcingSprints, sprintResults } from '~/shared/lib/db/schema'
@@ -45,6 +45,10 @@ export interface SprintRecord {
   completedAt: Date | null
 }
 
+export interface SprintListItem extends SprintRecord {
+  resultCount: number
+}
+
 function toRecord(row: typeof sourcingSprints.$inferSelect): SprintRecord {
   return {
     id: row.id,
@@ -62,11 +66,15 @@ function toRecord(row: typeof sourcingSprints.$inferSelect): SprintRecord {
   }
 }
 
-export async function listSprints(transaction: TenantTransaction, organizationId: string): Promise<SprintRecord[]> {
-  const rows = await transaction.select().from(sourcingSprints)
+export async function listSprints(transaction: TenantTransaction, organizationId: string): Promise<SprintListItem[]> {
+  const rows = await transaction
+    .select({ sprint: sourcingSprints, resultCount: sql<number>`count(${sprintResults.id})::int` })
+    .from(sourcingSprints)
+    .leftJoin(sprintResults, eq(sprintResults.sprintId, sourcingSprints.id))
     .where(eq(sourcingSprints.organizationId, organizationId))
+    .groupBy(sourcingSprints.id)
     .orderBy(desc(sourcingSprints.createdAt))
-  return rows.map(toRecord)
+  return rows.map((row) => ({ ...toRecord(row.sprint), resultCount: row.resultCount }))
 }
 
 export async function findSprint(

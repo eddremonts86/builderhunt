@@ -31,6 +31,16 @@
 > agents, and Devpost — all removed (Devpost has no viable API per `_meta/app-reality.md`;
 > AI provider policy is `_meta/ai-policy.md`). The `assets/*.jpg` mockups remain useful
 > visual direction for the wizard, minus the map pane.
+>
+> **v2 (2026-07-20)**: reconciling the shipped UI against the 4 reference mockups
+> (`assets/*.jpg`) added: batch upload of up to **10** `.txt`/`.md` files (not the mockup's
+> 500, and no PDF/DOCX — explicitly deferred, see Future), each parsed independently via
+> `jd-parse` into its own criteria card in a queue; per-variant candidate counts and a
+> variant-selection checkbox in the preview step; a chat-style history for `filter-refine`
+> instead of a single input; and an honest cursor-based progress indicator (real
+> `variantIndex`/`page` position, never a fabricated "Searching..." state). The map pane
+> stays deferred to a separate Future pass (needs a bounded city/country → lat/lng lookup
+> table + MapLibre GL; out of scope for this v2 pass).
 
 ## Problem
 
