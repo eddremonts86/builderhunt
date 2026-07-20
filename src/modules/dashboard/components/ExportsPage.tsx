@@ -71,20 +71,26 @@ export function ExportsPage() {
 
   const loading = builders === null && !error
   const count = builders?.length ?? 0
+  const sourceCounts = React.useMemo(() => {
+    const map = new Map<string, number>()
+    for (const b of builders ?? []) map.set(b.source, (map.get(b.source) ?? 0) + 1)
+    return [...map.entries()].sort((a, b) => b[1] - a[1])
+  }, [builders])
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold text-bh-text mb-1">Exports</h1>
-      <p className="text-bh-text-muted mb-2">
-        Builders you've tracked from search, in one place — download the list as a CSV whenever you want.
-      </p>
-      <p className="text-sm text-bh-text-dim mb-8">
-        Looking to export <em>all your BuilderHunt account data</em> (profile, saved searches, notes) instead?
-        That's a different, GDPR-focused export on{' '}
-        <LinkComponent to="/settings/privacy" className="text-bh-accent hover:underline">
-          Settings → Privacy
-        </LinkComponent>.
-      </p>
+    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-11 h-11 rounded-xl bg-bh-accent-soft flex items-center justify-center shrink-0">
+          <Download className="w-5 h-5 text-bh-accent" />
+        </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-bh-text mb-1">Exports</h1>
+          <p className="text-bh-text-muted text-sm md:text-base">
+            Builders you've tracked from search, in one place — download the list as a CSV whenever you want.
+          </p>
+        </div>
+      </div>
 
       {error && (
         <div className="card mb-6 border-red-500/30 bg-red-500/5">
@@ -94,6 +100,7 @@ export function ExportsPage() {
 
       {loading && (
         <div className="space-y-3 animate-pulse">
+          <div className="h-20 bg-bh-surface/50 rounded-3xl" />
           {[...Array(3)].map((_, i) => (
             <div key={i} className="card h-16 bg-bh-surface/50" />
           ))}
@@ -101,12 +108,12 @@ export function ExportsPage() {
       )}
 
       {!loading && count === 0 && !error && (
-        <div className="card text-center py-12">
-          <div className="w-12 h-12 rounded-xl bg-bh-accent/10 flex items-center justify-center mx-auto mb-4">
+        <div className="card text-center py-14">
+          <div className="w-12 h-12 rounded-xl bg-bh-accent-soft flex items-center justify-center mx-auto mb-4">
             <Bookmark className="w-6 h-6 text-bh-accent" />
           </div>
           <p className="font-semibold text-bh-text mb-1">No tracked builders yet</p>
-          <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-4">
+          <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-5">
             Search for builders and click "Track" on the ones you want to keep — they'll show up here, ready to export.
           </p>
           <LinkComponent to="/search" className="btn-primary btn-sm inline-flex items-center gap-2">
@@ -117,12 +124,40 @@ export function ExportsPage() {
 
       {!loading && count > 0 && (
         <>
-          <p className="text-sm text-bh-text-muted mb-3">
-            {count} builder{count === 1 ? '' : 's'} tracked
-          </p>
-          <ul className="space-y-2 mb-6" role="list">
+          {/* Toolbar: count + source mix + primary export action, all in one place */}
+          <div className="card mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+            <div className="flex-1 min-w-0">
+              <p className="text-2xl font-bold text-bh-text leading-none mb-1.5">
+                {count} <span className="text-base font-medium text-bh-text-muted">builder{count === 1 ? '' : 's'} tracked</span>
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {sourceCounts.map(([source, n]) => (
+                  <span key={source} className={`badge badge-${source}`}>
+                    {source} · {n}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="sm:text-right shrink-0">
+              {downloadMsg && <p className="text-sm mb-2 text-red-400">{downloadMsg}</p>}
+              <button
+                onClick={handleDownload}
+                disabled={downloading}
+                className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+              >
+                {downloading ? <span className="spinner" /> : <Download className="w-4 h-4" />}
+                {downloading ? 'Preparing...' : 'Download CSV'}
+              </button>
+            </div>
+          </div>
+
+          <ul className="space-y-2" role="list">
             {builders!.map((b) => (
-              <li key={b.id} className="card p-3 flex items-center gap-3" data-testid={`tracked-builder-${b.id}`}>
+              <li
+                key={b.id}
+                className="card card-hover p-3 flex items-center gap-3"
+                data-testid={`tracked-builder-${b.id}`}
+              >
                 {b.avatarUrl ? (
                   <img src={b.avatarUrl} alt="" loading="lazy" className="w-9 h-9 rounded-full shrink-0 object-cover bg-bh-surface" />
                 ) : (
@@ -132,10 +167,13 @@ export function ExportsPage() {
                 )}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm text-bh-text truncate">{b.displayName ?? b.username}</p>
-                  <p className="text-xs text-bh-text-muted truncate">
-                    @{b.username} · {b.source}
-                    {b.topics.length > 0 && ` · ${b.topics.slice(0, 3).join(', ')}`}
-                  </p>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    <span className={`badge badge-${b.source} text-[10px] px-1.5 py-0 shrink-0`}>{b.source}</span>
+                    <p className="text-xs text-bh-text-muted truncate">
+                      @{b.username}
+                      {b.topics.length > 0 && ` · ${b.topics.slice(0, 3).join(', ')}`}
+                    </p>
+                  </div>
                 </div>
                 {b.score != null && <ScoreRing score={b.score} size={32} showLabel={false} />}
                 <a
@@ -162,29 +200,13 @@ export function ExportsPage() {
         </>
       )}
 
-      <div className="card max-w-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-3 rounded-xl bg-bh-accent/10">
-            <Download className="w-6 h-6 text-bh-accent" />
-          </div>
-          <div>
-            <p className="font-medium text-bh-text">Export all builders</p>
-            <p className="text-sm text-bh-text-muted">Download as CSV</p>
-          </div>
-        </div>
-
-        {downloadMsg && <p className="text-sm mb-4 text-red-400">{downloadMsg}</p>}
-
-        <button
-          onClick={handleDownload}
-          disabled={downloading || count === 0}
-          title={count === 0 ? 'Track at least one builder first' : undefined}
-          className="btn-primary w-full flex items-center justify-center gap-2"
-        >
-          <Download className="w-4 h-4" />
-          {downloading ? 'Preparing...' : 'Download CSV'}
-        </button>
-      </div>
+      <p className="text-xs text-bh-text-dim mt-8 text-center">
+        Looking to export <em>all your BuilderHunt account data</em> (profile, saved searches, notes) instead? That's a
+        different, GDPR-focused export on{' '}
+        <LinkComponent to="/settings/privacy" className="text-bh-accent hover:underline">
+          Settings → Privacy
+        </LinkComponent>.
+      </p>
     </div>
   )
 }
