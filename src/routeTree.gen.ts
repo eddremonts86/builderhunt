@@ -61,6 +61,9 @@ import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/trac
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
+import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
+import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
+import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
 import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
 import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
@@ -359,6 +362,21 @@ const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
   path: '/api/alerts/test-trigger',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAiEmbedRoute = ApiAiEmbedRouteImport.update({
+  id: '/api/ai/embed',
+  path: '/api/ai/embed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiConfigRoute = ApiAiConfigRouteImport.update({
+  id: '/api/ai/config',
+  path: '/api/ai/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
+  id: '/api/ai/complete',
+  path: '/api/ai/complete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LandingLegalTermsRoute = LandingLegalTermsRouteImport.update({
   id: '/legal/terms',
   path: '/legal/terms',
@@ -597,6 +615,9 @@ export interface FileRoutesByFullPath {
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
+  '/api/ai/complete': typeof ApiAiCompleteRoute
+  '/api/ai/config': typeof ApiAiConfigRoute
+  '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -687,6 +708,9 @@ export interface FileRoutesByTo {
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
+  '/api/ai/complete': typeof ApiAiCompleteRoute
+  '/api/ai/config': typeof ApiAiConfigRoute
+  '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -781,6 +805,9 @@ export interface FileRoutesById {
   '/_landing/legal/imprint': typeof LandingLegalImprintRoute
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
   '/_landing/legal/terms': typeof LandingLegalTermsRoute
+  '/api/ai/complete': typeof ApiAiCompleteRoute
+  '/api/ai/config': typeof ApiAiConfigRoute
+  '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
@@ -874,6 +901,9 @@ export interface FileRouteTypes {
     | '/legal/imprint'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/api/ai/complete'
+    | '/api/ai/config'
+    | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -964,6 +994,9 @@ export interface FileRouteTypes {
     | '/legal/imprint'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/api/ai/complete'
+    | '/api/ai/config'
+    | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -1057,6 +1090,9 @@ export interface FileRouteTypes {
     | '/_landing/legal/imprint'
     | '/_landing/legal/privacy'
     | '/_landing/legal/terms'
+    | '/api/ai/complete'
+    | '/api/ai/config'
+    | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/builders/$builderId'
@@ -1127,6 +1163,9 @@ export interface RootRouteChildren {
   OnboardingSearchRoute: typeof OnboardingSearchRoute
   OnboardingSuccessRoute: typeof OnboardingSuccessRoute
   OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
+  ApiAiCompleteRoute: typeof ApiAiCompleteRoute
+  ApiAiConfigRoute: typeof ApiAiConfigRoute
+  ApiAiEmbedRoute: typeof ApiAiEmbedRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
@@ -1540,6 +1579,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/ai/embed': {
+      id: '/api/ai/embed'
+      path: '/api/ai/embed'
+      fullPath: '/api/ai/embed'
+      preLoaderRoute: typeof ApiAiEmbedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/config': {
+      id: '/api/ai/config'
+      path: '/api/ai/config'
+      fullPath: '/api/ai/config'
+      preLoaderRoute: typeof ApiAiConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ai/complete': {
+      id: '/api/ai/complete'
+      path: '/api/ai/complete'
+      fullPath: '/api/ai/complete'
+      preLoaderRoute: typeof ApiAiCompleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_landing/legal/terms': {
       id: '/_landing/legal/terms'
       path: '/legal/terms'
@@ -1945,6 +2005,9 @@ const rootRouteChildren: RootRouteChildren = {
   OnboardingSearchRoute: OnboardingSearchRoute,
   OnboardingSuccessRoute: OnboardingSuccessRoute,
   OnboardingWelcomeRoute: OnboardingWelcomeRoute,
+  ApiAiCompleteRoute: ApiAiCompleteRoute,
+  ApiAiConfigRoute: ApiAiConfigRoute,
+  ApiAiEmbedRoute: ApiAiEmbedRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
