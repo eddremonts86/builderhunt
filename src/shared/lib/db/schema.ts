@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
+import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
 
 // ---------------------------------------------------------------------------
 // Authentication Tables (Better Auth)
@@ -633,3 +634,58 @@ export const discoveryState = pgTable('discovery_state', {
     .notNull()
     .default({ runs: 0, upserted: 0, errors: 0 }),
 })
+
+// ---------------------------------------------------------------------------
+// AI Sourcing Sprints (plan: ai-sourcing-sprints) — organization-scoped
+// saved query variants re-executed by a background worker until a result
+// quota is reached. No FK to `organizationBuilders`/`builders` — results are
+// per-(source, sourceId) public snapshots, same identity convention as
+// `builderEmbeddings`. Tracking a result uses the existing track endpoint.
+// ---------------------------------------------------------------------------
+
+export const sourcingSprints = pgTable(
+  'sourcing_sprints',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    creatorUserId: text('creator_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    criteria: jsonb('criteria').$type<ExtractedCriteria>().notNull(),
+    variants: jsonb('variants').$type<QueryVariant[]>().notNull(),
+    status: text('status').notNull().default('active'),
+    quota: integer('quota').notNull().default(200),
+    cursor: jsonb('cursor').$type<SprintCursor>().notNull().default({ variantIndex: 0, page: 1 }),
+    lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('sourcing_sprints_organization_id_id_unique').on(table.organizationId, table.id),
+    index('sourcing_sprints_org_status_last_run_idx').on(table.organizationId, table.status, table.lastRunAt),
+    check('sourcing_sprints_status_check', sql`${table.status} in ('active', 'paused', 'completed')`),
+  ],
+)
+
+export const sprintResults = pgTable(
+  'sprint_results',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    sprintId: text('sprint_id').notNull().references(() => sourcingSprints.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    sourceId: text('source_id').notNull(),
+    profile: jsonb('profile').$type<SprintProfileSnapshot>().notNull(),
+    matchedVariant: text('matched_variant').notNull(),
+    score: integer('score').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique('sprint_results_sprint_source_unique').on(table.sprintId, table.source, table.sourceId),
+    index('sprint_results_sprint_created_idx').on(table.sprintId, table.createdAt),
+    foreignKey({
+      columns: [table.organizationId, table.sprintId],
+      foreignColumns: [sourcingSprints.organizationId, sourcingSprints.id],
+      name: 'sprint_results_organization_sprint_fk',
+    }),
+  ],
+)

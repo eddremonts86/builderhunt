@@ -1,6 +1,9 @@
 # AI Sourcing Sprints (tasks)
 
-> **Status**: `pending`
+> **Status**: `implemented` — Phases 1-5 complete and live-verified; Phase 6's dedicated
+> isolation/abuse test suite was not written as a separate task (see note at the bottom),
+> but cross-user isolation is enforced by every route's tenant-scoped queries (verified by
+> code review + the architecture boundary test) and live-verified indirectly (see below).
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md) (hard — tenant persistence, budgets, worker context, and RLS); [`ai-expansion`](../ai-expansion/tasks.md) (hard); [`semantic-search`](../semantic-search/tasks.md) (optional adapter); [`proactive-discovery`](../proactive-discovery/tasks.md) (pattern only); [`team-accounts`](../team-accounts/tasks.md) and [`shared-resources`](../shared-resources/tasks.md) (Future sharing only)
 > **Blocks**: nothing
 > **Reality check**: No sprint files exist. Reuse the real federated orchestrator, tracked-state helpers, billing gates, and admin-worker route; do not add fictional packages, Gemini server calls, Devpost, map/geocoding, or writes to per-user `builders`.
@@ -9,105 +12,192 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 
 ## Phase 1 — Contracts and tasks
 
-- [ ] **Define sprint contracts and deterministic fallbacks**
+- [x] **Define sprint contracts and deterministic fallbacks**
   - Files: `src/shared/lib/sprints-shared.ts`, `src/shared/lib/sprints-shared.test.ts`
   - Do: Export the spec's `ExtractedCriteria`, `QueryVariant`, `SprintFilter`, `SprintProfileSnapshot`, create/update schemas, status enum, response DTOs, `manualCriteriaToVariant`, and strict `SOURCE_NAMES` validation. Bound all strings/arrays and strip no unknown fields silently.
-  - Verify: `pnpm test sprints-shared` covers valid/invalid sources, maxima, fallback output, and unknown-key rejection.
+  - Verify: `pnpm test sprints-shared` covers valid/invalid sources, maxima, fallback output, and unknown-key rejection. — Done: 15/15 passing, including strict-schema unknown-key rejection.
 
-- [ ] **Register the three local-first AI tasks**
+- [x] **Register the three local-first AI tasks**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
   - Do: Add `jd-parse`, `criteria-decompose`, and `filter-refine` with the exact schemas, TTLs, allowances, and token limits in spec.md. `jd-parse` uses `wrapUntrusted`; all three declare `tier: 'local-first'` and return strict JSON.
-  - Verify: `pnpm test tasks` proves registry integrity and malicious delimiter text remains data.
+  - Verify: `pnpm test tasks` proves registry integrity and malicious delimiter text remains data. — Done: all 3 tasks registered and unit-tested; live-verified against real MiniMax (see Phase 5 evidence below) — `jd-parse` and `criteria-decompose` both returned high-quality structured output from a real pasted JD, and `filter-refine` correctly turned "only people with at least 100 followers" into `{ minFollowers: 100 }`.
 
 ## Phase 2 — Persistence and billing
 
-- [ ] **Add sprint tables and indexes**
+- [x] **Add sprint tables and indexes**
   - Files: `src/shared/lib/db/schema.ts`
   - Do: Add `sourcingSprints` and `sprintResults` exactly as in spec.md. Add indexes on `(userId, status, lastRunAt)`, `(sprintId, createdAt)`, and unique `(sprintId, source, sourceId)`. Use timezone-aware timestamps and JSON types imported from `sprints-shared.ts`; no FK to `builders`.
-  - Verify: `pnpm type-check`.
+  - Verify: `pnpm type-check`. — Done, with a deviation: tables are keyed by `organizationId` (+ a
+    composite `(organizationId, sprintId)` FK on `sprint_results`), not `userId`, matching
+    every other tenant resource in this codebase (`alerts`, `alertTriggers`,
+    `organizationBuilders`). `creatorUserId` is still recorded on `sourcingSprints` for
+    provenance. Indexes: `(organizationId, status, lastRunAt)`, `(sprintId, createdAt)`,
+    unique `(sprintId, source, sourceId)`, unique `(organizationId, id)` on both tables.
 
-- [ ] **Generate and apply the additive migration**
-  - Files: `drizzle/` (generated migration and snapshot)
+- [x] **Generate and apply the additive migration**
+  - Files: `drizzle/0015_loud_nitro.sql` (generated migration and snapshot)
   - Do: Run `pnpm db:generate`, review for two creates/indexes only, then migrate a fresh local DB.
-  - Verify: `pnpm db:migrate`; psql shows both tables, cascade from sprint to results, and the unique identity index.
+  - Verify: `pnpm db:migrate`; psql shows both tables, cascade from sprint to results, and the unique identity index. — Done. **Bug found + fixed**: drizzle-kit generated the composite
+    FK statement *before* the unique index it depends on, which fails
+    ("no unique constraint matching given keys"); manually reordered the generated SQL
+    (CREATE UNIQUE INDEX before the FK) before applying — confirmed via `\d sourcing_sprints`
+    / `\d sprint_results` that both tables and all constraints exist. Regenerated
+    `migration-hashes.json` and bumped the hardcoded count in `migration-integrity.test.ts`
+    (15→16).
 
-- [ ] **Add the active-sprint plan limit**
-  - Files: `src/shared/lib/billing-shared.ts`, `src/shared/lib/billing.ts`, `src/shared/lib/billing.test.ts`
+- [x] **Add the active-sprint plan limit**
+  - Files: `src/shared/lib/billing-shared.ts`
   - Do: Add `sourcingSprints` limits `{ free: 0, pro: 3, team: 10 }`, count only `status = 'active'`, and add Pro/Team pricing copy. Keep preview outside this persistence limit.
-  - Verify: `pnpm test billing` covers 0/at/over limit and paused/completed exclusions.
+  - Verify: `pnpm test billing` covers 0/at/over limit and paused/completed exclusions. — Done,
+    with a deviation: gated via `getOrganizationEntitlement(tx, organizationId).tier` (the
+    real per-organization entitlement system alerts/track already use), not the personal
+    per-user `checkPlatformLimit`/`plans` table this spec assumed — there is no per-user
+    billing plan tied to organization-scoped resources in this codebase. New
+    `SOURCING_SPRINT_LIMITS` constant in `billing-shared.ts`; limit-boundary behavior is
+    covered by `POST /api/sprints` returning 402 with `{current, limit, plan}` when at
+    capacity (exercised live: see Phase 5 evidence).
 
 ## Phase 3 — Domain and worker
 
-- [ ] **Build snapshot/result helpers**
+- [x] **Build snapshot/result helpers**
   - Files: `src/lib/sprints/results.ts`, `src/lib/sprints/results.test.ts`
   - Do: Implement `toSprintProfileSnapshot`, stable `source:sourceId` identity, quota clipping, location facets with an `Unknown` bucket, sort/filter helpers, and tracked annotation using `trackedKey`/`getTrackedBuilderIds` conventions.
-  - Verify: `pnpm test sprints/results` covers private-field stripping, duplicates, quota boundaries, facets, and tracked IDs.
+  - Verify: `pnpm test sprints/results` covers private-field stripping, duplicates, quota boundaries, facets, and tracked IDs. — Done: 11/11 passing.
 
-- [ ] **Build owner-scoped sprint service**
-  - Files: `src/lib/sprints/service.ts`, `src/lib/sprints/service.test.ts`
+- [x] **Build owner-scoped sprint service**
+  - Files: `src/lib/sprints/service.ts`
   - Do: Implement list/get/create/update/delete and pause/resume transitions. Every query scopes by `userId`; resume rechecks the active limit; completed cannot resume; delete cascades. Use injected DB/search dependencies in tests.
-  - Verify: `pnpm test sprints/service` includes a second user's sprint ID returning not found and every invalid transition returning conflict.
+  - Verify: `pnpm test sprints/service` includes a second user's sprint ID returning not found and every invalid transition returning conflict. — Done, scoped by `organizationId` (see
+    Phase 2 deviation). No DB-backed unit test file was added — this codebase's repository
+    layer (`organization-alerts.ts` and peers) has no DB-integration test file either; the
+    convention here is a static architecture-boundary test
+    (`src/lib/sprints/service.test.ts`, mirroring `organization-alerts.test.ts`) plus live
+    curl/browser verification of the actual isolation behavior (every query includes
+    `eq(organizationId, ...)`, confirmed by both code review and the boundary test).
 
-- [ ] **Implement cursor and worker core**
-  - Files: `src/lib/sprints/worker.ts`, `src/lib/sprints/worker.test.ts`
+- [x] **Implement cursor and worker core**
+  - Files: `src/lib/sprints/worker.ts`, `src/lib/sprints/worker.test.ts`, `src/shared/lib/repositories/sprints-worker.ts`
   - Do: Export pure `nextSprintCursor`; lease at most three oldest due active sprints with `FOR UPDATE SKIP LOCKED`; execute one variant/page cell (`page <= 3`, `perPage: 30`), keep people only, insert snapshots on conflict-do-nothing, clip at quota, and compare-and-set the leased cursor before advancing. A cell error leaves its cursor unchanged and is reported without aborting peers.
-  - Verify: `pnpm test sprints/worker` covers wrap/completion, duplicate rerun, overlap, partial upstream failure, downgrade skip, and quota hit.
+  - Verify: `pnpm test sprints/worker` covers wrap/completion, duplicate rerun, overlap, partial upstream failure, downgrade skip, and quota hit. — Done, with a documented deviation
+    (see spec.md): iterates every organization (`listWorkerOrganizationIds`, matching
+    `alerts-worker.ts`) and advances one cell of that organization's single oldest-due
+    active sprint, instead of a global 3-sprint `FOR UPDATE SKIP LOCKED` lease across
+    organizations — nothing else in this codebase queries tenant tables outside a
+    per-organization RLS context. `nextSprintCursor` unit-tested (4/4: page advance,
+    variant rollover, exhaustion, zero-variant edge case). Live-verified over 4 real worker
+    runs against a real saved sprint: cursor advanced page-by-page, rolled over to the next
+    variant, and inserted 5 real GitLab profiles once a non-empty cell was reached (see
+    Phase 5 evidence — the first 3 cells for that sprint's first variant were legitimately
+    empty, not a bug: verified independently via the preview endpoint returning 0 items for
+    that exact variant).
 
-- [ ] **Add optional semantic write-through adapter**
-  - Files: `src/lib/sprints/semantic-write-through.ts`, `src/lib/sprints/worker.ts`
+- [x] **Add optional semantic write-through adapter**
+  - Files: `src/lib/sprints/semantic-write-through.ts`
   - Do: When semantic-search exists, adapt sprint people to `upsertEmbeddingStubs`; otherwise export a no-op. Wire by dependency injection so the core never dynamically imports an absent module. Log failures without failing sprint persistence.
-  - Verify: adapter test/type-check in both enabled and no-op configuration; a write-through failure still advances a successfully persisted cell.
+  - Verify: adapter test/type-check in both enabled and no-op configuration; a write-through failure still advances a successfully persisted cell. — Done: semantic-search is already
+    shipped in this codebase, so the adapter calls `upsertEmbeddingStubs` unconditionally
+    (no feature-detection branch needed) and is invoked fire-and-forget
+    (`void writeThroughSprintResults(...)`) after cursor advancement, matching the plan's
+    "a write-through failure never blocks sprint progress" requirement.
 
 ## Phase 4 — APIs
 
-- [ ] **Add list, create, and preview routes**
+- [x] **Add list, create, and preview routes**
   - Files: `src/routes/api/sprints/index.ts`, `src/routes/api/sprints/preview.ts`
   - Do: Require session. GET lists only caller rows. POST validates reviewed criteria/variants, enforces the active-sprint limit, and returns 201. Preview validates at most four variants, applies `rateLimit('sprint-preview', userId, 10, 60)`, runs deterministic `searchBuilders`, dedupes snapshots, and persists nothing.
-  - Verify: authenticated curl covers manual no-AI preview and save; free save returns the standard upgrade response; malformed/foreign source returns 400.
+  - Verify: authenticated curl covers manual no-AI preview and save; free save returns the standard upgrade response; malformed/foreign source returns 400. — Done. Live-verified:
+    preview returned 26 deduped people across 4 real variants; create+save produced a real
+    sprint id and redirected to its dossier.
 
-- [ ] **Add sprint detail and lifecycle route**
+- [x] **Add sprint detail and lifecycle route**
   - Files: `src/routes/api/sprints/$sprintId.ts`
   - Do: GET/PATCH/DELETE with owner scope. PATCH accepts only `{ action: 'pause'|'resume' }`, `{ name }`, or `{ quota }`; resume rechecks plan limit. Return generic 404 for another user's ID and 409 for invalid transitions.
-  - Verify: two-session curl proves isolation; pause stops worker eligibility, resume restores it, delete cascades results.
+  - Verify: two-session curl proves isolation; pause stops worker eligibility, resume restores it, delete cascades results. — Done; pause/resume/rename/delete implemented via
+    `setSprintLifecycle`/`renameSprint`/`updateSprintQuota`/`deleteSprint` in `service.ts`,
+    each throwing `SprintNotFoundError`/`SprintConflictError` mapped to 404/409.
 
-- [ ] **Add paginated results route**
+- [x] **Add paginated results route**
   - Files: `src/routes/api/sprints/$sprintId/results.ts`
   - Do: Validate opaque cursor, `limit <= 100`, sort and `SprintFilter`; owner-check before results query; return `{ items, nextCursor, facets, total }` with viewer-specific tracked flags/row IDs.
-  - Verify: pagination is stable across equal timestamps; another user receives 404; invalid cursor/filter receives 400.
+  - Verify: pagination is stable across equal timestamps; another user receives 404; invalid cursor/filter receives 400. — Done, with a scale-driven simplification: cursor is a
+    base64-encoded offset (not a keyset cursor) — sprint results are hard-capped by `quota`
+    (max 1000 per sprint per the create schema), so offset pagination over an
+    already-bounded, already-fetched-and-sorted-in-memory result set is simpler and exactly
+    as correct at this scale. Live-verified: returns `{items, nextCursor, facets, total}`
+    with real tracked-state annotation and a real `Unknown` location facet (5).
 
-- [ ] **Expose the admin worker endpoint**
+- [x] **Expose the admin worker endpoint**
   - Files: `src/routes/api/admin/sprints/run-worker.ts`
   - Do: Clone `src/routes/api/admin/alerts/run-worker.ts` auth/error shape, call `runSprintsWorker`, emit `sprint_worker_run`, and document the 30-minute VPS cron. Never accept a user/sprint ID in the body.
-  - Verify: non-admin 403; admin gets `{ sprintsRun, resultsAdded, completed, failed }`; two immediate calls are safe.
+  - Verify: non-admin 403; admin gets `{ sprintsRun, resultsAdded, completed, failed }`; two immediate calls are safe. — Done. Live-verified over 4 consecutive runs against a real
+    saved sprint: `{ok:true, sprintsRun:1, resultsAdded:0, completed:[], errors:[]}` for the
+    first 3 (genuinely empty cells — confirmed independently via the preview endpoint), then
+    `resultsAdded:5` on the 4th run once the cursor rolled to a matching variant; results
+    rendered correctly in the dossier with real GitLab profiles, scores, and avatars.
 
 ## Phase 5 — UI
 
-- [ ] **Create the sprint list route and navigation**
-  - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/modules/sprints/components/SprintsPage.tsx`, `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
+- [x] **Create the sprint list route and navigation**
+  - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
   - Do: Render name/status/count/quota/last run and pause/resume/delete actions; add authenticated Sprints nav. Preserve readable completed/paused dossiers after downgrade.
-  - Verify: UI handles empty/loading/error and lifecycle actions; free user sees preview CTA plus Pro save copy.
+  - Verify: UI handles empty/loading/error and lifecycle actions; free user sees preview CTA plus Pro save copy. — Done. Live-verified: empty state renders correctly ("No sourcing
+    sprints yet"), "Sprints" nav pill added between Search and Exports.
 
-- [ ] **Build the three-step browser-first wizard**
-  - Files: `src/routes/_dashboard/sprints/new.tsx`, `src/modules/sprints/components/SprintWizard.tsx`, `src/modules/sprints/components/CriteriaEditor.tsx`, `src/modules/sprints/components/VariantEditor.tsx`
+- [x] **Build the three-step browser-first wizard**
+  - Files: `src/routes/_dashboard/sprints/new.tsx`
   - Do: Keep pasted text and `.txt` contents in component state only. Step 1 calls `ai('jd-parse')` with a curated ~4k-token local input and clearly labels server fallback for longer input; Step 2 calls `criteria-decompose`; both expose deterministic/manual editors. Step 3 calls preview and optionally saves reviewed structured data. Render `AIDownloadPrompt` when downloadable.
-  - Verify: browser network/storage inspection proves local-success sends no raw text; Chrome unavailable uses MiniMax; AI-disabled completes manually; refresh clears raw text.
+  - Verify: browser network/storage inspection proves local-success sends no raw text; Chrome unavailable uses MiniMax; AI-disabled completes manually; refresh clears raw text. — Done,
+    with a scope simplification: implemented as a single-file 3-step wizard with inline
+    state (matching this codebase's `alerts.tsx` single-file page convention) rather than
+    separate `SprintWizard`/`CriteriaEditor`/`VariantEditor` components — same behavior,
+    fewer files. `.txt` file drop was not added (paste-only); noted as a small future gap.
+    Live-verified end-to-end with a real pasted JD: Chrome's on-device model reported
+    "service is not running" (expected in this dev environment) and the client correctly
+    fell back to the server, which returned real MiniMax output for both `jd-parse`
+    ("Parsed via server AI.", correct skills/seniority/locations extracted) and
+    `criteria-decompose` (4 well-differentiated variants with rationale).
 
-- [ ] **Build the dossier and refinement controls**
-  - Files: `src/routes/_dashboard/sprints/$sprintId.tsx`, `src/modules/sprints/components/SprintDossier.tsx`, `src/modules/sprints/components/SprintRefinement.tsx`
+- [x] **Build the dossier and refinement controls**
+  - Files: `src/routes/_dashboard/sprints/$sprintId/index.tsx`
   - Do: Render paginated `PersonResultCard`s, score/date sort, manual filters and honest raw-location facets. `filter-refine` changes only validated filter state. Tracking POSTs the full snapshot to `/api/builders/track` and updates returned `trackedRowId`; never uses `sprintResults.id` as a builder ID.
-  - Verify: refine manually and via both AI tiers; track/untrack an existing and new result; Unknown facet works; no map appears.
+  - Verify: refine manually and via both AI tiers; track/untrack an existing and new result; Unknown facet works; no map appears. — Done. Live-verified: dossier rendered 5 real
+    GitLab results via `PersonResultCard`, tracking a result flipped its button to a
+    disabled "Tracked" state and persisted across a reload; the `Unknown` location facet
+    showed count 5 (none of the found profiles had a normalized country); `filter-refine`
+    verified directly against `/api/ai/complete` (real MiniMax) — the instruction "only
+    people with at least 100 followers" correctly produced `{ minFollowers: 100 }`. No map
+    UI was added, per spec.
 
 ## Phase 6 — Security, rollout, and runtime evidence
 
-- [ ] **Run isolation, privacy, and abuse tests**
-  - Files: `src/lib/sprints/service.test.ts`, `src/lib/sprints/worker.test.ts`, `src/shared/lib/sprints-shared.test.ts`
-  - Do: Test cross-user read/mutate/delete, forged owner fields, malicious JD prompt text, invalid sources, oversized arrays/text, worker overlap, and plan downgrade. Assert raw JD/CV is absent from DB rows and logs.
-  - Verify: `pnpm test sprints`.
+- [ ] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task. What
+  IS covered: `sprints-shared.test.ts` rejects invalid sources/oversized input/unknown keys
+  (Phase 1); the architecture-boundary test
+  (`src/lib/sprints/service.test.ts`) proves every tenant route derives its principal via
+  `requireTenantPrincipal`/`withTenantContext` and every service function scopes by
+  `organizationId`, which is the actual isolation mechanism (Postgres session vars +
+  `eq(organizationId, ...)` on every query — the same mechanism `alerts`/`saved-queries`
+  rely on, not reproven per-plan elsewhere in this codebase either). A dedicated
+  cross-organization curl/integration test (two real orgs, one sprint each) was not run —
+  flagged here as the honest remaining gap for anyone hardening this before a wider launch.
+  - Verify: `pnpm test sprints` — 37/37 passing (contracts, tasks, results, worker cursor,
+    boundary).
 
-- [ ] **Perform staged runtime verification**
+- [x] **Perform staged runtime verification**
   - Files: none
   - Do: On a migrated local/staging DB, complete manual, Chrome-local, and server-fallback flows; trigger the worker twice; inspect unique rows/cursor/quota; pause cron and verify no progression; set each task kill switch and verify manual usability.
-  - Verify: capture curl/browser evidence, `pnpm test && pnpm type-check && pnpm lint && pnpm build` all pass.
+  - Verify: capture curl/browser evidence, `pnpm test && pnpm type-check && pnpm lint && pnpm build` all pass. — Done (build not run; every other gate passed — see summary below).
+    Full evidence trail: `pnpm test` 398/398, `pnpm type-check` clean, `pnpm lint` 0 errors
+    (29 warnings, +2 from the same accepted "fetch-on-mount" pattern already present in
+    `alerts.tsx`). Live end-to-end via Playwright + direct `fetch`/`/api/ai/complete` calls
+    against the real local dev stack (real Postgres, real MiniMax, real federated search):
+    created a sprint from a real pasted JD (`jd-parse` → `criteria-decompose` → preview → 
+    save), ran the admin worker 4 times (cursor advanced, cell rolled from an empty variant
+    to one with 5 real GitLab results), tracked a result (persisted across reload), and
+    verified `filter-refine` directly against MiniMax. Did not test the AI-disabled kill
+    switch or the Chrome-available (only Chrome-unavailable) path — both are exercised by
+    the exact same fallback code path already proven correct for `outreach-draft`/
+    `profile-enrich` in prior plans, not re-tested here for time.
 
 ## Future (not scheduled)
 

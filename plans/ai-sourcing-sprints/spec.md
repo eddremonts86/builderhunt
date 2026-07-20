@@ -1,6 +1,17 @@
 # AI Sourcing Sprints (spec)
 
-> **Status**: `pending`
+> **Status**: `implemented` \u2014 Phases 1-5 shipped and live-verified (see tasks.md for the
+> full evidence trail). Two deliberate architectural deviations from this spec, both
+> documented in tasks.md: (1) sprints are organization-scoped (`sourcingSprints.organizationId`
+> via `withTenantContext`/`requireTenantPrincipal`), not the raw `userId`-keyed table this
+> spec originally described \u2014 the codebase's real convention for every other tenant
+> resource (alerts, saved queries) is organization-scoped, confirmed by reading
+> `organization-alerts.ts` before implementing; (2) the worker processes one cell per
+> organization per run (iterating every org, like `alerts-worker.ts`) instead of a global
+> `FOR UPDATE SKIP LOCKED` lease across all organizations \u2014 nothing else in this codebase
+> queries tenant tables outside a per-organization RLS context, so introducing that pattern
+> here would have been new, untested architecture. Team sharing (Future phase) is
+> unaffected by either deviation.
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md) (hard — tenant persistence, budgets, worker context, and RLS);
 > [`ai-expansion`](../ai-expansion/spec.md) (hard — task registry,
 > `ai()` client, budgets); [`semantic-search`](../semantic-search/spec.md) (soft — sprint

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import {
   LayoutDashboard, Search, Download, Mail, CreditCard, Shield, Activity,
-  Cog, Users, Inbox, AlertTriangle, BookOpen, Map, CircleUser, LogOut,
+  Cog, Users, Inbox, AlertTriangle, BookOpen, Map, CircleUser, LogOut, Compass,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
@@ -15,6 +15,7 @@ import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/search', icon: Search, label: 'Search', end: false },
+  { to: '/sprints', icon: Compass, label: 'Sprints', end: false },
   { to: '/exports', icon: Download, label: 'Exports', end: false },
   { to: '/alerts', icon: Mail, label: 'Alerts', end: false },
   { to: '/settings/billing', icon: CreditCard, label: 'Billing', end: false },

@@ -32,6 +32,7 @@ import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
 import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
+import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
 import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
@@ -42,10 +43,13 @@ import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
 import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
 import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
 import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
+import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/sprints/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
+import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
@@ -71,6 +75,7 @@ import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal
 import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
 import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
 import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
+import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
@@ -92,7 +97,9 @@ import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admi
 import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
 import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
 import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
+import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
+import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
@@ -101,6 +108,7 @@ import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
+import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
@@ -221,6 +229,11 @@ const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
   path: '/api/status/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSprintsIndexRoute = ApiSprintsIndexRouteImport.update({
+  id: '/api/sprints/',
+  path: '/api/sprints/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRoadmapIndexRoute = ApiRoadmapIndexRouteImport.update({
   id: '/api/roadmap/',
   path: '/api/roadmap/',
@@ -271,6 +284,11 @@ const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
   path: '/blog/',
   getParentRoute: () => LandingRouteRoute,
 } as any)
+const DashboardSprintsIndexRoute = DashboardSprintsIndexRouteImport.update({
+  id: '/sprints/',
+  path: '/sprints/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
   id: '/search/',
   path: '/search/',
@@ -290,6 +308,16 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
   getParentRoute: () => DashboardRouteRoute,
+} as any)
+const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
+  id: '/api/sprints/preview',
+  path: '/api/sprints/preview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSprintsSprintIdRoute = ApiSprintsSprintIdRouteImport.update({
+  id: '/api/sprints/$sprintId',
+  path: '/api/sprints/$sprintId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
   id: '/api/search/semantic',
@@ -416,6 +444,11 @@ const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
   path: '/blog/$slug',
   getParentRoute: () => LandingRouteRoute,
 } as any)
+const DashboardSprintsNewRoute = DashboardSprintsNewRouteImport.update({
+  id: '/sprints/new',
+  path: '/sprints/new',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardSettingsPrivacyRoute =
   DashboardSettingsPrivacyRouteImport.update({
     id: '/settings/privacy',
@@ -525,11 +558,23 @@ const ApiAdminChangelogIndexRoute = ApiAdminChangelogIndexRouteImport.update({
   path: '/api/admin/changelog/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardSprintsSprintIdIndexRoute =
+  DashboardSprintsSprintIdIndexRouteImport.update({
+    id: '/sprints/$sprintId/',
+    path: '/sprints/$sprintId/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardBuilderBuilderIdIndexRoute =
   DashboardBuilderBuilderIdIndexRouteImport.update({
     id: '/builder/$builderId/',
     path: '/builder/$builderId/',
     getParentRoute: () => DashboardRouteRoute,
+  } as any)
+const ApiSprintsSprintIdResultsRoute =
+  ApiSprintsSprintIdResultsRouteImport.update({
+    id: '/results',
+    path: '/results',
+    getParentRoute: () => ApiSprintsSprintIdRoute,
   } as any)
 const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
   id: '/api/me/data-export/$id',
@@ -574,6 +619,12 @@ const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
   path: '/api/admin/users/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminSprintsRunWorkerRoute =
+  ApiAdminSprintsRunWorkerRouteImport.update({
+    id: '/api/admin/sprints/run-worker',
+    path: '/api/admin/sprints/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   id: '/api/admin/roadmap/$id',
   path: '/api/admin/roadmap/$id',
@@ -636,6 +687,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
@@ -661,10 +713,13 @@ export interface FileRoutesByFullPath {
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
+  '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
+  '/sprints/': typeof DashboardSprintsIndexRoute
   '/blog/': typeof LandingBlogIndexRoute
   '/changelog/': typeof LandingChangelogIndexRoute
   '/explore/': typeof LandingExploreIndexRoute
@@ -675,6 +730,7 @@ export interface FileRoutesByFullPath {
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
+  '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -682,6 +738,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -690,7 +747,9 @@ export interface FileRoutesByFullPath {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
@@ -733,6 +792,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
@@ -758,10 +818,13 @@ export interface FileRoutesByTo {
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
+  '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
+  '/sprints': typeof DashboardSprintsIndexRoute
   '/blog': typeof LandingBlogIndexRoute
   '/changelog': typeof LandingChangelogIndexRoute
   '/explore': typeof LandingExploreIndexRoute
@@ -772,6 +835,7 @@ export interface FileRoutesByTo {
   '/api/queries': typeof ApiQueriesIndexRoute
   '/api/recommendations': typeof ApiRecommendationsIndexRoute
   '/api/roadmap': typeof ApiRoadmapIndexRoute
+  '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -779,6 +843,7 @@ export interface FileRoutesByTo {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -787,7 +852,9 @@ export interface FileRoutesByTo {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
+  '/sprints/$sprintId': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics': typeof ApiAdminMetricsIndexRoute
@@ -834,6 +901,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/_dashboard/sprints/new': typeof DashboardSprintsNewRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
   '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
   '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
@@ -859,10 +927,13 @@ export interface FileRoutesById {
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
+  '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
+  '/_dashboard/sprints/': typeof DashboardSprintsIndexRoute
   '/_landing/blog/': typeof LandingBlogIndexRoute
   '/_landing/changelog/': typeof LandingChangelogIndexRoute
   '/_landing/explore/': typeof LandingExploreIndexRoute
@@ -873,6 +944,7 @@ export interface FileRoutesById {
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
+  '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -880,6 +952,7 @@ export interface FileRoutesById {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -888,7 +961,9 @@ export interface FileRoutesById {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/_dashboard/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
@@ -934,6 +1009,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/sprints/new'
     | '/blog/$slug'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -959,10 +1035,13 @@ export interface FileRouteTypes {
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/sprints/$sprintId'
+    | '/api/sprints/preview'
     | '/dashboard/'
     | '/exports/'
     | '/me/'
     | '/search/'
+    | '/sprints/'
     | '/blog/'
     | '/changelog/'
     | '/explore/'
@@ -973,6 +1052,7 @@ export interface FileRouteTypes {
     | '/api/queries/'
     | '/api/recommendations/'
     | '/api/roadmap/'
+    | '/api/sprints/'
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
@@ -980,6 +1060,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
@@ -988,7 +1069,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
+    | '/sprints/$sprintId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
@@ -1031,6 +1114,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/sprints/new'
     | '/blog/$slug'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -1056,10 +1140,13 @@ export interface FileRouteTypes {
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/sprints/$sprintId'
+    | '/api/sprints/preview'
     | '/dashboard'
     | '/exports'
     | '/me'
     | '/search'
+    | '/sprints'
     | '/blog'
     | '/changelog'
     | '/explore'
@@ -1070,6 +1157,7 @@ export interface FileRouteTypes {
     | '/api/queries'
     | '/api/recommendations'
     | '/api/roadmap'
+    | '/api/sprints'
     | '/api/status'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
@@ -1077,6 +1165,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
@@ -1085,7 +1174,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
+    | '/sprints/$sprintId'
     | '/api/admin/changelog'
     | '/api/admin/incidents'
     | '/api/admin/metrics'
@@ -1131,6 +1222,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
+    | '/_dashboard/sprints/new'
     | '/_landing/blog/$slug'
     | '/_landing/changelog/$slug'
     | '/_landing/legal/cookies'
@@ -1156,10 +1248,13 @@ export interface FileRouteTypes {
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/sprints/$sprintId'
+    | '/api/sprints/preview'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
+    | '/_dashboard/sprints/'
     | '/_landing/blog/'
     | '/_landing/changelog/'
     | '/_landing/explore/'
@@ -1170,6 +1265,7 @@ export interface FileRouteTypes {
     | '/api/queries/'
     | '/api/recommendations/'
     | '/api/roadmap/'
+    | '/api/sprints/'
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
@@ -1177,6 +1273,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
@@ -1185,7 +1282,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
+    | '/_dashboard/sprints/$sprintId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
@@ -1233,6 +1332,8 @@ export interface RootRouteChildren {
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
+  ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
+  ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
@@ -1240,6 +1341,7 @@ export interface RootRouteChildren {
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
   ApiRoadmapIndexRoute: typeof ApiRoadmapIndexRoute
+  ApiSprintsIndexRoute: typeof ApiSprintsIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
@@ -1247,6 +1349,7 @@ export interface RootRouteChildren {
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
+  ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
@@ -1430,6 +1533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStatusIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/sprints/': {
+      id: '/api/sprints/'
+      path: '/api/sprints'
+      fullPath: '/api/sprints/'
+      preLoaderRoute: typeof ApiSprintsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/roadmap/': {
       id: '/api/roadmap/'
       path: '/api/roadmap'
@@ -1500,6 +1610,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingBlogIndexRouteImport
       parentRoute: typeof LandingRouteRoute
     }
+    '/_dashboard/sprints/': {
+      id: '/_dashboard/sprints/'
+      path: '/sprints'
+      fullPath: '/sprints/'
+      preLoaderRoute: typeof DashboardSprintsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/search/': {
       id: '/_dashboard/search/'
       path: '/search'
@@ -1527,6 +1644,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardDashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/api/sprints/preview': {
+      id: '/api/sprints/preview'
+      path: '/api/sprints/preview'
+      fullPath: '/api/sprints/preview'
+      preLoaderRoute: typeof ApiSprintsPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sprints/$sprintId': {
+      id: '/api/sprints/$sprintId'
+      path: '/api/sprints/$sprintId'
+      fullPath: '/api/sprints/$sprintId'
+      preLoaderRoute: typeof ApiSprintsSprintIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/search/semantic': {
       id: '/api/search/semantic'
@@ -1703,6 +1834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingBlogSlugRouteImport
       parentRoute: typeof LandingRouteRoute
     }
+    '/_dashboard/sprints/new': {
+      id: '/_dashboard/sprints/new'
+      path: '/sprints/new'
+      fullPath: '/sprints/new'
+      preLoaderRoute: typeof DashboardSprintsNewRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/settings/privacy': {
       id: '/_dashboard/settings/privacy'
       path: '/settings/privacy'
@@ -1850,12 +1988,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminChangelogIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/sprints/$sprintId/': {
+      id: '/_dashboard/sprints/$sprintId/'
+      path: '/sprints/$sprintId'
+      fullPath: '/sprints/$sprintId/'
+      preLoaderRoute: typeof DashboardSprintsSprintIdIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/builder/$builderId/': {
       id: '/_dashboard/builder/$builderId/'
       path: '/builder/$builderId'
       fullPath: '/builder/$builderId/'
       preLoaderRoute: typeof DashboardBuilderBuilderIdIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/api/sprints/$sprintId/results': {
+      id: '/api/sprints/$sprintId/results'
+      path: '/results'
+      fullPath: '/api/sprints/$sprintId/results'
+      preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
+      parentRoute: typeof ApiSprintsSprintIdRoute
     }
     '/api/me/data-export/$id': {
       id: '/api/me/data-export/$id'
@@ -1913,6 +2065,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/sprints/run-worker': {
+      id: '/api/admin/sprints/run-worker'
+      path: '/api/admin/sprints/run-worker'
+      fullPath: '/api/admin/sprints/run-worker'
+      preLoaderRoute: typeof ApiAdminSprintsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/roadmap/$id': {
       id: '/api/admin/roadmap/$id'
       path: '/api/admin/roadmap/$id'
@@ -1968,11 +2127,14 @@ interface DashboardRouteRouteChildren {
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRoute
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
+  DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
   DashboardMeIndexRoute: typeof DashboardMeIndexRoute
   DashboardSearchIndexRoute: typeof DashboardSearchIndexRoute
+  DashboardSprintsIndexRoute: typeof DashboardSprintsIndexRoute
   DashboardBuilderBuilderIdIndexRoute: typeof DashboardBuilderBuilderIdIndexRoute
+  DashboardSprintsSprintIdIndexRoute: typeof DashboardSprintsSprintIdIndexRoute
 }
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
@@ -1985,11 +2147,14 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRoute,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
+  DashboardSprintsNewRoute: DashboardSprintsNewRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
   DashboardMeIndexRoute: DashboardMeIndexRoute,
   DashboardSearchIndexRoute: DashboardSearchIndexRoute,
+  DashboardSprintsIndexRoute: DashboardSprintsIndexRoute,
   DashboardBuilderBuilderIdIndexRoute: DashboardBuilderBuilderIdIndexRoute,
+  DashboardSprintsSprintIdIndexRoute: DashboardSprintsSprintIdIndexRoute,
 }
 
 const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
@@ -2076,6 +2241,17 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
 const ApiBuildersBuilderIdRouteWithChildren =
   ApiBuildersBuilderIdRoute._addFileChildren(ApiBuildersBuilderIdRouteChildren)
 
+interface ApiSprintsSprintIdRouteChildren {
+  ApiSprintsSprintIdResultsRoute: typeof ApiSprintsSprintIdResultsRoute
+}
+
+const ApiSprintsSprintIdRouteChildren: ApiSprintsSprintIdRouteChildren = {
+  ApiSprintsSprintIdResultsRoute: ApiSprintsSprintIdResultsRoute,
+}
+
+const ApiSprintsSprintIdRouteWithChildren =
+  ApiSprintsSprintIdRoute._addFileChildren(ApiSprintsSprintIdRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
@@ -2108,6 +2284,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
+  ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
+  ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
@@ -2115,6 +2293,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
   ApiRoadmapIndexRoute: ApiRoadmapIndexRoute,
+  ApiSprintsIndexRoute: ApiSprintsIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
@@ -2122,6 +2301,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
+  ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,

@@ -10,6 +10,17 @@ export const PLAN_LIMITS: Record<PlanTier, { savedSearches: number; savedBuilder
   team: { savedSearches: 200, savedBuilders: Infinity, rssSubscriptions: Infinity },
 }
 
+// Plan: ai-sourcing-sprints. Counts only `status = 'active'` sprints per
+// organization (paused/completed never count against the limit). Gated via
+// the organization's entitlement tier (getOrganizationEntitlement), same
+// convention as every other organization-scoped resource — NOT the
+// personal per-user `plans` table PLAN_LIMITS above is read from.
+export const SOURCING_SPRINT_LIMITS: Record<PlanTier, number> = {
+  free: 0,
+  pro: 3,
+  team: 10,
+}
+
 export const PLAN_PRICING: Record<PlanTier, { monthly: number; annual: number; label: string; features: string[] }> = {
   free: {
     monthly: 0,
@@ -33,6 +44,7 @@ export const PLAN_PRICING: Record<PlanTier, { monthly: number; annual: number; l
       'Smart alerts',
       'Semantic search',
       'Code fingerprinting',
+      'AI sourcing sprints (up to 3)',
       'Priority support',
     ],
   },
@@ -47,6 +59,7 @@ export const PLAN_PRICING: Record<PlanTier, { monthly: number; annual: number; l
       'Shared builder lists',
       'Work-sample analysis',
       'Activity feed',
+      'AI sourcing sprints (up to 10)',
       'Priority support',
     ],
   },

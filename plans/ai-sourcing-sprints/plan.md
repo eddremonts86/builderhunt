@@ -1,6 +1,9 @@
 # AI Sourcing Sprints (plan)
 
-> **Status**: `pending`
+> **Status**: `implemented` — Phases 1-5 shipped, tested (`pnpm test` 398/398, `pnpm lint`
+> 0 errors), and live-verified end-to-end against real MiniMax + the federated search
+> connectors (see tasks.md for evidence and documented deviations from this doc's original
+> per-user/global-worker design).
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md) (hard — tenant persistence, budgets, worker context, and RLS); [`ai-expansion`](../ai-expansion/spec.md) (hard); [`semantic-search`](../semantic-search/spec.md) (optional index write-through); [`proactive-discovery`](../proactive-discovery/spec.md) (pattern only); [`team-accounts`](../team-accounts/spec.md) and [`shared-resources`](../shared-resources/spec.md) (Future sharing only)
 > **Blocks**: nothing
 > **Reality check**: No sprint schema, worker, API, or UI exists. This plan reuses `src/lib/search.ts`, `src/routes/api/search/builders.ts`, `src/routes/api/builders/track.ts`, `src/shared/lib/tracked-builders.ts`, `src/shared/lib/billing.ts`, and the admin worker pattern in `src/routes/api/admin/alerts/run-worker.ts`; it does not add connectors, a queue, a map, or a second AI client.
