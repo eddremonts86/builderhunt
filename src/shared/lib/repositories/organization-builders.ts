@@ -125,6 +125,30 @@ export async function findOrganizationBuilder(
   return row ?? null
 }
 
+/**
+ * Looks up a tracked builder by the org's own membership, keyed by the
+ * global `builderIdentities.id` (not `organizationBuilders.id`). Used by
+ * `GET /api/builders/:id` so an authenticated recruiter can open the
+ * profile page for any builder they've tracked, without requiring the
+ * builder to have gone through the separate claim/publish flow that backs
+ * `findPublishedBuilderProfile` (the anonymous-safe public path).
+ */
+export async function findOrganizationBuilderByIdentity(
+  transaction: TenantTransaction,
+  organizationId: string,
+  builderIdentityId: string,
+) {
+  const [row] = await transaction.select(privateBuilderFields)
+    .from(organizationBuilders)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+    .where(and(
+      eq(organizationBuilders.organizationId, organizationId),
+      eq(organizationBuilders.builderIdentityId, builderIdentityId),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
 export async function trackOrganizationBuilder(
   transaction: TenantTransaction,
   input: TrackOrganizationBuilderInput,

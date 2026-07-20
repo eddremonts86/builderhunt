@@ -15,6 +15,11 @@ export const Route = createFileRoute('/api/builders/recent/')({
           )
           return Response.json(rows.map((row) => ({
             id: row.id,
+            // The profile page route (/builder/$builderId, /builders/$builderId)
+            // and GET /api/builders/:id both key on the global builder_identities
+            // id, not organization_builders.id — expose it separately so links
+            // built from this list resolve instead of 404ing.
+            identityId: row.identityId,
             username: row.username,
             displayName: row.displayName,
             source: row.source,

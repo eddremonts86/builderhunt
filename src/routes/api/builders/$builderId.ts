@@ -4,6 +4,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import {
   deleteOrganizationBuilder,
+  findOrganizationBuilderByIdentity,
   updateOrganizationBuilder,
 } from '~/shared/lib/repositories/organization-builders'
 import { findPublishedBuilderProfile } from '~/shared/lib/repositories/public-builders'
@@ -18,8 +19,43 @@ export const Route = createFileRoute('/api/builders/$builderId')({
   component: () => null,
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ request, params }) => {
         try {
+          // Authenticated recruiters can view any builder they've tracked in
+          // their own organization, even if that builder never went through
+          // the separate claim/publish flow (findPublishedBuilderProfile
+          // below requires a verified claim — see public-builders.ts). This
+          // is what makes "click a tracked builder from Dashboard/Alerts/me"
+          // work for the overwhelming majority of tracked-but-unclaimed
+          // builders. Anonymous requests (no session) fall straight through
+          // to the public path.
+          let principal: Awaited<ReturnType<typeof requireTenantPrincipal>> | null = null
+          try {
+            principal = await requireTenantPrincipal(request)
+          } catch {
+            principal = null
+          }
+          if (principal) {
+            const tenantBuilder = await withTenantContext(principal, (tx) =>
+              findOrganizationBuilderByIdentity(tx, principal!.organizationId, params.builderId),
+            )
+            if (tenantBuilder) {
+              const privateMetadata = tenantBuilder.privateMetadata as { topics?: string[]; country?: string; language?: string }
+              return Response.json({
+                id: tenantBuilder.identityId,
+                source: tenantBuilder.source,
+                username: tenantBuilder.username,
+                displayName: tenantBuilder.displayName,
+                avatarUrl: tenantBuilder.avatarUrl,
+                bio: tenantBuilder.bio,
+                profileUrl: tenantBuilder.profileUrl,
+                followersCount: tenantBuilder.followersCount,
+                language: privateMetadata.language ?? tenantBuilder.language,
+                country: privateMetadata.country ?? tenantBuilder.country,
+                topics: privateMetadata.topics ?? [],
+              })
+            }
+          }
           const builder = await findPublishedBuilderProfile(params.builderId)
           if (!builder) return Response.json({ error: 'Builder not found' }, { status: 404 })
           return Response.json(builder)

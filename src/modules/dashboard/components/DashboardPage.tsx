@@ -29,6 +29,8 @@ interface SavedQuery {
 
 interface RecentBuilder {
   id: string
+  /** builder_identities.id — use this for the profile page link, not `id`. */
+  identityId: string
   username: string
   displayName: string | null
   source: 'github' | 'reddit' | 'hn' | 'devto'
@@ -328,10 +330,10 @@ export function DashboardPage() {
             ) : (
               <ul className="divide-y divide-bh-border -mx-5 -mb-5 border-t border-bh-border">
                 {recent.map((b) => (
-                  <li key={b.id}>
+                  <li key={b.identityId}>
                     <Link
                       to="/builder/$builderId"
-                      params={{ builderId: b.id }}
+                      params={{ builderId: b.identityId }}
                       className="flex items-start gap-3 p-4 hover:bg-bh-surface-2/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     >
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white text-xs font-semibold shrink-0">
