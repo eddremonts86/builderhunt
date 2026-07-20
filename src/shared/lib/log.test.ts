@@ -71,4 +71,18 @@ describe('log', () => {
     expect(result).toBeNull()
     expect(consoleErrorSpy).toHaveBeenCalledTimes(1)
   })
+
+  it('redacts nested secrets, credentials, emails, prompts, and export payloads', () => {
+    log.error('canary', {
+      email: 'person@example.test',
+      authorization: 'Bearer token-canary',
+      databaseUrl: 'postgresql://user:password-canary@db:5432/app',
+      nested: { prompt: 'prompt-canary', exportPayload: { private: 'export-canary' } },
+      error: new Error('failed with token=reset-canary for person@example.test'),
+    })
+    const line = consoleErrorSpy.mock.calls[0][0] as string
+    for (const canary of ['person@example.test', 'token-canary', 'password-canary', 'prompt-canary', 'export-canary', 'reset-canary']) {
+      expect(line).not.toContain(canary)
+    }
+  })
 })

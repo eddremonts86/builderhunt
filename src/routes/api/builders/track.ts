@@ -5,6 +5,7 @@ import { and, eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
 import { z } from 'zod'
+import { isAllowedBuilderProfileUrl } from '~/shared/lib/security/url-policy'
 
 const TrackBody = z.object({
   source: z.enum([
@@ -23,6 +24,9 @@ const TrackBody = z.object({
   topics: z.array(z.string()).optional(),
   score: z.number().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+}).refine((data) => isAllowedBuilderProfileUrl(data.source, data.profileUrl), {
+  path: ['profileUrl'],
+  message: 'Profile URL does not match the declared source',
 })
 
 export const Route = createFileRoute('/api/builders/track')({

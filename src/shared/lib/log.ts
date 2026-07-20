@@ -8,12 +8,12 @@ interface LogContext {
 }
 
 function emit(level: LogLevel, event: string, ctx: LogContext = {}) {
-  const entry = {
+  const entry = redactLogValue({
     ts: new Date().toISOString(),
     level,
     event,
     ...ctx,
-  }
+  })
   const line = JSON.stringify(entry)
   if (level === 'error') {
     console.error(line)
@@ -22,6 +22,29 @@ function emit(level: LogLevel, event: string, ctx: LogContext = {}) {
   } else {
     console.log(line)
   }
+}
+
+const sensitiveKey = /authorization|cookie|database.*url|email|export.*payload|pass(word)?|prompt|response|secret|token/i
+
+export function redactLogValue(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (typeof value === 'string') return redactString(value)
+  if (Array.isArray(value)) return value.map((entry) => redactLogValue(entry, seen))
+  if (!value || typeof value !== 'object') return value
+  if (seen.has(value)) return '[CIRCULAR]'
+  seen.add(value)
+  const redacted: Record<string, unknown> = {}
+  for (const [key, entry] of Object.entries(value)) {
+    redacted[key] = sensitiveKey.test(key) ? '[REDACTED]' : redactLogValue(entry, seen)
+  }
+  return redacted
+}
+
+function redactString(value: string) {
+  return value
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, '[REDACTED_EMAIL]')
+    .replace(/\bBearer\s+[^\s,;]+/gi, 'Bearer [REDACTED]')
+    .replace(/([a-z][a-z0-9+.-]*:\/\/)[^\s/@]+:[^\s/@]+@/gi, '$1[REDACTED]@')
+    .replace(/\b(token|secret|password|code)=([^\s&,;]+)/gi, '$1=[REDACTED]')
 }
 
 export const log = {
