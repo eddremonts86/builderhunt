@@ -1,7 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { incidents } from '~/shared/lib/db/schema'
-import { desc } from 'drizzle-orm'
+import { listPublicIncidents } from '~/shared/lib/repositories/public-content'
 
 export const Route = createFileRoute('/api/incidents/')({
   component: () => null,
@@ -9,11 +7,7 @@ export const Route = createFileRoute('/api/incidents/')({
     handlers: {
       GET: async () => {
         try {
-          const rows = await db
-            .select()
-            .from(incidents)
-            .orderBy(desc(incidents.startedAt))
-            .limit(50)
+          const rows = await listPublicIncidents()
           return Response.json(rows)
         } catch (err) {
           console.error('incidents list error:', err)
