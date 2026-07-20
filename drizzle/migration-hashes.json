@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "migrations": {
+    "0000_tranquil_hemingway": {
+      "sql": "7673991111a13f923d2f622254f52f200d9ca5ae9c6e969122058631732076cc",
+      "snapshot": "59ce69f72078a7084d245a222c01f4657772b77804f51a078cfbc99fd358c860"
+    },
+    "0001_organizations": {
+      "sql": "4086a065eede7c5dbb880ea6efe44e28fec9b535f95ae48cfcf86dcf9df3cfbb",
+      "snapshot": "5128dd8027ac52626aadd5ce747efe9a0c724b9d518876f0a9035770cbce203f"
+    },
+    "0002_database_roles": {
+      "sql": "636cb4c235769651cc69c1b11d01fe05331be76e5672afe17f72124742876692",
+      "snapshot": "339615ee94d42bb1aeaf7072cbd9eb86276ab8ab813fa9ae7a84e193ce8ef469"
+    },
+    "0003_tenant_expand": {
+      "sql": "91101f91d6f3328c235d80f65e3eb7076914dc61851de376a99f49145ce62bb2",
+      "snapshot": "6d5cd38a51e5094a77d6bee97186fa2128129a234335ef37db16d66133cabe4a"
+    },
+    "0004_organization_entitlements": {
+      "sql": "100099fababdfee1c46f42a997a393f34d9f4ef294101a892ef98a03c01ac267",
+      "snapshot": "318cc44aa823222513a1d33314786309f021885995097a70b50aa1a6537d7ae7"
+    },
+    "0005_builder_normalization": {
+      "sql": "128373271d4a66a754d9d0684d316b35ffa033cdc7d47767ddd807bb7c5f614a",
+      "snapshot": "c9cf9649a99525e1f4de4df6bdb2752e58ec291645ce1004b54de7e231ef1d48"
+    },
+    "0006_backfill_state": {
+      "sql": "0dfbdbdc4f3bb30667a70709100743169ca411b0d463e6e26138b73d7349bed5",
+      "snapshot": "f442568f68b407f3ee7f569a8447228e456c5b42718085b5c6315b7bfc419807"
+    },
+    "0007_auth_broker": {
+      "sql": "1f9be1bdcc4a9f912d1af9a9f8db87a52a330b52dcf1f2d954b5e29d8c29c6ec",
+      "snapshot": "3bff8a425bc757b3b59b2ca872bc83df69760867f9710ee48438807ea0be5f17"
+    },
+    "0008_tenant_rls": {
+      "sql": "a55fdc1b663ba85fa1e698ecf8c7639843ed5d52238bc18b13c420ca454af7b9",
+      "snapshot": "5ea344dd3e83c02030d8e17de441b73151d1ce5985ba716a13aa915a63a59b9b"
+    },
+    "0009_entitlement_bootstrap": {
+      "sql": "77c84f44ce82db00099f5ed183eeaeb011db40eb20cf8e745d51f889d1e4cbeb",
+      "snapshot": "1cae736e26e531a1ba3658108cf44ec89c113935413d67032b5bb80375b66e5c"
+    }
+  }
+}

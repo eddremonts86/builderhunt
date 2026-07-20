@@ -1,0 +1,10 @@
+/src/shared/lib/auth/ @eddremonts86
+/src/shared/lib/authorization/ @eddremonts86
+/src/shared/lib/db/ @eddremonts86
+/src/shared/lib/security/ @eddremonts86
+/src/shared/lib/repositories/ @eddremonts86
+/drizzle/ @eddremonts86
+/scripts/db/ @eddremonts86
+/src/routes/api/me/ @eddremonts86
+/src/routes/api/admin/ @eddremonts86
+/.github/workflows/ @eddremonts86

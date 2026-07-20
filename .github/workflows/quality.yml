@@ -1,0 +1,67 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches: [master, codex/security-multitenancy]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:migration-integrity
+      - run: pnpm exec drizzle-kit check
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+      - name: Verify exact runtime roles and RLS
+        env:
+          RLS_TEST_APP_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
+          RLS_TEST_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+        run: pnpm test:rls:local
+      - name: Restore rehearsal
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres builderhunt_security_test_ci_restore
+          RESTORE_TEST_SOURCE_URL="$TEST_MIGRATION_URL" \
+          RESTORE_TEST_TARGET_URL=postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_restore \
+          pnpm db:restore-test
+      - run: pnpm security:boundaries
+      - run: pnpm lint
+      - run: pnpm type-check
+      - run: pnpm test
+      - run: pnpm security:dependencies
+      - run: pnpm build

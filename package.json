@@ -22,6 +22,8 @@
     "db:backfill:builders": "tsx --env-file=.env scripts/db/backfills/builders.ts",
     "test:rls:local": "node scripts/db/verify-rls-local.mjs",
     "test:migrations:local": "node scripts/db/verify-migrations-local.mjs",
+    "test:migration-integrity": "node scripts/db/verify-migration-integrity.mjs",
+    "db:restore-test": "tsx scripts/db/restore-test.ts",
     "security:boundaries": "node scripts/check-tenant-boundaries.mjs",
     "security:dependencies": "pnpm audit --prod --audit-level high",
     "db:migrate": "tsx --env-file=.env scripts/db/create-db.ts && drizzle-kit migrate",
