@@ -465,6 +465,27 @@ export function SearchPage() {
     return queryTerms.filter((t) => found.has(t))
   }, [matchedKeywords, query, results])
 
+  /* Removing a single matched tag re-runs the search with the remaining
+   * tags joined as the new query. This works the same way in both modes:
+   * semantic tags are AI-translated terms that may not appear verbatim in
+   * the original natural-language query (so stripping substrings out of
+   * `query` wouldn't work), while keyword-mode tags already are the real
+   * query terms. Removing the last tag clears back to the landing state. */
+  const handleRemoveKeyword = (keyword: string) => {
+    const remaining = displayKeywords.filter((k) => k !== keyword)
+    if (remaining.length === 0) {
+      setQuery('')
+      setMatchedKeywords([])
+      setSearched(false)
+      setResults([])
+      return
+    }
+    const nextQuery = remaining.join(' ')
+    setQuery(nextQuery)
+    setMatchedKeywords(remaining)
+    runSearch(nextQuery)
+  }
+
   /* Sort the active tab's results */
   const sorted = React.useMemo(() => {
     const list = activeTab === 'people' ? people : resources
@@ -883,53 +904,76 @@ export function SearchPage() {
       {/* Loading skeleton */}
       {loading && <SearchSkeleton />}
 
-      {/* Results header — count, tabs, sort and save all on one line */}
+      {/* Results header — count, tabs, sort and save on the top line; matched
+          tags (when any) get their own row of removable pills below so they
+          have room to breathe instead of being crammed into a sentence. */}
       {searched && !loading && results.length > 0 && (
-        <div className="mb-4 pb-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-bh-border">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <p className="text-sm text-bh-text-muted whitespace-nowrap">
-              <span className="font-semibold text-bh-text">{results.length}</span> result
-              {results.length === 1 ? '' : 's'} matching{' '}
-              <span className="font-medium text-bh-text">
-                {displayKeywords.length > 0
-                  ? displayKeywords.map((k, i) => (
-                      <React.Fragment key={k}>
-                        {i > 0 && ', '}
-                        "{k}"
-                      </React.Fragment>
-                    ))
-                  : `"${query}"`}
-              </span>
-            </p>
+        <div className="mb-4 pb-3 border-b border-bh-border">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <p className="text-sm text-bh-text-muted whitespace-nowrap">
+                <span className="font-semibold text-bh-text">{results.length}</span> result
+                {results.length === 1 ? '' : 's'}
+                {displayKeywords.length === 0 && (
+                  <>
+                    {' '}matching <span className="font-medium text-bh-text">"{query}"</span>
+                  </>
+                )}
+              </p>
 
-            {/* Tabs: People | Resources */}
-            <div role="tablist" aria-label="Result type" className="flex items-center gap-1">
-              <ResultTabButton
-                active={activeTab === 'people'}
-                onClick={() => setActiveTab('people')}
-                icon={Users}
-                label="People"
-                count={people.length}
-              />
-              <ResultTabButton
-                active={activeTab === 'resources'}
-                onClick={() => setActiveTab('resources')}
-                icon={BookMarked}
-                label="Resources"
-                count={resources.length}
-                disabled={resources.length === 0}
-              />
+              {/* Tabs: People | Resources */}
+              <div role="tablist" aria-label="Result type" className="flex items-center gap-1">
+                <ResultTabButton
+                  active={activeTab === 'people'}
+                  onClick={() => setActiveTab('people')}
+                  icon={Users}
+                  label="People"
+                  count={people.length}
+                />
+                <ResultTabButton
+                  active={activeTab === 'resources'}
+                  onClick={() => setActiveTab('resources')}
+                  icon={BookMarked}
+                  label="Resources"
+                  count={resources.length}
+                  disabled={resources.length === 0}
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <SortMenu value={sortBy} onChange={setSortBy} />
+              {searched && !showSave && (
+                <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
+                  <Bookmark className="w-4 h-4" /> Save search
+                </Button>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <SortMenu value={sortBy} onChange={setSortBy} />
-            {searched && !showSave && (
-              <Button onClick={() => setShowSave(true)} variant="secondary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]">
-                <Bookmark className="w-4 h-4" /> Save search
-              </Button>
-            )}
-          </div>
+          {/* Matched tags — click the × to drop that one tag and re-search
+              with what's left. */}
+          {displayKeywords.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-medium text-bh-text-muted">Matching</span>
+              {displayKeywords.map((k) => (
+                <span
+                  key={k}
+                  className="group inline-flex items-center gap-1 rounded-full border border-bh-accent/20 bg-bh-accent/10 py-1 pl-2.5 pr-1 text-xs font-medium text-bh-accent"
+                >
+                  {k}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveKeyword(k)}
+                    aria-label={`Remove "${k}" and search again`}
+                    className="rounded-full p-0.5 text-bh-accent/70 transition-colors hover:bg-bh-accent/20 hover:text-bh-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+                  >
+                    <X className="w-3 h-3" aria-hidden="true" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
