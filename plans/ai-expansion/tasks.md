@@ -113,7 +113,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
 
 ## Phase 3 — API routes
 
-- [ ] **Add GET /api/ai/config**
+- [x] **Add GET /api/ai/config**
   - Files: `src/routes/api/ai/config.ts`
   - Do: TanStack server route (same shape as `src/routes/api/health.tsx`); returns
     `{ disabled, disabledTasks, serverAI }` where `serverAI` = key set AND not disabled;
@@ -121,7 +121,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `curl localhost:3000/api/ai/config` → `{"disabled":false,...}`; flip
     `AI_DISABLED=true`, restart, → `{"disabled":true,...}`.
 
-- [ ] **Add POST /api/ai/complete**
+- [x] **Add POST /api/ai/complete**
   - Files: `src/routes/api/ai/complete.ts`
   - Do: Implement the 8-step pipeline from spec.md (kill switch 503 → unconfigured 503 →
     tenant principal 401/403 → task/input validation 400 →
@@ -134,7 +134,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     `curl -X POST /api/ai/complete -d '{"taskId":"ping","input":{}}'` returns
     `{"output":{"pong":true},...}`; 6th call in a day as a free user returns 429 `budget`.
 
-- [ ] **Add POST /api/ai/embed**
+- [x] **Add POST /api/ai/embed**
   - Files: `src/routes/api/ai/embed.ts`
   - Do: Admin-only (copy the `ADMIN_USER_IDS` check from
     `src/routes/api/admin/alerts/run-worker.ts`); zod body

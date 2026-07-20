@@ -45,7 +45,12 @@ const pingTask: AITaskDefinition<Record<string, never>, { pong: true }> = {
   buildPrompt: () => 'Respond with {"pong": true}.',
   cacheTtlSeconds: null,
   allowances: { free: 5, pro: 20, team: 20 },
-  maxOutputTokens: 32,
+  // MiniMax M3 is a reasoning model: it always emits a `<think>...</think>`
+  // block before its actual answer. A live smoke test showed ~110 reasoning
+  // tokens for this trivial prompt alone — a small budget like 32 truncates
+  // mid-think (finish_reason: "length") and the real JSON answer never
+  // arrives, so every completion fails to parse. 300 leaves headroom.
+  maxOutputTokens: 300,
 }
 
 // Individual task definitions keep their precise I/O generics (see `pingTask`
