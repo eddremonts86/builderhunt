@@ -619,20 +619,28 @@ export function SearchPage() {
       {/* Header — collapses to just a small title once results are on screen,
           so a returning search doesn't repeat a full-height intro every time. */}
       <header className={searched ? 'mb-4' : 'mb-8'}>
-        <h1 className={`font-bold tracking-tight ${searched ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl mb-1'}`}>
+        <h1 className={`font-bold tracking-tight ${searched ? 'text-xl md:text-2xl' : 'text-3xl md:text-4xl mb-2'}`}>
           Search builders
         </h1>
         {!searched && (
-          <p className="text-bh-text-muted">
-            Find active developers across{' '}
-            {ALL_SOURCES.map((s, i) => (
-              <React.Fragment key={s}>
-                <span className="text-bh-text font-medium">{SOURCE_META[s].label}</span>
-                {i < ALL_SOURCES.length - 1 && ', '}
-              </React.Fragment>
-            ))}
-            .
-          </p>
+          <>
+            <p className="text-bh-text-muted mb-4">
+              Find active developers across {ALL_SOURCES.length} platforms — from GitHub commits to Hacker News threads.
+            </p>
+            <ul className="flex flex-wrap gap-1.5" aria-label="Supported sources">
+              {ALL_SOURCES.map((s) => {
+                const meta = SOURCE_META[s]
+                return (
+                  <li key={s}>
+                    <span className="inline-flex items-center gap-1.5 pl-1.5 pr-2.5 py-1 rounded-full border border-bh-border bg-bh-surface text-xs font-medium text-bh-text-muted">
+                      <meta.Icon className="w-3.5 h-3.5 shrink-0" title={meta.label} />
+                      {meta.label}
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </>
         )}
       </header>
 
