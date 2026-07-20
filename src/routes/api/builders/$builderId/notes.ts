@@ -1,9 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { builderNotes } from '~/shared/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { z } from 'zod'
 import { randomId } from '~/lib/utils'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import {
+  createOrganizationBuilderNote,
+  listOrganizationBuilderNotes,
+} from '~/shared/lib/repositories/organization-builders'
+
+const NoteBody = z.object({ content: z.string().trim().min(1).max(10_000) })
 
 export const Route = createFileRoute('/api/builders/$builderId/notes')({
   component: () => null,
@@ -11,57 +16,47 @@ export const Route = createFileRoute('/api/builders/$builderId/notes')({
     handlers: {
       GET: async ({ request, params }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
-          const { builderId } = params
-
-          const notes = await db
-            .select()
-            .from(builderNotes)
-            .where(and(eq(builderNotes.builderId, builderId), eq(builderNotes.userId, userId)))
-            .orderBy(builderNotes.createdAt)
-
+          const principal = await requireTenantPrincipal(request)
+          const notes = await withTenantContext(principal, (tx) =>
+            listOrganizationBuilderNotes(tx, principal.organizationId, params.builderId),
+          )
           return Response.json(notes)
-        } catch (err) {
-          console.error('Notes fetch error:', err)
+        } catch (error) {
+          const response = tenantAuthorizationResponse(error)
+          if (response) return response
+          console.error('Notes fetch error:', error)
           return Response.json({ error: 'Failed to fetch notes' }, { status: 500 })
         }
       },
       POST: async ({ request, params }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
+          const principal = await requireTenantPrincipal(request)
+          const parsed = NoteBody.safeParse(await request.json().catch(() => ({})))
+          if (!parsed.success) {
+            return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })
           }
-          const userId = session.user.id
-          const { builderId } = params
-
-          const body = await request.json()
-          const { content } = body
-
-          if (!content?.trim()) {
-            return Response.json({ error: 'Content is required' }, { status: 400 })
-          }
-
-          const note = await db
-            .insert(builderNotes)
-            .values({
-              id: randomId(),
-              userId,
-              builderId,
-              content: content.trim(),
-            })
-            .returning()
-
-          return Response.json(note[0])
-        } catch (err) {
-          console.error('Notes create error:', err)
+          const note = await withTenantContext(principal, (tx) => createOrganizationBuilderNote(tx, {
+            id: randomId(),
+            organizationId: principal.organizationId,
+            userId: principal.userId,
+            builderId: params.builderId,
+            content: parsed.data.content,
+          }))
+          if (!note) return Response.json({ error: 'Builder not found' }, { status: 404 })
+          return Response.json(note)
+        } catch (error) {
+          const response = tenantAuthorizationResponse(error)
+          if (response) return response
+          console.error('Notes create error:', error)
           return Response.json({ error: 'Failed to create note' }, { status: 500 })
         }
       },
     },
   },
 })
+
+function tenantAuthorizationResponse(error: unknown) {
+  return error instanceof TenantAuthorizationError
+    ? Response.json({ error: error.message }, { status: error.status })
+    : null
+}

@@ -1,4 +1,5 @@
-import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uuid, index } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
+import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey } from 'drizzle-orm/pg-core'
 
 // ---------------------------------------------------------------------------
 // Authentication Tables (Better Auth)
@@ -14,16 +15,32 @@ export const authUsers = pgTable('auth_users', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
-export const authSessions = pgTable('auth_sessions', {
+export const organizations = pgTable('organizations', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
-  token: text('token').notNull().unique(),
-  expiresAt: timestamp('expires_at').notNull(),
-  ipAddress: text('ip_address'),
-  userAgent: text('user_agent'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  logo: text('logo'),
+  metadata: text('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 })
+
+export const authSessions = pgTable(
+  'auth_sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    activeOrganizationId: text('active_organization_id').references(() => organizations.id, { onDelete: 'set null' }),
+    token: text('token').notNull().unique(),
+    expiresAt: timestamp('expires_at').notNull(),
+    ipAddress: text('ip_address'),
+    userAgent: text('user_agent'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    index('auth_sessions_active_organization_idx').on(table.activeOrganizationId),
+  ],
+)
 
 export const authAccounts = pgTable('auth_accounts', {
   id: text('id').primaryKey(),
@@ -52,14 +69,146 @@ export const authVerifications = pgTable('auth_verifications', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })
 
+export const organizationMembers = pgTable(
+  'organization_members',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    role: text('role').notNull().default('member'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('organization_members_org_user_unique').on(table.organizationId, table.userId),
+    uniqueIndex('organization_members_one_owner_unique').on(table.organizationId).where(sql`${table.role} = 'owner'`),
+    index('organization_members_user_idx').on(table.userId),
+    check('organization_members_role_check', sql`${table.role} in ('owner', 'admin', 'member')`),
+  ],
+)
+
+export const organizationInvitations = pgTable(
+  'organization_invitations',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    role: text('role'),
+    status: text('status').notNull().default('pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    inviterId: text('inviter_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+  },
+  (table) => [
+    index('organization_invitations_email_idx').on(table.organizationId, table.email),
+    index('organization_invitations_expires_idx').on(table.expiresAt),
+    check('organization_invitations_role_check', sql`${table.role} is null or ${table.role} in ('admin', 'member')`),
+    check('organization_invitations_status_check', sql`${table.status} in ('pending', 'accepted', 'rejected', 'canceled')`),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // App Tables
 // ---------------------------------------------------------------------------
+
+export const builderIdentities = pgTable(
+  'builder_identities',
+  {
+    id: text('id').primaryKey(),
+    source: text('source').notNull(),
+    sourceId: text('source_id').notNull(),
+    username: text('username').notNull(),
+    displayName: text('display_name'),
+    avatarUrl: text('avatar_url'),
+    bio: text('bio'),
+    profileUrl: text('profile_url').notNull(),
+    followersCount: integer('followers_count').notNull().default(0),
+    language: text('language'),
+    country: text('country'),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('builder_identities_source_source_id_unique').on(table.source, table.sourceId),
+    index('builder_identities_source_username_idx').on(table.source, table.username),
+  ],
+)
+
+export const builderSourceSnapshots = pgTable(
+  'builder_source_snapshots',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    contentHash: text('content_hash').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('builder_source_snapshots_identity_hash_unique').on(table.builderIdentityId, table.contentHash),
+    index('builder_source_snapshots_identity_observed_idx').on(table.builderIdentityId, table.observedAt),
+  ],
+)
+
+export const organizationBuilders = pgTable(
+  'organization_builders',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'restrict' }),
+    creatorUserId: text('creator_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    visibility: text('visibility').notNull().default('private'),
+    status: text('status').notNull().default('tracked'),
+    privateMetadata: jsonb('private_metadata').$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('organization_builders_org_identity_unique').on(table.organizationId, table.builderIdentityId),
+    uniqueIndex('organization_builders_organization_id_id_unique').on(table.organizationId, table.id),
+    check('organization_builders_visibility_check', sql`${table.visibility} in ('private', 'organization')`),
+    check('organization_builders_status_check', sql`${table.status} in ('tracked', 'shortlisted', 'archived')`),
+  ],
+)
+
+export const builderClaims = pgTable(
+  'builder_claims',
+  {
+    id: text('id').primaryKey(),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    subjectUserId: text('subject_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    evidenceSource: text('evidence_source').notNull(),
+    evidenceReference: text('evidence_reference').notNull(),
+    verificationSecretHash: text('verification_secret_hash'),
+    status: text('status').notNull().default('pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('builder_claims_active_identity_unique').on(table.builderIdentityId).where(sql`${table.status} in ('pending', 'verified')`),
+    index('builder_claims_subject_idx').on(table.subjectUserId),
+    check('builder_claims_status_check', sql`${table.status} in ('pending', 'verified', 'rejected', 'revoked', 'expired')`),
+  ],
+)
+
+export const publishedBuilderProfiles = pgTable('published_builder_profiles', {
+  builderIdentityId: text('builder_identity_id').primaryKey().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+  publishedByUserId: text('published_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+  displayName: text('display_name'),
+  bio: text('bio'),
+  openToStatus: jsonb('open_to_status').$type<string[]>().default([]).notNull(),
+  topics: jsonb('topics').$type<string[]>().default([]).notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
 
 export const builders = pgTable(
   'builders',
   {
     id: text('id').primaryKey(),
+    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => authUsers.id),
     source: text('source').notNull(), // github | reddit | hn | devto
     sourceId: text('source_id').notNull(),
@@ -88,22 +237,31 @@ export const builders = pgTable(
   },
   (table) => ({
     userSourceUnique: unique('builders_user_source_unique').on(table.userId, table.source, table.sourceId),
+    organizationIdIdUnique: uniqueIndex('builders_organization_id_id_unique').on(table.organizationId, table.id),
   }),
 )
 
-export const savedQueries = pgTable('saved_queries', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => authUsers.id),
-  name: text('name').notNull(),
-  keywords: jsonb('keywords').$type<string[]>().notNull(),
-  sources: jsonb('sources').$type<string[]>().default(['github']),
-  language: text('language'),
-  country: text('country'),
-  createdAt: timestamp('created_at').defaultNow(),
-})
+export const savedQueries = pgTable(
+  'saved_queries',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => authUsers.id),
+    name: text('name').notNull(),
+    keywords: jsonb('keywords').$type<string[]>().notNull(),
+    sources: jsonb('sources').$type<string[]>().default(['github']),
+    language: text('language'),
+    country: text('country'),
+    createdAt: timestamp('created_at').defaultNow(),
+  },
+  (table) => ({
+    organizationIdIdUnique: uniqueIndex('saved_queries_organization_id_id_unique').on(table.organizationId, table.id),
+  }),
+)
 
 export const alerts = pgTable('alerts', {
   id: text('id').primaryKey(),
+  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
   queryId: text('query_id').references(() => savedQueries.id),
   name: text('name').notNull(),
@@ -124,10 +282,18 @@ export const alerts = pgTable('alerts', {
     .notNull()
     .default({ eventType: 'any_activity' }),
   deliveryChannel: text('delivery_channel').default('email'),
-})
+}, (table) => ({
+  organizationIdIdUnique: uniqueIndex('alerts_organization_id_id_unique').on(table.organizationId, table.id),
+  organizationQueryFk: foreignKey({
+    columns: [table.organizationId, table.queryId],
+    foreignColumns: [savedQueries.organizationId, savedQueries.id],
+    name: 'alerts_organization_query_fk',
+  }),
+}))
 
 export const alertTriggers = pgTable('alert_triggers', {
   id: text('id').primaryKey(),
+  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   alertId: text('alert_id').notNull().references(() => alerts.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
   builderId: text('builder_id').references(() => builders.id, { onDelete: 'set null' }),
@@ -135,16 +301,36 @@ export const alertTriggers = pgTable('alert_triggers', {
   payload: jsonb('payload').$type<Record<string, unknown>>().default({}).notNull(),
   matchedAt: timestamp('matched_at', { withTimezone: true }).notNull().defaultNow(),
   readAt: timestamp('read_at', { withTimezone: true }),
-})
+}, (table) => ({
+  organizationIdIdUnique: uniqueIndex('alert_triggers_organization_id_id_unique').on(table.organizationId, table.id),
+  organizationAlertFk: foreignKey({
+    columns: [table.organizationId, table.alertId],
+    foreignColumns: [alerts.organizationId, alerts.id],
+    name: 'alert_triggers_organization_alert_fk',
+  }),
+  organizationBuilderFk: foreignKey({
+    columns: [table.organizationId, table.builderId],
+    foreignColumns: [builders.organizationId, builders.id],
+    name: 'alert_triggers_organization_builder_fk',
+  }),
+}))
 
 export const builderNotes = pgTable('builder_notes', {
   id: text('id').primaryKey(),
+  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
   builderId: text('builder_id').notNull().references(() => builders.id),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
-})
+}, (table) => ({
+  organizationIdIdUnique: uniqueIndex('builder_notes_organization_id_id_unique').on(table.organizationId, table.id),
+  organizationBuilderFk: foreignKey({
+    columns: [table.organizationId, table.builderId],
+    foreignColumns: [builders.organizationId, builders.id],
+    name: 'builder_notes_organization_builder_fk',
+  }),
+}))
 // ---------------------------------------------------------------------------
 // Claimable Profiles (Plan 8)
 // ---------------------------------------------------------------------------
@@ -176,18 +362,25 @@ export const builderProfileViews = pgTable(
 // Onboarding (Plan: onboarding-flow)
 // ---------------------------------------------------------------------------
 
-export const onboardingProgress = pgTable('onboarding_progress', {
-  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
-  step: integer('step').notNull().default(0), // 0..3
-  completed: boolean('completed').notNull().default(false),
-  skipped: boolean('skipped').notNull().default(false),
-  skippedCount: integer('skipped_count').notNull().default(0),
-  firstQueryId: text('first_query_id'),
-  firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
-  completedAt: timestamp('completed_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-})
+export const onboardingProgress = pgTable(
+  'onboarding_progress',
+  {
+    userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    step: integer('step').notNull().default(0), // 0..3
+    completed: boolean('completed').notNull().default(false),
+    skipped: boolean('skipped').notNull().default(false),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    firstQueryId: text('first_query_id'),
+    firstBuilderIds: jsonb('first_builder_ids').$type<string[]>().default([]).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    organizationIdIdUnique: uniqueIndex('onboarding_progress_organization_id_id_unique').on(table.organizationId, table.userId),
+  }),
+)
 
 // ---------------------------------------------------------------------------
 // Status & Trust (Plan: status-and-trust)
@@ -305,3 +498,84 @@ export const planRequests = pgTable('plan_requests', {
   message: text('message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const organizationEntitlements = pgTable(
+  'organization_entitlements',
+  {
+    organizationId: text('organization_id').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
+    tier: text('tier').notNull().default('free'),
+    status: text('status').notNull().default('active'),
+    billingPeriod: text('billing_period').notNull().default('none'),
+    currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
+    seatLimit: integer('seat_limit').notNull().default(1),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('organization_entitlements_tier_check', sql`${table.tier} in ('free', 'pro', 'team')`),
+    check('organization_entitlements_status_check', sql`${table.status} in ('active', 'past_due', 'canceled', 'trialing')`),
+    check('organization_entitlements_period_check', sql`${table.billingPeriod} in ('none', 'monthly', 'annual')`),
+    check('organization_entitlements_seat_limit_check', sql`${table.seatLimit} between 1 and 10`),
+  ],
+)
+
+export const organizationPlanChanges = pgTable(
+  'organization_plan_changes',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    fromTier: text('from_tier'),
+    toTier: text('to_tier').notNull(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('organization_plan_changes_org_created_idx').on(table.organizationId, table.createdAt),
+    check('organization_plan_changes_from_tier_check', sql`${table.fromTier} is null or ${table.fromTier} in ('free', 'pro', 'team')`),
+    check('organization_plan_changes_to_tier_check', sql`${table.toTier} in ('free', 'pro', 'team')`),
+  ],
+)
+
+export const migrationBackfillRuns = pgTable(
+  'migration_backfill_runs',
+  {
+    name: text('name').primaryKey(),
+    status: text('status').notNull().default('pending'),
+    cursor: text('cursor'),
+    processedCount: integer('processed_count').notNull().default(0),
+    migratedCount: integer('migrated_count').notNull().default(0),
+    skippedCount: integer('skipped_count').notNull().default(0),
+    conflictCount: integer('conflict_count').notNull().default(0),
+    orphanCount: integer('orphan_count').notNull().default(0),
+    checksum: text('checksum'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (table) => [
+    check('migration_backfill_runs_status_check', sql`${table.status} in ('pending', 'running', 'completed', 'failed')`),
+    check('migration_backfill_runs_counts_check', sql`${table.processedCount} >= 0 and ${table.migratedCount} >= 0 and ${table.skippedCount} >= 0 and ${table.conflictCount} >= 0 and ${table.orphanCount} >= 0`),
+  ],
+)
+
+export const migrationBackfillConflicts = pgTable(
+  'migration_backfill_conflicts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    runName: text('run_name').notNull().references(() => migrationBackfillRuns.name, { onDelete: 'cascade' }),
+    sourceTable: text('source_table').notNull(),
+    sourceId: text('source_id').notNull(),
+    reason: text('reason').notNull(),
+    checksum: text('checksum').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('migration_backfill_conflicts_source_reason_unique').on(table.runName, table.sourceTable, table.sourceId, table.reason),
+    index('migration_backfill_conflicts_unresolved_idx').on(table.runName, table.resolvedAt),
+  ],
+)

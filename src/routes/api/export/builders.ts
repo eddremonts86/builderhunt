@@ -1,8 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { builders } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { listOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 
 export const Route = createFileRoute('/api/export/builders')({
   component: () => null,
@@ -10,46 +9,48 @@ export const Route = createFileRoute('/api/export/builders')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
-
-          const allBuilders = await db
-            .select()
-            .from(builders)
-            .where(eq(builders.userId, userId))
-
+          const principal = await requireTenantPrincipal(request)
+          const builders = await withTenantContext(principal, (tx) =>
+            listOrganizationBuilders(tx, principal.organizationId),
+          )
           const header = ['username', 'source', 'score', 'language', 'country', 'topics', 'profileUrl']
-          const rows = allBuilders.map(b => [
-            b.username,
-            b.source,
-            b.metadata && typeof b.metadata === 'object' && 'score' in (b.metadata as Record<string, unknown>)
-              ? String((b.metadata as Record<string, unknown>).score)
-              : '0',
-            b.language ?? '',
-            b.country ?? '',
-            (b.topics ?? []).join('; '),
-            b.profileUrl,
+          const rows = builders.map((builder) => [
+            builder.username,
+            builder.source,
+            typeof builder.privateMetadata.score === 'number' ? builder.privateMetadata.score : 0,
+            privateString(builder.privateMetadata.language) ?? builder.language ?? '',
+            privateString(builder.privateMetadata.country) ?? builder.country ?? '',
+            privateTopics(builder.privateMetadata).join('; '),
+            builder.profileUrl,
           ])
-
           const csv = [
             header.join(','),
-            ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
+            ...rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(',')),
           ].join('\n')
-
           return new Response(csv, {
             headers: {
               'Content-Type': 'text/csv',
               'Content-Disposition': 'attachment; filename="builders.csv"',
             },
           })
-        } catch (err) {
-          console.error('Export error:', err)
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
+          }
+          console.error('Export error:', error)
           return Response.json({ error: 'Export failed' }, { status: 500 })
         }
       },
     },
   },
 })
+
+function privateString(value: unknown) {
+  return typeof value === 'string' ? value : null
+}
+
+function privateTopics(metadata: Record<string, unknown>) {
+  return Array.isArray(metadata.topics)
+    ? metadata.topics.filter((value): value is string => typeof value === 'string')
+    : []
+}

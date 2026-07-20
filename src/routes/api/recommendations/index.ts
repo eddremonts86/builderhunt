@@ -1,11 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auth } from '~/shared/lib/auth/better-auth'
-import { db } from '~/shared/lib/db/index'
-import { savedQueries } from '~/shared/lib/db/schema'
-import { desc, eq } from 'drizzle-orm'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { searchBuilders } from '~/lib/search'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { getTrackedKeySet, trackedKey } from '~/shared/lib/tracked-builders'
+import { listRecentSavedQueries } from '~/shared/lib/repositories/saved-queries'
 
 /**
  * Proactive Discovery — "For you" recommendations.
@@ -72,13 +71,9 @@ export const Route = createFileRoute('/api/recommendations/')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
+          const principal = await requireTenantPrincipal(request)
 
-          const rl = await rateLimit('recommendations', userId, 30, 60)
+          const rl = await rateLimit('recommendations', `${principal.organizationId}:${principal.userId}`, 30, 60)
           if (!rl.allowed) {
             return Response.json(
               { error: 'Too many requests. Please slow down.' },
@@ -87,17 +82,10 @@ export const Route = createFileRoute('/api/recommendations/')({
           }
 
           // 1. Pull most recent saved queries
-          const userQueries = await db
-            .select({
-              id: savedQueries.id,
-              name: savedQueries.name,
-              keywords: savedQueries.keywords,
-              sources: savedQueries.sources,
-            })
-            .from(savedQueries)
-            .where(eq(savedQueries.userId, userId))
-            .orderBy(desc(savedQueries.createdAt))
-            .limit(MAX_QUERIES_TO_RUN)
+          const { userQueries, savedKey } = await withTenantContext(principal, async (tx) => ({
+            userQueries: await listRecentSavedQueries(tx, principal.organizationId, MAX_QUERIES_TO_RUN),
+            savedKey: await getTrackedKeySet(tx, principal.organizationId),
+          }))
 
           if (userQueries.length === 0) {
             return Response.json({
@@ -156,8 +144,6 @@ export const Route = createFileRoute('/api/recommendations/')({
 
           // 5. Exclude builders the user has already tracked — sourceId+source
           //    is the key since builders.id is per-user (see tracked-builders.ts)
-          const savedKey = await getTrackedKeySet(userId)
-
           const candidates = Array.from(aggregated.values()).filter(
             (a) => !savedKey.has(trackedKey(a.builder.source, a.builder.sourceId)),
           )
@@ -267,6 +253,9 @@ export const Route = createFileRoute('/api/recommendations/')({
             },
           })
         } catch (err) {
+          if (err instanceof TenantAuthorizationError) {
+            return Response.json({ error: err.message }, { status: err.status })
+          }
           console.error('Recommendations error:', err)
           return Response.json({
             recommendations: [],

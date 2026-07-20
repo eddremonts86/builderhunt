@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { roadmapItems } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { deletePlatformRoadmapItem, updatePlatformRoadmapItem } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -36,11 +34,7 @@ export const Route = createFileRoute('/api/admin/roadmap/$id')({
           const update: Record<string, unknown> = { ...parsed.data }
           if (parsed.data.status === 'shipped') update.shippedAt = new Date()
           if (parsed.data.status && parsed.data.status !== 'shipped') update.shippedAt = null
-          const [updated] = await db
-            .update(roadmapItems)
-            .set(update)
-            .where(eq(roadmapItems.id, params.id))
-            .returning()
+          const updated = await updatePlatformRoadmapItem(params.id, update)
           if (!updated) return Response.json({ error: 'Not found' }, { status: 404 })
           return Response.json(updated)
         } catch (err) {
@@ -54,7 +48,7 @@ export const Route = createFileRoute('/api/admin/roadmap/$id')({
           if (!session?.user?.id || !isAdmin(session.user.id)) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
-          await db.delete(roadmapItems).where(eq(roadmapItems.id, params.id))
+          await deletePlatformRoadmapItem(params.id)
           return Response.json({ ok: true })
         } catch (err) {
           console.error('admin roadmap delete error:', err)

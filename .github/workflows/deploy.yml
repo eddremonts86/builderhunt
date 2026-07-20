@@ -1,9 +1,10 @@
 name: Deploy to Coolify
 
 on:
-  push:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
     branches: [master]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,6 +15,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Trigger deployment

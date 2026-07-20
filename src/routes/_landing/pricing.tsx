@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Check, X, Mail, Sparkles, Users, Crown, HelpCircle } from 'lucide-react'
-import { PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
+import { PLAN_LIMITS, PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 
 export const Route = createFileRoute('/_landing/pricing')({
@@ -138,10 +138,15 @@ function PricingPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {tiers.map((tier) => {
           const config = PLAN_PRICING[tier]
+          const limits = PLAN_LIMITS[tier]
           const isCurrent = plan?.plan === tier
           const Icon = PLAN_ICONS[tier]
-          const price = billingPeriod === 'monthly' ? config.priceMonthly : config.priceAnnual
+          const price = billingPeriod === 'monthly' ? config.monthly : config.annual
           const periodLabel = billingPeriod === 'monthly' ? '/mo' : '/yr'
+          const hasAlerts = config.features.includes('Smart alerts')
+          const hasCodeStyle = config.features.includes('Code fingerprinting')
+          const teamSeats = tier === 'team' ? 10 : 1
+          const displayLimit = (value: number) => Number.isFinite(value) ? value : 'Unlimited'
 
           return (
             <article
@@ -176,35 +181,35 @@ function PricingPage() {
                 <ul className="space-y-3 mb-8 text-sm text-bh-text-muted">
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-bh-success" />
-                    <span>{config.maxSavedSearches} saved searches</span>
+                    <span>{displayLimit(limits.savedSearches)} saved searches</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-bh-success" />
-                    <span>{config.maxSavedBuilders} saved builders</span>
+                    <span>{displayLimit(limits.savedBuilders)} saved builders</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-bh-success" />
-                    <span>{config.maxRssFeeds} RSS feeds</span>
+                    <span>{displayLimit(limits.rssSubscriptions)} RSS feeds</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    {config.hasAlerts ? (
+                    {hasAlerts ? (
                       <Check className="w-4 h-4 text-bh-success" />
                     ) : (
                       <X className="w-4 h-4 text-bh-text-dim" />
                     )}
-                    <span className={config.hasAlerts ? 'text-bh-text' : 'line-through text-bh-text-dim'}>Smart alerts</span>
+                    <span className={hasAlerts ? 'text-bh-text' : 'line-through text-bh-text-dim'}>Smart alerts</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    {config.hasCodeStyle ? (
+                    {hasCodeStyle ? (
                       <Check className="w-4 h-4 text-bh-success" />
                     ) : (
                       <X className="w-4 h-4 text-bh-text-dim" />
                     )}
-                    <span className={config.hasCodeStyle ? 'text-bh-text' : 'line-through text-bh-text-dim'}>Code fingerprinting</span>
+                    <span className={hasCodeStyle ? 'text-bh-text' : 'line-through text-bh-text-dim'}>Code fingerprinting</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <Check className="w-4 h-4 text-bh-success" />
-                    <span>{config.maxTeamSeats} seat{config.maxTeamSeats > 1 ? 's' : ''}</span>
+                    <span>{teamSeats} seat{teamSeats > 1 ? 's' : ''}</span>
                   </li>
                 </ul>
               </div>

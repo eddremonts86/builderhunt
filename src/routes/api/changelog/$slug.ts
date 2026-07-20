@@ -1,7 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { changelog } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { findPublicChangelogEntryBySlug } from '~/shared/lib/repositories/public-content'
 
 export const Route = createFileRoute('/api/changelog/$slug')({
   component: () => null,
@@ -9,11 +7,7 @@ export const Route = createFileRoute('/api/changelog/$slug')({
     handlers: {
       GET: async ({ params }) => {
         try {
-          const [row] = await db
-            .select()
-            .from(changelog)
-            .where(eq(changelog.slug, params.slug))
-            .limit(1)
+          const row = await findPublicChangelogEntryBySlug(params.slug)
           if (!row) return Response.json({ error: 'Not found' }, { status: 404 })
           return Response.json(row)
         } catch (err) {

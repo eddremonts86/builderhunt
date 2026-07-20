@@ -1,14 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { builders } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { auth } from '~/shared/lib/auth/better-auth'
 import { z } from 'zod'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { updateVerifiedBuilderProfile } from '~/shared/lib/repositories/builder-claims'
 
-/**
- * PATCH /api/me/builder/:builderId
- * Update the claimed builder's topics + open-to status.
- */
 const Body = z.object({
   claimedTopics: z.array(z.string().min(1).max(40)).max(20).optional(),
   openToStatus: z.array(z.enum(['chats', 'mentoring', 'collaboration', 'hires', 'consulting', 'nothing'])).max(6).optional(),
@@ -21,43 +16,23 @@ export const Route = createFileRoute('/api/me/builder/$builderId')({
     handlers: {
       PATCH: async ({ request, params }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
-          const { builderId } = params
-
-          const body = await request.json().catch(() => ({}))
-          const parsed = Body.safeParse(body)
-          if (!parsed.success) {
-            return Response.json({ error: 'Invalid body' }, { status: 400 })
-          }
-
-          const [existing] = await db
-            .select({ id: builders.id, claimedByUserId: builders.claimedByUserId })
-            .from(builders)
-            .where(eq(builders.id, builderId))
-            .limit(1)
-
-          if (!existing || existing.claimedByUserId !== userId) {
-            return Response.json({ error: 'Not your profile' }, { status: 403 })
-          }
-
-          const update: Record<string, unknown> = { updatedAt: new Date() }
-          if (parsed.data.claimedTopics !== undefined) update.claimedTopics = parsed.data.claimedTopics
-          if (parsed.data.openToStatus !== undefined) update.openToStatus = parsed.data.openToStatus
-          if (parsed.data.bio !== undefined) update.bio = parsed.data.bio
-
-          const [updated] = await db
-            .update(builders)
-            .set(update)
-            .where(eq(builders.id, builderId))
-            .returning()
-
+          const principal = await requireTenantPrincipal(request)
+          const parsed = Body.safeParse(await request.json().catch(() => ({})))
+          if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
+          const updated = await withTenantContext(principal, (tx) => updateVerifiedBuilderProfile(tx, {
+            subjectUserId: principal.userId,
+            builderIdentityId: params.builderId,
+            topics: parsed.data.claimedTopics,
+            openToStatus: parsed.data.openToStatus,
+            bio: parsed.data.bio,
+          }))
+          if (!updated) return Response.json({ error: 'Not your profile' }, { status: 403 })
           return Response.json(updated)
-        } catch (err) {
-          console.error('Patch me/builder error:', err)
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
+          }
+          console.error('Patch me/builder error:', error)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }
       },

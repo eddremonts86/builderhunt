@@ -433,7 +433,10 @@ function SavedSearchRow({
   }, [])
 
   const runUrl = `/search?q=${encodeURIComponent(query.keywords.join(' '))}`
-  const rssUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/${query.id}?format=rss`
+  const feedToken = typeof (query as typeof query & { feedToken?: unknown }).feedToken === 'string'
+    ? (query as typeof query & { feedToken: string }).feedToken
+    : ''
+  const rssUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/${query.id}?format=rss&token=${encodeURIComponent(feedToken)}`
 
   const handleExport = async (kind: 'people' | 'resources') => {
     setExporting(kind)

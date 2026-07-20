@@ -1,18 +1,32 @@
 import { betterAuth } from 'better-auth'
+import { organization } from 'better-auth/plugins'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
-import { db } from '~/shared/lib/db/index'
-import { authUsers, authSessions, authAccounts, authVerifications } from '~/shared/lib/db/schema'
-import { sendResetPasswordEmail } from '~/shared/lib/email'
+import { authDb } from '~/shared/lib/db/auth-db'
+import {
+  authUsers,
+  authSessions,
+  authAccounts,
+  authVerifications,
+  organizations,
+  organizationMembers,
+  organizationInvitations,
+} from '~/shared/lib/db/schema'
+import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
+import { organizationOptions } from './organization-options'
+import { ensurePersonalOrganization } from './personal-organization'
 
 export const auth = betterAuth({
-  database: drizzleAdapter(db, {
+  database: drizzleAdapter(authDb, {
     provider: 'pg',
     schema: {
       user: authUsers,
       session: authSessions,
       account: authAccounts,
       verification: authVerifications,
+      organization: organizations,
+      member: organizationMembers,
+      invitation: organizationInvitations,
     },
   }),
   emailAndPassword: {
@@ -21,9 +35,62 @@ export const auth = betterAuth({
       await sendResetPasswordEmail(user.email, url)
     },
   },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await ensurePersonalOrganization(user.id)
+        },
+      },
+    },
+  },
   // BETTER_AUTH_SECRET is the canonical name
   secret: env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production',
   baseURL: env.APP_URL,
+  plugins: [
+    organization({
+      ...organizationOptions,
+      schema: {
+        organization: {
+          modelName: 'organization',
+          fields: {
+            name: 'name',
+            slug: 'slug',
+            logo: 'logo',
+            metadata: 'metadata',
+            createdAt: 'createdAt',
+          },
+        },
+        member: {
+          modelName: 'member',
+          fields: {
+            organizationId: 'organizationId',
+            userId: 'userId',
+            role: 'role',
+            createdAt: 'createdAt',
+          },
+        },
+        invitation: {
+          modelName: 'invitation',
+          fields: {
+            organizationId: 'organizationId',
+            email: 'email',
+            role: 'role',
+            status: 'status',
+            expiresAt: 'expiresAt',
+            createdAt: 'createdAt',
+            inviterId: 'inviterId',
+          },
+        },
+        session: { fields: { activeOrganizationId: 'activeOrganizationId' } },
+      },
+      sendInvitationEmail: async ({ id, email, organization: invitedOrganization }) => {
+        const invitationUrl = new URL(`/team/invite/${encodeURIComponent(id)}`, env.APP_URL).toString()
+        const result = await sendOrganizationInvitationEmail(email, invitedOrganization.name, invitationUrl)
+        if (!result.ok) throw new Error('Unable to deliver organization invitation')
+      },
+    }),
+  ],
   // Cookies are handled via standard browser cookie mechanism
   // Rate limiting: better-auth only enables this by default in production
   // (NODE_ENV === 'production'). We force it on everywhere so brute-force

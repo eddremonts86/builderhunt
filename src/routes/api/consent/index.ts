@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { userConsents } from '~/shared/lib/db/schema'
-import { eq, desc } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
+import { insertAccountConsent, listAccountConsents } from '~/shared/lib/repositories/account-privacy'
 
 const CURRENT_VERSIONS = {
   tos: 'v1.0',
@@ -32,11 +30,7 @@ export const Route = createFileRoute('/api/consent/')({
               needsAcceptance: [],
             })
           }
-          const rows = await db
-            .select()
-            .from(userConsents)
-            .where(eq(userConsents.userId, session.user.id))
-            .orderBy(desc(userConsents.acceptedAt))
+          const rows = await listAccountConsents(session.user.id)
           // Keep latest consent per document
           const map: Record<string, string> = {}
           for (const r of rows) {
@@ -70,7 +64,7 @@ export const Route = createFileRoute('/api/consent/')({
           const parsed = ConsentBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
-          await db.insert(userConsents).values({
+          await insertAccountConsent({
             id: randomId(),
             userId: session.user.id,
             document: parsed.data.document,

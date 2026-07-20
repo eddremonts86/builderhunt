@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { planChanges } from '~/shared/lib/db/schema'
-import { desc, eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { listAccountPlanChanges } from '~/shared/lib/repositories/account-privacy'
 
 export const Route = createFileRoute('/api/me/plan-changes/')({
   component: () => null,
@@ -14,12 +12,7 @@ export const Route = createFileRoute('/api/me/plan-changes/')({
           if (!session?.user?.id) {
             return Response.json({ error: 'Unauthorized' }, { status: 401 })
           }
-          const rows = await db
-            .select()
-            .from(planChanges)
-            .where(eq(planChanges.userId, session.user.id))
-            .orderBy(desc(planChanges.createdAt))
-            .limit(20)
+          const rows = await listAccountPlanChanges(session.user.id)
           return Response.json(
             rows.map((r) => ({
               id: r.id,

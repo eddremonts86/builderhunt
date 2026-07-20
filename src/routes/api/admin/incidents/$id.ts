@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { incidents } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { updatePlatformIncident } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -40,11 +38,7 @@ export const Route = createFileRoute('/api/admin/incidents/$id')({
           if (parsed.data.title !== undefined) update.title = parsed.data.title
           if (parsed.data.description !== undefined) update.description = parsed.data.description
 
-          const [updated] = await db
-            .update(incidents)
-            .set(update)
-            .where(eq(incidents.id, params.id))
-            .returning()
+          const updated = await updatePlatformIncident(params.id, update)
           return Response.json(updated)
         } catch (err) {
           console.error('admin incident patch error:', err)

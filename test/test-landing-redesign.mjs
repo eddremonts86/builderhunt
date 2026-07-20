@@ -4,7 +4,6 @@ import { chromium } from 'playwright'
 const PORTS = [3001, 3000]
 
 async function verifyPageLayout(page, urlPath, pageName) {
-  const url = `${page.url()}`
   console.log(`\n🔍 Verifying page: ${pageName} (${urlPath})`)
   
   // Assert header exists

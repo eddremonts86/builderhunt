@@ -1,0 +1,115 @@
+import { and, count, desc, eq, gte } from 'drizzle-orm'
+import { randomId } from '~/lib/utils'
+import { PLAN_LIMITS, type LimitCheck, type LimitResource, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
+import { platformDb } from '../db/client'
+import { authUsers, builders, planChanges, planRequests, plans, savedQueries } from '../db/schema'
+
+export async function getPlatformUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {
+  if (!userId) return null
+  const [row] = await platformDb.select().from(plans).where(eq(plans.userId, userId)).limit(1)
+  if (!row) {
+    await platformDb.insert(plans).values({ userId, plan: 'free', status: 'active' }).onConflictDoNothing()
+    return { userId, plan: 'free', status: 'active', planEndsAt: null, trialEndsAt: null, notes: null }
+  }
+  return {
+    userId: row.userId,
+    plan: row.plan as PlanTier,
+    status: row.status as PlanStatus,
+    planEndsAt: row.planEndsAt?.toISOString() ?? null,
+    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
+    notes: row.notes,
+  }
+}
+
+export async function setPlatformUserPlan(
+  userId: string,
+  newPlan: PlanTier,
+  changedBy: string,
+  reason?: string,
+  planEndsAt?: Date,
+) {
+  const from = (await getPlatformUserPlan(userId))?.plan ?? 'free'
+  await platformDb.transaction(async (tx) => {
+    await tx.insert(plans).values({ userId, plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null })
+      .onConflictDoUpdate({
+        target: plans.userId,
+        set: { plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null, updatedAt: new Date() },
+      })
+    await tx.insert(planChanges).values({ id: randomId(), userId, fromPlan: from, toPlan: newPlan, changedBy, reason: reason ?? null })
+  })
+  return { from, to: newPlan }
+}
+
+export async function requestPlatformPlanUpgrade(userId: string, requestedPlan: 'pro' | 'team', message?: string) {
+  const [existing] = await platformDb.select({ id: planRequests.id }).from(planRequests)
+    .where(and(eq(planRequests.userId, userId), eq(planRequests.status, 'pending'))).limit(1)
+  if (existing) return { id: existing.id, alreadyPending: true }
+  const id = randomId()
+  await platformDb.insert(planRequests).values({ id, userId, requestedPlan, message: message ?? null })
+  return { id, alreadyPending: false }
+}
+
+export async function resolvePlatformPlanRequest(id: string, status: 'approved' | 'declined') {
+  await platformDb.update(planRequests).set({ status }).where(eq(planRequests.id, id))
+}
+
+export async function findPlatformPlanRequest(id: string) {
+  const [row] = await platformDb.select().from(planRequests).where(eq(planRequests.id, id)).limit(1)
+  return row ?? null
+}
+
+export async function checkPlatformLimit(userId: string, resource: LimitResource): Promise<LimitCheck> {
+  const plan = (await getPlatformUserPlan(userId))?.plan ?? 'free'
+  const limit = PLAN_LIMITS[plan][resource]
+  const table = resource === 'savedBuilders' ? builders : savedQueries
+  const userColumn = resource === 'savedBuilders' ? builders.userId : savedQueries.userId
+  const [row] = await platformDb.select({ value: count() }).from(table).where(eq(userColumn, userId))
+  const current = Number(row?.value ?? 0)
+  return { allowed: current < limit, current, limit, plan, resource }
+}
+
+export async function listPlatformUsersWithPlans() {
+  const rows = await platformDb.select({
+    userId: authUsers.id,
+    name: authUsers.name,
+    email: authUsers.email,
+    createdAt: authUsers.createdAt,
+    plan: plans.plan,
+    status: plans.status,
+    planEndsAt: plans.planEndsAt,
+  }).from(authUsers).leftJoin(plans, eq(plans.userId, authUsers.id)).orderBy(desc(authUsers.createdAt))
+  return rows.map((row) => ({
+    ...row,
+    plan: (row.plan ?? 'free') as PlanTier,
+    status: row.status ?? 'active',
+    createdAt: row.createdAt.toISOString(),
+    planEndsAt: row.planEndsAt?.toISOString() ?? null,
+  }))
+}
+
+export function listPlatformPlanRequests() {
+  return platformDb.select({
+    id: planRequests.id,
+    userId: planRequests.userId,
+    requestedPlan: planRequests.requestedPlan,
+    status: planRequests.status,
+    message: planRequests.message,
+    createdAt: planRequests.createdAt,
+    userName: authUsers.name,
+    userEmail: authUsers.email,
+  }).from(planRequests).leftJoin(authUsers, eq(authUsers.id, planRequests.userId))
+    .orderBy(desc(planRequests.createdAt)).limit(200)
+}
+
+export async function getPlatformAccountMetrics(oneDayAgo: Date, oneWeekAgo: Date) {
+  const [[total], [daily], [weekly]] = await Promise.all([
+    platformDb.select({ value: count() }).from(authUsers),
+    platformDb.select({ value: count() }).from(authUsers).where(gte(authUsers.createdAt, oneDayAgo)),
+    platformDb.select({ value: count() }).from(authUsers).where(gte(authUsers.createdAt, oneWeekAgo)),
+  ])
+  return {
+    totalUsers: Number(total?.value ?? 0),
+    newUsersLast24h: Number(daily?.value ?? 0),
+    newUsersLast7d: Number(weekly?.value ?? 0),
+  }
+}

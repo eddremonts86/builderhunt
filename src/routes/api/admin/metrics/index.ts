@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { metrics } from '~/shared/lib/metrics'
-import { db } from '~/shared/lib/db/index'
-import { authUsers, savedQueries, builders, builderNotes } from '~/shared/lib/db/schema'
-import { count, gte } from 'drizzle-orm'
+import { getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 function isAdmin(userId: string) {
@@ -29,22 +27,15 @@ export const Route = createFileRoute('/api/admin/metrics/')({
           const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
           const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-          const [userCount] = await db.select({ c: count() }).from(authUsers)
-          const [dauCount] = await db.select({ c: count() }).from(authUsers).where(gte(authUsers.createdAt, oneDayAgo))
-          const [wauCount] = await db.select({ c: count() }).from(authUsers).where(gte(authUsers.createdAt, oneWeekAgo))
-          const [sqCount] = await db.select({ c: count() }).from(savedQueries)
-          const [bCount] = await db.select({ c: count() }).from(builders)
-          const [nCount] = await db.select({ c: count() }).from(builderNotes)
+          const accountMetrics = await getPlatformAccountMetrics(oneDayAgo, oneWeekAgo)
 
           return Response.json({
             inProcess,
             db: {
-              totalUsers: Number(userCount?.c ?? 0),
-              newUsersLast24h: Number(dauCount?.c ?? 0),
-              newUsersLast7d: Number(wauCount?.c ?? 0),
-              totalSavedQueries: Number(sqCount?.c ?? 0),
-              totalBuilders: Number(bCount?.c ?? 0),
-              totalNotes: Number(nCount?.c ?? 0),
+              ...accountMetrics,
+              totalSavedQueries: null,
+              totalBuilders: null,
+              totalNotes: null,
             },
             server: {
               nodeVersion: process.version,

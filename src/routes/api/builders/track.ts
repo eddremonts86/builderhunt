@@ -1,10 +1,16 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { builders } from '~/shared/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
-import { auth } from '~/shared/lib/auth/better-auth'
-import { randomId } from '~/lib/utils'
 import { z } from 'zod'
+import { randomId } from '~/lib/utils'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
+import {
+  countOrganizationBuilders,
+  findOrganizationBuilderBySource,
+  trackOrganizationBuilder,
+} from '~/shared/lib/repositories/organization-builders'
+import { isAllowedBuilderProfileUrl } from '~/shared/lib/security/url-policy'
 
 const TrackBody = z.object({
   source: z.enum([
@@ -23,6 +29,9 @@ const TrackBody = z.object({
   topics: z.array(z.string()).optional(),
   score: z.number().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
+}).refine((data) => isAllowedBuilderProfileUrl(data.source, data.profileUrl), {
+  path: ['profileUrl'],
+  message: 'Profile URL does not match the declared source',
 })
 
 export const Route = createFileRoute('/api/builders/track')({
@@ -31,76 +40,47 @@ export const Route = createFileRoute('/api/builders/track')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) {
-            return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          }
-          const userId = session.user.id
-
-          const body = await request.json().catch(() => ({}))
-          const parsed = TrackBody.safeParse(body)
+          const principal = await requireTenantPrincipal(request)
+          const parsed = TrackBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) {
             return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })
           }
-          const data = parsed.data
-
-          const [existing] = await db
-            .select({ id: builders.id })
-            .from(builders)
-            .where(
-              and(
-                eq(builders.userId, userId),
-                eq(builders.source, data.source),
-                eq(builders.sourceId, data.sourceId),
+          const result = await withTenantContext(principal, async (tx) => {
+            const [entitlement, current, existing] = await Promise.all([
+              getOrganizationEntitlement(tx, principal.organizationId),
+              countOrganizationBuilders(tx, principal.organizationId),
+              findOrganizationBuilderBySource(
+                tx,
+                principal.organizationId,
+                parsed.data.source,
+                parsed.data.sourceId,
               ),
-            )
-            .limit(1)
-
-          if (!existing) {
-            const { checkLimit } = await import('~/shared/lib/billing')
-            const limit = await checkLimit(userId, 'savedBuilders')
-            if (!limit.allowed) {
-              return Response.json(
-                {
-                  error: `You've reached the ${limit.plan} plan limit of ${limit.limit} saved builders. Upgrade to save more.`,
-                  limit: limit.limit,
-                  current: limit.current,
-                  plan: limit.plan,
-                  upgradeUrl: '/pricing',
-                },
-                { status: 402 },
-              )
-            }
+            ])
+            const limit = PLAN_LIMITS[entitlement.tier].savedBuilders
+            if (!existing && current >= limit) return { tracked: null, current, limit, plan: entitlement.tier }
+            const tracked = await trackOrganizationBuilder(tx, {
+              id: randomId(),
+              organizationId: principal.organizationId,
+              creatorUserId: principal.userId,
+              ...parsed.data,
+            })
+            return { tracked, current, limit, plan: entitlement.tier }
+          })
+          if (!result.tracked) {
+            return Response.json({
+              error: `You've reached the ${result.plan} plan limit of ${result.limit} saved builders. Upgrade to save more.`,
+              current: result.current,
+              limit: result.limit,
+              plan: result.plan,
+              upgradeUrl: '/pricing',
+            }, { status: 402 })
           }
-
-          const id = existing?.id ?? randomId()
-          const [row] = await db
-            .insert(builders)
-            .values({
-              id,
-              userId,
-              source: data.source,
-              sourceId: data.sourceId,
-              username: data.username,
-              displayName: data.displayName ?? null,
-              avatarUrl: data.avatarUrl ?? null,
-              bio: data.bio ?? null,
-              profileUrl: data.profileUrl,
-              followersCount: data.followersCount ?? 0,
-              language: data.language ?? null,
-              country: data.country ?? null,
-              topics: data.topics ?? [],
-              metadata: { ...(data.metadata ?? {}), score: data.score ?? null },
-            })
-            .onConflictDoUpdate({
-              target: [builders.userId, builders.source, builders.sourceId],
-              set: { lastSeen: new Date(), updatedAt: new Date() },
-            })
-            .returning()
-
-          return Response.json({ id: row.id, tracked: true })
-        } catch (err) {
-          console.error('Track builder error:', err)
+          return Response.json({ id: result.tracked.id, tracked: true })
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
+          }
+          console.error('Track builder error:', error)
           return Response.json({ error: 'Failed to track builder' }, { status: 500 })
         }
       },

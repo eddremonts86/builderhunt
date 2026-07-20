@@ -1,13 +1,13 @@
 # Security, Normalization, and Multi-Tenancy Foundation
 
-> **Status**: `pending`
+> **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/spec.md), [`shared-resources`](../shared-resources/spec.md), [`activity-feed`](../activity-feed/spec.md), [`ai-expansion`](../ai-expansion/spec.md), [`semantic-search`](../semantic-search/spec.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/spec.md), [`production-infrastructure`](../production-infrastructure/spec.md)
-> **Reality check**: `src/shared/lib/db/schema.ts` has 21 single-user/global tables, no
-> organization schema, no `organization_id`, no composite tenant foreign keys, and no RLS.
-> `src/shared/lib/db/index.ts` exposes one unrestricted global Drizzle client, while local Docker
-> and `.env.example` use the PostgreSQL owner account. The only migration is
-> `drizzle/0000_tranquil_hemingway.sql`.
+> **Reality check**: the additive organization, tenant-key, entitlement, normalized-builder,
+> auth-broker, backfill-state, bootstrap, and RLS layers are implemented through migration `0009`
+> and verified against local PostgreSQL. Product route/repository cutover and the remaining legacy
+> resource/builder backfills are still in progress; 37 direct global-db imports are ratcheted and
+> must reach zero before canonical mode.
 
 ## Problem
 

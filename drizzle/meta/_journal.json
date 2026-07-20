@@ -8,6 +8,90 @@
       "when": 1784460383174,
       "tag": "0000_tranquil_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784539951135,
+      "tag": "0001_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784540282407,
+      "tag": "0002_database_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784540519719,
+      "tag": "0003_tenant_expand",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784540575212,
+      "tag": "0004_organization_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784540775502,
+      "tag": "0005_builder_normalization",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784541093990,
+      "tag": "0006_backfill_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784541280777,
+      "tag": "0007_auth_broker",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784541344840,
+      "tag": "0008_tenant_rls",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784542146025,
+      "tag": "0009_entitlement_bootstrap",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784545794348,
+      "tag": "0010_worker_alert_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784546348503,
+      "tag": "0011_builder_claim_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784546620301,
+      "tag": "0012_platform_role",
+      "breakpoints": true
     }
   ]
 }

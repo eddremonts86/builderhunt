@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { dataExportRequests } from '~/shared/lib/db/schema'
-import { and, eq } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { findAccountExportRequest } from '~/shared/lib/repositories/account-privacy'
 
 export const Route = createFileRoute('/api/me/data-export/$id')({
   component: () => null,
@@ -12,11 +10,7 @@ export const Route = createFileRoute('/api/me/data-export/$id')({
         try {
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          const [row] = await db
-            .select()
-            .from(dataExportRequests)
-            .where(and(eq(dataExportRequests.id, params.id), eq(dataExportRequests.userId, session.user.id)))
-            .limit(1)
+          const row = await findAccountExportRequest(session.user.id, params.id)
           if (!row) return Response.json({ error: 'Not found' }, { status: 404 })
           if (row.status !== 'ready' || !row.payload) {
             return Response.json({ id: row.id, status: row.status })

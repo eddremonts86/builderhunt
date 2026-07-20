@@ -1,12 +1,12 @@
 # Tasks: Security, Normalization, and Multi-Tenancy Foundation
 
-> **Status**: `pending`
+> **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
-> **Reality check**: the app currently has no organization or tenant context, exports the global
-> `db` client to all consumers, uses a database owner in local examples, and relies on route-level
-> `userId` filters. These tasks change planning and infrastructure first; no destructive contract
-> migration occurs until dual-write reconciliation, RLS tests, and a restore rehearsal pass.
+> **Reality check**: migrations `0001`–`0009` now provide the additive foundation and RLS has passed
+> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, and bootstrap checks. The 37
+> remaining legacy direct-db imports are tracked by `security:boundaries`; no destructive contract
+> migration or production credential switch is authorized until they reach zero and readiness passes.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.

@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { db } from '~/shared/lib/db/index'
-import { changelog } from '~/shared/lib/db/schema'
-import { desc } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { randomId } from '~/lib/utils'
+import { createPlatformChangelog, listPlatformChangelog } from '~/shared/lib/repositories/platform-content'
 
 const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
@@ -33,11 +31,7 @@ export const Route = createFileRoute('/api/admin/changelog/')({
           if (!session?.user?.id || !isAdmin(session.user.id)) {
             return Response.json({ error: 'Forbidden' }, { status: 403 })
           }
-          const rows = await db
-            .select()
-            .from(changelog)
-            .orderBy(desc(changelog.publishedAt))
-            .limit(200)
+          const rows = await listPlatformChangelog()
           return Response.json(rows)
         } catch (err) {
           console.error('admin changelog list error:', err)
@@ -58,7 +52,7 @@ export const Route = createFileRoute('/api/admin/changelog/')({
           const slug = parsed.data.slug || slugify(parsed.data.title)
           const id = randomId()
           try {
-            await db.insert(changelog).values({
+            await createPlatformChangelog({
               id,
               title: parsed.data.title,
               content: parsed.data.content,

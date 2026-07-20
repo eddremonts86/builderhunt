@@ -12,15 +12,18 @@
 
 import postgres from 'postgres'
 
-const url = process.env.DATABASE_URL
+const url = process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL
 
 if (!url) {
-  console.error('❌  DATABASE_URL is not set. Check your .env file.')
+  console.error('❌  DATABASE_MIGRATION_URL (or local DATABASE_URL fallback) is not set.')
   process.exit(1)
 }
 
 const parsed = new URL(url.replace(/^postgres:\/\//, 'postgresql://'))
 const dbName = parsed.pathname.replace(/^\//, '')
+if (!/^[A-Za-z0-9_]+$/.test(dbName)) {
+  throw new Error('Database name may contain only letters, numbers, and underscores')
+}
 const adminUrl = `postgresql://${parsed.username}:${parsed.password}@${parsed.hostname}:${parsed.port}/postgres`
 
 const sql = postgres(adminUrl, { max: 1, prepare: false })
