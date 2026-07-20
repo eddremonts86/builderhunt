@@ -15,6 +15,38 @@ export interface SendResult {
   error?: string
 }
 
+export async function sendOrganizationInvitationEmail(
+  to: string,
+  organizationName: string,
+  link: string,
+): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    // Do not log invitation URLs or recipient addresses: both are credentials/PII.
+    return { ok: true, devLink: link }
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: `Invitation to join ${organizationName} on BuilderHunt`,
+        html: organizationInvitationEmailHtml(organizationName, link),
+      }),
+    })
+    if (!res.ok) return { ok: false, error: `Resend request failed (${res.status})` }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Email delivery failed' }
+  }
+}
+
 export async function sendClaimEmail(to: string, link: string): Promise<SendResult> {
   if (!env.RESEND_API_KEY) {
     // Dev mode — log and return the link so the UI can show it
@@ -189,6 +221,26 @@ function claimEmailHtml(link: string): string {
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">This link expires in 24 hours. If you didn't request this, you can safely ignore this email.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function organizationInvitationEmailHtml(organizationName: string, link: string): string {
+  const safeName = organizationName
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;')
+  const safeLink = link.replaceAll('&', '&amp;').replaceAll('"', '&quot;')
+
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Join ${safeName}</h1>
+    <p>You have been invited to collaborate in BuilderHunt.</p>
+    <p style="margin:1.5rem 0;"><a href="${safeLink}" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review invitation</a></p>
+    <p style="color:#6b7280;font-size:0.85rem;">This invitation expires in 7 days. Sign in with the invited email address to accept it.</p>
   </body>
 </html>`
 }

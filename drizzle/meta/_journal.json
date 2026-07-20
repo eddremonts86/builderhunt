@@ -8,6 +8,41 @@
       "when": 1784460383174,
       "tag": "0000_tranquil_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784539951135,
+      "tag": "0001_organizations",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784540282407,
+      "tag": "0002_database_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784540519719,
+      "tag": "0003_tenant_expand",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784540575212,
+      "tag": "0004_organization_entitlements",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784540775502,
+      "tag": "0005_builder_normalization",
+      "breakpoints": true
     }
   ]
 }

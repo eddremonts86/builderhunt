@@ -16,6 +16,7 @@
     "db:up": "docker inspect workspace-postgres --format '{{.State.Running}}' 2>/dev/null | grep -q true || docker compose --profile standalone up -d db",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
+    "db:audit-schema": "tsx scripts/db/audit-schema.ts",
     "db:migrate": "tsx --env-file=.env scripts/db/create-db.ts && drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/db/seed.ts",

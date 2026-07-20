@@ -1,8 +1,10 @@
 import { createAuthClient } from 'better-auth/react'
+import { organizationClient } from 'better-auth/client/plugins'
 import { ensureProtocol } from '~/shared/lib/env'
 
 export const authClient = createAuthClient({
   baseURL: ensureProtocol(import.meta.env.VITE_APP_URL ?? 'http://localhost:3000'),
+  plugins: [organizationClient()],
 })
 
 export const signInEmail = authClient.signIn.email

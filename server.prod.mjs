@@ -30,6 +30,23 @@ try {
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
 const HOST = process.env.HOST ?? '0.0.0.0';
+const PUBLIC_ORIGIN = new URL(process.env.APP_URL ?? `http://localhost:${PORT}`);
+
+function securityHeaders() {
+  const headers = {
+    'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; upgrade-insecure-requests",
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'DENY',
+    'Referrer-Policy': 'strict-origin-when-cross-origin',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
+    'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Resource-Policy': 'same-origin',
+  };
+  if (process.env.NODE_ENV === 'production' && PUBLIC_ORIGIN.protocol === 'https:') {
+    headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
+  }
+  return headers;
+}
 
 console.error('[server] Starting with env:', {
   PORT, HOST,
@@ -72,6 +89,7 @@ function tryServeStatic(pathname, res) {
   const mime = MIME[ext] ?? 'application/octet-stream';
   const isHashedAsset = /\/assets\//.test(safePath);
   res.writeHead(200, {
+    ...securityHeaders(),
     'Content-Type': mime,
     'Content-Length': stat.size,
     'Cache-Control': isHashedAsset ? 'public, max-age=31536000, immutable' : 'public, max-age=3600',
@@ -88,15 +106,27 @@ if (!app || typeof app.fetch !== 'function') {
 console.error('[server] App handler loaded OK');
 
 const server = createServer(async (req, res) => {
-  const protocol = 'http';
-  const host = req.headers.host ?? `localhost:${PORT}`;
-  const url = new URL(req.url ?? '/', `${protocol}://${host}`);
+  const url = new URL(req.url ?? '/', PUBLIC_ORIGIN);
 
-  console.error('[server] Incoming request:', req.method, url.pathname);
+  // Paths may contain invitation/reset/export identifiers; do not log them.
+  console.error('[server] Incoming request:', req.method);
 
   if (req.method === 'GET' || req.method === 'HEAD') {
     if (tryServeStatic(url.pathname, res)) {
-      console.error('[server] Served static file:', url.pathname);
+      console.error('[server] Served static asset');
+      return;
+    }
+  }
+
+  const hasCookie = typeof req.headers.cookie === 'string' && req.headers.cookie.length > 0;
+  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');
+  if (hasCookie && unsafeMethod) {
+    const origin = req.headers.origin;
+    let trusted;
+    try { trusted = typeof origin === 'string' && new URL(origin).origin === PUBLIC_ORIGIN.origin; } catch { trusted = false; }
+    if (!trusted) {
+      res.writeHead(403, { ...securityHeaders(), 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ status: 403, message: 'Forbidden' }));
       return;
     }
   }
@@ -120,9 +150,9 @@ const server = createServer(async (req, res) => {
   try {
     webResponse = await app.fetch(webRequest);
   } catch (err) {
-    console.error('[server] Handler error:', err.message, err.stack?.split('\n').slice(0,3).join(' | '));
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: 500, message: err.message }));
+    console.error('[server] Handler error:', err instanceof Error ? err.name : 'UnknownError');
+    res.writeHead(500, { ...securityHeaders(), 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 500, message: 'Internal server error' }));
     return;
   }
 
@@ -130,6 +160,7 @@ const server = createServer(async (req, res) => {
   for (const [k, v] of webResponse.headers.entries()) {
     resHeaders[k] = v;
   }
+  Object.assign(resHeaders, securityHeaders());
   res.writeHead(webResponse.status, resHeaders);
 
   if (webResponse.body) {
