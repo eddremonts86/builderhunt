@@ -101,6 +101,7 @@ import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/tri
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
+import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 
@@ -569,6 +570,12 @@ const ApiAdminIncidentsIdRoute = ApiAdminIncidentsIdRouteImport.update({
   path: '/api/admin/incidents/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminEmbeddingsRunWorkerRoute =
+  ApiAdminEmbeddingsRunWorkerRouteImport.update({
+    id: '/api/admin/embeddings/run-worker',
+    path: '/api/admin/embeddings/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   id: '/api/admin/changelog/$id',
   path: '/api/admin/changelog/$id',
@@ -650,6 +657,7 @@ export interface FileRoutesByFullPath {
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
@@ -743,6 +751,7 @@ export interface FileRoutesByTo {
   '/api/status': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
@@ -840,6 +849,7 @@ export interface FileRoutesById {
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
@@ -936,6 +946,7 @@ export interface FileRouteTypes {
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
@@ -1029,6 +1040,7 @@ export interface FileRouteTypes {
     | '/api/status'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
@@ -1125,6 +1137,7 @@ export interface FileRouteTypes {
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/embeddings/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/users/$userId'
@@ -1191,6 +1204,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
+  ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
@@ -1859,6 +1873,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminIncidentsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/embeddings/run-worker': {
+      id: '/api/admin/embeddings/run-worker'
+      path: '/api/admin/embeddings/run-worker'
+      fullPath: '/api/admin/embeddings/run-worker'
+      preLoaderRoute: typeof ApiAdminEmbeddingsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/changelog/$id': {
       id: '/api/admin/changelog/$id'
       path: '/api/admin/changelog/$id'
@@ -2033,6 +2054,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
+  ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
