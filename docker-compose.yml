@@ -40,6 +40,35 @@ services:
       timeout: 5s
       retries: 5
 
+  # Self-hosted embedding provider for the semantic-search plan
+  # (src/shared/lib/ai/embeddings.ts). Ollama exposes an OpenAI-compatible
+  # POST /v1/embeddings endpoint out of the box — no app code change needed,
+  # just point AI_EMBEDDING_URL at it (see .env.example / .env.production.example).
+  # `nomic-embed-text` matches the 768-dim model used in local dev via LM
+  # Studio (text-embedding-nomic-embed-text-v1.5, same underlying model
+  # family) — AI_EMBEDDING_DIM stays 768, no schema/migration change.
+  # Entrypoint override: start the server, pull the model once (idempotent —
+  # `ollama pull` no-ops if already present), then wait on the server process
+  # so container lifecycle matches `ollama serve` exiting/restarting normally.
+  embeddings:
+    profiles: ['standalone']
+    image: ollama/ollama:latest
+    container_name: builderhunt-embeddings
+    entrypoint: ['/bin/sh', '-c', 'ollama serve & pid=$$!; sleep 3; ollama pull nomic-embed-text; wait $$pid']
+    ports:
+      - '11434:11434'
+    volumes:
+      - builderhunt_ollama_data:/root/.ollama
+    healthcheck:
+      # First boot downloads the model (~270MB) — generous start_period so
+      # compose doesn't report unhealthy while the pull is in progress.
+      test: ['CMD-SHELL', 'ollama list | grep -q nomic-embed-text || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 120s
+
 volumes:
   builderhunt_postgres_data:
   builderhunt_redis_data:
+  builderhunt_ollama_data:

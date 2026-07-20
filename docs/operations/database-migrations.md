@@ -39,4 +39,40 @@ If the extension is missing, the app fails soft: `/api/search/semantic` returns
 `503 { error: 'semantic_unavailable' }` and the UI falls back to keyword search — this is not an
 outage, but semantic search stays disabled until the operator step above is done.
 
+## Self-hosted embeddings (semantic-search plan)
+
+Embeddings are a separate, swappable, OpenAI-compatible vector endpoint (`AI_EMBEDDING_URL`) —
+never MiniMax (see `plans/_meta/ai-policy.md` §3: MiniMax M3 doesn't expose the vector contract
+this app needs). Both local dev and production run the same self-hosted answer: **Ollama**,
+serving `nomic-embed-text` (768-dim) via its built-in OpenAI-compatible `POST /v1/embeddings`
+route — no app code depends on which provider is behind `AI_EMBEDDING_URL`.
+
+**Local dev**: `docker-compose.yml`'s `embeddings` service (profile `standalone`). Start it with
+the other standalone infra:
+
+```sh
+docker compose --profile standalone up -d embeddings
+```
+
+First boot downloads the model (~270 MB); the healthcheck has a 120s `start_period` to cover
+that. `.env.example` already points `AI_EMBEDDING_URL` at `http://localhost:11434/v1/embeddings`.
+
+**Production (Coolify)**: deploy the same `embeddings` service definition as its own Coolify
+resource (a docker-compose resource, not the main app's Dockerfile build) on the same Hetzner
+VPS/network as the app container, so the app can reach it at its internal service hostname.
+Steps:
+1. Create a new Coolify resource from `docker-compose.yml`'s `embeddings` service (or a copy of
+   it) — same image (`ollama/ollama:latest`), same entrypoint (serve + pull `nomic-embed-text`),
+   with a persistent volume so the model isn't re-downloaded on every redeploy.
+2. Set the app's `AI_EMBEDDING_URL` to that resource's internal hostname, e.g.
+   `http://embeddings:11434/v1/embeddings` (Coolify resources on the same network resolve by
+   service name — confirm the actual hostname Coolify assigns before going live).
+3. Leave `AI_EMBEDDING_API_KEY` empty (self-hosted, no auth) and `AI_EMBEDDING_DIM=768`,
+   `AI_EMBEDDING_MODEL=nomic-embed-text` — these three must stay in lockstep with whatever the
+   embeddings container actually serves, per the single-dimension-source rule above.
+4. Same fail-soft guarantee as the missing-pgvector case: if the embeddings resource is down,
+   `embedTexts()` throws `AIEmbeddingUnavailableError`, the write-through/worker paths log and
+   skip, and `/api/search/semantic` degrades to `mode: 'keyword-fallback'` — never a dead end.
+
+
 
