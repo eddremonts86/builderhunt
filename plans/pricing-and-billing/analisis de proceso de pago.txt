@@ -1,0 +1,746 @@
+## Diagnóstico ejecutivo
+
+La idea central del vídeo no es “hacer un paywall más bonito”. Es **construir una secuencia en la que el usuario entienda y experimente el valor antes de pedirle que pague**.
+
+Para BuilderHunt, la compra no debería ocurrir al crear la cuenta. Debería ocurrir después de que el usuario:
+
+1. Defina qué tipo de builder busca.
+2. Obtenga resultados relevantes.
+3. Guarde varios perfiles.
+4. Cree una búsqueda persistente.
+5. Entienda el valor de mantener ese “radar” funcionando automáticamente.
+
+El paywall se convierte así en el siguiente paso natural: **pasar de una búsqueda puntual a un sistema continuo de descubrimiento, alertas y colaboración**. Esa es la tesis que se repite a lo largo del vídeo. 
+
+---
+
+# 1. Qué corregir antes de introducir el paywall
+
+Ahora mismo existe una deuda de confianza y consistencia en la experiencia pública:
+
+* La home dice que el producto es gratuito durante la beta y también afirma que se pueden guardar tantas búsquedas como se quiera; Pricing presenta límites de 3, 50 y 200 búsquedas guardadas según el plan, y además se describe como “free forever”. ([BuilderHunt][1])
+* La home destaca cuatro fuentes, mientras que Explore afirma buscar en doce. ([BuilderHunt][1])
+* La FAQ de la home habla del plan de pago como algo futuro, mientras que Pricing ya presenta Pro y Team como planes disponibles mediante una suscripción gestionada manualmente. ([BuilderHunt][1])
+* En el contenido rastreable de Pricing aparecen los símbolos `$ /mo`, pero no se muestran importes concretos para Free, Pro o Team. Además, para contratar hay que enviar un email y esperar la activación manual. ([BuilderHunt][2])
+* Status y Roadmap muestran estados de carga, y Changelog está prácticamente vacío. Esto puede parecer un producto inacabado justo cuando se pide confianza y dinero. ([BuilderHunt][3])
+* La prueba social principal es un testimonio anónimo de un “beta user”; es mejor que nada, pero será débil dentro de un flujo de compra. ([BuilderHunt][1])
+
+Antes de optimizar conversiones, BuilderHunt necesita una única verdad comercial:
+
+* ¿La beta es completamente gratuita o existen planes de pago?
+* ¿Cuántas fuentes existen realmente?
+* ¿Cuáles son los límites de cada plan?
+* ¿Cuánto cuesta cada plan?
+* ¿Qué sucede al terminar la prueba?
+* ¿Qué se conserva al bajar de plan?
+
+Una buena implementación sería tener una única configuración de planes en el código que alimente la home, Pricing, los límites del producto y los paywalls. Así se evita que cada página cuente una historia diferente.
+
+---
+
+# 2. Todas las ideas de valor del vídeo, aplicadas a BuilderHunt
+
+| Idea del vídeo                                                               | Qué significa                                                                 | Aplicación en BuilderHunt                                                                                                                                       |
+| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **La decisión ocurre antes del paywall**                                     | El usuario empieza a decidir cuando comprende el resultado deseado.           | Vender primero “un radar de builders activos”, no límites, seats o exports.                                                                                     |
+| **El paywall es un flujo, no una pantalla**                                  | La información debe desplegarse gradualmente.                                 | Usar un flujo de 2–3 pantallas: resultado personalizado → evidencia → plan y riesgo.                                                                            |
+| **El momento importa más que el diseño**                                     | Un excelente paywall en un mal momento seguirá fallando.                      | No mostrarlo al registrarse. Mostrarlo al activar una alerta, superar un límite, exportar o compartir.                                                          |
+| **El paywall debe sentirse como el siguiente paso**                          | No debe interrumpir una tarea, sino completarla.                              | Tras guardar una hunt: “Tu radar está listo. Actívalo para recibir nuevos matches”.                                                                             |
+| **Personalizar según el contexto**                                           | Un paywall genérico habla peor que uno conectado con la intención.            | Cambiar mensaje según sea recruiter, founder, maintainer o DevRel.                                                                                              |
+| **Reducir el riesgo aumenta la conversión**                                  | Explicar cobros, recordatorios, cancelación y trial elimina ansiedad.         | Mostrar una línea temporal del trial, fecha exacta del cobro, recordatorio y conservación de datos.                                                             |
+| **Más fricción puede producir mejores clientes**                             | Menos trials, pero mayor porcentaje de usuarios realmente dispuestos a pagar. | Probar tarjeta obligatoria para el trial, pero solo después de la activación. No confundirlo con fricción operativa como “envíanos un email y espera 24 horas”. |
+| **La claridad del offer puede cambiar el resultado sin cambiar el producto** | El mismo precio puede convertir mejor si se entiende mejor.                   | Explicar qué se desbloquea, qué límite se alcanzó y qué resultado recurrente compra el usuario.                                                                 |
+| **Enmarcar valor, no solo características**                                  | Las personas compran un futuro deseado.                                       | “Descubre builders antes de que aparezcan en los canales tradicionales”, no “50 saved searches”.                                                                |
+| **La prueba social aporta autoridad**                                        | Reviews, resultados y usuarios reales reducen incertidumbre.                  | Casos reales por persona: horas ahorradas, maintainers encontrados, candidatos cualificados.                                                                    |
+| **El precio debe anclarse a algo relevante**                                 | Mostrar coste equivalente o compararlo con una alternativa conocida.          | Compararlo con horas de sourcing manual, una herramienta de recruiting o una búsqueda de agencia; no con métricas irrelevantes.                                 |
+| **Mostrar pocas opciones reduce carga cognitiva**                            | Dos opciones suelen ser suficientes.                                          | Dentro del producto, mostrar anual y mensual del plan relevante; no Free, Pro y Team simultáneamente.                                                           |
+| **El anual puede maximizar LTV**                                             | Pero depende del negocio y necesita reducción de riesgo.                      | Anual preseleccionado con trial; mensual como alternativa para quien aún no quiere comprometerse.                                                               |
+| **Las tablas funcionan**                                                     | Permiten ver claramente qué se pierde al no suscribirse.                      | Tabla compacta Free vs Pro o Pro vs Team, contextualizada al trigger.                                                                                           |
+| **El vídeo puede comunicar valor rápidamente**                               | Una demostración puede vender mejor que una lista.                            | Mostrar en 10–15 segundos: hunt → resultados → nuevo match → alerta → shortlist.                                                                                |
+| **El diseño bonito no siempre gana**                                         | Un paywall largo, denso o “feo” puede convertir mejor si explica mejor.       | Probar una variante visual pulida y otra evidence-heavy con datos, tabla y copy largo.                                                                          |
+| **El polish diferencia productos similares**                                 | Animaciones y personalidad elevan la percepción del producto.                 | Animar el radar, la agregación de fuentes y la actualización de señales, sin frenar la tarea.                                                                   |
+| **Los microdetalles son secundarios**                                        | CTA específica y flecha pueden ayudar, pero no sustituyen oferta o timing.    | Usar “Start tracking this hunt →”, pero probarlo después de resolver activación, pricing y packaging.                                                           |
+| **El exit intent puede recuperar demanda**                                   | Al cerrar, ofrecer una alternativa más adecuada.                              | Si rechaza anual, ofrecer mensual o continuar con Free; no lanzar automáticamente un descuento.                                                                 |
+| **Los trials más largos pueden sustituir descuentos agresivos**              | Reducen riesgo sin devaluar el producto.                                      | Probar 14 días para que el usuario experimente al menos un ciclo de nuevas alertas.                                                                             |
+| **No copiar patrones manipulativos**                                         | Fake urgency puede elevar conversión inmediata y destruir confianza.          | Nada de countdown falso, ruletas, trial oculto, toggles confusos o descuentos que aparecen siempre al cerrar.                                                   |
+| **No existe un paywall universalmente mejor**                                | Cada producto y audiencia responde diferente.                                 | Ejecutar experimentos radicalmente distintos, no limitarse a cambiar un titular.                                                                                |
+| **La retención y el LTV son más importantes que iniciar trials**             | Cobrar una vez no demuestra que el producto sea bueno.                        | Optimizar usuarios que continúan usando alerts, hunts y shortlists después de pagar.                                                                            |
+
+Todas estas ideas aparecen, con distintos ejemplos, en el análisis y las entrevistas del vídeo. 
+
+---
+
+# 3. Arquitectura de monetización recomendada
+
+## El resultado que realmente se vende
+
+BuilderHunt no debería vender principalmente:
+
+* 50 búsquedas.
+* 200 búsquedas.
+* Un CSV.
+* Diez seats.
+* Smart alerts.
+
+Debería vender:
+
+> **Un radar permanente que encuentra builders activos antes de que tengas que buscarlos manualmente.**
+
+Las características son el mecanismo. El resultado es:
+
+* Menos horas revisando comunidades.
+* Nuevos candidatos o contribuidores detectados automáticamente.
+* Una shortlist actualizada con señales recientes.
+* Menos dependencia de perfiles tradicionales o búsquedas manuales.
+* Un proceso compartido y repetible para equipos.
+
+---
+
+## Hipótesis de activación
+
+Definiría inicialmente un usuario activado como alguien que:
+
+1. Ejecuta una búsqueda.
+2. Abre varios perfiles.
+3. Guarda al menos tres builders.
+4. Guarda una hunt o intenta activar una alerta.
+
+Ese usuario ya ha visto suficiente valor como para entender la propuesta de Pro. El número exacto de builders debe validarse con datos, pero la lógica importante es **no medir activación como “creó una cuenta”**.
+
+---
+
+## Recorrido recomendado
+
+**Landing → búsqueda pública → registro → onboarding personalizado → resultados → shortlist → activar monitoring → paywall contextual → trial → alertas → renovación**
+
+### 1. Landing y Explore
+
+Mantener la búsqueda pública o una demostración interactiva. No pedir tarjeta ni mostrar un paywall antes de enseñar resultados.
+
+La promesa principal debería acercarse a:
+
+> Find active builders across the open web — and keep discovering them automatically.
+
+### 2. Registro
+
+El registro actual es sencillo y no exige tarjeta, lo cual es correcto para esta primera fase de descubrimiento. ([BuilderHunt][4])
+
+Cambiaría el mensaje “No credit card” por algo más preciso si posteriormente el trial de Pro requiere tarjeta:
+
+> No card required to start searching.
+
+Así no se promete implícitamente que jamás será necesaria.
+
+### 3. Onboarding multipágina
+
+En lugar de llevar al usuario directamente a un dashboard vacío:
+
+**Pantalla 1: intención**
+
+* Hire developers.
+* Find open-source contributors.
+* Discover community advocates.
+* Track builders in a specific ecosystem.
+
+**Pantalla 2: criterios**
+
+* Keywords o stack.
+* País/idioma.
+* Fuentes.
+* Nivel de actividad o recencia.
+
+**Pantalla 3: resultado esperado**
+
+> We’re building your React + TypeScript radar.
+
+Después se ejecuta la primera búsqueda y se muestra un resultado real.
+
+### 4. Primera experiencia gratuita
+
+Permitir:
+
+* Ver resultados.
+* Abrir perfiles.
+* Guardar varios builders.
+* Crear la primera shortlist.
+* Entender el score.
+* Guardar al menos una hunt.
+
+No bloquearía la primera percepción de valor.
+
+### 5. “Value receipt” antes del paywall
+
+Después de la primera hunt, mostrar un resumen dinámico:
+
+> **Your React + TypeScript radar is ready**
+> `[N]` active builders found across `[N]` sources.
+> `[N]` have shipped something in the last seven days.
+> Keep this hunt running to receive new matches automatically.
+
+Esta pantalla es la versión BuilderHunt del enfoque del vídeo de vender el resultado antes de enseñar el precio.
+
+### 6. Trigger de compra
+
+El CTA no debería ser “Upgrade” ni “Continue”.
+
+Usaría:
+
+> **Start tracking this hunt →**
+
+El usuario no siente que está abandonando su tarea para comprar software; siente que está terminando de configurar su sistema.
+
+---
+
+# 4. Dónde deben aparecer los paywalls
+
+## Trigger 1: activar Smart Alerts
+
+Probablemente sea el trigger más fuerte porque convierte una búsqueda puntual en valor recurrente.
+
+**Mensaje:**
+
+> Turn this search into a live radar.
+> Get notified when a new high-signal builder matches your criteria.
+
+**CTA:** `Start tracking this hunt →`
+
+---
+
+## Trigger 2: alcanzar el límite de hunts
+
+La página pública ya utiliza como estructura inicial 3 búsquedas para Free, 50 para Pro y 200 para Team. También plantea 50 builders en Free frente a unlimited en los niveles superiores, así como 1/1/10 seats. Estos límites pueden servir como baseline, pero deben validarse con comportamiento real. ([BuilderHunt][2])
+
+**Mensaje:**
+
+> You have three active hunts.
+> Upgrade to keep every ecosystem you care about under continuous monitoring.
+
+No bloquear la hunt que el usuario acaba de crear antes de enseñarle sus resultados. Permitir verla y pedir el upgrade al guardarla o activarla.
+
+---
+
+## Trigger 3: exportar una shortlist
+
+**Mensaje:**
+
+> Take this shortlist into your workflow.
+> Export builders, scores and source signals to CSV or JSON.
+
+Mostrar exactamente cuántas filas exportará y qué campos estarán incluidos.
+
+---
+
+## Trigger 4: Code Fingerprinting o análisis avanzado
+
+**Mensaje:**
+
+> Go beyond profile keywords.
+> See the code, languages and recent contributions behind each match.
+
+Este es un paywall de “depth”: el usuario ya encontró a una persona y quiere mayor confianza.
+
+---
+
+## Trigger 5: compartir o invitar
+
+Este debe abrir el paywall de Team, no el de Pro.
+
+**Mensaje:**
+
+> Turn this shortlist into a shared sourcing workspace.
+> Invite your team, assign notes and track activity together.
+
+---
+
+## Trigger 6: Settings
+
+Mantener un acceso permanente a Pricing/Plan para usuarios que llegan con intención de compra propia. No todos los upgrades deben ser consecuencia de un límite.
+
+---
+
+## Trigger 7: cancelación y win-back
+
+Al cancelar:
+
+* Permitir la cancelación en un flujo breve.
+* Mantener los datos guardados.
+* Explicar qué alertas se pausarán.
+* Ofrecer mensual si el problema es el compromiso anual.
+* No lanzar automáticamente un descuento.
+
+Después, se puede enviar un mensaje basado en datos reales:
+
+> Your saved hunts found 8 new builders while Pro was paused.
+
+Solo debe mostrarse si realmente hubo ocho resultados nuevos.
+
+---
+
+# 5. Paywall multipágina propuesto
+
+## Pantalla 1: resultado
+
+> **Your builder radar is ready**
+> We found `[N]` active builders matching your hunt across `[N]` sources.
+> Keep it running and get notified when new high-signal matches appear.
+
+CTA:
+
+> **Start tracking this hunt →**
+
+Secundario:
+
+> Keep searching for free
+
+---
+
+## Pantalla 2: valor y evidencia
+
+> **Know who is shipping before everyone else**
+
+* Smart alerts for new matches.
+* Cross-source activity in one profile.
+* More saved hunts and unlimited shortlists.
+* Exportable results and private notes.
+
+Debajo, añadir prueba social relevante para la persona:
+
+> “BuilderHunt reduced our weekly contributor research from two hours to fifteen minutes.”
+> Nombre, rol y proyecto — solamente con permiso y datos auténticos.
+
+Otra opción es una demostración breve del producto, en lugar de un testimonio genérico.
+
+CTA:
+
+> **Choose my plan →**
+
+---
+
+## Pantalla 3: plan y reducción de riesgo
+
+Dentro del producto mostraría solo:
+
+* **Annual**, recomendado.
+* **Monthly**, alternativa.
+
+No mostraría Free, Pro y Team simultáneamente. El usuario ya se encuentra en Free; solo necesita decidir cómo comprar el nivel adecuado.
+
+Ejemplo:
+
+> **Start Pro free for 14 days**
+
+**Annual — Best value**
+`€X/year · €Y/month equivalent`
+
+**Monthly**
+`€Z/month`
+
+Línea temporal:
+
+* **Today:** Pro is activated.
+* **Day 12:** We remind you before billing.
+* **Day 14:** Your selected plan begins.
+
+Debajo:
+
+> No commitment. Cancel anytime. Your saved data stays.
+
+CTA:
+
+> **Start my 14-day Pro trial →**
+
+Secundario:
+
+> Continue with Free
+
+La página pública ya promete cancelación y que los datos no se pierden al hacer downgrade; estas dos garantías deberían subir desde la FAQ hasta el paywall, donde realmente reducen el riesgo. ([BuilderHunt][2])
+
+---
+
+# 6. Packaging recomendado
+
+## Free
+
+El objetivo de Free es permitir experimentar el “aha moment”, no reemplazar completamente Pro.
+
+* Explore público.
+* Perfiles y scores básicos.
+* Primera shortlist.
+* Un pequeño número de hunts persistentes.
+* Límites visibles y comprensibles.
+* Sin colaboración de equipo.
+
+## Pro
+
+El resultado que compra Pro es **monitorización recurrente para una persona**.
+
+* Más hunts guardadas.
+* Smart alerts.
+* Builders ilimitados.
+* RSS y exports ampliados.
+* Code fingerprinting.
+* Historial o señales avanzadas.
+* Ajustes de scoring, cuando estén disponibles.
+
+## Team
+
+El resultado que compra Team es **un proceso de sourcing o community intelligence compartido**.
+
+* Hunts y shortlists compartidas.
+* Notas compartidas.
+* Actividad del equipo.
+* Invitaciones y roles.
+* Más seats.
+* Límites mayores.
+* Integraciones o exports operativos.
+
+La tabla pública debe centrarse en diferencias reales, no repetir la misma lista bajo los tres planes.
+
+---
+
+# 7. Fricción: cuál eliminar y cuál probar
+
+## Fricción que debe eliminarse
+
+El proceso actual de enviar un email, configurar el pago manualmente y esperar hasta 24 horas es fricción operativa. Interrumpe el momento de mayor intención y no mejora la calidad del cliente. ([BuilderHunt][2])
+
+Debe sustituirse por:
+
+* Checkout inmediato.
+* Activación automática.
+* Webhooks de billing.
+* Página de gestión de plan.
+* Cancelación y downgrade autoservicio.
+* Recordatorio automático antes del cobro.
+
+## Fricción que sí merece un experimento
+
+La tarjeta obligatoria para iniciar el trial puede:
+
+* Reducir el número de trials.
+* Aumentar el porcentaje de trials que se convierten.
+* Filtrar a usuarios que solo querían explorar.
+
+No debe decidirse mirando únicamente `trial_started`. El resultado correcto es:
+
+> Paid customers per 100 activated accounts.
+
+Probaría:
+
+* Variante A: trial sin tarjeta.
+* Variante B: trial con tarjeta y recordatorio transparente.
+
+La cuenta gratuita seguiría sin requerir tarjeta.
+
+---
+
+# 8. Prueba social y framing específicos por persona
+
+## Recruiter o founder
+
+> Discover active engineers through what they are shipping, not just what their profile says.
+
+Prueba social ideal:
+
+* Candidatos cualificados encontrados.
+* Tiempo de sourcing ahorrado.
+* Porcentaje de perfiles con actividad reciente.
+
+## Open-source maintainer
+
+> Find contributors already working in your stack before maintainer load becomes a bottleneck.
+
+Prueba social:
+
+* Contributors encontrados.
+* PRs recientes.
+* Tiempo hasta encontrar un nuevo maintainer.
+
+## DevRel o community
+
+> Spot emerging advocates and contributors across the communities where they already participate.
+
+Prueba social:
+
+* Nuevos contribuidores detectados.
+* Fuentes monitorizadas.
+* Actividad comunitaria identificada.
+
+El onboarding debe guardar la persona seleccionada y pasarla al paywall como contexto.
+
+---
+
+# 9. Price anchoring adecuado
+
+No copiaría literalmente ejemplos de consumo como “cuesta menos que un café”. BuilderHunt tiene una propuesta profesional.
+
+Anchors más creíbles:
+
+* Horas mensuales de sourcing manual.
+* Coste de una herramienta de recruiting.
+* Coste de perder un maintainer clave.
+* Coste de una búsqueda externa o una comisión de agencia.
+* Coste por seat comparado con horas del recruiter o engineering manager.
+
+Ejemplo:
+
+> If BuilderHunt saves one hour of manual sourcing per month, Pro has already paid for itself.
+
+Debe utilizarse únicamente si el precio hace cierta la afirmación.
+
+---
+
+# 10. Experimentos que ejecutaría, en este orden
+
+## Experimento 1: timing
+
+**A:** Paywall después del primer resultado.
+**B:** Paywall después de guardar una hunt.
+**C:** Paywall al activar la primera Smart Alert o alcanzar el límite.
+
+**Métrica principal:** usuarios pagados por cuenta activada.
+
+Mi hipótesis es que B o C ganarán porque el usuario ya ha invertido intención y entiende el valor recurrente.
+
+---
+
+## Experimento 2: arquitectura
+
+**A:** Pricing card de una sola pantalla.
+**B:** Flujo de tres pantallas: outcome → proof → plan.
+
+**Métrica:** checkout iniciado y trial iniciado por paywall visto.
+
+**Guardrails:** abandono, tiempo hasta completar y quejas.
+
+---
+
+## Experimento 3: diseño radical
+
+**A:** Paywall visual, breve y animado.
+**B:** Paywall largo con explicación, tabla y datos.
+**C:** Vídeo breve del flujo completo.
+
+Esto aplica directamente la observación de que un diseño menos elegante puede superar a uno visualmente perfecto.
+
+---
+
+## Experimento 4: oferta
+
+**A:** Trial de 7 días.
+**B:** Trial de 14 días.
+**C:** Sin trial, pero con garantía.
+
+**Métrica:** paid retention, no solamente trial starts.
+
+BuilderHunt necesita tiempo para demostrar valor recurrente mediante nuevos matches, por lo que 14 días es una buena hipótesis inicial.
+
+---
+
+## Experimento 5: fricción de pago
+
+**A:** Sin tarjeta.
+**B:** Tarjeta obligatoria con timeline y recordatorio.
+
+**Métrica:** clientes pagados por cada 100 activados.
+
+**Guardrails:** refunds, quejas, chargebacks y churn temprano.
+
+---
+
+## Experimento 6: framing
+
+**A:** Feature-led: “50 searches, unlimited builders”.
+**B:** Outcome-led: “Keep your builder radar running automatically”.
+**C:** ROI-led: “Replace hours of manual sourcing”.
+
+---
+
+## Experimento 7: salida
+
+**A:** Cerrar y continuar con Free.
+**B:** Ofrecer mensual como alternativa al anual.
+
+No probaría descuentos de salida hasta haber validado lo anterior.
+
+---
+
+# 11. Métricas que deberían gobernar el sistema
+
+## North-star recomendada
+
+> **Nuevos builders cualificados entregados a hunts activas y guardados en una shortlist.**
+
+Combina entrega de valor y acción del usuario. Evita premiar búsquedas vacías o volumen sin relevancia.
+
+## Funnel de producto
+
+* Visitante → primera búsqueda.
+* Primera búsqueda → registro.
+* Registro → primera hunt.
+* Hunt → shortlist.
+* Shortlist → alerta activada.
+* Activación → paywall.
+* Paywall → checkout.
+* Checkout → trial.
+* Trial → pago.
+* Pago → retención a 30 y 90 días.
+
+## Métricas comerciales
+
+* Paid conversion por trigger.
+* Paid conversion por persona.
+* Trial-to-paid.
+* Churn mensual.
+* Retención de Pro y Team.
+* Expansión de seats.
+* LTV.
+* Refunds y quejas.
+* Tiempo hasta cancelar.
+* Uso de alerts después del pago.
+
+La métrica que no debería dominar las decisiones es `trial_started`. El vídeo insiste en que conseguir el primer pago es mucho menos importante que construir algo por lo que las personas sigan pagando. 
+
+---
+
+# 12. Plan de implementación priorizado
+
+## P0 — Confianza y coherencia
+
+1. Crear una fuente única de verdad para planes, límites, precios y features.
+2. Decidir oficialmente si la beta es gratuita o si la monetización ya está activa.
+3. Corregir 4 vs 12 fuentes.
+4. Corregir “unlimited searches” vs límites.
+5. Mostrar precios reales o retirar temporalmente los CTAs de pago.
+6. Eliminar del frontend el proceso manual de “email y activación en 24 horas”.
+7. Completar o retirar temporalmente Status, Roadmap y Changelog.
+8. Cambiar la prueba social anónima por evidencia real y autorizada.
+
+**Criterio de finalización:** cualquier usuario debe poder explicar Free, Pro y Team sin encontrar contradicciones.
+
+---
+
+## P1 — Instrumentación y definición de activación
+
+Implementar los eventos:
+
+* `account_created`
+* `onboarding_completed`
+* `search_completed`
+* `profile_opened`
+* `builder_saved`
+* `hunt_saved`
+* `alert_attempted`
+* `alert_enabled`
+* `export_attempted`
+* `limit_reached`
+* `paywall_viewed`
+* `paywall_dismissed`
+* `plan_selected`
+* `checkout_started`
+* `trial_started`
+* `subscription_started`
+* `subscription_cancelled`
+* `subscription_renewed`
+
+Cada `paywall_viewed` debe incluir:
+
+* Trigger.
+* Persona.
+* Hunt.
+* Uso actual.
+* Límite alcanzado.
+* Variante experimental.
+
+---
+
+## P2 — Activación antes de monetización
+
+1. Construir onboarding multipágina.
+2. Crear automáticamente la primera hunt.
+3. Mostrar resultados antes del precio.
+4. Añadir shortlist guiada.
+5. Crear el “value receipt” personalizado.
+6. Definir la activación con datos reales.
+7. No mostrar paywall genérico durante el registro.
+
+---
+
+## P3 — Paywall MVP
+
+1. Componente multipágina reutilizable.
+2. Contexto dinámico según trigger.
+3. Copy por persona.
+4. Annual y Monthly como únicas opciones.
+5. Timeline transparente del trial.
+6. CTA específico.
+7. Opción visible de continuar con Free.
+8. Tabla Free vs Pro o Pro vs Team.
+9. Checkout y activación automáticos.
+10. Feature gates verificados en servidor, no solo ocultos en la interfaz.
+
+---
+
+## P4 — Monetización durante el ciclo de vida
+
+1. Paywall de Smart Alerts.
+2. Paywall de límite de hunts.
+3. Paywall de exports.
+4. Paywall de Code Fingerprinting.
+5. Paywall de colaboración Team.
+6. Gestión de plan desde Settings.
+7. Recordatorio antes del cobro.
+8. Downgrade sin pérdida de datos.
+9. Cancelación sencilla.
+10. Win-back basado en actividad real.
+
+---
+
+## P5 — Experimentación y polish
+
+1. Ejecutar un experimento radical cada vez.
+2. Probar timing antes que colores o iconos.
+3. Probar arquitectura antes que microcopy.
+4. Probar oferta antes que flechas o badges.
+5. Añadir demo en vídeo.
+6. Añadir animación del radar y actualización de señales.
+7. Introducir casos de uso y testimonios por persona.
+8. Mantener refunds, quejas y churn como guardrails.
+
+---
+
+# 13. Qué no integraría
+
+* Paywall inmediatamente después del registro.
+* Countdown falso.
+* “Oferta solo ahora” que reaparece cada vez.
+* Ruletas o gamificación artificial del descuento.
+* Trial preseleccionado mediante controles confusos.
+* Precio anual escondido detrás de un equivalente semanal ambiguo.
+* Descuento automático al cerrar.
+* Tres o cuatro planes simultáneos dentro de un paywall contextual.
+* Cancelación deliberadamente complicada.
+* Optimización exclusiva de trials o ingresos de la primera semana.
+* Animaciones que oculten la falta de una propuesta clara.
+* Copiar un patrón solamente porque otra aplicación lo usa.
+
+---
+
+## La primera versión que construiría
+
+La implementación mínima con mayor probabilidad de impacto sería:
+
+1. Corregir todas las contradicciones públicas.
+2. Automatizar checkout, activación, downgrade y cancelación.
+3. Definir activación como primera hunt + shortlist + intento de alerta.
+4. Mostrar el paywall únicamente al activar monitoring o superar un límite.
+5. Usar un flujo de tres pasos con resultado personalizado, evidencia y oferta transparente.
+6. Probar anual con trial frente a mensual.
+7. Medir clientes pagados y retención por cuenta activada, no solamente trials.
+
+En una frase, BuilderHunt debería dejar de preguntar **“¿quieres comprar Pro?”** y empezar a preguntar **“¿quieres mantener este radar funcionando por ti?”**.
+
+[1]: https://builderhunt.eduardoinerarte.dk/ "BuilderHunt — Discover Active Builders Across the Open Web"
+[2]: https://builderhunt.eduardoinerarte.dk/pricing "Pricing — BuilderHunt"
+[3]: https://builderhunt.eduardoinerarte.dk/status "BuilderHunt — Discover Active Builders Across the Open Web"
+[4]: https://builderhunt.eduardoinerarte.dk/auth/sign-up "BuilderHunt — Discover Active Builders Across the Open Web"
