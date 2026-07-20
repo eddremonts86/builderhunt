@@ -24,7 +24,7 @@ function LandingLayout() {
   return (
     <div className="flex flex-col min-h-screen bg-app">
       <Header />
-      <main className="flex-grow">
+      <main className={`flex-grow ${location.pathname === '/' ? '' : 'pt-20'}`}>
         <Outlet />
       </main>
       <Footer />

@@ -3,13 +3,12 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Check, X, Mail, Sparkles, Users, Crown, HelpCircle } from 'lucide-react'
 import { PLAN_LIMITS, PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
 
 export const Route = createFileRoute('/_landing/pricing')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
-    // Dynamic-import getUserPlan to keep db out of the client bundle
-    const { getUserPlan } = await import('~/shared/lib/billing')
-    const plan = user.userId ? await getUserPlan(user.userId) : null
+    const plan = user.userId ? await getAppOrganizationPlan() : null
     return { user, plan }
   },
   loader: async ({ context }) => context,

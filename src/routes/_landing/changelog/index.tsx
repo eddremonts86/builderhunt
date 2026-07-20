@@ -18,7 +18,7 @@ const TAG_COLORS: Record<string, string> = {
   improvement: 'bg-bh-cyan/10 text-bh-cyan border-bh-cyan/30',
 }
 
-export const Route = createFileRoute('/changelog/')({
+export const Route = createFileRoute('/_landing/changelog/')({
   component: ChangelogPage,
 })
 

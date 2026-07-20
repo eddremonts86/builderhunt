@@ -1,14 +1,13 @@
 import * as React from 'react'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { ArrowLeft, Calendar, Clock, Tag as TagIcon, ArrowRight } from 'lucide-react'
-import { getPostBySlug, getRelatedPosts } from '~/shared/lib/blog'
+import { getBlogPostPage } from '~/shared/lib/blog-data'
 
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
-    const post = await getPostBySlug(params.slug)
-    if (!post) throw notFound()
-    const related = await getRelatedPosts(params.slug, 3)
-    return { post, related }
+    const page = await getBlogPostPage({ data: params.slug })
+    if (!page) throw notFound()
+    return page
   },
   head: ({ loaderData }) => {
     if (!loaderData) return { meta: [{ title: 'Post not found — BuilderHunt' }] }

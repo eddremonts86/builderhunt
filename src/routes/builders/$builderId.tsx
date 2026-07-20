@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BuilderProfilePage } from '~/modules/builder-profile/components/BuilderProfilePage'
+import { getPublicBuilder } from '~/shared/lib/public-data'
 
 const SITE_URL = 'https://builderhunt.dev'
 const SITE_NAME = 'BuilderHunt'
@@ -15,26 +16,9 @@ interface LoaderBuilder {
 
 export const Route = createFileRoute('/builders/$builderId')({
   loader: async ({ params }) => {
-    // Lazy-import server-only deps (drizzle/postgres) so they never end up
-    // in the client bundle — same pattern as ~/shared/lib/blog.ts.
     try {
-      const [{ db }, { builders }, { eq }] = await Promise.all([
-        import('~/shared/lib/db/index'),
-        import('~/shared/lib/db/schema'),
-        import('drizzle-orm'),
-      ])
-      const [builder] = await db
-        .select({
-          id: builders.id,
-          username: builders.username,
-          displayName: builders.displayName,
-          bio: builders.bio,
-          avatarUrl: builders.avatarUrl,
-          source: builders.source,
-        })
-        .from(builders)
-        .where(eq(builders.id, params.builderId))
-      return { builder: (builder ?? null) as LoaderBuilder | null }
+      const builder = await getPublicBuilder({ data: params.builderId })
+      return { builder: builder as LoaderBuilder | null }
     } catch (err) {
       console.error('Builder profile loader error:', err)
       return { builder: null as LoaderBuilder | null }

@@ -1,11 +1,11 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Calendar, Clock, ArrowRight, BookOpen, Tag as TagIcon } from 'lucide-react'
-import { getAllPosts } from '~/shared/lib/blog'
+import { getBlogPosts } from '~/shared/lib/blog-data'
 
 export const Route = createFileRoute('/_landing/blog/')({
   loader: async () => {
-    const posts = await getAllPosts()
+    const posts = await getBlogPosts()
     return { posts }
   },
   head: () => ({

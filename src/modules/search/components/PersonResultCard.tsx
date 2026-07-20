@@ -31,6 +31,8 @@ const SOURCE_META: Record<string, { label: string; Icon: React.ComponentType<{ c
   sourcehut: { label: 'SourceHut', Icon: SourceHutIcon },
 }
 
+const numberFormatter = new Intl.NumberFormat('en-US')
+
 function ScoreRing({ score }: { score?: number }) {
   if (score == null) return null
   const pct = Math.max(0, Math.min(100, score))
@@ -39,7 +41,7 @@ function ScoreRing({ score }: { score?: number }) {
       className="relative w-10 h-10 flex items-center justify-center rounded-full bg-bh-surface/40 border border-bh-border shrink-0"
       data-testid="person-score-ring"
     >
-      <svg className="absolute inset-0" viewBox="0 0 40 40">
+      <svg className="absolute inset-0" viewBox="0 0 40 40" aria-hidden="true">
         <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
         <circle
           cx="20"
@@ -78,13 +80,15 @@ export function PersonResultCard({ builder }: { builder: PersonCardData }) {
   const initial = (builder.displayName ?? builder.username ?? '?').trim()
   return (
     <article
-      className="card p-3 flex items-center gap-3 hover:border-bh-accent/30 transition-colors"
+      className="card flex w-full min-w-0 max-w-full items-center gap-3 overflow-hidden p-3 transition-colors hover:border-bh-accent/30"
       data-testid={`person-card-${builder.id}`}
     >
       {builder.avatarUrl ? (
         <img
           src={builder.avatarUrl}
           alt=""
+          width={40}
+          height={40}
           loading="lazy"
           className="w-10 h-10 rounded-full shrink-0 object-cover bg-bh-surface"
         />
@@ -97,25 +101,27 @@ export function PersonResultCard({ builder }: { builder: PersonCardData }) {
             {builder.displayName ?? builder.username}
           </h3>
           <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-bh-text-dim shrink-0">
-            <meta.Icon className="w-3 h-3" />
+            <span aria-hidden="true"><meta.Icon className="w-3 h-3" /></span>
             {meta.label}
           </span>
         </div>
         <p className="text-xs text-bh-text-muted line-clamp-1">
           @{builder.username}
-          {builder.followersCount != null && ` · ${builder.followersCount.toLocaleString()} followers`}
+          {builder.followersCount != null && ` · ${numberFormatter.format(builder.followersCount)} followers`}
           {builder.language && ` · ${builder.language}`}
         </p>
         {builder.bio && (
           <p className="text-xs text-bh-text-dim line-clamp-1 mt-0.5">{builder.bio}</p>
         )}
       </div>
-      <ScoreRing score={builder.score} />
+      <div className="hidden shrink-0 sm:block">
+        <ScoreRing score={builder.score} />
+      </div>
       <a
         href={builder.profileUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className="btn-ghost btn-sm shrink-0"
+        className="btn-ghost btn-sm shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
         data-testid={`person-card-link-${builder.id}`}
         data-builder-id={builder.id}
       >

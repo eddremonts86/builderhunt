@@ -11,17 +11,14 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
-import { Route as ChangelogRouteImport } from './routes/changelog'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
-import { Route as ChangelogIndexRouteImport } from './routes/changelog/index'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
 import { Route as OnboardingSaveRouteImport } from './routes/onboarding/save'
-import { Route as ChangelogSlugRouteImport } from './routes/changelog/$slug'
 import { Route as BuildersBuilderIdRouteImport } from './routes/builders/$builderId'
 import { Route as BlogAtomDotxmlRouteImport } from './routes/blog/atom[.]xml'
 import { Route as AuthSignUpRouteImport } from './routes/auth/sign-up'
@@ -32,6 +29,7 @@ import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as LandingStatusRouteImport } from './routes/_landing/status'
 import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
 import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
+import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
@@ -42,6 +40,7 @@ import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
 import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
 import { Route as ApiAlertsIndexRouteImport } from './routes/api/alerts/index'
 import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explore/index'
+import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
 import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
@@ -66,6 +65,7 @@ import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/t
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
 import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
 import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
+import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
 import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
@@ -111,11 +111,6 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChangelogRoute = ChangelogRouteImport.update({
-  id: '/changelog',
-  path: '/changelog',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -128,11 +123,6 @@ const LandingRouteRoute = LandingRouteRouteImport.update({
 const DashboardRouteRoute = DashboardRouteRouteImport.update({
   id: '/_dashboard',
   getParentRoute: () => rootRouteImport,
-} as any)
-const ChangelogIndexRoute = ChangelogIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ChangelogRoute,
 } as any)
 const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
@@ -158,11 +148,6 @@ const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
   id: '/onboarding/save',
   path: '/onboarding/save',
   getParentRoute: () => rootRouteImport,
-} as any)
-const ChangelogSlugRoute = ChangelogSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ChangelogRoute,
 } as any)
 const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   id: '/builders/$builderId',
@@ -214,6 +199,11 @@ const LandingPricingRoute = LandingPricingRouteImport.update({
   path: '/pricing',
   getParentRoute: () => LandingRouteRoute,
 } as any)
+const LandingChangelogRoute = LandingChangelogRouteImport.update({
+  id: '/changelog',
+  path: '/changelog',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
 const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -263,6 +253,11 @@ const LandingExploreIndexRoute = LandingExploreIndexRouteImport.update({
   id: '/explore/',
   path: '/explore/',
   getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingChangelogIndexRoute = LandingChangelogIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LandingChangelogRoute,
 } as any)
 const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
   id: '/blog/',
@@ -383,6 +378,11 @@ const LandingLegalCookiesRoute = LandingLegalCookiesRouteImport.update({
   id: '/legal/cookies',
   path: '/legal/cookies',
   getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingChangelogSlugRoute = LandingChangelogSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => LandingChangelogRoute,
 } as any)
 const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
   id: '/blog/$slug',
@@ -565,10 +565,10 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
-  '/changelog': typeof ChangelogRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/alerts': typeof DashboardAlertsRoute
+  '/changelog': typeof LandingChangelogRouteWithChildren
   '/pricing': typeof LandingPricingRoute
   '/roadmap': typeof LandingRoadmapRoute
   '/status': typeof LandingStatusRoute
@@ -579,12 +579,10 @@ export interface FileRoutesByFullPath {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
-  '/changelog/$slug': typeof ChangelogSlugRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/changelog/': typeof ChangelogIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -594,6 +592,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
+  '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -618,6 +617,7 @@ export interface FileRoutesByFullPath {
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
   '/blog/': typeof LandingBlogIndexRoute
+  '/changelog/': typeof LandingChangelogIndexRoute
   '/explore/': typeof LandingExploreIndexRoute
   '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
@@ -669,12 +669,10 @@ export interface FileRoutesByTo {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
-  '/changelog/$slug': typeof ChangelogSlugRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
-  '/changelog': typeof ChangelogIndexRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -684,6 +682,7 @@ export interface FileRoutesByTo {
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
+  '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -708,6 +707,7 @@ export interface FileRoutesByTo {
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
   '/blog': typeof LandingBlogIndexRoute
+  '/changelog': typeof LandingChangelogIndexRoute
   '/explore': typeof LandingExploreIndexRoute
   '/api/alerts': typeof ApiAlertsIndexRoute
   '/api/changelog': typeof ApiChangelogIndexRoute
@@ -748,10 +748,10 @@ export interface FileRoutesById {
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/_landing': typeof LandingRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
-  '/changelog': typeof ChangelogRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_dashboard/alerts': typeof DashboardAlertsRoute
+  '/_landing/changelog': typeof LandingChangelogRouteWithChildren
   '/_landing/pricing': typeof LandingPricingRoute
   '/_landing/roadmap': typeof LandingRoadmapRoute
   '/_landing/status': typeof LandingStatusRoute
@@ -762,13 +762,11 @@ export interface FileRoutesById {
   '/auth/sign-up': typeof AuthSignUpRoute
   '/blog/atom.xml': typeof BlogAtomDotxmlRoute
   '/builders/$builderId': typeof BuildersBuilderIdRoute
-  '/changelog/$slug': typeof ChangelogSlugRoute
   '/onboarding/save': typeof OnboardingSaveRoute
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
-  '/changelog/': typeof ChangelogIndexRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -778,6 +776,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
+  '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
   '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
   '/_landing/legal/imprint': typeof LandingLegalImprintRoute
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
@@ -802,6 +801,7 @@ export interface FileRoutesById {
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
   '/_landing/blog/': typeof LandingBlogIndexRoute
+  '/_landing/changelog/': typeof LandingChangelogIndexRoute
   '/_landing/explore/': typeof LandingExploreIndexRoute
   '/api/alerts/': typeof ApiAlertsIndexRoute
   '/api/changelog/': typeof ApiChangelogIndexRoute
@@ -842,10 +842,10 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
-    | '/changelog'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/alerts'
+    | '/changelog'
     | '/pricing'
     | '/roadmap'
     | '/status'
@@ -856,12 +856,10 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
-    | '/changelog/$slug'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
-    | '/changelog/'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -871,6 +869,7 @@ export interface FileRouteTypes {
     | '/settings/billing'
     | '/settings/privacy'
     | '/blog/$slug'
+    | '/changelog/$slug'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -895,6 +894,7 @@ export interface FileRouteTypes {
     | '/me/'
     | '/search/'
     | '/blog/'
+    | '/changelog/'
     | '/explore/'
     | '/api/alerts/'
     | '/api/changelog/'
@@ -946,12 +946,10 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
-    | '/changelog/$slug'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
-    | '/changelog'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -961,6 +959,7 @@ export interface FileRouteTypes {
     | '/settings/billing'
     | '/settings/privacy'
     | '/blog/$slug'
+    | '/changelog/$slug'
     | '/legal/cookies'
     | '/legal/imprint'
     | '/legal/privacy'
@@ -985,6 +984,7 @@ export interface FileRouteTypes {
     | '/me'
     | '/search'
     | '/blog'
+    | '/changelog'
     | '/explore'
     | '/api/alerts'
     | '/api/changelog'
@@ -1024,10 +1024,10 @@ export interface FileRouteTypes {
     | '/_dashboard'
     | '/_landing'
     | '/auth'
-    | '/changelog'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/_dashboard/alerts'
+    | '/_landing/changelog'
     | '/_landing/pricing'
     | '/_landing/roadmap'
     | '/_landing/status'
@@ -1038,13 +1038,11 @@ export interface FileRouteTypes {
     | '/auth/sign-up'
     | '/blog/atom.xml'
     | '/builders/$builderId'
-    | '/changelog/$slug'
     | '/onboarding/save'
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/_landing/'
-    | '/changelog/'
     | '/_dashboard/admin/changelog'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
@@ -1054,6 +1052,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
     | '/_landing/blog/$slug'
+    | '/_landing/changelog/$slug'
     | '/_landing/legal/cookies'
     | '/_landing/legal/imprint'
     | '/_landing/legal/privacy'
@@ -1078,6 +1077,7 @@ export interface FileRouteTypes {
     | '/_dashboard/me/'
     | '/_dashboard/search/'
     | '/_landing/blog/'
+    | '/_landing/changelog/'
     | '/_landing/explore/'
     | '/api/alerts/'
     | '/api/changelog/'
@@ -1118,7 +1118,6 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   LandingRouteRoute: typeof LandingRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
-  ChangelogRoute: typeof ChangelogRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
@@ -1191,13 +1190,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/changelog': {
-      id: '/changelog'
-      path: '/changelog'
-      fullPath: '/changelog'
-      preLoaderRoute: typeof ChangelogRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -1218,13 +1210,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof DashboardRouteRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/changelog/': {
-      id: '/changelog/'
-      path: '/'
-      fullPath: '/changelog/'
-      preLoaderRoute: typeof ChangelogIndexRouteImport
-      parentRoute: typeof ChangelogRoute
     }
     '/_landing/': {
       id: '/_landing/'
@@ -1260,13 +1245,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/onboarding/save'
       preLoaderRoute: typeof OnboardingSaveRouteImport
       parentRoute: typeof rootRouteImport
-    }
-    '/changelog/$slug': {
-      id: '/changelog/$slug'
-      path: '/$slug'
-      fullPath: '/changelog/$slug'
-      preLoaderRoute: typeof ChangelogSlugRouteImport
-      parentRoute: typeof ChangelogRoute
     }
     '/builders/$builderId': {
       id: '/builders/$builderId'
@@ -1338,6 +1316,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingPricingRouteImport
       parentRoute: typeof LandingRouteRoute
     }
+    '/_landing/changelog': {
+      id: '/_landing/changelog'
+      path: '/changelog'
+      fullPath: '/changelog'
+      preLoaderRoute: typeof LandingChangelogRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
     '/_dashboard/alerts': {
       id: '/_dashboard/alerts'
       path: '/alerts'
@@ -1407,6 +1392,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/explore/'
       preLoaderRoute: typeof LandingExploreIndexRouteImport
       parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/changelog/': {
+      id: '/_landing/changelog/'
+      path: '/'
+      fullPath: '/changelog/'
+      preLoaderRoute: typeof LandingChangelogIndexRouteImport
+      parentRoute: typeof LandingChangelogRoute
     }
     '/_landing/blog/': {
       id: '/_landing/blog/'
@@ -1575,6 +1567,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/legal/cookies'
       preLoaderRoute: typeof LandingLegalCookiesRouteImport
       parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/changelog/$slug': {
+      id: '/_landing/changelog/$slug'
+      path: '/$slug'
+      fullPath: '/changelog/$slug'
+      preLoaderRoute: typeof LandingChangelogSlugRouteImport
+      parentRoute: typeof LandingChangelogRoute
     }
     '/_landing/blog/$slug': {
       id: '/_landing/blog/$slug'
@@ -1855,7 +1854,21 @@ const DashboardRouteRouteWithChildren = DashboardRouteRoute._addFileChildren(
   DashboardRouteRouteChildren,
 )
 
+interface LandingChangelogRouteChildren {
+  LandingChangelogSlugRoute: typeof LandingChangelogSlugRoute
+  LandingChangelogIndexRoute: typeof LandingChangelogIndexRoute
+}
+
+const LandingChangelogRouteChildren: LandingChangelogRouteChildren = {
+  LandingChangelogSlugRoute: LandingChangelogSlugRoute,
+  LandingChangelogIndexRoute: LandingChangelogIndexRoute,
+}
+
+const LandingChangelogRouteWithChildren =
+  LandingChangelogRoute._addFileChildren(LandingChangelogRouteChildren)
+
 interface LandingRouteRouteChildren {
+  LandingChangelogRoute: typeof LandingChangelogRouteWithChildren
   LandingPricingRoute: typeof LandingPricingRoute
   LandingRoadmapRoute: typeof LandingRoadmapRoute
   LandingStatusRoute: typeof LandingStatusRoute
@@ -1870,6 +1883,7 @@ interface LandingRouteRouteChildren {
 }
 
 const LandingRouteRouteChildren: LandingRouteRouteChildren = {
+  LandingChangelogRoute: LandingChangelogRouteWithChildren,
   LandingPricingRoute: LandingPricingRoute,
   LandingRoadmapRoute: LandingRoadmapRoute,
   LandingStatusRoute: LandingStatusRoute,
@@ -1905,20 +1919,6 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
-interface ChangelogRouteChildren {
-  ChangelogSlugRoute: typeof ChangelogSlugRoute
-  ChangelogIndexRoute: typeof ChangelogIndexRoute
-}
-
-const ChangelogRouteChildren: ChangelogRouteChildren = {
-  ChangelogSlugRoute: ChangelogSlugRoute,
-  ChangelogIndexRoute: ChangelogIndexRoute,
-}
-
-const ChangelogRouteWithChildren = ChangelogRoute._addFileChildren(
-  ChangelogRouteChildren,
-)
-
 interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
@@ -1936,7 +1936,6 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
-  ChangelogRoute: ChangelogRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
