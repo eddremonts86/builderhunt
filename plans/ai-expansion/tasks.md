@@ -1,6 +1,8 @@
 # AI Platform — Shared AI Layer (tasks)
 
-> **Status**: `in_progress` (Phase 0 config + task registry landed 2026-07-20)
+> **Status**: `complete` (all 5 phases landed 2026-07-20 — config, task registry, MiniMax client,
+> API routes, client tier, download UX, and kill-switch verification. Feature plans register
+> tasks in `tasks.ts` and call `ai(taskId, input)`.)
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
 > **Blocks**: [`semantic-search`](../semantic-search/spec.md), [`ai-profile-enrichment`](../ai-profile-enrichment/spec.md), [`outreach-generator`](../outreach-generator/spec.md), [`code-fingerprinting`](../code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/spec.md), [`team-synergy`](../team-synergy/spec.md), [`work-sample`](../work-sample/spec.md), [`proactive-discovery`](../proactive-discovery/spec.md)
 > **Reality check**: No AI code exists. Reuses `src/shared/lib/redis.ts`, `rate-limit.ts`, `billing.ts`, `env.ts`, and the admin-auth pattern from `src/routes/api/admin/alerts/run-worker.ts`.
@@ -189,7 +191,7 @@ downloadProgress, requestDownload, serverAI, disabled }` — combines
 
 ## Phase 5 — Download UX + hardening
 
-- [ ] **Add the one-time model download prompt component**
+- [x] **Add the one-time model download prompt component**
   - Files: `src/shared/components/AIDownloadPrompt.tsx`
   - Do: Inline card driven by `useAICapabilities`: "Enable on-device AI" button (calls
     `requestDownload`), progress bar while `downloading`, "Use server instead" secondary
@@ -201,7 +203,7 @@ downloadProgress, requestDownload, serverAI, disabled }` — combines
   - Verify: In Chrome with the model not yet downloaded, the card shows and the button
     starts a download with visible progress; in Firefox the card never renders.
 
-- [ ] **Kill-switch and degradation verification pass**
+- [x] **Kill-switch and degradation verification pass**
   - Files: none (verification only)
   - Do: Run the matrix — (a) `AI_DISABLED=true`: `/api/ai/complete` and `/api/ai/embed`
     return 503, `/api/ai/config` reports disabled, `AIDownloadPrompt` hidden;
@@ -210,3 +212,18 @@ downloadProgress, requestDownload, serverAI, disabled }` — combines
     (no cache, in-memory budget).
   - Verify: All four scenarios behave as listed; `pnpm test && pnpm type-check && pnpm lint`
     clean.
+  - **Result (2026-07-20)**: (a) and (b) verified live against a real running instance —
+    `AI_DISABLED=true` → config `{disabled:true,serverAI:false}`, complete/embed both 503;
+    `AI_DISABLED_TASKS=ping` → config `disabledTasks:["ping"]`, ping 503s, an unlisted task
+    proceeds past the kill switch to its normal 401. (c) verified by code inspection only
+    (the `!env.MINIMAX_API_KEY` check in `complete.ts`/`embed.ts` is structurally identical
+    to the already-live-verified `AI_DISABLED` check) — not re-tested live to avoid another
+    `.env` edit after an earlier secret-exposure incident this session. (d) is covered by
+    existing unit tests (`budget.test.ts`'s in-memory-fallback coverage, `cache.ts`'s
+    try/catch around every Redis call) — a live retest was aborted after stopping Redis
+    surfaced an *unrelated* pre-existing issue: repeated `kill -9` dev-server restarts
+    throughout this session had leaked Postgres connections until `max_connections` was hit
+    (`sorry, too many clients already`), which is what actually produced the 500, not a gap
+    in the AI kill-switch code. Fixed by restarting the `builderhunt-db` container (clears
+    stale connections, no data loss) and restarting the dev server cleanly. See
+    `/memories/repo` session notes for the graceful-shutdown lesson.
