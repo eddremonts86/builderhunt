@@ -14,7 +14,7 @@ import {
 import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
 import { organizationOptions } from './organization-options'
-import { ensurePersonalOrganization } from './personal-organization'
+import { ensurePersonalOrganization, pickDefaultActiveOrganizationId } from './personal-organization'
 
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
@@ -40,6 +40,23 @@ export const auth = betterAuth({
       create: {
         after: async (user) => {
           await ensurePersonalOrganization(user.id)
+        },
+      },
+    },
+    // better-auth's organization plugin never auto-populates a new
+    // session's activeOrganizationId — it must be set explicitly (see
+    // node_modules/better-auth/dist/plugins/organization/organization.mjs,
+    // which only reads it, never assigns it). Without this hook every
+    // signed-in user has no active organization and every tenant-scoped
+    // route 403s via requireTenantPrincipal. Default to the user's earliest
+    // membership (their personal workspace, created at signup).
+    session: {
+      create: {
+        before: async (session) => {
+          if (session.activeOrganizationId) return
+          const organizationId = await pickDefaultActiveOrganizationId(session.userId)
+          if (!organizationId) return
+          return { data: { activeOrganizationId: organizationId } }
         },
       },
     },

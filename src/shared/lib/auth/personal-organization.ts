@@ -37,3 +37,42 @@ export async function ensurePersonalOrganization(userId: string): Promise<void> 
     )
   `)
 }
+
+export interface DefaultActiveOrganizationDependencies {
+  findFirstMembership(userId: string): Promise<{ organizationId: string } | null>
+}
+
+/**
+ * Pure resolution logic for which organization a brand-new session should be
+ * scoped to when the auth provider doesn't set one explicitly (better-auth's
+ * organization plugin never auto-populates `activeOrganizationId` — see
+ * `databaseHooks.session.create.before` in better-auth.ts). Picks the user's
+ * earliest membership (their personal organization, created at signup)
+ * unless they already belong to none (e.g. hook race, deleted org).
+ */
+export async function resolveDefaultActiveOrganizationId(
+  userId: string,
+  dependencies: DefaultActiveOrganizationDependencies,
+): Promise<string | null> {
+  const membership = await dependencies.findFirstMembership(userId)
+  return membership?.organizationId ?? null
+}
+
+export async function pickDefaultActiveOrganizationId(userId: string): Promise<string | null> {
+  const [{ asc, eq }, { organizationMembers }] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/schema'),
+  ])
+
+  return resolveDefaultActiveOrganizationId(userId, {
+    findFirstMembership: async (currentUserId) => {
+      const [membership] = await authDb
+        .select({ organizationId: organizationMembers.organizationId })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.userId, currentUserId))
+        .orderBy(asc(organizationMembers.createdAt))
+        .limit(1)
+      return membership ?? null
+    },
+  })
+}
