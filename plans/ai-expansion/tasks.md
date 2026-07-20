@@ -80,7 +80,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
 
 ## Phase 2 — MiniMax client
 
-- [ ] **Implement the MiniMax server client**
+- [x] **Implement the MiniMax server client**
   - Files: `src/shared/lib/ai/minimax.ts`
   - Do: `minimaxChat({ system, prompt, schema, maxOutputTokens })` — POST
     `${env.MINIMAX_BASE_URL}/v1/text/chatcompletion_v2` (verify exact path/fields against
@@ -92,7 +92,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     `AIProviderError(status, message)` on HTTP errors; never log the key.
   - Verify: `pnpm type-check`.
 
-- [ ] **Test MiniMax parsing and retry**
+- [x] **Test MiniMax parsing and retry**
   - Files: `src/shared/lib/ai/minimax.test.ts`
   - Do: Mock global `fetch` (vi.stubGlobal): valid JSON → parsed output; schema-invalid
     first response + valid retry → success with exactly 2 calls; invalid twice →
@@ -100,7 +100,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     claim provider-side JSON Schema enforcement.
   - Verify: `pnpm test minimax.test`.
 
-- [ ] **Implement and test the embedding adapter**
+- [x] **Implement and test the embedding adapter**
   - Files: `src/shared/lib/ai/embeddings.ts`, `src/shared/lib/ai/embeddings.test.ts`
   - Do: Export `embedTexts(texts)` using `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, and an
     optional bearer `AI_EMBEDDING_API_KEY`; send OpenAI-compatible `{ model, input }`, use
