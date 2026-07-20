@@ -147,7 +147,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
 
 ## Phase 4 — Client tier
 
-- [ ] **Implement Chrome AI capability detection**
+- [x] **Implement Chrome AI capability detection**
   - Files: `src/shared/lib/ai/capabilities.ts`
   - Do: `getAICapability(api: 'prompt' | 'writer' | 'rewriter' | 'summarizer')` →
     availability enum via `LanguageModel.availability()` / `Writer.availability()` etc.,
@@ -156,7 +156,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm type-check`; in Chrome devtools console the exported fn resolves without
     throwing; in Firefox it returns `'unavailable'`.
 
-- [ ] **Implement local (on-device) prompting**
+- [x] **Implement local (on-device) prompting**
   - Files: `src/shared/lib/ai/local.ts`
   - Do: `promptLocal({ system, prompt, schema })` — `LanguageModel.create({ initialPrompts:
 [{ role: 'system', content: system }] })`, `session.prompt(prompt, { responseConstraint:
@@ -165,7 +165,7 @@ z.toJSONSchema(schema) })`, `JSON.parse` + `schema.safeParse` (retry once with a
   - Verify: `pnpm type-check`; manual check in Chrome with the model downloaded (any
     trivial schema round-trips).
 
-- [ ] **Implement the unified ai() client entry**
+- [x] **Implement the unified ai() client entry**
   - Files: `src/shared/lib/ai/client.ts`
   - Do: `ai(taskId, input, opts?)` — validate input against the task's `inputSchema`;
     if tier `local-first`, no `forceServer`, no `bh-ai-prefer-server` localStorage flag, and
@@ -177,7 +177,7 @@ z.toJSONSchema(schema) })`, `JSON.parse` + `schema.safeParse` (retry once with a
   - Verify: `pnpm type-check`; in-browser `ai('ping', {})` returns
     `{ output: { pong: true }, via: 'server' }` (ping is server-only).
 
-- [ ] **Add the useAICapabilities hook**
+- [x] **Add the useAICapabilities hook**
   - Files: `src/shared/lib/ai/useAICapabilities.ts`
   - Do: React hook returning `{ status, ready, needsDownload, downloading,
 downloadProgress, requestDownload, serverAI, disabled }` — combines
