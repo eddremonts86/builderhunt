@@ -35,6 +35,16 @@ const zodEnv = z.object({
   HASHNODE_API_KEY: z.string().optional(),
   SOURCEHUT_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  MINIMAX_API_KEY: z.string().optional(),
+  MINIMAX_BASE_URL: z.string().default('https://api.minimax.io'),
+  MINIMAX_MODEL: z.string().default('MiniMax-M3'),
+  AI_EMBEDDING_URL: z.string().optional(),
+  AI_EMBEDDING_MODEL: z.string().optional(),
+  AI_EMBEDDING_API_KEY: z.string().optional(),
+  AI_EMBEDDING_DIM: z.coerce.number().int().positive().default(1536),
+  AI_EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  AI_DISABLED: z.enum(['true', 'false']).default('false'),
+  AI_DISABLED_TASKS: z.string().default(''),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

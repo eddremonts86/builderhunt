@@ -1,6 +1,6 @@
 # AI Platform — Shared AI Layer (tasks)
 
-> **Status**: `pending`
+> **Status**: `in_progress` (Phase 0 config + task registry landed 2026-07-20)
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
 > **Blocks**: [`semantic-search`](../semantic-search/spec.md), [`ai-profile-enrichment`](../ai-profile-enrichment/spec.md), [`outreach-generator`](../outreach-generator/spec.md), [`code-fingerprinting`](../code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/spec.md), [`team-synergy`](../team-synergy/spec.md), [`work-sample`](../work-sample/spec.md), [`proactive-discovery`](../proactive-discovery/spec.md)
 > **Reality check**: No AI code exists. Reuses `src/shared/lib/redis.ts`, `rate-limit.ts`, `billing.ts`, `env.ts`, and the admin-auth pattern from `src/routes/api/admin/alerts/run-worker.ts`.
@@ -9,7 +9,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
 
 ## Phase 0 — Config
 
-- [ ] **Add AI env vars to the env schema**
+- [x] **Add AI env vars to the env schema**
   - Files: `src/shared/lib/env.ts`
   - Do: Add `MINIMAX_API_KEY` (optional), `MINIMAX_BASE_URL` (default `https://api.minimax.io`),
     `MINIMAX_MODEL` (default `MiniMax-M3`; verify it still appears in MiniMax
@@ -24,7 +24,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
 
 ## Phase 1 — Pure core + tests
 
-- [ ] **Create the AI task registry**
+- [x] **Create the AI task registry**
   - Files: `src/shared/lib/ai/tasks.ts`
   - Do: Define `AITaskId`, `AITier`, `AITaskDefinition` (fields: `id`, `tier`, `inputSchema`,
     `outputSchema`, `system`, `buildPrompt`, `cacheTtlSeconds: number | null`,
@@ -37,7 +37,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     plans register tasks.
   - Verify: `pnpm type-check`.
 
-- [ ] **Test the task registry**
+- [x] **Test the task registry**
   - Files: `src/shared/lib/ai/tasks.test.ts`
   - Do: Assert every registered task has a non-empty system prompt, allowances for all
     three plan tiers, positive `maxOutputTokens`; `wrapUntrusted` escapes embedded
