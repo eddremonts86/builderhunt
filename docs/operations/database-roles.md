@@ -8,6 +8,7 @@ BuilderHunt uses separate credentials. Never inject more than the role required 
 | Better Auth adapter | `DATABASE_AUTH_URL` | `builderhunt_auth` | auth and organization lifecycle tables only |
 | Migration/backfill job | `DATABASE_MIGRATION_URL` | deployment owner | DDL and approved backfills; never web runtime |
 | Background worker | `DATABASE_WORKER_URL` | `builderhunt_worker` | command-specific policies added with each worker |
+| Platform administration | `DATABASE_PLATFORM_URL` | `builderhunt_platform` | editorial, account directory, and billing administration only |
 | Operational reporting | dedicated secret | `builderhunt_readonly` | reviewed views only, no tenant base tables |
 
 All named runtime roles are `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION
@@ -23,4 +24,3 @@ Before credential cutover, run the exact-role tests against a disposable databas
 `current_user`, `rolsuper = false`, `rolbypassrls = false`, missing-context denial, tenant A/B rows,
 cross-tenant insert/update denial, pool reuse, and auth-broker product denial. Never test RLS as the
 owner and treat that as evidence.
-

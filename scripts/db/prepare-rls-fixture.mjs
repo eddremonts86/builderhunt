@@ -13,6 +13,7 @@ try {
   await owner.unsafe("alter role builderhunt_app password 'test-app-password'")
   await owner.unsafe("alter role builderhunt_auth password 'test-auth-password'")
   await owner.unsafe("alter role builderhunt_worker password 'test-worker-password'")
+  await owner.unsafe("alter role builderhunt_platform password 'test-platform-password'")
   await owner`
     insert into auth_users (id, name, email, email_verified, created_at, updated_at)
     values
@@ -53,6 +54,14 @@ try {
       ('tracked-a', 'org-a', 'identity-a', 'user-a', 'private', 'tracked', '{}', now(), now()),
       ('tracked-b', 'org-b', 'identity-b', 'user-b', 'private', 'tracked', '{}', now(), now())
     on conflict (organization_id, builder_identity_id) do nothing
+  `
+  await owner`
+    insert into builder_claims (
+      id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, created_at
+    ) values
+      ('claim-a', 'identity-a', 'user-a', 'email', 'a@test.invalid', 'verified', now()),
+      ('claim-b', 'identity-b', 'user-b', 'email', 'b@test.invalid', 'verified', now())
+    on conflict (id) do nothing
   `
   console.log(JSON.stringify({ prepared: true, database: databaseName }))
 } finally {

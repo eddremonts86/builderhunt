@@ -44,6 +44,14 @@
     "0010_worker_alert_policies": {
       "sql": "654a0dd68ee0f354f5a53a6bcf07e42e05a9c93a0f155cf1e5fb487e4914878c",
       "snapshot": "097756733253da5ff3433883076d93dc8cbdc28f6ff08bb8ad7d3e37fc71c3f4"
+    },
+    "0011_builder_claim_policies": {
+      "sql": "a1e72f4167e494cada1a1fb6c33e15239cf32a22595c086a1e59b6ee93cc2dae",
+      "snapshot": "46ae7a6bb58060c090bd550453b25c52d56595f12129464c081124462f876727"
+    },
+    "0012_platform_role": {
+      "sql": "0682ead90ef350fae02f3d7d22858e9010eb5f6f8d11c1f12715da1dcefdb9be",
+      "snapshot": "5966740dbabc6eecd3650a9fe9a91e700a11d5234dae9c6198c04e5cb0e147f5"
     }
   }
 }

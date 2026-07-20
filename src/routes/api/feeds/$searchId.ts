@@ -1,9 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { db } from '~/shared/lib/db/index'
-import { savedQueries } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { searchBuilders } from '~/lib/search'
 import { env } from '~/shared/lib/env'
+import { findCapabilitySavedQuery } from '~/shared/lib/repositories/public-feeds'
+import { verifyFeedCapability } from '~/shared/lib/security/feed-capability'
 
 /**
  * Public RSS feed for a saved search.
@@ -216,10 +215,17 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
           }
 
           const { searchId } = params
-          const [search] = await db
-            .select()
-            .from(savedQueries)
-            .where(eq(savedQueries.id, searchId))
+          const token = new URL(request.url).searchParams.get('token')
+          const capability = token && env.BETTER_AUTH_SECRET
+            ? verifyFeedCapability(token, searchId, env.BETTER_AUTH_SECRET)
+            : null
+          if (!capability) {
+            return new Response('Feed not found', {
+              status: 404,
+              headers: { 'Content-Type': 'text/plain' },
+            })
+          }
+          const search = await findCapabilitySavedQuery(capability.organizationId, searchId)
 
           if (!search) {
             return new Response('Feed not found', {
@@ -238,7 +244,7 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
           })
 
           const siteUrl = env.APP_URL.replace(/\/$/, '')
-          const selfUrl = `${siteUrl}/api/feeds/${searchId}?format=rss`
+          const selfUrl = `${siteUrl}/api/feeds/${searchId}?format=rss&token=${encodeURIComponent(token as string)}`
 
           // Browsers (without an explicit RSS reader Accept) get HTML.
           // RSS readers send application/rss+xml or */* — give them XML.

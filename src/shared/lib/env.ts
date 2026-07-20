@@ -14,6 +14,7 @@ const zodEnv = z.object({
   DATABASE_MIGRATION_URL: z.string().min(1).optional(),
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
+  DATABASE_PLATFORM_URL: z.string().min(1).optional(),
   TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy'),
   TENANT_WRITE_MODE: z.enum(['legacy', 'dual', 'canonical']).default('legacy'),
   TENANT_CANONICAL_READY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
@@ -50,6 +51,9 @@ const zodEnv = z.object({
   }
   if (!data.DATABASE_WORKER_URL) {
     context.addIssue({ code: 'custom', path: ['DATABASE_WORKER_URL'], message: 'Production DATABASE_WORKER_URL is required' })
+  }
+  if (!data.DATABASE_PLATFORM_URL) {
+    context.addIssue({ code: 'custom', path: ['DATABASE_PLATFORM_URL'], message: 'Production DATABASE_PLATFORM_URL is required' })
   }
 
   let runtimeUsername = ''
@@ -89,6 +93,18 @@ const zodEnv = z.object({
       code: 'custom',
       path: ['DATABASE_WORKER_URL'],
       message: 'Worker, auth, migration, and product database identities must be different',
+    })
+  }
+  if (
+    data.DATABASE_PLATFORM_URL === data.DATABASE_URL
+    || data.DATABASE_PLATFORM_URL === data.DATABASE_AUTH_URL
+    || data.DATABASE_PLATFORM_URL === data.DATABASE_WORKER_URL
+    || data.DATABASE_PLATFORM_URL === data.DATABASE_MIGRATION_URL
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['DATABASE_PLATFORM_URL'],
+      message: 'Platform, worker, auth, migration, and product database identities must be different',
     })
   }
   if (!data.BETTER_AUTH_SECRET || data.BETTER_AUTH_SECRET.length < 32 || /change[_-]?me|dev-secret|example/i.test(data.BETTER_AUTH_SECRET)) {

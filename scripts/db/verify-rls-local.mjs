@@ -4,8 +4,9 @@ import { createHash } from 'node:crypto'
 const appUrl = process.env.RLS_TEST_APP_URL
 const authUrl = process.env.RLS_TEST_AUTH_URL
 const workerUrl = process.env.RLS_TEST_WORKER_URL
-if (!appUrl || !authUrl || !workerUrl) throw new Error('RLS_TEST_APP_URL, RLS_TEST_AUTH_URL, and RLS_TEST_WORKER_URL are required')
-for (const value of [appUrl, authUrl, workerUrl]) {
+const platformUrl = process.env.RLS_TEST_PLATFORM_URL
+if (!appUrl || !authUrl || !workerUrl || !platformUrl) throw new Error('All exact-role test URLs are required')
+for (const value of [appUrl, authUrl, workerUrl, platformUrl]) {
   const databaseName = new URL(value).pathname.slice(1)
   if (!/^builderhunt_security_test_[A-Za-z0-9_]+$/.test(databaseName)) {
     throw new Error('RLS verifier refuses to run outside a named builderhunt_security_test database')
@@ -15,6 +16,7 @@ for (const value of [appUrl, authUrl, workerUrl]) {
 const app = postgres(appUrl, { max: 2 })
 const auth = postgres(authUrl, { max: 1 })
 const worker = postgres(workerUrl, { max: 1 })
+const platform = postgres(platformUrl, { max: 1 })
 
 try {
   const missing = await app`select id from organization_builders order by id`
@@ -49,6 +51,28 @@ try {
 
   const afterCommit = await app`select id from organization_builders`
   if (afterCommit.length !== 0) throw new Error('Pooled tenant context leaked after commit')
+
+  const claimMissing = await app`select id from builder_claims`
+  if (claimMissing.length !== 0) throw new Error('Missing user context exposed builder claims')
+  const subjectClaims = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select id from builder_claims order by id`
+  })
+  assertIds(subjectClaims, ['claim-a'], 'claim subject isolation')
+  let crossSubjectClaimDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.user_id', 'user-a', true)`
+      await transaction`
+        insert into builder_claims (
+          id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, created_at
+        ) values ('claim-cross', 'identity-b', 'user-b', 'email', 'x@test.invalid', 'pending', now())
+      `
+    })
+  } catch (error) {
+    crossSubjectClaimDenied = error?.code === '42501'
+  }
+  if (!crossSubjectClaimDenied) throw new Error('Cross-subject claim insert was not denied')
 
   const organizations = await auth`select id from organizations order by id`
   const organizationIds = organizations.map((row) => row.id)
@@ -92,6 +116,16 @@ try {
   }
   if (!workerAuthColumnsDenied) throw new Error('Worker accessed unapproved auth user columns')
 
+  const platformUsers = await platform`select id from auth_users order by id`
+  if (!platformUsers.some((row) => row.id === 'user-a')) throw new Error('Platform account directory access failed')
+  let platformProductDenied = false
+  try {
+    await platform`select id from saved_queries`
+  } catch (error) {
+    platformProductDenied = error?.code === '42501'
+  }
+  if (!platformProductDenied) throw new Error('Platform role accessed tenant product tables')
+
   const bootstrapUserId = 'user-bootstrap'
   const bootstrapHash = createHash('sha256')
     .update(`builderhunt:personal-organization:v1:${bootstrapUserId}`)
@@ -125,15 +159,18 @@ try {
     tenantB: tenantB.map((row) => row.id),
     crossTenantInsert: 'denied',
     poolReuse: 'clean',
+    claimSubjectIsolation: subjectClaims.map((row) => row.id),
+    crossSubjectClaimInsert: 'denied',
     authProductAccess: 'denied',
     workerMissingContext: 'denied',
     workerTenantIsolation: workerAlerts.map((row) => row.id),
     workerCrossTenantInsert: 'denied',
     workerAuthColumns: 'restricted',
+    platformProductAccess: 'denied',
     personalOrganizationBootstrap: 'atomic',
   }))
 } finally {
-  await Promise.all([app.end(), auth.end(), worker.end()])
+  await Promise.all([app.end(), auth.end(), worker.end(), platform.end()])
 }
 
 function assertIds(rows, expected, label) {

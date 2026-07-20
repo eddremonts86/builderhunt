@@ -30,6 +30,8 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
       DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
       APP_URL: http://localhost:3000
       VITE_APP_URL: http://localhost:3000
       BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
@@ -53,6 +55,7 @@ jobs:
           RLS_TEST_APP_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
           RLS_TEST_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
           RLS_TEST_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+          RLS_TEST_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
         run: pnpm test:rls:local
       - name: Restore rehearsal
         run: |

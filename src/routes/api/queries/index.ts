@@ -8,6 +8,7 @@ import { recordMigrationMismatch } from '~/shared/lib/migration/migration-metric
 import { executeTenantRead } from '~/shared/lib/migration/shadow-read'
 import { resolveTenantMigrationModes } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
+import { createFeedCapability } from '~/shared/lib/security/feed-capability'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import {
   countSavedQueries,
@@ -32,7 +33,14 @@ export const Route = createFileRoute('/api/queries/')({
             canonical: () => listSavedQueries(tx, principal.organizationId),
             recordMismatch: recordMigrationMismatch,
           }))
-          return Response.json(queries)
+          return Response.json(queries.map((query) => ({
+            ...query,
+            feedToken: createFeedCapability(
+              principal.organizationId,
+              query.id,
+              env.BETTER_AUTH_SECRET as string,
+            ),
+          })))
         } catch (error) {
           const authorizationResponse = tenantAuthorizationResponse(error)
           if (authorizationResponse) return authorizationResponse

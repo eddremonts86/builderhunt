@@ -7,6 +7,7 @@ const productionEnvironment = {
   DATABASE_MIGRATION_URL: 'postgresql://migration_operator:owner-secret@db:5432/builderhunt',
   DATABASE_AUTH_URL: 'postgresql://builderhunt_auth:auth-secret@db:5432/builderhunt',
   DATABASE_WORKER_URL: 'postgresql://builderhunt_worker:worker-secret@db:5432/builderhunt',
+  DATABASE_PLATFORM_URL: 'postgresql://builderhunt_platform:platform-secret@db:5432/builderhunt',
   APP_URL: 'https://builderhunt.example',
   VITE_APP_URL: 'https://builderhunt.example',
   BETTER_AUTH_SECRET: 'a-production-secret-with-more-than-32-characters',
@@ -36,6 +37,8 @@ describe('production environment security', () => {
     ['shared auth URL', { DATABASE_AUTH_URL: productionEnvironment.DATABASE_URL }],
     ['missing worker URL', { DATABASE_WORKER_URL: undefined }],
     ['shared worker URL', { DATABASE_WORKER_URL: productionEnvironment.DATABASE_URL }],
+    ['missing platform URL', { DATABASE_PLATFORM_URL: undefined }],
+    ['shared platform URL', { DATABASE_PLATFORM_URL: productionEnvironment.DATABASE_URL }],
     ['weak auth secret', { BETTER_AUTH_SECRET: 'change_me' }],
   ])('rejects %s', (_label, override) => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()

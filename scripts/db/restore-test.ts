@@ -23,10 +23,11 @@ try {
         'organizations', 'organization_members', 'organization_invitations',
         'organization_entitlements', 'organization_plan_changes', 'organization_builders',
         'builders', 'saved_queries', 'alerts', 'alert_triggers', 'builder_notes', 'onboarding_progress',
+        'builder_claims', 'published_builder_profiles',
       ])})
       and (not c.relrowsecurity or not c.relforcerowsecurity)
   `
-  if (migrations?.count !== 11) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
+  if (migrations?.count !== 13) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
   if (rls?.missing !== 0) throw new Error(`Restored RLS manifest has ${rls?.missing ?? 0} missing policies`)
   console.log(JSON.stringify({ restored: true, migrations: migrations.count, rlsMissing: rls.missing }))
 } finally {
