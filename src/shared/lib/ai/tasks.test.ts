@@ -14,6 +14,20 @@ describe('AI task registry', () => {
     expect(getTask('does-not-exist')).toBeNull()
   })
 
+  it('registers query-translate as local-first, Pro-gated, with the QueryTranslation output schema', () => {
+    const task = getTask('query-translate')
+    expect(task).not.toBeNull()
+    expect(task?.tier).toBe('local-first')
+    expect(task?.allowances).toEqual({ free: 0, pro: 200, team: 500 })
+    expect(task?.cacheTtlSeconds).toBe(86400)
+    expect(task?.inputSchema.safeParse({ query: 'rust async devs' }).success).toBe(true)
+    expect(task?.inputSchema.safeParse({ query: 'ab' }).success).toBe(false)
+    const validOutput = { keywords: ['rust', 'async'], language: 'en', sources: ['github'] }
+    expect(task?.outputSchema.safeParse(validOutput).success).toBe(true)
+    expect(task?.outputSchema.safeParse({ keywords: [] }).success).toBe(false)
+    expect(task?.outputSchema.safeParse({ keywords: ['rust'], sources: ['not-a-real-source'] }).success).toBe(false)
+  })
+
   it('every registered task has a non-empty system prompt, full allowances, and positive maxOutputTokens', () => {
     for (const task of Object.values(AI_TASKS)) {
       expect(task.system.trim().length).toBeGreaterThan(0)

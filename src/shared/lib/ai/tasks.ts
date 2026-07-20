@@ -20,6 +20,7 @@
  */
 import { z } from 'zod'
 import type { PlanTier } from '~/shared/lib/billing-shared'
+import { SOURCE_NAMES } from '~/lib/sources/types'
 
 export type AITaskId = string
 export type AITier = 'local-first' | 'server-only'
@@ -53,11 +54,49 @@ const pingTask: AITaskDefinition<Record<string, never>, { pong: true }> = {
   maxOutputTokens: 300,
 }
 
+export interface QueryTranslation {
+  keywords: string[]
+  language?: string
+  country?: string
+  sources?: (typeof SOURCE_NAMES)[number][]
+}
+
+const queryTranslationOutputSchema: z.ZodType<QueryTranslation> = z.object({
+  keywords: z.array(z.string().min(1)).min(1).max(8),
+  language: z.string().optional(),
+  country: z.string().optional(),
+  sources: z.array(z.enum(SOURCE_NAMES)).optional(),
+})
+
+// Plan: semantic-search. Translates a natural-language sourcing query into
+// search keywords + optional filters, used by the query engine's
+// degradation ladder (semantic-search.ts) when the local vector index has
+// too few matches. Runs client-side first (Chrome AI, free); the server
+// re-validates with this same schema regardless of where it ran.
+const queryTranslateTask: AITaskDefinition<{ query: string }, QueryTranslation> = {
+  id: 'query-translate',
+  tier: 'local-first',
+  inputSchema: z.object({ query: z.string().min(3).max(300) }),
+  outputSchema: queryTranslationOutputSchema,
+  system:
+    'You translate a natural-language developer-sourcing query into search keywords and '
+    + 'optional filters. Keywords must be technologies or domain nouns actually present or '
+    + 'clearly implied by the query (1-8 keywords). Never invent a language, country, or '
+    + 'source filter that is not implied by the query — omit the field instead. Respond with '
+    + 'JSON only, matching the schema exactly.',
+  buildPrompt: (input) => `Query: ${input.query}\n\nRespond with JSON: { "keywords": string[], "language"?: string, "country"?: string, "sources"?: string[] }`,
+  cacheTtlSeconds: 86400,
+  // Pro feature — free is gated to 0.
+  allowances: { free: 0, pro: 200, team: 500 },
+  maxOutputTokens: 256,
+}
+
 // Individual task definitions keep their precise I/O generics (see `pingTask`
 // above); the registry itself is necessarily heterogeneous, so it is keyed as
 // `AITaskDefinition<any, any>` — callers narrow the schema at the call site.
 export const AI_TASKS: Record<AITaskId, AITaskDefinition<any, any>> = {
   [pingTask.id]: pingTask,
+  [queryTranslateTask.id]: queryTranslateTask,
 }
 
 export function getTask(id: string): AITaskDefinition<any, any> | null {

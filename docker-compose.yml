@@ -7,6 +7,11 @@ services:
     profiles: ['standalone']
     image: pgvector/pgvector:pg16
     container_name: builderhunt-db
+    # Dev only: default max_connections=100 has been exhausted more than
+    # once by the combination of a running dev server + drizzle-kit +
+    # vitest + ad-hoc tsx scripts, each opening their own postgres() pool.
+    # Bumped for local headroom — not a production tuning recommendation.
+    command: ['postgres', '-c', 'max_connections=200']
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres

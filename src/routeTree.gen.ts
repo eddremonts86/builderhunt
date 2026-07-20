@@ -46,6 +46,7 @@ import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/se
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
@@ -287,6 +288,11 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
   getParentRoute: () => DashboardRouteRoute,
+} as any)
+const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
+  id: '/api/search/semantic',
+  path: '/api/search/semantic',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   id: '/api/search/builders',
@@ -640,6 +646,7 @@ export interface FileRoutesByFullPath {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
@@ -734,6 +741,7 @@ export interface FileRoutesByTo {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
@@ -832,6 +840,7 @@ export interface FileRoutesById {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
@@ -929,6 +938,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/api/search/semantic'
     | '/dashboard/'
     | '/exports/'
     | '/me/'
@@ -1023,6 +1033,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/api/search/semantic'
     | '/dashboard'
     | '/exports'
     | '/me'
@@ -1120,6 +1131,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/api/search/semantic'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
@@ -1194,6 +1206,7 @@ export interface RootRouteChildren {
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
+  ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
@@ -1487,6 +1500,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardDashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
+    }
+    '/api/search/semantic': {
+      id: '/api/search/semantic'
+      path: '/api/search/semantic'
+      fullPath: '/api/search/semantic'
+      preLoaderRoute: typeof ApiSearchSemanticRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/search/builders': {
       id: '/api/search/builders'
@@ -2044,6 +2064,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
+  ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
