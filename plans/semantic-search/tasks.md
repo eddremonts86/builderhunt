@@ -1,6 +1,6 @@
 # Semantic Search (tasks)
 
-> **Status**: `pending`
+> **Status**: `complete`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md) (global-public identity/index classification and tenant-private query isolation); [`ai-expansion`](../ai-expansion/spec.md) (Phases 1–3: `embeddings.ts`, `minimax.ts`, `tasks.ts`, `budget.ts` must exist). Enhanced by [`proactive-discovery`](../proactive-discovery/spec.md) (optional cold-start seeding).
 > **Blocks**: [`proactive-discovery`](../proactive-discovery/tasks.md) (hard)
 > **Reality check**: Extends `src/lib/search.ts`, `src/routes/api/search/builders.ts`, `src/modules/search/components/SearchPage.tsx` / `PersonResultCard.tsx`, `docker-compose.yml`. New global table only; `builders` schema untouched.
@@ -9,7 +9,7 @@ Ordered so the app ships cleanly after every checkbox.
 
 ## Phase 1 — pgvector + schema
 
-- [ ] **Preflight the embedding deployment contract**
+- [x] **Preflight the embedding deployment contract**
   - Files: `src/shared/lib/ai/embeddings.test.ts`, `.env.example`
   - Do: Configure `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, optional
     `AI_EMBEDDING_API_KEY`, and `AI_EMBEDDING_DIM`; call `embedTexts(['dimension probe'])`
@@ -18,7 +18,7 @@ Ordered so the app ships cleanly after every checkbox.
   - Verify: staging probe returns one finite vector of exactly `AI_EMBEDDING_DIM`; invalid
     dimension fails with `AIDimensionMismatchError` before any pgvector DDL runs.
 
-- [ ] **Switch local Postgres to a pgvector image**
+- [x] **Switch local Postgres to a pgvector image**
   - Files: `docker-compose.yml`
   - Do: Change the `db` service image `postgres:16-alpine` → `pgvector/pgvector:pg16`
     (same major; existing `builderhunt_postgres_data` volume remains compatible).
@@ -26,20 +26,20 @@ Ordered so the app ships cleanly after every checkbox.
     `docker exec builderhunt-db psql -U postgres -d builderhunt -c "CREATE EXTENSION IF NOT EXISTS vector; SELECT extversion FROM pg_extension WHERE extname='vector';"`
     prints a version.
 
-- [ ] **Document the production (Coolify) pgvector step**
+- [x] **Document the production (Coolify) pgvector step**
   - Files: `plans/semantic-search/plan.md` (Risks already cover it), `README.md` (deploy notes section)
   - Do: Add a short deploy note: the Coolify Postgres resource must run
     `pgvector/pgvector:pg16` (or have the extension installed) before this feature's
     migration is applied in prod; take a DB backup before the image swap.
   - Verify: Note present; no code change.
 
-- [ ] **Single-source the embedding dimension**
+- [x] **Single-source the embedding dimension**
   - Files: `src/shared/lib/ai/embedding-dim.ts`
   - Do: `export const EMBEDDING_DIM = env.AI_EMBEDDING_DIM` (import from
     `~/shared/lib/env`). This is the only place schema/queries read the dim from.
   - Verify: `pnpm type-check`.
 
-- [ ] **Add the global builder_embeddings table**
+- [x] **Add the global builder_embeddings table**
   - Files: `src/shared/lib/db/schema.ts`
   - Do: Add `builderEmbeddings` exactly per spec.md §2 (`vector('embedding',
 { dimensions: EMBEDDING_DIM })` from `drizzle-orm/pg-core`, `unique(source, source_id)`,
@@ -47,7 +47,7 @@ Ordered so the app ships cleanly after every checkbox.
     to `builders`.
   - Verify: `pnpm type-check`.
 
-- [ ] **Generate the migration and append pgvector DDL**
+- [x] **Generate the migration and append pgvector DDL**
   - Files: `drizzle/` (new migration from `pnpm db:generate`)
   - Do: Run `pnpm db:generate`; prepend `CREATE EXTENSION IF NOT EXISTS vector;` and append
     `CREATE INDEX "builder_embeddings_hnsw_idx" ON "builder_embeddings" USING hnsw ("embedding" vector_cosine_ops);`
@@ -57,7 +57,7 @@ Ordered so the app ships cleanly after every checkbox.
 
 ## Phase 2 — Document lib + write-through
 
-- [ ] **Build the embedding-document module (pure)**
+- [x] **Build the embedding-document module (pure)**
   - Files: `src/lib/semantic/embedding-doc.ts`
   - Do: Export `embeddedProfileSchema` (zod: username, displayName?, avatarUrl?, bio?,
     profileUrl, followersCount?, language?, country?, topics — public fields only),
@@ -66,14 +66,14 @@ Ordered so the app ships cleanly after every checkbox.
     `toEmbeddedProfile(raw: RawBuilder)`.
   - Verify: `pnpm type-check`.
 
-- [ ] **Test the document module**
+- [x] **Test the document module**
   - Files: `src/lib/semantic/embedding-doc.test.ts`
   - Do: Same profile → same doc/hash; bio change → different hash; missing optional fields
     omit their lines; >6000-char bio truncates; `toEmbeddedProfile` strips unknown/private
     fields.
   - Verify: `pnpm test embedding-doc`.
 
-- [ ] **Add the upsert helper and wire write-through**
+- [x] **Add the upsert helper and wire write-through**
   - Files: `src/lib/semantic/index-writer.ts`, `src/routes/api/search/builders.ts`, `src/routes/api/builders/track.ts`
   - Do: `upsertEmbeddingStubs(results: RawBuilder[])` — per row compute doc+hash, then
     `INSERT ... ON CONFLICT (source, source_id) DO UPDATE SET document, profile,
@@ -86,7 +86,7 @@ content_hash, embedding = NULL, embedded_at = NULL, updated_at = now()` **only**
 
 ## Phase 3 — Worker
 
-- [ ] **Add the embeddings run-worker endpoint**
+- [x] **Add the embeddings run-worker endpoint**
   - Files: `src/routes/api/admin/embeddings/run-worker.ts`, `src/lib/semantic/embed-worker.ts`
   - Do: Endpoint clones the admin-auth pattern of
     `src/routes/api/admin/alerts/run-worker.ts`; `runEmbeddingWorker()` selects up to 256
@@ -100,7 +100,7 @@ content_hash, embedding = NULL, embedded_at = NULL, updated_at = now()` **only**
 
 ## Phase 4 — Query path
 
-- [ ] **Register the query-translate AI task**
+- [x] **Register the query-translate AI task**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
   - Do: Add `query-translate`: tier `local-first`; input `z.object({ query:
 z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md §6
@@ -110,7 +110,7 @@ z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md
     (JSON only, never invent filters). Extend the registry test to cover it.
   - Verify: `pnpm test tasks.test`.
 
-- [ ] **Implement the semantic query engine**
+- [x] **Implement the semantic query engine**
   - Files: `src/lib/semantic/semantic-search.ts`
   - Do: `semanticSearch({ query, translated?, language?, country?, perPage })`:
     (1) embed query via `embedTexts([query])` with a 24 h Redis cache
@@ -126,7 +126,7 @@ z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md
   - Verify: `pnpm type-check`; with ≥ a few embedded rows, a related natural-language query
     returns them with `similarity` ≥ 0.60 (manual node/tsx script or endpoint in next task).
 
-- [ ] **Add POST /api/search/semantic**
+- [x] **Add POST /api/search/semantic**
   - Files: `src/routes/api/search/semantic.ts`
   - Do: Auth required (401); plan gate via `getUserPlan` — pro/team else
     `403 { error: 'plan' }`; `rateLimit('search-semantic', userId, 20, 60)`; zod body
@@ -142,7 +142,7 @@ z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md
 
 ## Phase 5 — UI + gating
 
-- [ ] **Add the Semantic toggle to the search page**
+- [x] **Add the Semantic toggle to the search page**
   - Files: `src/modules/search/components/SearchPage.tsx`
   - Do: Toggle beside the search input bound to URL state (`?mode=semantic`). Free users:
     toggle renders locked with a "Pro" pill linking to `/pricing` (plan available from the
@@ -155,7 +155,7 @@ z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md
   - Verify: Pro user toggles semantic and gets results with the mode notice on a cold index;
     free user sees the locked pill; Firefox works via server translation.
 
-- [ ] **Show similarity badges and hybrid notice**
+- [x] **Show similarity badges and hybrid notice**
   - Files: `src/modules/search/components/PersonResultCard.tsx`, `src/modules/search/components/SearchPage.tsx`
   - Do: When a result has `similarity`, render a `NN% match` badge in place of the score
     chip. When response `mode` is `hybrid` or `keyword-fallback`, render a one-line notice
@@ -164,7 +164,7 @@ z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md
   - Verify: Badges render for local hits; notice shows in hybrid mode; keyword mode
     (toggle off) is pixel-identical to today.
 
-- [ ] **Full verification pass**
+- [x] **Full verification pass**
   - Files: none
   - Do: `pnpm test && pnpm type-check && pnpm lint`; e2e manual: cold index → hybrid; run
     worker → warm queries go `mode: 'semantic'` under 100 ms (check server log timing);

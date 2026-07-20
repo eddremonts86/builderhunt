@@ -2,11 +2,14 @@ import * as React from 'react'
 import {
   Search, X, Bookmark, ExternalLink, Code, Filter, Clock, Hash,
   TrendingUp, Save, Lightbulb, ChevronDown, Sparkles, RotateCcw, MapPin,
-  Users, BookMarked, Star, GitFork, Loader2,
+  Users, BookMarked, Star, GitFork, Loader2, Lock, Wand2,
 } from 'lucide-react'
 import { useSearch } from '@tanstack/react-router'
 import { Input, Button, Dialog, ScoreRing, getScoreBreakdown } from '~/components/ui'
 import { Tooltip } from '~/shared/components/Tooltip'
+import { ai } from '~/shared/lib/ai/client'
+import { AIUnavailableError } from '~/shared/lib/ai/errors'
+import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
@@ -33,6 +36,9 @@ interface Builder {
   metadata?: Record<string, unknown>
   tracked?: boolean
   trackedRowId?: string
+  /** Present only on /api/search/semantic hits — a local (embedded) match's
+   * cosine similarity to the query, 0..1. Renders in place of the score chip. */
+  similarity?: number
 }
 
 /** Recency lives in `metadata.lastSeen` (a ms-epoch number set by each
@@ -145,6 +151,41 @@ export function SearchPage() {
   const [saveMsg, setSaveMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [featured, setFeatured] = React.useState<Builder[]>([])
+
+  /* Semantic search (Plan: semantic-search) — Pro/team feature, toggled
+     via ?mode=semantic. `resultMode` reflects what the last response
+     actually returned (semantic/hybrid/keyword-fallback), which can differ
+     from the toggle itself (e.g. a cold index falls back to hybrid). */
+  const [semanticMode, setSemanticMode] = React.useState(search.mode === 'semantic')
+  const [resultMode, setResultMode] = React.useState<'semantic' | 'hybrid' | 'keyword-fallback' | null>(null)
+  const [plan, setPlan] = React.useState<'free' | 'pro' | 'team' | null>(null)
+  const aiCaps = useAICapabilities()
+
+  React.useEffect(() => {
+    fetch('/api/plans/me', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: { plan?: { plan?: 'free' | 'pro' | 'team' } } | null) => {
+        if (data?.plan?.plan) setPlan(data.plan.plan)
+      })
+      .catch(() => {})
+  }, [])
+
+  const toggleSemanticMode = () => {
+    if (plan !== 'pro' && plan !== 'team') return
+    const next = !semanticMode
+    setSemanticMode(next)
+    // Keeps the URL shareable/bookmarkable without fighting the router's
+    // typed `from`/`search` inference for a purely cosmetic sync — the
+    // actual re-search below is what matters functionally.
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('mode', next ? 'semantic' : 'keyword')
+      window.history.replaceState(null, '', url)
+    } catch {
+      // ignore
+    }
+    if (searched && query.trim()) runSearch(query)
+  }
 
   const inputRef = React.useRef<HTMLInputElement>(null)
 
@@ -273,6 +314,20 @@ export function SearchPage() {
     await runSearch(q)
   }
 
+  /** Runs the `query-translate` AI task (Chrome on-device first, MiniMax via
+   * /api/ai/complete as fallback — see client.ts). Returns `undefined` on
+   * any failure (disabled/budget/parse error); the server re-validates and
+   * re-attempts server-side translation itself if this is omitted. */
+  const getClientTranslation = async (q: string): Promise<unknown> => {
+    try {
+      const result = await ai('query-translate', { query: q })
+      return result.output
+    } catch (err) {
+      if (!(err instanceof AIUnavailableError)) console.error('query-translate error:', err)
+      return undefined
+    }
+  }
+
   const runSearch = async (q: string) => {
     setLoading(true)
     setSearched(true)
@@ -281,13 +336,18 @@ export function SearchPage() {
     setError(null)
     setPage(1)
     setHasMore(true)
+    setResultMode(null)
     rememberSearch(q)
     try {
-      const res = await fetch('/api/search/builders', {
+      const endpoint = semanticMode ? '/api/search/semantic' : '/api/search/builders'
+      const translated = semanticMode ? await getClientTranslation(q) : undefined
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keywords: q,
+          query: q,
+          translated,
           sources: Array.from(activeSources),
           country: location.trim() || undefined,
           language: language.trim() || undefined,
@@ -302,6 +362,9 @@ export function SearchPage() {
       const data = await res.json()
       setResults(data.builders ?? [])
       setHasMore(Boolean(data.hasMore) && (data.builders?.length ?? 0) > 0)
+      if (semanticMode && (data.mode === 'semantic' || data.mode === 'hybrid' || data.mode === 'keyword-fallback')) {
+        setResultMode(data.mode)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed. Please try again.')
       setResults([])
@@ -317,11 +380,13 @@ export function SearchPage() {
     setLoadingMore(true)
     try {
       const next = page + 1
-      const res = await fetch('/api/search/builders', {
+      const endpoint = semanticMode ? '/api/search/semantic' : '/api/search/builders'
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           keywords: query,
+          query,
           sources: Array.from(activeSources),
           country: location.trim() || undefined,
           language: language.trim() || undefined,
@@ -344,7 +409,7 @@ export function SearchPage() {
     } finally {
       setLoadingMore(false)
     }
-  }, [loadingMore, hasMore, loading, searched, page, query, activeSources, location, language])
+  }, [loadingMore, hasMore, loading, searched, page, query, activeSources, location, language, semanticMode])
 
   React.useEffect(() => {
     const el = sentinelRef.current
@@ -558,6 +623,42 @@ export function SearchPage() {
           >
             {loading ? 'Searching' : 'Search'}
           </Button>
+
+          {/* Semantic toggle (Plan: semantic-search) — hidden entirely when
+              the AI platform is disabled or has no server tier configured;
+              locked with a Pro pill until the plan is positively known to
+              be pro/team (fail-closed while /api/plans/me is loading, for
+              anonymous visitors, and for free-plan users). */}
+          {!aiCaps.disabled && aiCaps.serverAI && (
+            <Tooltip label={plan === 'pro' || plan === 'team' ? 'Semantic search — find builders by meaning, not just keywords' : 'Semantic search — upgrade to Pro to unlock'}>
+              {plan === 'pro' || plan === 'team' ? (
+                <button
+                  type="button"
+                  onClick={toggleSemanticMode}
+                  aria-pressed={semanticMode}
+                  aria-label="Toggle semantic search"
+                  data-testid="semantic-toggle"
+                  className={`relative shrink-0 w-11 h-11 rounded-full border flex items-center justify-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 ${
+                    semanticMode
+                      ? 'bg-bh-accent-soft text-bh-accent border-bh-accent/30'
+                      : 'bg-transparent text-bh-text-muted border-bh-border hover:border-bh-border-strong hover:text-bh-text'
+                  }`}
+                >
+                  <Wand2 className="w-4 h-4" aria-hidden="true" />
+                </button>
+              ) : (
+                <a
+                  href="/pricing"
+                  className="relative shrink-0 w-11 h-11 rounded-full border border-bh-border bg-transparent text-bh-text-dim flex items-center justify-center hover:border-bh-border-strong hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                  aria-label="Semantic search — Pro feature, upgrade to unlock"
+                  data-testid="semantic-toggle-locked"
+                >
+                  <Wand2 className="w-4 h-4" aria-hidden="true" />
+                  <Lock className="w-2.5 h-2.5 absolute -bottom-0.5 -right-0.5 bg-bh-bg-alt rounded-full p-0.5" aria-hidden="true" />
+                </a>
+              )}
+            </Tooltip>
+          )}
 
           {/* Sources & filters — compact trigger next to Search, opens a
               dialog instead of an inline panel so it stays out of the way
@@ -830,6 +931,18 @@ export function SearchPage() {
               View {resources.length} resource{resources.length === 1 ? '' : 's'}
             </button>
           )}
+        </div>
+      )}
+
+      {/* Semantic mode notice — degradation ladder is silent otherwise;
+          this is the one line that tells the user why federated/keyword
+          results are mixed in (spec.md's UX integration). */}
+      {searched && !loading && !error && semanticMode && (resultMode === 'hybrid' || resultMode === 'keyword-fallback') && (
+        <div className="mb-4 rounded-xl border border-bh-border bg-bh-surface-2 px-4 py-2.5 text-xs text-bh-text-muted flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+          {resultMode === 'hybrid'
+            ? 'Not enough indexed matches yet — showing live search results too.'
+            : 'Semantic search unavailable right now — showing keyword results.'}
         </div>
       )}
 
@@ -1167,7 +1280,15 @@ function PersonResultCard({ builder, query, onToggleTrack, tracking }: { builder
               )}
             </div>
             <div className="flex items-center gap-2.5 shrink-0">
-              {builder.score != null && (
+              {builder.similarity != null ? (
+                <span
+                  className="badge inline-flex items-center gap-1 border-bh-accent/30 bg-bh-accent-soft text-bh-accent text-[11px] font-semibold"
+                  title="Cosine similarity to your query"
+                  data-testid={`similarity-badge-${builder.id}`}
+                >
+                  {Math.round(builder.similarity * 100)}% match
+                </span>
+              ) : builder.score != null && (
                 <ScoreRing
                   score={builder.score}
                   size={38}

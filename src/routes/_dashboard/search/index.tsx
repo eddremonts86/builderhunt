@@ -4,6 +4,7 @@ import { z } from 'zod'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
+  mode: z.enum(['keyword', 'semantic']).optional().default('keyword'),
 })
 
 export const Route = createFileRoute('/_dashboard/search/')({
