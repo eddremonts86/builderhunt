@@ -109,6 +109,15 @@ const MAX_RECENT = 5
 const FEATURED_QUERY = 'open source maintainers'
 /** Sources/location/language selection persists across visits. */
 const FILTERS_KEY = 'builderhunt.search_filters'
+/** Short connector words that substring-match almost anything (e.g. "con"
+ * inside "container") — excluded from the results header's real-tag list so
+ * natural-language queries don't surface noise like "y"/"con"/"the"/"and". */
+const QUERY_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'that', 'this', 'from', 'are', 'was', 'you',
+  'your', 'have', 'has', 'not', 'but', 'all', 'can', 'una', 'uno', 'los',
+  'las', 'del', 'con', 'para', 'por', 'que', 'como', 'esta', 'este', 'y',
+  'en', 'de', 'la', 'el', 'un',
+])
 
 /* -------------------------------------------------------------------------- */
 /*  Page                                                                       */
@@ -158,6 +167,11 @@ export function SearchPage() {
      from the toggle itself (e.g. a cold index falls back to hybrid). */
   const [semanticMode, setSemanticMode] = React.useState(search.mode === 'semantic')
   const [resultMode, setResultMode] = React.useState<'semantic' | 'hybrid' | 'keyword-fallback' | null>(null)
+  /** The real keywords a search actually matched on — the AI translation's
+   * keywords in semantic mode, or the same whitespace/comma split the server
+   * applies for keyword mode. Rendered in the results header instead of the
+   * raw (possibly long, natural-language) query text. */
+  const [matchedKeywords, setMatchedKeywords] = React.useState<string[]>([])
   const [plan, setPlan] = React.useState<'free' | 'pro' | 'team' | null>(null)
   const aiCaps = useAICapabilities()
 
@@ -365,6 +379,11 @@ export function SearchPage() {
       if (semanticMode && (data.mode === 'semantic' || data.mode === 'hybrid' || data.mode === 'keyword-fallback')) {
         setResultMode(data.mode)
       }
+      // AI-translated keywords (semantic mode) are the actual filter that
+      // was applied — real tags. Plain keyword mode has no such list; the
+      // header derives real tags itself from what actually matched (see
+      // `matchedKeywords` memo below), so this only needs the AI case.
+      setMatchedKeywords(Array.isArray(data.translated?.keywords) ? (data.translated.keywords as string[]) : [])
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Search failed. Please try again.')
       setResults([])
@@ -429,6 +448,22 @@ export function SearchPage() {
   /* Split results by kind */
   const people = React.useMemo(() => results.filter((b) => b.kind === 'person'), [results])
   const resources = React.useMemo(() => results.filter((b) => b.kind !== 'person'), [results])
+
+  /* Real tags for the results header (spec: never show the raw, possibly
+   * long/natural-language query string). AI-translated keywords (semantic
+   * mode) win when present; otherwise derive from what the query terms
+   * actually matched across the returned results — filters out filler
+   * words a naive whitespace split would otherwise show. */
+  const displayKeywords = React.useMemo(() => {
+    if (matchedKeywords.length > 0) return matchedKeywords
+    const queryTerms = query.toLowerCase().split(/[,\s]+/).filter((t) => t.length > 2 && !QUERY_STOPWORDS.has(t))
+    if (queryTerms.length === 0 || results.length === 0) return []
+    const found = new Set<string>()
+    for (const b of results) {
+      for (const term of getMatchHighlights(b, query).terms) found.add(term)
+    }
+    return queryTerms.filter((t) => found.has(t))
+  }, [matchedKeywords, query, results])
 
   /* Sort the active tab's results */
   const sorted = React.useMemo(() => {
@@ -855,7 +890,16 @@ export function SearchPage() {
             <p className="text-sm text-bh-text-muted whitespace-nowrap">
               <span className="font-semibold text-bh-text">{results.length}</span> result
               {results.length === 1 ? '' : 's'} matching{' '}
-              <span className="font-medium text-bh-text">"{query}"</span>
+              <span className="font-medium text-bh-text">
+                {displayKeywords.length > 0
+                  ? displayKeywords.map((k, i) => (
+                      <React.Fragment key={k}>
+                        {i > 0 && ', '}
+                        "{k}"
+                      </React.Fragment>
+                    ))
+                  : `"${query}"`}
+              </span>
             </p>
 
             {/* Tabs: People | Resources */}
@@ -1057,21 +1101,40 @@ function LandingState({
             </ul>
           </section>
         )}
+      </div>
+
+      {/* Sidebar — utility panels grouped together (tips, shortcuts, history)
+          so the main column stays focused on real results. */}
+      <div className="space-y-6 lg:self-start">
+        <aside aria-labelledby="tips-heading" className="card">
+          <h2 id="tips-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2 mb-3">
+            <Lightbulb className="w-3.5 h-3.5 text-bh-warning" aria-hidden="true" />
+            Search tips
+          </h2>
+          <ul className="space-y-2.5">
+            {PRO_TIPS.map((tip, i) => (
+              <li key={i} className="flex items-start gap-2.5 text-xs text-bh-text-muted leading-snug">
+                <tip.icon className="w-3.5 h-3.5 text-bh-text-dim shrink-0 mt-0.5" aria-hidden="true" />
+                <span>{tip.text}</span>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
         {/* Popular queries */}
-        <section aria-labelledby="popular-heading">
+        <section aria-labelledby="popular-heading" className="card">
           <h2 id="popular-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-3 flex items-center gap-2">
             <TrendingUp className="w-3.5 h-3.5" /> Popular searches
           </h2>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-col gap-1.5">
             {POPULAR_QUERIES.map((p) => (
               <button
                 key={p.label}
                 onClick={() => onPickQuery(p.label)}
-                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-bh-surface border border-bh-border text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-bh-surface-2 border border-transparent text-sm text-bh-text hover:border-bh-accent hover:text-bh-accent hover:bg-bh-accent-soft/30 transition-all text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
               >
                 <span aria-hidden="true">{p.emoji}</span>
-                {p.label}
+                <span className="truncate">{p.label}</span>
               </button>
             ))}
           </div>
@@ -1079,7 +1142,7 @@ function LandingState({
 
         {/* Recent searches */}
         {recent.length > 0 && (
-          <section aria-labelledby="recent-heading">
+          <section aria-labelledby="recent-heading" className="card">
             <div className="flex items-center justify-between mb-3">
               <h2 id="recent-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5" /> Your recent searches
@@ -1096,11 +1159,11 @@ function LandingState({
                 <li key={q}>
                   <button
                     onClick={() => onPickQuery(q)}
-                    className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                    className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-bh-text-muted hover:bg-bh-surface hover:text-bh-text transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
                   >
-                    <Search className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
-                    <span className="flex-1">{q}</span>
-                    <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-bh-text-dim" aria-hidden="true" />
+                    <Search className="w-3.5 h-3.5 text-bh-text-dim shrink-0" aria-hidden="true" />
+                    <span className="flex-1 truncate">{q}</span>
+                    <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-bh-text-dim shrink-0" aria-hidden="true" />
                   </button>
                 </li>
               ))}
@@ -1108,22 +1171,6 @@ function LandingState({
           </section>
         )}
       </div>
-
-      {/* Sidebar tips — compact, secondary to the interactive content on wide screens */}
-      <aside aria-labelledby="tips-heading" className="card lg:self-start">
-        <h2 id="tips-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2 mb-3">
-          <Lightbulb className="w-3.5 h-3.5 text-bh-warning" aria-hidden="true" />
-          Search tips
-        </h2>
-        <ul className="space-y-2.5">
-          {PRO_TIPS.map((tip, i) => (
-            <li key={i} className="flex items-start gap-2.5 text-xs text-bh-text-muted leading-snug">
-              <tip.icon className="w-3.5 h-3.5 text-bh-text-dim shrink-0 mt-0.5" aria-hidden="true" />
-              <span>{tip.text}</span>
-            </li>
-          ))}
-        </ul>
-      </aside>
     </div>
   )
 }
