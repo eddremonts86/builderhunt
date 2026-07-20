@@ -48,6 +48,9 @@ const zodEnv = z.object({
   if (!data.DATABASE_AUTH_URL) {
     context.addIssue({ code: 'custom', path: ['DATABASE_AUTH_URL'], message: 'Production DATABASE_AUTH_URL is required' })
   }
+  if (!data.DATABASE_WORKER_URL) {
+    context.addIssue({ code: 'custom', path: ['DATABASE_WORKER_URL'], message: 'Production DATABASE_WORKER_URL is required' })
+  }
 
   let runtimeUsername = ''
   try {
@@ -75,6 +78,17 @@ const zodEnv = z.object({
       code: 'custom',
       path: ['DATABASE_AUTH_URL'],
       message: 'Auth, migration, and product database identities must be different',
+    })
+  }
+  if (
+    data.DATABASE_WORKER_URL === data.DATABASE_URL
+    || data.DATABASE_WORKER_URL === data.DATABASE_AUTH_URL
+    || data.DATABASE_WORKER_URL === data.DATABASE_MIGRATION_URL
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['DATABASE_WORKER_URL'],
+      message: 'Worker, auth, migration, and product database identities must be different',
     })
   }
   if (!data.BETTER_AUTH_SECRET || data.BETTER_AUTH_SECRET.length < 32 || /change[_-]?me|dev-secret|example/i.test(data.BETTER_AUTH_SECRET)) {

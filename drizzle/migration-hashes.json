@@ -40,6 +40,10 @@
     "0009_entitlement_bootstrap": {
       "sql": "77c84f44ce82db00099f5ed183eeaeb011db40eb20cf8e745d51f889d1e4cbeb",
       "snapshot": "1cae736e26e531a1ba3658108cf44ec89c113935413d67032b5bb80375b66e5c"
+    },
+    "0010_worker_alert_policies": {
+      "sql": "654a0dd68ee0f354f5a53a6bcf07e42e05a9c93a0f155cf1e5fb487e4914878c",
+      "snapshot": "097756733253da5ff3433883076d93dc8cbdc28f6ff08bb8ad7d3e37fc71c3f4"
     }
   }
 }

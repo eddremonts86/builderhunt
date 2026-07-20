@@ -12,6 +12,7 @@ const owner = postgres(migrationUrl, { max: 1, prepare: false })
 try {
   await owner.unsafe("alter role builderhunt_app password 'test-app-password'")
   await owner.unsafe("alter role builderhunt_auth password 'test-auth-password'")
+  await owner.unsafe("alter role builderhunt_worker password 'test-worker-password'")
   await owner`
     insert into auth_users (id, name, email, email_verified, created_at, updated_at)
     values
@@ -28,6 +29,14 @@ try {
     insert into organization_members (id, organization_id, user_id, role, created_at)
     values ('member-a', 'org-a', 'user-a', 'owner', now()), ('member-b', 'org-b', 'user-b', 'owner', now())
     on conflict (organization_id, user_id) do nothing
+  `
+  await owner`
+    insert into alerts (
+      id, organization_id, user_id, name, keywords, enabled, trigger_conditions, delivery_channel, created_at
+    ) values
+      ('alert-a', 'org-a', 'user-a', 'A', '{}', true, '{"eventType":"any_activity"}', 'dashboard', now()),
+      ('alert-b', 'org-b', 'user-b', 'B', '{}', true, '{"eventType":"any_activity"}', 'dashboard', now())
+    on conflict (id) do nothing
   `
   await owner`
     insert into builder_identities (id, source, source_id, username, profile_url, created_at, updated_at)

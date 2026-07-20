@@ -3,8 +3,9 @@ import { createHash } from 'node:crypto'
 
 const appUrl = process.env.RLS_TEST_APP_URL
 const authUrl = process.env.RLS_TEST_AUTH_URL
-if (!appUrl || !authUrl) throw new Error('RLS_TEST_APP_URL and RLS_TEST_AUTH_URL are required')
-for (const value of [appUrl, authUrl]) {
+const workerUrl = process.env.RLS_TEST_WORKER_URL
+if (!appUrl || !authUrl || !workerUrl) throw new Error('RLS_TEST_APP_URL, RLS_TEST_AUTH_URL, and RLS_TEST_WORKER_URL are required')
+for (const value of [appUrl, authUrl, workerUrl]) {
   const databaseName = new URL(value).pathname.slice(1)
   if (!/^builderhunt_security_test_[A-Za-z0-9_]+$/.test(databaseName)) {
     throw new Error('RLS verifier refuses to run outside a named builderhunt_security_test database')
@@ -13,6 +14,7 @@ for (const value of [appUrl, authUrl]) {
 
 const app = postgres(appUrl, { max: 2 })
 const auth = postgres(authUrl, { max: 1 })
+const worker = postgres(workerUrl, { max: 1 })
 
 try {
   const missing = await app`select id from organization_builders order by id`
@@ -61,6 +63,35 @@ try {
   }
   if (!authProductAccessDenied) throw new Error('Auth broker accessed product tenant data')
 
+  const workerMissing = await worker`select id from alerts`
+  if (workerMissing.length !== 0) throw new Error('Worker missing context exposed alerts')
+  const workerAlerts = await worker.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select id from alerts order by id`
+  })
+  assertIds(workerAlerts, ['alert-a'], 'worker org-a isolation')
+  let workerCrossTenantDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into alert_triggers (
+          id, organization_id, alert_id, user_id, event_type, payload, matched_at
+        ) values ('trigger-cross', 'org-b', 'alert-b', 'user-b', 'any_activity', '{}', now())
+      `
+    })
+  } catch (error) {
+    workerCrossTenantDenied = error?.code === '42501'
+  }
+  if (!workerCrossTenantDenied) throw new Error('Worker cross-tenant trigger insert was not denied')
+  let workerAuthColumnsDenied = false
+  try {
+    await worker`select name from auth_users limit 1`
+  } catch (error) {
+    workerAuthColumnsDenied = error?.code === '42501'
+  }
+  if (!workerAuthColumnsDenied) throw new Error('Worker accessed unapproved auth user columns')
+
   const bootstrapUserId = 'user-bootstrap'
   const bootstrapHash = createHash('sha256')
     .update(`builderhunt:personal-organization:v1:${bootstrapUserId}`)
@@ -95,10 +126,14 @@ try {
     crossTenantInsert: 'denied',
     poolReuse: 'clean',
     authProductAccess: 'denied',
+    workerMissingContext: 'denied',
+    workerTenantIsolation: workerAlerts.map((row) => row.id),
+    workerCrossTenantInsert: 'denied',
+    workerAuthColumns: 'restricted',
     personalOrganizationBootstrap: 'atomic',
   }))
 } finally {
-  await Promise.all([app.end(), auth.end()])
+  await Promise.all([app.end(), auth.end(), worker.end()])
 }
 
 function assertIds(rows, expected, label) {

@@ -52,6 +52,7 @@ jobs:
         env:
           RLS_TEST_APP_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
           RLS_TEST_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+          RLS_TEST_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
         run: pnpm test:rls:local
       - name: Restore rehearsal
         run: |

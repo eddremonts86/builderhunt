@@ -4,17 +4,13 @@ import { join, relative } from 'node:path'
 const root = process.cwd()
 const sourceRoot = join(root, 'src')
 const legacyDirectDbImports = new Set([
-  'src/lib/alerts/worker.ts',
   'src/routes/api/admin/metrics/index.ts',
   'src/routes/api/admin/plan-requests/index.ts',
-  'src/routes/api/alerts/index.ts',
-  'src/routes/api/alerts/test-trigger.ts',
   'src/routes/api/builders/$builderId/claim.ts',
   'src/routes/api/builders/claim/verify.ts',
   'src/routes/api/feeds/$searchId.ts',
   'src/routes/api/me/builder/$builderId.ts',
   'src/routes/api/me/builder/index.ts',
-  'src/shared/lib/alerts.ts',
   'src/shared/lib/billing.ts',
 ])
 const authDbAllowlist = new Set([

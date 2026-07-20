@@ -1,11 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auth } from '~/shared/lib/auth/better-auth'
-import { recordTrigger, evaluateMatch, type TriggerConditions } from '~/shared/lib/alerts'
-import { db } from '~/shared/lib/db/index'
-import { alerts } from '~/shared/lib/db/schema'
-import { eq } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
+import { evaluateMatch, recordTrigger, type TriggerConditions } from '~/shared/lib/alerts'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { env } from '~/shared/lib/env'
+import {
+  createOrganizationAlert,
+  findOrganizationAlert,
+} from '~/shared/lib/repositories/organization-alerts'
 
 const Body = z.object({
   alertId: z.string().optional(),
@@ -29,62 +32,56 @@ const Body = z.object({
   }),
 })
 
-// Test/dev-only endpoint: evaluate a match and record a trigger if it matches.
-// Creates a placeholder alert on-the-fly if alertId isn't provided so the
-// e2e tests don't have to set up a real alert first.
 export const Route = createFileRoute('/api/alerts/test-trigger')({
   component: () => null,
   server: {
     handlers: {
       POST: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          const body = await request.json().catch(() => ({}))
-          const parsed = Body.safeParse(body)
+          if (env.NODE_ENV === 'production') return Response.json({ error: 'Not found' }, { status: 404 })
+          const principal = await requireTenantPrincipal(request)
+          const parsed = Body.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
-
-          let alertId = parsed.data.alertId
-          if (!alertId) {
-            // Auto-create a placeholder alert
-            alertId = randomId()
-            await db.insert(alerts).values({
-              id: alertId,
-              userId: session.user.id,
-              name: parsed.data.alertName ?? 'Test alert',
-              keywords: parsed.data.conditions.keywords ?? [],
-              triggerConditions: parsed.data.conditions,
-            })
-          } else {
-            // Verify alert exists for this user
-            const [existing] = await db
-              .select()
-              .from(alerts)
-              .where(eq(alerts.id, alertId))
-              .limit(1)
-            if (!existing || existing.userId !== session.user.id) {
-              return Response.json({ error: 'Alert not found' }, { status: 404 })
+          const result = await withTenantContext(principal, async (tx) => {
+            let alertId = parsed.data.alertId
+            if (!alertId) {
+              alertId = randomId()
+              await createOrganizationAlert(tx, {
+                id: alertId,
+                organizationId: principal.organizationId,
+                userId: principal.userId,
+                name: parsed.data.alertName ?? 'Test alert',
+                keywords: parsed.data.conditions.keywords ?? [],
+                triggerConditions: parsed.data.conditions,
+              })
+            } else if (!await findOrganizationAlert(tx, principal.organizationId, alertId)) {
+              return { status: 'not-found' as const, trigger: null }
             }
-          }
-
-          const matches = evaluateMatch(
-            parsed.data.conditions as TriggerConditions,
-            parsed.data.builder ?? {},
-            parsed.data.event,
-          )
-          if (!matches) {
-            return Response.json({ ok: true, matched: false })
-          }
-          const trigger = await recordTrigger({
-            alertId,
-            userId: session.user.id,
-            builderId: parsed.data.builderId ?? null,
-            eventType: parsed.data.event.type,
-            payload: parsed.data.event.payload,
+            const matches = evaluateMatch(
+              parsed.data.conditions as TriggerConditions,
+              parsed.data.builder ?? {},
+              parsed.data.event,
+            )
+            if (!matches) return { status: 'no-match' as const, trigger: null }
+            const trigger = await recordTrigger(tx, {
+              organizationId: principal.organizationId,
+              alertId,
+              userId: principal.userId,
+              builderId: parsed.data.builderId ?? null,
+              eventType: parsed.data.event.type,
+              payload: parsed.data.event.payload,
+            })
+            return { status: 'matched' as const, trigger }
           })
-          return Response.json({ ok: true, matched: true, trigger })
-        } catch (err) {
-          console.error('test trigger error:', err)
+          if (result.status === 'not-found') {
+            return Response.json({ error: 'Alert not found' }, { status: 404 })
+          }
+          return Response.json({ ok: true, matched: result.status === 'matched', trigger: result.trigger })
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
+          }
+          console.error('test trigger error:', error)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }
       },

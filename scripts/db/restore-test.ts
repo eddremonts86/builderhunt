@@ -26,7 +26,7 @@ try {
       ])})
       and (not c.relrowsecurity or not c.relforcerowsecurity)
   `
-  if (migrations?.count !== 10) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
+  if (migrations?.count !== 11) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
   if (rls?.missing !== 0) throw new Error(`Restored RLS manifest has ${rls?.missing ?? 0} missing policies`)
   console.log(JSON.stringify({ restored: true, migrations: migrations.count, rlsMissing: rls.missing }))
 } finally {
