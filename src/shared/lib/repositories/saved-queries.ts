@@ -19,6 +19,12 @@ export function listSavedQueries(transaction: TenantTransaction, organizationId:
     .orderBy(savedQueries.createdAt)
 }
 
+export function listLegacySavedQueries(transaction: TenantTransaction, userId: string) {
+  return transaction.select().from(savedQueries)
+    .where(eq(savedQueries.userId, userId))
+    .orderBy(savedQueries.createdAt)
+}
+
 export async function countSavedQueries(transaction: TenantTransaction, organizationId: string) {
   const [row] = await transaction.select({ value: count() }).from(savedQueries)
     .where(eq(savedQueries.organizationId, organizationId))

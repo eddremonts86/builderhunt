@@ -13,7 +13,19 @@ const productionEnvironment = {
 
 describe('production environment security', () => {
   it('accepts separated runtime and migration identities', () => {
-    expect(parseEnvironment(productionEnvironment).DATABASE_WORKER_URL).toBeUndefined()
+    const parsed = parseEnvironment(productionEnvironment)
+    expect(parsed.DATABASE_WORKER_URL).toBeUndefined()
+    expect(parsed).toMatchObject({
+      TENANT_READ_MODE: 'legacy',
+      TENANT_WRITE_MODE: 'legacy',
+      TENANT_CANONICAL_READY: false,
+    })
+  })
+
+  it('parses explicit tenant migration gates without permissive boolean coercion', () => {
+    expect(parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'true' }).TENANT_CANONICAL_READY).toBe(true)
+    expect(() => parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'yes' })).toThrow()
+    expect(() => parseEnvironment({ ...productionEnvironment, TENANT_READ_MODE: 'on' })).toThrow()
   })
 
   it.each([

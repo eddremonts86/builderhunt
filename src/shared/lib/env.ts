@@ -14,6 +14,9 @@ const zodEnv = z.object({
   DATABASE_MIGRATION_URL: z.string().min(1).optional(),
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
+  TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy'),
+  TENANT_WRITE_MODE: z.enum(['legacy', 'dual', 'canonical']).default('legacy'),
+  TENANT_CANONICAL_READY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   // BETTER_AUTH_SECRET is the canonical name
   BETTER_AUTH_SECRET: z.string().optional(),
   APP_URL: z.string().min(1, 'APP_URL is required').transform(ensureProtocol),

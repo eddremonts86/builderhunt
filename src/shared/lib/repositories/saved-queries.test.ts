@@ -9,6 +9,8 @@ describe('saved query tenant boundary', () => {
     expect(source).not.toContain("~/shared/lib/db/schema")
     expect(source).toContain('requireTenantPrincipal')
     expect(source).toContain('withTenantContext')
+    expect(source).toContain('executeTenantRead')
+    expect(source).toContain('recordMigrationMismatch')
     expect(source).toContain("~/shared/lib/repositories/saved-queries")
     expect(source).not.toContain('organizationId } = body')
   })

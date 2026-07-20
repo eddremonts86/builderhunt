@@ -3,12 +3,17 @@ import { randomId } from '~/lib/utils'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { env } from '~/shared/lib/env'
+import { recordMigrationMismatch } from '~/shared/lib/migration/migration-metrics'
+import { executeTenantRead } from '~/shared/lib/migration/shadow-read'
+import { resolveTenantMigrationModes } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import {
   countSavedQueries,
   createSavedQuery,
   deleteSavedQuery,
+  listLegacySavedQueries,
   listSavedQueries,
 } from '~/shared/lib/repositories/saved-queries'
 
@@ -19,9 +24,14 @@ export const Route = createFileRoute('/api/queries/')({
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const queries = await withTenantContext(principal, (tx) =>
-            listSavedQueries(tx, principal.organizationId),
-          )
+          const modes = resolveTenantMigrationModes(env, { canonicalReady: env.TENANT_CANONICAL_READY })
+          const queries = await withTenantContext(principal, (tx) => executeTenantRead(modes.read, {
+            surface: 'saved-queries',
+            requestId: principal.requestId,
+            legacy: () => listLegacySavedQueries(tx, principal.userId),
+            canonical: () => listSavedQueries(tx, principal.organizationId),
+            recordMismatch: recordMigrationMismatch,
+          }))
           return Response.json(queries)
         } catch (error) {
           const authorizationResponse = tenantAuthorizationResponse(error)
