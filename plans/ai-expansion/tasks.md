@@ -44,7 +44,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     delimiters; `isTaskDisabled` honors `AI_DISABLED` and `AI_DISABLED_TASKS=a,b` lists.
   - Verify: `pnpm test tasks.test`.
 
-- [ ] **Create the response cache module**
+- [x] **Create the response cache module**
   - Files: `src/shared/lib/ai/cache.ts`
   - Do: Export pure `canonicalJson(value)` (recursive key-sort) and
     `cacheKeyFor(taskId, input)` = `` `ai:cache:${taskId}:${sha256hex(canonicalJson(input))}` ``
@@ -53,14 +53,14 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     uses `SET ... EX task.cacheTtlSeconds` and skips when `cacheTtlSeconds` is null.
   - Verify: `pnpm type-check`.
 
-- [ ] **Test cache key hashing**
+- [x] **Test cache key hashing**
   - Files: `src/shared/lib/ai/cache.test.ts`
   - Do: `canonicalJson` is key-order invariant (`{a:1,b:2}` ≡ `{b:2,a:1}`, nested);
     `cacheKeyFor` is stable across calls, differs across taskIds and across inputs;
     arrays keep order (order-sensitive inputs must differ).
   - Verify: `pnpm test cache.test`.
 
-- [ ] **Create the budget module**
+- [x] **Create the budget module**
   - Files: `src/shared/lib/ai/budget.ts`
   - Do: Export pure `decideBudget({ used, limit })` → `{ allowed, reason?: 'plan' | 'budget' }`
     (`limit === 0` → `plan`; `used >= limit` → `budget`; `Infinity` always allowed); export
@@ -71,7 +71,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
     `{ allowed, used, limit, reason? }`.
   - Verify: `pnpm type-check`.
 
-- [ ] **Test budget logic**
+- [x] **Test budget logic**
   - Files: `src/shared/lib/ai/budget.test.ts`
   - Do: `decideBudget` under/at/over limit, zero limit → `plan`, Infinity; in-memory
     fallback of `checkAndConsumeBudget` counts per user+task+day and blocks at the limit
