@@ -1,5 +1,7 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector } from 'drizzle-orm/pg-core'
+import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
+import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 
 // ---------------------------------------------------------------------------
 // Authentication Tables (Better Auth)
@@ -577,5 +579,39 @@ export const migrationBackfillConflicts = pgTable(
   (table) => [
     uniqueIndex('migration_backfill_conflicts_source_reason_unique').on(table.runName, table.sourceTable, table.sourceId, table.reason),
     index('migration_backfill_conflicts_unresolved_idx').on(table.runName, table.resolvedAt),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// Semantic Search (Plan: semantic-search)
+//
+// Global, non-tenant table: one row per unique (source, sourceId) shared
+// across all users (public profile data only, no userId — see spec.md's
+// "per-user vs global tension" resolution). Read/written via `publicDb`
+// (src/shared/lib/db/index.ts), never `withTenantContext`.
+// ---------------------------------------------------------------------------
+
+export const builderEmbeddings = pgTable(
+  'builder_embeddings',
+  {
+    id: text('id').primaryKey(),
+    source: text('source').notNull(),
+    sourceId: text('source_id').notNull(),
+    contentHash: text('content_hash').notNull(),
+    document: text('document').notNull(),
+    profile: jsonb('profile').$type<EmbeddedProfile>().notNull(),
+    // NULL = pending embed (picked up by the run-worker).
+    embedding: vector('embedding', { dimensions: EMBEDDING_DIM }),
+    embeddedAt: timestamp('embedded_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique('builder_embeddings_source_unique').on(table.source, table.sourceId),
+    // Worker scan target: `WHERE embedding IS NULL` benefits from indexing
+    // embeddedAt (NULL rows sort first); the HNSW vector index itself is
+    // hand-written SQL appended to the generated migration (drizzle-kit
+    // does not emit `USING hnsw`) — see drizzle/000X_*.sql.
+    index('builder_embeddings_pending_idx').on(table.embeddedAt),
   ],
 )

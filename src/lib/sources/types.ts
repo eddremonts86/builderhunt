@@ -14,6 +14,21 @@ export type SourceName =
   | 'huggingface'
   | 'lobsters'
 
+export const SOURCE_NAMES = [
+  'github',
+  'gitlab',
+  'codeberg',
+  'sourcehut',
+  'hn',
+  'reddit',
+  'devto',
+  'hashnode',
+  'stackoverflow',
+  'npm',
+  'huggingface',
+  'lobsters',
+] as const satisfies readonly SourceName[]
+
 export interface RawBuilder {
   id: string
   kind: BuilderKind

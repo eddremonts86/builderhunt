@@ -52,6 +52,10 @@
     "0012_platform_role": {
       "sql": "0682ead90ef350fae02f3d7d22858e9010eb5f6f8d11c1f12715da1dcefdb9be",
       "snapshot": "5966740dbabc6eecd3650a9fe9a91e700a11d5234dae9c6198c04e5cb0e147f5"
+    },
+    "0013_polite_night_thrasher": {
+      "sql": "08ee6ef558a3d7a061cd4c99b5a701bfc8fe747ec4bec258e46d501ac2c2fba4",
+      "snapshot": "57ebeadaf8f2f0eefca835be98848e1f0e9ef96ee93d5dc455155f23d8d8aa37"
     }
   }
 }

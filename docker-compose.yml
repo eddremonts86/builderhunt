@@ -5,7 +5,7 @@
 services:
   db:
     profiles: ['standalone']
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: builderhunt-db
     environment:
       POSTGRES_USER: postgres

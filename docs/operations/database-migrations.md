@@ -21,3 +21,22 @@ Both scripts refuse any other database name. Backfills use stable cursors, small
 checkpoint counters, retryable forward execution, and non-sensitive conflict checksums. A rerun of a
 completed backfill must write nothing.
 
+## pgvector (semantic-search plan)
+
+The `builder_embeddings` table requires the Postgres `vector` extension. Local dev's
+`docker-compose.yml` already runs `pgvector/pgvector:pg16` (same Postgres 16 major as before —
+the existing data volume is compatible, no export/import needed).
+
+**Before applying this feature's migration in production**: the managed Postgres resource
+(Coolify, on Hetzner) must also run a pgvector-enabled image or have the extension installed.
+Steps:
+1. Take a fresh encrypted backup and verify a restore rehearsal succeeds (standard gate above).
+2. Switch the Coolify Postgres resource's image to `pgvector/pgvector:pg16`. The data volume
+   persists across the image swap since the Postgres major version is unchanged.
+3. Confirm `CREATE EXTENSION IF NOT EXISTS vector;` succeeds, then apply this plan's migration.
+
+If the extension is missing, the app fails soft: `/api/search/semantic` returns
+`503 { error: 'semantic_unavailable' }` and the UI falls back to keyword search — this is not an
+outage, but semantic search stays disabled until the operator step above is done.
+
+
