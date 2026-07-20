@@ -1,148 +1,91 @@
-# Tasks: Proactive Discovery
+# Proactive Discovery Worker (tasks)
 
-## Phase 0 — Research (read first)
+> **Status**: `pending`
+> **Depends on**: [`semantic-search`](../semantic-search/spec.md) (hard — Phases 1–2:
+> `builder_embeddings` schema + `src/lib/semantic/index-writer.ts#upsertEmbeddingStubs`)
+> **Blocks**: nothing hard — see spec.md header
+> **Reality check**: "For you" recommendations already shipped
+> (`src/routes/api/recommendations/index.ts`, `RecommendationsSection.tsx`) — recorded
+> below, not re-planned. Worker pattern to clone:
+> `src/routes/api/admin/alerts/run-worker.ts`.
 
-- [ ] Read `src/shared/lib/db/schema.ts` to understand `builders`, `savedQueries`, `alerts` schemas
-- [ ] Read `src/routes/api/dashboard/stats.ts` to see current query patterns and Drizzle usage
-- [ ] Read `src/modules/dashboard/components/DashboardPage.tsx` to see current structure
-- [ ] Confirm `builders` table has `topics`, `lastSeen`, `source`, `userId`, `score`, `displayName`, `bio`
+## Phase 0 — Delivered (record only)
 
-## Phase 1 — Data model
+- [x] **"For you" dashboard recommendations (old scope of this directory)**
+  - Files: `src/routes/api/recommendations/index.ts`, `src/modules/dashboard/components/RecommendationsSection.tsx`
 
-- [ ] **No schema changes required.** The data we need already exists.
+## Phase 1 — Matrix + state
 
-## Phase 2 — Backend: aggregation query
+- [ ] **Discovery matrix module (pure)**
+  - Files: `src/lib/discovery/matrix.ts`
+  - Do: Export `DiscoveryCell { key, keywords, sources }`, `DISCOVERY_MATRIX` (~40–60
+    curated cells; topics × source groups per spec §1; `SourceName` imported from
+    `src/lib/sources/types.ts`), and `cellAt(cursor: number): DiscoveryCell` (wraps modulo
+    length).
+  - Verify: `pnpm type-check`.
+- [ ] **Matrix tests**
+  - Files: `src/lib/discovery/matrix.test.ts`
+  - Do: Unique keys; every cell: 1–3 keywords, 1–4 sources, all sources valid; matrix
+    length ≥ 40; `cellAt(len)` === `cellAt(0)`.
+  - Verify: `pnpm test matrix`.
+- [ ] **`discovery_state` table**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` (generated)
+  - Do: Single-row table per spec §2 (`id` pk, `cursor` int default 0, `lastCellKey`,
+    `lastRunAt`, `stats` jsonb default `{runs:0,upserted:0,errors:0}`); `pnpm db:generate`
+    - `pnpm db:migrate`.
+  - Verify: `\d discovery_state` on a fresh DB.
+- [ ] **Env vars**
+  - Files: `src/shared/lib/env.ts`
+  - Do: Add `DISCOVERY_CELLS_PER_RUN` (coerced int, default 2) and
+    `DISCOVERY_DAILY_STUB_CAP` (coerced int, default 1500).
+  - Verify: `pnpm type-check`; app boots with neither set.
 
-File: `src/routes/api/recommendations/index.ts` (new)
+## Phase 2 — Worker + endpoint
 
-- [ ] **Endpoint:** `GET /api/recommendations`
-- [ ] **Auth:** required (uses `auth.api.getSession`)
-- [ ] **Limit:** default 8, max 24
-- [ ] **Query strategy** (single SQL with CTE, no Python/JS loops):
+- [ ] **Worker core**
+  - Files: `src/lib/discovery/worker.ts`
+  - Do: `runDiscoveryWorker()` per spec §3: load/init cursor row (`id = 'default'`); loop
+    `DISCOVERY_CELLS_PER_RUN` cells **sequentially**; per cell
+    `searchBuilders({ keywords, sources, perPage: 30 })` (`src/lib/search.ts`), filter
+    `kind === 'person'`; check daily counter `discovery:stubs:{YYYY-MM-DD}` (Redis via
+    `getRedis()`, in-memory `Map` fallback) against the cap — skip upserts when exceeded;
+    else `upsertEmbeddingStubs(persons)` (`src/lib/semantic/index-writer.ts`) and `INCRBY`
+    the counter; advance + persist cursor and stats; return
+    `{ cellsRun, resultsSeen, upserted, cursor, capped }`. Export pure
+    `isCapped(count, cap)` for tests. Unknown/out-of-range cursor → reset 0 + `log.warn`.
+  - Verify: `pnpm test discovery` (pure parts); type-check.
+- [ ] **Worker tests (pure parts)**
+  - Files: `src/lib/discovery/worker.test.ts`
+  - Do: `isCapped` boundary cases; cursor wrap/reset logic (extract as pure
+    `nextCursor(cursor, step, len)`).
+  - Verify: `pnpm test discovery`.
+- [ ] **Admin run-worker endpoint**
+  - Files: `src/routes/api/admin/discovery/run-worker.ts`
+  - Do: Clone the admin-auth + try/catch shape of
+    `src/routes/api/admin/alerts/run-worker.ts`; POST runs `runDiscoveryWorker()`; when
+    the `builder_embeddings` relation is missing (catch Postgres `42P01`), return
+    `503 { error: 'embeddings_store_missing' }`. Doc-comment: VPS cron every 15 min, same
+    crontab as alerts/embeddings workers.
+  - Verify: As admin, `curl -X POST /api/admin/discovery/run-worker` twice → second run
+    reports mostly-zero `upserted` for the same cells (hash no-op);
+    `SELECT count(*) FROM builder_embeddings WHERE embedding IS NULL` grew after the first;
+    non-admin gets 403.
 
-```sql
-WITH user_searches AS (
-  SELECT id, name, keywords, sources
-  FROM saved_queries
-  WHERE user_id = $1
-),
-user_seen AS (
-  SELECT builder_id FROM alerts WHERE user_id = $1
-  -- AND any other "already saved" indicator
-),
-candidates AS (
-  SELECT
-    b.*,
-    -- Score: keyword overlap × 10 + topic overlap × 5 + source overlap × 2
-    (
-      SELECT count(*) FROM user_searches us
-      WHERE b.topics && us.keywords
-        OR us.sources @> ARRAY[b.source]
-    ) AS overlap_count,
-    array_agg(DISTINCT us.name) FILTER (WHERE us.id IS NOT NULL) AS matched_searches
-  FROM builders b
-  WHERE b.user_id = $1
-    AND b.last_seen > now() - interval '90 days'
-    AND b.id NOT IN (SELECT builder_id FROM user_seen)
-  GROUP BY b.id
-)
-SELECT *
-FROM candidates
-WHERE overlap_count > 0
-ORDER BY overlap_count DESC, score DESC
-LIMIT $2;
-```
+## Phase 3 — Operations polish
 
-- [ ] **Response shape:** `{ recommendations: Recommendation[], meta: { basedOnSearches: number, totalCandidates: number } }`
-- [ ] **Empty state handling:**
-  - If `user_searches` is empty → return `{ recommendations: [], meta: { reason: 'no_saved_searches' } }`
-  - If `candidates` is empty → return `{ recommendations: [], meta: { reason: 'no_matches' } }`
-- [ ] **Error handling:** wrap in try/catch, return 200 with `[]` (frontend handles empty), log error
-- [ ] **Cache:** in-memory LRU with 5 min TTL keyed by user_id. Add `@upstash/redis` or similar only if traffic warrants.
+- [ ] **Structured run log**
+  - Files: `src/lib/discovery/worker.ts`
+  - Do: `log.info('discovery_worker_run', report)` mirroring `alerts_worker_run`
+    (`src/shared/lib/log.ts`).
+  - Verify: log line visible on a manual run.
+- [ ] **Admin visibility**
+  - Files: `src/routes/api/admin/metrics/index.ts`, `src/routes/_dashboard/admin/metrics.tsx`
+  - Do: Include `discovery_state` (cursor, lastCellKey, lastRunAt, stats) in the admin
+    metrics payload and render a small card.
+  - Verify: UI check as admin after ≥ 1 run.
 
-## Phase 3 — Frontend: section component
+## Future (not scheduled)
 
-File: `src/modules/dashboard/components/RecommendationsSection.tsx` (new)
-
-- [ ] **Component signature:** `function RecommendationsSection({ initialData }: { initialData?: Recommendation[] })`
-- [ ] **Fetch on mount** if `initialData` is null
-- [ ] **States:**
-  - Loading → skeleton (3 cards)
-  - Empty (no_saved_searches) → empty state with starter suggestions
-  - Empty (no_matches) → empty state "Try adding more keywords to your searches"
-  - Populated → grid of cards
-- [ ] **Card component:** extract reusable `<BuilderCard>` to share with `Recent builders` section
-- [ ] **Reasons display:** chip-style below the card, max 2 visible + "+N more" if more
-- [ ] **Dismiss action:** client-side only (no persistence) for v1
-- [ ] **Save action:** POST to `/api/queries/:id/save-builder` (or whatever the existing endpoint is — check the codebase)
-
-## Phase 4 — Wire into dashboard
-
-File: `src/modules/dashboard/components/DashboardPage.tsx`
-
-- [ ] Add `<RecommendationsSection />` **above** the stats grid
-- [ ] Parallel fetch in the existing `useEffect`:
-  ```ts
-  Promise.all([
-    fetch('/api/dashboard/stats'),
-    fetch('/api/queries'),
-    fetch('/api/builders/recent'),
-    fetch('/api/recommendations'),  // NEW
-  ])
-  ```
-- [ ] Don't block the dashboard render on recommendations: show dashboard first, recommendations load progressively
-
-## Phase 5 — Polish
-
-- [ ] **Animations:** cards stagger-fade in with `animate-fade-in-up` (CSS class already exists)
-- [ ] **Hover state:** card lifts and border brightens (`card-hover` already exists)
-- [ ] **Loading state:** pulse animation (already in design system)
-- [ ] **Empty state illustration:** inline SVG (or reuse the existing hero illustration cropped)
-- [ ] **Analytics:** add `data-event="recommendation_view"` and `data-event="recommendation_save"` to the cards for future tracking
-
-## Phase 6 — Verification
-
-### Manual
-- [ ] Sign in as fresh user (0 saved searches) → see empty state with starter suggestions
-- [ ] Sign in as user with 1 saved search ("rust async") → see 0-8 recommendations matching rust/async topics
-- [ ] Save a builder from a recommendation → it disappears from "For you" on next load
-- [ ] Check no console errors, no layout shift
-
-### Automated (Playwright)
-- [ ] Test: fresh user sees empty state
-- [ ] Test: with seed data, user with saved searches sees ≥3 recommendations
-- [ ] Test: clicking "Save" on a recommendation calls the right endpoint
-
-### Performance
-- [ ] Endpoint response time: < 200ms for user with 50 saved searches and 1000 candidate builders (index on `builders.user_id`, `builders.last_seen`, `builders.topics` — GIN index on topics)
-- [ ] Dashboard still renders in < 1s with recommendations enabled
-
-## Phase 7 — Rollout
-
-- [ ] Deploy behind a `ENABLE_RECOMMENDATIONS=true` env var (default true)
-- [ ] Monitor for 1 week: dismiss rate, save rate, latency
-- [ ] If dismiss rate > 40%, tune the algorithm (lower keyword overlap threshold, add recency boost)
-
-## Edge cases to handle
-
-- Builder with `topics = []` (no signal) → don't recommend them
-- Saved search with `keywords = []` (empty search) → exclude from matching
-- User has 0 saved searches but 50 saved builders → alternative source of signal: extract topics from saved builders, use as keywords
-- Builder that user previously dismissed → exclude (track in `user_dismissed` table, or in-memory cookie for v1)
-
-## Dependencies
-
-- Existing: `auth.api.getSession`, `db`, `builders`, `savedQueries` tables
-- New package: none
-- Schema migration: none
-
-## Estimated effort
-
-| Phase | Effort |
-|-------|--------|
-| 2 — Backend query | M (4-6h) |
-| 3 — Frontend section | M (4-6h) |
-| 4 — Dashboard wiring | S (1-2h) |
-| 5 — Polish | S (2-3h) |
-| 6 — Verification | S (2-3h) |
-| **Total** | **~2 days** |
+- `discovery-keywords` AI task + admin suggestion endpoint requires a future spec revision
+  after [`ai-expansion`](../ai-expansion/spec.md); expansions remain operator-reviewed and
+  are never auto-committed.

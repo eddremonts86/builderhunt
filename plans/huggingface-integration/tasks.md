@@ -1,53 +1,39 @@
 # Tasks: Hugging Face Integration
 
-> **Note: deferred** until top picks ship and we validate AI/ML demand.
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and an
+> optional author-profile enrichment.
 
-## Phase 0 — Research
+## Delivered
 
-- [ ] Test user search at `https://huggingface.co/api/users?search=X`
-- [ ] Check rate limits and ToS
-- [ ] Test profile endpoint `/api/users/{username}`
+- [x] **Create HF connector (models + aggregated authors)** — Done:
+      `src/lib/sources/huggingface.ts` (`searchHuggingFace(keywords, {page, perPage})`;
+      `/api/models?search=` + author aggregation; private models filtered; errors return `[]`).
+- [x] **Register in federated search** — Done: `src/lib/search.ts`; `huggingface` in
+      `SourceName` (`src/lib/sources/types.ts`).
+- [x] **Add `HUGGINGFACE_TOKEN` env var** — Done: `src/shared/lib/env.ts` (optional bearer).
+- [x] **UI source pill + metadata** — Done: `ALL_SOURCES` + `SOURCE_META.huggingface` in
+      `SearchPage.tsx` (opt-in); `PersonResultCard.tsx`.
+- [x] **Brand icon + badge** — Done: `HuggingFaceIcon` in `BrandIcons.tsx`;
+      `.badge-huggingface` in `src/shared/styles/globals.css`.
+- [x] **Scoring** — Done: `huggingface` branch in `src/lib/score.ts` (log total-downloads
+      bonus; downloads/likes as popularity proxies).
 
-## Phase 1 — Data model
+## Remaining
 
-- [ ] No schema changes; `source: 'huggingface'`
+- [ ] **Document `HUGGINGFACE_TOKEN` in `.env.example`**
+  - Files: `.env.example`
+  - Do: add `HUGGINGFACE_TOKEN=` under "External Source API Tokens" (comment: optional,
+    raises rate limits; from huggingface.co Settings > Access Tokens, read scope).
+  - Verify: `grep HUGGINGFACE_TOKEN .env.example` prints the documented line.
 
-## Phase 2 — Source
-
-- [ ] New file `src/lib/sources/huggingface.ts`
-- [ ] `searchHuggingFaceUsers(keywords, token?)`:
-  - `GET /api/users?search={query}` (limited, may need to iterate)
-  - For each user, fetch `/api/users/{username}` for full profile
-  - Map to `RawBuilder` with `kind: 'person'`
-  - `followersCount: user.numFollowers` (HF exposes this!)
-  - Topics from model tags
-- [ ] `searchHuggingFaceModels(keywords, token?)`:
-  - `GET /api/models?search={query}&limit=20`
-  - Map to `RawBuilder` with `kind: 'repo'`
-  - `followersCount: model.downloads` (proxy for popularity)
-- [ ] `searchHuggingFace(keywords, token?)`: combine
-
-## Phase 3 — Wire
-
-- [ ] Add `HUGGINGFACE_TOKEN` to env (optional)
-- [ ] Add to `search.ts`, `Source` type, default active sources (off by default)
-- [ ] Add `HuggingFaceIcon` to `BrandIcons.tsx` (yellow smiley)
-- [ ] Add `.badge-huggingface` to globals.css
-
-## Phase 4 — Scoring
-
-- [ ] Model downloads (log scale, ×5)
-- [ ] Followers (log scale, ×3)
-- [ ] Bio match (×10)
-- [ ] Recency (×5 if model published last week)
-
-## Phase 5 — Verification
-
-- [ ] Manual: search "transformers" → see HF users
-- [ ] Manual: search "stable diffusion" → see HF users
-- [ ] Performance: < 600ms
-- [ ] Rate limit handling
-
-## Estimated effort
-
-**M (2-3 días)**. API is decent but user search is limited.
+- [ ] **(Optional) Enrich top authors with avatar + real followers**
+  - Files: `src/lib/sources/huggingface.ts`
+  - Do: after author aggregation, for the top 5 authors by total downloads call
+    `GET https://huggingface.co/api/users/{username}/overview` in parallel (try/catch per
+    call); when it succeeds, set `avatarUrl` and replace the likes-proxy `followersCount`
+    with the real `numFollowers`, keeping the aggregate values in `metadata`.
+  - Verify: search "llama" with only the HF pill active; the top author cards show avatars;
+    when the overview endpoint is blocked (e.g. offline), results equal today's output.

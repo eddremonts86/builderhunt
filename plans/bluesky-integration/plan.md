@@ -1,53 +1,56 @@
 # Plan: Bluesky Integration
 
-## Goal recap
+> **Status**: `pending`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Greenfield connector following the existing pattern exactly; closest
+> analogs are `src/lib/sources/codeberg.ts` (clean two-call REST source) and the
+> registration checklist visible in `src/lib/search.ts` / `SearchPage.tsx`. Verified: the
+> public AppView answers unauthenticated `searchActors` and `getProfiles` today.
 
-Integrate Bluesky as a data source in BuilderHunt. This allows indexing tech builders who share updates and "build in public" on the decentralized AT Protocol.
+## Phases (dependency order)
 
-## Why this is a valuable addition
+### Phase 1 — Connector
 
-1. **Zero-friction public API**: The AT Protocol AppView allows querying public actors, posts, and feeds with standard HTTP requests, without requiring complex OAuth loops or paid credentials.
-2. **Growing developer hub**: In 2026, Bluesky has become a primary hub for independent developers, open-source engineers, and tech founders moving away from proprietary platforms.
-3. **Decentralized verification**: Many builders verify their identity using custom domains (e.g. `username.dev` or `username.com`), which gives high-integrity signal for matching and deduplicating their profiles with other platforms.
+`src/lib/sources/bluesky.ts` exporting
+`searchBluesky(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]>`:
 
-## Phases
+1. `GET https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q={keywords joined}&limit=25`
+   with the standard `User-Agent: BuilderHunt/1.0 (bluesky source)` header.
+2. Hydrate all hits in **one** `app.bsky.actor.getProfiles` call (25-actor cap matches the
+   search limit) to get follower/follows/posts counts.
+3. Map to `RawBuilder` per the spec; extract `#hashtags` from bios as topics; sort by
+   `followersCount` desc; slice by `page`/`perPage` like every other connector.
+4. Every fetch try/caught; hydration failure degrades to countless profiles, search
+   failure degrades to `[]`. This is mandatory — `search.ts` uses `Promise.all`.
 
-### Phase 1: API Utilities (`src/lib/sources/bluesky.ts`)
-- Implement fetch utilities pointing to the public AppView: `https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors`.
-- Fetch detailed profile statistics (followers, posts count) using `app.bsky.actor.getProfile` for each search hit.
-- Map the raw AT Protocol payloads to our standardized `RawBuilder` interface.
-- Parse hashtags in bios or posts to populate `topics`.
+### Phase 2 — Registration
 
-### Phase 2: Pipeline Integration
-- Update `src/lib/search.ts` to import `searchBluesky`.
-- Register `'bluesky'` in the allowed list of sources.
-- Add `'bluesky'` as a default active source or as an optional toggleable filter.
+- `bluesky` in `SourceName` (`src/lib/sources/types.ts`).
+- Import + `if (sources.includes('bluesky')) tasks.push(searchBluesky(keywords, { page, perPage }))`
+  in `src/lib/search.ts`.
 
-### Phase 3: Scoring Adjustment (`src/lib/score.ts`)
-- Add specific scoring rules for Bluesky:
-  - **Popularity**: Logarithmic scaling of followers count (0-30 pts).
-  - **Recency**: Parse the `createdAt` of the developer's latest post to calculate days since last active (0-30 pts).
-  - **Quality signals**: Boost score if the user handle is a custom domain name (verification signal, +5 pts) and if they have a complete profile (avatar, bio, displayName).
+### Phase 3 — UI
 
-### Phase 4: UI and Brand Integration
-- Add the Bluesky Butterfly SVG icon in `src/components/icons` (or equivalent location).
-- Implement the `.badge-bluesky` CSS classes with the Celeste Blue theme (`#0085ff`).
-- Render the recent Bluesky posts in the developer's profile detail view.
+- `Builder.source` union, `ALL_SOURCES`, `SOURCE_META.bluesky` in `SearchPage.tsx`
+  (opt-in); `SOURCE_META` in `PersonResultCard.tsx`.
+- `BlueskyIcon` in `BrandIcons.tsx`; `.badge-bluesky` in `src/shared/styles/globals.css`.
 
-### Phase 5: Verification and E2E Tests
-- Write Vitest unit tests for the mapper logic in `src/lib/sources/bluesky.ts`.
-- Mock API responses using MSW or static fixtures.
-- Add a Playwright test to verify search toggle interaction on the frontend dashboard.
+### Phase 4 — Scoring nuance
+
+`bluesky` branch in `src/lib/score.ts`: +5 for custom-domain handles
+(`metadata.customDomainHandle`). Everything else rides the default paths (no
+`metadata.lastSeen` in v1 -> neutral recency).
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **IP-based rate limits on public AppView** | Medium | High | Implement local Map cache in search wrapper and query with low concurrency limits. |
-| **No native location/country metadata** | High | Low | Parse bio text for location strings (regex matching) or leave location blank. |
-| **Fuzzy search noise** | Medium | Medium | Require a minimum threshold of developer-related keywords (e.g., code, build, developer) in bios for organic ranking. |
+| Risk                                      | Likelihood | Impact | Mitigation                                                                        |
+| ----------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------- |
+| Fuzzy actor search returns non-developers | Medium     | Medium | Opt-in pill; scoring favors complete profiles; users toggle it per query          |
+| AppView rate limiting under load          | Low        | Low    | 2 requests/search behind the 5-min cache in `search.ts`                           |
+| No recency signal (no lastSeen)           | Certain    | Low    | Accepted v1 tradeoff; `getAuthorFeed` enrichment can come with `unified-timeline` |
 
 ## Rollback plan
 
-- Control the feature availability using an environment variable flag: `ENABLE_BLUESKY=false`.
-- If the AppView rate limit gets triggered frequently on the production server, disable Bluesky in default active sources but leave it available as an opt-in toggle.
+No migrations, no env vars. Remove `'bluesky'` from `ALL_SOURCES` to hide; remove the gate
+in `search.ts` to disable.

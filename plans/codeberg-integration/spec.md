@@ -1,34 +1,54 @@
 # Feature: Codeberg (Gitea) Integration
 
-## Why (short)
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Fully functional connector at `src/lib/sources/codeberg.ts`, wired
+> into `src/lib/search.ts`, UI, and `src/lib/score.ts`. `CODEBERG_API_URL` /
+> `CODEBERG_TOKEN` exist in `src/shared/lib/env.ts`; the only remaining gap is that neither
+> is documented in `.env.example`.
 
-Codeberg es la instancia Gitea más grande. Open source, EU-based (Berlín), fuerte entre devs que rechazan GitHub. Tiene la API estándar de Gitea que también sirve para **cualquier instancia Gitea auto-hospedada** (universities, empresas). Es el equivalente EU-friendly de GitHub.
+## Problem
 
-## API summary
+Codeberg is the largest Gitea/Forgejo instance: EU-based, OSS-focused, popular with
+developers who avoid GitHub. Its Gitea-standard API also works for any self-hosted
+Gitea/Forgejo instance.
 
-- **Base URL**: `https://codeberg.org/api/v1/` (Gitea-compatible)
-- **Auth**: opcional, mejora rate limit
-- **Endpoints** (Gitea standard):
-  - `GET /users/search?q={query}&limit=20` — user search
-  - `GET /users/{username}` — user details
-  - `GET /users/{username}/repos` — repos
-  - `GET /repos/search?limit=20&q={query}` — repo search
-- **Rate limit**: 500/h sin auth, ~5000/h con token
-- **Docs**: https://docs.gitea.io/en-us/api-1.0.html
+## Goal
 
-**Bonus**: same API works for any self-hosted Gitea instance. Could add support for "custom Gitea" later.
+Index Codeberg users and repositories as `RawBuilder` records alongside the other sources.
 
-## Why honorable mention
+## Delivered
 
-- **Nicho**: ~100k users vs 100M+ on GitHub
-- **API familiar** (Gitea is well-documented)
-- **Same pattern as GitHub**: just different base URL
-- **Self-hosted potential**: v2 could let users add their company's Gitea
+Shipped in `src/lib/sources/codeberg.ts`:
 
-## Effort
+- Real search API (unlike GitLab, works unauthenticated):
+  - `GET {CB_BASE}/users/search?q={q}&limit=20` — people, filtered to public non-restricted
+    accounts; real `followers_count` (Gitea exposes it). `id: cb-{userId}`.
+  - `GET {CB_BASE}/repos/search?q={q}&limit=20` — repos, filtered to non-private,
+    non-archived; stars as `followersCount`. `id: cb-repo-{repoId}`.
+- Base URL is configurable: `CODEBERG_API_URL` (defaults to
+  `https://codeberg.org/api/v1`), so any self-hosted Gitea/Forgejo works — the "bonus" from
+  the original spec was actually delivered.
+- Optional `CODEBERG_TOKEN` sent as `Authorization: token ...` for higher rate limits.
+- Registered in `src/lib/search.ts` and `SourceName` (`src/lib/sources/types.ts`).
+- UI: opt-in pill in `ALL_SOURCES` + `SOURCE_META` (`SearchPage.tsx`), `CodebergIcon` in
+  `BrandIcons.tsx`, `.badge-codeberg` in `src/shared/styles/globals.css`.
+- Scoring: `codeberg` branch in `src/lib/score.ts` (honest follower counts + star/fork
+  bonuses).
+- All fetches wrapped in try/catch returning `[]` (required: `search.ts` uses `Promise.all`).
 
-**S-M (1-2 días)**. Pattern is identical to GitHub; just change base URL and shape of response. Faster than GitLab because Gitea is simpler.
+## Remaining gaps (real)
 
-## Recommendation
+1. **`CODEBERG_API_URL` and `CODEBERG_TOKEN` are missing from `.env.example`** — the only
+   documentation of these vars is the zod schema in `src/shared/lib/env.ts`.
 
-**Integrate after GitLab** (which proves the "second forge" demand). Could be done in parallel if we have capacity. The pattern is the same, so the marginal effort is small.
+## Non-goals (unchanged)
+
+Multiple simultaneous Gitea instances (the env var points at exactly one); private repos;
+org/team crawling.
+
+## Success metrics
+
+- Queries like "rust", "forgejo", "privacy" return Codeberg people with real follower
+  counts; source pill toggling adds/removes the results.

@@ -1,89 +1,46 @@
 # Plan: npm Registry Integration
 
-## Goal recap
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: `src/lib/sources/npm.ts` shipped (npms.io search + registry metadata +
+> maintainer aggregation). Remaining: migrate search off the third-party npms.io service.
 
-Index npm package maintainers as discoverable entities. Different angle from GitHub: maintainers are builders of widely-used tools, not just PR contributors.
+## Executed phases (record)
 
-## Why this is the third pick
+1. **Source file** — `src/lib/sources/npm.ts`: npms.io search, per-package registry
+   metadata (parallel, cap 20), maintainer aggregation, email privacy.
+2. **Pipeline** — import + gate in `src/lib/search.ts`; `npm` in `SourceName`.
+3. **UI** — opt-in pill (the original "off by default" recommendation was adopted),
+   `SOURCE_META.npm`, `NpmIcon`, `.badge-npm`.
+4. **Scoring** — `npm` branch in `src/lib/score.ts` (multi-package maintainer bonus).
 
-1. **Unique angle.** No other source in this product captures "package maintainer" identity. GitHub user search finds people who commit to repos; npm finds people who *own* widely-used packages.
-2. **High-signal data.** A person who maintains a package with 100k weekly downloads is a serious builder. Easy to identify.
-3. **Public email exposure** (opt-out default) — useful for cross-source dedup later.
+## Remaining phase
 
-## Phases
+### Phase A — First-party search endpoint
 
-### Phase 0: Research (done in plan)
+Replace `api.npms.io/v2/search` with `GET https://registry.npmjs.org/-/v1/search?text={q}&size=20`
+(verified alive; returns `objects[].package` with maintainers inline plus
+`objects[].score.final` in the same 0-1 range). Benefits:
 
-Confirmed:
-- `api.npms.io/v2/search` for search
-- `registry.npmjs.org/{package}` for metadata
-- `api.npmjs.org/downloads/point/last-week/{package}` for downloads
-- Public, no auth
+- Removes the third-party single point of failure (npms.io has had outages/deprecation
+  scares; if it dies the source silently empties).
+- The response embeds `maintainers` and `keywords`, so the 20 per-package
+  `registry.npmjs.org/{name}` fetches can be dropped or kept only for `time.modified`
+  (recency). Prefer keeping one batch of fetches only for packages that make the final
+  page slice.
 
-### Phase 1: Data model
-
-No changes. Two kinds in one source: 'person' (maintainer) and 'repo' (package).
-
-### Phase 2-3: Source + parallel fetching
-
-New file `src/lib/sources/npm.ts`. Pattern:
-1. Search packages via npms.io
-2. Fetch metadata for each (parallel)
-3. Extract maintainers
-4. Group by username
-
-### Phase 4-5: Pipeline + UI
-
-Add to `search.ts`, add to `Source` type, add brand icon (npm red `#CB3837`).
-
-### Phase 6: Scoring
-
-Maintainer score = packages × downloads × recency × bio-match.
-
-### Phase 7: Default on/off — **RECOMMEND OFF BY DEFAULT**
-
-With 6 other sources, adding npm by default would dilute most results. **Off by default for v1** with a "JS ecosystem? Enable npm" prompt. User can toggle on.
-
-This is a conservative bet. After monitoring, if data quality is good, we can switch to default-on.
-
-### Phase 8-9: Verification + rollout
-
-Manual + Playwright + soft launch.
-
-## Dependency graph
-
-```
-Phase 0 ──> Phase 1 (npm package) ──> Phase 2 (search) ──┐
-                                                        ├──> Phase 6 (verify) ──> Phase 7 (rollout)
-                                  Phase 3 (UI) ──> Phase 4 (scoring) ──┘
-```
+No UI, scoring, or env changes needed — the score scale and shapes stay the same.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Many sources, dilute results** | High | Medium | npm OFF by default; one-click banner to enable |
-| **Email exposure (privacy)** | Certain | Low | Never show emails in UI; only use for dedup |
-| **Slow due to many parallel fetches** | Medium | Medium | Throttle 5 concurrent, cache package metadata |
-| **Scope packages clutter** | Medium | Low | Filter `@types/*` or deprioritize |
-| **Deprecated packages** | Medium | Low | Mark as deprecated in card |
+| Risk                                                              | Likelihood | Impact | Mitigation                                           |
+| ----------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------- |
+| npms.io disappears before migration                               | Medium     | Medium | This phase; connector already degrades to `[]`       |
+| First-party score distribution differs slightly                   | Medium     | Low    | Same 0-1 `score.final` field; spot-check top queries |
+| Losing `time.modified` recency if per-package fetches are dropped | Medium     | Low    | Keep per-package fetch for the final slice only      |
 
 ## Rollback plan
 
-- `ENABLE_NPM=false` env var hides from UI
-- No migrations
-- Per-user preference to enable/disable
-
-## What this is NOT
-
-- **Not full registry scrape.** Only keyword-matched packages.
-- **Not just packages.** The maintainer is the user, not the package.
-- **Not security audit data.** Just ownership.
-
-## What this enables (downstream)
-
-Once npm works:
-1. **PyPI / crates.io / RubyGems** — same pattern, multi-language maintainer discovery
-2. **"Who maintains X?"** — direct query: `npm:react` → maintainers of react
-3. **Cross-source dedup by email** — same person on GitHub + npm
-4. **Team pages** — "maintainers of @vercel/*"
+No migrations, no env vars. The change is contained in `npm.ts`; reverting the fetch URL
+restores today's behavior.

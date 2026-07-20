@@ -1,177 +1,90 @@
-# Tasks: Waitlist & Launch
+# Tasks: Launch Checklist
 
-## Phase 0 — Research
+> **Status**: `pending`
+> **Depends on**: [`production-infrastructure`](../production-infrastructure/spec.md), [`legal-and-compliance`](../legal-and-compliance/spec.md), [`public-landing-pages`](../public-landing-pages/spec.md), [`content-marketing`](../content-marketing/spec.md), [`status-and-trust`](../status-and-trust/spec.md), [`pricing-and-billing`](../pricing-and-billing/spec.md)
+> **Blocks**: nothing
+> **Reality check**: No waitlist is built or planned. These are execution/verification tasks
+> against the already-deployed app; the only "Files" entries are checklists run against prod.
 
-- [ ] Check existing `src/routes/_landing/` for inspiration
-- [ ] Read `src/shared/lib/email.ts` (already built for claim flow) — reuse for waitlist emails
-- [ ] Decide: use existing landing page (modify) or new landing?
-- [ ] Set up `RESEND_FROM_ADDRESS` (e.g., `hello@builderhunt.dev`)
+## Phase 1 — Prerequisite gate
 
-## Phase 1 — Data model
+- [ ] **Verify launch-blocking fixes from sibling plans are merged**
+  - Files: none (review task)
+  - Do: Confirm merged: pricing price-field fix (`pricing-and-billing` Phase 1), deletion
+    purge worker (`legal-and-compliance` Phase 1), sitemap `/pricing`+`/blog` entries
+    (`public-landing-pages` Phase 1), backup cron verified (`production-infrastructure`
+    Phase 1), 5th blog post published (`content-marketing`).
+  - Verify: Each owning plan's tasks.md shows those tasks checked; spot-check on prod
+    (`/pricing` shows $19, `/sitemap.xml` contains `/blog`).
 
-- [ ] Add `waitlist` table to schema
-- [ ] Add `randomReferralCode()` helper to `src/lib/utils.ts` (8 chars base62)
-- [ ] Generate + apply migration
+## Phase 2 — Production verification (T-7)
 
-## Phase 2 — Waitlist API
+- [ ] **Smoke-test every public route on prod**
+  - Files: none (manual, against `https://builderhunt.dev`)
+  - Do: Load `/`, `/pricing`, `/explore`, `/explore?q=react`, `/blog`, each of the 3+ post
+    slugs, `/status`, `/changelog`, `/roadmap`, `/legal/terms|privacy|cookies|imprint`,
+    `/sitemap.xml`, `/robots.txt`, `/api/status`. Check no 500s, no `$undefined`, cookie
+    banner appears once, dark theme renders.
+  - Verify: All routes 200 with correct content; note failures as issues before proceeding.
 
-File: `src/routes/api/waitlist/signup.ts` (new, POST)
+- [ ] **Smoke-test the core authed funnel on prod**
+  - Files: none (manual)
+  - Do: Fresh email → sign up → land on `/onboarding/welcome` → complete the 3-step tour →
+    run a search → track 3 builders → `/exports` CSV download → request upgrade on `/pricing`
+    → verify it appears in `/admin/plan-requests` → delete the test account from
+    `/settings/privacy` and cancel the deletion.
+  - Verify: Every step succeeds; the plan request and deletion request rows appear and behave.
 
-- [ ] Body: `{ email: string, referralCode?: string }`
-- [ ] Validate email
-- [ ] If referralCode provided, look up the referrer
-- [ ] Generate unique referral code
-- [ ] Insert row in `waitlist` with position = current_count + 1
-- [ ] If referred: bump referrer's position by -3
-- [ ] Send welcome email
-- [ ] Return `{ position, referralCode, totalSignups }`
+- [ ] **Submit sitemap and verify OG previews**
+  - Files: none (external tools)
+  - Do: Add the property in Google Search Console + Bing Webmaster Tools, submit
+    `/sitemap.xml`. Paste `/`, `/pricing`, `/explore?q=react`, and one blog URL into the
+    X card validator / LinkedIn post inspector / a Slack DM; confirm the PNG OG image renders
+    (endpoint: `src/routes/api/og/explore.tsx`).
+  - Verify: GSC shows sitemap "Success"; all 4 URLs show image + title + description previews.
 
-File: `src/routes/api/waitlist/status.ts` (new, GET)
+## Phase 3 — Content freeze (T-2)
 
-- [ ] Query: `?code=X`
-- [ ] Returns `{ position, totalSignups, referralCount, shareLinks }`
+- [ ] **Seed changelog with real shipped history**
+  - Files: none (via `/admin/changelog` UI → `src/routes/api/admin/changelog/index.ts`)
+  - Do: Create 6-10 entries from real git history (federated search, tracking + exports,
+    smart alerts, claimable profiles, onboarding, billing, legal/GDPR, status page, landing
+    redesign), dated to when they shipped.
+  - Verify: `/changelog` lists them newest-first; each `/changelog/$slug` renders.
 
-File: `src/routes/api/waitlist/stats.ts` (new, GET)
+- [ ] **Seed public roadmap**
+  - Files: none (via `/admin/roadmap` UI → `src/routes/api/admin/roadmap/index.ts`)
+  - Do: Add 5-8 public-friendly items from `plans/` (semantic search, AI outreach drafts,
+    team accounts, more sources, portfolio pages) in planned/in-progress columns. No internal
+    jargon, no dates promised.
+  - Verify: `/roadmap` renders the items; vote button works signed-in.
 
-- [ ] Public
-- [ ] Returns `{ totalSignups, topReferrers (anonymized), launchedAt }`
+## Phase 4 — Distribution (T-0, one channel per day)
 
-## Phase 3 — Landing page
+- [ ] **Show HN post**
+  - Files: none
+  - Do: "Show HN: BuilderHunt – find active developers across 12 sources (GitHub, HN,
+    Stack Overflow…)". First comment: honest write-up — what it does, stack (TanStack Start +
+    Postgres, single Hetzner VPS), what feedback is wanted (search relevance, sources to add).
+    Post morning US time, stay available all day to reply.
+  - Verify: Post live; every top-level comment answered within 2h; feedback captured as issues.
 
-File: `src/routes/_landing/index.tsx` (modify existing)
+- [ ] **dev.to cross-post + X thread + LinkedIn + one subreddit + Indie Hackers**
+  - Files: none
+  - Do: dev.to: cross-post "Why I built BuilderHunt" (`content/posts/why-i-built-builderhunt.md`)
+    with `canonical_url` set to the builderhunt.dev URL. X: 6-8 tweet thread (problem → 12
+    sources screenshot → tracking/alerts → link). LinkedIn: recruiter-angle summary. Reddit:
+    r/ExperiencedDevs or r/webdev per sub self-promo rules. Indie Hackers: launch milestone.
+    Stagger one per day after HN.
+  - Verify: Each post live with working links; UTM-tagged links (`?utm_source=devto` etc.) so
+    referrers show in analytics/server logs.
 
-- [ ] Above the fold: title, value prop, email form
-- [ ] Below: 3-step explainer, screenshots, FAQ
-- [ ] "You're #N in line" live counter (auto-refresh every 30s)
-- [ ] Footer with legal links
+## Phase 5 — Monitoring (T+1..30)
 
-## Phase 4 — Signup modal
-
-After form submit:
-- Modal: "You're #1247! Share to climb"
-- Pre-filled tweet button
-- Pre-filled LinkedIn button
-- Copy link button
-- Close button (back to landing)
-
-## Phase 5 — Status page
-
-File: `src/routes/waitlist.tsx` (new, public)
-
-- [ ] Reads `?code=X` from URL
-- [ ] Shows: position, total signups, your referrals, top referrers
-- [ ] Share buttons
-- [ ] "Estimated launch" countdown
-
-## Phase 6 — Email sequences
-
-File: `src/shared/lib/email-templates/waitlist-welcome.tsx`
-
-- [ ] Welcome email with referral link
-- [ ] Pre-header: "Welcome to the BuilderHunt waitlist!"
-
-File: `src/shared/lib/email-templates/waitlist-reminder.tsx`
-
-- [ ] After 7 days no referrals
-- [ ] "Quick reminder: 3 friends = 100 spots"
-
-File: `src/shared/lib/email-templates/waitlist-launch.tsx`
-
-- [ ] When we launch
-- [ ] "BuilderHunt is live! Sign in."
-
-**Cron jobs** to send:
-- `scripts/jobs/waitlist-reminders.ts`: daily, finds waitlist rows > 7 days old with 0 referrals, sends reminder
-- `scripts/jobs/waitlist-launch.ts`: one-time, sends launch email when triggered
-
-## Phase 7 — Launch trigger
-
-File: `scripts/jobs/check-launch.ts`
-
-- [ ] Daily, count `waitlist` rows
-- [ ] If >= 500 (configurable), trigger launch
-- [ ] Send launch email to all waitlist
-- [ ] Open registration (already open, but publicize)
-
-## Phase 8 — Marketing content
-
-Blog posts (cross-posted to dev.to):
-
-1. **"I built a 12-source developer search engine"** — founder story + technical
-2. **"How to find good developers as a solo founder"** — SEO, value-first
-3. **"The 12 sources I use to find developers in 30 seconds"** — listicle
-4. **"How I ranked 10,000 developers by activity"** — technical depth
-5. **"Building a TanStack Start app in public"** — dev audience
-
-Each post:
-- 1000-2000 words
-- 2-3 code snippets
-- 1-2 screenshots
-- CTA to waitlist
-- SEO keywords
-
-## Phase 9 — Social media launch kit
-
-**Twitter thread** (8-10 tweets):
-- Problem
-- Existing solutions and gaps
-- BuilderHunt value prop
-- 12 sources screenshot
-- "Try it" link
-- Founder bio
-
-**LinkedIn post** (B2B angle):
-- Recruiters spend hours
-- BuilderHunt indexes 12 sources
-- "Free during beta"
-
-**HN Show post**:
-- "Show HN: BuilderHunt – Find active developers across 12 sources"
-- Honest about what it is
-- "Looking for feedback on X and Y"
-
-## Phase 10 — Verification
-
-### Manual
-- [ ] Visit /, see landing
-- [ ] Enter email, see position
-- [ ] Click referral link in different browser, see position +5
-- [ ] Share buttons pre-fill correctly
-- [ ] Status page works
-
-### Automated
-- [ ] Playwright: signup flow end-to-end
-- [ ] Position calculation is correct
-- [ ] Referral dedup (same email twice = 1 entry)
-
-### Analytics
-- [ ] PostHog events fire correctly
-- [ ] Email open rate > 30%
-- [ ] Referral share rate > 10%
-
-## Phase 11 — Rollout
-
-- [ ] Soft launch to friends + early waitlist (50-100 people)
-- [ ] Get feedback, iterate
-- [ ] Public launch: 1 tweet thread + 1 dev.to + 1 HN
-- [ ] Goal: 1000 signups in 30 days
-- [ ] Goal: viral coefficient > 0.5
-
-## Edge cases
-
-- **Duplicate email**: unique constraint, return existing entry's data (no error)
-- **Spam signups**: rate limit 5/hour per IP, CAPTCHA after 3
-- **Disposable emails**: blocklist (mailinator, tempmail, etc.)
-- **Position gap on referral**: when someone refers, we need to renumber positions. Use UPDATE with ORDER BY created_at
-- **Launch before threshold**: admin can manually trigger launch
-- **Referrer deleted their email**: still counts as referral
-
-## Dependencies
-
-- New tables: 1 (`waitlist`)
-- New package: none
-- New env vars: `LAUNCH_NOTIFY_EMAIL`, `RESEND_FROM_ADDRESS`
-- New background jobs: 3 (reminders, launch trigger, launch email)
-- Marketing: 5 blog posts (1-2 weeks content work)
-
-## Estimated effort: 2-3 weeks
+- [ ] **Daily launch-week monitoring, then weekly**
+  - Files: none
+  - Do: Check `/admin/metrics` (signups, searches, errors), `/status`, Search Console
+    impressions; reply to every feedback comment; file real bugs/requests into `plans/` or
+    issues; publish a weekly changelog entry.
+  - Verify: 30-day review written up: signups vs 200 target, activation rate
+    (`onboarding_progress.completed` / signups), top 3 feedback themes, next-plan decision.

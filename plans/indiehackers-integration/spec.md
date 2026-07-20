@@ -1,39 +1,64 @@
 # Feature: IndieHackers Integration
 
-## Why (short)
+> **Status**: `blocked`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: No `src/lib/sources/indiehackers.ts` exists; `indiehackers` is not in
+> `SourceName` (`src/lib/sources/types.ts`). IndieHackers has **no official API of any
+> kind**; the site is a JS-rendered SPA whose data would have to be scraped, which the
+> existing connector pattern (plain server-side `fetch` inside a live search) cannot do.
+> A decision is required before any implementation (see "Blocking decision").
 
-IndieHackers es la comunidad de founders bootstrapped. Sus users son devs que **construyen productos** y comparten revenue/metrics. Es una clase DIFERENTE de builder: no solo programador, sino entrepreneur técnico. Si tu usuario busca "bootstrapped SaaS" o "indie developer", IndieHackers es donde están.
+## Problem
 
-## API summary
+IndieHackers is the community of bootstrapped technical founders — a builder class
+(entrepreneur-engineers sharing revenue and metrics) that no current source captures
+directly.
 
-- **Public API**: NONE
-- **Data source**: scrape `https://www.indiehackers.com/`
-- **Auth**: requires login (free account)
-- **Scraping risk**: ToS unclear, site has anti-bot
+## Goal (if unblocked)
 
-## Why honorable mention (not top pick)
+Index IndieHackers members as `RawBuilder` person records searchable by keyword.
 
-- **No public API** — has to be scraping, which is fragile
-- **Smaller user base** (~200k, but most are lurkers)
-- **Different audience** than the rest of BuilderHunt's targets
-- **Hard to maintain**: any site redesign breaks the scraper
+## API viability (honest assessment)
 
-## Effort
+- **Official API: none.** There has never been one, and none is announced.
+- **The site is a client-rendered SPA** backed by a private Firebase backend; plain
+  server-side `fetch` of profile or search URLs returns an app shell without data.
+  Extracting people requires a headless browser (and historically a logged-in session),
+  which:
+  - violates the spirit (and likely the letter) of the site's ToS,
+  - cannot run inside the live federated search (`src/lib/search.ts` fires connectors as
+    parallel cheap fetches per request), and
+  - would need the background-ingestion worker pattern + durable storage
+    (`plans/_meta/app-reality.md`, constraint #3) — a much larger plan.
+- **No viable third-party data source** offers IndieHackers member data legitimately.
 
-**L (1+ semana)**. No API, scraping required, fragile. Plus auth flow.
+Pretending otherwise would produce a permanently-empty source pill. This plan is therefore
+`blocked`, not `pending`.
 
-## Recommendation
+## Blocking decision (owner: product)
 
-**Skip unless the user specifically asks for "founders" as an audience.** Even then, the cost is high for low return.
+Choose one:
 
-Better alternatives if you want founder signal:
-- **Crunchbase API** (paid, but proper data)
-- **Product Hunt API** (free, has maker profiles)
-- **Twitter/X** (where founders tweet, but API is paywalled)
-- **LinkedIn** (closed, scraping ToS)
+- **(a) Skip permanently — recommended.** Cover "founder signal" through legitimate
+  channels instead:
+  - the pending [`producthunt-integration`](../producthunt-integration/spec.md) (makers
+    ARE largely indie founders, official API, token-gated), and/or
+  - user-driven tagging: BuilderHunt users already own `builder_notes` and
+    `builders.metadata`; a lightweight "founder / indie hacker" tag + search filter is a
+    small, honest feature (would be its own mini-plan, touching
+    `src/shared/lib/tracked-builders.ts` and the search UI filters).
+- **(b) Approve scraping** — accept ToS risk, a logged-in headless-browser ingestion job,
+  and permanent fragility. Requires rewriting this plan as a background-worker plan.
+- **(c) Re-check yearly** for an official API announcement.
 
-None of these are easy. IndieHackers scraping is probably the lowest-effort option, but it has long-term maintenance cost.
+## Non-goals
 
-## Better path
+Scraping under option (a)/(c); revenue-metric ingestion; anything requiring an
+IndieHackers login.
 
-If you need founder signal, **let users self-tag** as "founder" or "indie hacker" in their profile. Add a filter. Skip the integration.
+## Success metrics
+
+Only definable after the blocking decision. Under option (a), the success metric moves to
+the Product Hunt plan (founder-type coverage) and/or the tagging mini-plan (usage of the
+"founder" filter).

@@ -1,57 +1,65 @@
 # Plan: Product Hunt Integration
 
-## Goal recap
+> **Status**: `pending`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Greenfield connector. Closest in-repo analogs: token-gated GraphQL
+> pattern from `src/lib/sources/sourcehut.ts` + author-aggregation pattern from
+> `src/lib/sources/huggingface.ts`. Requires an operator-provisioned `PRODUCTHUNT_TOKEN`
+> before it returns anything.
 
-Integrate Product Hunt as a data source to locate and score product-minded software creators ("makers") based on their launched products and community traction (votes, karma).
+## Phases (dependency order)
 
-## Why this is a valuable addition
+### Phase 0 — Token + schema verification (30 min, before any code)
 
-1. **High-intent credentials**: Launching a successful product on Product Hunt demonstrates end-to-end execution capacity (coding + shipping + marketing), which is a key trait of senior "builders".
-2. **Cross-source linking**: The Product Hunt API natively exposes social fields like `gitHubUsername` and `twitterUsername` for many makers, enabling seamless profile stitching and deduplication within BuilderHunt.
-3. **Alternative search angle**: Searching for developers by *what they have launched* (e.g. searching "database client" to find creators of database UI tools) is often more effective for talent discovery than searching bio keywords alone.
+Create a PH API application, obtain a Developer Token, and introspect the v2 schema to
+confirm: `topics(query:)` argument, `posts(topic:, order:)` arguments, and which identity
+fields exist on the maker/User type (`gitHubUsername` availability determines metadata).
+The spec's queries are written from documented behavior but MUST be re-verified — the v2
+API has changed field availability before.
 
-## Phases
+### Phase 1 — Connector
 
-### Phase 1: API Utilities (`src/lib/sources/producthunt.ts`)
-- Implement a GraphQL client utility pointing to `https://api.producthunt.com/v2/api/graphql`.
-- Read `PRODUCTHUNT_TOKEN` from environment variables.
-- Write query functions:
-  - Query 1: Search products ("posts") by keyword, extract makers, and return them as `RawBuilder` records.
-  - Query 2 (Optional / Detail fetch): Resolve detailed maker statistics (karma, followers count) if not fully returned in Query 1.
-- Parse product tags/topics to populate the builder's `topics` array.
+`src/lib/sources/producthunt.ts` exporting
+`searchProductHunt(keywords, { page, perPage })`:
 
-### Phase 2: Pipeline Integration
-- Add `'producthunt'` to the allowed list of sources in `src/lib/search.ts`.
-- Integrate `searchProductHunt` inside the search handler.
-- Map and deduplicate returned makers based on their `gitHubUsername` matching with existing `'github'` source hits.
+1. Short-circuit `[]` when `env.PRODUCTHUNT_TOKEN` is unset (sourcehut pattern).
+2. `gql` helper: POST to `https://api.producthunt.com/v2/api/graphql`, bearer token,
+   try/catch + GraphQL-errors -> `null` (never throw — `search.ts` uses `Promise.all`).
+3. Keyword -> topic slug (`topics(first:1, query:$q)` per keyword, first hit wins; also
+   try the raw keyword as a slug), then `posts(first:20, topic:$slug, order:VOTES)` with
+   makers, votes, topics, createdAt.
+4. Aggregate makers across posts (huggingface `aggregateAuthor` pattern); people first,
+   optional post repo-cards second; sort makers by total votes; slice by page/perPage.
 
-### Phase 3: Scoring Adjustment (`src/lib/score.ts`)
-- Implement Product Hunt-specific scoring rules:
-  - **Popularity**: Logarithmic scaling of followers count (0-15 pts) + Logarithmic scaling of Product Hunt Karma (0-15 pts).
-  - **Traction bonus**: Add score based on the highest-voted launched product:
-    - >1000 votes: +15 pts.
-    - >500 votes: +10 pts.
-    - >100 votes: +5 pts.
-  - **Recency**: Score based on the launch date of their latest product (0-20 pts).
+### Phase 2 — Env
 
-### Phase 4: UI & Badging
-- Add the Product Hunt SVG brand mark.
-- Implement the `.badge-producthunt` styling classes using the signature brand color `#da552f`.
-- Build a "Launched Products" component to render inside the builder sheet, showing their product names, taglines, and vote badges.
+`PRODUCTHUNT_TOKEN` optional in `src/shared/lib/env.ts`; documented line in `.env.example`.
 
-### Phase 5: Verification & Tests
-- Create unit tests with mocked GraphQL responses under `tests/sources/producthunt.test.ts`.
-- Verify query construction and rate-limit backoff handling.
+### Phase 3 — Registration
+
+`producthunt` in `SourceName`; import + gate in `src/lib/search.ts`.
+
+### Phase 4 — UI
+
+Pill (opt-in), `SOURCE_META.producthunt` in `SearchPage.tsx` + `PersonResultCard.tsx`,
+`ProductHuntIcon` in `BrandIcons.tsx`, `.badge-producthunt` in `globals.css`.
+
+### Phase 5 — Scoring
+
+`producthunt` branch in `src/lib/score.ts`: log bonus on `metadata.bestVotes` (cap 10).
+`metadata.lastSeen` (newest launch) makes default recency scoring work.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **GraphQL rate limits (complexity points)** | High | Medium | Implement memory cache for query responses (TTL = 1 hour) and cache empty hits to prevent API spamming. |
-| **Missing developer signal** | Medium | Low | Only index makers of products tagged under development-related categories (e.g., developer tools, design tools, productivity). |
-| **Token expiration/quota exhaust** | Medium | High | Gracefully bypass Product Hunt source if the API returns a 401 or query quota errors, logging a warning instead of failing the search. |
+| Risk                                  | Likelihood | Impact | Mitigation                                                       |
+| ------------------------------------- | ---------- | ------ | ---------------------------------------------------------------- |
+| No free-text search in API v2         | Certain    | Medium | Topic-slug strategy; honest empty result for unmappable keywords |
+| Complexity-based rate limit           | Medium     | Low    | 5-min search cache; opt-in pill; 2 queries/search                |
+| Token expiry / revocation in prod     | Medium     | Low    | Connector degrades to `[]` on 401; log a warn line               |
+| Schema drift on maker identity fields | Medium     | Low    | Phase 0 introspection gate before implementation                 |
 
 ## Rollback plan
 
-- Keep the integration behind the `ENABLE_PRODUCTHUNT=false` feature flag.
-- If the developer token expires or is rate-limited in production, the application will fallback to other sources without raising a runtime crash.
+No migrations. Unset `PRODUCTHUNT_TOKEN` to silence the source instantly; remove the pill/
+gate to remove it from the product.

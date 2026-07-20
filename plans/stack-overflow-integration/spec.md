@@ -1,91 +1,59 @@
 # Feature: Stack Overflow Integration
 
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector exists at `src/lib/sources/stackoverflow.ts` and is fully
+> wired (pipeline, opt-in pill, badge, icon, scoring branch). `STACKOVERFLOW_API_KEY`
+> exists in `src/shared/lib/env.ts` but is not documented in `.env.example`, and quota
+> exhaustion is invisible (silent `[]`).
+
 ## Problem
 
-Hoy BuilderHunt indexa GitHub, Reddit, HN, DEV.to. Falta **el registro canónico de expertise técnica**: Stack Overflow. Sus top users por tag son **los que responden** — señal de expertise. Si un usuario busca "kubernetes operator" en BuilderHunt, debería ver a los top SO users de `kubernetes` y `k8s.io`, no solo devs que commit code.
+Stack Overflow is the canonical registry of technical expertise. Top answerers per tag are
+proven experts — a different, stronger signal than commit activity.
 
 ## Goal
 
-Indexar SO users con expertise signal:
-- Username, display name, avatar
-- Reputation (proxy fuerte de expertise)
-- Top tags (proxy de dominio)
-- Answers count (proxy de participación)
-- Bio (a veces tienen uno)
+Index SO experts as `RawBuilder` person records, keyed to the query's technology keywords.
 
-## Non-goals
+## Delivered
 
-- **No es full-text de questions.** Solo users.
-- **No es SO for Teams.** Solo el público.
-- **No es scraping de answers.** Demasiado volumen.
-- **No es reputation real-time.** Cache agresivo (cambia poco).
+Shipped in `src/lib/sources/stackoverflow.ts` (file header documents the strategy):
 
-## API summary
+- **Better approach than originally specced**: instead of "top 50 global users filtered by
+  tag", the connector hits the canonical experts endpoint per query keyword:
+  `GET /2.3/tags/{tag}/top-answerers/all_time?site=stackoverflow`, unioned across
+  keywords — users matching multiple keywords accumulate score and get a multi-tag boost.
+- `TAG_SYNONYMS` map fixes silent-empty lookups (`react` -> `reactjs`, `node` -> `node.js`,
+  `golang` -> `go`, etc.) — a real-world pitfall the original spec missed.
+- One batch call `GET /2.3/users/{ids}/top-tags` (up to 100 ids) enriches topics.
+- Mapping: `id: so-{userId}`, `kind: 'person'`, reputation as `followersCount` (the
+  original open question resolved as "reputation"), accept-rate bio,
+  `metadata.matchedTags/postScore/postCount/reputation`.
+- Filters unregistered users; sorts by tag-specific score, then reputation.
+- Optional `STACKOVERFLOW_API_KEY` appended as `key=` (300 req/day/IP without, 10k/day
+  with).
+- Registered in `src/lib/search.ts` and `SourceName`; opt-in pill (the original
+  "off by default due to quota" recommendation was adopted), `StackOverflowIcon`,
+  `.badge-stackoverflow`, `stackoverflow` scoring branch in `src/lib/score.ts`
+  (multi-tag expert boost + engagement bonus).
+- All fetches try/caught to `[]` (mandatory: `search.ts` uses `Promise.all`).
 
-- **Base URL**: `https://api.stackexchange.com/2.3/`
-- **Auth**: optional but recommended (10k req/día sin key, 300 con key por IP)
-- **Endpoint clave**:
-  - `GET /users?site=stackoverflow&pagesize=20&order=desc&sort=reputation&filter=!-*f(6s)8tG`
-  - `GET /users/{ids}?site=stackoverflow`
-  - `GET /tags?site=stackoverflow` (for tag list)
-  - `GET /users/{ids}/top-tags?site=stackoverflow` (top tags per user)
-- **Rate limit**: 300 req/día sin key por IP, 10k/día con key
-- **Docs**: https://api.stackexchange.com/docs
+## Remaining gaps (real)
 
-**Critical**: the API has a QUOTA model. The free key is per-IP, easy to exhaust. Need a registered app + key.
+1. **`STACKOVERFLOW_API_KEY` is missing from `.env.example`** — the 300/day unkeyed quota
+   is easy to exhaust in production and operators have no pointer to the fix.
+2. **Quota exhaustion is silent.** The Stack Exchange API reports `quota_remaining` in
+   every response and throttle violations as a 400 body; the connector ignores both, so an
+   exhausted key looks identical to "no experts found". A log line is enough.
 
-## Data shape
+## Non-goals (unchanged)
 
-```ts
-{
-  id: `so-${user.user_id}`,
-  kind: 'person',
-  source: 'stackoverflow',
-  sourceId: String(user.user_id),
-  username: user.display_name,
-  displayName: user.display_name,
-  avatarUrl: user.profile_image,
-  bio: user.about_me || `Top tags: ${topTags.join(', ')}`,
-  profileUrl: user.link,
-  followersCount: user.reputation,  // SO doesn't have followers; use rep
-  topics: topTags.slice(0, 5),
-  metadata: {
-    reputation: user.reputation,
-    goldBadges: user.badge_counts.gold,
-    silverBadges: user.badge_counts.silver,
-    bronzeBadges: user.badge_counts.bronze,
-    answerCount: user.answer_count,
-    questionCount: user.question_count,
-    location: user.location,
-    accountAge: user.creation_date,
-  }
-}
-```
-
-## User stories
-
-1. **Como usuario**, busco "rust async" y veo a los top SO users de los tags `rust` y `async`.
-2. **Como usuario**, en `/search`, toggle "Stack Overflow" en los sources.
-3. **Como usuario**, en los results, las tarjetas de SO muestran reputation como "followers" y top tags como topics.
+Question/answer content; Stack Exchange network sites (Server Fault etc.); real-time
+reputation.
 
 ## Success metrics
 
-- **Primary**: % of saved searches that find at least 1 SO user. Target: 50% (SO covers most popular programming topics).
-- **Secondary**: CTR on SO results is within 30% of GitHub.
-- **Quality guardrail**: dismiss rate < 30% (SO reputation is a strong signal).
-
-## Open questions
-
-- **Reputation as followers**: SO doesn't have a follower count. Use reputation (proxy for expertise). Or use `accept_rate` (how often their answers are accepted).
-- **Top tags**: fetch separately (`/users/{ids}/top-tags`) per user. That's 1 extra request per user. Cache 1h.
-- **Search by tag or by keyword?** SO search is by tag. We can pass our query as a tag filter, but might miss matches. Two options:
-  - (a) Search users by their top tags overlapping with query
-  - (b) Use SO search API for users matching a query (less precise)
-  - **Recommended**: (a) — fetch top SO users, filter by tag overlap with query.
-
-## Out of scope (this iteration)
-
-- SO for Teams / Enterprise
-- Answers / questions
-- Real-time reputation changes
-- Stack Exchange network (other sites: Server Fault, Super User, etc. — v2)
+- "kubernetes", "rust" (with the SO pill active) return high-reputation experts whose
+  `matchedTags` include the query terms; multi-keyword queries rank multi-tag experts first.

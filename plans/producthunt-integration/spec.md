@@ -1,130 +1,120 @@
 # Feature: Product Hunt Integration
 
+> **Status**: `pending`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: No `src/lib/sources/producthunt.ts` exists; `producthunt` is not in
+> `SourceName` (`src/lib/sources/types.ts`). Product Hunt has an **official GraphQL API
+> that requires a token** — the connector must be token-gated exactly like
+> `src/lib/sources/sourcehut.ts` (returns `[]` when the env var is unset). Downstream
+> `unified-timeline` / `proactive-discovery` are enhanced by this source, not blocked.
+
 ## Problem
 
-BuilderHunt tracks developer contributions to code repositories (GitHub, GitLab) and technical content (Dev.to, Hashnode). However, code activity is only one side of the coin. Many builders are tech creators who launch SaaS products, open-source tools, or utilities directly to communities. 
-
-Without Product Hunt, we miss:
-1. Product-minded developers who build, launch, and monetize software (indie hackers, solo founders).
-2. The traction signals (upvotes, reviews, product tiering) of projects built by these developers.
-3. Valuable context on whether a builder's project is a hobby codebase or a launched product with real users.
+Code activity misses product-minded builders: makers who ship and launch. Product Hunt is
+the canonical record of launched products and exposes their makers — with `gitHubUsername`
+and `twitterUsername` fields that bridge identities across sources.
 
 ## Goal
 
-Search and ingest builder profiles from Product Hunt. This is achieved by:
-- Querying for products ("posts") that match search keywords.
-- Extracting the "makers" (creators) of those products.
-- Mapping their Product Hunt user profiles (karma, follower count, headline) to our developer schema.
+Index Product Hunt makers as `RawBuilder` person records, discovered through the products
+they launched.
 
-## Non-goals
+## API viability (honest assessment)
 
-- **No product directories hosting.** We are not rebuilding Product Hunt; we only list the builder's profile and links to their launched products.
-- **No social actions.** Users cannot upvote or review Product Hunt projects from BuilderHunt.
+- **Official API v2 (GraphQL)**: `https://api.producthunt.com/v2/api/graphql`.
+- **Auth is mandatory**: `Authorization: Bearer {PRODUCTHUNT_TOKEN}` (a "Developer Token"
+  from api.producthunt.com/v2/docs, tied to a PH account/app). Without a token the source
+  MUST be silently empty (`[]`), the same wired-but-dormant pattern as
+  `src/lib/sources/sourcehut.ts`.
+- **Rate limit**: complexity-point based, 6250 points / 20 min for GraphQL requests. One
+  search = 1-2 small queries; BuilderHunt's 5-min search cache keeps this trivial.
+- **Critical constraint the previous draft got wrong**: the v2 `posts` query has **no
+  free-text `search` argument**. Discovery must go through topics:
+  1. Resolve the query keyword to a topic slug: `topics(first: 1, query: $q)` (or a small
+     hardcoded keyword->slug map for common stacks: `ai`, `developer-tools`, `saas`,
+     `productivity` — verify exact slugs at implementation time via introspection).
+  2. Fetch posts for that topic: `posts(first: 20, topic: $slug, order: VOTES)` with
+     `makers { id name username headline profileImage twitterUsername }` and
+     `votesCount`, `topics { nodes { slug } }`, `createdAt`.
+  3. Aggregate makers across matched posts (same author-aggregation pattern as
+     `src/lib/sources/huggingface.ts`).
+     Keywords that resolve to no topic yield `[]` — acceptable and honest; PH simply cannot
+     answer arbitrary keyword queries.
 
-## User stories
+## Which endpoint yields PEOPLE
 
-1. **As a user**, when I search for "markdown editor", I want to see the creators of popular markdown editors launched on Product Hunt, along with their upvote counts.
-2. **As a user**, I want to filter search results to only show makers from Product Hunt using the source pill.
-3. **As a user**, in the builder detail view, I want to see a card displaying the products they have launched on Product Hunt, including the product name, tagline, upvote count, and launch date.
+`Post.makers` is the people source. Makers are aggregated across posts; each maker card is
+a person, each post can optionally become a `kind: 'repo'` resource card.
 
-## API summary
-
-- **Base Endpoint**: `https://api.producthunt.com/v2/api/graphql`
-- **Auth**: Requires a Client Token / Developer Token passed as `Authorization: Bearer PRODUCTHUNT_TOKEN`.
-- **Key GraphQL Queries**:
-  - Search posts by term and fetch their makers:
-    ```graphql
-    query SearchMakers($query: String!) {
-      posts(search: $query, first: 15) {
-        nodes {
-          name
-          tagline
-          votesCount
-          url
-          createdAt
-          makers {
-            id
-            name
-            username
-            headline
-            profileImage
-            twitterUsername
-            gitHubUsername
-            websiteUrl
-          }
-        }
-      }
-    }
-    ```
-  - Fetch detailed user profile by username:
-    ```graphql
-    query GetUserProfile($username: String!) {
-      user(username: $username) {
-        id
-        name
-        username
-        headline
-        coverImage
-        profileImage
-        followers {
-          totalCount
-        }
-        karma
-        websiteUrl
-        twitterUsername
-        gitHubUsername
-      }
-    }
-    ```
-
-## Data shape
-
-Reuses the `RawBuilder` structure with `source: 'producthunt'`:
+## RawBuilder mapping
 
 ```ts
-export interface RawBuilder {
-  id: string              // `ph-${userId}`
-  kind: 'person'
-  source: 'producthunt'
-  sourceId: string        // Product Hunt User ID
-  username: string        // handle/username
-  displayName?: string    // name
-  avatarUrl?: string      // profileImage
-  bio?: string            // headline
-  profileUrl: string      // `https://www.producthunt.com/@${username}`
-  followersCount?: number // followers count from GraphQL query
-  language?: string
-  country?: string
-  topics: string[]        // parsed from product tags
+// person (aggregated maker)
+{
+  id: `ph-${user.id}`,
+  kind: 'person',
+  source: 'producthunt',
+  sourceId: String(user.id),
+  username: user.username,
+  displayName: user.name ?? undefined,
+  avatarUrl: user.profileImage ?? undefined,
+  bio: user.headline ?? undefined,
+  profileUrl: `https://www.producthunt.com/@${user.username}`,
+  followersCount: totalVotesAcrossMatchedPosts, // votes proxy; v2 exposes no follower count on makers cheaply
+  language: undefined,
+  country: undefined,
+  topics: topicSlugsFromMatchedPosts,           // max 10
   metadata: {
-    karma: number
-    launchedProducts: Array<{
-      name: string
-      tagline: string
-      votesCount: number
-      url: string
-      createdAt: string
-    }>
-    twitterUsername?: string
-    gitHubUsername?: string
-  }
+    launchedCount: matchedPosts.length,
+    totalVotes,
+    bestVotes,
+    lastSeen: Date.parse(newestPost.createdAt), // real recency for score.ts
+    launches: matchedPosts.slice(0, 5).map(p => ({ name, tagline, votesCount, url })),
+    twitterUsername: user.twitterUsername ?? null,
+    // NOTE: if schema introspection confirms `gitHubUsername` on User/Maker, include it —
+    // it is the cross-source dedup bridge.
+  },
 }
+// repo (optional, the launched product): id `ph-post-{id}`, votesCount as followersCount
 ```
+
+## Dedup / score interplay
+
+- `src/lib/dedup.ts` keys on `username.toLowerCase()` — a PH maker whose username equals
+  their GitHub login merges automatically (metadata union, max followers). No dedup code
+  changes; do NOT build bespoke gitHubUsername matching in v1 (that belongs to a future
+  cross-source-identity plan).
+- `src/lib/score.ts`: add a `producthunt` branch — log-scale bonus on `metadata.bestVotes`
+  (capped ~10) mirroring the `huggingface` totalDownloads bonus. `metadata.lastSeen` gives
+  real recency scoring for free.
+
+## Failure behavior (non-negotiable)
+
+`src/lib/search.ts` uses `Promise.all`; the connector wraps every request in try/catch and
+returns `[]` on: missing token, 401 (expired token), 429/complexity exhaustion, GraphQL
+errors, network failure. Mirror the `gql<T>()` helper in `src/lib/sources/sourcehut.ts`.
+
+## Env
+
+`PRODUCTHUNT_TOKEN` (optional) added to `src/shared/lib/env.ts` and documented in
+`.env.example`. Feature hides itself (empty results) when unset.
 
 ## UX integration
 
-- Add `producthunt` to the `Source` type.
-- Add Product Hunt SVG Icon (custom "P" brand logo) to icons asset list.
-- Color theme: Dark Orange/Red (`#da552f` / `rgb(218, 85, 47)`).
-- Pill badge style: `.badge-producthunt`.
+`producthunt` in `SourceName`, `Builder.source` union, `ALL_SOURCES` + `SOURCE_META`
+(opt-in) in `SearchPage.tsx`, `PersonResultCard.tsx`; `ProductHuntIcon` in
+`BrandIcons.tsx`; `.badge-producthunt` (brand `#da552f`) in `src/shared/styles/globals.css`.
+
+## Non-goals
+
+Upvoting/reviewing from BuilderHunt; free-text product search (the API cannot do it);
+"Launched products" profile widget (defer to builder-profile work); GitHub-username-based
+dedup logic.
 
 ## Success metrics
 
-- **Coverage**: Increase the representation of "indie hackers" and "solo founders" in tech queries by 20%.
-- **Retention**: Active recruiters who filter by Product Hunt stay on profile views 15% longer due to the tangible product validation.
-
-## Open questions
-
-- **Rate Limit Constraints**: Product Hunt GraphQL API has a complexity-based rate limit system. How do we prevent running out of credits during high-concurrency searches?
-  - *Recommendation*: Cache the resolved "makers" of posts aggressively (e.g. 1 hour) since product launch rosters do not change frequently.
-- **Cross-linking profiles**: The API returns `gitHubUsername` and `twitterUsername` for makers. This allows automatic de-duplication at search time if the builder is also indexed via GitHub.
+- With a token: searching "ai" or "developer tools" with only the PH pill active returns
+  maker cards with launch counts and vote totals; topic-less keywords cleanly return
+  nothing from this source.
+- Without a token: zero requests, zero errors, zero results.

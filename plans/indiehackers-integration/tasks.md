@@ -1,37 +1,30 @@
 # Tasks: IndieHackers Integration
 
-> **Note: skip unless you really need founder signal**. No public API, scraping is fragile, effort is high.
+> **Status**: `blocked`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Blocked on data access — no official API exists and the SPA cannot be
+> read by the plain-`fetch` connector pattern. Only decision tasks are valid; no connector
+> code until unblocked.
 
-## Why this plan is short
+- [ ] **Make the blocking decision: skip / approve scraping / re-check**
+  - Files: `plans/indiehackers-integration/spec.md`,
+    `plans/indiehackers-integration/plan.md`
+  - Do: product owner picks option (a), (b), or (c) from the spec's "Blocking decision"
+    section. On (a) — recommended — record the decision in all three headers, point at
+    [`producthunt-integration`](../producthunt-integration/spec.md) and the optional
+    tagging mini-plan as the replacements, and stop. On (b): rewrite this plan as a
+    background-ingestion worker plan (per `plans/_meta/app-reality.md` constraint #3)
+    before any code. On (c): keep `blocked` with a yearly re-check note.
+  - Verify: the three status headers in this directory reflect the decision and agree
+    with each other.
 
-There's no good path. Each option has significant downsides:
-
-## Option A: Scrape the public site
-- [ ] Set up Puppeteer or Playwright
-- [ ] Login with a test account
-- [ ] Scrape user profiles from `/people?query=X`
-- [ ] Parse HTML (no JSON API)
-- [ ] Handle pagination, anti-bot
-- [ ] **Effort: 1+ week**. Fragile to site redesigns.
-
-## Option B: Scrape the public leaderboard
-- [ ] `/leaderboard` is public, has top users
-- [ ] No auth needed
-- [ ] Limited to top 100, no keyword search
-- [ ] **Effort: 3-4 days**. Useful for "top founders" but not for keyword search.
-
-## Option C: Skip and use a tag system
-- [ ] Add a `tags` field to `builders.metadata` JSONB
-- [ ] User can tag a builder as "indie hacker" / "founder" / "bootstrapped"
-- [ ] Filter by tag in search
-- [ ] **Effort: 1-2 days**. Lower quality but no maintenance.
-
-## Recommendation
-
-**Do option C** (self-tagging) before considering A or B. If users complain "I can't find founders", then consider B (leaderboard scrape) as a small feature.
-
-## Estimated effort (if you do it)
-
-- Option A: L (1+ week)
-- Option B: M-L (3-5 days)
-- Option C: S (1-2 days)
+- [ ] **(Only under option (a), and only if founder-filter demand exists) Spec the
+      "builder tags + founder filter" mini-plan**
+  - Files: `plans/` (new directory, e.g. `plans/builder-tags/`)
+  - Do: write spec/plan/tasks per `plans/_meta/conventions.md` for user-applied tags on
+    tracked builders (namespaced `builders.metadata.userTags` key, filter UI in the search
+    and tracked-builders views, plan-tier-neutral). This replaces IndieHackers as the
+    "find founders" answer with zero scraping.
+  - Verify: the new plan passes the conventions checklist (three files, status headers,
+    Files/Do/Verify tasks) and is referenced from this directory's spec.

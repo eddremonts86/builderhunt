@@ -1,53 +1,59 @@
-# Plan: AI Code-Style Fingerprinting
+# Code-Style Fingerprinting — v2 AI Upgrade (plan)
 
-## Goal recap
+> **Status**: `partially-implemented` (v1 heuristic shipped; phases below are the v2 work)
+> **Depends on**: [`ai-expansion`](../ai-expansion/spec.md)
+> **Blocks**: [`team-synergy`](../team-synergy/spec.md) (soft), [`work-sample`](../work-sample/spec.md) (soft — shared `src/lib/github/content.ts`)
+> **Reality check**: `src/shared/lib/code-style.ts` + `code-style.test.ts` + `src/shared/components/CodeStyleCard.tsx` are live (client-side heuristic, nothing persisted). The AI platform (`src/shared/lib/ai/*`, `/api/ai/*`) must exist through its Phase 3 before Phase 2 here.
 
-Build a code compatibility profiling engine that maps developers' coding signatures based on AST analysis and LLM profiling, allowing recruiters to upload code snippets and find developers with similar style habits.
+## Delivered (v1 — do not re-plan)
 
-## Why this is a valuable addition
+- Heuristic fingerprint generator and `similarity()` — `src/shared/lib/code-style.ts`, tested.
+- Profile card rendering the fingerprint — `src/shared/components/CodeStyleCard.tsx`,
+  mounted in `BuilderProfilePage.tsx`.
+- Pricing promise — "Code fingerprinting" under Pro in `billing-shared.ts`.
 
-1. **Deep Code alignment**: No other candidate matching tool looks at actual coding structure and paradigm habits. This represents a highly disruptive feature for recruitment software.
-2. **Accelerates Onboarding**: Teams waste time arguing about styling and architecture in PRs. Matching candidates with pre-aligned habits reduces codebase friction.
-3. **Interactive UI Hook**: Tech leads love testing code snippets. It provides an immediate interactive hook that drives word-of-mouth adoption.
+## Phases (v2)
 
-## Phases
+### Phase 1 — GitHub content fetcher (no AI, independently shippable)
 
-### Phase 1: AST Parser Integration (`src/lib/fingerprint/parser.ts`)
-- Implement a parser utility (using lightweight Javascript AST tools like `acorn` or simple regex/line counters for multi-language support).
-- Extract structural metrics:
-  - Average lines per function.
-  - Ratio of comment lines to code lines.
-  - Number of exported modules vs. imports.
-  - Count of test descriptors (`describe`, `test`, `assert`).
+`src/lib/github/content.ts`: repo selection, tree walking, candidate-file filtering/ranking,
+blob fetching, and the pure pre-stats functions (`testFileRatio`, `avgCommentDensity`,
+exclusion regex, ranking comparator). Pure parts unit-tested against fixture trees. This
+module is deliberately task-agnostic — [`work-sample`](../work-sample/plan.md) reuses it.
 
-### Phase 2: LLM Profiler (`src/lib/fingerprint/profiler.ts`)
-- Combine AST metrics with 3 key code snippets from the builder's repos.
-- Invoke Gemini API (`gemini-2.5-flash`) to normalize inputs and output the structured `CodeStyleFingerprint` JSON block.
-- Cache the fingerprint in the `builders` table under the `metadata.codeStyleFingerprint` field.
+### Phase 2 — Task registration + generation endpoint
 
-### Phase 3: Distance Vector Query Actions
-- Create Server Function `findStyleMatches({ sampleCode })`.
-- Within the function:
-  - Generate fingerprint for `sampleCode`.
-  - Calculate Euclidean distance across the 6 dimensions of the fingerprint vector.
-  - Return the top 15 matches sorted by distance ascending.
+Register `fingerprint-v2` in `src/shared/lib/ai/tasks.ts` (schemas, prompt, allowances
+`{ free: 0, pro: 20, team: 40 }`, TTL 30 d). Build
+`POST /api/builders/$builderId/fingerprint` implementing the 10-step flow from the spec,
+persisting the versioned envelope to `builders.metadata.codeStyleFingerprint` via `jsonb_set`.
 
-### Phase 4: Drag & Drop Dashboard UI
-- Build the `/fingerprint` dashboard view.
-- Create the drop zone with CSS glow animations.
-- Display styling radar comparisons for each candidate (comparing sample code metrics against candidate profile).
+### Phase 3 — UI upgrade
 
-### Phase 5: Verification & Safety
-- Write unit tests validating that the distance calculation correctly handles null or default profiles.
-- Set a file size limit (max 500KB) for uploaded samples to avoid overloading the parser.
+`CodeStyleCard.tsx` renders stored v2 when present (caption, evidence bullets, relative
+date), keeps v1 otherwise; "Analyze real code" button with plan-gate/budget/error states;
+hidden per `/api/ai/config` degradation rules.
+
+### Phase 4 — Match against my tracked builders (density-gated)
+
+Sample-file fingerprinting (same task, single-sample input) + ranking the user's tracked
+builders with the existing `similarity()`. UI appears only at ≥ 20 stored v2 fingerprints
+among the user's tracked builders. Global cross-user matching stays cut (Future — see spec).
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Multi-language styling inconsistencies** | High | Medium | Normalize metrics per language. (e.g. do not compare a Python script against a Rust builder's fingerprint directly without language qualifiers). |
-| **Parsing syntax errors on invalid code** | Medium | Low | Use try-catch blocks in the parser. If AST parsing fails, fallback to simple regex-based line analysis. |
+| Risk                                    | Likelihood | Impact | Mitigation                                                                                                            |
+| --------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------- |
+| GitHub rate limits (13 req/generation)  | Medium     | Medium | Require `GITHUB_TOKEN`; hard request cap per generation; abuse rate limit 5/user/h; 30-day artifact freshness.        |
+| Prompt injection via code comments      | High       | Medium | `wrapUntrusted` on every sample; system-prompt data-not-instructions rule; poisoned-fixture test.                     |
+| Scores still feel arbitrary (LLM noise) | Medium     | Medium | Require `evidence` citations in the schema; temperature 0.2 (platform default); 30-day cache stabilizes repeat views. |
+| v1/v2 shape drift breaks `similarity()` | Low        | High   | Model schema reuses v1 metric names/ranges; type-level compatibility test.                                            |
+| Phase 4 demos empty (no density)        | High       | Low    | UI gated on ≥ 20 stored fingerprints with an explanatory hint; no dead search box.                                    |
 
 ## Rollback plan
 
-- The fingerprint search is an independent view. Disable the `/fingerprint` link if LLM API usage spikes, leaving traditional search active.
+- Task-level kill: `AI_DISABLED_TASKS=fingerprint-v2` — endpoint 503s, UI hides the analyze
+  button, v1 heuristic card keeps rendering (no deploy needed).
+- Persisted envelopes are inert data under one namespaced metadata key; safe to leave, or
+  clear with a single `jsonb - 'codeStyleFingerprint'` update.
+- Phase 4 UI is an isolated panel; removing it touches no other surface.

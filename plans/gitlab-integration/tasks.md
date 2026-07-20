@@ -1,116 +1,44 @@
 # Tasks: GitLab Integration
 
-## Phase 0 — Read first
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector, pipeline wiring, UI pill, badge, icon, scoring branch, and
+> env var all exist. Only token-gated search and `.env.example` docs remain.
 
-- [ ] `src/lib/sources/github.ts` — pattern to follow
-- [ ] `src/lib/score.ts` — how scoring works, how to add source-specific quirks
-- [ ] `src/lib/dedup.ts` — current dedup logic, plan for cross-source merge
-- [ ] `src/modules/landing/components/BrandIcons.tsx` — add GitLab icon
+## Delivered
 
-## Phase 1 — Data model
+- [x] **Create GitLab connector** — Done: `src/lib/sources/gitlab.ts`
+      (`searchGitLab(keywords, {page, perPage})`, top-500-starred-projects sampling + owner
+      aggregation; errors return `[]`).
+- [x] **Register in federated search** — Done: `src/lib/search.ts` (import + gate),
+      `gitlab` in `SourceName` union (`src/lib/sources/types.ts`).
+- [x] **Add `GITLAB_TOKEN` env var** — Done: `src/shared/lib/env.ts` (optional).
+- [x] **UI source pill + metadata** — Done: `ALL_SOURCES` + `SOURCE_META.gitlab` in
+      `src/modules/search/components/SearchPage.tsx` (opt-in, not default-active);
+      `SOURCE_META` in `src/modules/search/components/PersonResultCard.tsx`.
+- [x] **Brand icon** — Done: `GitLabIcon` in `src/modules/landing/components/BrandIcons.tsx`.
+- [x] **Badge CSS** — Done: `.badge-gitlab` in `src/shared/styles/globals.css`.
+- [x] **Scoring quirk for missing followers** — Done: `gitlab` branch in `src/lib/score.ts`
+      (total stars as `followersCount` proxy, fork bonus, `metadata.lastSeen` recency).
 
-- [ ] **No schema changes.** Use the same `builders` table; rely on `source: 'gitlab'`.
+## Remaining
 
-## Phase 2 — New source: `src/lib/sources/gitlab.ts`
+- [ ] **Use `GITLAB_TOKEN` to unlock authenticated user/project search**
+  - Files: `src/lib/sources/gitlab.ts`
+  - Do: when `env.GITLAB_TOKEN` is set, call
+    `GET https://gitlab.com/api/v4/search?scope=users&search={q}&per_page=20` and
+    `?scope=projects` (header `PRIVATE-TOKEN`), map users to `kind: 'person'`
+    (`id: gl-user-{username}`, `followersCount: undefined` — score falls back to recency/
+    quality) and projects through the existing `projectToRepoBuilder`. Keep the current
+    top-500 sampling as the tokenless fallback. Wrap every fetch in try/catch returning `[]`.
+  - Verify: with `GITLAB_TOKEN` set, search "kubernetes" with only the GitLab pill active
+    returns user cards whose usernames are not owners of top-500-starred projects; with the
+    token unset, results are unchanged from today.
 
-- [ ] Create the file
-- [ ] Add to `BuilderKind` type: `'person' | 'repo'`
-- [ ] `searchGitLabUsers(query, token?)`:
-  - `GET /search?scope=users&search={query}&per_page=20`
-  - Map to `RawBuilder[]` with `kind: 'person'`, `source: 'gitlab'`
-  - Use `user.id` for `sourceId`
-  - Use `user.web_url` for `profileUrl` (already full URL)
-  - `avatarUrl: user.avatar_url` (already full URL)
-  - `metadata` includes: `createdAt`, `location`, `organization`, `jobTitle`, `publicProjects` (if available)
-  - **`followersCount: undefined`** — not exposed by API
-- [ ] `searchGitLabProjects(query, token?)`:
-  - `GET /search?scope=projects&search={query}&per_page=20`
-  - Map to `RawBuilder[]` with `kind: 'repo'`, `source: 'gitlab'`
-  - `followersCount: project.star_count` (try first) or `project.forks_count` (fallback)
-  - `topics: project.topics` (if any) or `project.tag_list` (legacy)
-  - `metadata` includes: `stars`, `forks`, `issues`, `lastActivityAt`
-- [ ] `searchGitLab(keywords, token?)`:
-  - Run both in parallel via `Promise.all`
-  - Combine: `[...users, ...projects]`
-- [ ] Add `GITLAB_TOKEN` to `src/shared/lib/env.ts` (optional, increases rate limit)
-
-## Phase 3 — Wire into the search pipeline
-
-- [ ] Update `src/lib/search.ts` to include `searchGitHub`, `searchGitLab`, etc.
-- [ ] Update `BuilderKind` union in `src/lib/search.ts` if needed
-- [ ] Update `ALL_SOURCES` and `SOURCE_META` in `SearchPage.tsx`:
-  - Add `'gitlab'` to the `Source` type
-  - Add `SOURCE_META.gitlab = { label: 'GitLab', color: 'badge-gitlab', Icon: GitLabIcon }`
-  - Add GitLab to the default active sources (4 → 5)
-
-## Phase 4 — Brand icon
-
-File: `src/modules/landing/components/BrandIcons.tsx`
-
-- [ ] Add `GitLabIcon` (inline SVG, same pattern as `GithubIcon`)
-- [ ] Color: `#FC6D26` (GitLab tanuki orange)
-
-## Phase 5 — UI badge + scoring
-
-- [ ] Add `.badge-gitlab` to `globals.css`:
-  ```css
-  .badge-gitlab { background: rgba(252, 109, 38, 0.12); color: #FC6D26; border-color: rgba(252, 109, 38, 0.2); }
-  ```
-- [ ] Update `src/lib/score.ts` to handle GitLab's missing `followersCount`:
-  - If `followersCount === undefined` and `source === 'gitlab'`, fall back to a relevance score based on:
-    - Bio keyword match (already in place)
-    - Recency of `lastActivityAt` (if `kind === 'repo'`)
-    - For users: just rely on the existing recency-based score
-  - This is a **quirk**, not a hack: GitLab users have less social proof but are equally good builders
-
-## Phase 6 — Verification
-
-### Manual
-- [ ] Anonymous: search "kubernetes" with GitLab enabled → see GitLab users in results
-- [ ] Anonymous: search "kubernetes" with GitLab disabled → no GitLab results
-- [ ] Logged in: save search with GitLab enabled → search has the `gitlab` source
-- [ ] GitLab user card shows the orange badge and GitLab icon correctly
-
-### Automated (Playwright)
-- [ ] Toggle "GitLab" off → result count decreases
-- [ ] Toggle "GitLab" on → result count increases
-- [ ] GitLab cards have the `.badge-gitlab` class
-
-### Performance
-- [ ] GitLab endpoint < 400ms (rate-limit aware)
-- [ ] Cache: in-memory LRU 5min, keyed by `(query, sources)`
-- [ ] If 429 (rate limit), degrade gracefully to cached results
-
-## Phase 7 — Rollout
-
-- [ ] Soft launch: enable GitLab for all users by default
-- [ ] Monitor: 7 days
-- [ ] Track: % searches using GitLab, click-through rate vs GitHub, dismiss rate
-- [ ] If dismiss rate > 50%, review scoring and data quality
-- [ ] If GitLab proves valuable, add it to the popular queries on the landing page
-
-## Edge cases to handle
-
-- **Rate limit (429)**: back off exponentially, serve cached results if available
-- **GitLab user with no public activity**: filter out (or show with "low activity" indicator)
-- **Same person on GitHub + GitLab with same email**: dedup logic (deferred to v2, document in spec)
-- **Private GitLab users**: not accessible via public API, skip
-- **Self-hosted GitLab instances**: not in scope; document as future
-- **Search returns 0 results from GitLab**: silently skip, don't error the whole request
-
-## Dependencies
-
-- Existing: `RawBuilder`, `search.ts`, `score.ts`, `dedup.ts`, `SearchPage`
-- New: `GITLAB_TOKEN` env var (optional)
-- Schema: no changes
-
-## Estimated effort
-
-| Phase | Effort |
-|-------|--------|
-| 2 — New source | S (4-6h) |
-| 3 — Wire in | XS (1-2h) |
-| 4 — Brand icon | XS (30min) |
-| 5 — UI + scoring | S (2-3h) |
-| 6 — Verification | S (2-3h) |
-| **Total** | **~1.5 days** |
+- [ ] **Document `GITLAB_TOKEN` in `.env.example`**
+  - Files: `.env.example`
+  - Do: add `GITLAB_TOKEN=` under the "External Source API Tokens" section with a comment
+    (raises quota 2000/h to 6000/h and unlocks user search; from gitlab.com Settings >
+    Access Tokens, `read_api` scope).
+  - Verify: `grep GITLAB_TOKEN .env.example` prints the documented line.

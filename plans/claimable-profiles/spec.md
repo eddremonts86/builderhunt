@@ -1,184 +1,166 @@
-# Feature: Public Claimable Builder Profiles
+# Claimable Builder Profiles — Specification
+
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`portfolio-builder`](../portfolio-builder/spec.md)
+> **Reality check**: Claim columns and request/view tables exist in `src/shared/lib/db/schema.ts` and `drizzle/0000_tranquil_hemingway.sql`; public profile, claim, verification, email, and owner-edit surfaces exist in `src/routes/builders/$builderId.tsx`, `src/routes/api/builders/`, `src/shared/lib/email.ts`, and `src/routes/_dashboard/me/index.tsx`. The current email flow accepts an arbitrary address and then sets `isVerified = true`, so it proves mailbox access but not ownership of the indexed source identity. `builders` is also a per-user cache, so one external identity may have several rows with inconsistent claim state.
 
 ## Problem
 
-BuilderHunt hoy es una plataforma de **un solo lado**: solo los "cazadores" (recruiters, founders, maintainers) la usan. Los builders (las personas indexadas) no saben que existen, no pueden reclamar su perfil, y no pueden enriquecer la data que los representa.
+Builders can discover, claim, and edit a tracked profile today, but the trust boundary is
+not sound. `POST /api/builders/$builderId/claim` sends a link to the address supplied by the
+requester; `GET /api/builders/claim/verify` then marks the row verified. Nothing binds that
+address to `builders.source` and `builders.sourceId`. In addition, claim state is stored on
+one per-user cache row rather than on the external identity shared by duplicate rows.
 
-Eso es un problema porque:
-1. **Data drift.** Si un builder cambia de enfoque, de país, o deja de estar activo, no hay forma de que la plataforma lo sepa. La data se queda obsoleta.
-2. **Confianza cero.** Un recruiter ve "John Doe — Rust async" sin verificación. ¿Es el John correcto? ¿Está todavía activo? No hay forma de saberlo.
-3. **Sin flywheel.** Cazadores guardan builders → esa data no vuelve a los builders → builders nunca llegan a la plataforma → el crecimiento depende 100% de la adquisición por parte de los cazadores.
-4. **Sin moat de network effects.** Cualquiera puede scrapear la misma data de GitHub. La única defensa sostenible es que los builders quieran **estar** en BuilderHunt.
+Public reads currently return the complete builder row. A production claim surface needs a
+public DTO, auditable proof, transactional one-time verification, revocation, and tests.
 
 ## Goal
 
-Convertir BuilderHunt en una plataforma de **dos lados**:
-- **Cazadores** descubren, guardan, contactan.
-- **Builders** reclaman su perfil, lo enriquecen, lo mantienen, y (opcionalmente) declaran su disponibilidad.
+Deliver a trustworthy two-sided profile surface in which:
 
-El día que un builder busca su propio nombre en Google y encuentra su perfil BuilderHunt — con un badge "Verified" y un link a su repo — la plataforma se vuelve imparable. Ahora el builder tiene una razón para volver, actualizar su info, y mantener su perfil fresco.
+- a claim belongs to the canonical external identity `(source, sourceId)`, not to one
+  hunter's cached row;
+- `verified` means BuilderHunt checked proof controlled by that source identity;
+- a verified owner can curate public topics and availability without mutating scraped data;
+- anonymous readers receive only an explicit public-field allowlist;
+- duplicate `builders` rows resolve to the same active claim;
+- operators can revoke a disputed claim without deleting tracked builder data.
 
 ## Non-goals
 
-- **No es un LinkedIn.** No es una red social, no es un portfolio completo, no hay endorsements ni recomendaciones.
-- **No es público-anónimo.** Los profiles son públicos. Si el builder quiere estar fuera, no reclamamos. Pero la data scraped de fuentes públicas ya es pública.
-- **No es verificado-por-empleador.** Verified = "este perfil es realmente de esta persona y está mantenido por ella". No = "esta persona es un developer senior".
-- **No requiere todos los campos.** Un builder puede reclamar sin añadir nada. Solo el badge cambia.
+- Endorsements, messaging, team ownership, a public directory, or reputation scoring.
+- Treating verification as an assessment of ability or seniority.
+- Editing source-owned bio/avatar fields in v1.
+- Fabricated “saved by” or search-keyword analytics. Only measured aggregates may ship.
+- Portfolio publishing; that is owned by [`portfolio-builder`](../portfolio-builder/spec.md).
 
-## User stories
+## Delivered scope
 
-### Builders (lado "reclamado")
-1. **Como builder**, quiero buscar mi nombre, encontrar mi perfil, y reclamarlo con un click.
-2. **Como builder**, quiero verificar que el perfil es mío vía OAuth (GitHub, Reddit, etc.) o vía un email al email público de mi profile.
-3. **Como builder verificado**, quiero añadir/editar mis topics, mi bio, y mi "open to" status (chats, hires, mentoring, nada).
-4. **Como builder verificado**, quiero ver analytics: cuántas personas me han guardado, qué keywords usaron, top sources.
+- Claim-related builder columns, `builder_claim_requests`, and `builder_profile_views` exist.
+- `/builders/$builderId` renders publicly with SEO metadata and a claim CTA.
+- Claim request rate limiting, Resend delivery with a development fallback, expiring
+  one-time links, account creation/reuse, verified badge rendering, and the `/me` editor
+  exist.
+- `PATCH /api/me/builder/$builderId` validates topics/availability and enforces
+  `claimedByUserId` ownership.
 
-### Visitantes (público)
-5. **Como visitante**, quiero ver `/builders/<username>` y ver el perfil completo con badge de verificación si aplica.
-6. **Como visitante**, quiero ver "saved by 12 people" o "tracked by 3 teams" como social proof.
-7. **Como visitante no-auth**, no puedo guardar (auth required) pero puedo ver el perfil completo y subscribir al RSS del builder.
+These are useful foundations, but they do not satisfy the identity, privacy, atomicity, or
+test gates below.
 
-### Cazadores (lado autenticado)
-8. **Como cazador**, los perfiles reclamados y verificados aparecen más arriba en search (signal boost).
+## Canonical data model
 
-## UX flow
+Add `builder_claims` as the source of truth:
 
-### Página pública de perfil: `/builders/<username>`
-
-```
-┌─────────────────────────────────────────────────────────┐
-│  [avatar]  John Doe  ✓ Verified                          │
-│            @johndoe  · github.com/johndoe                │
-│            Senior Rust engineer working on async runtimes│
-│                                                         │
-│  Topics: [rust] [async] [distributed-systems] [tokio]  │
-│  Source: GitHub  Hacker News                             │
-│  Last seen: 2 days ago                                   │
-│                                                         │
-│  ─────────────────────────────────────────────────       │
-│                                                         │
-│  🟢  Open to: chats about Rust, mentoring               │
-│                                                         │
-│  ─────────────────────────────────────────────────       │
-│                                                         │
-│  Stats                                                  │
-│  • 47 stars · 12 forks on top repo                      │
-│  • 23 HN comments this month                            │
-│  • Trending in: rust, async, distributed systems       │
-│                                                         │
-│  Recent activity                                        │
-│  • 2 days ago — 1.2k stars on tokio-rs/mio              │
-│  • 5 days ago — Top HN comment on "async Rust in 2026"  │
-│  • 1 week ago — Release v0.3.2 of hyper                 │
-│                                                         │
-│  ─────────────────────────────────────────────────       │
-│                                                         │
-│  Saved by 12 people · 3 teams                           │
-│                                                         │
-│  [  Save to my list  ]  [  Add note  ]                   │
-│  [  Subscribe to RSS  ]                                 │
-│                                                         │
-│  ─────────────────────────────────────────────────       │
-│                                                         │
-│  Is this you? [Claim this profile →]                   │
-└─────────────────────────────────────────────────────────┘
+```ts
+builderClaims = {
+  id: string,
+  source: string,
+  sourceId: string,
+  claimedByUserId: string,
+  verificationMethod: 'source-challenge' | 'trusted-source-email',
+  verifiedAt: Date,
+  revokedAt: Date | null,
+  revokedReason: string | null,
+  metadata: {
+    claim?: { schemaVersion: 1, lastReverifiedAt: string },
+    portfolio?: unknown // owned exclusively by portfolio-builder
+  },
+  createdAt: Date,
+  updatedAt: Date
+}
 ```
 
-### Reclamar perfil (no auth)
+Constraints: unique `(source, sourceId)` among all rows; indexes on
+`claimedByUserId` and `(source, sourceId)`; an active claim has `revokedAt = null`.
+`builders.isClaimed`, `claimedByUserId`, `isVerified`, and timestamps remain temporary
+compatibility mirrors until all readers use `builder_claims`. Backfill groups duplicate
+rows by `(source, sourceId)` and refuses conflicting verified owners for manual review.
 
-1. Visit `/builders/<id>` (no auth)
-2. Click "Is this you? Claim this profile"
-3. **Modal:** "We'll send a verification link to the email we have on file. If that doesn't work, you can verify via [GitHub OAuth]."
-4. Enter email → receive link with signed token
-5. Click link → if matches, profile becomes `claimed + pending_verified`
-6. Optional: connect GitHub OAuth to flip to `verified`
+Extend `builder_claim_requests` with `requesterUserId`, `method`, `tokenHash`,
+`challengeHash`, `attemptCount`, and `supersededAt`. New secrets are stored only as SHA-256
+hashes. Existing plaintext `token` values are invalidated during migration, not copied.
 
-### Builder dashboard (auth required, is a claimed builder)
+## Verification policy
 
-`/me/dashboard`:
-```
-┌─────────────────────────────────────────────────────────┐
-│  Your profile  ✓ Verified                                │
-│  ────────────────────────────                           │
-│  This week                                              │
-│  12 people saved you                                    │
-│  8 people searched for your handle directly            │
-│  Top keywords others used: "rust", "async", "tokio"    │
-│                                                         │
-│  [  Edit profile  ]  [  View public profile  ]          │
-│  [  Set "open to" status  ]  [  Notification settings  ]│
-└─────────────────────────────────────────────────────────┘
-```
+Claim initiation requires an authenticated account. The server reads `source`, `sourceId`,
+and `username` from the builder row; the client cannot choose the identity being verified.
 
-## Data model changes
+1. Prefer a **source challenge**: generate `builderhunt-verify-<random>`, return it once,
+   and ask the requester to place it temporarily in the canonical public source profile.
+   The server adapter fetches that profile directly and confirms both stable source ID and
+   challenge. Initial adapters: GitHub, GitLab, Codeberg, and DEV.to. Unsupported sources
+   show an honest unavailable state.
+2. `trusted-source-email` is allowed only when the source API itself exposes an email for
+   that exact stable source ID. Compare normalized addresses server-side, send the link to
+   the source-provided address, and return the same generic response for match/mismatch.
+3. Email ownership alone never sets `verified` unless step 2 bound it to source data.
+4. Verification locks the request row, consumes it, and upserts the canonical claim in one
+   DB transaction. Concurrent requests cannot transfer an active claim.
+5. Limits: 5 starts/IP/day, 5 starts/user/day, 10 proof checks/request, 24-hour expiry;
+   superseding a request invalidates earlier requests for the same canonical identity.
 
-**`builders` table — new columns:**
+## API and authorization
 
-```sql
-ALTER TABLE builders ADD COLUMN
-  is_claimed boolean DEFAULT false NOT NULL,
-  claimed_by_user_id text REFERENCES auth_users(id) ON DELETE SET NULL,
-  claimed_at timestamp with time zone,
-  is_verified boolean DEFAULT false NOT NULL,
-  verified_at timestamp with time zone,
-  open_to_status jsonb DEFAULT '[]'::jsonb,  -- ['chats', 'mentoring', 'hires']
-  claimed_topics jsonb DEFAULT '[]'::jsonb;  -- builder-curated topics (separate from scraped)
-```
+- `GET /api/builders/$builderId`: public, returns `PublicBuilderProfileSchema` only. It
+  joins active canonical claim state by `(source, sourceId)` and never returns `userId`,
+  `claimedByUserId`, raw `metadata`, emails, notes, or claim-request data.
+- `POST /api/builders/$builderId/claim`: authenticated; creates a proof request and returns
+  the challenge once or a generic email-delivery acknowledgement.
+- `POST /api/builders/claim/verify`: authenticated; verifies source-bound proof and returns
+  a typed result. State-changing verification must not use GET.
+- `GET /api/me/builder` and `PATCH /api/me/builder/$builderId`: active verified owner only;
+  an admin may inspect/revoke through a separate admin route but cannot silently edit the
+  owner's public fields.
+- `POST /api/admin/builder-claims/$claimId/revoke`: admin only, requires a reason and emits
+  an audit log.
 
-**New table: `builder_claim_requests`**
+Authorization tests cover anonymous, unrelated authenticated user, verified owner, and
+admin for every route.
 
-```sql
-CREATE TABLE builder_claim_requests (
-  id text PRIMARY KEY,
-  builder_id text NOT NULL REFERENCES builders(id) ON DELETE CASCADE,
-  email text NOT NULL,
-  token text NOT NULL UNIQUE,
-  expires_at timestamp with time zone NOT NULL,
-  used_at timestamp with time zone,
-  created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-```
+## Public fields and privacy
 
-**New table: `builder_profile_views` (for analytics)**
+The public DTO may contain: id, source, sourceId, username, displayName, avatarUrl, bio,
+profileUrl, follower count, language, country, scraped topics, claimed topics, open-to
+status, last-seen timestamp, and boolean/dated verification state. Claimed owner IDs,
+request emails, tokens/challenges, per-user row ownership, raw metadata, notes, and viewer
+identity are private.
 
-```sql
-CREATE TABLE builder_profile_views (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  builder_id text NOT NULL REFERENCES builders(id) ON DELETE CASCADE,
-  viewer_id text REFERENCES auth_users(id) ON DELETE SET NULL,  -- null if anonymous
-  viewed_at timestamp with time zone DEFAULT now() NOT NULL
-);
--- Index on (builder_id, viewed_at DESC) for analytics
-```
+Profile views are recorded only after the product's analytics consent policy permits it.
+Anonymous views contain no IP or fingerprint. Owner analytics are aggregates with a
+minimum cohort threshold; raw viewer IDs are never exposed. A revoked claim hides
+owner-curated fields until ownership is re-established.
 
-## Success metrics
+## UX
 
-- **Primary:** % of indexed builders who are claimed within 90 days. Target: 10% (assuming we have 1000+ indexed builders).
-- **Secondary:** % of claimed builders who add `open_to_status` or `claimed_topics`. Target: 50% of claimed.
-- **Tertiary:** Click-through rate from "Claim this profile" CTA. Target: 1% of anonymous profile views.
-- **Quality:** Profile freshness — % of verified profiles with `verified_at < 180 days`. Target: > 70%.
+- Public profile: verified badge explains “source identity verified”, claimed topics and
+  availability are clearly builder-curated, and unsupported claim methods explain the
+  limitation without promising email verification.
+- `/me`: lists all canonical claims for the session user, supports topic/availability
+  editing, links to the public profile, and shows verification age/reverification state.
+- Claim flow: sign in → receive source-specific proof instructions → verify → manage. No
+  account with an unknown password is created as a side effect of an anonymous GET.
+- Disputed/revoked profiles retain scraped public data but lose badge and owner controls.
 
-## Out of scope (this iteration)
+## Success and release gates
 
-- GitHub OAuth verification (v2 — email verification is enough for v1)
-- Editable bio / avatar (the scraped bio is the bio for v1)
-- "Endorsements" from other users
-- Builder-to-builder connections
-- Public builder directory (`/builders` listing all claimed builders)
-- Custom vanity URLs (`builderhunt.dev/johndoe`)
-- Multi-language profile support
+- 100% of newly verified claims have source-bound proof and an audit trail.
+- Duplicate builder rows resolve to one canonical owner in integration tests.
+- No private column appears in the public DTO snapshot.
+- Replay, expiry, concurrent verification, ownership, and revocation tests pass.
+- Claim start-to-verified conversion and verification failures are observable by method;
+  emails and proof secrets are never logged.
+- Runtime smoke: complete one source-challenge claim, edit topics, view the public page
+  anonymously, then revoke it and confirm the badge/owner fields disappear.
 
-## Open questions
+## Resolved edge cases
 
-- **¿Quién puede reclamar un perfil?** Cualquiera con acceso al email del builder (sea el builder o no). Si el impostor reclama, el builder real puede "dispute" y reset. **Para v1:** confiamos en el email + OAuth. Disputes en v2.
-- **¿El perfil es público incluso si no está reclamado?** Sí. Los datos scraped son públicos. Reclamar = control del builder, no = publicity.
-- **¿Verified badge = real authority?** No. Verified = "el builder mantiene este perfil". No dice nada sobre skills.
-- **¿Builders pueden tener cuentas sin ser builders indexados?** Sí, en `/me/onboarding` pueden crear su perfil desde cero si no están en el índice. (v2)
-
-## Privacy
-
-- **`open_to_status`:** público. El builder lo elige explícitamente.
-- **`claimed_topics`:** público. Refuerza la data scraped.
-- **Email:** privado. Solo se usa para enviar el verification link, no se muestra.
-- **`builder_profile_views`:** el builder ve aggregate counts, no la lista de viewers.
-- **Disputes:** si alguien reclama un perfil que no es suyo, el builder real puede "dispute" con proof (commit, post). Reseteamos. (v2)
+- Conflicting legacy owners: migration records the group for admin review and creates no
+  canonical active claim.
+- Deleted/renamed source account: stable source-ID mismatch fails verification without
+  consuming the request.
+- Existing active claim: return conflict; only admin revocation/dispute can transfer it.
+- Builder row deleted during verification: canonical identity can still be checked, but
+  verification fails unless at least one current builder row references it.
+- Existing account: attach the claim to the authenticated user; never create a duplicate.

@@ -1,162 +1,108 @@
-# Feature: Pricing & Plans (Admin-Managed, No Paid Services)
+# Pricing & Billing (Manual, Admin-Approved — No Payment Processor)
 
-## Scope (v1: bootstrap mode)
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`team-accounts`](../team-accounts/spec.md), [`ai-expansion`](../ai-expansion/spec.md), [`semantic-search`](../semantic-search/spec.md), [`code-fingerprinting`](../code-fingerprinting/spec.md), [`work-sample`](../work-sample/spec.md)
+> **Reality check**: Billing v1 is live: `plans`/`plan_changes`/`plan_requests` tables
+> (`src/shared/lib/db/schema.ts`), `PLAN_LIMITS`/`PLAN_PRICING` (`src/shared/lib/billing-shared.ts`),
+> server helpers + limit enforcement (`src/shared/lib/billing.ts` + `billing.test.ts`), `/pricing`
+> page, `/settings/billing`, admin plan-requests UI, `/api/plans/request-upgrade`. **No payment
+> processor exists** and none is planned for launch.
 
-**No external paid services.** No Stripe, no Paddle, no Lemonsqueezy.
+## Problem
 
-v1 uses **admin-managed plans**: an admin flips a switch in the DB to upgrade/downgrade a user. Real billing integrations come later when there's revenue to pay for them.
+BuilderHunt needs a way to monetize (free/pro/team tiers) without spending days integrating
+a payment processor at 0 paying customers. The manual-approval model is built; what remains
+is fixing display bugs, closing enforcement holes, and defining the Stripe trigger point.
 
-This is intentional: at 0 paying customers, integrating a payment processor is a multi-day investment that doesn't pay back. We can validate the tier model with manual plan grants first, then automate when volume justifies it.
+## Goal
 
-## Tiers (same as the original plan)
+A correct, fully-enforced manual billing system: accurate prices on `/pricing`, every limit in
+`PLAN_LIMITS` actually enforced (or removed), plan expiry honored, and a documented path to
+Stripe that we deliberately do NOT take until volume justifies it.
 
-| Tier       | Price     | Audience                         | Limits                          |
-|------------|-----------|----------------------------------|----------------------------------|
-| **Free**    | $0         | Curious, exploring              | 3 saved searches, 50 saved builders, basic RSS |
-| **Pro**     | $19/mo    | Active recruiters/founders       | 50 saved searches, unlimited builders, smart alerts, semantic search, code fingerprinting |
-| **Team**    | $99/mo    | Sourcing teams (3-10 seats)     | Everything in Pro + team-synergy, work-sample, shared lists |
+## Non-goals
 
-## How users actually upgrade (v1)
+- **No Stripe/Paddle/Lemonsqueezy at launch.** Decision (2026-07-19): manual admin approval is
+  the right model for a pre-revenue product. Stripe is a defined future phase with an explicit
+  trigger (see "Stripe trigger" below), not launch work.
+- No coupons, tax compliance, refund automation, invoicing.
+- No team seats or shared billing — that is [`team-accounts`](../team-accounts/spec.md), which
+  owns `PLAN_LIMITS.seats` and the `getEffectivePlan(userId)` helper.
 
-1. User clicks "Get Pro" on `/pricing`
-2. Modal: "Contact us at hello@builderhunt.dev to upgrade"
-3. Admin sees the request (logged in DB), confirms payment manually (bank transfer, crypto, whatever)
-4. Admin goes to `/admin/users`, finds the user, sets their `plan` to `pro` and `plan_ends_at` to now + 30 days
-5. User's session refreshes, sees Pro features unlocked
+## Delivered (audited 2026-07-19)
 
-When volume justifies it (50+ paying customers or $1k MRR), we integrate Stripe and automate the upgrade flow.
+- **Tiers & pricing**: free $0 / pro $19/mo ($182/yr) / team $99/mo ($950/yr) in
+  `PLAN_PRICING` (`src/shared/lib/billing-shared.ts`), with per-tier feature lists.
+- **Data model**: `plans` (PK `user_id`, 1:1), `plan_changes` (audit log), `plan_requests`
+  (upgrade queue) — all in `src/shared/lib/db/schema.ts`, migrated.
+- **Server helpers** (`src/shared/lib/billing.ts`, 12 tests in `billing.test.ts`):
+  `getUserPlan` (auto-creates free row), `setUserPlan` (writes `plan_changes`),
+  `requestPlanUpgrade` (dedupes pending), `resolvePlanRequest`, `checkLimit`,
+  `listAllUsersWithPlans`, `listPlanRequestsWithUsers`.
+- **Limit enforcement**: `savedSearches` in `src/routes/api/queries/index.ts`;
+  `savedBuilders` in `src/routes/api/builders/track.ts` (counts tracked builders);
+  smart alerts gated to paid plans in `src/routes/api/alerts/index.ts`.
+- **User-facing**: `/pricing` (`src/routes/_landing/pricing.tsx`) with monthly/annual toggle,
+  FAQ, request-upgrade flow; `/settings/billing` (`src/routes/_dashboard/settings/billing.tsx`)
+  with plan card, usage meters, plan-change history via `/api/me/plan-changes`;
+  `/api/plans/me`, `/api/plans/request-upgrade`.
+- **Admin**: `/admin/users` (set plan via `/api/admin/users/$userId` → `setUserPlan`),
+  `/admin/plan-requests` (approve/decline via `/api/admin/plan-requests`, approval sets the
+  plan with a 30-day `planEndsAt`).
 
-## Data model
+## Remaining work (each gap cited)
 
-**New table: `plans`** (subscription state per user)
+1. **Pricing renderer uses the wrong contract**: `src/routes/_landing/pricing.tsx:143` reads
+   `config.priceMonthly` / `config.priceAnnual`, but `PLAN_PRICING` entries expose
+   `monthly` / `annual` (`src/shared/lib/billing-shared.ts:13`). The same component also reads
+   nonexistent `maxSavedSearches`, `maxSavedBuilders`, `maxRssFeeds`, `hasAlerts`,
+   `hasCodeStyle`, and `maxTeamSeats` instead of the declared `features[]`. It does not
+   type-check and can render `$undefined`/incorrect feature rows.
+2. **Plan expiry is never enforced**: `setUserPlan` stores `planEndsAt` (admin approval sets
+   now+30d in `src/routes/api/admin/plan-requests/index.ts:72`), but `getUserPlan`
+   (`src/shared/lib/billing.ts:17-39`) returns the stored plan regardless of expiry. A lapsed
+   Pro user keeps Pro forever unless an admin remembers to downgrade.
+3. **`rssSubscriptions` limit is dead config**: defined in `PLAN_LIMITS` and displayed in
+   `/settings/billing`, but no route checks it — `src/routes/api/feeds/$searchId.ts` serves
+   any saved search's feed. RSS feeds are 1:1 with saved searches (already limited), so the
+   separate limit is redundant and should be removed.
+4. **Gates for promised-but-unbuilt features**: `PLAN_PRICING.pro.features` promises
+   "Semantic search" and "Code fingerprinting"; `.team.features` promises "Work-sample
+   analysis", "Team seats", "Shared lists", "Activity feed". Those gates belong to the plans
+   that build the features (see cross-plan map below) — this plan only requires that each of
+   them lands its billing gate before its feature ships.
 
-```sql
-CREATE TABLE plans (
-  user_id text PRIMARY KEY REFERENCES auth_users(id),
-  plan text NOT NULL DEFAULT 'free',  -- 'free' | 'pro' | 'team'
-  status text NOT NULL DEFAULT 'active',  -- 'active' | 'past_due' | 'canceled'
-  plan_ends_at timestamp with time zone,
-  trial_ends_at timestamp with time zone,
-  notes text,  -- admin notes (e.g., "paid via bank transfer 2026-08")
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now()
-);
-```
+## Cross-plan gating map (shared surface: `PLAN_LIMITS`/`PLAN_PRICING` in billing-shared.ts)
 
-**New table: `plan_changes`** (audit log)
+| Promised feature                          | Owning plan                                                                                                                                 | Gate location it must add                                                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Smart alerts (pro)                        | delivered                                                                                                                                   | `src/routes/api/alerts/index.ts` (done)                                                                            |
+| Semantic search (pro)                     | [`semantic-search`](../semantic-search/spec.md)                                                                                             | its search endpoint, via AI task tier policy                                                                       |
+| Code fingerprinting v2 (pro)              | [`code-fingerprinting`](../code-fingerprinting/spec.md)                                                                                     | its enrich endpoint                                                                                                |
+| Work-sample analysis (team)               | [`work-sample`](../work-sample/spec.md)                                                                                                     | its analysis endpoint                                                                                              |
+| Team seats / shared lists / activity feed | [`team-accounts`](../team-accounts/spec.md), [`shared-resources`](../shared-resources/spec.md), [`activity-feed`](../activity-feed/spec.md) | `team-accounts` adds `PLAN_LIMITS.seats` (`free:1, pro:1, team:10`) and `getEffectivePlan(userId)` in `billing.ts` |
+| AI usage allowances per tier              | [`ai-expansion`](../ai-expansion/spec.md)                                                                                                   | per-task rate limits in the AI task registry                                                                       |
 
-```sql
-CREATE TABLE plan_changes (
-  id text PRIMARY KEY,
-  user_id text NOT NULL REFERENCES authUsers(id),
-  from_plan text,
-  to_plan text NOT NULL,
-  changed_by text NOT NULL,  -- userId of admin who made the change
-  reason text,
-  created_at timestamp with time zone DEFAULT now()
-);
-```
+**Rule**: once `team-accounts` ships `getEffectivePlan(userId)`, all new gating code must call
+it instead of `getUserPlan` so team members inherit the owner's plan. Do not duplicate that
+helper here.
 
-**New table: `plan_requests`** (user clicks "Get Pro" — admin sees a queue)
+## Stripe trigger (deferred phase)
 
-```sql
-CREATE TABLE plan_requests (
-  id text PRIMARY KEY,
-  user_id text NOT NULL REFERENCES authUsers(id),
-  requested_plan text NOT NULL,  -- 'pro' | 'team'
-  status text NOT NULL DEFAULT 'pending',  -- 'pending' | 'approved' | 'declined'
-  message text,
-  created_at timestamp with time zone DEFAULT now()
-);
-```
-
-**New env var**: `ADMIN_USER_IDS` (comma-separated list of user IDs that can access /admin)
-
-## Limits enforcement
-
-Same as the original plan, but enforced server-side via a `checkLimit()` helper:
-
-```ts
-// src/shared/lib/limits.ts
-const FREE_LIMITS = { savedSearches: 3, savedBuilders: 50, rssSubscriptions: 3 }
-const PRO_LIMITS = { savedSearches: 50, savedBuilders: Infinity, rssSubscriptions: Infinity }
-const TEAM_LIMITS = PRO_LIMITS // same as Pro for v1
-
-export async function checkLimit(userId, resource) {
-  const plan = await getUserPlan(userId)
-  const limits = plan === 'team' ? TEAM_LIMITS : plan === 'pro' ? PRO_LIMITS : FREE_LIMITS
-  const current = await countResource(userId, resource)
-  return { allowed: current < limits[resource], current, limit: limits[resource], plan }
-}
-```
-
-**Resources affected**:
-- POST `/api/queries` — savedSearches limit
-- POST `/api/builders/:id/save` — savedBuilders limit
-- RSS subscriptions — rssSubscriptions limit
-- Smart alerts — Pro+ only
-- Code fingerprinting — Pro+ only
-- Team-synergy — Team only
-
-## API endpoints
-
-- `GET /api/plans/me` — current user's plan
-- `POST /api/plans/request-upgrade` — user requests upgrade (creates `plan_request`)
-- `GET /api/admin/plan-requests` — admin sees queue
-- `POST /api/admin/plans/:userId` — admin sets plan (creates `plan_changes` entry)
-- `GET /api/admin/users` — list users with their plans
-- `GET /api/admin/plans` — all subscriptions
-
-## UX
-
-### /pricing (public)
-
-- 3 tier cards
-- Monthly/Annual toggle
-- Free card: "Current plan" if applicable
-- Pro/Team cards: "Get Pro" / "Contact us" button (mailto or modal)
-- Comparison table
-- FAQ
-
-### /admin (admin only, gated by `ADMIN_USER_IDS` env)
-
-- `/admin/users` — table of all users with their current plan
-  - Click user → modal to set plan
-- `/admin/plan-requests` — pending upgrade requests, with user contact info
-- `/admin/incidents`, `/admin/changelog` — other admin tasks (separate plan)
-
-## Migration path (when ready to add Stripe)
-
-The `plans` table is already shaped to match what Stripe would sync:
-- `status` = Stripe `subscription.status`
-- `plan_ends_at` = Stripe `current_period_end`
-- `plan` = Stripe `price.lookup_key`
-
-When Stripe is added later:
-- Add a `stripe_customer_id` and `stripe_subscription_id` column
-- Webhook updates the same `plans` table
-- Admin UI is unchanged
-- Manual `POST /api/admin/plans/:userId` is replaced with auto-sync
-
-The limits enforcement and UI work today; only the billing integration is deferred.
+Integrate Stripe only when ≥50 paying customers OR ≥$1k MRR (whichever first). The `plans`
+table is already Stripe-shaped: `status` ↔ `subscription.status`, `planEndsAt` ↔
+`current_period_end`. Migration adds `stripe_customer_id`/`stripe_subscription_id` columns and
+a webhook that calls the existing `setUserPlan`. Admin UI and limit enforcement are unchanged.
+Nothing in the codebase may assume Stripe webhooks exist before then.
 
 ## Success metrics
 
-- **Primary**: Free → Pro conversion (admin-granted). Track in `plan_changes`.
-- **Secondary**: # of plan_requests per week (proxy for "intent to pay")
-- **Tertiary**: Churn (# of `pro` users downgraded back to `free` in a month)
+- Free → Pro conversions per month (rows in `plan_changes` with `to_plan='pro'`).
+- Pending `plan_requests` per week (intent-to-pay signal).
+- Expired plans auto-downgraded within 24h of `planEndsAt` (after task 2 lands).
 
-## Out of scope (v1)
+## Resolved questions
 
-- Self-serve payment (no Stripe)
-- Subscription auto-renewal (admin renews manually)
-- Tax compliance
-- Coupons / promo codes
-- Refund handling
-
-## Open questions
-
-- **How do we price in v1 if we can't take money?** Validation: do people upgrade when we ask them to email us? This is the real test.
-- **Should we use Stripe Atlas to incorporate?** That's a separate plan (legal-and-compliance).
-
-## Estimated effort: 1-2 days (much less than the Stripe version)
+- Manual billing at launch: **yes** — the request→admin-approve loop already works end to end.
+- Annual pricing: totals per year ($182 = 19×12×0.8, $950 = 99×12×0.8), shown with "-20%".

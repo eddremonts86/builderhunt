@@ -1,48 +1,36 @@
 # Tasks: Codeberg (Gitea) Integration
 
-> **Note: deferred** until GitLab integration ships and validates the "second forge" demand.
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Everything shipped except `.env.example` documentation of the two
+> Codeberg env vars.
 
-## Phase 0 — Research
+## Delivered
 
-- [ ] Test Gitea API at `https://codeberg.org/api/v1/` (it should work as a Gitea instance)
-- [ ] Check rate limits and ToS
+- [x] **Create Codeberg connector** — Done: `src/lib/sources/codeberg.ts`
+      (`searchCodeberg(keywords, {page, perPage})`; `GET /users/search` + `GET /repos/search`
+      in parallel; public/non-restricted/non-archived filters; errors return `[]`).
+- [x] **Configurable Gitea base URL** — Done: `CODEBERG_API_URL` in
+      `src/shared/lib/env.ts`, consumed as `CB_BASE` in `codeberg.ts` (works for self-hosted
+      Gitea/Forgejo).
+- [x] **Optional token** — Done: `CODEBERG_TOKEN` in `src/shared/lib/env.ts`, sent as
+      `Authorization: token ...`.
+- [x] **Register in federated search** — Done: `src/lib/search.ts`; `codeberg` in
+      `SourceName` (`src/lib/sources/types.ts`).
+- [x] **UI source pill + metadata** — Done: `ALL_SOURCES` + `SOURCE_META.codeberg` in
+      `SearchPage.tsx` (opt-in); `PersonResultCard.tsx`.
+- [x] **Brand icon + badge** — Done: `CodebergIcon` in `BrandIcons.tsx`; `.badge-codeberg`
+      in `src/shared/styles/globals.css`.
+- [x] **Scoring** — Done: `codeberg` branch in `src/lib/score.ts` (real followers, star and
+      fork bonuses).
 
-## Phase 1 — Data model
+## Remaining
 
-- [ ] No schema changes; `source: 'codeberg'`
-
-## Phase 2 — Source
-
-- [ ] New file `src/lib/sources/codeberg.ts`
-- [ ] `searchCodebergUsers(keywords, token?)`:
-  - `GET /users/search?q={query}&limit=20`
-  - Map to `RawBuilder` with `kind: 'person'`
-  - Source: 'codeberg'
-- [ ] `searchCodebergRepos(keywords, token?)`:
-  - `GET /repos/search?q={query}&limit=20`
-  - Map to `RawBuilder` with `kind: 'repo'`
-- [ ] `searchCodeberg(keywords, token?)`: combine
-
-## Phase 3 — Wire
-
-- [ ] Add `CODEBERG_TOKEN` to env (optional)
-- [ ] Add to `search.ts`, `Source` type, default active sources (off by default)
-- [ ] Add `CodebergIcon` to `BrandIcons.tsx` (use Gitea icon — teal)
-- [ ] Add `.badge-codeberg` to globals.css
-
-## Phase 4 — Scoring
-
-- [ ] Bio match (×10)
-- [ ] Followers count (Gitea exposes it!)
-- [ ] Repo stars (Gitea exposes them!)
-- [ ] Recency of last commit (×5)
-
-## Phase 5 — Verification
-
-- [ ] Manual: search "rust" → see Codeberg users
-- [ ] Performance: < 500ms (Gitea is fast)
-- [ ] Test with `?limit=20` pagination
-
-## Estimated effort
-
-**S-M (1-2 días)**. Pattern is essentially a clone of GitHub integration with a different base URL.
+- [ ] **Document `CODEBERG_API_URL` and `CODEBERG_TOKEN` in `.env.example`**
+  - Files: `.env.example`
+  - Do: add both under "External Source API Tokens":
+    `CODEBERG_API_URL=` (comment: defaults to `https://codeberg.org/api/v1`; point at any
+    Gitea/Forgejo instance) and `CODEBERG_TOKEN=` (comment: optional, raises rate limit;
+    from codeberg.org Settings > Applications).
+  - Verify: `grep CODEBERG .env.example` prints both documented lines.

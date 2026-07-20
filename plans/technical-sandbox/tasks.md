@@ -1,30 +1,14 @@
-# Tasks: AI Technical Persona Sandbox
+# Technical Sandbox — Superseded (tasks)
 
-## Phase 1: Database Setup
-- [ ] Create database migration for `sandbox_chats`
-- [ ] Add `sandbox_chats` mapping inside `src/shared/lib/db/schema.ts`
-- [ ] Configure automatic cascade deletion constraints
+> **Status**: `superseded` — merged into [`work-sample`](../work-sample/tasks.md)
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: no code exists and none will be written under this plan. Rationale in [`spec.md`](./spec.md).
 
-## Phase 2: Persona Prompt Compiler
-- [ ] Create `src/lib/ai/sandbox.ts`
-  - [ ] Implement code and context compiler script
-  - [ ] Write system instruction builder for developer persona roleplay
-  - [ ] Test system prompt outputs using mock data payloads
+## Tasks
 
-## Phase 3: Streaming Route Handler
-- [ ] Create API route or Server Function endpoint supporting Server-Sent Events (SSE) streaming
-  - [ ] Enforce user session authentication
-  - [ ] Stream Gemini API response chunks using `generateContentStream`
-  - [ ] Capture stream completions and append final AI message to `sandbox_chats` database row
-
-## Phase 4: Retro Terminal Frontend UI
-- [ ] Create `src/modules/builder-profile/components/TechnicalSandbox.tsx`
-  - [ ] Design terminal window shell container (dark mode, monospace typography)
-  - [ ] Implement quick-start prompt chips based on builder's projects list
-  - [ ] Implement input state management with mock prompt runner
-  - [ ] Render streaming responses with active Markdown parsing and code snippet highlighting
-  - [ ] Add auto-scroll utility to keep cursor in view
-
-## Phase 5: Verification & Safety
-- [ ] Test SSE connection performance on local networks
-- [ ] Implement strict conversation limits (max 20 messages per session)
+None. The old task list (sandbox_chats migration, persona prompt compiler, SSE streaming
+route, retro terminal UI) is discarded. The surviving idea — interview questions grounded
+in a builder's real code — is implemented by the `work-sample-analyze` task's
+`suggestedInterviewQuestions` field; see
+[`work-sample/tasks.md`](../work-sample/tasks.md) Phase 2 onward.

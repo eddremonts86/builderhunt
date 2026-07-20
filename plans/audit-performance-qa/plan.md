@@ -1,50 +1,96 @@
-# Plan: Performance & QA Validation
+# Delivery Plan: Performance and QA Release Gate
 
-## Goal recap
+> **Status**: `partially-implemented`
+> **Depends on**: [`public-landing-pages`](../public-landing-pages/spec.md)
+> **Blocks**: [`audit-trust`](../audit-trust/spec.md), [`audit-visual-system`](../audit-visual-system/spec.md)
+> **Reality check**: Explicit image dimensions, eager/lazy hints, font preconnects, Vitest, and
+> standalone Playwright scripts already exist. The missing work is active-asset optimization, a
+> supported browser config, quantitative budgets, and CI/deploy enforcement.
 
-Optimize Largest Contentful Paint (LCP) and Cumulative Layout Shift (CLS) on the landing page, configure preloading for fonts, enforce explicit aspect-ratio sizes, and build a Playwright E2E integration test suite.
+## Delivery sequence
 
-## Why this is a valuable addition
+### Phase 0 — Restore a truthful static baseline
 
-1. **Ensures Rapid First Impressions**: Slow page loads directly reduce conversion. Lowering LCP under 2s increases user retention and sign-up conversions.
-2. **Layout Stability (No Shifts)**: Omitted image heights cause layout jumps that frustrate users. Reserving aspect ratio dimensions ensures a smooth load experience.
-3. **PR Build Safety Gates**: Having automated E2E tests prevents regressions from entering production, ensuring all landing buttons, forms, and auth links remain functional.
+Replace the stale pricing renderer contract with the real `PLAN_PRICING` shape (`monthly`,
+`annual`, `label`, and `features`) as specified by `pricing-optimization`, and remove the unused
+`url` assignment in `test/test-landing-redesign.mjs`. Run lint and type-check without suppressions;
+the QA workflow must begin from zero known errors rather than allowlisting the current failures.
 
-## Phases
+### Phase 1 — Make the harness deterministic
 
-### Phase 1: Image Compression Script
-- Since macOS `sips` lacks default WebP output configurations, implement a lightweight Node.js script using the standard `sharp` library to compress and convert the main JPG images:
-  - Create a development utility `scripts/compress-images.ts` that scans the `public/images/` folder and outputs optimized WebP versions.
+Add the QA scripts and pinned tooling to `package.json`/`pnpm-lock.yaml`, then create
+`playwright.config.ts`, `.lighthouserc.cjs`, and `e2e/fixtures/`. Reuse `scripts/db/seed-admin.ts`
+and Docker Compose Postgres/Redis; isolate the QA database name and fixture user. Document exact
+local and CI commands in `README.md`. This phase proves the harness can boot a production build
+before adding assertions.
 
-### Phase 2: Markup Image Sizing & Priority Tags
-- Edit `src/routes/_landing/index.tsx`.
-- Replace the mockup image wrapper. Update it to include `width={1200}`, `height={675}`, `aspect-ratio: 16/9`, `fetchpriority="high"`, and `loading="eager"`.
-- Apply `loading="lazy"` tags to the testimonials avatars and icons lower down the page.
+### Phase 2 — Establish critical runtime coverage
 
-### Phase 3: Font Optimization & Preloading
-- Edit `src/routes/__root.tsx`.
-- Add `<link rel="preload">` configurations for Google Fonts Outfit and Inter.
-- Update global CSS rules to verify `font-display: swap` is active on imports.
+Implement anonymous navigation/link/console tests and one authenticated dashboard smoke test in
+`e2e/`. Mock external source and email boundaries, not BuilderHunt routes. Use semantic selectors
+or `data-testid` values and deterministic fixture cleanup. Store traces/screenshots only after a
+failure and redact auth headers from reporters.
 
-### Phase 4: Playwright E2E Tests Setup
-- Initialize Playwright configs.
-- Create E2E test file: `e2e/landing.spec.ts`.
-- Write test assertions:
-  - Validate that guest search redirects to `/search`.
-  - Validate that waitlist form submission inserts the email address and returns a success status.
-  - Verify that no links return a 404 response.
+### Phase 3 — Optimize the actual transfer path
 
-### Phase 5: Verification & Web Vitals Audit
-- Build the production bundle locally: `npm run build` and `npm run preview`.
-- Run Lighthouse audits on the preview port (usually port 4173) to verify compliance metrics (LCP < 2s, CLS < 0.05).
+Add `sharp`, the deterministic optimizer, generated AVIF/WebP variants, and byte/dimension checks.
+Update only the screenshot markup in `HomePage.tsx`; verify the selected current source with the
+browser Performance API at 390, 768, and 1440 px. Self-host the two current font families and
+remove the remote font origins from `__root.tsx`.
 
-## Risks
+### Phase 4 — Add quantitative performance gates
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Lighthouse reports slower score on mobile networks** | Medium | Medium | Compress all images aggressively. Reduce the number of external scripts loaded in the header. |
-| **Playwright tests fail in CI due to database state** | Medium | Low | Ensure the waitlist E2E test deletes its test subscriber record upon completion to prevent duplicate key failures in subsequent runs. |
+Run Lighthouse CI against the preview with fixed runs, URLs, throttling, and assertions. Record the
+pre-change and post-change medians in the pull request artifact; budgets in the spec remain the
+merge gate. If a budget cannot be met, fix the responsible resource or submit a separately reviewed
+budget change with evidence—do not silently loosen assertions.
 
-## Rollback plan
+### Phase 5 — Gate deployment and smoke production
 
-- Performance changes are static structure enhancements and test suites, requiring no rollback pipelines.
+Add a pull-request quality workflow. Add the same quality job as a prerequisite to the existing
+deploy job in `.github/workflows/deploy.yml`, then append read-only post-deploy health/content
+checks. Enable required-check branch protection outside the repository and record its screenshot or
+API output in the release ticket.
+
+## CI gate matrix
+
+| Gate        | Command                        | Pass condition                                           |
+| ----------- | ------------------------------ | -------------------------------------------------------- |
+| Static      | `pnpm lint && pnpm type-check` | exit 0, no ignored new error                             |
+| Unit        | `pnpm test`                    | exit 0                                                   |
+| Assets      | `pnpm assets:check`            | generated tree clean; every byte/dimension budget passes |
+| Build       | `pnpm build`                   | exit 0                                                   |
+| Browser     | `pnpm test:e2e`                | Chromium critical suite passes with zero retries         |
+| Performance | `pnpm test:lighthouse`         | all Lighthouse assertions pass across three runs         |
+| Runtime     | post-deploy curl/browser smoke | health and four critical routes match status/content     |
+
+## Risks and controls
+
+| Risk                                          | Control                                                                                          |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Native `sharp` output changes across versions | Pin the package and runtime, commit outputs, and fail CI on a generated diff.                    |
+| External APIs/fonts make tests flaky          | Self-host fonts and intercept source/email requests with deterministic fixtures.                 |
+| Lighthouse variance causes false failures     | Fixed CI runner and throttling, three runs, median assertions, no local score promises.          |
+| Auth traces expose secrets                    | Disposable account, failure-only retention, reporter redaction, no production environment.       |
+| Quality and deploy workflows race             | Make deploy explicitly depend on its quality job; do not rely on two independent push workflows. |
+
+## Rollout
+
+1. Land the harness in non-blocking/report-only mode and collect three CI baselines.
+2. Land asset/font changes and confirm browser-selected resources plus Lighthouse deltas.
+3. Make static/unit/build/browser/asset checks required, then Lighthouse.
+4. Add the deploy dependency and read-only production smoke once `master` is green.
+
+## Rollback
+
+Revert `HomePage.tsx` to the original PNG sources and restore the remote font links if rendering
+regresses; generated assets can remain harmlessly deployed. Temporarily switch only Lighthouse to
+report-only when runner variance is proven, while keeping lint, type, unit, build, browser, and
+post-deploy health gates mandatory. Reverting the deploy dependency requires an incident note and
+explicit maintainer approval.
+
+## Completion evidence
+
+Attach the clean `pnpm qa` output, selected-resource/transfer report for all three viewports,
+three-run Lighthouse summary, CI run URL, and post-deploy smoke output. Update all three headers to
+`implemented` only after those artifacts exist.

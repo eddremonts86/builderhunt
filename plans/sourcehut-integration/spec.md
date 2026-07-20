@@ -1,30 +1,55 @@
 # Feature: SourceHut Integration
 
-## Why (short)
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector exists at `src/lib/sources/sourcehut.ts` and is fully wired
+> (pipeline, pill, badge, icon, scoring, env var). It returns results **only when
+> `SOURCEHUT_TOKEN` is set** — the SourceHut GraphQL API requires auth. Token is not
+> documented in `.env.example`.
 
-Open source forge con base de users pequeña pero muy leal. Foco en privacidad y código abierto. Complementa a GitHub/GitLab con devs que rechazan Microsoft. **Nicho pero leal**: si tu usuario busca "open source maximalist", SourceHunt es donde están.
+## Problem
 
-## API summary
+SourceHut is a small-but-loyal OSS forge (privacy-focused developers who avoid GitHub and
+Microsoft). Complementary niche coverage next to GitHub/GitLab/Codeberg.
 
-- **Base URL**: `https://sr.ht/` (graphQL) + REST en `https://api.sourcehut.org/`
-- **Auth**: opcional, mejora rate limit
-- **Endpoints**:
-  - `POST /query` (GraphQL) — search users by username
-  - `GET /api/user/profile/{username}` — user details
-  - `GET /api/user/repos` — repos
-- **Rate limit**: sin auth ~60 req/h, con PAT ~600 req/h
-- **Docs**: https://man.sr.ht/integrations/
+## Goal
 
-## Why honorable mention
+Index SourceHut users as `RawBuilder` person records via the meta.sr.ht GraphQL API.
 
-- **Nicho**: ~50k users vs 100M+ en GitHub
-- **API menos madura** que GitHub/GitLab (GraphQL en beta)
-- **Slow scrape**: response times pueden ser lentos
+## Delivered
 
-## Effort
+Shipped in `src/lib/sources/sourcehut.ts`:
 
-**M (3-4 días)**. La API es GraphQL, hay que escribir el cliente, y el rate limit es agresivo (60/h sin auth).
+- GraphQL user search against `https://meta.sr.ht/query`:
+  `users(search: $q, first: 20) { results { canonicalName name description location url } }`.
+- **Auth is mandatory upstream**: without `SOURCEHUT_TOKEN` every request 401s, so the
+  connector short-circuits to `[]` when the token is unset (by design — the source is wired
+  so it lights up the moment a token is configured).
+- Mapping: `id: sh-{canonicalName}`, `kind: 'person'`, `followersCount: undefined`
+  (SourceHut has no follower concept), profile URL `https://sr.ht/~{name}`.
+- Registered in `src/lib/search.ts` and `SourceName` (`src/lib/sources/types.ts`).
+- UI: opt-in pill in `ALL_SOURCES` + `SOURCE_META` (`SearchPage.tsx`), `SourceHutIcon` in
+  `BrandIcons.tsx`, `.badge-sourcehut` in `src/shared/styles/globals.css`.
+- Scoring: `sourcehut` branch in `src/lib/score.ts` (bio-length bonus, since no
+  followers/karma exist).
+- GraphQL errors and network failures return `null`/`[]` — never break the federated
+  search (`search.ts` uses `Promise.all`).
 
-## Recommendation
+## Remaining gaps (real)
 
-**No integrar en v1.** Hacer después de GitLab, cuando sepamos que el "open source forge" angle tiene tracción. Si BuilderHunt crece en el segmento EU/OSS, este es un buen paso 2.
+1. **Repo search never built.** The original plan promised `kind: 'repo'` results from the
+   git.sr.ht GraphQL API; only people are returned today. Low value (SourceHut repos carry
+   no stars), kept as an optional task.
+2. **`SOURCEHUT_TOKEN` is missing from `.env.example`** — without documentation, deploys
+   silently get an always-empty source.
+
+## Non-goals (unchanged)
+
+Unauthenticated operation (impossible — the API requires a token); social graph; mailing
+list / todo trackers.
+
+## Success metrics
+
+- With a token configured, searching a known SourceHut username or topic keyword returns
+  person cards; without a token the source contributes nothing and costs nothing.

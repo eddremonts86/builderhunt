@@ -1,65 +1,60 @@
 # Feature: Lobsters Integration
 
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector exists at `src/lib/sources/lobsters.ts` and is fully wired;
+> `lobsters` is one of the five **default-active** sources in `SearchPage.tsx`. The
+> HTML-scraping profile enrichment (bio/karma/avatar) this spec originally recommended was
+> never built — the connector works JSON-only.
+
 ## Problem
 
-HN ya está indexado pero es broad — política, jobs, "Ask HN", crypto, todo. **Lobsters** es el complemento perfecto: comunidad small-but-high-signal centrada en programming, security, distributed systems, languages, unix. Los users de Lobsters son devs senior con criterio técnico. Si un usuario busca "distributed systems" o "PL theory", Lobsters es donde están los matches de mayor calidad.
+HN is broad (politics, jobs, crypto); Lobsters is the small, heavily-moderated,
+high-signal complement focused on programming, security, systems, and languages. For
+queries like "distributed systems" or "compilers", Lobsters submitters are top-quality
+matches.
 
 ## Goal
 
-Indexar Lobsters users públicos con la misma calidad de signal que HN:
-- Username, karma (proxy for quality)
-- Tags de los stories que comenta (proxy for interests)
-- Recent activity (último story submitted)
-- Bio (la mayoría tienen)
+Index active Lobsters users as `RawBuilder` person records.
 
-## Non-goals
+## Delivered
 
-- **No es scraping de stories.** Solo users. Stories y comments son dominio de HN ya.
-- **No es full-text del bio.** El bio es típicamente 1-2 frases, lo guardamos tal cual.
-- **No es invite-only signal.** Lobsters es invite-only, pero los profiles son públicos. La integración es sobre los profiles, no sobre el sistema de invites.
+Shipped in `src/lib/sources/lobsters.ts` (file header documents the strategy and v1
+limitations):
 
-## API summary
+- JSON-only strategy: fetch `https://lobste.rs/hottest.json` + `/newest.json` in parallel,
+  dedupe stories by `short_id`, aggregate by `submitter_user`, filter users by query match
+  against story titles/descriptions/tags, sort by max story score then recency.
+- Mapping: `id: lobsters-{username}`, `kind: 'person'`, `followersCount` = max story score
+  (documented quality proxy — Lobsters exposes no followers/karma via JSON), topics from
+  matched-story tags, `metadata` includes `storyCount`, `matchedStoryCount`, `totalScore`,
+  `maxScore`, `lastSeen`, `sampleTitles`, `representativeUrl`.
+- Registered in `src/lib/search.ts` and `SourceName`; **default-active**
+  (`DEFAULT_ACTIVE_SOURCES` in `SearchPage.tsx`).
+- UI: pill + `SOURCE_META.lobsters`, `LobstersIcon` in `BrandIcons.tsx`, `.badge-lobsters`
+  in `src/shared/styles/globals.css`.
+- Scoring: `lobsters` branch in `src/lib/score.ts` (story-count activity + total-score
+  bonus).
+- Fetch errors caught to `[]` (mandatory: `search.ts` uses `Promise.all`).
+- No new dependencies, no env vars — the original `cheerio`/`linkedom` plan was avoided.
 
-- **Base URL**: `https://lobste.rs/`
-- **Auth**: none required (public read API)
-- **Endpoints clave**:
-  - `GET /hottest.json` — top 25 stories (hottest last 3 days)
-  - `GET /newest.json` — newest stories
-  - `GET /search?q=X` — HTML search (use a parser, no JSON endpoint for user search)
-  - `GET /u/:username.json` — single user details (HTML, not JSON)
-- **Rate limit**: no documented limit, but be polite (cache aggressively)
-- **OpenAPI spec**: https://github.com/api-evangelist/lobsters
+## Remaining gaps (real, cited from code)
 
-**Important caveat**: Lobsters does NOT have a JSON search API for users. We have to scrape the HTML search or iterate from `/hottest.json` + `/newest.json` to collect users, then fetch `/u/:username.json` (or scrape `/u/:username`) for details. The latter is also HTML, not JSON.
+1. **No bio, no avatar, no karma.** `lobsters.ts` sets `bio: undefined`,
+   `avatarUrl: undefined`, `displayName: undefined` — the promised `/u/:username` HTML
+   scrape was never built. Lobsters person cards are visibly thinner than every other
+   source's and lose the 4+2+3 quality points in `score.ts`.
+2. **Coverage limited to recent submitters** (hottest + newest, roughly the last few days).
+   This is inherent to the JSON-only strategy and is accepted — documented here as a
+   constraint, not tracked as a task.
 
-This is a real constraint. See "Open questions".
+## Non-goals (unchanged)
 
-## User stories
-
-1. **Como usuario**, al buscar "compilers" en BuilderHunt, quiero ver devs activos en Lobsters sobre ese tema, junto a los de HN/GitHub/Reddit/DEV.to.
-2. **Como usuario**, en `/search`, quiero toggle "Lobsters" en los sources.
-3. **Como usuario**, las tarjetas de Lobsters deben distinguirse visualmente (color rojo Lobsters: `#AC130D`).
+Story/comment indexing; invite-graph signal; tag browsing.
 
 ## Success metrics
 
-- **Primary**: % of saved searches with at least 1 Lobsters result. Target: 20% (lower than HN because Lobsters is smaller).
-- **Secondary**: CTR from Lobsters is ≥ 80% of HN's CTR. Lobsters users are high-quality, so the bar is high.
-- **Quality guardrail**: dismiss rate < 30% (Lobsters should be the highest-signal source).
-
-## Open questions
-
-- **Search-by-keyword from JSON?** Not available. Two options:
-  - (a) Iterate `/hottest.json` + `/newest.json` (last N stories), extract `submitter_user.username`, fetch each user's details, filter by bio match. Limited to "active users" only.
-  - (b) Scrape `/search?q=X` HTML for user results. More results but fragile to layout changes.
-  - **Recommended**: (a) for v1. Sample 100 hottest + 100 newest stories → unique users → fetch each → filter by bio match. Cache aggressively (5-10min).
-- **Bio scraping required?** The `/u/:username` page has the bio but no JSON. We'll need to parse HTML (use a simple regex or DOM parser like `cheerio` / `linkedom`).
-  - Alternative: just use `username` and `karma`, skip bio. Lower signal but no scraping.
-  - **Recommended**: scrape bio. Quality matters more than simplicity here.
-- **Tags as topics?** The user has a "frequent tags" page (`/u/:username/tags`) that lists tags they've submitted. This is gold. Scrape it.
-  - **Recommended**: yes, scrape. Adds ~30 lines of code.
-
-## Out of scope (this iteration)
-
-- Stories / comments / threads
-- Invite tracking
-- Tag-based discovery (browse all users in tag X)
+- Queries matching recent Lobsters activity ("rust", "security", "unix") return person
+  cards; the source contributes zero noise on non-matching queries.

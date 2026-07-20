@@ -1,19 +1,42 @@
 # Plan: IndieHackers Integration
 
-## Status: skip
+> **Status**: `blocked`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Blocked on data access: IndieHackers has no official API and its SPA
+> cannot be read by the plain-`fetch` connector pattern used by every source in
+> `src/lib/sources/`. No code should be written until the decision in `spec.md` is made.
 
-Honorable mention with high cost and uncertain value. No public API, scraping required, site has anti-bot, audience is different from rest of BuilderHunt.
+## Why there are no implementation phases
 
-## When to reconsider
+- Live connectors must be cheap parallel HTTP fetches inside `searchBuilders`
+  (`src/lib/search.ts`, `Promise.all`); IndieHackers offers no endpoint that pattern can
+  consume.
+- The only technical path (logged-in headless browser) is ToS-hostile, fragile, and
+  forces the background-ingestion worker + durable-storage architecture
+  (`plans/_meta/app-reality.md`, constraint #3) — a different, larger plan that should
+  only be written if scraping is explicitly approved.
 
-- If multiple users ask for "find founders" or "indie hackers" as a feature
-- If a public API appears
-- If a third-party API emerges (Product Hunt's maker profiles might be a good alternative)
+## Decision matrix (for the product owner)
 
-## Recommended path
+| Option                                                   | Cost                         | Risk                                              | Outcome                            |
+| -------------------------------------------------------- | ---------------------------- | ------------------------------------------------- | ---------------------------------- |
+| (a) Skip; cover founders via Product Hunt + user tagging | small (tagging mini-plan)    | none                                              | Recommended                        |
+| (b) Approve scraping ingestion job                       | 1+ week, ongoing maintenance | ToS violation, account bans, breakage on redesign | Rewrite this plan as a worker plan |
+| (c) Re-check yearly for an official API                  | ~5 min/year                  | none                                              | Stay `blocked`                     |
 
-If founder signal is needed: **self-tagging** (option C in tasks.md). Users tag their profile, filter by tag. 1-2 days. No maintenance.
+Recommendation: **(a)**. The Product Hunt integration (official API) reaches most of the
+same population with real traction signals, and the tagging filter serves users who need
+an explicit "founder" facet.
 
-If the self-tag solution is not enough: consider **Product Hunt API** instead of IndieHackers. Product Hunt has a proper API and shows makers (founders) of products — closer to "founder" signal than IndieHackers.
+## If (a) is chosen — follow-ups outside this plan
 
-## Decision: skip for v1
+1. Execute [`producthunt-integration`](../producthunt-integration/plan.md).
+2. Optionally spec a small "builder tags + founder filter" feature (tracked builders
+   already own `builders.metadata`; a namespaced `metadata.userTags` key would follow the
+   shared-surface convention in `plans/_meta/conventions.md`).
+3. Close this directory with final status headers pointing at those replacements.
+
+## Rollback plan
+
+Nothing to roll back — no code exists and none should be written while blocked.

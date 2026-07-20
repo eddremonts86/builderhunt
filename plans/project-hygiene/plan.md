@@ -1,47 +1,56 @@
-# Plan: Maintenance & Project Hygiene Checker
+# Project Hygiene — Real GitHub Signals (plan)
 
-## Goal recap
+> **Status**: `partially-implemented` (v1 shipped; phases below are the v2 work)
+> **Depends on**: nothing (no AI; uses existing `GITHUB_TOKEN` env)
+> **Blocks**: nothing
+> **Reality check**: scoring math and card exist (`src/shared/lib/hygiene.ts`, `src/shared/components/HygieneCard.tsx`); today's inputs are fabricated when `metadata.repos` is absent (always). This is a small plan: one fetch module, one endpoint, one card upgrade.
 
-Build a project health evaluation service that queries repository issue metadata, PR resolution times, documentation standards, and CI/CD pipelines, mapping outcomes to an interactive bento panel.
+## Delivered (v1 — do not re-plan)
 
-## Why this is a valuable addition
+- Pure scoring: `computeHygiene`, `hygieneGrade` — `src/shared/lib/hygiene.ts`, tested in
+  `hygiene.test.ts`.
+- Fallback signal estimator: `estimateRepoSignalsFromBuilder` (same file) — currently
+  non-deterministic (`Math.random`).
+- Profile card: `src/shared/components/HygieneCard.tsx`, mounted in `BuilderProfilePage.tsx`.
 
-1. **Identifies "Finisher" Candidates**: Traditional platforms cannot distinguish between a developer who writes buggy, abandoned scripts and an engineer who maintains stable open-source products.
-2. **Quantifies Coding Rigor**: Evaluating automated test pipelines (CI/CD) and documentation proves a builder has professional production-level discipline.
-3. **Enterprise Selling Angle**: Recruiter organizations will pay premium memberships to ensure candidates have verified engineering hygiene profiles.
+## Phases (v2)
 
-## Phases
+### Phase 1 — Deterministic fallback (tiny, independently shippable)
 
-### Phase 1: Database Setup
-- Modify `builders` metadata to include the `projectHygiene` schema types.
-- Sync migrations on the PostgreSQL database instances.
+Replace `Math.random()` in `estimateRepoSignalsFromBuilder` with values derived from a
+stable hash of `username + repo name`, so the estimate stops changing between renders.
+Behavior contract otherwise unchanged; tests updated to assert determinism.
 
-### Phase 2: Sourcing Scanner Pipeline (`src/lib/hygiene/scanner.ts`)
-- Implement fetch handlers querying repository issue and pull request list endpoints.
-- Parse file lists to verify `.github/workflows/`, `README.md`, and `CONTRIBUTING.md` presence.
-- Write the scoring compiler formula.
-- Create tests asserting calculations are correct when API returns empty or zero issues counts.
+### Phase 2 — Real signal fetcher (no UI change yet)
 
-### Phase 3: Server Action
-- Build TanStack Start Server Function `calculateProjectHygiene({ builderId })`.
-- Fetch repository details, call scanner pipeline, update database row metadata, and return outcomes.
-- Limit scanning requests (only recalculate if `lastAnalyzedAt` is > 15 days old to save API tokens).
+`src/lib/github/repo-signals.ts`: top-5 repo selection, per-repo issues window (100 most
+recent, PRs filtered out), docs/CI presence checks, ≤ 16 requests per builder, typed errors
+for missing token / rate limit. Pure aggregation helpers unit-tested with fixture payloads.
 
-### Phase 4: Project Health bento card UI
-- Build `src/modules/builder-profile/components/ProjectHygienePanel.tsx`.
-- Design visual gauges for score displays.
-- Render project list tables displaying individual repository health flags.
+### Phase 3 — Endpoint + persistence
 
-### Phase 5: Verification & Safety
-- Check rate-limit mitigation: repository issues API calls use cached payloads to avoid running out of Github request quotas.
+`GET /api/builders/$builderId/hygiene` implementing the spec's 7-step flow: ownership check,
+GitHub-only, 15-day freshness on `metadata.projectHygiene`, rate limit 10/user/h, envelope
+persist via `jsonb_set`.
+
+### Phase 4 — Card upgrade
+
+`HygieneCard.tsx` fetches the endpoint for GitHub builders; real data gets the provenance
+caption + per-repo mini-table; estimated/error paths keep the heuristic with an explicit
+"estimated" caption.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Github API rate limits from deep issue searches** | High | High | Restrict query parameters (`per_page=20` instead of downloading full history). Only scan the top 3 repositories by star count. |
-| **Outdated statistics** | Medium | Low | Set a cache validation window of 15 days. Update statistics automatically when a profile is claimed. |
+| Risk                                               | Likelihood | Impact | Mitigation                                                                                                                       |
+| -------------------------------------------------- | ---------- | ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| GitHub quota pressure (≤ 16 req/builder)           | Medium     | Medium | `GITHUB_TOKEN` required (5k/h); 15-day persisted freshness; 10/user/h rate limit; top-5 repos only, single issues page per repo. |
+| Issue window (100 recent) misrepresents huge repos | Medium     | Low    | It is a rate over a recent window — caption says "recent issues"; no pagination storms accepted as the trade-off.                |
+| Estimated card mistaken for real data              | Medium     | Medium | Explicit `estimated: true` contract + sharpened caption; real data path visually distinct (provenance line).                     |
+| Fetch latency blocks profile render                | Low        | Low    | Card fetches independently after mount with skeleton; profile page never waits on it.                                            |
 
 ## Rollback plan
 
-- Keep the hygiene panel self-contained. Toggle visibility off in UI stylesheets if API queries overload backend request queues.
+- The endpoint is additive; if GitHub quota becomes a problem, return `estimated: true`
+  unconditionally (one-line change) — the card degrades to v1 behavior everywhere.
+- Persisted envelopes live under one namespaced metadata key; inert if unused, clearable
+  with a single `jsonb - 'projectHygiene'` update.

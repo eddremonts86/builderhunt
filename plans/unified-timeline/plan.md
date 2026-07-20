@@ -1,51 +1,66 @@
-# Plan: Unified "Build in Public" Timeline
+# Unified Builder Timeline (plan)
 
-## Goal recap
-
-Build a standardized chronological activity pipeline that aggregates, caches, and elegantly renders a builder's public contributions (commits, posts, socials, Q&As) on their profile sheet.
-
-## Why this is a valuable addition
-
-1. **Shows Shipping Velocity**: A static profile tells you what a developer knows. A timeline shows you what they did *this week*, serving as a real indicator of coding passion and velocity.
-2. **Aggregates Multi-Source Context**: A recruiter doesn't have to parse raw JSON feeds or open 4 browser tabs. They see a single unifed story of the candidate's active building process.
-3. **Visually Premium**: A functional, live-refreshing timeline makes the app feel responsive and alive, matching high-end design tastes.
+> **Status**: `pending`
+> **Depends on**: nothing hard; [`ai-expansion`](../ai-expansion/spec.md) only for Phase 4
+> **Blocks**: nothing — future consumers noted in spec.md header
+> **Reality check**: No timeline code exists. Profile view to extend:
+> `src/modules/builder-profile/components/BuilderProfilePage.tsx`. Cache/fetch conventions
+> to mirror: `src/lib/search.ts` (two-layer cache), `src/lib/sources/*.ts` (fail-soft
+> fetchers).
 
 ## Phases
 
-### Phase 1: Event Normalizer Utility (`src/lib/timeline/normalizer.ts`)
-- Design functions to map API payloads into the unified `TimelineEvent` contract.
-  - Map GitHub `PushEvent` -> Extract repository, commit messages, and branches.
-  - Map GitLab `Event` -> Extract target projects and action name.
-  - Map Dev.to/Hashnode API items -> Map title, URL, tags, and summary.
-  - Map Bluesky `feed` post -> Extract text, links, and likes.
-- Implement sorting: `events.sort((a, b) => b.timestamp - a.timestamp)`.
+### Phase 1 — Types, normalizer, first fetcher (github)
 
-### Phase 2: Server Cache Layer (`src/lib/timeline/cache.ts`)
-- Modify `builders` database schema metadata to support `timeline` array cache and `timelineCachedAt` timestamp.
-- Write a resolver action `getBuilderTimeline(builderId)`:
-  - Check if cache is fresh (< 1 hour).
-  - If stale, trigger parallel fetches (GitHub, Dev.to, Bluesky).
-  - Merge, slice to top 15 events, update database cache, and return.
+1. `src/lib/timeline/types.ts` (`TimelineEvent`, `TimelineResult`).
+2. `src/lib/timeline/normalize.ts` + tests (sort/clamp/dedupe/cap/truncate — pure).
+3. `src/lib/timeline/fetchers/github.ts` (events → TimelineEvent mapping) + a pure
+   `mapGithubEvent(raw)` exported for tests with fixture payloads.
 
-### Phase 3: UI Timeline Component
-- Create `src/modules/builder-profile/components/BuilderTimeline.tsx`.
-- Design cards using HSL-based palettes matching the original source colors:
-  - GitHub: Dark gray border and git branch icons.
-  - Bluesky: Light blue accents.
-  - Blog: Purple/indigo notes.
-- Integrate filter state (e.g., matching event types) using a simple button strip.
+### Phase 2 — Service, cache, API, UI (ships the feature, github-only)
 
-### Phase 4: Verification & Performance
-- Set up unit tests verifying the normalizer maps various feed payloads accurately without throwing undefined errors.
-- Verify rate limit safety: if one API fails (e.g. StackOverflow returns 429), resolve the remaining feeds gracefully instead of failing the request.
+1. `src/lib/timeline/index.ts`: `getBuilderTimeline` with Redis 6 h TTL + in-memory
+   fallback + 10 min negative cache; unsupported-source map.
+2. `GET /api/builders/$builderId/timeline` (auth, ownership, rate limit, never-5xx).
+3. `BuilderTimeline.tsx` + integration in `BuilderProfilePage.tsx` (lazy fetch, filter
+   chips, three empty/degraded states).
+
+Checkpoint: shippable — GitHub builders (the majority) get timelines; every other source
+shows the honest "not available" note.
+
+### Phase 3 — Remaining fetchers (each its own shippable checkpoint)
+
+Order by value: `hn` (Algolia author search) → `devto` (articles by username) →
+`stackoverflow` (answers by user id) → `gitlab` (events by user id). Each: fetcher +
+pure mapping test + flip the source from unsupported to supported in the service map.
+
+### Phase 4 — Optional AI summary (requires ai-expansion Phases 1–4)
+
+1. Register `timeline-summary` in `src/shared/lib/ai/tasks.ts` (local-first; schema,
+   TTL 6 h, allowances per spec).
+2. "Summarize activity" button in `BuilderTimeline.tsx` via the `ai()` client; hides on
+   `AIUnavailableError` / `serverAI: false` config.
+
+### Future (not scheduled)
+
+- Two-source join when devto metadata carries a `github` handle.
+- Repo-kind rows (GitHub repo activity endpoint).
+- Bluesky fetcher once [`bluesky-integration`](../bluesky-integration/spec.md) ships.
+- Feeding smart-alerts real event detection from these fetchers.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Slow API queries blocking page load** | High | High | Run fetches in parallel using `Promise.allSettled`. Enforce a strict 800ms timeout per external call. If a call times out, ignore it and render the rest. |
-| **Out-of-sync events timeline** | Medium | Low | Trust the source timestamps. Filter out events dated future or past 1 year to prevent timestamp formatting anomalies. |
+| Risk                                     | Likelihood | Impact | Mitigation                                                                                                          |
+| ---------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| Upstream latency blocks profile UX       | Medium     | Medium | Lazy section fetch after profile paint; 5 s abort; skeleton state                                                   |
+| GitHub unauthed 60 req/h ceiling         | Medium     | Medium | 6 h cache + 10 min negative cache; `GITHUB_TOKEN` already supported in env                                          |
+| Event payload shape drift breaks mapping | Medium     | Low    | Pure mappers with fixture tests; unknown event types skipped, never thrown                                          |
+| Cache stampede on popular builders       | Low        | Low    | Single-source fetch is cheap; acceptable duplicate fetch, noted for v2 (no coalescing, same stance as ai-expansion) |
+| Endpoint abuse (activity scraping proxy) | Low        | Medium | Auth + ownership check + 30/min rate limit — only builders you track                                                |
 
 ## Rollback plan
 
-- Keep the timeline block optional in the UI view. If `getBuilderTimeline` fails or is disabled via environment configuration (`ENABLE_TIMELINE=false`), render a static "Recent Projects" folder view.
+- No schema, no migrations. Removing the `<BuilderTimeline />` render and the API route
+  fully reverts the feature; Redis keys expire on their own.
+- Phase 4 is covered by the AI platform kill switch
+  (`AI_DISABLED_TASKS=timeline-summary`).

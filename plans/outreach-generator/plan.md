@@ -1,44 +1,52 @@
-# Plan: Code-Contextual Outreach Generator
+# Outreach Generator v2 — AI Upgrade (plan)
 
-## Goal recap
+> **Status**: `partially-implemented` (v1 shipped; AI upgrade pending)
+> **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (full platform: client ladder, `/api/ai/complete`, `useAICapabilities`, `AIDownloadPrompt`)
+> **Blocks**: nothing
+> **Reality check**: v1 is live and frozen as the fallback: `src/shared/lib/outreach.ts` (+ `outreach.test.ts`) and `src/modules/builder-profile/components/OutreachCopilot.tsx`. This plan modifies the component and adds one task to the registry — no routes, no schema, no migrations of its own.
 
-Build an interactive copywriting assistant that reads a builder's public code footprint (commits, repos) and writes tailored outreach drafts for recruiters, matching different tones and open roles.
+## Phases (dependency order — shippable after each)
 
-## Why this is a valuable addition
+### Phase 0 — Delivered (v1, keep as-is)
 
-1. **Addresses Sourcing's Biggest Bottleneck**: Finding candidates is only 20% of the job; getting them to reply is 80%. This tool targets the response bottleneck directly.
-2. **Unlocks Deep Code Insights**: Traditional sourcing tools only scan LinkedIn headlines. By matching job descriptions to actual codebase structures and commits, BuilderHunt acts as a technical intermediary.
-3. **High Virality Hook**: Recruiters will share drafts on social networks (e.g. "Look at this amazing Rust recruiting message this tool wrote for me"), generating organic traffic.
+- [x] Rule-based generator with 3 tones and hook cascade — `src/shared/lib/outreach.ts`,
+      tests in `outreach.test.ts`.
+- [x] Copilot panel UI (job inputs, tone radio, draft, copy) —
+      `src/modules/builder-profile/components/OutreachCopilot.tsx`.
 
-## Phases
+### Phase 1 — Register the `outreach-draft` task
 
-### Phase 1: Sourcing Pitch Prompting (`src/lib/ai/pitch.ts`)
-- Implement the copywriter utility using the Gemini API.
-- Define system instructions for the 3 tones (`casual`, `professional`, `geek`).
-- Write template parsers to combine job parameters and builder database columns.
-- Test drafts on mock builders to verify they reference specific repositories and commits.
+Add the task to `src/shared/lib/ai/tasks.ts` per spec.md: local-first, no cache,
+allowances `{ free: 10, pro: 100, team: 200 }`, output schema mirroring `OutreachDraft`,
+banned-cliché `superRefine`, `<untrusted>` wrapping of bio/topics, `revision` support.
+Import `OutreachTone` from `outreach.ts` (single tone source). Registry tests extended.
+No UI change yet — task is callable but unused.
 
-### Phase 2: Server Function & Limits
-- Create a TanStack Start Server Function `generateOutreachDraft`.
-- Integrate verification: only authenticated recruiters can invoke it.
-- Implement rate limits (save request count to the session/database to prevent API spamming).
+### Phase 2 — Wire the generation ladder into the panel
 
-### Phase 3: UI Editor & Copying
-- Create `src/modules/builder-profile/components/OutreachCopilot.tsx` inside the profile module.
-- Design a sleek compose interface resembling a modern webmail editor.
-- Include interactive sliders/selectors for tone.
-- Implement clipboard copying utility with micro-animation transitions.
+`OutreachCopilot.tsx`: Generate calls `ai('outreach-draft', input)`; catch
+`AIUnavailableError` → `generateOutreach()` (v1). Add the mode badge
+(on-device / server AI / template) and loading state. Existing testids and layout intact.
 
-### Phase 4: Verification & Edge Cases
-- Test cases where builders have empty repos: fall back to article references, or show an alert: "No repository data found for this builder; draft will rely on generic bio context."
+### Phase 3 — Revision actions + download UX
+
+Rewrite/Shorten buttons: Chrome Rewriter API when available, else task re-invocation with
+`revision`; hidden in template mode. Inline `AIDownloadPrompt` when the panel is open and
+the model is `downloadable`.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **AI hallucinations (referencing files or libraries they didn't write)** | Medium | High | Strict prompt training requiring the model to ONLY reference repositories and languages actually returned in the builder's verified db columns. |
-| **High API latency** | Medium | Low | Run the generator asynchronously. Display a simulated progress bar in the compose window during loading. |
+| Risk                                                                 | Likelihood | Impact | Mitigation                                                                                                                              |
+| -------------------------------------------------------------------- | ---------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Chrome Prompt/Rewriter output quality varies (small on-device model) | Medium     | Medium | Strict output schema + banned-phrase refine + retry; server tier one rung away; template floor                                          |
+| Drafts feel same-y despite AI (cached)                               | —          | —      | Explicitly no caching (`cacheTtlSeconds: null`)                                                                                         |
+| Spam generation at scale                                             | Low        | Medium | Free tier 10/day server budget (matches v1's stated limit); on-device generation is self-limiting (user's own machine, no scraping API) |
+| Prompt injection via builder bio                                     | Medium     | Low    | `wrapUntrusted` + system rule; output schema blocks URLs > body cap; ephemeral output reviewed by the user before sending               |
+| Regression of the shipped v1 panel                                   | Medium     | Medium | v1 lib untouched and tests frozen; component changes are additive; template path exercised in the degradation test                      |
 
-## Rollback plan
+## Rollback
 
-- Sourcing outreach is a self-contained modal. Disable it in the UI via the `ENABLE_OUTREACH_COPILOT=false` environment setting if LLM billing exceeds thresholds.
+- No persistence, no routes, no migrations — rollback is reverting the `OutreachCopilot.tsx`
+  diff and removing the task from the registry; v1 behavior returns exactly.
+- Soft kill without deploy: `AI_DISABLED_TASKS=outreach-draft` → the panel silently runs in
+  template mode (rung 3), which is precisely today's shipped behavior.

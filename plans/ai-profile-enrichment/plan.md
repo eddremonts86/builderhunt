@@ -1,55 +1,51 @@
-# Plan: AI Profile Enrichment
+# AI Profile Enrichment — Developer Persona Card (plan)
 
-## Goal recap
+> **Status**: `pending`
+> **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (Phases 1–3 of the AI Platform: registry, cache, budget, `minimaxChat`)
+> **Blocks**: nothing
+> **Reality check**: Builds on `BuilderProfilePage.tsx`, the claim verify flow (`src/routes/api/builders/claim/verify.ts`), and `builders.metadata` jsonb. Owns the `metadata.aiEnrichment` key. No schema migration needed.
 
-Add an AI-driven profile enrichment engine to BuilderHunt that summarizes developer profiles, extracts strengths, and styles an elegant "Developer Persona Card" using LLM structured outputs.
+## Phases (dependency order — shippable after each)
 
-## Why this is a valuable addition
+### Phase 1 — Pure enrichment lib + task registration
 
-1. **Instant Clarity**: Going through hundreds of git commits and repositories is tedious. An objective AI summary acts as a strong initial filter for profile screening.
-2. **Interactive UI**: A beautifully designed "Persona Card" makes BuilderHunt look highly polished and premium, separating it from standard raw API aggregators.
-3. **Low-latency rendering**: Since results are cached directly inside the `builders` table's JSONB `metadata` column, subsequent views load instantaneously.
+`src/shared/lib/ai/enrichment.ts` (or `src/lib/enrichment/` if it grows): zod schemas
+(`builderAIEnrichmentModelSchema`, `builderAIEnrichmentSchema`), `hasEnrichableContent`,
+`buildEnrichInput(builderRow)`, freshness check `isEnrichmentFresh(artifact)`. Register the
+`profile-enrich` task in `src/shared/lib/ai/tasks.ts` (server-only, 30 d TTL, allowances
+per spec). Full vitest coverage of the pure parts. Nothing user-visible.
 
-## Phases
+### Phase 2 — API endpoints
 
-### Phase 1: LLM Client Setup & Prompts (`src/lib/ai/enrich.ts`)
-- Implement a wrapper for the Gemini API using official Google AI SDK (`@google/genai` or fetch client).
-- Read the API credentials: `GEMINI_API_KEY`.
-- Design a specialized system prompt enforcing a strict JSON output matching our schema.
-- Write unit tests validating prompt output handling.
+`GET /api/builders/$builderId/enrichment` (ownership check → DB-cached → threshold →
+platform pipeline → `jsonb_set` persist) and
+`POST /api/builders/$builderId/enrichment/refresh` (claimed-owner/admin, hourly rate limit).
+Verified with curl before any UI exists.
 
-### Phase 2: Server Action & Trigger Handler
-- Write a TanStack Start Server Function `enrichBuilderProfile({ builderId })`.
-- Within the function:
-  - Assert authentication (only logged-in users can trigger or load profiles).
-  - Verify if `metadata.aiEnrichment` exists and is younger than 30 days. If so, return cached data.
-  - Compile developer activity payload.
-  - Call the LLM service.
-  - Save the response inside the `builders` database row.
+### Phase 3 — Claim hook
 
-### Phase 3: Dashboard Profile Details Integration
-- Update `src/routes/_dashboard/builder/$id.tsx` to call the server function during page load.
-- Show a skeleton loading loader with an AI animation spinner while generating.
-- Build the "Developer Persona Bento Card" layout in the UI:
-  - Gradient borders.
-  - Strengths rendered as pill chips.
-  - Seniority displayed with distinctive brand tags.
+Fire-and-forget refresh after successful claim verification in
+`src/routes/api/builders/claim/verify.ts` — logged, never blocks or fails the claim response.
 
-### Phase 4: Verification & Limits
-- Mock the Gemini API in testing files.
-- Test edge cases where profiles have:
-  - Very large payload (truncate input to fit 4,000 tokens limit).
-  - Minimal public data (return a default empty persona without calling the API).
+### Phase 4 — PersonaCard UI
+
+`PersonaCard.tsx` in `src/modules/builder-profile/components/`, wired into
+`BuilderProfilePage.tsx`: skeleton → card / insufficient placeholder / budget-note states,
+refresh button gated to claimed-owner/admin, hidden when AI is disabled or unconfigured.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **LLM Hallucinations (e.g. estimating wrong seniority)** | High | Medium | Label the card clearly as "AI-Generated Summary" and display a disclaimer. Allow claimed profile owners to request a rerun. |
-| **Runaway API costs** | Medium | High | Apply a strict daily quota (e.g. max 5 profile enrichments per user per day). Cache outcomes for 30 days. |
-| **API Timeout / Latency** | Medium | Medium | Fetch enrichment asynchronously. Load the main profile data immediately, and lazy-load the AI card once the API responds. |
+| Risk                                               | Likelihood | Impact | Mitigation                                                                                                          |
+| -------------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| Hallucinated seniority/strengths damage trust      | Medium     | High   | Evidence-only system prompt, `mid` default under uncertainty, visible "AI-generated" disclaimer, no numeric scoring |
+| Prompt injection via bios/READMEs                  | Medium     | Medium | `wrapUntrusted` on all external fields + standing system-prompt rule (platform-provided)                            |
+| Duplicate MiniMax spend across per-user rows       | High       | Low    | Platform Redis cache keyed on canonical input dedupes identical profiles across users                               |
+| `metadata` shape drift breaks highlight extraction | Medium     | Low    | `buildEnrichInput` is defensive (zod-parses unknown metadata, skips silently) and unit-tested per source shape      |
+| Detail-page latency on cold generation             | Medium     | Low    | Card loads async after page render (skeleton); page never blocks on the LLM                                         |
 
-## Rollback plan
+## Rollback
 
-- Control the feature via the `ENABLE_AI_ENRICHMENT=false` flag.
-- If disabled, the UI profile page hides the "AI Overview" block entirely and displays the raw repository list as before.
+- No migrations: rollback is code-only. Remove the two endpoints, the claim hook, and
+  `PersonaCard.tsx`; stale `metadata.aiEnrichment` blobs are inert data (harmless to leave,
+  or clear with a one-off `UPDATE builders SET metadata = metadata - 'aiEnrichment'`).
+- Soft kill without deploy: `AI_DISABLED_TASKS=profile-enrich` — endpoints 503, card hides.

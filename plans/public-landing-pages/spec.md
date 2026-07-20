@@ -1,248 +1,87 @@
-# Feature: Public Landing Pages (SEO)
+# Public Landing Pages (SEO)
+
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md), [`content-marketing`](../content-marketing/spec.md)
+> **Reality check**: The public SEO surface is largely live: redesigned landing
+> (`src/routes/_landing/index.tsx` → `src/modules/landing/components/HomePage.tsx`), SSR
+> `/explore` with meta + `ItemList` JSON-LD (`src/routes/_landing/explore/index.tsx`), PNG OG
+> images (`src/routes/api/og/explore.tsx`, resvg), `sitemap.xml`/`robots.txt` routes, site-wide
+> `WebSite`+`Organization` JSON-LD (`src/routes/__root.tsx:75-94`), `/pricing`, `/blog`.
+> **No public radars** (`public_radars` is not in `schema.ts`).
 
 ## Problem
 
-BuilderHunt hoy es una SPA. La página de búsqueda requiere JavaScript y auth para mostrar valor. Google indexa 0 páginas. Resultado:
-
-1. **No SEO traffic** — los devs no nos encuentran buscando "react developers" en Google
-2. **No social sharing** — compartir un link no muestra preview porque no hay OG tags
-3. **No backlinks** — sin contenido público, nada que enlazar
-4. **No shareable radar pages** — un user con saved searches no puede compartir "mi radar de Rust async"
+Without indexable public pages Google sends zero traffic, shared links have no previews, and
+there is nothing to backlink. Mostly solved; the remaining gaps are sitemap omissions, blog OG
+images, and the still-unbuilt shareable public radar pages.
 
 ## Goal
 
-Páginas públicas estáticas (SSR) para queries populares + cada saved search pública. Cada una:
-
-- **SSR'd** (server-side render) para que Google las indexe
-- **Has unique meta tags** (title, description, OG image)
-- **Shows 10-20 builder cards** (real data, not mock)
-- **CTA to sign up** to save the search
-- **Schema.org structured data** for rich results
+Every public page indexable with correct meta/OG/structured data, a complete sitemap, and
+(phase 2) opt-in public radar pages (`/r/$slug`) so users can share a saved search.
 
 ## Non-goals
 
-- **No es una página por cada builder.** Eso es `/builders/:id` (ya existe).
-- **No es un blog.** Eso es `content-marketing` (otro plan).
-- **No es un marketplace indexable.** No exponemos saved searches privadas.
-- **No es un A/B testing framework.** v1: same page for everyone.
+- No per-topic hub pages (`/topics/*`) — revisit only if Search Console shows demand.
+- No per-builder SEO pages beyond the existing `/builders/$builderId`.
+- No blog content production (that is [`content-marketing`](../content-marketing/spec.md));
+  this plan owns the blog's _SEO plumbing_ (OG endpoint, sitemap entries).
+- No CDN/Cloudflare HTML caching layer for v1 (single VPS + Redis cache is enough).
 
-## User stories
+## Delivered (audited 2026-07-19)
 
-1. **Como Google bot**, quiero indexar 1000+ páginas: "react developers", "rust async developers", "AI engineers", etc.
-2. **Como dev que busca en Google**, quiero ver una landing page relevante con builders reales
-3. **Como founder**, quiero compartir mi radar en Twitter y que se vea un preview bonito
-4. **Como user con saved search**, quiero una URL pública de mi radar para compartir con mi equipo
-5. **Como visitante anónimo**, quiero ver "esta es la app, aquí está lo que hace" sin tener que registrarme
+- **Landing redesign** — `src/modules/landing/components/HomePage.tsx`, `FAQSection.tsx`,
+  `BrandIcons.tsx`; shared `Header`/`Footer` (`src/shared/components/`); footer links every
+  public page.
+- **`/explore`** — `src/routes/_landing/explore/index.tsx`: SSR loader runs `searchBuilders`
+  (Redis+memory cached, `src/lib/search.ts`), per-query `<title>`/description/OG meta
+  (`head:` at line 39), `ItemList` JSON-LD (line 119), sign-up CTA.
+- **OG images** — `src/routes/api/og/explore.tsx`: 1200×630 SVG rasterized to PNG via
+  `@resvg/resvg-js` (raw SVG OG images silently fail on X/LinkedIn/Slack — solved).
+- **`sitemap.xml`** — `src/routes/sitemap[.]xml.ts`: home, `/explore`, changelog, roadmap,
+  status, legal pages + one entry per `POPULAR_QUERIES` explore query; 1h cache headers.
+- **`robots.txt`** — `src/routes/robots[.]txt.ts`: allows public routes, disallows
+  api/auth/dashboard/onboarding, explicitly allows AI crawlers (GPTBot, ClaudeBot,
+  PerplexityBot), sitemap pointer.
+- **Structured data** — site-wide `WebSite` + `Organization` JSON-LD in
+  `src/routes/__root.tsx:75-94`; `BlogPosting` JSON-LD on posts
+  (`src/routes/_landing/blog/$slug.tsx:42`).
+- **`/pricing`, `/blog`, `/blog/$slug`, `/blog/atom.xml`** — live (see sibling plans).
 
-## URL design
+## Remaining work (each gap cited)
 
-```
-/explore/rust-async-runtime     → SSR page for "rust async runtime" search
-/explore/ai-engineers           → SSR page for "ai engineers"
-/r/[userId]/[searchSlug]        → Public radar (user's saved search)
-/developers/react               → SSR page for "react" (broader)
-/topics/typescript              → SSR page for "typescript" tag
-```
+1. **Sitemap omissions**: `src/routes/sitemap[.]xml.ts:79-89` lists home, explore, changelog,
+   roadmap, status, legal — but **not `/pricing`, `/blog`, or the blog post URLs** (grep
+   "blog" in that file → no matches), even though those pages exist and are the main SEO
+   content.
+2. **Blog posts have no OG image**: `src/routes/_landing/blog/$slug.tsx:13-25` sets
+   `og:title/description/type/url` but no `og:image` (grep confirms), and the only OG
+   generator is `api/og/explore.tsx`. Shared posts render without preview images.
+3. **Public radars not built**: the spec's `/r/$id` shareable saved-search pages and the
+   `public_radars` table do not exist (`_meta/app-reality.md`: not in schema). This remains
+   the one genuinely new feature in this plan — opt-in, private by default.
 
-**Or, simpler v1**: just `/explore/[slug]` and `/r/[id]`
+## Public radars design (phase 2)
 
-## UX layout
+- New table `public_radars` (`saved_query_id` PK → `saved_queries.id` cascade, `slug` unique,
+  `created_at`). Opt-in via a "Share publicly" action on a saved search; deleting the saved
+  query or toggling private removes the row (404 afterwards).
+- Route `/r/$slug` (public, SSR): loads the saved query, runs the same cached
+  `searchBuilders` as `/explore`, renders "{userName}'s radar: {queryName}" with the explore
+  card layout, sign-up CTA, `ItemList` JSON-LD, OG image via a `radar` variant of the OG
+  endpoint. Public radars are appended to the sitemap.
+- Privacy: only the query text/filters and the owner's display name are public — never notes,
+  alerts, or tracked-builder state (`builders` rows are per-user and stay private).
 
-```
-┌──────────────────────────────────────────────────────┐
-│  BuilderHunt                                          │
-│  Find active developers across 12 sources.            │
-│  [ Try a search → ]  [ Sign up free → ]              │
-├──────────────────────────────────────────────────────┤
-│  Rust async runtime developers                        │
-│  Last updated: 2 hours ago · 47 builders              │
-│  Sources: GitHub, HN, Reddit, DEV.to, SO, npm, HF     │
-├──────────────────────────────────────────────────────┤
-│  [Card] [Card] [Card] [Card]                         │
-│  [Card] [Card] [Card] [Card]                         │
-│  [Card] [Card] [Card] [Card]                         │
-│  [Card] [Card] [Card] [Card]                         │
-│  [Card] [Card] [Card] [Card]                         │
-│                                                       │
-│  [See all 47 →]                                      │
-│                                                       │
-│  ┌─────────────────────────────────────────────┐    │
-│  │  Save this radar to get daily updates.      │    │
-│  │  [ Sign up free ]                            │    │
-│  └─────────────────────────────────────────────┘    │
-└──────────────────────────────────────────────────────┘
-```
+## Success metrics
 
-## Pages
+- Search Console: sitemap accepted, blog + pricing pages indexed within 2 weeks of launch.
+- OG previews render for `/`, `/pricing`, `/explore?q=*`, and every blog post.
+- ≥1 public radar shared by a real user in the first month (validates phase 2).
 
-### 1. `/explore/[slug]` — discovery page
+## Resolved questions
 
-**Slug format**: `kebab-case(query + sources)`
-- `/explore/rust-async-runtime` — query="rust async runtime", sources=all
-- `/explore/react-github` — query="react", sources=github
-
-**Or simpler**: just `/explore?q=...&sources=...` (query string, server-rendered)
-
-**Server logic**:
-- Parse query from URL
-- Run `searchBuilders` (cached for 6h)
-- Render top 20 builders
-- Render full page (SSR)
-
-**Meta**:
-- Title: "47 React developers — BuilderHunt"
-- Description: "Top 47 active React developers across GitHub, HN, Reddit, DEV.to. Updated daily. Save searches to get alerts."
-- OG image: dynamically generated, shows top 3 builder avatars + query
-- OG title: same as title
-- Schema.org: `ItemList` with `ListItem` per builder
-
-**Frequency**: re-render every 6h via cron (so Google sees fresh data on each crawl)
-
-### 2. `/r/[id]` — public radar
-
-For each saved search that the user has marked public (or all by default v1):
-- Title: `{user.name}'s radar: {search.name}`
-- Description: same
-- Renders the same way as `/explore` but with the user's branding
-- "Saved by {N} people" social proof
-
-### 3. `/topics/[topic]` — topic hub
-
-For each top-100 popular topic (rust, typescript, kubernetes, etc.):
-- Landing page with all builders in that topic
-- Generated from `builders.topics` aggregate
-- "Builders who work with rust" semantic
-
-**v1 skip** — this is a big project on its own. Start with `/explore` only.
-
-## SEO requirements
-
-### Sitemap
-
-`/sitemap.xml`: lists all public pages
-- Static pages (`/`, `/pricing`, `/about`)
-- All `/explore` pages (pre-computed list of top 100 queries)
-- All `/r/:id` pages for public radars
-
-**Cron**: regenerate daily
-
-### Robots
-
-`/robots.txt`:
-- Allow all on `/`, `/explore/*`, `/r/*`
-- Disallow on `/dashboard`, `/settings`, `/me`, `/api/*`
-- Sitemap: `https://builderhunt.dev/sitemap.xml`
-
-### Meta tags per page
-
-- `<title>{title}</title>`
-- `<meta name="description" content="{description}">`
-- `<meta property="og:title" content="{title}">`
-- `<meta property="og:description" content="{description}">`
-- `<meta property="og:image" content="{ogImageUrl}">`
-- `<meta property="og:type" content="website">`
-- `<meta name="twitter:card" content="summary_large_image">`
-- `<link rel="canonical" href="{canonicalUrl}">`
-
-### OG image generation
-
-For each public page, generate a 1200×630 PNG:
-- Background: dark theme
-- Big query text (e.g., "Rust async runtime")
-- Top 3 builder avatars
-- BuilderHunt logo
-
-**Tools**: `@vercel/og` (works without Vercel) or `satori` + `resvg`
-
-**Files**:
-- `src/routes/api/og/[type].ts`: dynamic OG image
-- Cached for 24h
-
-### Structured data (JSON-LD)
-
-```json
-{
-  "@context": "https://schema.org",
-  "@type": "ItemList",
-  "name": "Rust async runtime developers",
-  "numberOfItems": 47,
-  "itemListElement": [
-    { "@type": "ListItem", "position": 1, "url": "https://builderhunt.dev/builders/123", "name": "Shepmaster" }
-  ]
-}
-```
-
-## Server-side rendering (SSR)
-
-TanStack Start supports SSR. For public pages, we want them SSR'd by default (no client-side JS needed for the initial render).
-
-**File**: `src/routes/explore/index.tsx` (new)
-
-```tsx
-export const Route = createFileRoute('/explore/')({
-  component: ExplorePage,
-  loader: async ({ search }) => {
-    const q = search.q || ''
-    const results = await searchBuilders({ keywords: [q], sources: search.sources?.split(',') })
-    return { results, query: q }
-  },
-})
-```
-
-The `loader` runs on the server for SSR.
-
-## Performance
-
-- LCP < 1.5s
-- TTFB < 300ms
-- Each `/explore` page is cached 6h in Redis (per query)
-- CDN cache for HTML (1h) with revalidation
-
-## Data model
-
-**New table: `public_radars`** (track which saved searches are public)
-
-```sql
-CREATE TABLE public_radars (
-  saved_query_id text PRIMARY KEY REFERENCES saved_queries(id) ON DELETE CASCADE,
-  slug text NOT NULL UNIQUE,
-  created_at timestamp with time zone DEFAULT now()
-);
-```
-
-Default: all saved searches are private. Users can opt-in to public via "Share this radar" button (already exists in Dashboard, but make it public).
-
-## Out of scope (v1)
-
-- Per-builder public pages (already exists as `/builders/:id`, but not SEO-optimized)
-- Per-tag pages (`/topics/typescript`)
-- Per-user profile pages
-- Blog
-- Backlinks / directory submissions
-- Paid backlinks / HARO
-
-## Open questions
-
-- **How many landing pages to create?** Start with top 100 queries. Add more based on search analytics.
-- **Public radars default opt-in or opt-out?** Opt-in for v1 (privacy). Add "Make this radar public" button.
-- **OG image generation cost**: 1 image per cached page. 100 pages × 1 image = 100. Negligible.
-- **CDN cache for HTML**: balance freshness vs perf. 1h is good.
-
-## Dependencies
-
-- New package: `@vercel/og` or `satori` + `resvg`
-- New table: `public_radars`
-- Schema migration: 1 new table
-- No new env vars (uses APP_URL)
-
-## Estimated effort
-
-| Phase | Effort |
-|-------|--------|
-| 1 — `/explore` page with SSR | M (4-6h) |
-| 2 — Meta tags + canonical | S (2-3h) |
-| 3 — Sitemap + robots | S (2-3h) |
-| 4 — OG image generation | M (4-6h) |
-| 5 — Public radars | M (3-4h) |
-| 6 — Schema.org structured data | S (2-3h) |
-| **Total** | **~3-4 days** |
+- Explore URL shape: query-string (`/explore?q=…`) — shipped, keep; no slug pages.
+- OG library: `@resvg/resvg-js` (already a dependency) — shipped.
+- Radars default visibility: private; explicit opt-in.

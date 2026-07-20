@@ -1,47 +1,40 @@
 # Tasks: SourceHut Integration
 
-> **Note: deferred**. This is an honorable mention, not a top priority. Plan only; do not execute until GitLab integration is shipped and validated.
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and an
+> optional repo-search extension.
 
-## Phase 0 — Research
+## Delivered
 
-- [ ] Read SourceHut GraphQL schema: `https://sr.ht/query`
-- [ ] Confirm endpoint URLs and auth methods
-- [ ] Test query for `queryUsers(search: "rust")`
+- [x] **GraphQL client + user search** — Done: `src/lib/sources/sourcehut.ts`
+      (`searchSourceHut(keywords, {page, perPage})` against `https://meta.sr.ht/query`;
+      returns `[]` without `SOURCEHUT_TOKEN` or on any error).
+- [x] **Register in federated search** — Done: `src/lib/search.ts`; `sourcehut` in
+      `SourceName` (`src/lib/sources/types.ts`).
+- [x] **Add `SOURCEHUT_TOKEN` env var** — Done: `src/shared/lib/env.ts` (optional).
+- [x] **UI source pill + metadata** — Done: `ALL_SOURCES` + `SOURCE_META.sourcehut` in
+      `SearchPage.tsx` (opt-in); `PersonResultCard.tsx`.
+- [x] **Brand icon + badge** — Done: `SourceHutIcon` in `BrandIcons.tsx`;
+      `.badge-sourcehut` in `src/shared/styles/globals.css`.
+- [x] **Scoring without followers** — Done: `sourcehut` branch in `src/lib/score.ts`
+      (bio-length bonus; no follower data exists upstream).
 
-## Phase 1 — Data model
+## Remaining
 
-- [ ] No schema changes; `source: 'sourcehut'`
+- [ ] **Document `SOURCEHUT_TOKEN` in `.env.example`**
+  - Files: `.env.example`
+  - Do: add `SOURCEHUT_TOKEN=` under "External Source API Tokens" with a comment: REQUIRED
+    for the SourceHut source to return anything (API 401s unauthenticated); create at
+    meta.sr.ht > OAuth > personal access token.
+  - Verify: `grep SOURCEHUT_TOKEN .env.example` prints the documented line.
 
-## Phase 2 — GraphQL client
-
-- [ ] New file `src/lib/sources/sourcehut.ts`
-- [ ] `searchSourceHutUsers(keywords, token?)`:
-  - GraphQL query: `query { users(search: "X", first: 20) { ... } }`
-  - Map to `RawBuilder` with `kind: 'person'`
-- [ ] `searchSourceHutRepos(keywords, token?)`:
-  - GraphQL query for repos
-  - Map to `RawBuilder` with `kind: 'repo'`
-- [ ] Combine in `searchSourceHut(keywords, token?)`
-
-## Phase 3 — Wire into pipeline
-
-- [ ] Add `SOURCE_HUT_TOKEN` to env (optional)
-- [ ] Add to `search.ts`, `Source` type, default active sources (off by default)
-- [ ] Add `SourceHutIcon` to `BrandIcons.tsx`
-- [ ] Add `.badge-sourcehut` to globals.css
-
-## Phase 4 — Scoring
-
-- [ ] Bio match (×10)
-- [ ] Repo count (log scale, ×2)
-- [ ] Recency of last commit (×5 if last week)
-
-## Phase 5 — Verification
-
-- [ ] Manual: search "rust" → see SourceHunt users
-- [ ] Performance: < 1s per search (GraphQL is fast)
-- [ ] Rate limit handling
-
-## Estimated effort
-
-M (3-4 días) — GraphQL client + new auth flow + niche data validation.
+- [ ] **(Optional) Emit repo results from git.sr.ht**
+  - Files: `src/lib/sources/sourcehut.ts`
+  - Do: with the same token, POST to `https://git.sr.ht/query` searching public
+    repositories by keyword; map to `kind: 'repo'` (`id: sh-repo-{id}`,
+    `followersCount: undefined`, `metadata.lastSeen` from `updated`). Keep person results
+    first, then repos, sliced by `page`/`perPage` like other connectors. All errors -> `[]`.
+  - Verify: with a token set, search a term matching a known sr.ht repo with only the
+    SourceHut pill active; a repo card appears under the Resources tab.

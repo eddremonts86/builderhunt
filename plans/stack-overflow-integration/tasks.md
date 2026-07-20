@@ -1,103 +1,45 @@
 # Tasks: Stack Overflow Integration
 
-## Phase 0 — Read first
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and quota
+> logging.
 
-- [ ] `src/lib/sources/hn.ts` — pattern for "people only" source
-- [ ] The SO API filter syntax — confusing, need to test
+## Delivered
 
-## Phase 1 — Data model
+- [x] **Create SO connector (per-tag top answerers)** — Done:
+      `src/lib/sources/stackoverflow.ts` (`searchStackOverflow(keywords, {page, perPage})`;
+      `tags/{tag}/top-answerers/all_time` per keyword + `TAG_SYNONYMS`; union with multi-tag
+      accumulation; errors return `[]`).
+- [x] **Batch top-tags enrichment** — Done: `fetchTopTags` (one call, up to 100 ids) fills
+      `topics`.
+- [x] **Add `STACKOVERFLOW_API_KEY` env var** — Done: `src/shared/lib/env.ts` (optional,
+      appended as `key=`).
+- [x] **Register in federated search** — Done: `src/lib/search.ts`; `stackoverflow` in
+      `SourceName` (`src/lib/sources/types.ts`).
+- [x] **UI source pill (opt-in, as recommended)** — Done: `ALL_SOURCES` +
+      `SOURCE_META.stackoverflow` in `SearchPage.tsx`; `PersonResultCard.tsx`.
+- [x] **Brand icon + badge** — Done: `StackOverflowIcon` in `BrandIcons.tsx`;
+      `.badge-stackoverflow` in `src/shared/styles/globals.css`.
+- [x] **Scoring** — Done: `stackoverflow` branch in `src/lib/score.ts` (reputation as
+      popularity, +5/+5 multi-tag boosts, log post-count bonus).
+- [x] **Deleted/unregistered user filter** — Done: `user_type === 'registered'` filter in
+      `searchStackOverflow`.
 
-- [ ] No schema changes; `source: 'stackoverflow'`
+## Remaining
 
-## Phase 2 — API key setup
+- [ ] **Document `STACKOVERFLOW_API_KEY` in `.env.example`**
+  - Files: `.env.example`
+  - Do: add `STACKOVERFLOW_API_KEY=` under "External Source API Tokens" (comment: register
+    an app at stackapps.com/apps/register; raises quota 300/day/IP to 10k/day).
+  - Verify: `grep STACKOVERFLOW_API_KEY .env.example` prints the documented line.
 
-- [ ] Register a Stack Overflow app at https://stackapps.com/apps/register
-- [ ] Get an API key
-- [ ] Add `STACKOVERFLOW_API_KEY` to `src/shared/lib/env.ts`
-
-## Phase 3 — New source: `src/lib/sources/stackoverflow.ts`
-
-- [ ] Add `stackoverflow` to `Source` type
-- [ ] `searchStackOverflowUsers(keywords, apiKey)`:
-  - `GET /users?site=stackoverflow&pagesize=50&order=desc&sort=reputation&filter=default`
-  - Returns top 50 users globally
-  - Filter by top-tag overlap with keywords (need a second call)
-- [ ] `getTopTags(userIds, apiKey)`:
-  - `GET /users/{ids}/top-tags?site=stackoverflow` (batch up to 100 ids)
-  - Returns `top_tags: { tag_name, question_score }[]` per user
-- [ ] `searchStackOverflow(keywords, apiKey)`:
-  - Fetch top 50 users
-  - Fetch their top tags in one batch call
-  - Filter users where any top tag matches query (or partial)
-  - Sort by reputation DESC
-  - Map to `RawBuilder`
-- [ ] Rate limit: respect 300 req/día without key, 10k with key. Track quota in logs.
-
-## Phase 4 — Wire into pipeline
-
-- [ ] Update `src/lib/search.ts` to include `searchStackOverflow`
-- [ ] Update `ALL_SOURCES` and `SOURCE_META` in `SearchPage.tsx`:
-  - Add `'stackoverflow'` to `Source` type
-  - Add `SOURCE_META.stackoverflow = { label: 'Stack Overflow', color: 'badge-stackoverflow', Icon: StackOverflowIcon }`
-  - Add SO to default active sources (7 → 8)
-- [ ] Consider opt-in (off by default) due to quota constraints
-
-## Phase 5 — Brand icon + UI
-
-- [ ] Add `StackOverflowIcon` to `BrandIcons.tsx`
-- [ ] Color: SO orange `#F48024`
-- [ ] Add `.badge-stackoverflow` to `globals.css`
-
-## Phase 6 — Scoring
-
-- [ ] Reputation (log scale, ×10)
-- [ ] Top tag overlap with query (×5 per matching tag)
-- [ ] Gold badges (×3 per badge)
-- [ ] Bio match (×5)
-
-## Phase 7 — Verification
-
-### Manual
-- [ ] Search "kubernetes" → see SO users with kubernetes tag
-- [ ] Search "rust" → see SO users with rust tag
-- [ ] SO card shows orange badge + reputation
-- [ ] Quota tracking: see how many calls per search
-
-### Automated (Playwright)
-- [ ] SO toggle behavior
-- [ ] SO cards have `.badge-stackoverflow` class
-
-### Performance
-- [ ] SO endpoint < 600ms (2 calls: users + top-tags)
-- [ ] Cache 1h, keyed by `(query, day)` (reputation changes slowly)
-- [ ] If 429 (quota exhausted), fall back to cached or empty
-
-## Phase 8 — Rollout
-
-- [ ] **Decide: default on or off?** SO is a strong signal but quota is real. **Recommended**: off by default; opt-in via toggle, with a one-time banner explaining the value.
-- [ ] Monitor: quota usage, CTR, dismiss rate
-- [ ] If dismiss rate is high: tune scoring, consider reputation threshold
-
-## Edge cases
-
-- **No API key**: rate-limited to 300/day. Disable gracefully if quota exhausted.
-- **User with no top tags**: skip
-- **No tag overlap with query**: skip (means no expertise match)
-- **Deleted SO user**: skip (user.is_deleted check)
-
-## Dependencies
-
-- New env var: `STACKOVERFLOW_API_KEY` (optional, but recommended)
-- No schema changes
-- No new packages
-
-## Estimated effort
-
-| Phase | Effort |
-|-------|--------|
-| 2 — API key setup | XS (30min) |
-| 3 — New source | M (4-6h) |
-| 4-5 — Wire + UI | S (2-3h) |
-| 6 — Scoring | S (1-2h) |
-| 7 — Verification | S (2-3h) |
-| **Total** | **~1.5-2 days** |
+- [ ] **Log quota exhaustion instead of failing silently**
+  - Files: `src/lib/sources/stackoverflow.ts`
+  - Do: in `fetchTopAnswerersForTag` / `fetchTopTags`, read `quota_remaining` from the
+    parsed body; if `< 50`, call `log.warn('stackoverflow_quota_low', { quotaRemaining })`
+    (import `log` from `~/shared/lib/log`, same as `search.ts`); on non-OK responses log
+    `log.warn('stackoverflow_request_failed', { status })` before returning `[]`.
+  - Verify: temporarily force a bad `key=` value and run a search — the warn line appears
+    in server logs and search results still render (SO contributes `[]`).

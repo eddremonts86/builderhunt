@@ -1,194 +1,77 @@
-# Tasks: Status & Trust
+# Tasks: Status Page & Trust Signals
 
-## Phase 0 — Research
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
+> **Reality check**: Status/incidents/changelog/roadmap delivered (checked below).
+> Remaining: uptime history (Phase 1) and optional incident emails (Phase 2).
 
-- [ ] Check UptimeRobot free tier (50 monitors, 5min interval)
-- [ ] Decide: Canny.io (free tier) vs in-house roadmap
-- [ ] Read `src/routes/api/health.tsx` — current health endpoint
+## Phase 0 — Delivered (audited against src, 2026-07-19)
 
-## Phase 1 — Data model
+- [x] **Schema: `incidents`, `changelog`, `roadmap_items`, `roadmap_votes`** —
+      `src/shared/lib/db/schema.ts`, migrated
+- [x] **Status logic lib + tests** — `src/shared/lib/status.ts` (`aggregateStatus`, duration
+      helpers), `src/shared/lib/status.test.ts` (11 tests)
+- [x] **GET /api/status (DB SELECT 1, Redis ping, memory RSS, open incidents)** —
+      `src/routes/api/status/index.ts`
+- [x] **/status page with 30s polling** — `src/routes/_landing/status.tsx`
+- [x] **Public incidents API (last 90 days)** — `src/routes/api/incidents/index.ts`
+- [x] **Admin incidents CRUD + UI** — `src/routes/api/admin/incidents/{index,$id}.ts`,
+      `src/routes/_dashboard/admin/incidents.tsx`
+- [x] **Changelog public pages + API** — `src/routes/changelog.tsx` (layout),
+      `src/routes/changelog/{index,$slug}.tsx`, `src/routes/api/changelog/{index,$slug}.ts`
+- [x] **Changelog admin CMS** — `src/routes/_dashboard/admin/changelog.tsx`,
+      `src/routes/api/admin/changelog/{index,$id}.ts`
+- [x] **Roadmap public page with voting (in-house, not Canny)** —
+      `src/routes/_landing/roadmap.tsx`, `src/routes/api/roadmap/index.ts`
+- [x] **Roadmap admin CRUD** — `src/routes/_dashboard/admin/roadmap.tsx`,
+      `src/routes/api/admin/roadmap/{index,$id}.ts`
+- [x] **Shallow container health endpoint (deliberate — see file header)** —
+      `src/routes/api/health.tsx`
+- [x] **Footer links: Status, Changelog, Roadmap** — `src/shared/components/Footer.tsx:52-58`
 
-- [ ] Add `incidents`, `changelog`, `status_subscribers` tables to schema
-- [ ] Generate + apply migration
+## Phase 1 — Uptime history
 
-## Phase 2 — Status page
+- [ ] **Schema: `status_checks` snapshot table**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` (generated migration)
+  - Do: `statusChecks` pgTable: `id` text PK, `checkedAt` timestamptz NOT NULL default now,
+    `ok` boolean NOT NULL, `components` jsonb (the per-component results array from
+    `/api/status`). Index on `checkedAt`.
+  - Verify: `pnpm db:generate && pnpm db:migrate` applies cleanly.
 
-File: `src/routes/status.tsx` (new, public)
+- [ ] **Snapshot worker endpoint (HTTP-cron pattern)**
+  - Files: `src/routes/api/admin/status/snapshot.ts` (new)
+  - Do: POST, auth like `src/routes/api/admin/alerts/run-worker.ts` (mirror its admin/cron
+    auth exactly). Runs the same three checks as `api/status/index.ts` (extract them into a
+    shared `runStatusChecks()` in `src/shared/lib/status.ts` if needed to avoid duplication),
+    inserts one `status_checks` row, deletes rows older than 90 days. Returns
+    `{ ok, inserted: true, pruned: n }`. Then add to the VPS crontab:
+    `*/5 * * * * curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/status/snapshot`
+    (documented in the production-infrastructure runbook).
+  - Verify: `curl -X POST` inserts a row; unauthorized call is 401/403; repeated calls prune
+    old rows.
 
-- [ ] Hero: "All systems operational" or active incident summary
-- [ ] Component list: App, API, Database, Email, Search, Redis, Stripe, Auth
-- [ ] Each: green ✓ if healthy, yellow ⚠ if degraded, red ✗ if down
-- [ ] Auto-refresh every 30s (client-side `setInterval`)
-- [ ] 30-day uptime percentage
-- [ ] Recent incidents list (last 5)
-- [ ] Subscribe form
+- [ ] **Uptime computation + display**
+  - Files: `src/shared/lib/status.ts`, `src/shared/lib/status.test.ts`,
+    `src/routes/api/status/index.ts`, `src/routes/_landing/status.tsx`
+  - Do: Pure function `computeUptime(checks: {checkedAt: Date; ok: boolean}[], days: number,
+intervalMinutes = 5): number | null` — expected samples = days×24×60/interval; missing
+    samples count as down; returns null when < 1 day of data. Tests: all-ok → 100; one gap
+    hour → proportional; empty → null. `/api/status` GET adds `uptime30d` (query last 30d of
+    `status_checks`); status page renders "30-day uptime: 99.9%" (hidden while null).
+  - Verify: `pnpm test status` passes; page shows the number once ≥1 day of cron snapshots
+    exists in dev.
 
-File: `src/routes/api/status/index.ts` (new, GET)
+## Phase 2 — Incident email subscriptions (OPTIONAL — build only on demonstrated need)
 
-- [ ] Runs all health checks (DB, Redis, Resend, Stripe)
-- [ ] Queries open incidents from DB
-- [ ] Returns aggregated status
-
-File: `src/routes/api/status/subscribe.ts` (new, POST)
-
-- [ ] Body: `{ email }`
-- [ ] Insert into `status_subscribers` (with verification email)
-
-## Phase 3 — Incidents
-
-File: `src/routes/api/incidents/index.ts` (new, GET)
-
-- [ ] Returns incidents from last 90 days
-
-File: `src/routes/api/admin/incidents/index.ts` (new, POST)
-
-- [ ] Auth required (admin role)
-- [ ] Body: `{ title, description, severity }`
-- [ ] Insert incident, set status='investigating'
-- [ ] Send email to all status_subscribers
-- [ ] Return incident id
-
-File: `src/routes/api/admin/incidents/$id.ts` (new, PATCH)
-
-- [ ] Auth required
-- [ ] Update status, resolved_at
-- [ ] Send resolution email to subscribers
-
-## Phase 4 — Changelog
-
-File: `src/routes/changelog.tsx` (new, public)
-
-- [ ] List latest 20 entries
-- [ ] Each: date, title, excerpt, tags
-- [ ] RSS link
-
-File: `src/routes/changelog/$slug.tsx` (new, public)
-
-- [ ] Full entry, rendered from markdown
-
-File: `src/routes/api/changelog/index.ts` (new, GET)
-
-- [ ] List (paginated)
-
-File: `src/routes/api/changelog/$slug.ts` (new, GET)
-
-- [ ] Single entry by slug
-
-File: `src/routes/api/admin/changelog/index.ts` (new, POST)
-
-- [ ] Auth required
-- [ ] Create entry
-- [ ] Trigger weekly digest (Sunday 9am) — set up cron
-
-File: `src/routes/api/admin/changelog/$id.ts` (new, PATCH/DELETE)
-
-- [ ] Auth required
-- [ ] Edit or delete
-
-## Phase 5 — Roadmap
-
-Decision: use Canny.io free tier
-
-- [ ] Sign up at canny.io
-- [ ] Create BuilderHunt board
-- [ ] Seed 10 items (matches existing /plans/ folder)
-- [ ] Get embed code
-- [ ] File: `src/routes/roadmap.tsx` (new, public) — Canny embed
-
-## Phase 6 — Subscription emails
-
-File: `src/shared/lib/email-templates/status-incident.tsx`
-
-- [ ] "🚨 BuilderHunt is experiencing [incident]"
-- [ ] Body: title, description, what to do
-
-File: `src/shared/lib/email-templates/status-resolved.tsx`
-
-- [ ] "✅ [Incident] has been resolved"
-- [ ] Body: duration, postmortem link
-
-File: `src/shared/lib/email-templates/changelog-weekly.tsx`
-
-- [ ] "This week in BuilderHunt"
-- [ ] List of last week's changelog entries
-
-**Cron**:
-- `scripts/jobs/send-changelog-digest.ts` — Sunday 9am UTC, find changelog entries from last 7 days, send to subscribers
-- `scripts/jobs/check-incidents.ts` — every 5min, check for newly-resolved incidents, send emails
-
-## Phase 7 — Admin CMS
-
-File: `src/routes/_dashboard/admin/incidents.tsx` (new)
-
-- [ ] List incidents
-- [ ] "Create new" form: title, severity, description
-- [ ] Click incident → edit form: update status, add postmortem
-- [ ] "Resolved at" datetime picker
-
-File: `src/routes/_dashboard/admin/changelog.tsx` (new)
-
-- [ ] List changelog entries
-- [ ] "New entry" form: title, content (markdown editor), tags
-- [ ] Click entry → edit
-- [ ] Publish/draft toggle
-
-## Phase 8 — Footer updates
-
-File: `src/shared/components/Footer.tsx` (new or extend)
-
-- [ ] Links: Pricing, About, Blog, **Status**, **Changelog**, **Roadmap**
-- [ ] Legal: Terms, Privacy, Cookies, Imprint
-
-## Phase 9 — UptimeRobot setup
-
-- [ ] Sign up at uptimerobot.com
-- [ ] Add monitor: `https://builderhunt.dev/api/status` (5min interval, expects 200)
-- [ ] Add contact: email + Slack webhook
-- [ ] Create status page: `https://status.builderhunt.dev` (UptimeRobot free tier)
-- [ ] Add DNS CNAME for `status.builderhunt.dev` → UptimeRobot
-
-## Phase 10 — Verification
-
-### Manual
-- [ ] /status shows all green when healthy
-- [ ] /status shows red when DB down (test: stop docker, check)
-- [ ] Create incident in /admin/incidents → status page updates within 30s
-- [ ] Subscribe to status → receive email
-- [ ] Create changelog entry in /admin/changelog → /changelog shows it
-- [ ] /roadmap shows Canny board
-
-### Automated
-- [ ] Playwright: /status renders
-- [ ] Playwright: /changelog renders
-- [ ] /api/status returns valid JSON
-
-### Performance
-- [ ] /status TTFB < 300ms
-- [ ] Auto-refresh doesn't cause flicker
-
-## Phase 11 — Rollout
-
-- [ ] Deploy with `ENABLE_STATUS_PAGE=true`
-- [ ] Add to footer on all public pages
-- [ ] Add to landing page
-- [ ] Email existing users: "We added a status page and changelog"
-
-## Edge cases
-
-- **Health check flaky**: require 3 consecutive failures before marking down
-- **Incident during deploy**: auto-mark as investigating, then resolved when deploy done
-- **Changelog with no content**: don't publish (require both title and content)
-- **Roadmap vote fraud**: rate limit (1 vote per user per item per day)
-- **Subscriber email bounces**: remove from list
-
-## Dependencies
-
-- New tables: 3 (`incidents`, `changelog`, `status_subscribers`)
-- New package: none
-- Schema migrations: 3 new tables
-- New env vars: `STATUS_PAGE_URL`
-- New services: UptimeRobot (free), Canny.io (free)
-- New background jobs: 2 (changelog digest, incident emails)
-- New pages: 5 routes (status, changelog, changelog/$slug, roadmap, admin/*)
-
-## Estimated effort: 2-3 days
+- [ ] **Subscribers table + subscribe endpoint + send hooks**
+  - Files: `src/shared/lib/db/schema.ts` (`status_subscribers`: id, email unique, createdAt),
+    `src/routes/api/status/subscribe.ts` (new, POST, zod email, rate-limited via
+    `src/shared/lib/rate-limit.ts`), `src/routes/api/admin/incidents/index.ts` + `$id.ts`
+    (send on create/resolve via `src/shared/lib/email.ts`), `src/routes/_landing/status.tsx`
+    (subscribe form)
+  - Do: Opt-in list, plain-text emails ("Investigating: {title}" / "Resolved: {title},
+    duration {d}"), unsubscribe link (`GET /api/status/subscribe?remove=<id>`), all no-op
+    without `RESEND_API_KEY`.
+  - Verify: Subscribe → create incident in admin → email received; resolve → second email;
+    unsubscribe link removes the row.

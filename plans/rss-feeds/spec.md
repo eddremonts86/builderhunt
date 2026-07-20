@@ -1,125 +1,67 @@
 # Feature: RSS Feeds per Saved Search
 
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: The public feed route exists at `src/routes/api/feeds/$searchId.ts`
+> (RSS 2.0 + HTML fallback + rate limiting) and the dashboard exposes a "Copy RSS feed URL"
+> action (`src/modules/dashboard/components/DashboardPage.tsx`, `SavedSearchRow`). The
+> real URL is `/api/feeds/{searchId}` (optionally `?format=rss`), **not** the `.xml` path
+> earlier drafts promised.
+
 ## Problem
 
-Hoy las alertas de BuilderHunt son **email**. Email tiene tres problemas:
-
-1. **Fricción alta.** El usuario tiene que dar su email (que ya hizo para el sign-up, OK), pero luego tiene que configurar un email separado, filtros, "from address", decidir si quiere daily/weekly/instant. Demasiados pasos para algo que el usuario quiere que "simplemente le llegue".
-2. **Saturación.** Los developers vivimos saturados de email. Un email más de un producto SaaS se pierde entre 50 newsletters y 20 notificaciones.
-3. **No es compartible.** Un email de alerta es privado por naturaleza. No puedo reenviarlo a un compañero sin que tenga cuenta.
-
-Mientras tanto, **los developers seguimos usando RSS** (Feedly, Inoreader, NetNewsWire). Es donde consumimos HN, lobste.rs, dev newsletters convertidas, GitHub release feeds. Es nuestro substrate nativo.
+Email alerts have friction, saturation, and are not shareable. Developers still live in
+RSS readers (Feedly, Inoreader, NetNewsWire). A public RSS URL per saved search turns each
+search into a shareable endpoint and each user into a potential evangelist.
 
 ## Goal
 
-Cada saved search tiene una **URL pública de RSS** que el usuario puede:
-1. Pegar en su reader (Feedly, Inoreader, etc.)
-2. Compartir con un compañero (link público, no requiere auth)
-3. Compartir públicamente en Twitter, su blog, etc.
+Every saved search has a public RSS URL that works in any reader, needs no auth, and shows
+a friendly HTML page when opened in a browser.
 
-Eso convierte cada saved search en un **endpoint compartible** de la app, y a cada usuario en un **posible evangelista** del producto.
+## Delivered
 
-## Non-goals
+Shipped in `src/routes/api/feeds/$searchId.ts` and `DashboardPage.tsx`:
 
-- **No es auth-gated.** El feed es público. La data que indexa es pública (ya scraped de fuentes públicas).
-- **No es personalizable.** No hay "filtros en el feed", no hay "include/exclude keywords". Si quieres custom, edita la search.
-- **No es un reemplazo de email.** Email sigue ahí para quien lo prefiera. RSS es **alternativa**, no **reemplazo**.
-- **No es full-text.** El feed muestra builders nuevos que matchean, no un stream de cada commit/post. (Eso sería ruido.)
-- **No es un RSS reader.** El usuario usa el suyo. BuilderHunt solo emite.
+- **Route**: `GET /api/feeds/{searchId}` — public, no auth.
+  - Loads the saved query (`savedQueries` table), 404 when missing.
+  - Runs the live federated search (`searchBuilders` from `src/lib/search.ts`) with the
+    saved keywords/sources/filters, `perPage: 50`.
+  - Content negotiation: browsers (Accept `text/html` without `application/rss`) get a
+    styled HTML page with a copyable feed URL, Feedly/Inoreader/NetNewsWire subscribe
+    links, and a 5-item preview; everything else gets RSS 2.0 XML with
+    `atom:link rel="self"`, CDATA descriptions, XML-escaping, and stable
+    `guid: builderhunt-builder-{id}` per item.
+  - `Cache-Control: public, max-age=3600` on both variants.
+  - In-memory rate limit 60 req/h per IP (`x-forwarded-for` aware), 429 beyond.
+  - Whole handler wrapped in try/catch -> 500 plain text (never leaks stack).
+- **UI**: `SavedSearchRow` in `DashboardPage.tsx` has an "Export & RSS" menu with
+  "Copy RSS feed URL" (copies `{origin}/api/feeds/{id}?format=rss`, clipboard fallback
+  message included).
 
-## User stories
+### Delivered semantics worth knowing
 
-1. **Como usuario**, quiero copiar la URL de RSS de mi saved search con un click, pegarla en Feedly, y empezar a recibir updates sin dar mi email ni configurar nada.
-2. **Como usuario**, quiero compartir mi saved search con un compañero vía link, sin que tenga que registrarse para verlo.
-3. **Como visitante anónimo** (llegando vía un link compartido), quiero ver un feed RSS válido que pueda subscribir inmediatamente en mi reader.
-4. **Como usuario power**, quiero ver un feed combinado de todas mis saved searches en un solo endpoint (bonus, no v1).
+- The feed is a **live snapshot** of the current top-50 scored results, not a diff of
+  "new builders since last poll". Readers deduplicate via the stable per-builder `guid`,
+  which yields the intended "new items appear as new matches show up" behavior without
+  any persistence.
+- `pubDate` uses the builder's `lastSeen` when present, else "now".
 
-## UX flow
+## Remaining gaps (real)
 
-**En la página de Saved searches (dashboard):**
+1. **No reader deep links in the dashboard popover.** "Open in Feedly / Inoreader" links
+   exist only on the HTML fallback page, not next to the copy action where the user
+   actually is.
+2. **The shareable "all my searches" page (original Phase 4) was never built.** Kept as an
+   optional task; drop it if sharing sees no demand.
 
-```
-┌─────────────────────────────────────────────────────────┐
-│  Saved searches                                          │
-│  ──────────────────                                      │
-│  Rust async runtime                                      │
-│  rust, async, tokio · 3 sources                         │
-│                                          [Run] [RSS]    │
-│                                                          │
-│  Indie hackers in EU                                     │
-│  indie, hacker, eu · 2 sources                           │
-│                                          [Run] [RSS]    │
-└─────────────────────────────────────────────────────────┘
-```
+## Non-goals (unchanged)
 
-**Click en [RSS]:**
-- Modal/tooltip con la URL: `https://builderhunt.dev/api/feeds/<searchId>.xml`
-- Botón "Copy"
-- Botón "Open in Feedly" (deep link)
-- Botón "Open in Inoreader" (deep link)
-- Texto: "This feed is public. Anyone with the link can subscribe."
-
-**Visitante anónimo pegando la URL en el browser:**
-- Si acepta application/xml o un reader pide la URL → XML válido (RSS 2.0)
-- Si es un humano en el browser → HTML "nice page" con explicación + link a la app
-
-**Visitante pegando la URL en Feedly:**
-- Feedly detecta RSS, muestra preview, permite subscribir
-
-## Data shape (XML)
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
-  <channel>
-    <title>BuilderHunt — Rust async runtime</title>
-    <link>https://builderhunt.dev/search?q=...</link>
-    <description>New builders matching "rust async runtime" — updated daily</description>
-    <language>en-us</language>
-    <lastBuildDate>Wed, 15 Jul 2026 19:00:00 GMT</lastBuildDate>
-    <atom:link href="https://builderhunt.dev/api/feeds/<id>.xml" rel="self" type="application/rss+xml" />
-
-    <item>
-      <title>alice — Rust async runtime</title>
-      <link>https://builderhunt.dev/builder/abc123</link>
-      <guid isPermaLink="false">builderhunt-builder-abc123</guid>
-      <pubDate>Wed, 15 Jul 2026 12:00:00 GMT</pubDate>
-      <description><![CDATA[
-        Senior Rust engineer working on async runtimes.
-        Topics: rust, async, tokio
-        Sources: github, hn
-        Last seen: 2 days ago
-        Why this match: matches keywords "rust", "async" in your saved search.
-      ]]></description>
-    </item>
-    ...
-  </channel>
-</rss>
-```
-
-## Public discovery (bonus, v1.5)
-
-Una página `/explore` que lista los saved searches públicos más populares (medidos por nº de subscriptores del feed o por nº de builders descubiertos). Marketing orgánico y SEO.
+Auth-gated feeds; feed personalization; JSON Feed / Atom variants; WebSub push; per-builder
+feeds; feed analytics. Also explicitly **not** a diffing engine (see delivered semantics).
 
 ## Success metrics
 
-- **Primary:** Nº de saved searches que tienen al menos 1 fetch del feed en los últimos 30 días. Target: 20% después de 4 semanas.
-- **Secondary:** Nº de clicks en "Copy RSS link" / "Open in Feedly" en la página de saved searches. Target: 10% de los usuarios.
-- **Viral:** Nº de feeds accedidos sin auth (proxy de "usuarios nuevos llegaron vía feed"). Target: 100/mes en el primer mes post-launch.
-
-## Out of scope (this iteration)
-
-- Auth-gated feeds
-- Per-builder RSS (futuro, fácil de añadir)
-- WebSub / PubSubHubbub (push updates en vez de poll)
-- "Combined" feed multi-search
-- Per-user "all my searches" feed
-- Feed analytics dashboard (defer until we have meaningful volume)
-
-## Open questions
-
-- **¿Cache-Control?** RSS readers poll aggressively. Sugerido: `Cache-Control: max-age=3600` (1h).
-- **¿Auth del user?** El feed es público pero el contenido es **de un saved search privado del user**. ¿Es OK? → Asumir que sí (la data es pública; el "saved" es organización personal). Si el user quiere hacer el feed privado, no lo exponemos en la UI.
-- **¿Rate limiting?** Sí, en el endpoint: 60 req/h per IP, suficiente para un reader normal. Previene scraping.
-- **¿Abuse / spam?** Si un user crea 50 saved searches para spamear RSS, ¿lo permitimos? → Rate limit en creación de saved searches (10/día) ya cubre esto.
-- **¿Límite de items en el feed?** Cap a 50 items, ordenados por `lastSeen DESC`. Readers antiguos paginan via `?page=N` (no v1).
+- Feeds validate in the W3C feed validator and render in Feedly/Inoreader/NetNewsWire.
+- Share of saved searches with >=1 feed fetch in 30 days: target 20%.

@@ -1,51 +1,99 @@
-# Plan: Trust & Security Enhancements
+# Delivery Plan: Trust, Claims, and Profile Removal Audit
 
-## Goal recap
+> **Status**: `partially-implemented`
+> **Depends on**: [`audit-performance-qa`](../audit-performance-qa/spec.md), [`pricing-and-billing`](../pricing-and-billing/spec.md), [`legal-and-compliance`](../legal-and-compliance/spec.md), [`claimable-profiles`](../claimable-profiles/spec.md)
+> **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
+> **Reality check**: Trust pages and pricing exist, but public claims drift from
+> `billing-shared.ts`; claim verification proves an arbitrary email, not source ownership; and live
+> federated search has no durable, global suppression layer.
 
-Implement pricing transparency comparison grids, detail a security modal for GitHub Personal Access Tokens, establish a profile removal opt-out pipeline, and re-write over-promising copy elements on the landing page.
+## Delivery sequence
 
-## Why this is a valuable addition
+### Phase 0 — Contain current misrepresentation
 
-1. **Resolves Frictional Blockers**: Developers are highly sensitive to security. Explaining token encryption and scoping rules removes the main reason they abandon the registration flow.
-2. **Legal & Compliance Readiness**: Having a verified automated opt-out / de-indexing route prevents GDPR complaints and privacy threats.
-3. **Professional Appeal**: Polishing copy to sound analytical rather than hyperbolic matches the serious tone expected by enterprise tech leads.
+Before schema work, remove the unsupported aggregate rating, user-PAT instructions, fictional or
+future feature statements, and the nonfunctional alert/newsletter form. Add
+`PROFILE_CLAIMS_ENABLED=false` and hide/reject new claims until source proof is live. Publish an
+accurate `/security` page and link it plus `/privacy/remove` from the footer. This is independently
+releasable and reduces active trust risk.
 
-## Phases
+### Phase 1 — Centralize claim truth
 
-### Phase 1: Database Setup
-- Add a boolean column `isDeindexed` to the `builders` table schema:
-  ```sql
-  ALTER TABLE builders ADD COLUMN is_deindexed BOOLEAN DEFAULT FALSE NOT NULL;
-  ```
-- Update schemas in `src/shared/lib/db/schema.ts`. Modify query routines inside `src/lib/search.ts` to exclude de-indexed builders (`where(eq(builders.isDeindexed, false))`).
+Add the client-safe product-claims contract and tests that compare it with
+`PLAN_LIMITS`/`PLAN_PRICING`, existing source adapters, and actual export code. Refactor landing,
+FAQ, pricing, metadata/JSON-LD, security, and privacy copy to use or assert against it. Do not add a
+second pricing component.
 
-### Phase 2: Landing Copy Updates & Pricing Component
-- Edit H1 headlines and body paragraphs in `src/routes/_landing/index.tsx`.
-- Create `src/modules/landing/components/PricingTable.tsx` implementing the table design. Mount it inside the landing layout section.
+### Phase 2 — Add minimal removal state
 
-### Phase 3: Token Security Modal
-- Create `src/modules/landing/components/TokenSecurityModal.tsx`.
-- Bind the modal trigger to a help icon placed next to the GitHub Token input element in the search/settings panels.
+Create the two new tables and indexes in a forward-only Drizzle migration. Add pure URL
+normalization, HMAC/redaction, state-transition, and suppression helpers with unit tests. Existing
+data remains readable; no `builders` column is added because it cannot represent global identity.
 
-### Phase 4: Opt-Out Route
-- Create route `src/routes/privacy/remove.tsx` and its page container.
-- Implement server function `requestDeindexing({ emailOrProfileUrl })`:
-  - Validate parameters.
-  - Send email verification token.
-- Implement server function `confirmDeindexing({ token })`:
-  - Flag builder record as `isDeindexed = true` and erase their details (bio, name, avatar) from the DB row to ensure complete removal compliance.
+### Phase 3 — Prove source ownership
 
-### Phase 5: Verification & Safety
-- Verify that opt-out deletion requests erase personal information.
-- Write tests confirming de-indexed profiles are never returned by keyword search pipelines.
+Implement fixed-host source proof adapters, then request/verify routes and the public UI. Launch
+automation only for adapters with stable official endpoints. Rate-limit, conceal enumeration,
+bound network work, hash secrets, and expose manual review for unsupported sources. Reuse this
+helper in builder claims before re-enabling claim UI.
 
-## Risks
+### Phase 4 — Enforce suppression everywhere
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Spam removal requests** | Medium | Medium | Require email validation (sending verification links to their platform emails, or verifying GitHub OAuth claims) before deleting database profiles. |
-| **Ambiguous pricing friction** | Low | Low | Make it clear that all core features remain completely free during the public beta phase. |
+Filter both cache hits and misses in `search.ts`, invalidate versioned caches on verification,
+reject tracking, return 404 for suppressed public profiles, and filter recent/recommendation/export/
+feed/alert paths. In one DB transaction, create suppression, complete request, and delete all
+per-user cached builder copies for the identity. Tests seed the same identity under two users and
+in Redis/memory to prove global behavior.
 
-## Rollback plan
+### Phase 5 — Observe and roll out safely
 
-- Changes are cosmetic and route-isolated. The de-indexing column can remain active in the database even if the removal form is hidden from the UI.
+Emit redacted request/verify/reject/suppress events and metrics. Enable request intake first,
+supported-source verification second, claims last. Run browser trust tests from the performance QA
+harness and a production canary using a dedicated synthetic upstream profile. Document manual
+review, revocation, incident response, and the five-minute removal objective.
+
+## Gate matrix
+
+| Gate          | Pass condition                                                                                |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| Copy contract | No hardcoded contradictory limit/credential/rating claim in audited surfaces.                 |
+| Unit          | URL normalization, HMAC, transitions, expiry/replay, source adapters, and filters pass.       |
+| Integration   | Two-user + memory/Redis/fresh-source identity disappears from every surface.                  |
+| Abuse         | Wrong email/profile, replay, SSRF redirect, oversized body, and rate-limit cases fail safely. |
+| Privacy       | No plaintext challenge/email in DB, logs, metrics, traces, or AI/provider payloads.           |
+| Runtime       | Synthetic proof removes canary profile in ≤5 minutes and claim proof cannot be bypassed.      |
+
+## Risks and controls
+
+| Risk                                              | Control                                                                                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Malicious user suppresses someone else            | Require source-hosted challenge proof; email alone never authorizes.                                                     |
+| Removed identity returns from cache/source        | Filter after every cache read, version cache keys, and test all downstream surfaces.                                     |
+| SSRF through profile URL                          | Strict normalizer, fixed adapter hosts, no arbitrary redirects, byte/time limits.                                        |
+| Minimal suppression record conflicts with erasure | Retain only HMAC/stable source identifiers under documented legitimate-interest/legal basis; no content or contact data. |
+| Source API cannot expose a proof field            | Keep that source manual and pending; never weaken proof requirements.                                                    |
+| Claim rollout locks legitimate users out          | Existing claims remain visible but new verified state is disabled until proof ships; provide correction support path.    |
+
+## Rollout
+
+1. Deploy truthful copy/security page and default-off claim/removal flags.
+2. Apply additive tables and deploy read paths with suppression disabled.
+3. Enable `PROFILE_REMOVAL_ENABLED` for an internal canary and one supported source.
+4. Expand per source only after adapter abuse/integration tests and runtime proof pass.
+5. Enable `PROFILE_CLAIMS_ENABLED` after source proof is mandatory; audit legacy verified claims
+   separately rather than silently grandfathering them as strongly verified.
+
+## Rollback
+
+Turn off request/claim UI and POST routes via flags while continuing to enforce existing
+suppressions. Never roll back by deleting suppression rows or restoring scrubbed builder caches.
+The additive migration stays in place; code can revert to the previous schema-compatible version.
+If filtering causes false positives, revoke only the exact suppression through an audited admin/
+legal action and invalidate its cache namespace.
+
+## Completion evidence
+
+Attach copy-contract output, migration/integration tests, abuse-case results, DB/log redaction
+sample, all-surface two-user test, canary timing, browser screenshots, and feature-flag state. Mark
+the plan implemented only when claims are proof-backed and suppression remains active after a full
+cache TTL and application restart.

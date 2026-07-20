@@ -1,33 +1,42 @@
 # Plan: SourceHut Integration
 
-## Status: deferred
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: The original "deferred" decision is obsolete — the connector shipped
+> (`src/lib/sources/sourcehut.ts`), token-gated by upstream necessity. Remaining: env
+> documentation and an optional repo-search extension.
 
-Honorable mention, not top priority. Execute only after GitLab integration proves valuable and the "open source forge" angle is validated with users.
+## Executed phases (record)
 
-## Phases (when ready)
+1. **GraphQL client + user search** — `src/lib/sources/sourcehut.ts` (`gql<T>()` helper,
+   `searchSourceHut(keywords, {page, perPage})`, token-gated, silent degradation).
+2. **Pipeline** — import + gate in `src/lib/search.ts`; `sourcehut` in `SourceName`.
+3. **Env** — optional `SOURCEHUT_TOKEN` in `src/shared/lib/env.ts`.
+4. **UI** — opt-in pill, `SOURCE_META.sourcehut`, `SourceHutIcon`, `.badge-sourcehut`.
+5. **Scoring** — `sourcehut` branch in `src/lib/score.ts`.
 
-### Phase 0: Research
-Same as tasks.
+## Remaining phases
 
-### Phase 1: Data model
-No changes.
+### Phase A — Env documentation
 
-### Phase 2-3: GraphQL client + wire
-Pattern mirrors GitLab integration. Effort: 3-4 days.
+Add `SOURCEHUT_TOKEN` to `.env.example`. Without it the source is permanently empty, which
+is invisible to operators today.
 
-### Phase 4-5: Scoring + verification
-Standard.
+### Phase B (optional) — Repo results
 
-## When to do it
+Query git.sr.ht GraphQL (`repositories(filter: ...)`) with the same token and emit
+`kind: 'repo'` records. Only worth doing if SourceHut people-results prove useful; repos
+carry no popularity signal there.
 
-- After GitLab launch and 30 days of data
-- If we see EU/enterprise user growth (SourceHunt is small but signals a privacy-conscious user base)
-- If we have capacity (1 engineer for 1 week)
+## Risks
 
-## Risks (summary)
+| Risk                                      | Likelihood | Impact | Mitigation                                                    |
+| ----------------------------------------- | ---------- | ------ | ------------------------------------------------------------- |
+| Token quota (~600/h authed)               | Low        | Low    | 5-min search cache in `search.ts`; opt-in pill limits traffic |
+| GraphQL schema drift (API still maturing) | Medium     | Low    | Connector returns `[]` on GraphQL errors already              |
 
-- Small user base (50k vs 100M+ on GitHub)
-- GraphQL API in beta — could change
-- Rate limit aggressive (60/h without auth)
+## Rollback plan
 
-## Decision: defer
+No migrations. Unset `SOURCEHUT_TOKEN` to silence the source; remove the pill/gate to
+remove it from the product.

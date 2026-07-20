@@ -1,141 +1,86 @@
 # Tasks: Public Landing Pages (SEO)
 
-## Phase 0 — Research
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md), [`content-marketing`](../content-marketing/spec.md)
+> **Reality check**: Core SEO surface delivered (checked below). Remaining: sitemap
+> additions, blog OG images, and the public-radars feature.
 
-- [ ] Check TanStack Start SSR support for the routes we'll add
-- [ ] Pick OG image library: `@vercel/og` (simpler) vs `satori` + `resvg` (more flexible)
-- [ ] Read existing `/routes/_landing` for inspiration
-- [ ] Read `src/lib/search.ts` to understand caching for SSR
+## Phase 0 — Delivered (audited against src, 2026-07-19)
 
-## Phase 1 — `/explore` route
+- [x] **Landing page redesign** — `src/modules/landing/components/HomePage.tsx`,
+      `FAQSection.tsx`, `src/shared/components/Header.tsx`, `Footer.tsx`
+- [x] **SSR /explore with per-query meta + ItemList JSON-LD** —
+      `src/routes/_landing/explore/index.tsx` (head at line 39, JSON-LD at line 119), backed by
+      cached `searchBuilders` (`src/lib/search.ts`)
+- [x] **PNG OG image endpoint (1200×630, resvg)** — `src/routes/api/og/explore.tsx`
+- [x] **sitemap.xml route (static pages + popular explore queries, 1h cache)** —
+      `src/routes/sitemap[.]xml.ts`
+- [x] **robots.txt (public allow, private disallow, AI-bot allow, sitemap pointer)** —
+      `src/routes/robots[.]txt.ts`
+- [x] **Site-wide WebSite + Organization JSON-LD** — `src/routes/__root.tsx:75-94`
+- [x] **BlogPosting JSON-LD on posts** — `src/routes/_landing/blog/$slug.tsx:42`
 
-File: `src/routes/explore/index.tsx` (new, SSR)
+## Phase 1 — SEO fixes
 
-- [ ] Accept `?q=...&sources=...` query string
-- [ ] Server-side `loader`: parse params, call `searchBuilders`, return results
-- [ ] Render top 20 builder cards
-- [ ] Add "Save this radar" CTA at the bottom
-- [ ] Cache results in Redis 6h, keyed by `(q, sources)`
-- [ ] Add server-side meta tags (title, description, OG)
-- [ ] Add JSON-LD structured data
+- [ ] **Add /pricing, /blog, and blog posts to the sitemap**
+  - Files: `src/routes/sitemap[.]xml.ts`
+  - Do: In the GET handler's `entries` array (lines 79-89) add
+    `{ loc: `${SITE}/pricing`, changefreq: 'weekly', priority: 0.8 }` and
+    `{ loc: `${SITE}/blog`, changefreq: 'weekly', priority: 0.8 }`. Then
+    `const posts = await getAllPosts()` (from `~/shared/lib/blog`) and push
+    `{ loc: `${SITE}/blog/${p.slug}`, lastmod: p.date, changefreq: 'monthly', priority: 0.7 }`
+    per post.
+  - Verify: `curl localhost:3000/sitemap.xml` contains `/pricing`, `/blog`, and one `<url>`
+    per file in `content/posts/`; XML still validates (open in a browser, no parse error).
 
-## Phase 2 — Discover popular queries
+- [ ] **Blog OG images**
+  - Files: `src/routes/api/og/blog.tsx` (new), `src/routes/_landing/blog/$slug.tsx`,
+    `src/routes/_landing/blog/index.tsx`
+  - Do: New OG route modeled on `api/og/explore.tsx` (same SVG→PNG resvg pipeline): input
+    `?slug=…`, look up the post via `getPostBySlug`, render title (wrapped, max 3 lines),
+    date + author, BuilderHunt branding; 404 for unknown slug; `Cache-Control: public,
+max-age=86400`. In `blog/$slug.tsx` `head:` add
+    `{ property: 'og:image', content: `${SITE}/api/og/blog?slug=${post.slug}` }` and
+    `{ name: 'twitter:card', content: 'summary_large_image' }`; give the blog index a static
+    OG using the same endpoint style or the site default.
+  - Verify: `curl -I "localhost:3000/api/og/blog?slug=why-i-built-builderhunt"` →
+    `image/png` 200; view-source of a post page shows the `og:image` tag; X card validator
+    renders the image on prod.
 
-File: `scripts/seed-explore-pages.ts`
+## Phase 2 — Public radars (post-launch)
 
-- [ ] Static list of top 50-100 queries (rust async, indie hackers, AI engineers, etc.)
-- [ ] For each, create an `/explore?q=...` entry in a generated sitemap
-- [ ] Track which queries are most-visited → promote to "popular searches" on landing page
+- [ ] **Schema: `public_radars` table**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` (generated migration)
+  - Do: `publicRadars` pgTable: `savedQueryId` text PK referencing `saved_queries.id` ON
+    DELETE CASCADE, `slug` text unique NOT NULL, `createdAt` timestamptz default now. Slug =
+    kebab-case of query name + 6-char random suffix (reuse `randomId()` from `src/lib/utils.ts`
+    truncated).
+  - Verify: `pnpm db:generate && pnpm db:migrate` applies cleanly; `\d public_radars` shows
+    the FK cascade.
 
-## Phase 3 — Sitemap & robots
+- [ ] **Share/unshare API on saved queries**
+  - Files: `src/routes/api/queries/$id/share.ts` (new), `src/shared/lib/db/schema.ts` (read)
+  - Do: POST (auth required, must own the saved query) → upsert `public_radars` row, return
+    `{ slug, url: `/r/${slug}` }`. DELETE → remove the row. Zod-validate params; 404 if not
+    owner.
+  - Verify: `curl -X POST /api/queries/<id>/share` as owner returns slug; as another user
+    returns 404; DELETE then GET `/r/$slug` → 404.
 
-File: `src/routes/sitemap[.]xml.ts`
+- [ ] **Public radar page `/r/$slug` (SSR)**
+  - Files: `src/routes/r/$slug.tsx` (new)
+  - Do: Loader: resolve slug → saved query + owner display name; run `searchBuilders` with the
+    query's keywords/sources (same cache as explore); return ONLY `{ ownerName, queryName,
+results }` — never notes/alerts/tracked state. Render explore-style cards, "radar by
+    {ownerName}" header, sign-up CTA, `ItemList` JSON-LD, `og:image` via a `?slug=` variant
+    added to `api/og/explore.tsx`. 404 when no `public_radars` row.
+  - Verify: Share a search, open `/r/$slug` logged-out — renders cards and meta; toggling
+    private 404s; view-source contains no note/alert data.
 
-- [ ] Generate `sitemap.xml` server-side
-- [ ] Include: home, pricing, about, all `/explore` pages, all public radars
-- [ ] Last-modified timestamp per page
-- [ ] Cached 24h
-
-File: `src/routes/robots[.]txt.ts`
-
-- [ ] Allow: `/`, `/explore/*`, `/r/*`
-- [ ] Disallow: `/dashboard`, `/settings`, `/me`, `/api/*`
-- [ ] Sitemap URL: `https://builderhunt.dev/sitemap.xml`
-
-## Phase 4 — OG image generation
-
-File: `src/routes/api/og/explore.tsx` (new)
-
-- [ ] Use `@vercel/og` to render JSX → PNG
-- [ ] 1200×630 dimensions
-- [ ] Input: query, top 3 builder usernames + avatars, "BuilderHunt" branding
-- [ ] Output: PNG
-- [ ] Cache in Redis 24h
-- [ ] Content-Type: image/png
-
-File: `src/routes/api/og/radar.tsx` (new)
-
-- [ ] Same as explore but for public radars
-- [ ] Include user name + search name
-
-## Phase 5 — Public radars
-
-File: `src/routes/r/$radarId.tsx` (new, SSR)
-
-- [ ] Fetch public radar by id
-- [ ] Render same as `/explore` but with "by {userName}" branding
-- [ ] "Subscribe to this radar" CTA (RSS)
-- [ ] "Save a similar radar" CTA (requires sign-in)
-- [ ] 404 if radar is private
-
-Data model:
-- [ ] Add `public_radars` table to schema
-- [ ] Generate + apply migration
-- [ ] `POST /api/queries/:id/share` makes a radar public, returns `/r/{id}` URL
-
-## Phase 6 — SEO polish
-
-- [ ] Add `lang="en"` to `<html>` (or auto-detect)
-- [ ] Add `<link rel="alternate" hreflang="..." />` (skip, English only v1)
-- [ ] Add `<meta name="robots" content="index, follow, max-image-preview:large">`
-- [ ] Add `JSON-LD` structured data to all public pages:
-  - Home: `Organization` + `WebSite`
-  - Pricing: `Product` with offers
-  - Explore: `ItemList` with `ListItem` per builder
-  - Radar: `ProfilePage` + `ItemList`
-- [ ] Test with Google Rich Results tool: `https://search.google.com/test/rich-results`
-
-## Phase 7 — Performance
-
-- [ ] Lighthouse: home, pricing, explore pages all > 90
-- [ ] LCP < 1.5s, FID < 100ms, CLS < 0.1
-- [ ] Cache HTML in Cloudflare 1h with revalidation
-- [ ] Test with slow 3G: explore page still loads < 3s
-
-## Phase 8 — Verification
-
-### Manual
-- [ ] Visit `/explore?q=react` → 20 builder cards, meta tags present
-- [ ] View source: see SSR'd HTML (not just an empty `<div id="root">`)
-- [ ] OG image: visit `/api/og/explore?q=react` → PNG renders correctly
-- [ ] Sitemap: `/sitemap.xml` lists all expected pages
-- [ ] Robots: `/robots.txt` correct
-- [ ] Google Search Console: submit sitemap, see pages indexed within 1 week
-
-### Automated
-- [ ] Playwright: visit `/explore?q=react`, count cards (should be > 0)
-- [ ] Test OG image: GET, check Content-Type is `image/png`
-- [ ] Sitemap validation: parse XML, count URLs, verify structure
-
-### SEO
-- [ ] Mobile-friendly test: all pages pass
-- [ ] Core Web Vitals: all green
-- [ ] Submit to Google Search Console
-- [ ] Submit to Bing Webmaster Tools
-- [ ] Backlink strategy: list 30 directories to submit to (BetaList, ProductHunt, etc.)
-
-## Phase 9 — Rollout
-
-- [ ] Deploy with `ENABLE_PUBLIC_PAGES=true`
-- [ ] Submit sitemap to Google Search Console
-- [ ] Monitor: impressions, clicks, position in GSC
-- [ ] Iterate on top queries based on actual search traffic
-
-## Edge cases
-
-- **Query with no results**: render "No builders found" + suggest similar queries
-- **Query with profanity**: filter out (e.g., drop and show 0 results)
-- **OG image with broken avatar URL**: skip avatar, show initials
-- **Sitemap too large (>50k URLs)**: split into multiple sitemaps
-- **CDN cache stale**: revalidate via Cloudflare API
-- **User opts in to public radar but then changes mind**: add "Make private" button
-
-## Dependencies
-
-- New package: `@vercel/og` or `satori` + `resvg`
-- New table: `public_radars`
-- Schema migration: 1 new table
-- New env vars: none
-- New services: Google Search Console, Bing Webmaster
-
-## Estimated effort: 3-4 days
+- [ ] **Sitemap + share UI polish**
+  - Files: `src/routes/sitemap[.]xml.ts`, `src/routes/_dashboard/dashboard/index.tsx` (or the
+    saved-search list component under `src/modules/dashboard/`)
+  - Do: Append all `public_radars` slugs to the sitemap; add a "Share publicly" toggle with
+    copy-link on each saved search row calling the share API.
+  - Verify: Shared radar appears in `/sitemap.xml`; toggle round-trips (share → link works →
+    unshare → 404).

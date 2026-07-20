@@ -1,198 +1,98 @@
 # Tasks: Legal & Compliance
 
-## Phase 0 — Research
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
+> **Reality check**: Docs/consent/export/deletion-request flows delivered (checked below).
+> Remaining: purge worker, export completeness, lifecycle emails, ops checklist.
 
-- [ ] Read `src/modules/auth/components/SignUpPage.tsx` to find where to inject consent checkbox
-- [ ] Read `src/routes/api/auth/$.ts` to see signup handler (for email verification copy)
-- [ ] Check existing footer (if any) for "Terms / Privacy" links
-- [ ] Choose legal template: Termly ($200/yr) vs Iubenda vs DIY with templates
+## Phase 0 — Delivered (audited against src, 2026-07-19)
 
-## Phase 1 — Legal documents
+- [x] **Legal pages: terms, privacy, cookies, imprint** —
+      `src/routes/_landing/legal/{terms,privacy,cookies,imprint}.tsx`, footer links
+      (`src/shared/components/Footer.tsx:75-79`, incl. "Do Not Sell My Info" mailto)
+- [x] **Cookie banner (accept all / essential only, localStorage)** —
+      `src/shared/components/CookieBanner.tsx`, rendered in `src/routes/-root-components.tsx`
+- [x] **TOS re-acceptance modal + versioned consents** — `src/shared/components/TosModal.tsx`,
+      `CURRENT_CONSENT_VERSIONS`/`getConsentStatus`/`recordConsent` in `src/shared/lib/legal.ts`
+- [x] **Consent API** — `src/routes/api/consent/index.ts`
+- [x] **Schema: `user_consents`, `data_export_requests`, `deletion_requests`** —
+      `src/shared/lib/db/schema.ts`, migrated
+- [x] **Data export: synchronous build, 24h throttle, 7-day expiry** —
+      `src/routes/api/me/data-export/index.ts`, `$id.ts`, `buildExportPayload` in `legal.ts`
+- [x] **Account deletion request/cancel with 30-day grace** —
+      `src/routes/api/me/delete-account/index.ts`, `requestDeletion`/`cancelDeletion` in `legal.ts`
+- [x] **Privacy settings UI (export / delete / cancel)** —
+      `src/routes/_dashboard/settings/privacy.tsx`
+- [x] **Legal lib tests** — `src/shared/lib/legal.test.ts`
 
-File: `src/routes/legal/terms.tsx` (new)
+## Phase 1 — Execute the promised rights
 
-- [ ] Write Terms of Service (use Termly template as base, customize)
-- [ ] Sections: acceptance, service, accounts, acceptable use, content ownership, termination, disclaimers, liability, governing law, dispute resolution, contact
-- [ ] Versioned: `v1.0 - 2026-07-16`
-- [ ] Add to footer
+- [ ] **Deletion purge worker endpoint**
+  - Files: `src/routes/api/admin/legal/run-worker.ts` (new), `src/shared/lib/legal.ts`
+  - Do: POST handler modeled on `src/routes/api/admin/alerts/run-worker.ts` (admin session OR
+    `x-cron-secret` header matching env `CRON_SECRET` if that pattern exists there — mirror
+    it exactly). Add `processPendingDeletions()` to `legal.ts`: select `deletion_requests`
+    where `status='pending'` and `grace_period_ends_at < now()`, for each call
+    `performHardDelete(userId)` (`legal.ts:176`) then set `status='completed'`,
+    `completed_at=now()`. Return `{ processed: n }`. Idempotent — re-runs find nothing.
+  - Verify: New test in `legal.test.ts`: seed a user + expired request → run → user row gone,
+    request row `completed`; run again → `processed: 0`. Then add the daily VPS cron
+    (documented in `production-infrastructure` runbook task).
 
-File: `src/routes/legal/privacy.tsx` (new)
+- [ ] **Complete the export payload**
+  - Files: `src/shared/lib/legal.ts`, `src/shared/lib/legal.test.ts`
+  - Do: In `buildExportPayload` (lines 70-125) also select and include: `builders` (tracked
+    builders, `eq(builders.userId, userId)`), `plans` row, `plan_changes`, `plan_requests`.
+    Keep the existing `toPlain` serialization. Add a test that asserts the payload object
+    keys include `trackedBuilders`, `plan`, `planChanges`, `planRequests` for a seeded user.
+  - Verify: `pnpm test legal` passes; request an export in dev and confirm the JSON contains
+    a tracked builder created beforehand.
 
-- [ ] Write Privacy Policy
-- [ ] Sections: data collected, how we use, who we share with (Stripe, Sentry, PostHog), cookies, retention, your rights, children, international, contact
-- [ ] List subprocessors with links to their privacy policies
+- [ ] **Purge cascade covers the new data**
+  - Files: `src/shared/lib/legal.ts`, `src/shared/lib/legal.test.ts`
+  - Do: Review `performHardDelete` deletes (or FK-cascades) every user-keyed table that now
+    exists: `builders` (+`builder_notes` via cascade), `saved_queries`, `alerts` +
+    `alert_triggers`, `onboarding_progress`, `user_consents`, `data_export_requests`,
+    `plans`/`plan_changes`/`plan_requests`, `roadmap_votes`, `builder_profile_views`, then
+    auth tables. Add any missing delete in FK-safe order.
+  - Verify: Test: seed a user with one row in each table → `performHardDelete` → count 0 in
+    all of them (except `deletion_requests` compliance row).
 
-File: `src/routes/legal/cookies.tsx` (new)
+## Phase 2 — Lifecycle emails
 
-- [ ] List each cookie, purpose, type, lifespan
-- [ ] Browser-specific opt-out instructions
+- [ ] **Deletion + export emails via Resend**
+  - Files: `src/shared/lib/email.ts`, `src/routes/api/me/delete-account/index.ts`,
+    `src/routes/api/me/data-export/index.ts`
+  - Do: Add three plain-text senders to `email.ts` following its existing optional-key
+    pattern: deletion-scheduled (grace end date + "sign in to cancel" line), deletion-completed
+    (sent by the worker before the auth row is removed — capture email first),
+    export-ready (link to `/dashboard/settings/privacy`). Replace the `console.log` at
+    `delete-account/index.ts:26-31` with the send (keep the log as fallback when Resend is
+    unconfigured).
+  - Verify: With `RESEND_API_KEY` set in dev, request deletion → email arrives; without the
+    key, endpoints still return 200 and log.
 
-File: `src/routes/legal/imprint.tsx` (new)
+## Phase 3 — Ops checklist (non-code, before launch)
 
-- [ ] Company name, address, contact, tax ID
+- [ ] **Replace imprint placeholders with verified operator details**
+  - Files: `src/routes/_landing/legal/imprint.tsx`
+  - Do: Add the real operator name, contact email, and legally required address from the
+    approved business record; do not infer or copy personal details from development config.
+  - Verify: The production page contains no placeholder tokens and the operator approves the exact text.
 
-## Phase 2 — Cookie banner
+- [ ] **Audit the privacy-policy processor list**
+  - Files: `src/routes/_landing/legal/privacy.tsx`
+  - Do: Match named processors to the deployed stack (VPS hosting and Resend today); remove
+    Stripe/PostHog/Sentry claims while unused, and add MiniMax M3 plus the configured vector
+    processor before their production flags are enabled per `_meta/ai-policy.md`.
+  - Verify: Each named processor maps to a deployed integration and each deployed external
+    processor appears in the policy with purpose and data categories.
 
-File: `src/shared/components/CookieBanner.tsx` (new)
-
-- [ ] 3 buttons: Accept all, Essential, Customize
-- [ ] On mount, check `localStorage.getItem('bh_cookie_consent')`
-- [ ] If unset, show banner
-- [ ] On accept: save to localStorage + call `posthog.opt_in_capturing()` / `opt_out_capturing()`
-- [ ] Sentry always on (essential)
-
-File: `src/routes/-root-components.tsx`
-
-- [ ] Render `<CookieBanner />` at root
-
-## Phase 3 — Data model
-
-- [ ] Add `user_consents`, `data_export_requests`, `deletion_requests` tables to schema
-- [ ] Generate + apply migration
-
-## Phase 4 — TOS re-acceptance
-
-File: `src/routes/_dashboard/_layout.tsx` (or similar)
-
-- [ ] On dashboard mount, fetch `/api/me/consent-status`
-- [ ] If TOS not accepted for current version, show modal blocking the UI
-- [ ] "Read terms" link + "Accept" button
-- [ ] On accept: POST /api/consent
-
-File: `src/routes/api/consent/index.ts` (new, POST)
-
-- [ ] Body: `{ document: 'tos' | 'privacy' | 'cookies', version: string }`
-- [ ] Auth required
-- [ ] Insert row in `user_consents`
-
-## Phase 5 — Data export
-
-File: `src/routes/api/me/data-export.ts` (new, POST)
-
-- [ ] Auth required
-- [ ] Create row in `data_export_requests` with status='pending'
-- [ ] Return request id
-
-File: `src/routes/api/me/data-export/$id.ts` (new, GET)
-
-- [ ] Returns status + download URL when ready
-- [ ] Download URL is signed, expires 7 days
-
-File: `scripts/jobs/process-data-exports.ts` (new)
-
-- [ ] Find pending requests
-- [ ] Query all user data: authUsers, savedQueries, builders, builderNotes, subscriptions, etc.
-- [ ] Write to JSON
-- [ ] Upload to S3 (signed URL)
-- [ ] Update status='ready', set expires_at
-- [ ] Send email with download link
-- [ ] Schedule: cron every 1h
-
-File: `src/routes/_dashboard/settings/privacy.tsx` (new)
-
-- [ ] "Export my data" button
-- [ ] "Delete my account" button (in danger zone)
-- [ ] "Cookie preferences" link
-
-## Phase 6 — Account deletion
-
-File: `src/routes/api/me/delete-account.ts` (new, POST)
-
-- [ ] Auth required
-- [ ] Create row in `deletion_requests` with `grace_period_ends_at = now + 30 days`
-- [ ] Send confirmation email
-- [ ] Sign out user (invalidate session)
-
-File: `src/routes/api/me/cancel-deletion.ts` (new, POST)
-
-- [ ] Auth required
-- [ ] Delete the pending `deletion_requests` row
-- [ ] User can sign in normally
-
-File: `scripts/jobs/process-deletions.ts` (new)
-
-- [ ] Find `deletion_requests` where `grace_period_ends_at < now`
-- [ ] Hard delete: `authUsers` (cascades to everything)
-- [ ] Update status='completed', `completed_at=now`
-- [ ] Send final email
-- [ ] Schedule: cron daily
-
-## Phase 7 — CCPA "Do Not Sell"
-
-File: `src/shared/components/Footer.tsx` (new or extend existing)
-
-- [ ] Add "Do Not Sell My Info" link (anchored in California)
-- [ ] Honor Global Privacy Control (GPC) signal: if user has it set, opt out automatically
-
-File: `src/routes/api/privacy/opt-out.ts` (new, POST)
-
-- [ ] Set analytics opt-out for current user (or by IP if anonymous)
-
-## Phase 8 — DMCA agent
-
-- [ ] Register DMCA agent with US Copyright Office ($6 fee)
-- [ ] Add to Imprint
-- [ ] Email: dmca@builderhunt.dev
-- [ ] Process: log complaint, review, act (remove or counter-notice)
-
-## Phase 9 — Footer
-
-File: `src/shared/components/Footer.tsx` (new)
-
-- [ ] Links: Pricing, About, Blog, Status
-- [ ] Legal: Terms, Privacy, Cookies, Imprint
-- [ ] Social: Twitter, GitHub, LinkedIn
-- [ ] © 2026 BuilderHunt. All rights reserved.
-
-## Phase 10 — Verification
-
-### Manual
-- [ ] Visit /legal/terms → renders full text
-- [ ] Cookie banner shows on first visit
-- [ ] Sign up new user → TOS modal blocks dashboard
-- [ ] Accept TOS → modal closes
-- [ ] Request data export → email arrives within 1h with download link
-- [ ] Request account deletion → confirmation email, 30-day grace
-- [ ] Cancel deletion → user can sign in normally
-
-### Automated
-- [ ] Playwright: cookie banner appears, accept, refresh, banner gone
-- [ ] Playwright: TOS modal blocks dashboard, accept, modal gone
-- [ ] Playwright: data export request returns 200
-
-### Compliance audit
-- [ ] GDPR: all rights (access, export, delete, restrict, portability, object) are addressable
-- [ ] CCPA: "Do Not Sell" link present
-- [ ] Cookie consent: granular enough for EU
-- [ ] Subprocessor list: complete and accurate
-- [ ] Legal docs: written in plain language, easy to understand
-- [ ] All required sections present (per GDPR Art. 13)
-
-## Phase 11 — Rollout
-
-- [ ] All legal docs reviewed by an attorney (optional but recommended for v1)
-- [ ] Publish to /legal/*
-- [ ] Email existing users: "We updated our privacy policy"
-- [ ] New signups see consent flow
-- [ ] Existing signups see TOS re-accept modal on next login
-
-## Edge cases
-
-- **User requests deletion, then signs in within 30 days**: cancel deletion, restore session
-- **User requests multiple data exports**: cap to 1 per 7 days
-- **User has saved searches and tries to delete account**: warning modal lists what will be lost
-- **Cookie consent expired (1 year)**: re-prompt
-- **User is in EU but using VPN showing US**: trust their browser language + timezone
-- **Stripe webhook for subscription cancel during deletion**: handle gracefully (refund if applicable)
-
-## Dependencies
-
-- New tables: 3 (`user_consents`, `data_export_requests`, `deletion_requests`)
-- New package: none (built-in)
-- New background jobs: 2 (`process-data-exports`, `process-deletions`)
-- New env vars: `LEGAL_COMPANY_NAME`, `LEGAL_ADDRESS`, `LEGAL_TAX_ID`, `LEGAL_CONTACT_EMAIL`
-- Optional: Termly / Iubenda subscription ($200/yr)
-- One-time: DMCA agent registration ($6)
-- Recommended: attorney review ($500-2000 one-time)
-
-## Estimated effort: 3 days
+- [ ] **Complete the DMCA registration decision and disclosure**
+  - Files: `src/routes/_landing/legal/imprint.tsx`
+  - Do: Have counsel/operator determine whether US DMCA agent registration applies. If it
+    applies, register and publish the approved contact; otherwise record the dated rationale
+    in the legal review record and do not claim registration.
+  - Verify: Registration confirmation plus matching imprint text exists, or the approved
+    non-applicability record is linked from the internal legal checklist.

@@ -1,26 +1,37 @@
 # Plan: Codeberg Integration
 
-## Status: deferred until GitLab ships
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: The original "defer until GitLab ships" decision is obsolete — both
+> shipped. `src/lib/sources/codeberg.ts` is complete and wired; only `.env.example`
+> documentation remains.
 
-Honorable mention. Pattern is essentially identical to GitHub but for the Gitea API. Could be done in parallel with GitLab if we have capacity.
+## Executed phases (record)
 
-## When to do it
+1. **Source file** — `src/lib/sources/codeberg.ts`: parallel user + repo search against the
+   Gitea API, public/active filtering, combined and paginated output.
+2. **Pipeline** — import + `sources.includes('codeberg')` in `src/lib/search.ts`;
+   `codeberg` in `SourceName`.
+3. **Env** — `CODEBERG_API_URL` (default `https://codeberg.org/api/v1`) and
+   `CODEBERG_TOKEN`, both optional, in `src/shared/lib/env.ts`.
+4. **UI** — opt-in pill, `SOURCE_META.codeberg`, `CodebergIcon`, `.badge-codeberg`.
+5. **Scoring** — `codeberg` branch in `src/lib/score.ts` using real follower counts.
 
-- After GitLab integration is shipped and validated
-- If we see EU/dev-privacy segment growth
-- In parallel with other "second forge" work
+## Remaining phase
 
-## Phases (when ready)
+### Phase A — Env documentation
 
-Standard pattern, 1-2 days. The benefit:
-- EU-friendly forge
-- Gitea standard API = future-proof for self-hosted
-- Smaller user base, but high-signal (privacy-conscious devs)
+Add both vars to `.env.example`. One-line-each change, no code.
 
-## Risks (summary)
+## Risks
 
-- Small user base (~100k)
-- Different from GitLab but similar pattern (could batch)
-- Self-hosted: out of scope for v1, but worth documenting
+| Risk                         | Likelihood | Impact | Mitigation                                                          |
+| ---------------------------- | ---------- | ------ | ------------------------------------------------------------------- |
+| Codeberg rate limit (unauth) | Low        | Low    | 5-min search cache in `search.ts`; connector returns `[]` on non-OK |
+| Gitea API drift              | Low        | Low    | Standard stable endpoints; connector degrades to `[]`               |
 
-## Decision: defer until GitLab ships
+## Rollback plan
+
+No migrations. Remove `'codeberg'` from `ALL_SOURCES` to hide; remove the gate in
+`search.ts` to disable.

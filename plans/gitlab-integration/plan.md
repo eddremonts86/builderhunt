@@ -1,99 +1,45 @@
 # Plan: GitLab Integration
 
-## Goal recap
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: `src/lib/sources/gitlab.ts` ships the top-starred-projects sampling
+> strategy (unauth search API is impossible — 401). Wired into `src/lib/search.ts`, UI, and
+> `src/lib/score.ts`. Remaining work is small: token-gated real search + env docs.
 
-Index developers from GitLab.com alongside GitHub, doubling the addressable market and capturing the EU/enterprise OSS segment. Pattern is nearly identical to the existing GitHub integration.
+## Executed phases (record)
 
-## Why this is the top pick
+1. **Source file** — `src/lib/sources/gitlab.ts`: `searchGitLab(keywords, {page, perPage})`
+   fetching top ~500 public projects by stars, client-side keyword filter, owner
+   aggregation into person cards. All fetch errors swallowed to `[]`.
+2. **Pipeline** — import + `sources.includes('gitlab')` gate in `src/lib/search.ts`;
+   `gitlab` added to `SourceName` (`src/lib/sources/types.ts`).
+3. **UI** — pill (opt-in), `SOURCE_META.gitlab`, `GitLabIcon`, `.badge-gitlab`.
+4. **Scoring** — `gitlab` branch in `src/lib/score.ts` (log-fork bonus).
+5. **Env** — optional `GITLAB_TOKEN` in `src/shared/lib/env.ts`.
 
-Three reasons:
+## Remaining phases
 
-1. **Largest missing market.** GitHub + GitLab = ~95% of public OSS code. Without GitLab, we miss 30-50% of builders in many queries.
-2. **Same shape, low effort.** The API patterns mirror GitHub's. `RawBuilder` shape fits. Effort: ~1.5 days.
-3. **High-signal EU angle.** GitLab is bigger in Europe and in enterprise. Adding it adds a demographic BuilderHunt was missing.
+### Phase A — Token-gated real search (the only functional gap)
 
-## Phases
+When `GITLAB_TOKEN` is set, use the authenticated search API instead of the top-500 sample:
+`GET /api/v4/search?scope=users&search={q}` and `?scope=projects`. Keep the sampling path
+as the unauthenticated fallback. This keeps behavior identical for tokenless deploys and
+dramatically improves recall for deploys with a token.
 
-### Phase 0: Research (done in plan)
+### Phase B — Env documentation
 
-Confirmed:
-- API: `https://gitlab.com/api/v4/`, REST + GraphQL
-- Auth optional: 2000/h unauth, 6000/h with token
-- Key endpoints: `/search?scope=users`, `/search?scope=projects`, `/users/:id`, `/users/:id/projects`
-- Docs: https://docs.gitlab.com/api/users/
-
-**Critical finding**: GitLab's free API does NOT expose:
-- `followers_count` on users
-- `stargazers_count` on projects (only `forks_count` and `open_issues_count`)
-
-This is a real signal gap. We need a different scoring approach for GitLab.
-
-### Phase 1: Data model
-
-No schema changes. Use `source: 'gitlab'`.
-
-### Phase 2: New source file
-
-`src/lib/sources/gitlab.ts` — same pattern as `github.ts`. Two functions (`searchGitLabUsers`, `searchGitLabProjects`), exported `searchGitLab` that runs both in parallel.
-
-**Scoring quirk**: since `followersCount` is undefined, GitLab results rely on bio/repo match + recency. Document this in `score.ts` so the algorithm knows.
-
-### Phase 3: Pipeline integration
-
-Add to `src/lib/search.ts`, add `'gitlab'` to the `Source` type, add GitLab to the default active sources. Add `GitLabIcon` to `BrandIcons.tsx`.
-
-### Phase 4: UI
-
-- New pill in the source filter row
-- New `.badge-gitlab` in CSS
-- Tabs (People/Resources) work as before; GitLab repos show up in Resources
-
-### Phase 5: Verification
-
-- Manual: search with GitLab on/off, save search, log activity
-- Automated: Playwright test for toggle behavior
-- Performance: cache GitLab results, respect 429
-
-### Phase 6: Rollout
-
-Soft launch with monitoring. Track dismiss rate (target < 50%) and click-through (target within 20% of GitHub).
-
-## Dependency graph
-
-```
-Phase 0 (research) ──> Phase 2 (source) ──> Phase 3 (pipeline) ──> Phase 4 (UI) ──> Phase 5 (verify) ──> Phase 6 (rollout)
-                       Phase 1 (brand)  ──┘
-```
-
-All phases after 0 can run sequentially in ~1.5 days.
+Add `GITLAB_TOKEN` to `.env.example` under the source-tokens section.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Rate limiting aggressive** | Medium | Medium | Cache 5min, optional token for 6000/h, backoff on 429 |
-| **Missing followers/stars** | High | Medium | Use bio match + recency as primary signal; document quirk |
-| **Same person on GitHub + GitLab** | Medium | Low | Dedup by email (v2). For v1, show both — the dedup can dedup the display later |
-| **Self-hosted GitLab confusion** | Low | Low | Document clearly: only gitlab.com in v1 |
-| **Quality lower than GitHub** | Medium | Medium | Soft launch with dismiss rate monitoring; auto-disable if > 50% dismiss |
+| Risk                                                          | Likelihood | Impact | Mitigation                                                                   |
+| ------------------------------------------------------------- | ---------- | ------ | ---------------------------------------------------------------------------- |
+| Authed search-scope shape differs from `/projects` list shape | Medium     | Low    | Separate mapper for search results; keep existing mappers intact             |
+| Quota exhaustion (6000/h authed)                              | Low        | Low    | Existing 5-min search cache in `search.ts`; connector returns `[]` on non-OK |
+| Regression of unauth path                                     | Low        | Medium | Fallback branch untouched; verify both paths manually                        |
 
 ## Rollback plan
 
-- Feature flag: `ENABLE_GITLAB=false` in env
-- If data quality is poor, hide the source from the UI without removing the integration
-- No migrations to revert
-
-## What this is NOT
-
-- **Not GitLab CI / pipelines.** Out of scope.
-- **Not self-hosted.** Public SaaS only.
-- **Not MRs / issues / snippets.** Just users and projects.
-- **Not a deep social graph.** No followers/following import (API doesn't expose).
-
-## What this enables (downstream)
-
-Once GitLab works:
-1. **Cross-source dedup by email** — same person on GitHub + GitLab shown once
-2. **Self-hosted GitLab** (v2) — for enterprise customers
-3. **Group/org pages** (v2) — show all builders in a GitLab group
-4. **MR activity signal** (v2) — who has open MRs across the OSS ecosystem
+No migrations. Removing `'gitlab'` from `ALL_SOURCES` in `SearchPage.tsx` hides the source;
+removing the `sources.includes('gitlab')` line in `search.ts` disables it entirely.

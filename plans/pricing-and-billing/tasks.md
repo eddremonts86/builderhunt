@@ -1,120 +1,73 @@
 # Tasks: Pricing & Billing
 
-## Phase 0 — Research
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: [`team-accounts`](../team-accounts/spec.md), [`ai-expansion`](../ai-expansion/spec.md), [`semantic-search`](../semantic-search/spec.md), [`code-fingerprinting`](../code-fingerprinting/spec.md), [`work-sample`](../work-sample/spec.md)
+> **Reality check**: Billing v1 delivered (see checked tasks). Remaining: 3 correctness fixes
+> in Phase 1; Stripe is a deferred phase with an explicit trigger.
 
-- [ ] Sign up for Stripe account
-- [ ] Create products in Stripe dashboard: Pro ($19/mo, $182/yr), Team ($99/mo, $950/yr)
-- [ ] Get API keys (test mode for dev)
-- [ ] Read `src/shared/lib/auth/better-auth.ts` to understand session structure
+## Phase 0 — Delivered (audited against src, 2026-07-19)
 
-## Phase 1 — Data model
+- [x] **Schema: `plans`, `plan_changes`, `plan_requests` tables** — `src/shared/lib/db/schema.ts`, migrated in `drizzle/`
+- [x] **`PLAN_LIMITS` / `PLAN_PRICING` constants (client-safe)** — `src/shared/lib/billing-shared.ts`
+- [x] **Server billing helpers with tests** — `src/shared/lib/billing.ts` (`getUserPlan`, `setUserPlan`, `requestPlanUpgrade`, `resolvePlanRequest`, `checkLimit`, `listAllUsersWithPlans`, `listPlanRequestsWithUsers`), `src/shared/lib/billing.test.ts` (12 tests)
+- [x] **savedSearches limit enforced on saved-query creation** — `src/routes/api/queries/index.ts:57`
+- [x] **savedBuilders limit enforced on track** — `src/routes/api/builders/track.ts:60` (counts tracked builders)
+- [x] **Smart alerts gated to paid plans** — `src/routes/api/alerts/index.ts:71`
+- [x] **/pricing page (tiers, toggle, FAQ, request-upgrade)** — `src/routes/_landing/pricing.tsx`
+- [x] **/settings/billing (plan card, usage meters, change history)** — `src/routes/_dashboard/settings/billing.tsx`, `src/routes/api/plans/me.ts`, `src/routes/api/me/plan-changes/index.ts`
+- [x] **Upgrade request endpoint** — `src/routes/api/plans/request-upgrade.ts`
+- [x] **Admin: users list + set plan** — `src/routes/_dashboard/admin/users.tsx`, `src/routes/api/admin/users/index.ts`, `src/routes/api/admin/users/$userId.ts`
+- [x] **Admin: plan-requests queue with approve/decline (approval sets plan + 30d planEndsAt)** — `src/routes/_dashboard/admin/plan-requests.tsx`, `src/routes/api/admin/plan-requests/index.ts`
 
-- [ ] Add `subscriptions` table to schema
-- [ ] Add `team_memberships` table to schema
-- [ ] Generate + apply migration
-- [ ] Add `STRIPE_*` env vars to `src/shared/lib/env.ts` (optional, validate as z.string().optional())
+## Phase 1 — Correctness fixes
 
-## Phase 2 — Stripe SDK
+- [ ] **Align /pricing with the actual PLAN_PRICING contract**
+  - Files: `src/routes/_landing/pricing.tsx`
+  - Do: Line 143 reads `config.priceMonthly` / `config.priceAnnual`; `PLAN_PRICING` entries
+    have `monthly` / `annual` (`src/shared/lib/billing-shared.ts:13`). Change to
+    `config.monthly` / `config.annual`. Replace the hardcoded rows that read nonexistent
+    `maxSavedSearches`, `maxSavedBuilders`, `maxRssFeeds`, `hasAlerts`, `hasCodeStyle`, and
+    `maxTeamSeats` from `config` with `config.features.map(...)`; every declared feature gets
+    a Check icon and no unavailable state is inferred from absent fields. Keep the `/yr` label
+    for annual because 182 and 950 are yearly totals.
+  - Verify: `pnpm type-check` passes; visit `/pricing`, toggle Monthly/Annual — cards show
+    $0/$19/$99 then $0/$182/$950, render every `PLAN_PRICING[tier].features` string exactly
+    once, and never show `$undefined`.
 
-- [ ] `pnpm add stripe`
-- [ ] Create `src/shared/lib/stripe.ts` with configured client
-- [ ] Helper: `getOrCreateCustomer(userId, email)`
-- [ ] Helper: `getSubscription(userId)` (cache 5min)
+- [ ] **Enforce plan expiry in `getUserPlan`**
+  - Files: `src/shared/lib/billing.ts`, `src/shared/lib/billing.test.ts`
+  - Do: In `getUserPlan`, if the row's `plan !== 'free'` and `planEndsAt` is set and in the
+    past, update the row to `{ plan: 'free', status: 'canceled', planEndsAt: null }`, insert a
+    `plan_changes` row (`fromPlan: <old>`, `toPlan: 'free'`, `changedBy: 'system:expiry'`,
+    `reason: 'plan expired'`), and return the free plan. Add tests: expired pro → free with
+    audit row; future `planEndsAt` → unchanged; `planEndsAt` null → unchanged.
+  - Verify: `pnpm test billing` — new tests pass; existing 12 still pass.
 
-## Phase 3 — Pricing page
+- [ ] **Remove the dead `rssSubscriptions` limit**
+  - Files: `src/shared/lib/billing-shared.ts`, `src/shared/lib/billing.ts`,
+    `src/shared/lib/billing.test.ts`, `src/routes/api/plans/me.ts`,
+    `src/routes/_dashboard/settings/billing.tsx`
+  - Do: Nothing enforces it (`src/routes/api/feeds/$searchId.ts` has no plan check), and RSS
+    feeds are 1:1 with saved searches which are already limited. Delete `rssSubscriptions`
+    from `PLAN_LIMITS`, the `LimitResource` union, the `checkLimit` branch, the `/api/plans/me`
+    response, and the usage meter in settings. Update the free-tier feature copy in
+    `PLAN_PRICING.free.features` from "Basic RSS feeds" to "RSS feeds for saved searches".
+  - Verify: `pnpm type-check` and `pnpm test billing` pass; `/settings/billing` shows two
+    usage meters (searches, builders) with no blank third row.
 
-File: `src/routes/pricing.tsx` (new, public)
+## Phase 2 — Cross-plan gating (owned elsewhere, tracked here for visibility)
 
-- [ ] 3 tier cards: Free, Pro ($19/mo or $182/yr), Team ($99/mo or $950/yr)
-- [ ] Monthly/Annual toggle (20% off shown)
-- [ ] Feature comparison table
-- [ ] FAQ section
-- [ ] "Current plan" badge for logged-in users
-- [ ] CTA: "Start free trial" or "Get Pro" → /api/stripe/checkout
+- [ ] **Confirm each promised paid feature ships with its gate** (no code in this plan)
+  - Files: none here — gates land in `semantic-search`, `code-fingerprinting`, `work-sample`,
+    `team-accounts`, `ai-expansion` per the spec's gating map.
+  - Do: When reviewing those plans' PRs, check the gate exists and uses
+    `getEffectivePlan(userId)` once `team-accounts` has shipped it.
+  - Verify: For each shipped feature, a free-plan request to its endpoint returns 402/403 with
+    an upgrade message.
 
-## Phase 4 — Checkout + webhooks
+## Future trigger — Stripe (not part of this plan)
 
-- [ ] `src/routes/api/stripe/checkout.ts`: POST creates Stripe Checkout Session
-- [ ] `src/routes/api/stripe/webhook.ts`: handles events
-  - subscription.created/updated → upsert
-  - subscription.deleted → mark canceled
-  - invoice.paid → extend period
-  - invoice.payment_failed → mark past_due
-- [ ] Verify webhook signature with `STRIPE_WEBHOOK_SECRET`
-- [ ] On `customer.subscription.created`, start 14-day trial
-
-## Phase 5 — Settings page
-
-File: `src/routes/_dashboard/settings/billing.tsx`
-
-- [ ] Current plan card
-- [ ] "Manage subscription" button → opens Stripe Customer Portal
-- [ ] Payment method (last 4 digits)
-- [ ] Next billing date
-- [ ] Cancel at period end indicator
-- [ ] Invoice history (links to Stripe PDF)
-
-## Phase 6 — Limit enforcement
-
-File: `src/shared/lib/limits.ts` (new)
-
-- [ ] Constants: `FREE_LIMITS = { savedSearches: 3, savedBuilders: 50, ... }`
-- [ ] `checkLimit(userId, resource)` returns `{ allowed, current, limit, plan }`
-- [ ] Update POST `/api/queries` to return 402 with paywall data when over limit
-- [ ] Update POST `/api/builders/:id/save` (when it exists) to return 402
-- [ ] Hide Pro features in UI for free users (greyed out, "Upgrade" tooltip)
-- [ ] Show usage meter in `/settings/billing` ("3/3 saved searches")
-
-## Phase 7 — Team plan
-
-File: `src/routes/_dashboard/team.tsx` (new)
-
-- [ ] Team owner can invite members (email-based)
-- [ ] Member roles: owner (billing), admin (manage members), member (read access)
-- [ ] Shared saved searches / lists
-- [ ] Activity feed: "Alice saved a new builder"
-
-## Phase 8 — Verification
-
-### Manual
-- [ ] Click "Get Pro" → Stripe Checkout opens
-- [ ] Use test card 4242 4242 4242 4242
-- [ ] Webhook fires, subscription created in DB
-- [ ] User redirected to dashboard with success state
-- [ ] Try to create 4th saved search as free user → 402
-- [ ] Cancel subscription via customer portal → status updated
-- [ ] Annual plan toggle works, correct price shown
-
-### Automated (Playwright)
-- [ ] Pricing page renders 3 cards
-- [ ] Click "Get Pro" redirects to Stripe (mocked or skip)
-- [ ] Free user hits saved search limit, sees paywall modal
-
-### Performance
-- [ ] Webhook response < 500ms
-- [ ] Pricing page TTFB < 200ms
-
-## Phase 9 — Rollout
-
-- [ ] Soft launch: 10% of users see pricing page
-- [ ] Monitor conversion, churn, payment failures
-- [ ] Email all users: "We added Pro. Here's what you get."
-- [ ] If conversion < 1% after 2 weeks, reconsider limits
-
-## Edge cases
-
-- **Payment failure after trial**: downgrade to Free, email user, give 7-day grace
-- **Webhook duplicate events**: idempotent handlers (use stripe_event_id)
-- **User has multiple Stripe customers** (created in different sessions): always reuse latest
-- **Annual plan cancel mid-year**: refund prorated by Stripe
-- **Team plan downgrade**: keep members' saved data, just remove team features
-- **Free → Pro → Free → Pro**: cumulative, no penalty
-
-## Dependencies
-
-- Existing: `authUsers`, `savedQueries`, `builders` tables
-- New package: `stripe`
-- New env vars: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_*`
-- Schema: 2 new tables
-
-## Estimated effort: 3-4 days
+At ≥50 paying customers or ≥$1k MRR, create a dedicated Stripe spec/plan/tasks trio after
+verifying the then-current API and tax/compliance requirements. Until that trigger, the manual
+admin-approved system is the complete scoped product and no Stripe checkbox is executable here.

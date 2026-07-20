@@ -1,55 +1,121 @@
-# Specification: Visual System Normalization
+# Visual System Normalization and Regression Gate
+
+> **Status**: `partially-implemented`
+> **Depends on**: [`audit-performance-qa`](../audit-performance-qa/spec.md), [`audit-accessibility`](../audit-accessibility/spec.md)
+> **Blocks**: nothing
+> **Reality check**: Tailwind v4 is loaded from `src/shared/styles/globals.css`; there is no
+> `tailwind.config.*`. Semantic colors, `.card`, `.btn-*`, `.input-field`, spacing helpers, and
+> `src/components/ui/button.tsx` already exist. However `.card` forces a 24 px radius and shadow
+> with `!important`, overriding route-level `rounded-xl/2xl/3xl`; the light UI still advertises a
+> dark color scheme/theme color in `src/routes/__root.tsx`, and no visual-regression suite exists.
 
 ## Problem
 
-The BuilderHunt landing page and dashboard elements contain multiple layout and style discrepancies that break visual polish and consistency:
-1. **Ad-Hoc Spacing & Gaps**: Margins, paddings, and flex/grid gaps are defined arbitrarily across files, resulting in alignment offsets of 1–4 px.
-2. **Inconsistent Border Radii & Shadows**: Buttons, badges, and card components use different rounded values (e.g. some buttons use `rounded-md`, some `rounded-full`, cards alternate between `rounded-lg` and `rounded-2xl`) and shadow elevations, producing a chaotic feel.
-3. **Unequal Card Heights**: In grid systems (like the features list or candidate results), cards containing different copy lengths render at different heights, breaking vertical alignment.
-4. **Weak Secondary CTA Contrast**: The secondary action button uses low-contrast grey backgrounds and borders, making it resemble a disabled element.
-5. **Responsive Breakdown**: In mobile viewports (<640px) or tablet views (768px), floating elements overflow horizontally, lateral padding margins are insufficient, and the footer takes up too much vertical space.
+The app has a recognizable light visual language, but it is encoded twice: semantic CSS classes
+and scattered utility strings. Overrides such as `.card { ... !important }` make local radius and
+border utilities misleading. Buttons can be rendered through `Button`/`LinkButton` or raw
+`.btn-*` classes, while shell, landing, search, pricing, and builder-profile surfaces use different
+container and responsive rules. This makes visual changes hard to reason about and easy to regress.
 
-## Goal
+The old audit assumed a dark zinc theme, a nonexistent `src/shared/components/Button.tsx`, and a
+Tailwind config file. It also proposed arbitrary universal radii rather than documenting current
+component roles.
 
-Standardize the visual system of BuilderHunt using a unified design token system:
-- Enforce strict spacing scales (multiples of 4px) and flex/grid alignments.
-- Unify border radii and shadow elevations.
-- Ensure all grid card elements share identical height constraints.
-- Re-design secondary button styles to prevent "disabled" appearance.
-- Refactor responsive layouts to prevent overflows and layout shifts on small viewports.
+## Outcome
 
-## User stories
+Normalize a small semantic visual system for the highest-traffic surfaces, migrate shared
+primitives before pages, and enforce responsive screenshots plus structural assertions in CI.
+Normalization must preserve meaning, keyboard focus, reduced-motion behavior, and density; it is
+not a wholesale redesign.
 
-1. **As a visitor**, when I view the page on my phone or tablet, I want the grids and cards to stack neatly without horizontal scrollbars or overflowing tags.
-2. **As a visitor**, I want card containers in any row grid to have matching heights, creating clean horizontal lines.
-3. **As a visitor**, I want to clearly distinguish between primary and secondary clickable buttons.
+## Scope and non-goals
 
-## Technical details & tokens
+In scope: global tokens/primitives, `Button`/`LinkButton`/`Input`/`Dialog`, landing/header/footer,
+pricing, dashboard shell, search/results, builder profile, and the viewports defined below.
 
-### 1. Unified Border Radii & Shadow Tokens
-We establish strict visual style guides:
-- **Card containers**: `rounded-2xl` (`1rem` / `16px`) with `shadow-xl`.
-- **Primary/Secondary Buttons & Inputs**: `rounded-xl` (`0.75rem` / `12px`) with `shadow-md`.
-- **Badges, Pills, and Tag chips**: `rounded-full` or `rounded-md` (`0.375rem` / `6px`) with `shadow-sm`.
+Out of scope: changing the brand palette, rewriting content, certifying WCAG (owned by
+`audit-accessibility`), normalizing source-brand colors, forcing equal heights across unrelated
+content, or mass search-and-replace of every `rounded-*` utility. Visual baselines never contain
+real user data.
 
-### 2. Equal Grid Heights
-Modify all grid card layouts (e.g. `src/modules/landing/components/FeaturesGrid.tsx` and builder cards) to enforce same-height constraints:
-- Apply `flex flex-col h-full justify-between` to card wrappers.
-- Set title and body layout heights so text wrapping does not push content down.
+## Token and component contract
 
-### 3. Button Restyling
-Modify the secondary button style inside `src/shared/components/Button.tsx`:
-- **Old (Frictional)**: `bg-zinc-800 border border-zinc-700 text-zinc-500` (low contrast, looks disabled).
-- **New (Premium)**: `bg-zinc-900 border border-zinc-700 text-zinc-200 hover:bg-zinc-800 hover:border-zinc-500 active:scale-95 transition-all duration-150`.
+Keep tokens in `src/shared/styles/globals.css` under Tailwind v4 `@theme` and CSS custom properties.
+Define and document these semantic roles:
 
-### 4. Responsive Padding & Overflows
-- Set main grid layout wrappers on the landing page to use clean responsive padding rules:
-  - Mobile: `px-4 py-8`
-  - Tablet: `md:px-8 md:py-16`
-  - Desktop: `lg:px-12 lg:py-24 max-w-7xl mx-auto`
-- For card text blocks, prevent text overflow issues by using standard Tailwind text-wrapping overrides (`break-words` and `line-clamp-3`).
+- spacing: 4 px base; page gutters 16/24/40 px at `<768`/`768–1023`/`≥1024`; sections 48/80 px
+  mobile/desktop; component gaps 8/12/16/24/32 px;
+- radii: control 8 px, panel 16 px, feature/hero 24 px, pill full;
+- elevation: none, raised, overlay; each is a named shadow token, never an ad hoc page shadow;
+- control heights: small 36 px, default 40 px, large 48 px; icon-only minimum 36 px while
+  accessibility may require a larger target;
+- motion: fast 150 ms and normal 200 ms; transform only for deliberate hover/press feedback and
+  disabled under `prefers-reduced-motion`;
+- layout: content max width 1200 px and narrow max width 800 px, using one responsive gutter rule.
 
-## Success metrics
+Semantic `.card`, `.btn-*`, and `.input-field` classes may remain compatibility APIs, but they must
+resolve to tokens without `!important`. `src/components/ui/button.tsx`, `link.tsx`, `input.tsx`, and
+`dialog.tsx` are the canonical React primitives. Variants define state, size, focus, disabled, and
+loading behavior; page code may add layout classes but not restyle a variant.
 
-- **Pixel-Perfect Alignment**: All margins, paddings, and card gaps align to a strict 4px grid system without custom pixel values.
-- **Visual Harmony**: 100% of cards, buttons, and inputs share matching corner radii tokens.
+Equal-height behavior applies only to cards in the same comparison row. Grid containers use
+`items-stretch`; card roots use `h-full flex flex-col`; actions use `mt-auto`. Copy is not clamped
+unless truncation is part of the product contract and the full value remains accessible.
+
+## Audited surfaces and invariants
+
+- Landing (`HomePage.tsx`, `FAQSection.tsx`, `Header.tsx`, `Footer.tsx`): no overflow at 390, 768,
+  or 1440 px; hero remains above feature content; comparison cards align within 1 px per row.
+- Pricing (`_landing/pricing.tsx`): plan cards use one panel role, CTA controls share height, and
+  the comparison grid scrolls or stacks without page-level overflow.
+- Dashboard (`DashboardLayout.tsx`): fixed navigation remains reachable at 390 px without hiding
+  account/sign-out actions; main content uses the shared gutter/max-width contract.
+- Search (`SearchPage.tsx`, `PersonResultCard.tsx`): filters/actions wrap without collision; cards
+  do not clip usernames, badges, or action buttons at 320–390 px.
+- Builder profile (`BuilderProfilePage.tsx`): main panels use consistent panel radius/elevation;
+  action and claim states do not shift surrounding layout unexpectedly.
+- Root metadata (`__root.tsx`): `color-scheme` and theme color match the rendered light system.
+
+## Regression harness and budgets
+
+Use the Playwright config from `audit-performance-qa`. Add deterministic fixtures and screenshot
+specs for public landing/pricing and authenticated dashboard/search/builder profile at 390×844,
+768×1024, and 1440×1000, Chromium only. Disable animation/caret, freeze time, mock external data,
+wait for local fonts, and use committed snapshots per platform-independent Docker CI.
+
+Gates:
+
+- zero page-level horizontal overflow (`scrollWidth <= clientWidth`) at 320, 390, 768, and 1440 px;
+- screenshot diff ratio ≤0.2% with `maxDiffPixelRatio: 0.002`; intentional baseline updates require
+  a reviewed before/after artifact;
+- same-row comparison-card bottom edges differ by ≤1 CSS px;
+- controls meet the declared heights within ±1 px and retain visible focus/disabled states;
+- no new raw hex color, arbitrary pixel radius/shadow, or `!important` in audited component files,
+  enforced by `scripts/check-visual-contract.mjs` with a small documented source-brand allowlist.
+
+## Security, privacy, and AI isolation
+
+Snapshots use synthetic names, avatars, emails, notes, and source payloads from `e2e/fixtures/`.
+CI traces/screenshots must not include production sessions or personal data. No AI is needed; run
+with `AI_DISABLED=true`, and never generate visual “evidence” or testimonials with a model. If a
+future AI surface is captured, its output must be a fixed synthetic fixture, not a live provider
+response.
+
+## Acceptance criteria
+
+- The token/component contract is documented in code and demonstrated in a `/admin`-independent
+  development route or isolated test fixture; all canonical primitives cover state and size.
+- The five audited surfaces use canonical primitives/tokens and satisfy every viewport invariant.
+- Removing `!important` does not produce accidental radius/shadow drift; intentional role changes
+  are captured in approved snapshots.
+- Static, unit, responsive structural, accessibility interaction, and visual diff checks run in CI.
+- A production smoke at 390 and 1440 px shows no overflow, missing local font, unstyled content,
+  or metadata/theme mismatch.
+
+## Success measures
+
+- Zero unexplained visual snapshot changes on merge.
+- Zero horizontal-overflow failures on the audited surfaces for four consecutive releases.
+- 100% of primary CTA/control instances on audited surfaces use canonical primitives or a documented
+  exception.
+- No `!important` or arbitrary radius/shadow declarations remain in audited component styles.

@@ -1,44 +1,60 @@
-# Plan: Co-founder & Team Synergy Matchmaking
+# Team Synergy — Candidate-vs-Team Fit Analysis (plan)
 
-## Goal recap
+> **Status**: `pending`
+> **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (hard), [`code-fingerprinting`](../code-fingerprinting/spec.md) (soft), [`ai-profile-enrichment`](../ai-profile-enrichment/spec.md) (soft), [`team-accounts`](../team-accounts/spec.md) (soft)
+> **Blocks**: nothing
+> **Reality check**: no synergy code exists. Reads (never writes) `builders.metadata.codeStyleFingerprint` and `.aiEnrichment`; falls back to `generateFingerprint` from `src/shared/lib/code-style.ts` for members without stored artifacts. Ephemeral by design — no schema changes anywhere in this plan.
 
-Implement a matching algorithm and comparison dashboard that evaluates technical complementarily, coding habits, and project synergy between two developers, displaying results in an interactive, visual radar chart dashboard.
+## Scope decision (recorded)
 
-## Why this is a valuable addition
-
-1. **Focuses on Team Building**: Modern product building is collaborative. Sourcing individual developers is only half the battle; building cohesive teams is the goal.
-2. **First-of-its-Kind Feature**: Sourcing platforms generally lack pairwise comparison engines. An interactive compatibility radar chart places BuilderHunt firmly in next-generation recruiting territory.
-3. **High Engagement Loops**: Encourages developers to link their own profiles and run self-matches against potential co-founders or teammates, driving viral onboarding.
+The old plan built builder-to-builder co-founder matchmaking with a `/match` route and
+radar charts. Rewritten to **candidate vs team aggregate** — the recruiting product the
+Team tier actually sells. Pairwise matchmaking is cut, not deferred (different product,
+no paying persona).
 
 ## Phases
 
-### Phase 1: Matchmaking Utility (`src/lib/matchmaking/synergy.ts`)
-- Implement the static scoring rules (language overlaps, complementary topics, focus variance).
-- Implement the LLM-powered detailed comparison prompt using Gemini.
-- Write unit tests validating that the synergy score falls strictly in the range of 0-100.
+### Phase 1 — Pure synergy lib (shippable alone: powers a rule-based card even before AI)
 
-### Phase 2: Server Function
-- Create a TanStack Start Server Function `checkTeamSynergy({ builderId1, builderId2 })`.
-- Fetch profiles and AI Enrichment records.
-- Run the matchmaking logic, store comparisons in cache, and return the structured response.
+`src/shared/lib/synergy.ts`: `buildTeamAggregate(rows)` (fingerprint fallback chain,
+language/topic/paradigm/metric aggregation, seniority mix, `aiFingerprintShare`) and
+`computeSynergyBaseline(candidate, team)` (scoring rules from the spec, clamped, with
+notes). Fully unit-tested — this file has zero I/O.
 
-### Phase 3: Matchmaking Dashboard UI
-- Create the `/match` route folder under `src/routes/_dashboard/match/`.
-- Build the dual selector interface: users select candidates from their saved collections or search results.
-- Implement an interactive double-radar chart using pure SVG paths (ensuring responsive, framework-agnostic rendering without heavy chart libraries).
-- Render bento cards detailing highlights and friction points with micro-animations.
+### Phase 2 — Task registration
 
-### Phase 4: Verification & Limits
-- Mock Gemini API comparison calls in test suites.
-- Verify page performance: caching comparisons ensures subsequent loads of identical pairings take under 10ms.
+`synergy-analysis` in `src/shared/lib/ai/tasks.ts`: schemas, system prompt (baseline-
+anchored ±15, constructive-friction rule, confidence rule), `wrapUntrusted` on candidate
+bio/topics, tier `server-only`, TTL 86 400, allowances `{ free: 0, pro: 0, team: 25 }`.
+
+### Phase 3 — Endpoint
+
+`POST /api/builders/$builderId/synergy` implementing the spec's 8-step flow, including the
+`teamTooSmall` and `degraded` (baseline-only) contracts. Nothing persisted.
+
+### Phase 4 — UI
+
+`TeamFitCard.tsx` on the builder profile page with all five states (result / degraded /
+too-small / plan-gated / loading).
+
+### Phase 5 — Team-accounts hookup (deferred until that plan ships)
+
+Accept an org list id as the team source; `buildTeamAggregate` already takes a row list, so
+this is endpoint plumbing only. Explicitly out of the first release.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Friction comments perceived as too negative** | Medium | Low | Instruct the LLM prompt to frame friction constructively (e.g. "Pragmatic vs. Structured" rather than "Messy vs. Slow"). |
-| **API Costs for pairwise checks** | High | Medium | Cache matching results in memory or database using a compound key: `match:${builderId1}:${builderId2}` (sorted alphabetically to prevent duplicate entries). Cache TTL: 7 days. |
+| Risk                                          | Likelihood | Impact | Mitigation                                                                                                                     |
+| --------------------------------------------- | ---------- | ------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Analyses read as confident noise on thin data | High       | High   | Deterministic baseline anchor (±15 model adjustment); `confidence` field forced low on heuristic-heavy input; min team size 2. |
+| Friction phrasing offends (about real people) | Medium     | Medium | Prompt: constructive framing only; friction items capped at 4; output length caps.                                             |
+| Cache never hits (teams churn)                | Medium     | Low    | Accepted: TTL 24 h is a bonus, not a dependency; cost model assumes mostly cold calls.                                         |
+| Cross-user privacy leak via team data         | Low        | High   | Aggregate contains only numeric/enum rollups — no member names, bios, or notes; input schema structurally enforces it.         |
+| Score inflation via candidate bio injection   | Medium     | Medium | `wrapUntrusted` + baseline anchoring; poisoned-fixture test.                                                                   |
 
 ## Rollback plan
 
-- Keep the matching portal modular. Hide `/match` routes if disabled via `ENABLE_MATCHMAKING=false` configuration parameters.
+- `AI_DISABLED_TASKS=synergy-analysis` → endpoint returns baseline-only (`degraded`) —
+  feature degrades to the rule-based card, no deploy.
+- Full removal = delete one card component + one endpoint + one task entry; no schema or
+  metadata cleanup needed (nothing persisted).

@@ -1,32 +1,55 @@
 # Feature: Hugging Face Integration
 
-## Why (short)
+> **Status**: `partially-implemented`
+> **Depends on**: nothing
+> **Blocks**: nothing
+> **Reality check**: Connector exists at `src/lib/sources/huggingface.ts` and is fully
+> wired (pipeline, pill, badge, icon, scoring, `HUGGINGFACE_TOKEN` env var). Remaining:
+> `.env.example` documentation and an optional author-profile enrichment.
 
-Hugging Face es **el** hub de AI/ML. Crece exponencialmente. Sus perfiles públicos muestran models, datasets, spaces — señal única de "AI practitioner activo". Si tu usuario busca "LLM fine-tuning" o "vector databases", HF es donde están los builders.
+## Problem
 
-## API summary
+Hugging Face is the canonical AI/ML hub. Queries like "LLM fine-tuning", "transformers",
+or "diffusion" find their best builders there, not on general-purpose forges.
 
-- **Base URL**: `https://huggingface.co/api/`
-- **Auth**: opcional, mejora rate limit
-- **Endpoints**:
-  - `GET /api/models?search={query}&limit=20` — search models
-  - `GET /api/datasets?search={query}&limit=20`
-  - `GET /api/users/{username}` — user profile (models, datasets, spaces, followers)
-  - `GET /api/users?search={query}` — user search (limited)
-- **Rate limit**: ~1000 req/h sin auth
-- **Docs**: https://huggingface.co/docs/api
+## Goal
 
-## Why honorable mention
+Index HF model authors (people) and models (repos) as `RawBuilder` records.
 
-- **Nicho vertical**: solo AI/ML
-- **API limitado** para user search (no robusto)
-- **Datos únicos**: model downloads, likes, datasets
-- **No es "devs general"**: es "AI devs"
+## Delivered
 
-## Effort
+Shipped in `src/lib/sources/huggingface.ts` (file header documents the strategy):
 
-**M (2-3 días)**. API no tan pulida, hay que escribir lógica custom para user discovery.
+- Model search: `GET https://huggingface.co/api/models?search={q}&limit=20&full=true`
+  (works unauthenticated; optional `HUGGINGFACE_TOKEN` bearer header).
+- Two entity kinds from one call:
+  - `kind: 'repo'` — each public model (`id: hf-model-{_id}`), downloads as
+    `followersCount`, tags as topics, `metadata.lastSeen` from `createdAt`.
+  - `kind: 'person'` — authors aggregated from the result set
+    (`id: hf-{username}`), total likes as `followersCount` proxy, aggregated tags,
+    model count / total downloads in metadata. The original plan's "user search API"
+    approach was dropped deliberately: HF's user-search endpoint requires auth, so
+    authors are derived from matched models instead (documented in the connector header).
+- Registered in `src/lib/search.ts` and `SourceName` (`src/lib/sources/types.ts`).
+- UI: opt-in pill in `ALL_SOURCES` + `SOURCE_META` (`SearchPage.tsx`), `HuggingFaceIcon`
+  in `BrandIcons.tsx`, `.badge-huggingface` in `src/shared/styles/globals.css`.
+- Scoring: `huggingface` branch in `src/lib/score.ts` (log total-downloads bonus).
+- All fetches try/caught to `[]` (mandatory: `search.ts` uses `Promise.all`).
 
-## Recommendation
+## Remaining gaps (real)
 
-**Integrate después de las 4 top picks**, si el vertical AI/ML es relevante para los usuarios. Si vemos queries tipo "transformers", "fine-tuning", "embeddings" sin buenos matches, este es el próximo paso.
+1. **`HUGGINGFACE_TOKEN` is missing from `.env.example`.**
+2. **Author cards lack avatar and real follower counts** — the per-user endpoint
+   (`GET /api/users/{username}/overview`) was never called. Known v1 limitation stated in
+   the connector header; kept as an optional enrichment task (adds N requests per search,
+   so it must be batched/capped).
+
+## Non-goals (unchanged)
+
+Datasets and Spaces (models cover the discovery need); HF discussion activity; paid
+Inference endpoints.
+
+## Success metrics
+
+- Searching "stable diffusion" or "llama" with only the HF pill active returns author
+  person-cards above model repo-cards, sorted by impact (total downloads).
