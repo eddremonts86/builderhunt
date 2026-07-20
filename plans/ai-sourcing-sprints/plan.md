@@ -1,94 +1,121 @@
-# Implementation Plan: Unified AI Sourcing Workspace
+# AI Sourcing Sprints (plan)
 
-This document outlines the step-by-step technical implementation phases for integrating the AI Sourcing Workspace in **BuilderHunt**.
+> **Status**: `pending`
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md) (hard — tenant persistence, budgets, worker context, and RLS); [`ai-expansion`](../ai-expansion/spec.md) (hard); [`semantic-search`](../semantic-search/spec.md) (optional index write-through); [`proactive-discovery`](../proactive-discovery/spec.md) (pattern only); [`team-accounts`](../team-accounts/spec.md) and [`shared-resources`](../shared-resources/spec.md) (Future sharing only)
+> **Blocks**: nothing
+> **Reality check**: No sprint schema, worker, API, or UI exists. This plan reuses `src/lib/search.ts`, `src/routes/api/search/builders.ts`, `src/routes/api/builders/track.ts`, `src/shared/lib/tracked-builders.ts`, `src/shared/lib/billing.ts`, and the admin worker pattern in `src/routes/api/admin/alerts/run-worker.ts`; it does not add connectors, a queue, a map, or a second AI client.
 
----
+## Delivery strategy
 
-## Phase 1: Dependencies & Database Schema Migration
+Ship an immediately useful deterministic search workspace first, then persistence and cron continuation. The only AI work is the three interactive `local-first` tasks in the shared registry. No LLM executes in the worker.
 
-### 1.1 Package Installation
-Run the following package installations in the root directory:
-```bash
-pnpm add @edd_remonts/ai-schadcn-chat
-pnpm dlx shadcn@latest add @shadcn-map/map
-```
+## Phase 1 — Shared contracts and AI tasks
 
-### 1.2 Schema Update
-Add the Drizzle schema extensions inside `src/shared/db/schema.ts` (or corresponding database module files):
-- Define `sourcingBatches` table.
-- Define `sourcingSprints` table.
-- Define `sprintResults` table.
-- Export relations.
+Create `src/shared/lib/sprints-shared.ts` with the zod contracts from the spec: criteria,
+query variants, filters, profile snapshots, create/update bodies, and response DTOs. Register
+`jd-parse`, `criteria-decompose`, and `filter-refine` in
+`src/shared/lib/ai/tasks.ts`. Keep task prompts pure, delimit the pasted JD/CV as untrusted,
+and retain deterministic manual fallbacks in the feature module rather than the platform.
 
-### 1.3 DB Migration
-Generate and execute migrations:
-```bash
-pnpm db:generate
-pnpm db:migrate
-```
+Checkpoint: the task registry and all shared contracts are testable with no DB or UI change.
 
----
+## Phase 2 — Additive schema and billing
 
-## Phase 2: Backend Logic & LLM Integrations (`src/lib/agents/`)
+Add `sourcing_sprints` and `sprint_results` exactly as specified, including ownership,
+status/cursor indexes, and unique `(sprint_id, source, source_id)`. Generate and review an
+additive Drizzle migration. Add `sourcingSprints` to every `PLAN_LIMITS` tier and its limit
+key tests; add the Pro/Team pricing copy only when the save API is ready.
 
-### 2.1 Batch Document Ingestion (`src/lib/agents/batch-analyzer.ts`)
-- Implement PDF and Word text parsing helpers.
-- Write parallel extraction scheduler:
-  - Take an array of files.
-  - Dispatch extraction queries to the Gemini API (using `Gemini 3.5 Flash`) in parallel (limit concurrency to 3 to respect rate limits).
-  - Extract structured JSON tags (Skills, Locations, Experience Level, Roles).
-  - Store results in `sourcing_batches`.
+Checkpoint: migration is safe and dormant; existing users and `builders` rows are untouched.
 
-### 2.2 Search Variant Generator (`src/lib/agents/search-generator.ts`)
-- Write an LLM generator that accepts aggregated batch tags and outputs 3 distinct Boolean query structures (Skills list + Location parameters + Seniority).
-- Save generated variants linked to the active `sourcing_batches`.
+## Phase 3 — Domain service and worker
 
-### 2.3 Sourcing Worker & Vetting Loop (`src/lib/agents/sourcing-worker.ts`)
-- Implement background runner that:
-  - Takes a search variant.
-  - Queries local DB matches.
-  - Sequentially queries external APIs (GitHub, Devpost).
-  - Feeds candidate profiles to the vetting engine (`vetting.ts`) to calculate suitability scores.
-  - Populates `sprint_results`.
+Implement `src/lib/sprints/results.ts` for public snapshot conversion, stable identity,
+dedupe, quota clipping, location facets, and tracked-state annotation. Implement
+`src/lib/sprints/service.ts` for owner-scoped list/get/create/update/delete and state
+transitions. All mutations fetch by `(id, userId)`; unsupported transitions return 409.
 
----
+Implement `src/lib/sprints/worker.ts` with a pure cursor transition helper and a DB-backed
+runner. It leases at most three due active sprints with a short `FOR UPDATE SKIP LOCKED`
+transaction, executes one search cell per sprint outside the transaction, then conditionally
+updates the unchanged cursor. Unique result keys and compare-and-set cursor updates make
+overlapping cron calls safe. A failed cell records an error in the report, advances no cursor,
+and does not fail other sprints. Semantic indexing is an explicit deployment adapter:
+`src/lib/sprints/semantic-write-through.ts` exists only when semantic-search is installed;
+the sprint core accepts a no-op callback and never imports a missing optional module.
 
-## Phase 3: Frontend Routes & Layout (`src/routes/_dashboard/sprints/`)
+Checkpoint: a seeded sprint progresses to completion under repeated and concurrent runs.
 
-### 3.1 Workspace Router Setup
-- Create `src/routes/_dashboard/sprints/workspace.tsx` as a TanStack route.
-- Define state context:
-  ```ts
-  interface WorkspaceState {
-    step: 1 | 2 | 3 | 4;
-    batchId: string | null;
-    activeVariant: string | null;
-    selectedVariants: string[];
-    filters: SearchFilters;
-  }
-  ```
+## Phase 4 — API surface
 
-### 3.2 Chat Sidebar Component (`@edd_remonts/ai-schadcn-chat`)
-- Implement collapsible left panel.
-- Sync message history to the current workspace session.
-- Implement callbacks to toggle candidate highlight state and location zooming on the map.
+Add authenticated routes:
 
-### 3.3 Main Dashboard Views (1 -> 2 -> 3 -> 4)
-- **Step 1 View (Upload & Queue)**: Dropzone component + uploading/processing list with progress rings.
-- **Step 2 View (Variants Generator)**: Interactive tag cloud + checkbox list of suggested variant cards.
-- **Step 3 View (Active Sprints)**: Dual pane progress dashboard with status bars and console logs.
-- **Step 4 View (Results Map)**: Split screen. Left shows candidate list with circular match rings. Right shows the `@shadcn-map/map` Canvas/Leaflet instance.
+- `GET/POST /api/sprints` — list owner rows; create a saved sprint after re-validating all
+  client-produced criteria/variants and enforcing the active-sprint limit.
+- `GET/PATCH/DELETE /api/sprints/$sprintId` — owner-scoped detail and lifecycle mutations;
+  PATCH accepts `{ action: 'pause' | 'resume' }` or editable `{ name, quota }`.
+- `POST /api/sprints/preview` — free-tier-compatible immediate deterministic run from
+  validated variants, maximum four variants and 30 results per variant; no persistence.
+- `GET /api/sprints/$sprintId/results` — paginated results (`cursor`, `limit <= 100`), sort
+  and filter validation, location facets, tracked annotation.
+- `POST /api/admin/sprints/run-worker` — admin-only, idempotent worker entry point; returns
+  `{ sprintsRun, resultsAdded, completed, failed }`.
 
----
+Every route uses session auth, zod, `rateLimit`, generic 404s for foreign IDs, and bounded
+payloads. Preview has a 10/minute per-user limit; writes have 30/minute. The worker is called
+by VPS cron every 30 minutes.
 
-## Phase 4: Verification & Quality Gates
+Checkpoint: curl covers create → preview/save → worker → dossier → pause/resume/delete and
+cross-user isolation.
 
-### 4.1 Unit Testing (`test/sprints/`)
-- Mock Gemini API responses for document tag extraction and variant generation.
-- Test `batch-analyzer.ts` parallel scheduling execution under concurrent pressure.
-- Test boolean parser and criteria aggregators.
+## Phase 5 — Workspace UI
 
-### 4.2 Integration Verification
-- Drag 5 sample resumes (PDF) into Step 1.
-- Confirm tags compile correctly and suggest variants in Step 2.
-- Execute search, and verify pins render with accurate latitude/longitude coordinates on the map in Step 4.
+Add route files under `src/routes/_dashboard/sprints/` and feature components under
+`src/modules/sprints/components/`. The new-sprint wizard keeps pasted text in browser memory;
+only reviewed structured criteria and accepted variants are sent on save. A `.txt` drop is
+read client-side and never uploaded as a file. Chrome AI is attempted first via `ai()` and
+`AIDownloadPrompt`; MiniMax fallback parity is automatic. Manual criteria and variant editors
+remain available when both tiers fail.
+
+The dossier reuses `PersonResultCard` for display but owns a small action wrapper that sends
+the complete snapshot to `/api/builders/track`; it does not assume a sprint result ID is a
+tracked-builder ID. Filter refinement only changes visible filter state. Add a Sprints nav
+entry for authenticated users; saving shows the Pro upgrade response when gated.
+
+Checkpoint: the full no-AI manual flow and Chrome/MiniMax flows reach the same persisted
+sprint contract.
+
+## Phase 6 — Operations and rollout
+
+1. Deploy migration and task registry with routes/UI hidden behind `AI_DISABLED_TASKS` or no
+   nav entry.
+2. Enable preview for internal/admin accounts; validate source load and MiniMax budgets.
+3. Enable Pro saves, then activate the cron at 30-minute cadence.
+4. Watch structured `sprint_worker_run` metrics: due, run, added, failed, duration, and
+   per-source failures. Pause cron first if upstream pressure rises.
+5. Enable Team limits. Shared sprint visibility remains out of scope until both team plans
+   are implemented; there is no dormant `organizationId` column in v1.
+
+## Risks
+
+| Risk                                           | Likelihood | Impact | Mitigation                                                                                            |
+| ---------------------------------------------- | ---------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| Overlapping cron runs duplicate work           | Medium     | Medium | `SKIP LOCKED`, compare-and-set cursor, unique result identity, idempotency tests                      |
+| A crafted AI result reaches search/source code | Medium     | High   | Re-validate criteria and variants at every API boundary; source enum and strict maxima                |
+| Pasted CV/JD leaks unexpectedly                | Low        | High   | Browser-memory-only input; local-first default; explicit server-fallback copy; never persist raw text |
+| Active sprint load exceeds source limits       | Medium     | Medium | Three sprints/run, one cell/sprint, page cap, 30-minute cron, pause control and metrics               |
+| Optional semantic dependency breaks deploy     | Low        | Medium | Dependency injection/no-op adapter; no runtime import unless semantic-search is installed             |
+| Team promise precedes team isolation           | Low        | High   | No sharing fields or UI until `team-accounts` + `shared-resources` land                               |
+
+## Rollback
+
+Remove the cron first, hide Sprints navigation, and set the three task IDs in
+`AI_DISABLED_TASKS`. Existing dossiers remain readable while writes are disabled. The schema
+is additive; retain tables during code rollback and drop them only in a later reviewed
+migration. Keyword search, tracking, and `builders` are unaffected.
+
+## Future
+
+After both team dependencies ship, add `organizationId`/visibility with server-resolved org
+scope and explicit cross-org isolation tests. PDF/DOCX parsing, normalized geocoding/maps,
+and work-sample/code analysis remain separate future work.

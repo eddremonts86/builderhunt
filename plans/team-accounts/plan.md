@@ -1,99 +1,62 @@
-# Plan: Team Accounts & Seats
+# Delivery Plan: Team Account Experience
 
-**Status:** Not yet implemented. Blocking dependency for [`shared-resources`](../shared-resources/plan.md) and [`activity-feed`](../activity-feed/plan.md) — do this one first.
+> **Status**: `pending`
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md)
+> **Blocks**: [`shared-resources`](../shared-resources/plan.md), [`activity-feed`](../activity-feed/plan.md)
+> **Reality check**: the organization, invitation, active-tenant, entitlement, authorization, audit,
+> RLS, and migration layers must come from the security foundation. This plan adds product routes/UI
+> only after those contracts have runtime evidence.
 
-## Goal recap
+## Phase 1 — Verify dependency contracts
 
-Introduce a multi-user **organization** concept so the "Team" pricing tier can actually
-back its headline promise — "Up to 10 team seats" — with real infrastructure. Today
-there is no such thing as a team account anywhere in the schema or the app.
+Pin the Better Auth organization service interfaces, `TenantPrincipal`, permission matrix,
+organization entitlement/seat response, lifecycle errors, and audit event contract. Add contract
+tests from the UI/API consumer perspective; do not duplicate foundation queries or role logic.
 
-## Why this is a valuable addition
+## Phase 2 — Organization context and switching UX
 
-1. **The Team plan is currently unsellable as advertised.** `PLAN_LIMITS`/`PLAN_PRICING`
-   in [`billing-shared.ts`](../../src/shared/lib/billing-shared.ts) list "Up to 10 team
-   seats" as a Team-tier feature, but `plans` is keyed
-   `userId text('user_id').primaryKey()` — a strict 1:1 user-to-plan relationship. There
-   is no `organizations` table, no membership table, and no invite flow. A prospect who
-   pays for Team today gets nothing beyond what Pro already gives them.
-2. **It's the prerequisite for the other two Team-only promises.** "Shared saved
-   searches & builder lists" and the "Activity feed" both require knowing which users
-   belong to the same paying account — neither can be built before this.
-3. **Revenue ceiling.** Without seats, BuilderHunt has no natural path from $19/mo
-   individual buyers to $99+/mo company accounts, which is normally where SaaS revenue
-   concentrates.
+Add a tenant query provider keyed by active organization, server-backed organization switcher, and
+cache invalidation/navigation behavior. Prove multi-tab switch/removal states and ensure no cached
+tenant response survives under another active organization.
 
-## Current-state constraints this plan must work around
+## Phase 3 — Team settings and invitation UX
 
-- `plans.userId` is the **primary key** (`src/shared/lib/db/schema.ts`) — one plan per
-  user, no room for a shared plan today without a migration.
-- `savedQueries`, `builderNotes`, `alerts`, `dataExportRequests`, `deletionRequests` are
-  all owned by a single `userId` with no group concept.
-- Auth is `better-auth` email/password only, session-cookie based, with no existing
-  notion of invitations or multi-tenant scoping.
+Build Team settings from allowlisted organization/member/invitation DTOs and shared permission
+predicates. Add create/rename, member roles/removal/leave, invitation create/cancel/resend, seat usage,
+and verified-recipient acceptance states. The server foundation remains the authority for every
+mutation.
 
-## Phases
+## Phase 4 — Billing, ownership, and deletion UX
 
-### Phase 1: Database schema
-- Add `organizations` table: `id`, `name`, `ownerUserId` (references `auth_users`),
-  `createdAt`.
-- Add `organization_members` table: `id`, `organizationId`, `userId`, `role`
-  (`'owner' | 'admin' | 'member'`), `invitedAt`, `joinedAt` (null while pending),
-  unique constraint on `(organizationId, userId)`.
-- Add `organization_invites` table: `id`, `organizationId`, `email`, `role`, `token`,
-  `expiresAt`, `acceptedAt`.
-- Add nullable `organizationId` to `plans` (keep `userId` as-is for personal
-  free/pro accounts; a `team` plan row's `userId` becomes the org owner and
-  `organizationId` is set). Add a `seats` column to `PLAN_LIMITS.team` in
-  `billing-shared.ts` (default 10) so the limit is enforced from the same source of
-  truth as every other plan limit.
+Show active organization entitlement and seat use in billing. Add recent-auth ownership transfer,
+account deletion guard, and delayed organization deletion surfaces using existing lifecycle
+operations/audit evidence.
 
-### Phase 2: Server logic
-- `src/shared/lib/organizations.ts` (mirrors the shape of `billing.ts`): create org,
-  invite member (generates `organization_invites` row + email via Resend), accept
-  invite, remove member, change role, list members.
-- Seat-limit enforcement: reuse the existing `LimitCheck`/`checkLimit` pattern from
-  `billing.ts` — inviting past the `seats` limit is rejected the same way saving a 4th
-  search on Free is today.
-- A `getBillingScope(userId)` helper resolving "does this user act on behalf of a
-  personal plan or an org plan" — every existing per-user query (saved searches,
-  notes, alerts) will eventually call through this instead of assuming `userId` is
-  always the right scope.
+## Phase 5 — Isolation and release gate
 
-### Phase 3: UI
-- New `/settings/team` route (sibling to `settings/billing`, `settings/privacy`):
-  member list with role + pending-invite badges, "Invite by email" form, seat usage
-  bar ("3 of 10 seats used"), remove/role-change actions gated to `owner`/`admin`.
-- Invite-acceptance flow: emailed link → `/team/invite/$token` → sign in or sign up →
-  join the org.
-- Add a lightweight org switcher to the dashboard topbar only when a user belongs to
-  an org (most users never see it — no UI cost for personal accounts).
+Run two-organization browser/API matrices, cache-switch tests, invitation races, role transitions,
+session invalidation, accessibility, and critical runtime smoke. Only then unblock shared resources.
 
-### Phase 4: Billing integration
-- `settings/billing.tsx`: when `plan === 'team'`, show org name + seat usage instead
-  of the personal-plan card.
-- `admin/plan-requests.tsx`: extend the existing admin plan-request review flow to
-  handle "upgrade to Team + create organization" as a distinct request type.
+## Risks and controls
 
-### Phase 5: Verification
-- Seat-limit enforcement (11th invite on a 10-seat org is rejected, matches the
-  existing `checkLimit` test pattern in `billing.test.ts`).
-- Invite → accept → member appears in the list, can access org-scoped resources.
-- A user who is not an org member cannot read another org's members or resources.
-- Personal (non-team) accounts see zero behavior change — no org switcher, no
-  `/settings/team` link, no regression to today's single-user flows.
+| Risk                                      | Control                                                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------------------------- |
+| UI cache displays previous tenant data    | organization-keyed query cache; synchronous clear/invalidation on confirmed switch      |
+| UI permission differs from server         | shared pure permission predicates plus full server role matrix tests                    |
+| Removed member keeps stale access         | foundation rechecks membership and clears session active organization; tab revalidation |
+| Invite flow leaks recipient/account state | generic errors and role-minimized DTO; verified-email match enforced by foundation      |
+| Team plan duplicates auth/data model      | boundary tests forbid direct organization table/global DB access in Team routes         |
 
-## Risks
+## Rollout and rollback
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **Touches auth/session code used by every route** | Medium | High | Keep org membership strictly additive — no existing query changes scope until `shared-resources` explicitly opts a resource into org visibility. |
-| **Invite email deliverability** | Medium | Medium | Reuse the existing Resend integration (already used for alerts); fall back to a copyable invite link if email fails. |
-| **Migrating a `plans.userId` primary key** | Low | High | Don't change the PK — add `organizationId` as a nullable sibling column instead of restructuring `plans`. |
+Release switcher read-only first, then organization creation, invitations/member management, and
+finally destructive ownership/deletion actions. Feature flags may hide Team UI, but foundation
+tenant isolation remains enabled. Roll back UI/routes without dropping organization data or
+weakening RLS/runtime roles.
 
-## Rollback plan
+## Completion evidence
 
-- Feature-flaggable: if `organizations`/`organization_members` are empty, the app
-  behaves exactly as it does today (no org switcher renders, no `/settings/team` link
-  appears). Dropping the three new tables is a clean, isolated rollback with no
-  foreign keys reaching into pre-existing tables other than `auth_users` and `plans`.
+Attach dependency contract results, multi-org switch/cache traces, invitation and seat race tests,
+role matrix, tenant A/B browser/API suite, ownership/deletion audit evidence, accessibility run, and
+production smoke. Mark implemented only after shared-resource consumers can safely use the same
+active tenant without a second organization model.

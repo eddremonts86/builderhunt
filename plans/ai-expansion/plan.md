@@ -1,55 +1,63 @@
-# Implementation Plan: AI Expansion Features
+# AI Platform — Shared AI Layer (plan)
 
-This plan details the implementation phases for the AI-Powered Semantic Search, AI Profile Enrichment, and Outreach Copilot in **BuilderHunt**.
+> **Status**: `pending`
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md) (tenant-scoped budgets, caches, artifacts, logs, and organization entitlements)
+> **Blocks**: [`semantic-search`](../semantic-search/spec.md), [`ai-profile-enrichment`](../ai-profile-enrichment/spec.md), [`outreach-generator`](../outreach-generator/spec.md), [`code-fingerprinting`](../code-fingerprinting/spec.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/spec.md), [`team-synergy`](../team-synergy/spec.md), [`work-sample`](../work-sample/spec.md), [`proactive-discovery`](../proactive-discovery/spec.md)
+> **Reality check**: No AI code exists. Builds on `src/shared/lib/redis.ts`, `rate-limit.ts`, `billing.ts`/`billing-shared.ts`, `env.ts`, and the auth/admin patterns in `src/routes/api/admin/alerts/run-worker.ts`.
 
----
+## Phases (dependency order — shippable after each)
 
-## Phase 1: Semantic Search Infrastructure (pgvector & Write-Through Cache)
+### Phase 0 — Config surface
 
-### 1.1 Database Extension & Schema
-- Install `pgvector` in the Postgres Docker Compose file configuration or script.
-- Add database migration generating the HNSW index on the `builders.embedding` vector column.
-- Update the Drizzle schema in `src/shared/lib/db/schema.ts` to export the `vector` custom type.
+Add the seven AI env vars to `src/shared/lib/env.ts` (all optional/defaulted, browser-safe
+stubs like the existing ones). No behavior change; app boots identically with nothing set.
 
-### 1.2 Translation Engine & Sourcing Hook
-- Create `src/lib/search/query-translator.ts` to translate semantic natural language search strings into array keywords.
-- Implement the "Write-Through Indexing Cache" hook inside `src/routes/api/search/builders.ts`:
-  - Intercept federated search results.
-  - Write new builder profiles to the database.
-  - Queue background jobs to fetch and generate vector embeddings asynchronously.
+### Phase 1 — Pure core (registry, cache keys, budget logic) + tests
 
-### 1.3 Semantic Query Handler
-- Write the database query utilizing the cosine similarity operator (`<=>`) to fetch matching vectors.
-- Implement similarity score percentage calculations in the frontend results view.
+`tasks.ts` (types, `AI_TASKS` with only `ping`, `getTask`, `wrapUntrusted`),
+`cache.ts` (`canonicalJson`, `cacheKeyFor`, Redis get/set), `budget.ts` (`decideBudget`,
+`checkAndConsumeBudget` with in-memory fallback). Full vitest coverage of the pure functions.
+No routes yet — nothing user-visible.
 
----
+### Phase 2 — MiniMax server client
 
-## Phase 2: AI Profile Enrichment (Persona Bento Card)
+`minimax.ts`: `minimaxChat` (prompt-constrained JSON, zod validate, one retry), typed errors,
+30 s timeout. `embeddings.ts`: `embedTexts` (OpenAI-compatible request, batch ≤ 64,
+dim assertion against `env.AI_EMBEDDING_DIM`). Sibling tests mock `fetch`
+with mocked `fetch` (no live key in CI).
 
-### 2.1 Schema & Cache Utilities
-- Add `aiEnrichment` JSONB property to the `builders` database schema.
-- Write cache verification functions to validate if a profile requires a refresh based on `aiEnrichedAt` (30-day TTL).
+### Phase 3 — API routes
 
-### 2.2 Enrichment Prompt & Service (`src/lib/agents/enricher.ts`)
-- Implement text content aggregator (reading languages, repo descriptions, recent posts metadata).
-- Build the Gemini prompt using structured JSON schema output to guarantee consistency.
+`/api/ai/config` (GET, public-safe flags), `/api/ai/complete` (full 8-step pipeline:
+kill switch → configured → auth → task+input validation → rate limit → budget → cache →
+MiniMax), `/api/ai/embed` (admin-gated batch). Verified end-to-end with the `ping` task.
 
-### 2.3 Profile Bento Card UI
-- Create `PersonaCard.tsx` component inside `src/modules/builder-profile/components/`.
-- Design a glassmorphism card matching the warm light-mode cream/terracota palette.
-- Add "Refresh AI Details" action button on the profile page.
+### Phase 4 — Client tier
 
----
+`capabilities.ts` (SSR-safe detection), `local.ts` (Prompt API + `responseConstraint` +
+zod re-validation), `client.ts` (`ai()` ladder with typed `AIUnavailableError`),
+`useAICapabilities.ts` hook.
 
-## Phase 3: Code-Contextual Outreach Generator (Outreach Copilot)
+### Phase 5 — Download UX + hardening
 
-### 3.1 Context Assembler
-- Write repository code analyzer helper `src/lib/agents/outreach-context.ts` that selects the candidate's top repository and reads its `README.md` file.
+`AIDownloadPrompt.tsx` (gesture-triggered download, progress, "use server instead"
+preference), kill-switch verification pass, README-style usage doc-block at the top of
+`tasks.ts` so feature plans integrate without reading this plan.
 
-### 3.2 Outreach Copilot Engine
-- Create the Gemini model caller, configuring system instructions to write short pitches referencing the top repository.
-- Support tone parameters: `casual`, `professional`, and `geek`.
+## Risks
 
-### 3.3 Composer UI Panel
-- Build `OutreachCopilotPanel.tsx` in `src/modules/builder-profile/components/`.
-- Implement a slide-over panel showing job description text inputs, tone toggle select switches, and a copy-to-clipboard button.
+| Risk                                                              | Likelihood              | Impact | Mitigation                                                                                           |
+| ----------------------------------------------------------------- | ----------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| MiniMax API shape differs from assumptions (endpoints, JSON mode) | Medium                  | Medium | All provider specifics isolated in `minimax.ts`; verify against docs in Phase 2 before wiring routes |
+| Chrome AI APIs change/renamed (they are Origin-Trial-era)         | Medium                  | Low    | All detection isolated in `capabilities.ts`; everything degrades to server tier                      |
+| Budget counters drift when Redis is down                          | High (dev) / Low (prod) | Low    | Documented best-effort in-memory fallback, same trade-off as existing `rate-limit.ts`                |
+| Model returns schema-invalid output persistently                  | Low                     | Medium | Single retry + 502 + feature-owned rule-based fallback; never crashes                                |
+| Cost runaway from a buggy caller loop                             | Low                     | High   | Per-user daily budgets + 30/min abuse rate limit + `AI_DISABLED` kill switch                         |
+
+## Rollback
+
+- Phases 0–2 are dead code until Phase 3 — revert freely.
+- Post-launch: set `AI_DISABLED=true` (instant, no deploy) or unset `MINIMAX_API_KEY`
+  (server tier 503s, Chrome-capable clients keep local-only tasks). Full revert = delete
+  `src/shared/lib/ai/`, the three `api/ai/*` routes, `AIDownloadPrompt.tsx`, and the env
+  additions — no DB migrations exist in this plan, so rollback is code-only.

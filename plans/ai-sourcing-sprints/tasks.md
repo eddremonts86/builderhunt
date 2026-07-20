@@ -1,208 +1,115 @@
-# Tasks: Unified AI Sourcing Workspace (Detailed Specification)
+# AI Sourcing Sprints (tasks)
 
-This document provides a highly detailed, granular breakdown of all technical tasks required to implement the Unified AI Sourcing Workspace in **BuilderHunt**.
+> **Status**: `pending`
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md) (hard — tenant persistence, budgets, worker context, and RLS); [`ai-expansion`](../ai-expansion/tasks.md) (hard); [`semantic-search`](../semantic-search/tasks.md) (optional adapter); [`proactive-discovery`](../proactive-discovery/tasks.md) (pattern only); [`team-accounts`](../team-accounts/tasks.md) and [`shared-resources`](../shared-resources/tasks.md) (Future sharing only)
+> **Blocks**: nothing
+> **Reality check**: No sprint files exist. Reuse the real federated orchestrator, tracked-state helpers, billing gates, and admin-worker route; do not add fictional packages, Gemini server calls, Devpost, map/geocoding, or writes to per-user `builders`.
 
----
+Ordered so each checkpoint builds and the feature can be rolled out incrementally.
 
-## Phase 1: Database Setup & Migrations
-This phase establishes the relational data structures required to trace multi-file batch uploads, asynchronous background sourcing runs, and geographic developer results.
+## Phase 1 — Contracts and tasks
 
-- [ ] **Create Database Schema Migrations**
-  * *What it is*: Define Drizzle schemas for batch tracking and candidate sourcing results.
-  * *Details*:
-    * Edit `src/shared/lib/db/schema.ts` (or equivalent database schema files).
-    * Add `sourcingBatches` table:
-      * `id`: `text` (primary key, UUID or nanoid).
-      * `userId`: `text` (foreign key referencing `authUsers.id`).
-      * `status`: `text` (defaults to `'processing'`, can be `'processing' | 'complete' | 'failed'`).
-      * `createdAt`: `timestamp` (defaults to `now()`).
-      * `completedAt`: `timestamp` (nullable).
-    * Add `sourcingSprints` table:
-      * `id`: `text` (primary key).
-      * `batchId`: `text` (foreign key referencing `sourcingBatches.id` with `onDelete: 'cascade'`).
-      * `userId`: `text` (foreign key referencing `authUsers.id`).
-      * `name`: `text` (name of the sprint).
-      * `prompt`: `text` (raw prompt / criteria text).
-      * `status`: `text` (defaults to `'running'`, can be `'running' | 'completed' | 'failed'`).
-      * `createdAt`: `timestamp` (defaults to `now()`).
-      * `completedAt`: `timestamp` (nullable).
-    * Add `sprintResults` table:
-      * `id`: `text` (primary key).
-      * `sprintId`: `text` (foreign key referencing `sourcingSprints.id` with `onDelete: 'cascade'`).
-      * `builderId`: `text` (foreign key referencing `builders.id` with `onDelete: 'cascade'`).
-      * `relevanceScore`: `integer` (suitability match score, 0-100).
-      * `aiReview`: `text` (structured markdown review details from code vetting).
-      * `createdAt`: `timestamp` (defaults to `now()`).
-- [ ] **Generate and Run Schema Migrations**
-  * *What it is*: Run Drizzle-kit commands to apply schema additions locally.
-  * *Details*:
-    * Run `pnpm db:generate` to produce SQL migration files under `drizzle/`.
-    * Run `pnpm db:migrate` to update the local Postgres database container.
+- [ ] **Define sprint contracts and deterministic fallbacks**
+  - Files: `src/shared/lib/sprints-shared.ts`, `src/shared/lib/sprints-shared.test.ts`
+  - Do: Export the spec's `ExtractedCriteria`, `QueryVariant`, `SprintFilter`, `SprintProfileSnapshot`, create/update schemas, status enum, response DTOs, `manualCriteriaToVariant`, and strict `SOURCE_NAMES` validation. Bound all strings/arrays and strip no unknown fields silently.
+  - Verify: `pnpm test sprints-shared` covers valid/invalid sources, maxima, fallback output, and unknown-key rejection.
 
----
+- [ ] **Register the three local-first AI tasks**
+  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Do: Add `jd-parse`, `criteria-decompose`, and `filter-refine` with the exact schemas, TTLs, allowances, and token limits in spec.md. `jd-parse` uses `wrapUntrusted`; all three declare `tier: 'local-first'` and return strict JSON.
+  - Verify: `pnpm test tasks` proves registry integrity and malicious delimiter text remains data.
 
-## Phase 2: Batch Ingestion & Parallel Extraction (`src/lib/agents/`)
-This phase builds the background processing engine that parses uploaded PDF/Word resumes or pasted profile URLs, querying Gemini in parallel to extract structured search criteria.
+## Phase 2 — Persistence and billing
 
-- [ ] **Implement Document Text Parsers**
-  * *What it is*: Utilities to extract raw text content from uploaded files.
-  * *Details*:
-    * Build helper functions inside `src/lib/agents/parsers.ts`.
-    * For `.pdf`: extract text pages.
-    * For `.docx`: parse document XML contents.
-    * For `.txt`: read file string buffer.
-- [ ] **Implement URL Scraper Utility**
-  * *What it is*: Helper to fetch and clean profile data from submitted URLs.
-  * *Details*:
-    * Implement a scraper inside `src/lib/agents/url-scraper.ts` that takes an external link (LinkedIn, GitHub, personal portfolio, or job board description).
-    * Strip HTML tags, formats content, and handles fallback errors.
-- [ ] **Build Parallel Processing Queue with Concurrency Limit**
-  * *What it is*: Scheduler in `src/lib/agents/batch-analyzer.ts` that runs concurrent API requests without triggering rate limits.
-  * *Details*:
-    * Define a queue function that receives an array of file buffers/URLs.
-    * Set a strict concurrency ceiling (e.g. maximum of 3 concurrent requests at any single moment).
-    * Execute parsing sequentially or in small chunks using a promise wrapper to prevent GitHub/Gemini API blockages.
-- [ ] **Design LLM Tag Extraction Prompt**
-  * *What it is*: Gemini API call that translates raw parsed text into structured search JSON.
-  * *Details*:
-    * Call `Gemini 3.5 Flash`.
-    * Inject system prompt instructions to return strict JSON matching this schema:
-      ```ts
-      interface ExtractedCriteria {
-        skills: string[]; // programming languages, frameworks, UI/UX tools
-        locations: string[]; // target locations mentioned
-        experienceLevel: 'junior' | 'mid' | 'senior';
-        roles: string[]; // job titles matching
-      }
-      ```
-    * Implement JSON parsing validation using `zod` to catch malformed LLM outputs.
-- [ ] **Batch Status Database Updater**
-  * *What it is*: Functions to update database task states during extraction.
-  * *Details*:
-    * Create a record in `sourcing_batches` at the start.
-    * Update states of individual files in the batch. Set batch status to `'complete'` once all files are successfully processed and tags are saved.
+- [ ] **Add sprint tables and indexes**
+  - Files: `src/shared/lib/db/schema.ts`
+  - Do: Add `sourcingSprints` and `sprintResults` exactly as in spec.md. Add indexes on `(userId, status, lastRunAt)`, `(sprintId, createdAt)`, and unique `(sprintId, source, sourceId)`. Use timezone-aware timestamps and JSON types imported from `sprints-shared.ts`; no FK to `builders`.
+  - Verify: `pnpm type-check`.
 
----
+- [ ] **Generate and apply the additive migration**
+  - Files: `drizzle/` (generated migration and snapshot)
+  - Do: Run `pnpm db:generate`, review for two creates/indexes only, then migrate a fresh local DB.
+  - Verify: `pnpm db:migrate`; psql shows both tables, cascade from sprint to results, and the unique identity index.
 
-## Phase 3: Tag Cloud & Multi-Variant Generator (`src/lib/agents/`)
-This phase aggregates the criteria extracted from the files and triggers the LLM to suggest targeted search strategies.
+- [ ] **Add the active-sprint plan limit**
+  - Files: `src/shared/lib/billing-shared.ts`, `src/shared/lib/billing.ts`, `src/shared/lib/billing.test.ts`
+  - Do: Add `sourcingSprints` limits `{ free: 0, pro: 3, team: 10 }`, count only `status = 'active'`, and add Pro/Team pricing copy. Keep preview outside this persistence limit.
+  - Verify: `pnpm test billing` covers 0/at/over limit and paused/completed exclusions.
 
-- [ ] **Implement Tag Aggregation Logic**
-  * *What it is*: An algorithm that consolidates extracted JSON data.
-  * *Details*:
-    * Retrieve all `ExtractedCriteria` records belonging to a specific `batch_id`.
-    * Consolidate skills, locations, and roles.
-    * Compute occurrences frequency for each tag (e.g., `"React"` appears 6 times, `"Munich"` appears 2 times).
-    * Output sorted lists to display on the dashboard tag cloud.
-- [ ] **Build LLM Search Variant Generator**
-  * *What it is*: Gemini API call that parses aggregated tags and formulates 3 distinct search profiles.
-  * *Details*:
-    * Prompt the LLM with the aggregated frequencies.
-    * Ask the LLM to generate 3 search variants. Each variant must output:
-      * `name`: String (e.g., "Senior React Developers in Germany").
-      * `skills`: String array (representing target skills to match).
-      * `locations`: String array (representing locations to search).
-      * `experienceLevel`: `'junior' | 'mid' | 'senior'`.
-      * `justification`: String (explaining the rationale based on the input documents).
-    * Store these variant profiles in the DB linked to the `batch_id` for retrieval in Step 2 of the UI.
+## Phase 3 — Domain and worker
 
----
+- [ ] **Build snapshot/result helpers**
+  - Files: `src/lib/sprints/results.ts`, `src/lib/sprints/results.test.ts`
+  - Do: Implement `toSprintProfileSnapshot`, stable `source:sourceId` identity, quota clipping, location facets with an `Unknown` bucket, sort/filter helpers, and tracked annotation using `trackedKey`/`getTrackedBuilderIds` conventions.
+  - Verify: `pnpm test sprints/results` covers private-field stripping, duplicates, quota boundaries, facets, and tracked IDs.
 
-## Phase 4: Sourcing Workers & Dual Execution (`src/lib/agents/`)
-This phase handles the sourcing run—executing local database queries and triggering background agents to scan external developer platforms.
+- [ ] **Build owner-scoped sprint service**
+  - Files: `src/lib/sprints/service.ts`, `src/lib/sprints/service.test.ts`
+  - Do: Implement list/get/create/update/delete and pause/resume transitions. Every query scopes by `userId`; resume rechecks the active limit; completed cannot resume; delete cascades. Use injected DB/search dependencies in tests.
+  - Verify: `pnpm test sprints/service` includes a second user's sprint ID returning not found and every invalid transition returning conflict.
 
-- [ ] **Implement Local Database Matcher**
-  * *What it is*: A Drizzle database query that finds matching developers already registered in BuilderHunt.
-  * *Details*:
-    * Query the `builders` table matching the selected variant's `skills` and `locations`.
-    * Calculate a baseline matching score in SQL/TS based on matched criteria.
-- [ ] **Implement Background External Sourcing Loop**
-  * *What it is*: Asynchronous worker loops inside `src/lib/agents/sourcing-worker.ts` that scan APIs.
-  * *Details*:
-    * Build search request triggers for:
-      * **GitHub**: Scan user repositories using GitHub search endpoints, filtering by skills (topics, languages) and locations.
-      * **Devpost**: Scan participants and projects matching the search topic.
-    * Implement a 2-second sleep delay helper between external API calls to avoid rate limiting.
-- [ ] **Implement Candidate Code Vetting Engine**
-  * *What it is*: Vetting engine in `src/lib/agents/vetting.ts` that grades candidate repositories using the LLM.
-  * *Details*:
-    * For the top 50 candidates found externally, fetch their profile `README.md` and the top 3 source code files in their popular repos (max 4,000 characters per file).
-    * Send the code content to `Gemini 3.5 Flash` with a structured grading rubric:
-      * Code organization (0-10)
-      * Test habit & habit detail (0-10)
-      * Architectural hygiene (0-10)
-      * Match with requirements (0-70)
-    * Save new developer profiles in the `builders` table and insert vetting scores and summaries in `sprint_results`.
-- [ ] **Implement Worker Logging Stream**
-  * *What it is*: Helper to record and stream active search operations.
-  * *Details*:
-    * Write logs to a text field or sub-table in the database during worker loops (e.g. *"Scanned Devpost hackathon X, found 4 matches"*).
-    * Expose an endpoint or TanStack query function to stream these logs to the Step 3 UI.
+- [ ] **Implement cursor and worker core**
+  - Files: `src/lib/sprints/worker.ts`, `src/lib/sprints/worker.test.ts`
+  - Do: Export pure `nextSprintCursor`; lease at most three oldest due active sprints with `FOR UPDATE SKIP LOCKED`; execute one variant/page cell (`page <= 3`, `perPage: 30`), keep people only, insert snapshots on conflict-do-nothing, clip at quota, and compare-and-set the leased cursor before advancing. A cell error leaves its cursor unchanged and is reported without aborting peers.
+  - Verify: `pnpm test sprints/worker` covers wrap/completion, duplicate rerun, overlap, partial upstream failure, downgrade skip, and quota hit.
 
----
+- [ ] **Add optional semantic write-through adapter**
+  - Files: `src/lib/sprints/semantic-write-through.ts`, `src/lib/sprints/worker.ts`
+  - Do: When semantic-search exists, adapt sprint people to `upsertEmbeddingStubs`; otherwise export a no-op. Wire by dependency injection so the core never dynamically imports an absent module. Log failures without failing sprint persistence.
+  - Verify: adapter test/type-check in both enabled and no-op configuration; a write-through failure still advances a successfully persisted cell.
 
-## Phase 5: Workspace Frontend Routes & UI (`src/routes/_dashboard/sprints/`)
-This phase builds the interactive dashboard workspace in React, integrating the map and chat packages.
+## Phase 4 — APIs
 
-- [ ] **Install and Configure Library Packages**
-  * *What it is*: Pull dependencies into the project.
-  * *Details*:
-    * Run `pnpm add @edd_remonts/ai-schadcn-chat`
-    * Run `pnpm dlx shadcn@latest add @shadcn-map/map`
-- [ ] **Create TanStack Router File & Global State Provider**
-  * *What it is*: Set up router and state contexts for the workspace.
-  * *Details*:
-    * Create `src/routes/_dashboard/sprints/workspace.tsx`.
-    * Define a React context to manage active steps (`1 | 2 | 3 | 4`), batch IDs, active variants, selected variants, and search filters.
-- [ ] **Implement Step 1 View: Batch Ingestion UI**
-  * *What it is*: File upload and progress monitoring screen.
-  * *Details*:
-    * Build a drag-and-drop file upload zone.
-    * Build a URL paste text area.
-    * Render a table of active files showing file names, sizes, processing statuses (`'parsing' | 'extracting' | 'complete'`), and circular progress indicators.
-- [ ] **Implement Step 2 View: Variant Selector UI**
-  * *What it is*: Tag cloud visualization and variant picker screen.
-  * *Details*:
-    * Render the aggregated tag clouds grouped by category with terracotta-styled frequency pills.
-    * Render 3 columns/cards displaying the AI search variants (Variant Name, Skills, Locations, Justification) with checkboxes to select them.
-- [ ] **Implement Step 3 View: Progress Monitor UI**
-  * *What it is*: Real-time sourcing logs screen.
-  * *Details*:
-    * Render a split view:
-      * Left: Real-time Database Matches (profiles loaded dynamically from the local DB matching query).
-      * Right: Background Sprints Progress (bars tracking GitHub/Devpost scans, terminal console displaying status logs).
-- [ ] **Implement Step 4 View: Geographic Results UI**
-  * *What it is*: The final split screen displaying lists and the map.
-  * *Details*:
-    * Left side: Scrollable list of candidate cards. Each card displays suitability scores in custom circular SVG progress rings.
-    * Right side: `@shadcn-map/map` canvas showing map coordinates with location marker pins.
-- [ ] **Integrate `@edd_remonts/ai-schadcn-chat` Sidebar**
-  * *What it is*: Fixed chat panel integrated into the workspace.
-  * *Details*:
-    * Place the chat component inside a fixed `320px` left panel.
-    * Connect callbacks so that:
-      * When the AI chat suggests a candidate, clicking that bubble highlights the candidate on the list and centers the map.
-      * The user can query list results in natural language (e.g. *"Who has React experience?"*), which updates filters on the list and map dynamically.
+- [ ] **Add list, create, and preview routes**
+  - Files: `src/routes/api/sprints/index.ts`, `src/routes/api/sprints/preview.ts`
+  - Do: Require session. GET lists only caller rows. POST validates reviewed criteria/variants, enforces the active-sprint limit, and returns 201. Preview validates at most four variants, applies `rateLimit('sprint-preview', userId, 10, 60)`, runs deterministic `searchBuilders`, dedupes snapshots, and persists nothing.
+  - Verify: authenticated curl covers manual no-AI preview and save; free save returns the standard upgrade response; malformed/foreign source returns 400.
 
----
+- [ ] **Add sprint detail and lifecycle route**
+  - Files: `src/routes/api/sprints/$sprintId.ts`
+  - Do: GET/PATCH/DELETE with owner scope. PATCH accepts only `{ action: 'pause'|'resume' }`, `{ name }`, or `{ quota }`; resume rechecks plan limit. Return generic 404 for another user's ID and 409 for invalid transitions.
+  - Verify: two-session curl proves isolation; pause stops worker eligibility, resume restores it, delete cascades results.
 
-## Phase 6: Verification & Testing
-This phase handles the testing of code correctness and E2E behavior.
+- [ ] **Add paginated results route**
+  - Files: `src/routes/api/sprints/$sprintId/results.ts`
+  - Do: Validate opaque cursor, `limit <= 100`, sort and `SprintFilter`; owner-check before results query; return `{ items, nextCursor, facets, total }` with viewer-specific tracked flags/row IDs.
+  - Verify: pagination is stable across equal timestamps; another user receives 404; invalid cursor/filter receives 400.
 
-- [ ] **Write Unit Tests for Parallel Scheduler**
-  * *What it is*: Tests ensuring the batch parser works under pressure.
-  * *Details*:
-    * Create `test/sprints/batch-analyzer.test.ts`.
-    * Mock the Gemini API and document text parsers.
-    * Assert that parallel uploads containing 10 files execute concurrently while honoring the ceiling limits.
-- [ ] **Write Integration Tests for Boolean Query Aggregator**
-  * *What it is*: Tests validating search variant generation.
-  * *Details*:
-    * Write tests ensuring tag frequencies are correctly sorted.
-    * Verify that Zod validates the LLM JSON response successfully.
-- [ ] **Manual End-to-End Verification**
-  * *What it is*: Live test upload of sample resumes.
-  * *Details*:
-    * Upload 5 sample developer resume PDFs.
-    * Confirm that Step 2 successfully generates tags.
-    * Confirm that Step 4 displays candidates positioned on the map with correct Leaflet coordinates.
+- [ ] **Expose the admin worker endpoint**
+  - Files: `src/routes/api/admin/sprints/run-worker.ts`
+  - Do: Clone `src/routes/api/admin/alerts/run-worker.ts` auth/error shape, call `runSprintsWorker`, emit `sprint_worker_run`, and document the 30-minute VPS cron. Never accept a user/sprint ID in the body.
+  - Verify: non-admin 403; admin gets `{ sprintsRun, resultsAdded, completed, failed }`; two immediate calls are safe.
+
+## Phase 5 — UI
+
+- [ ] **Create the sprint list route and navigation**
+  - Files: `src/routes/_dashboard/sprints/index.tsx`, `src/modules/sprints/components/SprintsPage.tsx`, `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
+  - Do: Render name/status/count/quota/last run and pause/resume/delete actions; add authenticated Sprints nav. Preserve readable completed/paused dossiers after downgrade.
+  - Verify: UI handles empty/loading/error and lifecycle actions; free user sees preview CTA plus Pro save copy.
+
+- [ ] **Build the three-step browser-first wizard**
+  - Files: `src/routes/_dashboard/sprints/new.tsx`, `src/modules/sprints/components/SprintWizard.tsx`, `src/modules/sprints/components/CriteriaEditor.tsx`, `src/modules/sprints/components/VariantEditor.tsx`
+  - Do: Keep pasted text and `.txt` contents in component state only. Step 1 calls `ai('jd-parse')` with a curated ~4k-token local input and clearly labels server fallback for longer input; Step 2 calls `criteria-decompose`; both expose deterministic/manual editors. Step 3 calls preview and optionally saves reviewed structured data. Render `AIDownloadPrompt` when downloadable.
+  - Verify: browser network/storage inspection proves local-success sends no raw text; Chrome unavailable uses MiniMax; AI-disabled completes manually; refresh clears raw text.
+
+- [ ] **Build the dossier and refinement controls**
+  - Files: `src/routes/_dashboard/sprints/$sprintId.tsx`, `src/modules/sprints/components/SprintDossier.tsx`, `src/modules/sprints/components/SprintRefinement.tsx`
+  - Do: Render paginated `PersonResultCard`s, score/date sort, manual filters and honest raw-location facets. `filter-refine` changes only validated filter state. Tracking POSTs the full snapshot to `/api/builders/track` and updates returned `trackedRowId`; never uses `sprintResults.id` as a builder ID.
+  - Verify: refine manually and via both AI tiers; track/untrack an existing and new result; Unknown facet works; no map appears.
+
+## Phase 6 — Security, rollout, and runtime evidence
+
+- [ ] **Run isolation, privacy, and abuse tests**
+  - Files: `src/lib/sprints/service.test.ts`, `src/lib/sprints/worker.test.ts`, `src/shared/lib/sprints-shared.test.ts`
+  - Do: Test cross-user read/mutate/delete, forged owner fields, malicious JD prompt text, invalid sources, oversized arrays/text, worker overlap, and plan downgrade. Assert raw JD/CV is absent from DB rows and logs.
+  - Verify: `pnpm test sprints`.
+
+- [ ] **Perform staged runtime verification**
+  - Files: none
+  - Do: On a migrated local/staging DB, complete manual, Chrome-local, and server-fallback flows; trigger the worker twice; inspect unique rows/cursor/quota; pause cron and verify no progression; set each task kill switch and verify manual usability.
+  - Verify: capture curl/browser evidence, `pnpm test && pnpm type-check && pnpm lint && pnpm build` all pass.
+
+## Future (not scheduled)
+
+- Team sharing after both team dependencies, with server-resolved `organizationId` and cross-org isolation tests.
+- PDF/DOCX extraction, normalized geocoding/MapLibre, and work-sample/code analysis as separate plans.

@@ -1,62 +1,59 @@
-# Plan: AI-Powered Semantic Search
+# Semantic Search (plan)
 
-**Status:** Not yet implemented. Listed as a Pro-tier feature in
-[`billing-shared.ts`](../../src/shared/lib/billing-shared.ts) but there is currently no
-`embedding` column, no embedding service, and no semantic-query path anywhere in the
-codebase — this plan predates any of that work.
+> **Status**: `pending`
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md) (global-public identity/index classification and tenant-private query isolation); [`ai-expansion`](../ai-expansion/spec.md) (must be implemented through Phase 3 — `embedTexts`, task registry, budgets). Enhanced by [`proactive-discovery`](../proactive-discovery/spec.md) (cold-start seeding; not required).
+> **Blocks**: [`proactive-discovery`](../proactive-discovery/spec.md) (hard)
+> **Reality check**: Builds on `src/lib/search.ts` (federated search), `src/routes/api/search/builders.ts` (annotation pattern), `src/shared/lib/tracked-builders.ts`, `docker-compose.yml` (postgres:16-alpine today). `builders` stays untouched — the new global `builder_embeddings` table carries all vector state.
 
-## Goal recap
+## Phases (dependency order — shippable after each)
 
-Enhance BuilderHunt's search dashboard by adding vector semantic search capabilities, using PostgreSQL's `pgvector` extension and text embedding APIs, allowing users to locate developers using natural language.
+### Phase 1 — pgvector infrastructure + schema
 
-## Why this is a valuable addition
+Preflight the configured embedding endpoint/model and assert its real vector dimension.
+Then swap the compose `db` image to `pgvector/pgvector:pg16`; add `EMBEDDING_DIM` re-export;
+add `builder_embeddings` to `schema.ts`; generate the migration and append
+`CREATE EXTENSION IF NOT EXISTS vector;` + the HNSW index SQL. Document the Coolify
+production image swap. App behavior unchanged (dead table).
 
-1. **Context-Aware Sourcing**: Recruiters and users often don't know the exact keyword tags developers use. Semantic search maps synonyms automatically (e.g. "AI integration" maps to "LLM", "OpenAI", "Prompt engineering", "RAG").
-2. **Offline-First Capabilities**: By building a local database of developers, BuilderHunt can return instant results without being blocked by third-party API rate limits.
-3. **Premium UX**: A search engine that understands natural language queries feels modern and matches the design taste of next-generation developer tooling.
+### Phase 2 — Pure document/hash lib + write-through upserts
 
-## Phases
+`embedding-doc.ts` (doc builder, contentHash, `EmbeddedProfile` zod schema) with tests;
+`upsertEmbeddingStubs(results)` helper wired fire-and-forget into
+`/api/search/builders` and `/api/builders/track`. Rows accumulate with `embedding = NULL`;
+still no user-visible change.
 
-### Phase 1: Database Setup & pgvector Migration
-- Add a new Drizzle migration to create the `vector` extension and add the `embedding` column.
-- Write raw SQL triggers or scripts to initialize the HNSW index in PostgreSQL.
-- Update `src/shared/lib/db/schema.ts` to include the `embedding` column definition using a custom type for Drizzle pgvector compatibility.
+### Phase 3 — Embedding worker
 
-### Phase 2: Embedding Generation Service (`src/lib/ai/embedding.ts`)
-- Implement a utility to connect to an embedding service.
-  - Option A (Cloud): Gemini API `text-embedding-004` (Fast, highly accurate, requires API Key).
-  - Option B (Local): Ollama running `nomic-embed-text` (Zero cost, fully local, requires Ollama running).
-- Design the service to compose profile strings and return the 768-dimension array.
-- Create an asynchronous processing queue (using a simple worker or event emitter) to avoid blocking HTTP requests when indexing new builders.
+`POST /api/admin/embeddings/run-worker`: batch-embeds pending rows via `embedTexts`,
+idempotent, returns counts. VPS cron note added alongside the alerts-worker cron. The
+index now fills; still no UI.
 
-### Phase 3: Query Execution & Drizzle Helpers
-- Write the database query logic inside `src/lib/search.ts`.
-- Formulate the cosine similarity query. Use raw SQL template tags in Drizzle:
-  ```ts
-  import { sql } from 'drizzle-orm'
-  // Cosine distance operator is <=> in pgvector. Distance = 1 - Cosine Similarity.
-  const similarity = sql<number>`1 - (${builders.embedding} <=> ${queryEmbedding})`
-  ```
-- Implement a fallback mechanism: if the semantic query yields no results with similarity > 0.65, fall back to extracting noun-phrases from the query to perform keyword searches on external sources.
+### Phase 4 — Query path
 
-### Phase 4: UI Dashboard Toggle
-- Add the "Semantic Search" slide/toggle component to `src/routes/_dashboard/search/index.tsx`.
-- Create a visual feedback indicator showing similarity matching percentages (e.g., "94% Match").
-- Style the cards with deep indigo/violet active highlights when in semantic mode.
+Register `query-translate` in `src/shared/lib/ai/tasks.ts`; implement
+`src/lib/semantic/semantic-search.ts` (query embed → HNSW query → threshold →
+federated merge fallback) and `POST /api/search/semantic` (auth, pro/team gate, rate
+limit, tracked annotation, `mode` field, keyword-fallback catch-all).
 
-### Phase 5: Verification & E2E Tests
-- Write test scripts to seed mock developers with distinct profiles (e.g., a pure Rust developer, a pure design developer).
-- Run queries like "who builds beautiful UI?" and assert that the design developer is returned with high similarity.
+### Phase 5 — UI + gating polish
+
+Semantic toggle in `SearchPage.tsx` (locked + Pro pill for free tier, hidden when AI
+disabled), `% match` badge and hybrid-mode notice in `PersonResultCard.tsx`.
 
 ## Risks
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| **pgvector extension missing on target PostgreSQL hosting** | Low | High | Document hosting requirements (standard Supabase, Neon, or local Docker support pgvector out of the box). |
-| **API Costs / Quota exhaustion for embeddings** | Medium | Medium | Implement caching at the query level. Only generate embeddings once per builder profile unless their core bio/topics change. |
-| **HNSW Index latency during build** | Low | Low | HNSW indices build slowly but query instantly. Only trigger index updates asynchronously. |
+| Risk                                                  | Likelihood   | Impact | Mitigation                                                                                                                          |
+| ----------------------------------------------------- | ------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Coolify prod Postgres image swap loses data           | Low          | High   | Backup before swap; pgvector image is stock Postgres + extension, same major version; verify with `SELECT 1` + row counts post-swap |
+| Embedding spend grows with search volume              | Medium       | Medium | contentHash idempotency, worker batch cap (256/run), 24 h query-embed cache, soft prune of stale rows                               |
+| Local matches are semantically poor at low index size | High (early) | Low    | `SEMANTIC_MIN_LOCAL_MATCHES=10` forces hybrid mode until the index is genuinely useful                                              |
+| drizzle-kit doesn't emit HNSW/extension DDL           | Certain      | Low    | Hand-append SQL to the generated migration file (documented task)                                                                   |
+| `AI_EMBEDDING_DIM` changed after data exists          | Low          | High   | Dim asserted at embed time; changing it requires an explicit re-embed migration (called out, out of scope)                          |
 
-## Rollback plan
+## Rollback
 
-- Keep semantic search as an optional feature toggle.
-- If the embedding API key is missing or fails, automatically disable the semantic search option in the UI and log a configuration warning.
+- Phases 1–3 are invisible to users: stop the cron, drop `builder_embeddings` (single
+  additive table; `builders` untouched), revert the compose image if desired.
+- Phase 4–5: remove the toggle / route; or leave code and gate off by removing
+  `query-translate` allowances (set all tiers to 0) / `AI_DISABLED_TASKS=query-translate` —
+  UI hides, keyword search is unaffected. The kill ladder from `ai-expansion` applies.
