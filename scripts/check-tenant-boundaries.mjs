@@ -44,6 +44,7 @@ const legacyDirectDbImports = new Set([
 ])
 const authDbAllowlist = new Set([
   'src/shared/lib/auth/better-auth.ts',
+  'src/shared/lib/auth/personal-organization.ts',
   'src/shared/lib/auth/tenant-principal.ts',
   'src/shared/lib/db/auth-db.ts',
 ])

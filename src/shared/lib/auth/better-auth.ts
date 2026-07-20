@@ -14,6 +14,7 @@ import {
 import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
 import { organizationOptions } from './organization-options'
+import { ensurePersonalOrganization } from './personal-organization'
 
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
@@ -32,6 +33,15 @@ export const auth = betterAuth({
     enabled: true,
     sendResetPassword: async ({ user, url }) => {
       await sendResetPasswordEmail(user.email, url)
+    },
+  },
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          await ensurePersonalOrganization(user.id)
+        },
+      },
     },
   },
   // BETTER_AUTH_SECRET is the canonical name

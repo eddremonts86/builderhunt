@@ -64,6 +64,13 @@
       "when": 1784541344840,
       "tag": "0008_tenant_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784542146025,
+      "tag": "0009_entitlement_bootstrap",
+      "breakpoints": true
     }
   ]
 }

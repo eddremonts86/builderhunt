@@ -1,4 +1,5 @@
 import postgres from 'postgres'
+import { createHash } from 'node:crypto'
 
 const appUrl = process.env.RLS_TEST_APP_URL
 const authUrl = process.env.RLS_TEST_AUTH_URL
@@ -48,7 +49,10 @@ try {
   if (afterCommit.length !== 0) throw new Error('Pooled tenant context leaked after commit')
 
   const organizations = await auth`select id from organizations order by id`
-  assertIds(organizations, ['org-a', 'org-b'], 'auth broker organization lifecycle')
+  const organizationIds = organizations.map((row) => row.id)
+  if (!organizationIds.includes('org-a') || !organizationIds.includes('org-b')) {
+    throw new Error('Auth broker organization lifecycle failed')
+  }
   let authProductAccessDenied = false
   try {
     await auth`select id from organization_builders`
@@ -57,6 +61,33 @@ try {
   }
   if (!authProductAccessDenied) throw new Error('Auth broker accessed product tenant data')
 
+  const bootstrapUserId = 'user-bootstrap'
+  const bootstrapHash = createHash('sha256')
+    .update(`builderhunt:personal-organization:v1:${bootstrapUserId}`)
+    .digest('hex')
+    .slice(0, 24)
+  const bootstrapOrganizationId = `org_personal_${bootstrapHash}`
+  await auth`
+    insert into auth_users (id, name, email, email_verified, created_at, updated_at)
+    values (${bootstrapUserId}, 'Bootstrap', 'bootstrap@test.invalid', true, now(), now())
+    on conflict (id) do nothing
+  `
+  await auth`
+    select bootstrap_personal_organization(
+      ${bootstrapUserId},
+      ${bootstrapOrganizationId},
+      ${`personal-${bootstrapHash}`},
+      ${`${bootstrapOrganizationId}:owner`}
+    )
+  `
+  const bootstrapEntitlement = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${bootstrapOrganizationId}, true)`
+    return transaction`select tier, status, seat_limit from organization_entitlements`
+  })
+  if (bootstrapEntitlement.length !== 1 || bootstrapEntitlement[0].tier !== 'free') {
+    throw new Error('Atomic personal organization bootstrap failed')
+  }
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
@@ -64,6 +95,7 @@ try {
     crossTenantInsert: 'denied',
     poolReuse: 'clean',
     authProductAccess: 'denied',
+    personalOrganizationBootstrap: 'atomic',
   }))
 } finally {
   await Promise.all([app.end(), auth.end()])

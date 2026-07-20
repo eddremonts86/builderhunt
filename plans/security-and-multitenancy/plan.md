@@ -1,12 +1,13 @@
 # Delivery Plan: Security, Normalization, and Multi-Tenancy Foundation
 
-> **Status**: `pending`
+> **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/plan.md), [`shared-resources`](../shared-resources/plan.md), [`activity-feed`](../activity-feed/plan.md), [`ai-expansion`](../ai-expansion/plan.md), [`semantic-search`](../semantic-search/plan.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/plan.md), [`production-infrastructure`](../production-infrastructure/plan.md)
-> **Reality check**: runtime code uses one global Drizzle client and manually scopes private rows by
-> `userId`; PostgreSQL has no organizations, runtime/migration role split, RLS, tenant context, or
-> cross-tenant test harness. `drizzle-kit check` passes for the single existing migration, but that
-> proves migration metadata consistency rather than normalization or isolation.
+> **Reality check**: roles, Better Auth organizations, tenant context, normalized expand schema,
+> personal-organization bootstrap, RLS, and local exact-role verification are implemented. The
+> runtime still has 37 explicitly baselined legacy global-db imports; canonical flags remain blocked
+> until resource backfills, shadow comparison, route/worker/privacy migration, restore evidence, and
+> the full readiness manifest pass.
 
 ## Delivery principle
 
