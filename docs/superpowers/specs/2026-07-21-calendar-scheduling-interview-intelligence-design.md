@@ -62,7 +62,8 @@ The feature program adds three connected product surfaces:
 
 - Video or voice calling.
 - An applicant tracking system or general HRIS.
-- LinkedIn scraping or fetching arbitrary personal websites during v1.
+- Authenticated/private-page crawling, CAPTCHA bypass, stealth crawling, or retrieval prohibited by
+  the source policy. LinkedIn remains URL-only without official API access or written permission.
 - Automated candidate ranking, hiring recommendations, personality analysis, emotion recognition,
   voice identification, or culture-fit scoring.
 - A shared organization calendar by default.
@@ -153,7 +154,8 @@ The public portal requires no account. It allows only operations scoped to one i
 - choose a slot rendered in the candidate's detected or selected IANA timezone;
 - provide name, email, CV, LinkedIn URL, personal website URL, other approved links, documents, and
   notes;
-- separately accept document processing and optional live transcription;
+- separately accept the required versioned purposes for documents, approved public-web import,
+  AI-assisted preparation/reporting, and transient live-audio transcription;
 - book, decline, cancel, or reschedule according to the invitation policy.
 
 The candidate never sees organization data, other candidates, raw availability rules, or the reason
@@ -213,8 +215,12 @@ score or hiring recommendation.
 ### 7.1 Capture modes
 
 - `in_person`: capture the microphone through `getUserMedia`.
-- `remote_call`: request microphone plus tab/window audio through `getDisplayMedia`, mix available
-  audio tracks with Web Audio, and stream the result.
+- `remote_call`: the organizer uses current/previous desktop Chrome on macOS/Windows, keeps the
+  BuilderHunt workspace separate from a Meet/Zoom/Teams web tab, and explicitly selects that meeting
+  tab with audio through `getDisplayMedia`. Stop the required video track immediately and before
+  provider connection; never transmit or retain video. Keep microphone and meeting-tab audio as
+  separate provider channels when supported. The candidate can use any client supported by the
+  meeting provider.
 
 Screen-audio support varies by browser and selected surface. A preflight test can verify available
 tracks, not whether both people will speak clearly. It must report one of:
@@ -223,12 +229,14 @@ tracks, not whether both people will speak clearly. It must report one of:
 - `microphone_only`;
 - `audio_capture_unsupported`.
 
-The product must not claim both-party transcription in the latter two states. Manual notes remain
-available in every state.
+Remote transcription requires the first state. Microphone-only remote capture, Safari, Firefox,
+mobile, native meeting apps, and unsupported sources use manual-only mode. Chromium Edge is beta.
+Manual notes remain available in every state. A Chrome extension is deferred unless native-picker
+telemetry justifies its installation and permission cost.
 
 ### 7.2 Audio lifecycle
 
-- The browser obtains an ephemeral provider token from an authenticated BuilderHunt route.
+- The browser obtains a 30-second Deepgram token from an authenticated BuilderHunt route.
 - Audio streams directly to the EU speech endpoint.
 - BuilderHunt does not create a `Blob`, use `MediaRecorder`, or expose an audio upload route.
 - Interim transcript text is memory-only.
@@ -267,8 +275,8 @@ Organization role is not sufficient to read an interview.
 - `availability_overrides`: owner, local date/range, `available` or `blocked`, and reason.
 - `scheduling_invitations`: organizer, optional builder identity, role fields, duration, validity,
   policy, status, token hash, opened/booked timestamps, and booked event reference.
-- `candidate_submissions`: invitation, name, normalized email, notes, document-processing consent,
-  live-transcription consent, and submitted timestamp.
+- `candidate_submissions`: invitation, name, normalized email, notes, consent receipt references,
+  and submitted timestamp.
 
 ### 8.2 Document tables
 
@@ -276,10 +284,15 @@ Organization role is not sufficient to read an interview.
   type, byte size, checksum, status, rejection code, retention expiry, and timestamps.
 - `document_extractions`: document, parser and version, normalized plain text, page or section map,
   extraction status, content hash, and error code.
-- `candidate_links`: submission, normalized URL, type, display label, and validation status.
+- `candidate_links`: submission, normalized URL, source/acquisition type, policy/import state,
+  display label, and validation status.
+- `candidate_web_imports`: final URL, source-policy/robots decision, response/content hashes,
+  extraction version, bounded text/evidence map, status, error, and retention expiry.
 
-URLs are stored and displayed in v1. BuilderHunt does not fetch arbitrary personal websites or
-scrape LinkedIn. Existing approved public-source enrichment may be referenced independently.
+Approved public personal/project websites are imported through the existing source registry,
+robots, rate-limit, and SSRF-safe enrichment envelope. Raw HTML is discarded after deterministic
+visible-text extraction. LinkedIn/X/Meta remain URL-only unless official API access or written crawl
+permission is recorded.
 
 ### 8.3 Interview tables
 
@@ -374,6 +387,8 @@ write state columns directly.
 - `POST /api/public/scheduling/:invitationId/decline`
 - `POST /api/public/scheduling/:invitationId/cancel`
 - `POST /api/public/scheduling/:invitationId/reschedule`
+- `POST /api/public/scheduling/:invitationId/withdraw`
+- `POST /api/public/scheduling/:invitationId/links/:linkId/import`
 - `POST /api/public/scheduling/:invitationId/uploads`
 - `POST /api/public/scheduling/:invitationId/uploads/:documentId/complete`
 - `POST /api/public/scheduling/:invitationId/consents`
@@ -455,11 +470,16 @@ rank, personality, emotion, culture fit, and hire/reject language.
 
 ## 14. Consent, Privacy, and Retention
 
-Candidate-facing notices describe `live audio capture and transcription`, not generic recording or
-product improvement. Document processing and live transcription are separate purposes.
+Candidate-facing booking notices describe documents, approved public-web import, AI preparation/
+reporting, and `transient live audio capture and stored transcription`, not generic recording or
+product improvement. Each purpose has a separate unticked versioned control.
 
-- The candidate can decline transcription and still attend the interview.
-- The organizer confirms the notice immediately before starting capture.
+- Booking cannot complete until the terms/privacy acknowledgement and every required processing
+  purpose are affirmatively accepted.
+- Consent covers only disclosed purposes and remains withdrawable after booking. Withdrawal of
+  transcription makes the appointment manual-only rather than cancelling it.
+- The organizer verbally reminds both parties immediately before starting capture; stored candidate
+  consent remains the authoritative booking receipt.
 - A persistent indicator is shown while capture is active.
 - Pause and stop are immediate. A verbal withdrawal requires the organizer to stop capture.
 - Withdrawal stops future processing and offers the applicable deletion controls for existing
@@ -481,6 +501,15 @@ and deletion workflows include these resources.
 Before production voice launch, complete a DPIA, execute DPAs with storage, speech, and AI providers,
 verify regional endpoints and no-training controls, and update the privacy notice and processor list.
 
+Because the AI tasks assist a recruitment workflow, complete and version an EU AI Act Article 6(3)
+classification for each task before launch. A preparatory-task/non-high-risk conclusion must be
+supported by intended-purpose, material-influence, UI, output, evidence, bias, traceability, and
+human-oversight controls. Otherwise the sensitive-AI flag remains off until the applicable high-risk
+provider/deployer obligations are satisfied. Every artifact is labelled as an AI draft; no AI path
+may rank, score, shortlist, reject, advance, or write candidate status. Candidate disclosure,
+organizer AI-literacy instructions, limitations, complaint/incident paths, and post-market monitoring
+are required regardless of final classification.
+
 ## 15. Usage Credits and Unit Economics
 
 Calendar and scheduling do not consume AI credits. Sensitive AI and speech cannot run without a
@@ -500,10 +529,12 @@ A 60-minute interview normally consumes 70 credits.
 ### 15.2 Initial commercial proposal
 
 - Pro subscription at $19/month: 140 included credits.
-- Small top-up: 300 credits for $15.
-- Medium top-up: 1,000 credits for $45.
-- Large top-up: 5,000 credits for $199 during beta. At the conservative internal cost budget of
-  $1.25 per 60-minute interview, use approximately $299 to target a 70% gross margin.
+- Pro Max subscription at $79/month: 700 included credits.
+- Team subscription at $199/month: 2,100 organization-pooled credits.
+- Starter 300 one-time pack: $15.
+- Scale 1K one-time pack: $45.
+- Max 5K one-time pack: $299, targeting approximately 70% gross margin at the conservative internal
+  cost budget.
 
 Pricing is configuration, not hardcoded domain logic. Finance can change catalog amounts without
 changing historical ledger entries.
@@ -536,8 +567,9 @@ entitlement.
   internal IDs, candidate existence, or storage keys.
 - CSRF protection applies to cookie-authenticated public and authenticated mutations.
 - Rate limits combine capability, IP, user, and organization as applicable.
-- URLs use the existing outbound URL policy. v1 stores candidate-provided links but does not fetch
-  arbitrary websites.
+- Public-web imports reuse the existing source registry, honest user agent, RFC 9309 robots,
+  per-hop SSRF validation, Redis host limits, bounded response/extraction, and hard-blocked-platform
+  policy. Candidate consent does not override third-party access terms.
 - Files and extracted text are treated as hostile. Rendering is plain text with safe link handling.
 - Provider credentials, temporary tokens, signed URLs, payment data, and candidate content are
   redacted from logs.
@@ -635,7 +667,8 @@ internal event without applying the user's selected sync policy.
 - simultaneous candidates competing for one slot;
 - cancel and reschedule;
 - reject malicious, corrupt, encrypted, excessive, and fake-type documents;
-- decline and withdraw transcription consent;
+- prove booking is blocked until all required purposes are accepted, then withdraw transcription
+  without cancelling the appointment;
 - in-person and remote capture;
 - exhaust credits during a live session;
 - finish, review, and finalize a report;
@@ -669,12 +702,12 @@ emails, transcripts, prompts, responses, capability tokens, or signed URLs.
 
 1. Internal calendar and manual events.
 2. Availability, accountless invitation, booking, confirmation, and `.ics`.
-3. Private storage, scan, extraction, and candidate intake.
-4. Stripe, internal ledger, top-ups, limits, and reconciliation.
+3. Private storage, scan, approved public-web import, extraction, and candidate intake.
+4. Stripe Checkout/Tax/Portal, internal ledger, top-ups, limits, refunds, and reconciliation.
 5. Interview preparation.
 6. Closed Chrome beta for in-person transcription.
-7. Remote capture, diarization, contextual questions, and final reports.
-8. Explicit Safari and Firefox degradation paths.
+7. Chrome meeting-tab capture with separate channels, contextual questions, and final reports.
+8. Chromium Edge beta and explicit Safari/Firefox/mobile/native-app manual-only paths.
 9. Job, alert-window, run, and result projections.
 10. Separate follow-up programs for Google/Microsoft sync and BYOK.
 
@@ -726,7 +759,11 @@ The program is complete only when runtime evidence demonstrates:
 - [Microsoft Graph change notifications](https://learn.microsoft.com/en-us/graph/change-notifications-overview)
 - [MDN `getUserMedia`](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia.)
 - [MDN `getDisplayMedia`](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia)
+- [Chrome screen-sharing controls](https://developer.chrome.com/docs/web-platform/screen-sharing-controls)
+- [Chrome `tabCapture`](https://developer.chrome.com/docs/extensions/reference/api/tabCapture)
 - [Deepgram streaming diarization](https://developers.deepgram.com/docs/diarization/)
+- [Deepgram multichannel streaming](https://developers.deepgram.com/docs/multichannel)
+- [Deepgram token-based authentication](https://developers.deepgram.com/guides/fundamentals/token-based-authentication)
 - [Deepgram EU endpoint](https://developers.deepgram.com/reference/custom-endpoints)
 - [Deepgram pricing](https://deepgram.com/pricing)
 - [AssemblyAI streaming diarization](https://www.assemblyai.com/docs/streaming/label-speakers-and-separate-channels)
@@ -735,12 +772,19 @@ The program is complete only when runtime evidence demonstrates:
 - [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/)
 - [AWS presigned URL behavior](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
 - [OWASP file upload guidance](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
+- [OWASP SSRF prevention](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html)
+- [RFC 9309 Robots Exclusion Protocol](https://www.rfc-editor.org/rfc/rfc9309.html)
+- [LinkedIn crawling terms](https://www.linkedin.com/legal/crawling-terms)
 - [Azure AI data privacy](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
 - [Stripe usage-based billing](https://docs.stripe.com/billing/subscriptions/usage-based/how-it-works)
-- [Stripe billing credits](https://docs.stripe.com/billing/subscriptions/usage-based/billing-credits/implementation-guide)
+- [Stripe Checkout automatic tax](https://docs.stripe.com/tax/checkout)
+- [Stripe Tax operating responsibilities](https://docs.stripe.com/tax/how-tax-works)
+- [Stripe Customer Portal](https://docs.stripe.com/customer-management)
+- [Stripe billing credits limitations](https://docs.stripe.com/billing/subscriptions/usage-based/billing-credits)
 - [GDPR Article 5 principles](https://eur-lex.europa.eu/legal-content/EN/TXT/?qid=1653314624165&uri=CELEX%3A32016R0679)
 - [EDPB automated decision-making guidance](https://www.edpb.europa.eu/documents/guideline/automated-decision-making-and-profiling_en)
 - [European Commission AI Act high-risk review](https://digital-strategy.ec.europa.eu/en/library/report-review-prohibitions-and-high-risk-ai)
+- [EU AI Act Regulation 2024/1689](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32024R1689)
 - [Danish Data Protection Authority recording guidance](https://www.datatilsynet.dk/regler-og-vejledning/optagelser-og-overvaagning?Page=6)
 
 ## 26. Implementation Plan Decomposition

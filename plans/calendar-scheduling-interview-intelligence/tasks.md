@@ -31,12 +31,26 @@
   - Verify: security/privacy reviewer signs the register; each regional endpoint is confirmed from a
     test response/console and every provider can be disabled independently.
 
+- [ ] **Approve the billing tax and commercial operating policy**
+  - Files: `docs/operations/interview-billing-tax-register.md` (new),
+    `docs/operations/interview-provider-register.md`
+  - Do: Record selling entity/address, launch countries, B2B/B2C availability, Stripe product tax
+    code, exclusive/inclusive display by storefront, active tax/VAT registrations, tax-ID validation
+    and reverse-charge handling, invoice numbering/retention, subscription cancellation/proration,
+    12-month top-up expiry disclosure, full/partial refund and chargeback credit reversal, filing/
+    remittance owner/cadence, currencies, and accounting reconciliation. Treat Stripe Tax as
+    calculation/collection support, not automatic registration, filing, or remittance.
+  - Verify: finance/legal sign-off is dated; Stripe sandbox Checkout fixtures cover domestic B2B,
+    intra-EU valid/invalid VAT, EU B2C, non-EU, refund, and invoice; no production price is enabled
+    without matching registration and tax behavior.
+
 - [ ] **Add environment schema and kill switches**
   - Files: `src/shared/lib/env.ts`, `src/shared/lib/env.security.test.ts`, `.env.example`,
     `.env.production.example`
   - Do: Add server-only R2 endpoint/account/bucket/access keys/jurisdiction, ClamAV host/port,
     Deepgram key/EU base URL, Azure endpoint/key/deployment/API version, Stripe secret/webhook/price
-    IDs, retention days, credit pack configuration, and the eight release flags from `plan.md`.
+    IDs, Stripe Tax settings, retention days, credit pack configuration, and all release flags from
+    `plan.md`, including `CANDIDATE_WEB_IMPORT_ENABLED`.
     Production validation must require regional URLs when a sensitive flag is enabled and reject
     secrets prefixed with `VITE_`.
   - Verify: env tests cover disabled minimal config, each enabled dependency, non-EU rejection,
@@ -55,9 +69,10 @@ src/shared/lib/env.security.test.ts`.
 - [ ] **Define shared feature/catalog configuration**
   - Files: `src/shared/lib/interview-config.ts` (new),
     `src/shared/lib/interview-config.test.ts` (new)
-  - Do: Define supported MIME/extensions, 10 MB/25 MB limits, retention defaults, supported capture
-    modes/languages, 5/1-minute/5 credit costs, 140 included Pro credits, top-up packs, low-balance
-    thresholds, recurrence horizon, and safe public flag DTO. Validate all operator overrides.
+  - Do: Define supported MIME/extensions, 10 MB/25 MB document and 2 MB web-import limits,
+    retention defaults, Chrome desktop current/previous major matrix, capture modes/languages,
+    5/1-minute/5 credit costs, exact Pro/Pro Max/Team and Starter/Scale/Max catalog from `spec.md`,
+    tax behavior, grant expiry, low-balance thresholds, recurrence horizon, and safe public flag DTO.
   - Verify: tests reject negative/zero limits, inconsistent pack pricing, unsupported jurisdiction,
     excessive retention, and missing fallback; `pnpm test src/shared/lib/interview-config.test.ts`.
 
@@ -65,16 +80,17 @@ src/shared/lib/env.security.test.ts`.
 
 - [ ] **Implement calendar contracts and state machine**
   - Files: `src/shared/lib/calendar.ts` (new), `src/shared/lib/calendar.test.ts` (new)
-  - Do: Add event/occurrence/participant/feed DTO schemas, event types/statuses, source types,
-    visibility fixed to `private`, optimistic-version input, transition guard, half-open range
-    overlap helper, and explicit read-only projection discrimination.
+  - Do: Add event/occurrence/participant/reminder/delivery/feed DTO schemas, event types/statuses,
+    source types, visibility fixed to `private`, optimistic-version and `this|following|series`
+    mutation input, transition/split guards, half-open overlap helper, search/export filters, and
+    explicit read-only projection discrimination.
   - Verify: tests cover every valid/invalid transition, invalid ranges, stale version mapping,
     participant DTO minimization, and projection `editable: false`; `pnpm test
 src/shared/lib/calendar.test.ts`.
 
 - [ ] **Implement timezone, recurrence, and availability calculations**
   - Files: `src/shared/lib/scheduling.ts` (new), `src/shared/lib/scheduling.test.ts` (new)
-  - Do: Add availability/override/invitation/slot schemas, IANA timezone validation, Temporal-based
+  - Do: Add availability/override/invitation/slot/consent-receipt schemas, IANA timezone validation, Temporal-based
     local-to-instant conversion, RFC 5545/RRule expansion contract, exception dates, buffers,
     minimum notice/horizon, busy-range subtraction, deterministic slot IDs, and safe public errors.
   - Verify: fixtures cover Copenhagen spring-forward/fall-back, UTC, America/New_York, half-hour
@@ -110,12 +126,24 @@ src/shared/lib/calendar.test.ts`.
   - Verify: TypeScript fake adapters implement every interface without provider packages;
     `pnpm type-check`.
 
+- [ ] **Implement the normative HTTP and error schemas**
+  - Files: `src/shared/lib/interview-api.ts` (new),
+    `src/shared/lib/interview-api.test.ts` (new), `src/shared/lib/api-errors.ts`
+  - Do: Encode every method/route request, success DTO, authority, idempotency key, bounded range,
+    pagination, and common error code from `spec.md` as named Zod schemas and discriminated unions.
+    Export route-safe types only; reject organization/owner/provider/price/credit authority fields
+    from client inputs. Public errors collapse unavailable capability states.
+  - Verify: contract tests instantiate every route row, reject unknown fields and oversized ranges/
+    batches, assert every declared error has stable HTTP mapping, and prove no private ORM/provider
+    object is assignable to a public DTO; `pnpm test src/shared/lib/interview-api.test.ts`.
+
 ## Phase 2 — Calendar persistence and RLS
 
 - [ ] **Add calendar and scheduling schema**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `docs/architecture/data-classification.md`
-  - Do: Add `user_calendars`, `calendar_events`, `calendar_event_occurrences`,
-    `event_participants`, `availability_rules`, `availability_overrides`,
+  - Do: Add the exact `spec.md` columns/checks for `user_calendars`, `calendar_events`,
+    `calendar_event_occurrences`, `event_participants`, `calendar_event_reminders`,
+    `calendar_notification_deliveries`, `availability_rules`, `availability_overrides`,
     `scheduling_invitations`, `candidate_submissions`, and `candidate_links`. Use UUID PKs,
     `organization_id`, owner/creator columns, composite `(organization_id,id)` uniques/FKs,
     timestamptz instants, IANA timezone text, typed checks, event `version >= 1`, one default calendar
@@ -146,7 +174,7 @@ test:rls:local`.
 - [ ] **Implement calendar repository**
   - Files: `src/shared/lib/repositories/calendar.ts` (new),
     `src/shared/lib/repositories/calendar.test.ts` (new)
-  - Do: Add calendar/event/occurrence/participant CRUD and range queries using an injected
+  - Do: Add calendar/event/occurrence/participant/reminder/delivery CRUD, search, and range queries using an injected
     `TenantTransaction`; explicit DTO columns only; all predicates include server-resolved
     organization and owner/participant semantics; optimistic updates match `id+organization+version`.
   - Verify: repository tests cover tenant predicates, no unrestricted row serialization, stale
@@ -169,9 +197,10 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/lib/calendar/service.ts` (new), `src/lib/calendar/service.test.ts` (new),
     `src/shared/lib/authorization/permissions.ts`,
     `src/shared/lib/authorization/permissions.test.ts`
-  - Do: Orchestrate create/update/move/resize/cancel/delete/range operations through tenant context;
-    centralize owner/participant permissions; enforce start/end, private visibility, recurrence,
-    version, and event-source mutation rules.
+  - Do: Orchestrate create/update/move/resize/cancel/delete/search/export/range operations through
+    tenant context; centralize owner/participant permissions; enforce start/end, private visibility,
+    recurrence `this|following|series`, manual-overlap warning versus interview hard conflict,
+    reminders, stable ICS UID/SEQUENCE, version, and event-source mutation rules.
   - Verify: service tests cover every role/action, stale membership, stale version, recurrence edit
     scope, cancel vs delete, and no admin implicit access; targeted tests pass.
 
@@ -181,19 +210,36 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/shared/lib/repositories/calendar-worker.ts` (new),
     `src/routes/api/admin/calendar/run-worker.ts` (new)
   - Do: Expand recurring events idempotently for the configured past/future horizon, apply
-    exclusions/overrides/cancellations, prune obsolete future instances, lease batches by tenant,
-    write job runs, and authenticate like existing workers using worker scope rather than a global
-    tenant transaction.
+    exclusions/overrides/cancellations/successor splits, prune obsolete future instances, lease
+    batches by tenant, schedule reminder deliveries with occurrence/recipient/channel/offset
+    idempotency, suppress cancelled/removed recipients, write job runs, and authenticate like
+    existing workers using worker scope rather than a global tenant transaction.
   - Verify: repeated/concurrent runs produce identical occurrence sets; one tenant failure does not
     affect another; unauthorized route fails; run against local DB and inspect rows.
+
+- [ ] **Implement reminder and participant-notification delivery**
+  - Files: `src/lib/calendar/reminder-worker.ts` (new),
+    `src/lib/calendar/reminder-worker.test.ts` (new),
+    `src/routes/api/admin/calendar/run-reminders.ts` (new), `src/shared/lib/email.ts`,
+    `src/shared/lib/repositories/calendar-worker.ts`
+  - Do: Lease due reminders per tenant, send in-app/email delivery and stable UID/increasing SEQUENCE
+    ICS `REQUEST`/`CANCEL` updates, write idempotent delivery/read state, retry transient failures with cap, and
+    suppress cancelled events, removed participants, stale occurrence versions, and duplicate
+    occurrence/recipient/channel/offset keys.
+  - Verify: tests cover each allowed offset/channel, exactly-once concurrent delivery, retry,
+    cancellation/reschedule update, participant removal, tenant isolation, and unauthorized worker;
+    a test inbox imports an update and cancellation into a standards-compliant calendar.
 
 - [ ] **Add calendar event APIs**
   - Files: `src/routes/api/calendar/events/index.ts` (new),
     `src/routes/api/calendar/events/$eventId.ts` (new),
-    `src/routes/api/calendar/events/$eventId/cancel.ts` (new)
-  - Do: Add authenticated range GET, create POST, detail GET, versioned PATCH, DELETE, and cancel
-    POST using `requireTenantPrincipal`, tenant context, Zod request limits, CSRF protection, safe
-    errors, explicit DTOs, and audit events for mutations/sharing.
+    `src/routes/api/calendar/events/$eventId/cancel.ts` (new),
+    `src/routes/api/calendar/export[.]ics.ts` (new),
+    `src/routes/api/calendar/notifications.ts` (new)
+  - Do: Add authenticated range/search GET, create POST, detail GET, versioned scoped PATCH/DELETE,
+    cancel POST, bounded private ICS export, and own paginated notification read/mark-read using
+    `requireTenantPrincipal`, tenant context, Zod request limits, CSRF protection, safe errors,
+    explicit DTOs, and audit events.
   - Verify: API tests/curl cover 401, no active org, malformed range, owner success, participant
     read-only, admin denial, tenant B, stale version `409`, and redacted errors.
 
@@ -211,11 +257,13 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/modules/calendar/components/EventEditor.tsx` (new),
     `src/modules/calendar/components/EventDetails.tsx` (new),
     `src/modules/calendar/components/AvailabilityEditor.tsx` (new),
-    `src/modules/calendar/components/CalendarAgenda.tsx` (new)
-  - Do: Add responsive FullCalendar month/week/day/list views, range fetching, optimistic drag/resize
-    with rollback, editor/detail side panel, recurrence scope selection, timezone label, agenda
-    fallback, keyboard actions, visible focus, loading/empty/error/stale states, and no color-only
-    semantics.
+    `src/modules/calendar/components/CalendarAgenda.tsx` (new),
+    `src/modules/calendar/components/CalendarNotifications.tsx` (new)
+  - Do: Add responsive FullCalendar month/week/day/list views, range fetching, search, optimistic
+    drag/resize with rollback, editor/detail side panel, recurrence-scope chooser, timezone label,
+    participant/reminder/default-reminder fields, overlap warning, ICS export, notification drawer/
+    unread/mark-read/event navigation, agenda fallback, keyboard actions, visible focus,
+    loading/empty/error/stale states, and no color-only semantics.
   - Verify: component tests cover keyboard and mutation rollback; Playwright creates/moves/recurs/
     cancels an event at desktop and 320 px; axe scan has no critical violations.
 
@@ -320,9 +368,10 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/lib/scheduling/booking-service.test.ts` (new),
     `src/shared/lib/repositories/scheduling.ts`
   - Do: Acquire transaction advisory lock by organizer/date, recompute slot, create event and
-    participants, mark invite booked, create outbox messages, and commit together. Cancellation
-    preserves history. Reschedule creates linked replacement occurrence/event state without a gap or
-    double confirmation.
+    participants, verify current individual consent receipts for every required purpose, mark invite
+    booked, create consent-receipt/outbox messages, and commit together. Missing/withdrawn consent
+    returns `422 consent_required`. Cancellation preserves history. Reschedule creates linked
+    replacement occurrence/event state without a gap or double confirmation.
   - Verify: real PostgreSQL race test yields exactly one booking; rollback leaves no partial rows;
     stale/used/revoked/expired capability and invalid slot return safe errors.
 
@@ -342,9 +391,12 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/routes/api/public/scheduling/$invitationId/book.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/decline.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/cancel.ts` (new),
-    `src/routes/api/public/scheduling/$invitationId/reschedule.ts` (new)
+    `src/routes/api/public/scheduling/$invitationId/reschedule.ts` (new),
+    `src/routes/api/public/scheduling/$invitationId/withdraw.ts` (new)
   - Do: Validate invitation cookie plus CSRF, apply capability/IP rate limits, return public
-    allowlists, accept normalized candidate details/slot ID, and expose only valid lifecycle actions.
+    allowlists, accept normalized candidate details/slot/individual notice-version receipt IDs,
+    reject incomplete consent, expose only valid lifecycle actions, and allow post-booking purpose
+    withdrawal that changes affected future processing/session state without cancelling the event.
   - Verify: API tests cover missing/expired/revoked cookie, CSRF, enumeration, rate limit, wrong
     invitation, book race `409`, and successful cancel/reschedule.
 
@@ -373,20 +425,23 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/modules/scheduling/components/SlotPicker.tsx` (new),
     `src/modules/scheduling/components/CandidateDetailsForm.tsx` (new)
   - Do: Exchange fragment capability, show organizer/role/privacy/modality, timezone switcher, slot
-    picker without drag/drop, candidate details, decline/book/cancel/reschedule states, expiry and
-    conflict recovery, no analytics, and 320 px accessibility.
-  - Verify: Playwright completes signed-out mobile booking, timezone switch, race recovery,
-    cancellation/reschedule, expired/revoked link, keyboard-only flow, and axe scan.
+    picker without drag/drop, candidate details, separate unticked terms/privacy and four required
+    purpose controls with notice versions, consent receipt/review/withdrawal, decline/book/cancel/
+    reschedule states, expiry/conflict recovery, no analytics, and 320 px accessibility.
+  - Verify: Playwright proves no booking with any missing consent, then completes signed-out mobile
+    booking, receives receipt, withdraws transcription without cancelling, switches timezone,
+    recovers a race, cancels/reschedules, handles expired/revoked link, keyboard-only flow, and axe.
 
 ## Phase 6 — Private documents and candidate intake
 
 - [ ] **Add document, extraction, and consent schema/RLS**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
     `docs/architecture/data-classification.md`, `src/shared/lib/security/rls-policy.test.ts`
-  - Do: Add `candidate_documents`, `document_extractions`, and `privacy_consents` with tenant
-    composite FKs, generated-key uniqueness, checksum/bytes/type/status/error/expiry indexes and
-    checks, versioned purpose, grant/withdraw timestamps, and owner/participant policies. Capability
-    writes go through a narrowly privileged server command, never anonymous SQL grants.
+  - Do: Add exact `spec.md` columns/checks for `candidate_documents`, `document_extractions`,
+    `candidate_web_imports`, and append-only `privacy_consents` with tenant composite FKs,
+    generated-key uniqueness, hashes/bytes/type/status/error/expiry indexes, individual versioned
+    purpose decisions/supersession/withdrawal, and owner/participant policies. Capability writes go
+    through a narrowly privileged server command, never anonymous SQL grants.
   - Verify: migration/RLS tests cover owner, participant, admin denial, tenant B, cross-invitation
     FK, worker scan, and missing context.
 
@@ -436,22 +491,48 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/routes/api/public/scheduling/$invitationId/uploads/$documentId/complete.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/consents.ts` (new),
     `src/routes/api/interviews/$interviewId/documents/$documentId/download.ts` (new)
-  - Do: Issue quota-bound signed upload, validate completion metadata, record separate purpose
-    consent, and issue authorized five-minute clean-download only to owner/participants. Apply CSRF,
-    capability/IP rate limit, safe status DTO, and audit without filename/email/token.
+  - Do: Issue quota-bound signed upload, validate completion metadata, record each unticked positive
+    purpose act with rendered notice/version/evidence hash, expose review/withdrawal, and issue
+    authorized five-minute clean-download only to owner/participants. Apply CSRF, capability/IP rate
+    limit, safe status DTO, and audit without filename/email/token.
   - Verify: tests cover quota, forged key/size/type/checksum, cross-invitation completion, pending/
     rejected download, admin denial, tenant B, URL expiry, consent version, and withdrawal.
+
+- [ ] **Implement policy-controlled public-web import**
+  - Files: `src/lib/enrichment/network.ts`, `src/lib/enrichment/network.test.ts`,
+    `src/lib/enrichment/policies.ts`, `src/lib/enrichment/policies.test.ts`,
+    `src/lib/enrichment/robots.ts`, `src/lib/enrichment/robots.test.ts`,
+    `src/lib/scheduling/web-import-worker.ts` (new),
+    `src/lib/scheduling/web-import-worker.test.ts` (new),
+    `src/shared/lib/repositories/interview-documents.ts`,
+    `src/routes/api/admin/documents/run-web-imports.ts` (new),
+    `src/routes/api/public/scheduling/$invitationId/links/$linkId/import.ts` (new)
+  - Do: Reuse the shared enrichment safety envelope and source registry. Permit only `official_api`
+    or `authorized_crawl`; create candidate personal/project host eligibility only after a positive,
+    versioned ownership/authorization attestation; keep LinkedIn/X/Meta `user_submitted` and URL-only
+    without source permission. Enforce HTTPS, honest user agent, RFC 9309 fail-closed robots, public A/AAAA on every
+    revalidated redirect, no credentials/nonstandard ports, five redirects, 10 seconds, 2 MB,
+    HTML/text/PDF allowlist, host Redis rate/concurrency limit, no JavaScript, sanitized visible-text
+    extraction, stable evidence IDs/hashes, raw-body discard, retention, idempotency, and redacted
+    job run.
+  - Verify: fake-host tests cover allowed import, robots allow/disallow/unreachable, LinkedIn hard
+    block, localhost/private/link-local/metadata IPv4/IPv6, DNS rebinding, redirect escape, auth,
+    port/scheme, compressed/oversized body, MIME mismatch, active HTML, timeout, Redis unavailable,
+    duplicate content, tenant isolation, raw-body absence, and unauthorized worker/API.
 
 - [ ] **Add candidate links and intake UI**
   - Files: `src/modules/scheduling/components/CandidateIntake.tsx` (new),
     `src/modules/scheduling/components/DocumentUploader.tsx` (new),
     `src/modules/scheduling/components/ConsentFields.tsx` (new),
     `src/modules/scheduling/components/CandidatePortal.tsx`
-  - Do: Add LinkedIn/personal/other URL validation, notes, resumable status UI, PDF/DOCX/TXT limits,
-    separate document/transcription consent, scan/extraction statuses, delete/retry, and no server
-    fetch of links. Booking may finish while documents continue processing.
-  - Verify: Playwright uploads valid and EICAR/fake-type/oversized fixtures, edits URLs, accepts one
-    purpose but declines transcription, books, and sees correct processing/error state.
+  - Do: Add LinkedIn/personal/other URL validation, source-policy/import status, a separate unticked
+    ownership/authorization attestation for each importable personal/project host, notes, resumable
+    status UI, PDF/DOCX/TXT limits, four separate required purpose controls, scan/extraction states,
+    delete/retry, and explicit URL-only state for blocked platforms. Booking may finish while
+    documents and permitted websites continue processing.
+  - Verify: Playwright uploads valid and EICAR/fake-type/oversized fixtures, imports an approved
+    public site, keeps LinkedIn URL-only, proves missing consent blocks booking, accepts all purposes,
+    books, and sees correct processing/error/withdrawal state.
 
 ## Phase 7 — Stripe and usage credits
 
@@ -472,30 +553,40 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/lib/payments/credit-service.ts` (new),
     `src/lib/payments/credit-service.test.ts` (new)
   - Do: Implement grant, FIFO expiry-aware balance, reserve, extend, partial consume, settle,
-    release, refund, operator adjustment, provider usage attach, and history DTO in serializable/
-    locked transactions. Require reason/actor/idempotency and prohibit negative balance.
+    release, refund/revoke, period refill, earliest-expiring-grant consumption, operator adjustment,
+    provider usage attach, and history DTO in serializable/locked transactions. Included grants
+    expire at period end; top-ups expire after 12 months where the catalog permits. Require reason/
+    actor/idempotency and prohibit negative balance.
   - Verify: real DB concurrency tests prove two reservations cannot overspend; replay is no-op;
     failure rollback preserves balance; ledger conservation query passes.
 
 - [ ] **Implement Stripe adapter and catalog mapping**
   - Files: `src/lib/payments/stripe.ts` (new), `src/lib/payments/stripe.test.ts` (new),
     `src/shared/lib/billing-shared.ts`, `src/shared/lib/billing.test.ts`
-  - Do: Map configured recurring/top-up price IDs to immutable internal catalog entries; create/reuse
-    organization customer, subscription checkout, top-up checkout, portal session, refund, and
-    normalized event verification. Never accept price, credits, organization, or success from the
-    client.
-  - Verify: Stripe test-clock/fixture tests cover catalog mismatch, forged price, duplicate customer,
-    checkout metadata, signature failure, refund, and disabled billing.
+  - Do: Map separate Stripe Products/Prices to immutable `pro`, `pro_max`, `team`, `starter_300`,
+    `scale_1000`, and `max_5000` catalog keys. Create/reuse organization customer; create hosted
+    recurring or one-time Checkout with `automatic_tax`, required billing address, tax-ID collection,
+    customer address update, idempotency, and safe URLs; create Customer Portal/refund; normalize
+    tax, VAT validation, payment, invoice, subscription, and refund events. Never accept amount,
+    price, credits, organization, tax status, or success from the client. Do not depend on Stripe
+    Billing Credits.
+  - Verify: Stripe test-clock/fixture tests cover every $19/$79/$199 tier and $15/$45/$299 pack,
+    catalog mismatch, forged price, duplicate customer, B2B EU VAT/reverse-charge validation,
+    B2C VAT, tax-inclusive display flag, checkout metadata, signature failure, full/partial refund,
+    portal invoice/tax-ID path, and disabled billing.
 
 - [ ] **Implement idempotent Stripe webhook processing**
   - Files: `src/routes/api/webhooks/stripe.ts` (new),
     `src/lib/payments/webhook-service.ts` (new),
     `src/lib/payments/webhook-service.test.ts` (new)
   - Do: Read raw body, verify signature, store event before processing, enforce monotonic
-    subscription/payment/refund transitions, grant credits only from paid configured line items,
-    handle duplicate/out-of-order/retry, update organization entitlement, and redact logs.
-  - Verify: Stripe CLI sends checkout/subscription/failure/refund events; replay grants once;
-    out-of-order events do not regress state; bad signature returns 400 without persistence.
+    subscription/payment/invoice/tax/refund transitions, grant credits only from paid configured
+    line items, refill included credits only after paid renewal, revoke/refund unused top-up units
+    proportionally, handle duplicate/out-of-order/retry, update organization entitlement, and redact
+    logs. A Checkout success redirect never grants access.
+  - Verify: Stripe CLI sends subscription/top-up, renewal, failure, tax-ID update, full/partial refund,
+    cancellation, and chargeback events; replay grants once; out-of-order events do not regress state;
+    bad signature returns 400 without persistence.
 
 - [ ] **Add billing/credit APIs**
   - Files: `src/routes/api/usage/credits.ts` (new),
@@ -515,12 +606,14 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/routes/_dashboard/settings/billing.tsx`,
     `plans/pricing-and-billing/spec.md`, `plans/pricing-and-billing/plan.md`,
     `plans/pricing-and-billing/tasks.md`
-  - Do: Add calendar/scheduling/interview gates and included credits to the organization catalog,
-    expose enforced usage/balance, add subscription/top-up/history UI, remove the obsolete global
-    no-processor claim, preserve existing manual records during migration, and ensure marketing
-    matches server limits.
-  - Verify: billing tests for free/pro/team, trial/past-due/canceled, downgrade, cached entitlement,
-    and credit allowance; UI and API agree on price/features.
+  - Do: Add exact Free/Pro/Pro Max/Team gates and included credits plus the three one-time packs to
+    the organization catalog, expose available/reserved/expiring balance, tax display, expiry/refund
+    rules, subscription/top-up/history/invoice/portal UI, remove the obsolete global no-processor
+    claim, preserve existing manual records during migration, and ensure marketing matches server
+    limits. Free receives one non-renewing manual scheduling trial with all providers disabled.
+  - Verify: billing tests for free/pro/pro-max/team, manual trial, tax display, trial/past-due/
+    canceled, renewal/downgrade, cached entitlement, grant expiry, and credit allowance; pricing UI,
+    Checkout catalog, portal, and API agree.
 
 - [ ] **Implement credit warnings and optional capped auto-recharge**
   - Files: `src/lib/payments/auto-recharge.ts` (new),
@@ -549,7 +642,8 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
   - Do: Add exact `interview-brief-generate` schemas from `spec.md`, server-only/no-cache metadata,
     evidence ID existence/refinement, untrusted wrapping, prohibited claims/language, bounded input/
-    output, prompt version, and Pro/Team allowance. Route it through sensitive client selection.
+    output, prompt version, and Pro/Pro Max/Team allowance. Route it through sensitive client
+    selection.
   - Verify: task tests cover valid output, missing/dangling evidence, fabricated claim, prompt
     injection in CV, excessive arrays/text, cache null, free gate, and sensitive routing.
 
@@ -567,10 +661,12 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [ ] **Implement brief generation/version service**
   - Files: `src/lib/interviews/brief-service.ts` (new),
     `src/lib/interviews/brief-service.test.ts` (new)
-  - Do: Assemble role/profile/extraction evidence with stable IDs, reserve 5 credits, call sensitive
-    task, validate evidence, save new draft version, settle/refund, support section regeneration and
-    manual edits, and create deterministic fallback when disabled/failing.
-  - Verify: tests cover ready/pending/rejected docs, no evidence, provider invalid/timeout, credit
+  - Do: Assemble role/profile/document and approved public-web extraction evidence with stable source
+    IDs/provenance, reserve 5 credits, call sensitive task, validate evidence, save new draft version,
+    settle/refund, support section regeneration/manual edits, and create deterministic fallback when
+    disabled/failing. URL-only restricted-platform links are displayed but never treated as fetched
+    factual evidence.
+  - Verify: tests cover ready/pending/rejected docs and websites, LinkedIn URL-only, no evidence, provider invalid/timeout, credit
     shortage, idempotent retry, fallback, edit/version conflict, settle and refund.
 
 - [ ] **Add brief APIs and editor**
@@ -601,19 +697,25 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [ ] **Implement Deepgram EU token and usage adapter**
   - Files: `src/lib/interviews/transcription/deepgram.ts` (new),
     `src/lib/interviews/transcription/deepgram.test.ts` (new)
-  - Do: Create least-privilege short-lived browser credential/session configuration for EU streaming
-    multilingual model, diarization, smart formatting, max speakers two, provider request ID and
-    normalized termination duration. Never return master key or permit non-transcription endpoints.
-  - Verify: fake/live synthetic tests cover EU URL, TTL/scope, master-key absence, invalid response,
-    expiry, disconnect, final segment shape, diarization unknown, and usage duration.
+  - Do: Generate a Deepgram 30-second JWT and explicit
+    `wss://api.eu.deepgram.com/v1/listen` session configuration for streaming multilingual STT:
+    remote Nova-3 interleaved linear PCM 16 kHz with `channels=2&multichannel=true` and in-person
+    mono Nova-3 with streaming diarization; smart formatting, provider request ID, and normalized
+    termination duration. Never return master key or permit management/
+    non-transcription endpoints; the WebSocket may continue after token expiry but reconnect obtains
+    a new token.
+  - Verify: fake/live synthetic tests cover exact EU URL, 30-second TTL/scope, master-key absence,
+    separate remote channels, in-person diarization, invalid response, expired initial connect,
+    reconnect token, final segment shape, unknown speaker, and usage duration.
 
 - [ ] **Implement interview session service**
   - Files: `src/lib/interviews/session-service.ts` (new),
     `src/lib/interviews/session-service.test.ts` (new),
     `src/shared/lib/repositories/interviews.ts`
   - Do: Start/ready/live/pause/resume/finish/fail/abandon transitions, participant permission,
-    versioned consent recheck, initial/live credit reservation and extension, heartbeat expiry,
-    provider usage attach, final settlement, and redacted audit.
+    stored per-purpose consent recheck, candidate withdrawal state polling/SSE and ten-second hard
+    stop, organizer verbal-reminder acknowledgement, initial/live credit reservation and extension,
+    heartbeat expiry, provider usage attach, final settlement, and redacted audit.
   - Verify: tests cover every transition, no consent, withdrawal, insufficient/expiring credit,
     participant/admin roles, stale heartbeat, provider failure, retry, and reservation lifecycle.
 
@@ -642,13 +744,19 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/modules/interviews/lib/audio-capture.test.ts` (new),
     `src/modules/interviews/lib/deepgram-client.ts` (new),
     `src/modules/interviews/lib/deepgram-client.test.ts` (new)
-  - Do: Implement microphone preflight, optional display-audio request, track-capability state,
-    Web Audio mixing, provider WebSocket, interim/final parsing, reconnect, device change, and
-    guaranteed track/context/socket cleanup. Do not import/use `MediaRecorder` or construct audio
-    Blob/object URL.
-  - Verify: mocked media/WebSocket tests cover all capability states, permission denial, track end,
-    reconnect, page unload, pause/stop, and static assertion forbidding `MediaRecorder`/audio Blob;
-    manual Chrome preflight confirms devices.
+  - Do: Enforce current/previous desktop Chrome on macOS/Windows for remote mode. Request
+    `getDisplayMedia` from a user gesture with browser-tab preference, self/monitor/system-audio
+    exclusion and local playback; require a separate meeting tab with audio; inspect
+    `displaySurface`; stop the mandatory video track immediately and before provider connect; keep
+    microphone as channel 0 and meeting tab as channel 1 in interleaved linear PCM 16 kHz; use
+    diarization only for in-person and reject remote multichannel failure to manual-only; implement
+    WebSocket parsing/reconnect/device change and guaranteed track/context/socket cleanup. Do not
+    import/use `MediaRecorder`, attach video, send video frames, or construct audio Blob/object URL.
+  - Verify: mocked media/WebSocket tests cover browser/version/OS matrix, non-tab/no-audio/self-tab,
+    permission denial, user-gesture requirement, video stopped before connect, zero video bytes,
+    distinct channel labels, in-person diarization, track end, reconnect, unload, pause/stop, and
+    static assertions forbidding `MediaRecorder`, audio Blob, video transport/element; manual Chrome
+    preflight confirms devices.
 
 - [ ] **Build dedicated live interview workspace**
   - Files: `src/routes/_dashboard/interviews/$interviewId/live.tsx` (new),
@@ -658,23 +766,25 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/modules/interviews/components/InterviewNotes.tsx` (new),
     `src/modules/interviews/components/InterviewControls.tsx` (new),
     `src/modules/interviews/components/SpeakerMapper.tsx` (new)
-  - Do: Add brief sidebar, consent/capture banner, preflight, timer, live transcript, speaker
-    correction, markers, private notes, pause/reconnect/finish, remaining credits, manual-only mode,
-    screen-reader throttled announcements, reduced motion, and 320 px layout. Require explicit
-    continuation in microphone-only remote mode.
+  - Do: Add brief sidebar, stored-consent receipt and verbal-reminder acknowledgement, capture
+    banner, Chrome meeting-tab instructions/preflight, timer, live transcript, deterministic remote
+    source labels/in-person speaker correction, markers, private notes, pause/reconnect/finish,
+    remaining credits, withdrawal hard-stop, manual-only mode, screen-reader throttled announcements,
+    reduced motion, and 320 px layout. Do not allow microphone-only remote transcription; offer
+    manual-only instead.
   - Verify: component/Playwright with fake provider covers permissions, both capture modes,
-    microphone-only confirmation, interim/final rendering, correction, offline outbox, pause,
-    withdrawal, zero credit, finish, keyboard, and axe.
+    microphone-only remote rejection/manual-only transition, interim/final rendering, correction,
+    offline outbox, pause, withdrawal, zero credit, finish, keyboard, and axe.
 
 - [ ] **Run real browser capture beta verification**
   - Files: `docs/operations/interview-runtime-verification.md` (new)
-  - Do: Test supported Chrome on macOS/Windows using in-person microphone and external Meet/Zoom
-    tab/window audio, headphones/speakers/external mic, Spanish/English, noise and crosstalk. Record
+  - Do: Test current/previous stable Chrome on macOS/Windows using in-person microphone and separate
+    Meet/Zoom/Teams web-tab audio, headphones/speakers/external mic, Spanish/English, noise and crosstalk. Record
     capability—not candidate content—latency, loss, diarization corrections, cleanup, and failures.
-    Document Safari/Firefox degradation.
+    Document Edge beta and Safari/Firefox/mobile/native-app manual-only degradation.
   - Verify: two consented/synthetic 30-minute sessions finish/reconnect with 99.9% acknowledged final
-    segments, correct billing variance, and DevTools/storage/network inspection showing no audio
-    artifact.
+    segments, correct channel attribution/billing variance, candidate withdrawal stop within ten
+    seconds, and DevTools/storage/network inspection showing no audio or video artifact.
 
 ## Phase 10 — Contextual questions and reports
 
@@ -745,10 +855,11 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/routes/api/me/data-export/index.ts`,
     `src/routes/api/me/delete-account/index.ts`,
     `src/routes/_dashboard/settings/privacy.tsx`
-  - Do: Include owned/participating calendar, invitations, submissions, links, documents metadata,
-    extraction/brief/transcript/report/consent, and credit history in authorized export with private
-    file links handled safely; delete/anonymize according to ownership/participant and organization
-    lifecycle; add interview retention controls/status UI.
+  - Do: Include owned/participating calendar, notifications, invitations, submissions, links,
+    public-web provenance/extractions, documents metadata/extraction, brief/transcript/report/consent,
+    and credit history in authorized export with private file links handled safely; delete/anonymize
+    according to ownership/participant and organization lifecycle; add interview retention controls/
+    status UI.
   - Verify: export fixture contains only subject-authorized data/no secrets/object keys; deletion
     removes storage/provider/cache artifacts; cross-user participant data follows documented policy;
     existing privacy tests remain green.
@@ -757,12 +868,37 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/routes/_landing/legal/privacy.tsx`,
     `src/routes/_landing/legal/terms.tsx`, `src/shared/lib/legal.ts`,
     `src/shared/lib/legal.test.ts`, `docs/operations/interview-provider-register.md`
-  - Do: After legal review, describe document processing, transient audio capture, stored transcript,
-    sensitive AI, purposes, legal basis, processors/regions, retention, rights, refusal/withdrawal,
-    no training, no automated decision, and credit billing. Version consent text and preserve old
-    versions.
-  - Verify: legal snapshot/version tests pass; portal links exact notice version; withdrawal and
-    contact paths work; reviewer sign-off recorded.
+  - Do: After legal review, describe controller, documents, approved public-web import, transient
+    audio capture, stored transcript, sensitive AI, four required purposes, legal basis, processors/
+    regions, retention, rights, withdrawal consequences, no training, no automated decision, and
+    credit billing. Version the exact independently accepted controls and preserve old versions.
+    Never describe booking consent as permission for unrelated future processing.
+  - Verify: legal snapshot/version tests pass; portal renders and records each exact notice version;
+    no `accept all` API field exists; consent receipt, withdrawal, and contact paths work; reviewer
+    sign-off is recorded.
+
+- [ ] **Complete EU AI Act classification and operational controls**
+  - Files: `docs/compliance/interview-ai-act-classification.md` (new),
+    `docs/operations/interview-ai-human-oversight.md` (new),
+    `docs/operations/interview-ai-post-market-monitoring.md` (new),
+    `src/shared/lib/ai/tasks.test.ts`, `src/shared/lib/interviews.test.ts`,
+    `src/modules/interviews/components/InterviewBriefEditor.tsx`,
+    `src/modules/interviews/components/InterviewReportEditor.tsx`,
+    `src/routes/_landing/legal/privacy.tsx`
+  - Do: For each `interview-brief-generate`, `interview-followup-suggest`, and
+    `interview-report-generate` task, document intended purpose, Annex III employment context,
+    Article 6(3) material-influence/preparatory-task assessment, classification owner/version,
+    evidence, foreseeable misuse, supported languages/capture modes, accuracy/limitations, protected-
+    trait proxy and bias evaluation, traceability, human oversight, AI-literacy instructions,
+    candidate disclosure/contest path, incident response, and post-market thresholds. If the
+    preparatory exception is not supportable, block launch behind `SENSITIVE_AI_ENABLED` until the
+    full applicable high-risk provider/deployer controls are complete. Label every output `AI draft`;
+    prevent automatic rank/score/status/hire decisions in schema, API, UI, and analytics.
+  - Verify: legal/compliance sign-off is dated; test fixtures across Spanish/English and protected-
+    trait proxy prompts reject prohibited influence; UI requires human review and shows disclosure/
+    limitations; static tests prove no candidate-status write from AI paths; monitoring/incident
+    drill passes; release checklist tracks Article 50 from 2026-08-02 and the then-current employment
+    high-risk enforcement date.
 
 - [ ] **Implement provider usage reconciliation**
   - Files: `src/lib/payments/reconciliation-worker.ts` (new),
