@@ -52,7 +52,9 @@ describe('log', () => {
 
   it('logged() wraps async function and logs duration', async () => {
     const result = await logged('op', { kind: 'test' }, async () => {
-      await new Promise((r) => setTimeout(r, 5))
+      // 25ms with a 15ms assertion floor tolerates CI clock-tick rounding
+      // (Date.now() resolution can undercount a 5ms setTimeout by ~1ms on busy runners).
+      await new Promise((r) => setTimeout(r, 25))
       return 42
     })
     expect(result).toBe(42)
@@ -61,7 +63,7 @@ describe('log', () => {
     expect(parsed.event).toBe('op')
     expect(parsed.kind).toBe('test')
     expect(parsed.ok).toBe(true)
-    expect(parsed.durationMs).toBeGreaterThanOrEqual(5)
+    expect(parsed.durationMs).toBeGreaterThanOrEqual(15)
   })
 
   it('logged() returns null and logs error on throw', async () => {

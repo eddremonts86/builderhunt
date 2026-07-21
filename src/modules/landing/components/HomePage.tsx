@@ -1,8 +1,7 @@
 import * as React from 'react'
-import { Link } from '@tanstack/react-router'
 import { LinkButton } from '~/components/ui'
 import {
-  Sparkles, Target, Mail, ArrowRight, Check, Search,
+  Sparkles, Target, ArrowRight, Check, Search,
   Bell, FileText, Download, Zap, Shield, Star
 } from 'lucide-react'
 import { useSession } from '~/shared/lib/auth/client'
