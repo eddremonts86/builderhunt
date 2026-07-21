@@ -745,20 +745,22 @@ The program is complete only when runtime evidence demonstrates:
 
 ## 26. Implementation Plan Decomposition
 
-This design is one product program but is too large for one executable task list. After design
-approval, split implementation into these independently verifiable plans:
+Keep the complete program in the single
+`plans/calendar-scheduling-interview-intelligence/` directory, with `spec.md`, `plan.md`, and
+`tasks.md` as its implementation contract. Inside that plan, preserve four independently
+verifiable workstreams:
 
-1. `calendar-core`: personal calendar, events, recurrence, availability primitives, reminders, and
+1. Calendar core: personal calendar, events, recurrence, availability primitives, reminders, and
    operational projections.
-2. `interview-scheduling`: invitation lifecycle, accountless portal, atomic booking, private
+2. Interview scheduling: invitation lifecycle, accountless portal, atomic booking, private
    storage, candidate intake, email, and `.ics`.
-3. `interview-intelligence`: sensitive AI provider, evidence-linked brief, live capture,
+3. Interview intelligence: sensitive AI provider, evidence-linked brief, live capture,
    transcription, contextual questions, report, consent, and retention.
-4. `pricing-and-billing` extension: Stripe foundation, prepaid usage credits, immutable ledger,
+4. Pricing and billing extension: Stripe foundation, prepaid usage credits, immutable ledger,
    top-ups, limits, refunds, and provider reconciliation. This updates the existing billing plan
    rather than creating a competing payment architecture.
 
-`calendar-core` and the billing extension can begin independently. `interview-scheduling` depends on
-the calendar event contract. `interview-intelligence` depends on scheduling plus the credit ledger
+Calendar core and the billing extension can begin independently. Interview scheduling depends on
+the calendar event contract. Interview intelligence depends on scheduling plus the credit ledger
 before any provider-backed production usage is enabled. Google/Microsoft sync and BYOK remain
 separate future plans.
