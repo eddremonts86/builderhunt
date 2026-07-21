@@ -2,7 +2,8 @@
 
 > **Status**: `pending`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md)
-> **Blocks**: [`shared-resources`](../shared-resources/spec.md), [`activity-feed`](../activity-feed/spec.md)
+> **Blocks**: [`shared-resources`](../shared-resources/spec.md), [`activity-feed`](../activity-feed/spec.md),
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md)
 > **Reality check**: no Team UI or organization runtime exists. The previous plan proposed custom
 > organization tables, one organization per user, bearer-style invite acceptance, and a nullable
 > `plans.organizationId`; those decisions are superseded by the approved Better Auth multi-org,
@@ -84,8 +85,15 @@ existence. It never accepts a role or organization from the page request.
 ### Billing and deletion
 
 Billing displays the active organization's entitlement. A member sees that the organization provides
-the plan; only permitted owners/admins may request changes. Seat usage includes accepted members and
-usable pending invitations.
+the plan; admins can inspect billing and usage, but only the owner may create charges or change the
+subscription, payment method, auto-recharge, refund request, or billing contact. Seat usage includes
+accepted members and usable pending invitations.
+
+Team includes 10 fixed seats at launch. An eleventh accepted member or usable invitation is blocked
+race-safely. Team cannot downgrade to a one-seat tier until the owner removes extra accepted members
+and cancels every usable invitation; billing never evicts members automatically. If Team access ends
+through non-payment, membership/data remain, only the owner retains workspace access, and other
+members are suspended until reactivation or reduction to one seat.
 
 An owner cannot delete their account while they are the sole owner of any organization with other
 members; transfer ownership first. Leaving/switching affects no organization-owned data. Organization

@@ -6,6 +6,12 @@
 > live transcription, interview intelligence, and usage credits
 > **Deferred**: Google Calendar and Microsoft Outlook synchronization, customer BYOK
 
+> **Billing amendment (2026-07-21)**: the later approved
+> [`Stripe billing platform design`](./2026-07-21-stripe-billing-platform-design.md) supersedes this
+> document wherever it describes Stripe, subscriptions, commercial catalog lifecycle, credit
+> storage/authorization, auto-recharge, tax, refunds, disputes, or reconciliation. Interview code
+> retains only its rate cards and reserve/settle integration.
+
 ## 1. Context
 
 BuilderHunt already supports authenticated personal organizations, tenant-scoped private data,

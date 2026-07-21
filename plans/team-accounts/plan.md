@@ -2,7 +2,8 @@
 
 > **Status**: `pending`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/plan.md)
-> **Blocks**: [`shared-resources`](../shared-resources/plan.md), [`activity-feed`](../activity-feed/plan.md)
+> **Blocks**: [`shared-resources`](../shared-resources/plan.md), [`activity-feed`](../activity-feed/plan.md),
+> [`stripe-billing-platform`](../stripe-billing-platform/plan.md)
 > **Reality check**: the organization, invitation, active-tenant, entitlement, authorization, audit,
 > RLS, and migration layers must come from the security foundation. This plan adds product routes/UI
 > only after those contracts have runtime evidence.
@@ -28,9 +29,10 @@ mutation.
 
 ## Phase 4 — Billing, ownership, and deletion UX
 
-Show active organization entitlement and seat use in billing. Add recent-auth ownership transfer,
-account deletion guard, and delayed organization deletion surfaces using existing lifecycle
-operations/audit evidence.
+Show active organization entitlement and seat use in billing with owner-mutate/admin-read policy.
+Expose authoritative downgrade blockers, non-payment member suspension, and the ownership-transfer
+billing disclosure contract consumed by Stripe. Add recent-auth ownership transfer, account deletion
+guard, and delayed organization deletion surfaces using existing lifecycle operations/audit evidence.
 
 ## Phase 5 — Isolation and release gate
 

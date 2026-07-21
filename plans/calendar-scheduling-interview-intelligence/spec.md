@@ -2,17 +2,19 @@
 
 > **Status**: `pending`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md) for
-> completed canonical tenant cutover/RLS and [`ai-expansion`](../ai-expansion/spec.md) for the
-> existing AI task registry, budgets, kill switches, and structured-output validation
+> completed canonical tenant cutover/RLS, [`ai-expansion`](../ai-expansion/spec.md) for the
+> existing AI task registry, budgets, kill switches, and structured-output validation, and
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md) for subscriptions, credits,
+> payment lifecycle, and real-time provider-cost authorization
 > **Blocks**: nothing
 > **Reality check**: BuilderHunt has no calendar, availability, accountless candidate scheduling,
-> private object storage, Stripe integration, usage ledger, live audio capture, transcription, or
+> private object storage, live audio capture, transcription, or
 > interview pages. Reusable foundations exist in `src/shared/lib/auth/tenant-principal.ts`,
 > `src/shared/lib/db/tenant-context.ts`, `src/shared/lib/ai/`, `src/shared/lib/rate-limit.ts`,
 > `src/shared/lib/email.ts`, and the HTTP-worker routes under `src/routes/api/admin/`. The current
-> [`pricing-and-billing`](../pricing-and-billing/spec.md) plan explicitly assumes manual billing and
-> no processor; this program supersedes that assumption only for Stripe subscriptions/top-ups and
-> prepaid interview usage.
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md) now owns the still-unimplemented
+> Stripe and credit platform. This program defines interview rate cards and consumes its generic
+> authorization contracts; it must not create a second payment or ledger implementation.
 
 ## Source design
 
@@ -154,11 +156,12 @@ flowchart LR
 - `src/lib/storage/`: storage contract, R2 adapter, ClamAV stream client, and extraction.
 - `src/lib/interviews/`: brief/report orchestration, live sessions, sensitive provider, and
   transcription contracts.
-- `src/lib/payments/`: Stripe catalog/checkout/webhook and provider reconciliation.
-- `src/shared/lib/calendar.ts`, `scheduling.ts`, `interviews.ts`, `usage-credits.ts`: pure schemas,
-  state machines, and calculations shared with UI/tests.
-- `src/shared/lib/repositories/{calendar,scheduling,interviews,usage-credits}.ts`: tenant-only
-  persistence accepting a transaction, never the global database.
+- `src/modules/interviews/billing.ts`: interview-only rate-card estimates and calls to the billing
+  platform's feature-authorization contracts; no payment or ledger implementation.
+- `src/shared/lib/calendar.ts`, `scheduling.ts`, `interviews.ts`: pure schemas, state machines, and
+  calculations shared with UI/tests.
+- `src/shared/lib/repositories/{calendar,scheduling,interviews}.ts`: tenant-only persistence
+  accepting a transaction, never the global database.
 - `src/modules/{calendar,scheduling,interviews}/`: feature UI.
 
 ### Provider contracts
@@ -166,21 +169,21 @@ flowchart LR
 - Private storage: Cloudflare R2, private Standard bucket, EU jurisdiction, S3-compatible adapter.
 - Speech-to-text: Deepgram EU first, AssemblyAI-compatible contract later.
 - Sensitive text AI: Azure OpenAI regional EU deployment. Never silently fall back to MiniMax.
-- Payments: Stripe subscriptions plus one-time top-ups; internal ledger remains authorization
-  authority.
+- Billing dependency: [`stripe-billing-platform`](../stripe-billing-platform/spec.md) owns Stripe,
+  subscriptions, packs, ledger, tax, refunds, disputes, and reconciliation.
 - Calendar UI: FullCalendar Standard with day-grid, time-grid, list, interaction, and RRule plugins.
 
 ## Data classification and ownership
 
-| Resource                              | Class                                            | Canonical owner                      | Read policy                                                                          |
-| ------------------------------------- | ------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------ |
-| User calendar, events, availability   | Tenant private                                   | `organization_id` + `owner_user_id`  | owner; explicitly authorized participant where applicable                            |
-| Invitation and candidate submission   | Tenant private                                   | organizer calendar owner             | owner and explicitly added internal interview participants                           |
-| Candidate document/web extraction     | Tenant private                                   | invitation owner                     | owner/explicit participants; public capability can submit its own evidence only      |
-| Brief, transcript, suggestion, report | Tenant private                                   | interview owner                      | owner/explicit participants only                                                     |
-| Consent evidence                      | Account/candidate subject within tenant workflow | consent subject + invitation/session | subject-capability operations and authorized owner privacy workflow                  |
-| Operational schedule/run              | System operational                               | stable job identity                  | redacted projection to applicable user; operator detail only                         |
-| Credit grant/ledger/provider usage    | Tenant private financial                         | organization entitlement             | authorized members see balance; owner/admin payment actions; operator reconciliation |
+| Resource                              | Class                                            | Canonical owner                      | Read policy                                                                     |
+| ------------------------------------- | ------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------- |
+| User calendar, events, availability   | Tenant private                                   | `organization_id` + `owner_user_id`  | owner; explicitly authorized participant where applicable                       |
+| Invitation and candidate submission   | Tenant private                                   | organizer calendar owner             | owner and explicitly added internal interview participants                      |
+| Candidate document/web extraction     | Tenant private                                   | invitation owner                     | owner/explicit participants; public capability can submit its own evidence only |
+| Brief, transcript, suggestion, report | Tenant private                                   | interview owner                      | owner/explicit participants only                                                |
+| Consent evidence                      | Account/candidate subject within tenant workflow | consent subject + invitation/session | subject-capability operations and authorized owner privacy workflow             |
+| Operational schedule/run              | System operational                               | stable job identity                  | redacted projection to applicable user; operator detail only                    |
+| Credit grant/ledger/provider usage    | Tenant private financial                         | organization entitlement             | owner/admin read; owner-only payment actions; operator reconciliation           |
 
 Every tenant relation includes `organization_id` in its foreign key. Creator or participant user IDs
 never replace tenant ownership. Authorization fields are typed columns, not JSON.
@@ -234,15 +237,9 @@ never replace tenant ownership. Authorization fields are typed columns, not JSON
 - `operational_schedules`: stable job key, cron expression/timezone, scope, next run, and enabled
   state.
 - `job_runs`: scheduled/actual times, state, counters, duration, and redacted error code.
-- `usage_credit_grants`: source, granted/remaining units, effective/expiry dates, payment reference,
-  and state.
-- `usage_credit_reservations`: interview/session estimate, consumed units, state, and expiry.
-- `usage_ledger_entries`: immutable credit/debit/reserve/release/refund/adjustment entries with unique
-  idempotency key.
-- `provider_usage_records`: external usage reference, duration/tokens, estimated cost, and
-  reconciliation state.
-- `stripe_customers`, `stripe_subscriptions`, and `stripe_events`: encrypted/minimized mapping and
-  idempotent webhook receipt state; Stripe objects do not replace organization entitlements.
+- Interview provider usage attaches external duration/token/request evidence to the billing
+  platform's reservation and provider-usage records. All credit, ledger, Stripe, refund, and
+  reconciliation persistence is defined and migrated by the billing platform.
 
 The normative column dictionary, indexes, constraints, composite foreign keys, and RLS policies are
 defined below and must be copied into Drizzle without route-level invention.
@@ -281,19 +278,13 @@ integers. Structured AI content is validated JSONB; authorization never lives in
 | `interview_reports`                | `event_id uuid`, `version integer`, `status text`, `content jsonb`, `evidence_segment_ids uuid[]`, `provider/model/prompt_version text null`, `edited_by_user_id text null`, `finalized_at timestamptz null`, `retention_expires_at timestamptz`; unique event/version                                                                                                                                                                                                                                                   |
 | `operational_schedules`            | system-operational UUID, `job_key text unique`, `cron_expression/timezone/scope text`, `enabled boolean`, `next_run_at/last_projected_at timestamptz null`, `version integer`; app role read through DTO only, worker writes                                                                                                                                                                                                                                                                                             |
 | `job_runs`                         | append-only system-operational UUID, `job_key text`, `organization_id text null`, `scheduled_at/started_at/finished_at timestamptz`, `state text`, `attempt/in_count/out_count/duration_ms integer`, `error_code text null`, `idempotency_key text unique`                                                                                                                                                                                                                                                               |
-| `usage_credit_grants`              | `source text`, `granted/remaining integer`, `effective_at/expires_at timestamptz null`, `stripe_payment_intent_id text null`, `catalog_key text`, `state text`; `remaining <= granted`                                                                                                                                                                                                                                                                                                                                   |
-| `usage_credit_reservations`        | `event_id/session_id uuid null`, `estimated/reserved/consumed integer`, `state text`, `idempotency_key text unique`, `expires_at/settled_at timestamptz null`; at least one resource reference                                                                                                                                                                                                                                                                                                                           |
-| `usage_ledger_entries`             | append-only: `grant_id/reservation_id uuid null`, `entry_type text`, `units integer`, `balance_after integer`, `reason text`, `actor_type/actor_id text`, `idempotency_key text unique`, `created_at timestamptz`; no update/delete grants                                                                                                                                                                                                                                                                               |
-| `provider_usage_records`           | `reservation_id uuid`, `provider/kind/external_reference text`, `duration_seconds/input_tokens/output_tokens integer`, `estimated_cost_minor integer`, `currency text`, `state text`, `observed_at timestamptz`; unique provider/external reference                                                                                                                                                                                                                                                                      |
-| `stripe_customers`                 | `stripe_customer_id text unique`, `billing_email_hash text null`, `tax_status text`, `livemode boolean`; unique organization                                                                                                                                                                                                                                                                                                                                                                                             |
-| `stripe_subscriptions`             | `stripe_subscription_id text unique`, `stripe_customer_id text`, `catalog_key/status text`, `period_start/period_end/cancel_at timestamptz null`, `livemode boolean`, `provider_version integer`                                                                                                                                                                                                                                                                                                                         |
-| `stripe_events`                    | append-only: `stripe_event_id text unique`, `type text`, `livemode boolean`, `payload_sha256 text`, `received_at/processed_at timestamptz`, `state/error_code text null`; raw payload retained only for the minimum verified replay window                                                                                                                                                                                                                                                                               |
 
 RLS is deny-by-default. Calendar owners receive CRUD on their rows; explicitly granted internal
 participants receive read-only event/interview access; organization admins receive no implicit
 candidate access; public capabilities never connect with a database role; worker policies name the
-specific occurrence, delivery, import, retention, reconciliation, and job-run commands they need.
-Financial writes are worker/platform-only except repository-mediated owner/admin checkout actions.
+specific occurrence, delivery, import, retention, and job-run commands they need. Billing grants,
+reservations, ledger, provider-usage, Stripe mappings/events, and financial-write policies are
+normatively defined by `stripe-billing-platform` and are not part of this migration.
 
 ## State contracts
 
@@ -428,9 +419,8 @@ resources. Common errors are `400 invalid_input`, `401 authentication_required`,
 | `POST /api/interviews/:id/segments`                            | participant         | Idempotent bounded final-segment batch; returns highest acknowledged sequence                                                                                    |
 | `POST /api/interviews/:id/suggestions`                         | participant         | Last acknowledged sequence and topic state; returns at most three ephemeral suggestions                                                                          |
 | `GET/PATCH/POST /api/interviews/:id/report`                    | participant         | Read/edit/generate with optimistic version and credit confirmation                                                                                               |
-| `GET /api/usage/credits`                                       | authorized member   | Available/reserved/expiring credits and paginated immutable history                                                                                              |
-| `POST /api/usage/top-ups/checkout`                             | owner/admin         | Catalog key and safe return path; returns hosted Checkout URL                                                                                                    |
-| `POST /api/webhooks/stripe`                                    | Stripe signature    | Raw signed event; returns success only after durable idempotent receipt                                                                                          |
+| `GET /api/billing/summary`                                     | role-minimized      | Billing-platform-owned entitlement and credit summary consumed by interview UI                                                                                   |
+| `POST /api/billing/checkout/credits`                           | owner               | Billing-platform-owned pack Checkout; interview code only links to this route                                                                                    |
 
 ## AI task contracts
 
@@ -579,7 +569,9 @@ User-facing meter: `AI interview credit`.
 - Final report: 5 credits.
 - Typical 60-minute interview: 70 credits.
 
-Initial configurable catalog:
+The canonical commercial catalog is owned by
+[`stripe-billing-platform`](../stripe-billing-platform/spec.md). Interview acceptance tests pin the
+following consumed values so marketing, estimates, and rate cards cannot drift:
 
 - Pro: $19/month, 140 included credits (approximately two 60-minute interviews).
 - Pro Max: $79/month, 700 included credits (approximately ten 60-minute interviews), priority
@@ -590,14 +582,12 @@ Initial configurable catalog:
 - Scale 1K one-time credit pack: $45.
 - Max 5K one-time credit pack: $299. This is a top-up product, not the `Pro Max` subscription.
 
-Catalog values are exclusive of applicable tax unless the storefront locale legally requires
-tax-inclusive display. Stripe Products/Prices are created separately for each recurring tier and
-one-time pack in USD first; the server maps immutable price IDs to catalog keys and never accepts an
-amount from the client. Monthly included credits expire at the subscription period end and refill
-only after a paid renewal. Purchased top-up credits are non-transferable, have no cash value, are
-restricted to BuilderHunt interview services, and expire 12 months after purchase where permitted
-and conspicuously disclosed; the ledger consumes the earliest-expiring grant first. Refund policy
-and local mandatory rights override that default.
+Catalog values are USD and exclusive of applicable tax. This plan never creates Stripe
+Products/Prices or accepts payment amounts. Included credits expire at the end of each monthly credit
+window, including annual subscriptions whose platform worker issues monthly grants. Purchased packs
+are non-transferable, have no cash value, require an active paid subscription to buy/use, and expire
+12 months after purchase; the platform consumes the earliest-expiring eligible grant. Refund policy
+and mandatory rights are owned by the billing platform.
 
 Enforcement:
 
@@ -605,24 +595,19 @@ Enforcement:
 - Never allow a negative balance.
 - Extend live reservation incrementally and warn at 80%, 90%, and ten remaining minutes.
 - Stop only provider-backed capture at zero; keep manual interview functionality.
-- Auto-recharge is opt-in with user-defined monthly cap.
+- Auto-recharge is platform-owned, disabled by default, and subject to its owner consent and hard
+  daily/monthly limits.
 - Release/refund unconsumed reservation on provider failure.
-- Internal ledger authorizes synchronously. Stripe receives idempotent billing events and cannot
-  grant credit from a client redirect.
-- Stripe Checkout uses `automatic_tax`, required billing address, tax-ID collection, and customer
-  address updates. Stripe Customer Portal handles payment methods, invoices, tax IDs, cancellation,
-  and supported plan changes. Webhooks provision entitlements/credits and mirror refunds. BuilderHunt
-  validates asynchronously reported EU VAT status before relying on reverse charge.
-- Stripe calculates/collects configured tax but does not by itself decide every registration
-  obligation or discharge BuilderHunt's filing/remittance duties. Public billing launch requires a
-  recorded selling-entity address, product tax code, active registrations, B2B/B2C price-display
-  policy, filing owner/cadence, invoice numbering/retention, and refund/chargeback accounting.
+- The platform ledger authorizes synchronously; interview code uses only its check/reserve/extend/
+  settle/release/refund contracts and never grants or adjusts credit.
+- Checkout, Portal, webhooks, subscription changes, tax, dunning, refunds, disputes, and accounting
+  are entirely owned and release-gated by the billing platform. Portal does not change/cancel plans.
 - Stripe Billing Credits is not used as the authorization ledger while it remains public preview;
   its meter/invoice timing and grant limits do not satisfy real-time hard-stop semantics.
 - Provider records reconcile duration/tokens/cost; variance must remain below 1%.
 
-Closed beta may use operator-granted credits. Public provider-backed launch requires verified Stripe
-checkout/webhooks and the internal ledger.
+Closed beta may use platform operator-granted credits. Public provider-backed launch requires the
+billing platform's completed sandbox certification and live canary.
 
 ## Consent, privacy, and retention
 
@@ -692,7 +677,7 @@ Controls required regardless of final classification:
 - Candidate scheduling and intake: Pro, Pro Max, and Team. Free receives one non-renewing manual
   scheduling trial with uploads, web import, and all provider-backed AI disabled.
 - Sensitive brief/transcription/report: Pro, Pro Max, and Team plus sufficient credits.
-- Payment/top-up actions: organization owner/admin only.
+- Payment/top-up actions: organization owner only; organization admins have read-only billing data.
 - Private interview read access: owner and explicitly added participants only, regardless of plan or
   organization role.
 - Downgrade never deletes calendar/interview data; it blocks new paid operations and preserves
@@ -765,8 +750,9 @@ leave marketing promises without server enforcement.
 - Tenant A, unrelated tenant member, and organization admin without participation cannot read,
   mutate, infer, download, or share another user's interview data.
 - Export, deletion, expiry, and retention purge database/object/provider artifacts.
-- Stripe Checkout/Tax/Portal and the internal ledger correctly handle subscription renewal,
-  one-time top-up, VAT/tax ID, refund, expiry, downgrade, and duplicate/out-of-order webhooks.
+- The certified billing dependency has passed its Checkout/Tax/Portal, ledger, renewal, pack,
+  refund/dispute, expiry, downgrade, and duplicate/out-of-order webhook acceptance matrix; interview
+  integration passes reserve/extend/settle/release without direct financial writes.
 - The AI Act classification record, candidate transparency, human-oversight instructions, bias/
   prohibited-output suite, limitations, and post-market monitoring are approved before AI launch.
 - Static checks, migrations, direct RLS tests, contract tests, unit tests, E2E tests, and runtime

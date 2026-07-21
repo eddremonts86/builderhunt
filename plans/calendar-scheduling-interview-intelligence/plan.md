@@ -1,10 +1,12 @@
 # Plan: Calendar, Scheduling, and Interview Intelligence
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md) and
-> [`ai-expansion`](../ai-expansion/spec.md)
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md),
+> [`ai-expansion`](../ai-expansion/spec.md), and
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md)
 > **Blocks**: nothing
-> **Reality check**: no calendar/scheduling/interview/storage/Stripe implementation exists. The
+> **Reality check**: no calendar/scheduling/interview/storage implementation exists. The Stripe and
+> credit platform is separately planned but also unimplemented. This
 > plan must extend current tenant, AI, email, rate-limit, worker, entitlement, privacy, and dashboard
 > patterns rather than creating parallel foundations. The worktree currently contains unrelated
 > legal/security changes; implementation must preserve them and generate migrations from the then
@@ -24,16 +26,15 @@ critical-path work and must not be parallelized without stable contracts.
 
 - Finish and verify canonical tenant cutover required by `security-and-multitenancy`: non-null tenant
   ownership, production runtime roles, RLS, tenant A/B tests, and restore rehearsal.
-- Obtain Cloudflare R2 EU, Deepgram EU, Azure regional EU, and Stripe test accounts without adding
-  secrets to git.
-- Record the selling entity, launch countries, B2B/B2C policy, Stripe product tax code, tax
-  registrations, price-display behavior, invoice/refund/chargeback rules, filing/remittance owner,
-  and monthly reconciliation cadence; Stripe Tax does not replace those obligations.
+- Obtain Cloudflare R2 EU, Deepgram EU, and Azure regional EU accounts without adding secrets to git;
+  consume the separately certified Stripe billing platform.
+- Verify the billing dependency's catalog, tax, refund/dispute, reconciliation, seller-country, and
+  live-canary gates instead of repeating those decisions here.
 - Complete provider DPA/DPIA checklist and record approved region, retention, training, deletion,
   and subprocessor settings.
-- Lock product flags, the spec's Pro/Pro Max/Team and top-up catalog, tax behavior, retention
-  defaults, supported languages, upload/import limits, and Chrome desktop support matrix in pure
-  shared configuration.
+- Lock interview flags, rate-card keys, retention defaults, supported languages, upload/import
+  limits, and Chrome desktop support matrix in pure shared configuration; import commercial catalog
+  and credit contracts from billing.
 - Approve the AI Act Article 6(3) classification method, candidate notices, human-oversight
   instructions, source registry, and legal basis for every mandatory booking purpose.
 - Add dependencies only after checking license, maintenance, browser/server compatibility, and
@@ -111,23 +112,20 @@ one confirmation and one generic conflict.
 Exit: clean files and approved public websites extract with evidence IDs; unsafe files, denied
 sources, robots failures, SSRF targets, active content, and oversized responses never reach AI.
 
-## Phase 6 — Stripe and credit foundation
+## Phase 6 — Integrate the Stripe billing platform
 
-- Add Stripe customer/subscription/event mappings, usage grants/reservations/immutable ledger, and
-  provider usage records.
-- Extend organization entitlements with the exact Pro/Pro Max/Team subscription and Starter/Scale/
-  Max pack catalog from `spec.md`.
-- Implement Stripe Checkout for recurring and one-time Products/Prices, automatic tax, billing
-  address/tax ID, Customer Portal, signed webhook, refund, and internal ledger service. Do not use
-  Stripe Billing Credits as the real-time authority.
-- Implement synchronous reserve/extend/settle/release/refund and periodic reconciliation.
-- Add balance/top-up/history UI and low-balance notifications.
-- Update the existing pricing/billing plan documentation to remove the global `no processor`
-  assumption.
+- Wait for [`stripe-billing-platform`](../stripe-billing-platform/plan.md) through sandbox
+  certification; do not create payment tables, Stripe routes, catalog mappings, or a second ledger.
+- Register interview-specific versioned rate cards and maximum reservations with the platform.
+- Use `checkEntitlement`, `reserveCredits`, `extendReservation`, `settleReservation`,
+  `releaseReservation`, and `refundUsage` at every brief/transcription/report provider boundary.
+- Render the platform's read-only credit summary and owner billing links in interview surfaces.
+- Attach provider request IDs, duration/tokens, estimated/actual cost, and settlement evidence for
+  platform reconciliation; interview code never grants or adjusts credits directly.
 
-Exit: test-mode subscription/top-up plus tax/VAT/refund flows grant exactly once; duplicate/
-out-of-order webhooks are safe; included/top-up expiry is correct; negative balances are impossible;
-provider access cannot start without reservation.
+Exit: fake-provider integration proves no interview provider request starts without a reservation,
+duplicate/retry settlement is safe, failures release correctly, and provider capture stops at the
+hard limit while manual interview functionality continues.
 
 ## Phase 7 — Sensitive AI and interview brief
 
@@ -219,7 +217,7 @@ flowchart LR
     B --> C[Scheduling]
     C --> D[Documents and intake]
     D --> F[Interview brief]
-    E[Stripe and credit ledger] --> F
+    E[Certified billing platform] --> F
     E --> G[Live session]
     C --> G
     G --> H[Live UI]
@@ -228,8 +226,8 @@ flowchart LR
     I --> J[Privacy and production gates]
 ```
 
-Calendar projections can follow calendar core independently. Stripe/credits can proceed in parallel
-with calendar/scheduling once the entitlement contract is stable.
+Calendar projections can follow calendar core independently. The billing platform can proceed in
+parallel; provider-backed interview phases wait for its stable authorization contract.
 
 ## Release flags
 
@@ -267,24 +265,23 @@ interview projects against the real local stack. Build/lint alone never satisfy 
 
 ## Risks
 
-| Risk                                        | Likelihood |   Impact | Mitigation                                                                                                  |
-| ------------------------------------------- | ---------: | -------: | ----------------------------------------------------------------------------------------------------------- |
-| Browser cannot capture remote-party audio   |       High |     High | capability preflight, shared-tab instructions, Chrome beta, microphone/manual fallback, never overclaim     |
-| Required video track leaks screen pixels    |        Low | Critical | browser-tab-only selection, stop video immediately, audio-only provider client, byte-level tests            |
-| Diarization misattributes speech            |       High |   Medium | estimate labels, unknown state, manual correction, separate accuracy metric, no biometric identity          |
-| Concurrent booking double-books organizer   |     Medium |     High | advisory lock, in-transaction slot recompute, optimistic event version, race tests                          |
-| Recurrence/DST produces wrong occurrence    |     Medium |     High | Temporal/RRule pure layer, DST fixtures, materialized occurrence idempotency                                |
-| Malicious upload reaches parser/model       |     Medium |     High | quarantine, byte/type/checksum validation, ClamAV, clean-only extraction, hostile-content prompt boundaries |
-| Public URL import causes SSRF/ToS breach    |     Medium | Critical | shared safeFetch/source registry, robots fail-closed, per-hop validation, hard-blocked platforms            |
-| Sensitive data leaves approved region       |        Low | Critical | separate provider, explicit regional endpoint, kill switch, DPA config gate, no MiniMax fallback            |
-| Provider spend exceeds revenue              |     Medium | Critical | prepaid reservation, no negative balances, hard stop, configurable catalog, reconciliation/alerts           |
-| Stripe async state grants duplicate credits |     Medium |     High | internal immutable ledger, unique event/idempotency keys, signed webhook, monotonic transitions             |
-| Tax/VAT or refund state diverges            |     Medium |     High | Stripe Tax/Portal, tax-ID validation, webhook authority, internal refund/revocation reconciliation          |
-| Recruitment AI is misclassified             |     Medium | Critical | Article 6(3) record, legal review, human-only decisions, high-risk fallback gate, monitoring                |
-| Admin role leaks private interview          |     Medium | Critical | owner/participant columns, explicit RLS, admin-negative tests, no organization visibility mode              |
-| Retention deletes too early/late            |     Medium |     High | explicit expiry, dry-run metrics, idempotent worker, legal review, backup/provider checks                   |
-| Scope delays core calendar                  |       High |   Medium | vertical phases, feature flags, calendar independence, voice/billing cannot block manual calendar release   |
-| FullCalendar/provider/library drift         |     Medium |   Medium | adapters, lockfile, contract tests, no Premium dependency, version review before install                    |
+| Risk                                          | Likelihood |   Impact | Mitigation                                                                                                  |
+| --------------------------------------------- | ---------: | -------: | ----------------------------------------------------------------------------------------------------------- |
+| Browser cannot capture remote-party audio     |       High |     High | capability preflight, shared-tab instructions, Chrome beta, microphone/manual fallback, never overclaim     |
+| Required video track leaks screen pixels      |        Low | Critical | browser-tab-only selection, stop video immediately, audio-only provider client, byte-level tests            |
+| Diarization misattributes speech              |       High |   Medium | estimate labels, unknown state, manual correction, separate accuracy metric, no biometric identity          |
+| Concurrent booking double-books organizer     |     Medium |     High | advisory lock, in-transaction slot recompute, optimistic event version, race tests                          |
+| Recurrence/DST produces wrong occurrence      |     Medium |     High | Temporal/RRule pure layer, DST fixtures, materialized occurrence idempotency                                |
+| Malicious upload reaches parser/model         |     Medium |     High | quarantine, byte/type/checksum validation, ClamAV, clean-only extraction, hostile-content prompt boundaries |
+| Public URL import causes SSRF/ToS breach      |     Medium | Critical | shared safeFetch/source registry, robots fail-closed, per-hop validation, hard-blocked platforms            |
+| Sensitive data leaves approved region         |        Low | Critical | separate provider, explicit regional endpoint, kill switch, DPA config gate, no MiniMax fallback            |
+| Provider spend exceeds revenue                |     Medium | Critical | prepaid reservation, no negative balances, hard stop, configurable catalog, reconciliation/alerts           |
+| Billing dependency grants/settles incorrectly |     Medium |     High | platform contract tests, idempotent operation keys, fake-provider integration, certification gate           |
+| Recruitment AI is misclassified               |     Medium | Critical | Article 6(3) record, legal review, human-only decisions, high-risk fallback gate, monitoring                |
+| Admin role leaks private interview            |     Medium | Critical | owner/participant columns, explicit RLS, admin-negative tests, no organization visibility mode              |
+| Retention deletes too early/late              |     Medium |     High | explicit expiry, dry-run metrics, idempotent worker, legal review, backup/provider checks                   |
+| Scope delays core calendar                    |       High |   Medium | vertical phases, feature flags, calendar independence, voice/billing cannot block manual calendar release   |
+| FullCalendar/provider/library drift           |     Medium |   Medium | adapters, lockfile, contract tests, no Premium dependency, version review before install                    |
 
 ## Rollback
 
@@ -297,8 +294,8 @@ interview projects against the real local stack. Build/lint alone never satisfy 
 - Sensitive AI rollback switches to deterministic templates and releases reservations.
 - Transcription rollback prevents new tokens, closes active sessions gracefully, and preserves
   already acknowledged transcript text for authorized review/deletion.
-- Stripe rollback stops checkout/top-ups but keeps existing credit balances and entitlement reads.
-- Catalog/price rollback creates new Stripe prices; never mutate historical price semantics.
+- Billing rollback is owned by the billing platform; interviews stop new provider work while manual
+  calendar/interview functionality and already persisted authorized data remain available.
 - Retention rollback pauses deletion worker and alerts operators; it never restores purged content.
 
 ## Post-program follow-ups

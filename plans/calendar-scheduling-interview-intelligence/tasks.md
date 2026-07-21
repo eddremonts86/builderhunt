@@ -1,8 +1,9 @@
 # Tasks: Calendar, Scheduling, and Interview Intelligence
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md) and
-> [`ai-expansion`](../ai-expansion/spec.md)
+> **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/spec.md),
+> [`ai-expansion`](../ai-expansion/spec.md), and
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md)
 > **Blocks**: nothing
 > **Reality check**: every task below is new work unless it explicitly says `extend`. Reuse tenant
 > principal/context, repositories, AI task registry, rate limiting, Resend, audit, entitlements,
@@ -25,32 +26,29 @@
   - Files: `docs/operations/interview-provider-register.md` (new),
     `docs/architecture/data-classification.md`, `docs/architecture/threat-model.md`
   - Do: Record Cloudflare R2 EU jurisdiction, Deepgram EU endpoint, Azure regional EU deployment,
-    Stripe test/live account separation, DPA links/status, retention, training opt-out, deletion,
-    subprocessors, region, account owner, and annual review date. Complete a DPIA before production
-    voice enablement. Store no secret values.
+    DPA links/status, retention, training opt-out, deletion, subprocessors, region, account owner,
+    and annual review date. Reference the billing platform's independent Stripe provider register;
+    do not duplicate it. Complete a DPIA before production voice enablement. Store no secret values.
   - Verify: security/privacy reviewer signs the register; each regional endpoint is confirmed from a
     test response/console and every provider can be disabled independently.
 
-- [ ] **Approve the billing tax and commercial operating policy**
-  - Files: `docs/operations/interview-billing-tax-register.md` (new),
+- [ ] **Verify the billing platform certification dependency**
+  - Files: `plans/stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
     `docs/operations/interview-provider-register.md`
-  - Do: Record selling entity/address, launch countries, B2B/B2C availability, Stripe product tax
-    code, exclusive/inclusive display by storefront, active tax/VAT registrations, tax-ID validation
-    and reverse-charge handling, invoice numbering/retention, subscription cancellation/proration,
-    12-month top-up expiry disclosure, full/partial refund and chargeback credit reversal, filing/
-    remittance owner/cadence, currencies, and accounting reconciliation. Treat Stripe Tax as
-    calculation/collection support, not automatic registration, filing, or remittance.
-  - Verify: finance/legal sign-off is dated; Stripe sandbox Checkout fixtures cover domestic B2B,
-    intra-EU valid/invalid VAT, EU B2C, non-EU, refund, and invoice; no production price is enabled
-    without matching registration and tax behavior.
+  - Do: Record the completed billing sandbox/release evidence consumed by interviews: paid
+    entitlement, reserve/extend/settle/release/refund contracts, owner billing links, provider-usage
+    attachment, and disabled/manual-grant beta behavior. Do not repeat selling-entity, tax,
+    Checkout, catalog, refund, dispute, or accounting decisions in this plan.
+  - Verify: every required billing-platform task is complete before provider-backed interview flags
+    can enable; interview-only beta works with platform operator grants and all paid providers off.
 
 - [ ] **Add environment schema and kill switches**
   - Files: `src/shared/lib/env.ts`, `src/shared/lib/env.security.test.ts`, `.env.example`,
     `.env.production.example`
   - Do: Add server-only R2 endpoint/account/bucket/access keys/jurisdiction, ClamAV host/port,
-    Deepgram key/EU base URL, Azure endpoint/key/deployment/API version, Stripe secret/webhook/price
-    IDs, Stripe Tax settings, retention days, credit pack configuration, and all release flags from
-    `plan.md`, including `CANDIDATE_WEB_IMPORT_ENABLED`.
+    Deepgram key/EU base URL, Azure endpoint/key/deployment/API version, interview retention days,
+    and interview release flags from `plan.md`, including `CANDIDATE_WEB_IMPORT_ENABLED`. Consume
+    billing readiness through its server contract; do not add Stripe secrets/Prices here.
     Production validation must require regional URLs when a sensitive flag is enabled and reject
     secrets prefixed with `VITE_`.
   - Verify: env tests cover disabled minimal config, each enabled dependency, non-EU rejection,
@@ -58,10 +56,11 @@
 src/shared/lib/env.security.test.ts`.
 
 - [ ] **Install and lock reviewed dependencies**
-  - Files: `package.json`, `package-lock.json`
+  - Files: `package.json`, `pnpm-lock.yaml`
   - Do: Add FullCalendar Standard React/day-grid/time-grid/list/interaction/RRule packages, `rrule`,
     `@js-temporal/polyfill`, AWS S3 client/presigner, `file-type`, `pdfjs-dist`, `mammoth`,
-    `ical-generator`, `openai`, and `stripe`. Record accepted MIT/Apache/BSD licenses; do not install
+    `ical-generator`, and `openai`. Stripe is installed by the billing dependency. Record accepted
+    MIT/Apache/BSD licenses; do not install
     FullCalendar Premium or an unmaintained ClamAV wrapper.
   - Verify: `pnpm list --depth 0` has no invalid tree; `pnpm build`,
     `pnpm security:dependencies`, and a license report show no unapproved runtime license.
@@ -71,10 +70,11 @@ src/shared/lib/env.security.test.ts`.
     `src/shared/lib/interview-config.test.ts` (new)
   - Do: Define supported MIME/extensions, 10 MB/25 MB document and 2 MB web-import limits,
     retention defaults, Chrome desktop current/previous major matrix, capture modes/languages,
-    5/1-minute/5 credit costs, exact Pro/Pro Max/Team and Starter/Scale/Max catalog from `spec.md`,
-    tax behavior, grant expiry, low-balance thresholds, recurrence horizon, and safe public flag DTO.
-  - Verify: tests reject negative/zero limits, inconsistent pack pricing, unsupported jurisdiction,
-    excessive retention, and missing fallback; `pnpm test src/shared/lib/interview-config.test.ts`.
+    interview operation rate-card keys/estimates, low-balance warning thresholds, recurrence horizon,
+    and safe public flag DTO. Import catalog/entitlement types from billing; define no price, tax,
+    grant-expiry, or pack authority here.
+  - Verify: tests reject negative/zero limits, unknown rate-card key, excessive retention, and
+    missing fallback; `pnpm test src/shared/lib/interview-config.test.ts`.
 
 ## Phase 1 — Pure domain contracts
 
@@ -106,23 +106,22 @@ src/shared/lib/calendar.test.ts`.
     prohibited outputs, unknown speaker, correction audit, and deterministic manual templates;
     `pnpm test src/shared/lib/interviews.test.ts`.
 
-- [ ] **Implement immutable credit arithmetic**
-  - Files: `src/shared/lib/usage-credits.ts` (new),
-    `src/shared/lib/usage-credits.test.ts` (new)
-  - Do: Define grant/reservation/ledger/provider-usage schemas and pure reserve, extend, consume,
-    settle, release, refund, expiry, balance, low-credit, and reconciliation calculations using
-    integer credits/currency minor units only.
-  - Verify: property-style tests prove conservation, non-negative balances, idempotent replay,
-    partial settlement/refund, expiry priority, rounding of provider-billed seconds, and <1%
-    reconciliation math; `pnpm test src/shared/lib/usage-credits.test.ts`.
+- [ ] **Implement interview usage estimation arithmetic**
+  - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`,
+    `src/shared/lib/billing/rate-cards.ts`
+  - Do: Define only interview-specific duration/token-to-unit estimation, maximum reservations,
+    warning projections, and provider-usage normalization with integer units. Import platform
+    reservation/ledger types and do not reimplement balance, expiry, refund, or allocation logic.
+  - Verify: property-style tests cover rounding, maximums, warning boundaries, and <1% provider
+    variance; a boundary test rejects local grant/ledger state machines.
 
 - [ ] **Define provider interfaces without SDK leakage**
   - Files: `src/lib/storage/types.ts` (new), `src/lib/interviews/transcription/types.ts` (new),
-    `src/lib/interviews/sensitive-ai/types.ts` (new), `src/lib/payments/types.ts` (new)
+    `src/lib/interviews/sensitive-ai/types.ts` (new)
   - Do: Define narrow interfaces for signed upload/download/delete/move, scan/extract, ephemeral
-    transcription credentials/usage, structured sensitive completion, checkout/refund/customer
-    portal, and webhook normalization. Domain layers receive normalized errors and usage, not vendor
-    response types.
+    transcription credentials/usage and structured sensitive completion. Billing provider types are
+    imported from the billing platform. Domain layers receive normalized errors and usage, not
+    vendor response types.
   - Verify: TypeScript fake adapters implement every interface without provider packages;
     `pnpm type-check`.
 
@@ -534,97 +533,32 @@ src/shared/lib/repositories/scheduling.test.ts`.
     public site, keeps LinkedIn URL-only, proves missing consent blocks booking, accepts all purposes,
     books, and sees correct processing/error/withdrawal state.
 
-## Phase 7 — Stripe and usage credits
+## Phase 7 — Consume the Stripe billing platform
 
-- [ ] **Add payment and credit schema/RLS**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
-    `docs/architecture/data-classification.md`, `src/shared/lib/security/rls-policy.test.ts`
-  - Do: Add `stripe_customers`, `stripe_subscriptions`, `stripe_events`, `usage_credit_grants`,
-    `usage_credit_reservations`, `usage_ledger_entries`, and `provider_usage_records` with
-    organization composite keys, unique provider/event/idempotency references, integer units/minor
-    currency, monotonic status checks, expiry/reconciliation indexes, append-only ledger grants, and
-    owner/admin payment policy. Web role cannot update/delete ledger entries.
-  - Verify: migration/RLS tests cover tenant A/B, member vs admin, worker/platform roles, duplicate
-    event/idempotency, negative constraints, and direct ledger mutation denial.
+- [ ] **Register interview rate cards with the billing platform**
+  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`
+  - Do: Add versioned interview brief, live transcription, contextual-question, and final-report unit
+    rules plus maximum reservations/durations. Import the platform contracts; do not create Stripe,
+    catalog, grant, ledger, checkout, refund, auto-recharge, or reconciliation code here.
+  - Verify: contract tests assert exact estimates/maximums and a boundary test fails any interview
+    module that imports Stripe or billing tables directly.
 
-- [ ] **Implement usage credit repository and transactional service**
-  - Files: `src/shared/lib/repositories/usage-credits.ts` (new),
-    `src/shared/lib/repositories/usage-credits.test.ts` (new),
-    `src/lib/payments/credit-service.ts` (new),
-    `src/lib/payments/credit-service.test.ts` (new)
-  - Do: Implement grant, FIFO expiry-aware balance, reserve, extend, partial consume, settle,
-    release, refund/revoke, period refill, earliest-expiring-grant consumption, operator adjustment,
-    provider usage attach, and history DTO in serializable/locked transactions. Included grants
-    expire at period end; top-ups expire after 12 months where the catalog permits. Require reason/
-    actor/idempotency and prohibit negative balance.
-  - Verify: real DB concurrency tests prove two reservations cannot overspend; replay is no-op;
-    failure rollback preserves balance; ledger conservation query passes.
+- [ ] **Wrap every interview provider boundary in reserve and settlement**
+  - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`, `src/shared/lib/billing/feature-authorization.ts`
+  - Do: Call entitlement check and reserve before brief/STT/question/report provider access; extend
+    long-running live work, settle actual use with provider references, and release/refund on failure.
+    Stop only paid provider capture at zero and preserve manual notes/interview controls.
+  - Verify: fake-provider tests cover insufficient entitlement/credits, duplicate/retry, disconnect,
+    extension denial, grant expiry during interview, provider failure, actual-vs-reserved settlement,
+    and prove no provider request starts before reservation.
 
-- [ ] **Implement Stripe adapter and catalog mapping**
-  - Files: `src/lib/payments/stripe.ts` (new), `src/lib/payments/stripe.test.ts` (new),
-    `src/shared/lib/billing-shared.ts`, `src/shared/lib/billing.test.ts`
-  - Do: Map separate Stripe Products/Prices to immutable `pro`, `pro_max`, `team`, `starter_300`,
-    `scale_1000`, and `max_5000` catalog keys. Create/reuse organization customer; create hosted
-    recurring or one-time Checkout with `automatic_tax`, required billing address, tax-ID collection,
-    customer address update, idempotency, and safe URLs; create Customer Portal/refund; normalize
-    tax, VAT validation, payment, invoice, subscription, and refund events. Never accept amount,
-    price, credits, organization, tax status, or success from the client. Do not depend on Stripe
-    Billing Credits.
-  - Verify: Stripe test-clock/fixture tests cover every $19/$79/$199 tier and $15/$45/$299 pack,
-    catalog mismatch, forged price, duplicate customer, B2B EU VAT/reverse-charge validation,
-    B2C VAT, tax-inclusive display flag, checkout metadata, signature failure, full/partial refund,
-    portal invoice/tax-ID path, and disabled billing.
-
-- [ ] **Implement idempotent Stripe webhook processing**
-  - Files: `src/routes/api/webhooks/stripe.ts` (new),
-    `src/lib/payments/webhook-service.ts` (new),
-    `src/lib/payments/webhook-service.test.ts` (new)
-  - Do: Read raw body, verify signature, store event before processing, enforce monotonic
-    subscription/payment/invoice/tax/refund transitions, grant credits only from paid configured
-    line items, refill included credits only after paid renewal, revoke/refund unused top-up units
-    proportionally, handle duplicate/out-of-order/retry, update organization entitlement, and redact
-    logs. A Checkout success redirect never grants access.
-  - Verify: Stripe CLI sends subscription/top-up, renewal, failure, tax-ID update, full/partial refund,
-    cancellation, and chargeback events; replay grants once; out-of-order events do not regress state;
-    bad signature returns 400 without persistence.
-
-- [ ] **Add billing/credit APIs**
-  - Files: `src/routes/api/usage/credits.ts` (new),
-    `src/routes/api/usage/top-ups/checkout.ts` (new),
-    `src/routes/api/billing/subscription/checkout.ts` (new),
-    `src/routes/api/billing/portal.ts` (new)
-  - Do: Add authorized balance/history, owner/admin checkout/top-up/portal, CSRF, configured pack ID
-    allowlist, rate limit, safe redirect origin, feature flag, and audit. Ordinary members can see
-    balance only if product policy allows; they cannot pay or adjust.
-  - Verify: API tests cover role matrix, tenant B, forged pack/redirect, duplicate request,
-    Stripe-disabled state, and no secret/provider object in DTO.
-
-- [ ] **Extend organization entitlements and product surfaces**
-  - Files: `src/shared/lib/billing-shared.ts`,
-    `src/shared/lib/repositories/entitlements.ts`,
-    `src/routes/api/plans/me.ts`, `src/routes/_landing/pricing.tsx`,
-    `src/routes/_dashboard/settings/billing.tsx`,
-    `plans/pricing-and-billing/spec.md`, `plans/pricing-and-billing/plan.md`,
-    `plans/pricing-and-billing/tasks.md`
-  - Do: Add exact Free/Pro/Pro Max/Team gates and included credits plus the three one-time packs to
-    the organization catalog, expose available/reserved/expiring balance, tax display, expiry/refund
-    rules, subscription/top-up/history/invoice/portal UI, remove the obsolete global no-processor
-    claim, preserve existing manual records during migration, and ensure marketing matches server
-    limits. Free receives one non-renewing manual scheduling trial with all providers disabled.
-  - Verify: billing tests for free/pro/pro-max/team, manual trial, tax display, trial/past-due/
-    canceled, renewal/downgrade, cached entitlement, grant expiry, and credit allowance; pricing UI,
-    Checkout catalog, portal, and API agree.
-
-- [ ] **Implement credit warnings and optional capped auto-recharge**
-  - Files: `src/lib/payments/auto-recharge.ts` (new),
-    `src/lib/payments/auto-recharge.test.ts` (new),
-    `src/modules/interviews/components/CreditBalance.tsx` (new),
-    `src/routes/_dashboard/settings/billing.tsx`
-  - Do: Add 80/90/ten-minute/zero warnings, explicit opt-in auto-recharge pack and monthly cap,
-    idempotent trigger, payment failure disablement, and notification. Default is off; never create
-    postpaid debt.
-  - Verify: tests cover each threshold once, concurrent trigger, monthly cap, failed payment,
-    opt-out, and no negative balance; test-mode charge grants once.
+- [ ] **Show platform-owned credit state in interview UX**
+  - Files: `src/modules/interviews/components/CreditBalance.tsx`, `src/modules/interviews/components/CreditBalance.test.tsx`, `src/routes/api/billing/summary.ts`
+  - Do: Render the role-minimized platform summary, 80/90/ten-minute/zero live warnings, and owner
+    links to billing/pack/auto-recharge settings. Do not expose payment mutations or duplicate the
+    general billing settings inside interview pages.
+  - Verify: owner/admin/member, active/grace/blocked, low/zero, and stale summary component tests pass
+    with accessible throttled announcements and no Stripe/provider object in the DTO.
 
 ## Phase 8 — Sensitive AI and brief
 
@@ -901,13 +835,14 @@ src/shared/lib/repositories/scheduling.test.ts`.
     high-risk enforcement date.
 
 - [ ] **Implement provider usage reconciliation**
-  - Files: `src/lib/payments/reconciliation-worker.ts` (new),
-    `src/lib/payments/reconciliation-worker.test.ts` (new),
-    `src/shared/lib/repositories/usage-credits.ts`,
-    `src/routes/api/admin/billing/run-reconciliation.ts` (new)
-  - Do: Compare Deepgram duration and Azure token usage with reservations/ledger, mark matched/
-    variance/missing/duplicate, apply reviewed refunds/adjustments idempotently, alert above 1%, and
-    never debit extra credit automatically after session close.
+  - Files: `src/lib/interviews/usage-reconciliation.ts` (new),
+    `src/lib/interviews/usage-reconciliation.test.ts` (new),
+    `src/shared/lib/billing/feature-authorization.ts`,
+    `src/shared/lib/billing/reconciliation.ts`
+  - Do: Normalize Deepgram duration and Azure token usage, attach provider references/actuals to the
+    platform settlement, and report matched/variance/missing/duplicate evidence through the billing
+    reconciliation contract. Request reviewed platform `refundUsage` adjustments above policy; never
+    write the ledger or create a second billing worker/route and never debit extra after close.
   - Verify: fixtures cover exact, rounding, <1%, >1%, missing provider, duplicate, late usage, refund,
     and unauthorized route; test provider export reconciles to ledger.
 

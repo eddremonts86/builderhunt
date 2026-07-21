@@ -2,7 +2,8 @@
 
 > **Status**: `pending`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md)
-> **Blocks**: [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md)
+> **Blocks**: [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md),
+> [`stripe-billing-platform`](../stripe-billing-platform/tasks.md)
 > **Reality check**: this plan no longer creates organization tables, custom invitation tokens, a
 > one-org membership constraint, or `plans.organizationId`. It consumes the implemented and tested
 > Better Auth organization/tenant/RLS foundation.
@@ -39,8 +40,8 @@
 
 - [ ] **Integrate active organization entitlement into billing**
   - Files: `src/routes/_dashboard/settings/billing.tsx`, `src/modules/dashboard/components/OrganizationBillingCard.tsx`, `src/modules/dashboard/components/OrganizationBillingCard.test.tsx`
-  - Do: Replace user-plan Team assumptions with active organization entitlement and seat usage. Members see provider organization/read-only state; permitted owner/admin actions use organization plan-request services. Switching organizations refreshes billing without mutating another organization.
-  - Verify: personal Free/Pro and two Team organizations render correct independent tier/status/seats; member cannot request a change; B switch never displays A entitlement.
+  - Do: Replace user-plan Team assumptions with active organization entitlement and accepted-member plus usable-invitation seat usage. Members see provider organization/minimal state, admins see read-only billing, and only owners receive billing mutation capability. Export race-safe one-seat downgrade blockers and suspend non-owner Team access after entitlement loss without deleting membership/data. Switching organizations refreshes billing without mutating another organization.
+  - Verify: personal Free/Pro and two Team organizations render correct independent tier/status/seats; admin/member cannot request a paid change; concurrent eleventh seat and downgrade blockers are correct; Team lapse suspends/restores members; B switch never displays A entitlement.
 
 - [ ] **Integrate ownership, account deletion, and organization deletion UX**
   - Files: `src/routes/_dashboard/settings/privacy.tsx`, `src/modules/dashboard/components/OrganizationDangerZone.tsx`, `src/modules/dashboard/components/OrganizationDangerZone.test.tsx`
