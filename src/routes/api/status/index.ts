@@ -13,7 +13,8 @@ async function checkDb(): Promise<CheckResult> {
     await db.execute(sql`SELECT 1`)
     return { name: 'db', ok: true }
   } catch (err) {
-    return { name: 'db', ok: false, message: err instanceof Error ? err.message : 'unknown' }
+    console.error('status db check failed:', err)
+    return { name: 'db', ok: false, message: 'unavailable' }
   }
 }
 
@@ -43,7 +44,8 @@ async function checkRedis(): Promise<CheckResult> {
     await client.quit()
     return { name: 'redis', ok: true }
   } catch (err) {
-    return { name: 'redis', ok: false, message: err instanceof Error ? err.message : 'unknown' }
+    console.error('status redis check failed:', err)
+    return { name: 'redis', ok: false, message: 'unavailable' }
   }
 }
 
