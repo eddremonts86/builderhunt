@@ -11,6 +11,21 @@ export function hashClaimSecret(secret: string) {
   return createHash('sha256').update(`builderhunt:claim:v1:${secret}`).digest('hex')
 }
 
+/** Used by the stealth-scraping plan's subject-rights routes (restriction, provenance). */
+export async function isVerifiedBuilderClaimant(
+  transaction: TenantTransaction,
+  subjectUserId: string,
+  builderIdentityId: string,
+): Promise<boolean> {
+  const [claim] = await transaction.select({ id: builderClaims.id }).from(builderClaims)
+    .where(and(
+      eq(builderClaims.subjectUserId, subjectUserId),
+      eq(builderClaims.builderIdentityId, builderIdentityId),
+      eq(builderClaims.status, 'verified'),
+    )).limit(1)
+  return Boolean(claim)
+}
+
 export async function createPendingBuilderClaim(
   transaction: TenantTransaction,
   input: {

@@ -104,6 +104,7 @@ import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-expo
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
+import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
@@ -111,10 +112,15 @@ import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/user
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
+import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
+import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
+import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -597,6 +603,12 @@ const ApiBuildersBuilderIdNotesRoute =
     path: '/notes',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersBuilderIdEvidenceRefreshRoute =
+  ApiBuildersBuilderIdEvidenceRefreshRouteImport.update({
+    id: '/evidence-refresh',
+    path: '/evidence-refresh',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdEnrichmentRoute =
   ApiBuildersBuilderIdEnrichmentRouteImport.update({
     id: '/enrichment',
@@ -635,6 +647,12 @@ const ApiAdminIncidentsIdRoute = ApiAdminIncidentsIdRouteImport.update({
   path: '/api/admin/incidents/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminEnrichmentRunWorkerRoute =
+  ApiAdminEnrichmentRunWorkerRouteImport.update({
+    id: '/api/admin/enrichment/run-worker',
+    path: '/api/admin/enrichment/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminEmbeddingsRunWorkerRoute =
   ApiAdminEmbeddingsRunWorkerRouteImport.update({
     id: '/api/admin/embeddings/run-worker',
@@ -657,6 +675,30 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBuildersBuilderIdEvidenceIndexRoute =
+  ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
+    id: '/evidence/',
+    path: '/evidence/',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiMeBuilderBuilderIdRestrictProcessingRoute =
+  ApiMeBuilderBuilderIdRestrictProcessingRouteImport.update({
+    id: '/restrict-processing',
+    path: '/restrict-processing',
+    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
+  } as any)
+const ApiMeBuilderBuilderIdEvidenceProvenanceRoute =
+  ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport.update({
+    id: '/evidence-provenance',
+    path: '/evidence-provenance',
+    getParentRoute: () => ApiMeBuilderBuilderIdRoute,
+  } as any)
+const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
+  ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport.update({
+    id: '/evidence/$evidenceId',
+    path: '/evidence/$evidenceId',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -736,6 +778,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
+  '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -743,9 +786,10 @@ export interface FileRoutesByFullPath {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
+  '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
-  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
+  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -763,6 +807,10 @@ export interface FileRoutesByFullPath {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
+  '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
@@ -841,6 +889,7 @@ export interface FileRoutesByTo {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
+  '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -848,9 +897,10 @@ export interface FileRoutesByTo {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
+  '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
-  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
+  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
@@ -868,6 +918,10 @@ export interface FileRoutesByTo {
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
+  '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
+  '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -950,6 +1004,7 @@ export interface FileRoutesById {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
+  '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -957,9 +1012,10 @@ export interface FileRoutesById {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
+  '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
-  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRoute
+  '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -977,6 +1033,10 @@ export interface FileRoutesById {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
+  '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1058,6 +1118,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
+    | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -1065,6 +1126,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
+    | '/api/builders/$builderId/evidence-refresh'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1085,6 +1147,10 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder/$builderId/evidence-provenance'
+    | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/builders/$builderId/evidence/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1163,6 +1229,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
+    | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -1170,6 +1237,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
+    | '/api/builders/$builderId/evidence-refresh'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1190,6 +1258,10 @@ export interface FileRouteTypes {
     | '/api/me/data-export'
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
+    | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder/$builderId/evidence-provenance'
+    | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/builders/$builderId/evidence'
   id:
     | '__root__'
     | '/_dashboard'
@@ -1271,6 +1343,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
+    | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -1278,6 +1351,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
+    | '/api/builders/$builderId/evidence-refresh'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1298,6 +1372,10 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder/$builderId/evidence-provenance'
+    | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/builders/$builderId/evidence/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1347,13 +1425,14 @@ export interface RootRouteChildren {
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
+  ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
-  ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRoute
+  ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
@@ -2037,6 +2116,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/$builderId/evidence-refresh': {
+      id: '/api/builders/$builderId/evidence-refresh'
+      path: '/evidence-refresh'
+      fullPath: '/api/builders/$builderId/evidence-refresh'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/enrichment': {
       id: '/api/builders/$builderId/enrichment'
       path: '/enrichment'
@@ -2086,6 +2172,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminIncidentsIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/enrichment/run-worker': {
+      id: '/api/admin/enrichment/run-worker'
+      path: '/api/admin/enrichment/run-worker'
+      fullPath: '/api/admin/enrichment/run-worker'
+      preLoaderRoute: typeof ApiAdminEnrichmentRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/embeddings/run-worker': {
       id: '/api/admin/embeddings/run-worker'
       path: '/api/admin/embeddings/run-worker'
@@ -2113,6 +2206,34 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/admin/alerts/run-worker'
       preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/builders/$builderId/evidence/': {
+      id: '/api/builders/$builderId/evidence/'
+      path: '/evidence'
+      fullPath: '/api/builders/$builderId/evidence/'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/me/builder/$builderId/restrict-processing': {
+      id: '/api/me/builder/$builderId/restrict-processing'
+      path: '/restrict-processing'
+      fullPath: '/api/me/builder/$builderId/restrict-processing'
+      preLoaderRoute: typeof ApiMeBuilderBuilderIdRestrictProcessingRouteImport
+      parentRoute: typeof ApiMeBuilderBuilderIdRoute
+    }
+    '/api/me/builder/$builderId/evidence-provenance': {
+      id: '/api/me/builder/$builderId/evidence-provenance'
+      path: '/evidence-provenance'
+      fullPath: '/api/me/builder/$builderId/evidence-provenance'
+      preLoaderRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport
+      parentRoute: typeof ApiMeBuilderBuilderIdRoute
+    }
+    '/api/builders/$builderId/evidence/$evidenceId': {
+      id: '/api/builders/$builderId/evidence/$evidenceId'
+      path: '/evidence/$evidenceId'
+      fullPath: '/api/builders/$builderId/evidence/$evidenceId'
+      preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
     }
   }
 }
@@ -2229,13 +2350,22 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
 interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
+  ApiBuildersBuilderIdEvidenceRefreshRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
+  ApiBuildersBuilderIdEvidenceEvidenceIdRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  ApiBuildersBuilderIdEvidenceIndexRoute: typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 
 const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdClaimRoute: ApiBuildersBuilderIdClaimRoute,
   ApiBuildersBuilderIdEnrichmentRoute: ApiBuildersBuilderIdEnrichmentRoute,
+  ApiBuildersBuilderIdEvidenceRefreshRoute:
+    ApiBuildersBuilderIdEvidenceRefreshRoute,
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
+  ApiBuildersBuilderIdEvidenceEvidenceIdRoute:
+    ApiBuildersBuilderIdEvidenceEvidenceIdRoute,
+  ApiBuildersBuilderIdEvidenceIndexRoute:
+    ApiBuildersBuilderIdEvidenceIndexRoute,
 }
 
 const ApiBuildersBuilderIdRouteWithChildren =
@@ -2251,6 +2381,23 @@ const ApiSprintsSprintIdRouteChildren: ApiSprintsSprintIdRouteChildren = {
 
 const ApiSprintsSprintIdRouteWithChildren =
   ApiSprintsSprintIdRoute._addFileChildren(ApiSprintsSprintIdRouteChildren)
+
+interface ApiMeBuilderBuilderIdRouteChildren {
+  ApiMeBuilderBuilderIdEvidenceProvenanceRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
+  ApiMeBuilderBuilderIdRestrictProcessingRoute: typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+}
+
+const ApiMeBuilderBuilderIdRouteChildren: ApiMeBuilderBuilderIdRouteChildren = {
+  ApiMeBuilderBuilderIdEvidenceProvenanceRoute:
+    ApiMeBuilderBuilderIdEvidenceProvenanceRoute,
+  ApiMeBuilderBuilderIdRestrictProcessingRoute:
+    ApiMeBuilderBuilderIdRestrictProcessingRoute,
+}
+
+const ApiMeBuilderBuilderIdRouteWithChildren =
+  ApiMeBuilderBuilderIdRoute._addFileChildren(
+    ApiMeBuilderBuilderIdRouteChildren,
+  )
 
 const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
@@ -2299,13 +2446,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
+  ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
-  ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRoute,
+  ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,

@@ -64,6 +64,18 @@
     "0015_loud_nitro": {
       "sql": "4ca271ba89d00ed813f3c6cac0dc415732adddd60581effe61f90d3033fc9a22",
       "snapshot": "3901b4d046913e0abcbde3bc6d49eea822938ad20e0733a545c40bf445f13096"
+    },
+    "0016_complete_loki": {
+      "sql": "304e2cc474b20f1e2e18a2a7db88b69dac5afa9c88c7a0cf396285a9fa6fa9ea",
+      "snapshot": "a525c11ac94f948483dab017964a66362c9dd259d535b7ca6bfde7d349e7aaf4"
+    },
+    "0017_enrichment_rls_policies": {
+      "sql": "6d2e1d11322662db104901d71744f5a51572d24d940efaa14b515aa818e9a4f0",
+      "snapshot": "49215064ada836e75470675646d83c0ecbec69214f7564733c8304b5bd7f5993"
+    },
+    "0018_enrichment_worker_target_access": {
+      "sql": "a954d830d4b32e7afa763bfed2ecdc95ebf3dcb91dcee23a69a4f42a2c7d3791",
+      "snapshot": "1358b93e67068fae66b8f538dfe7ced4f84a5ec016992ac8796d7e3228da0db7"
     }
   }
 }

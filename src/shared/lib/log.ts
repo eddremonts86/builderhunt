@@ -24,7 +24,7 @@ function emit(level: LogLevel, event: string, ctx: LogContext = {}) {
   }
 }
 
-const sensitiveKey = /authorization|cookie|database.*url|email|export.*payload|pass(word)?|prompt|response|secret|token/i
+const sensitiveKey = /authorization|cookie|database.*url|email|export.*payload|pass(word)?|prompt|response|secret|token|profileurl|sourceurl|submittedurls|payload|bio|displayname|location/i
 
 export function redactLogValue(value: unknown, seen = new WeakSet<object>()): unknown {
   if (typeof value === 'string') return redactString(value)

@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
+import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
 
 // ---------------------------------------------------------------------------
@@ -687,5 +688,119 @@ export const sprintResults = pgTable(
       foreignColumns: [sourcingSprints.organizationId, sourcingSprints.id],
       name: 'sprint_results_organization_sprint_fk',
     }),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// Public Profile Enrichment (plan: stealth-scraping) — organization-scoped
+// job queue + evidence, plus one platform-scoped subject-restriction table.
+// Spec: plans/stealth-scraping/spec.md §7. Reuses the organization_builders
+// composite-FK convention (organization_id, builder_identity_id) so a job can
+// never reference a builder identity the organization hasn't tracked.
+// ---------------------------------------------------------------------------
+
+export const enrichmentJobs = pgTable(
+  'enrichment_jobs',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    requestedByUserId: text('requested_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    trigger: text('trigger').notNull().default('manual'),
+    status: text('status').notNull().default('queued'),
+    requestedConnectors: jsonb('requested_connectors').$type<string[]>().default([]).notNull(),
+    submittedUrls: jsonb('submitted_urls').$type<string[]>().default([]).notNull(),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    availableAt: timestamp('available_at', { withTimezone: true }).notNull().defaultNow(),
+    leaseToken: text('lease_token'),
+    leaseExpiresAt: timestamp('lease_expires_at', { withTimezone: true }),
+    lastErrorCode: text('last_error_code'),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('enrichment_jobs_organization_id_id_unique').on(table.organizationId, table.id),
+    foreignKey({
+      columns: [table.organizationId, table.builderIdentityId],
+      foreignColumns: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
+      name: 'enrichment_jobs_organization_builder_fk',
+    }),
+    uniqueIndex('enrichment_jobs_active_unique')
+      .on(table.organizationId, table.builderIdentityId)
+      .where(sql`${table.status} in ('queued', 'running')`),
+    index('enrichment_jobs_worker_scan_idx').on(table.status, table.availableAt, table.leaseExpiresAt),
+    check('enrichment_jobs_status_check', sql`${table.status} in ('queued', 'running', 'succeeded', 'partial', 'failed', 'cancelled')`),
+    check('enrichment_jobs_trigger_check', sql`${table.trigger} in ('manual', 'scheduled')`),
+    check('enrichment_jobs_attempt_count_check', sql`${table.attemptCount} >= 0`),
+  ],
+)
+
+export const enrichmentEvidence = pgTable(
+  'enrichment_evidence',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    jobId: text('job_id').notNull(),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    connector: text('connector').notNull(),
+    acquisitionMode: text('acquisition_mode').notNull(),
+    sourceUrl: text('source_url').notNull(),
+    sourceRecordId: text('source_record_id'),
+    contentHash: text('content_hash').notNull(),
+    payload: jsonb('payload').$type<EnrichmentEvidencePayload>().notNull(),
+    confidenceBps: integer('confidence_bps').notNull(),
+    resolverVersion: integer('resolver_version').notNull(),
+    scoreComponents: jsonb('score_components').$type<Record<string, number>>().notNull(),
+    matchSignals: jsonb('match_signals').$type<string[]>().notNull(),
+    contradictions: jsonb('contradictions').$type<string[]>().notNull(),
+    resolution: text('resolution').notNull().default('review'),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    reviewedByUserId: text('reviewed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('enrichment_evidence_organization_id_id_unique').on(table.organizationId, table.id),
+    foreignKey({
+      columns: [table.organizationId, table.builderIdentityId],
+      foreignColumns: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
+      name: 'enrichment_evidence_organization_builder_fk',
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.jobId],
+      foreignColumns: [enrichmentJobs.organizationId, enrichmentJobs.id],
+      name: 'enrichment_evidence_organization_job_fk',
+    }),
+    uniqueIndex('enrichment_evidence_org_builder_connector_hash_unique')
+      .on(table.organizationId, table.builderIdentityId, table.connector, table.contentHash),
+    index('enrichment_evidence_org_builder_resolution_idx')
+      .on(table.organizationId, table.builderIdentityId, table.resolution, table.observedAt),
+    check('enrichment_evidence_confidence_check', sql`${table.confidenceBps} >= 0 and ${table.confidenceBps} <= 10000`),
+    check('enrichment_evidence_resolution_check', sql`${table.resolution} in ('accepted', 'review', 'rejected')`),
+  ],
+)
+
+/** Platform-scoped: one row per `builderIdentityId`. Never joined per-organization. */
+export const builderProcessingRestrictions = pgTable(
+  'builder_processing_restrictions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    status: text('status').notNull().default('active'),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    reference: text('reference'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('builder_processing_restrictions_active_unique')
+      .on(table.builderIdentityId)
+      .where(sql`${table.status} = 'active'`),
+    check('builder_processing_restrictions_reason_check', sql`${table.reason} in ('subject_request', 'legal', 'safety')`),
+    check('builder_processing_restrictions_status_check', sql`${table.status} in ('active', 'withdrawn')`),
   ],
 )

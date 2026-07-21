@@ -113,6 +113,27 @@
       "when": 1784576340074,
       "tag": "0015_loud_nitro",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1784582115484,
+      "tag": "0016_complete_loki",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1784582200377,
+      "tag": "0017_enrichment_rls_policies",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1784582746847,
+      "tag": "0018_enrichment_worker_target_access",
+      "breakpoints": true
     }
   ]
 }

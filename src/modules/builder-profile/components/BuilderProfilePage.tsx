@@ -5,6 +5,7 @@ import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
+import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
 
 interface Builder {
   id: string
@@ -257,6 +258,8 @@ export function BuilderProfilePage() {
         {/* Right Column: Persona Card, Outreach Copilot, Action Bar & Notes */}
         <div className="space-y-6">
           <PersonaCard builderId={builder.id} canRefresh={Boolean(isMyProfile)} />
+
+          <PublicEvidenceCard builderId={builder.id} />
 
           <OutreachCopilot
             builder={{

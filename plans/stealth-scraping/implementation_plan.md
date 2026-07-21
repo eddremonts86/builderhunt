@@ -1,6 +1,10 @@
 # Public Profile Enrichment — Implementation Plan
 
-> **Status:** `ready-for-implementation`
+> **Status:** `code-complete-dark` — Phases 0-6 implemented and verified locally (real
+> migrations against Postgres, 508/508 project tests, type-check/lint/build all green).
+> Phase 7 is partial: static/local gates ran clean; the runtime adversarial matrix, RLS
+> fixture tests, dark-deploy smoke, 7-day canary, and legal/source-register sign-off have
+> NOT happened — none of that can be faked or compressed into one sitting.
 > **Canonical requirements:** [`spec.md`](./spec.md)
 > **Execution rule:** complete phases in order. Do not enable production traffic until
 > Phase 7. Every checkpoint must remain deployable with `ENRICHMENT_ENABLED=false`.

@@ -85,4 +85,20 @@ describe('log', () => {
       expect(line).not.toContain(canary)
     }
   })
+
+  it('redacts enrichment-specific fields (plan: stealth-scraping spec §15)', () => {
+    log.info('enrichment_connector_result', {
+      profileUrl: 'https://github.com/canary-user',
+      sourceUrl: 'https://github.com/canary-user',
+      submittedUrls: ['https://linkedin.com/in/canary-user'],
+      payload: { bio: 'canary bio text', displayName: 'Canary Person' },
+      matchSignals: ['exact_username'],
+    })
+    const line = consoleLogSpy.mock.calls[0][0] as string
+    for (const canary of ['canary-user', 'canary bio text', 'Canary Person']) {
+      expect(line).not.toContain(canary)
+    }
+    // Non-PII operational data (which signals matched) stays visible for debugging.
+    expect(line).toContain('exact_username')
+  })
 })

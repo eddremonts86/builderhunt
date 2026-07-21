@@ -44,3 +44,31 @@ describe('production environment security', () => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
   })
 })
+
+describe('production enrichment security (plan: stealth-scraping)', () => {
+  it('boots with enrichment disabled and no enrichment env set (default-safe)', () => {
+    const parsed = parseEnvironment(productionEnvironment)
+    expect(parsed.ENRICHMENT_ENABLED).toBe('false')
+  })
+
+  it('accepts a fully valid enabled configuration', () => {
+    const parsed = parseEnvironment({
+      ...productionEnvironment,
+      ENRICHMENT_ENABLED: 'true',
+      ENRICHMENT_ALLOWED_CONNECTORS: 'github',
+      ENRICHMENT_USER_AGENT: 'BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)',
+      ENRICHMENT_RAW_RETENTION_DAYS: '30',
+      ENRICHMENT_ACCEPTED_RETENTION_DAYS: '180',
+    })
+    expect(parsed.ENRICHMENT_ENABLED).toBe('true')
+  })
+
+  it.each([
+    ['empty allowlist while enabled', { ENRICHMENT_ENABLED: 'true', ENRICHMENT_ALLOWED_CONNECTORS: '' }],
+    ['user agent without a contact URL', { ENRICHMENT_ENABLED: 'true', ENRICHMENT_ALLOWED_CONNECTORS: 'github', ENRICHMENT_USER_AGENT: 'BuilderHuntBot/1.0' }],
+    ['raw retention beyond policy bounds', { ENRICHMENT_ENABLED: 'true', ENRICHMENT_ALLOWED_CONNECTORS: 'github', ENRICHMENT_RAW_RETENTION_DAYS: '365' }],
+    ['accepted retention beyond policy bounds', { ENRICHMENT_ENABLED: 'true', ENRICHMENT_ALLOWED_CONNECTORS: 'github', ENRICHMENT_ACCEPTED_RETENTION_DAYS: '3650' }],
+  ])('rejects %s', (_label, override) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
+  })
+})

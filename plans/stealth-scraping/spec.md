@@ -1,6 +1,8 @@
 # Policy-Compliant Public Profile Enrichment — Product and Technical Specification
 
-> **Status:** `ready-for-implementation`
+> **Status:** `code-complete-dark` (Phases 0-6 implemented 2026-07-20; production activation,
+> the 7-day canary, RLS fixture tests, and legal-copy sign-off are explicitly NOT done —
+> `ENRICHMENT_ENABLED=false` everywhere. See plans/stealth-scraping/task.md for exact gaps.)
 > **Legacy directory name:** `stealth-scraping` is retained only to preserve existing links.
 > The implementation and product copy must use **Public Profile Enrichment**. It must not
 > claim stealth, anti-bot evasion, CAPTCHA solving, identity masking, or guaranteed access.

@@ -48,6 +48,17 @@ const zodEnv = z.object({
   // Plan: proactive-discovery
   DISCOVERY_CELLS_PER_RUN: z.coerce.number().int().positive().default(2),
   DISCOVERY_DAILY_STUB_CAP: z.coerce.number().int().positive().default(1500),
+  // Plan: stealth-scraping (Public Profile Enrichment) — spec §12. Disabled by
+  // default; enabling requires the source register + legal copy to be
+  // reviewed first (see docs/operations/public-enrichment-source-register.md).
+  ENRICHMENT_ENABLED: z.enum(['true', 'false']).default('false'),
+  ENRICHMENT_ALLOWED_CONNECTORS: z.string().default(''),
+  ENRICHMENT_BATCH_SIZE: z.coerce.number().int().positive().default(10),
+  ENRICHMENT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  ENRICHMENT_LEASE_SECONDS: z.coerce.number().int().positive().default(300),
+  ENRICHMENT_RAW_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
+  ENRICHMENT_ACCEPTED_RETENTION_DAYS: z.coerce.number().int().positive().default(180),
+  ENRICHMENT_USER_AGENT: z.string().default('BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)'),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
@@ -126,6 +137,19 @@ const zodEnv = z.object({
       path: ['BETTER_AUTH_SECRET'],
       message: 'Production BETTER_AUTH_SECRET must be a strong generated secret',
     })
+  }
+
+  if (data.ENRICHMENT_ENABLED === 'true') {
+    const allowedConnectors = data.ENRICHMENT_ALLOWED_CONNECTORS.split(',').map((v) => v.trim()).filter(Boolean)
+    if (allowedConnectors.length === 0) {
+      context.addIssue({ code: 'custom', path: ['ENRICHMENT_ALLOWED_CONNECTORS'], message: 'ENRICHMENT_ALLOWED_CONNECTORS must be non-empty when enrichment is enabled' })
+    }
+    if (!/^\+?https?:\/\//.test(data.ENRICHMENT_USER_AGENT.match(/\(([^)]*)\)/)?.[1] ?? '')) {
+      context.addIssue({ code: 'custom', path: ['ENRICHMENT_USER_AGENT'], message: 'ENRICHMENT_USER_AGENT must include a contact/info URL in parentheses' })
+    }
+    if (data.ENRICHMENT_RAW_RETENTION_DAYS > 90 || data.ENRICHMENT_ACCEPTED_RETENTION_DAYS > 365) {
+      context.addIssue({ code: 'custom', path: ['ENRICHMENT_RAW_RETENTION_DAYS'], message: 'Enrichment retention windows exceed policy bounds' })
+    }
   }
 })
 

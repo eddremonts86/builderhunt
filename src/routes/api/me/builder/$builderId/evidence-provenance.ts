@@ -1,0 +1,37 @@
+/**
+ * Public Profile Enrichment — verified-subject provenance read (plan: stealth-scraping).
+ * Spec §5.5, §10. Aggregates source URL, field categories, observation date,
+ * and retention state across every organization's evidence for this
+ * identity — never organization, recruiter, job, reviewer, note, or score
+ * metadata.
+ */
+import { createFileRoute } from '@tanstack/react-router'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { isVerifiedBuilderClaimant } from '~/shared/lib/repositories/builder-claims'
+import { listEnrichmentProvenanceForIdentity } from '~/shared/lib/repositories/enrichment-restrictions'
+
+export const Route = createFileRoute('/api/me/builder/$builderId/evidence-provenance')({
+  component: () => null,
+  server: {
+    handlers: {
+      GET: async ({ request, params }) => {
+        try {
+          const principal = await requireTenantPrincipal(request)
+          const isClaimant = await withTenantContext(principal, (tx) =>
+            isVerifiedBuilderClaimant(tx, principal.userId, params.builderId))
+          if (!isClaimant) return Response.json({ error: 'Not a verified claimant of this profile' }, { status: 403 })
+
+          const provenance = await listEnrichmentProvenanceForIdentity(params.builderId)
+          return Response.json({ provenance })
+        } catch (error) {
+          if (error instanceof TenantAuthorizationError) {
+            return Response.json({ error: error.message }, { status: error.status })
+          }
+          console.error('evidence-provenance error:', error)
+          return Response.json({ error: 'Failed' }, { status: 500 })
+        }
+      },
+    },
+  },
+})
