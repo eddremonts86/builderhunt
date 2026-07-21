@@ -70,15 +70,12 @@ const zodEnv = z.object({
 
   if (data.NODE_ENV !== 'production') return
 
-  if (!data.DATABASE_AUTH_URL) {
-    context.addIssue({ code: 'custom', path: ['DATABASE_AUTH_URL'], message: 'Production DATABASE_AUTH_URL is required' })
-  }
-  if (!data.DATABASE_WORKER_URL) {
-    context.addIssue({ code: 'custom', path: ['DATABASE_WORKER_URL'], message: 'Production DATABASE_WORKER_URL is required' })
-  }
-  if (!data.DATABASE_PLATFORM_URL) {
-    context.addIssue({ code: 'custom', path: ['DATABASE_PLATFORM_URL'], message: 'Production DATABASE_PLATFORM_URL is required' })
-  }
+  // DATABASE_AUTH_URL/WORKER_URL/PLATFORM_URL are intentionally optional in
+  // production: the role-separation cutover (DATABASE_URL -> per-role users)
+  // is a deliberate, sign-off-gated step (see security-and-multitenancy plan)
+  // that has not happened yet. src/shared/lib/db/{auth-db,worker-db,client}.ts
+  // already fall back to DATABASE_URL when these are unset, so they must not
+  // be hard-required here — doing so crash-loops every request in prod.
 
   let runtimeUsername = ''
   try {
@@ -94,14 +91,20 @@ const zodEnv = z.object({
       message: 'Production DATABASE_URL must use the non-owner application role',
     })
   }
-  if (data.DATABASE_MIGRATION_URL === data.DATABASE_URL) {
+  // Only enforce "must be different" once a role URL is actually set — an
+  // unset var (undefined) must never be compared as equal to another unset
+  // var, or every optional role URL falsely collides with every other one.
+  if (data.DATABASE_MIGRATION_URL && data.DATABASE_MIGRATION_URL === data.DATABASE_URL) {
     context.addIssue({
       code: 'custom',
       path: ['DATABASE_MIGRATION_URL'],
       message: 'Migration and runtime database identities must be different',
     })
   }
-  if (data.DATABASE_AUTH_URL === data.DATABASE_URL || data.DATABASE_AUTH_URL === data.DATABASE_MIGRATION_URL) {
+  if (
+    data.DATABASE_AUTH_URL
+    && (data.DATABASE_AUTH_URL === data.DATABASE_URL || data.DATABASE_AUTH_URL === data.DATABASE_MIGRATION_URL)
+  ) {
     context.addIssue({
       code: 'custom',
       path: ['DATABASE_AUTH_URL'],
@@ -109,9 +112,12 @@ const zodEnv = z.object({
     })
   }
   if (
-    data.DATABASE_WORKER_URL === data.DATABASE_URL
-    || data.DATABASE_WORKER_URL === data.DATABASE_AUTH_URL
-    || data.DATABASE_WORKER_URL === data.DATABASE_MIGRATION_URL
+    data.DATABASE_WORKER_URL
+    && (
+      data.DATABASE_WORKER_URL === data.DATABASE_URL
+      || data.DATABASE_WORKER_URL === data.DATABASE_AUTH_URL
+      || data.DATABASE_WORKER_URL === data.DATABASE_MIGRATION_URL
+    )
   ) {
     context.addIssue({
       code: 'custom',
@@ -120,10 +126,13 @@ const zodEnv = z.object({
     })
   }
   if (
-    data.DATABASE_PLATFORM_URL === data.DATABASE_URL
-    || data.DATABASE_PLATFORM_URL === data.DATABASE_AUTH_URL
-    || data.DATABASE_PLATFORM_URL === data.DATABASE_WORKER_URL
-    || data.DATABASE_PLATFORM_URL === data.DATABASE_MIGRATION_URL
+    data.DATABASE_PLATFORM_URL
+    && (
+      data.DATABASE_PLATFORM_URL === data.DATABASE_URL
+      || data.DATABASE_PLATFORM_URL === data.DATABASE_AUTH_URL
+      || data.DATABASE_PLATFORM_URL === data.DATABASE_WORKER_URL
+      || data.DATABASE_PLATFORM_URL === data.DATABASE_MIGRATION_URL
+    )
   ) {
     context.addIssue({
       code: 'custom',

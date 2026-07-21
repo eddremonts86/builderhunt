@@ -35,13 +35,29 @@ describe('production environment security', () => {
     ['postgres runtime role', { DATABASE_URL: 'postgresql://postgres:x@db:5432/builderhunt' }],
     ['shared migration URL', { DATABASE_MIGRATION_URL: productionEnvironment.DATABASE_URL }],
     ['shared auth URL', { DATABASE_AUTH_URL: productionEnvironment.DATABASE_URL }],
-    ['missing worker URL', { DATABASE_WORKER_URL: undefined }],
     ['shared worker URL', { DATABASE_WORKER_URL: productionEnvironment.DATABASE_URL }],
-    ['missing platform URL', { DATABASE_PLATFORM_URL: undefined }],
     ['shared platform URL', { DATABASE_PLATFORM_URL: productionEnvironment.DATABASE_URL }],
     ['weak auth secret', { BETTER_AUTH_SECRET: 'change_me' }],
   ])('rejects %s', (_label, override) => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
+  })
+
+  // DATABASE_AUTH_URL/WORKER_URL/PLATFORM_URL are optional in production: the
+  // role-separation cutover is a deliberate, sign-off-gated step that has not
+  // happened yet. src/shared/lib/db/{auth-db,worker-db,client}.ts fall back
+  // to DATABASE_URL when unset, so parsing must not fail on their absence.
+  it.each([
+    ['auth URL', { DATABASE_AUTH_URL: undefined }],
+    ['worker URL', { DATABASE_WORKER_URL: undefined }],
+    ['platform URL', { DATABASE_PLATFORM_URL: undefined }],
+    ['migration, auth, worker, and platform URLs', {
+      DATABASE_MIGRATION_URL: undefined,
+      DATABASE_AUTH_URL: undefined,
+      DATABASE_WORKER_URL: undefined,
+      DATABASE_PLATFORM_URL: undefined,
+    }],
+  ])('boots with missing %s (falls back to DATABASE_URL)', (_label, override) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...override })).not.toThrow()
   })
 })
 
