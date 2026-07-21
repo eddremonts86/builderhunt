@@ -76,6 +76,10 @@
     "0018_enrichment_worker_target_access": {
       "sql": "a954d830d4b32e7afa763bfed2ecdc95ebf3dcb91dcee23a69a4f42a2c7d3791",
       "snapshot": "1358b93e67068fae66b8f538dfe7ced4f84a5ec016992ac8796d7e3228da0db7"
+    },
+    "0019_lean_manta": {
+      "sql": "cfe72383d003dc024f51bb566a42aefc1932096ebccbacf7d2cf7eef28766e2a",
+      "snapshot": "eb6d4f8006cb7b7a134d60a704ae468095ffa3e29e39e255b3973bce7a81a56e"
     }
   }
 }

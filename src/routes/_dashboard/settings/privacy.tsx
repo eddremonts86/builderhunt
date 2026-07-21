@@ -245,29 +245,34 @@ function PrivacySettingsPage() {
 
       {/* Delete account */}
       <section className="card border-bh-danger/30 p-5 mb-6" data-testid="delete-section">
-        <h2 className="font-semibold flex items-center gap-2 mb-2 text-bh-danger">
-          <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-          Delete account
-        </h2>
-        <p className="text-sm text-bh-text-muted mb-4">
-          Schedules your account, saved searches, saved builders, notes, alerts, and all personal data for permanent deletion.
-          You have <strong>30 days</strong> to cancel. After 30 days, the data is irrecoverable.
-        </p>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="sm:pr-6">
+            <h2 className="font-semibold flex items-center gap-2 text-bh-danger">
+              <AlertTriangle className="w-4 h-4" aria-hidden="true" />
+              Delete account
+            </h2>
+            <p className="text-sm text-bh-text-muted mt-1 max-w-[60ch]">
+              Schedules your account, saved searches, saved builders, notes, alerts, and all personal data for permanent
+              deletion. You have <strong className="text-bh-text">30 days</strong> to cancel. After that, the data is
+              irrecoverable.
+            </p>
+          </div>
 
-        {(!deletion || deletion.status !== 'pending') && !confirmDelete && (
-          <button
-            type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="btn-sm bg-bh-danger/10 text-bh-danger hover:bg-bh-danger/20 border border-bh-danger/30"
-            data-testid="delete-account-btn"
-          >
-            <Trash2 className="w-4 h-4" aria-hidden="true" />
-            Delete my account
-          </button>
-        )}
+          {(!deletion || deletion.status !== 'pending') && !confirmDelete && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="btn-danger-outline btn-sm shrink-0"
+              data-testid="delete-account-btn"
+            >
+              <Trash2 className="w-4 h-4" aria-hidden="true" />
+              Delete my account
+            </button>
+          )}
+        </div>
 
         {(!deletion || deletion.status !== 'pending') && confirmDelete && (
-          <div className="border border-bh-danger/30 rounded-lg p-4 bg-bh-danger/5" data-testid="delete-confirm">
+          <div className="mt-4 pt-4 border-t border-bh-danger/20" data-testid="delete-confirm">
             <p className="text-sm text-bh-danger font-semibold mb-3">
               Are you absolutely sure? This will:
             </p>
@@ -282,7 +287,7 @@ function PrivacySettingsPage() {
                 type="button"
                 onClick={requestDeletion}
                 disabled={busy}
-                className="btn-sm bg-bh-danger text-white hover:bg-bh-danger/90"
+                className="btn-danger btn-sm"
                 data-testid="confirm-delete-btn"
               >
                 {busy ? 'Scheduling…' : 'Yes, schedule deletion'}

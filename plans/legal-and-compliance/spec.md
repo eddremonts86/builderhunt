@@ -1,14 +1,21 @@
 # Legal & Compliance (TOS, Privacy, GDPR)
 
-> **Status**: `partially-implemented`
+> **Status**: `complete`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
 > **Reality check**: Legal surface is largely live: `/legal/{terms,privacy,cookies,imprint}`
 > pages, `CookieBanner` + `TosModal` rendered at root (`src/routes/-root-components.tsx`),
 > consent API (`src/routes/api/consent/index.ts`), GDPR export + deletion endpoints
 > (`src/routes/api/me/data-export/`, `api/me/delete-account/`), `src/shared/lib/legal.ts`
-> (+ tests), tables `user_consents`/`data_export_requests`/`deletion_requests`. The critical
-> gap: **hard deletion never executes** — `performHardDelete` has no caller.
+> (+ tests), tables `user_consents`/`data_export_requests`/`deletion_requests`. **All three
+> phases done as of 2026-07-21**: hard deletion actually executes
+> (`processPendingDeletions()` + `POST /api/admin/legal/run-worker`), the export payload
+> includes tracked builders/plan/plan changes/plan requests, the hard-delete cascade covers
+> builder notes/alerts/saved queries/builders, lifecycle emails (deletion-scheduled/
+> deletion-completed/export-ready) send through the already-integrated free-tier Resend
+> setup, the privacy-policy processor list matches the real deployed stack, and the imprint
+> carries the operator's real name/address plus an honest DMCA-non-registration disclosure.
+> Still needs a daily VPS cron pointed at the worker endpoint (non-code, see tasks.md).
 
 ## Problem
 

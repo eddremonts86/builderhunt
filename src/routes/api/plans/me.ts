@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { count, eq } from 'drizzle-orm'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { PLAN_LIMITS, PLAN_PRICING } from '~/shared/lib/billing-shared'
+import { organizationEntitlements, organizationMembers } from '~/shared/lib/db/schema'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import { countOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
@@ -14,12 +16,32 @@ export const Route = createFileRoute('/api/plans/me')({
         try {
           const principal = await requireTenantPrincipal(request)
           const result = await withTenantContext(principal, async (tx) => {
-            const [entitlement, savedSearches, savedBuilders] = await Promise.all([
+            const [entitlement, savedSearches, savedBuilders, entitlementDetailRows, memberCountRows] = await Promise.all([
               getOrganizationEntitlement(tx, principal.organizationId),
               countSavedQueries(tx, principal.organizationId),
               countOrganizationBuilders(tx, principal.organizationId),
+              tx.select({
+                billingPeriod: organizationEntitlements.billingPeriod,
+                currentPeriodEnd: organizationEntitlements.currentPeriodEnd,
+                trialEndsAt: organizationEntitlements.trialEndsAt,
+                notes: organizationEntitlements.notes,
+              }).from(organizationEntitlements)
+                .where(eq(organizationEntitlements.organizationId, principal.organizationId))
+                .limit(1),
+              tx.select({ value: count() }).from(organizationMembers)
+                .where(eq(organizationMembers.organizationId, principal.organizationId)),
             ])
-            return { entitlement, savedSearches, savedBuilders }
+            const detail = entitlementDetailRows[0] ?? null
+            return {
+              entitlement,
+              savedSearches,
+              savedBuilders,
+              billingPeriod: detail?.billingPeriod ?? 'none',
+              currentPeriodEnd: detail?.currentPeriodEnd?.toISOString() ?? null,
+              trialEndsAt: detail?.trialEndsAt?.toISOString() ?? null,
+              notes: detail?.notes ?? null,
+              seatsUsed: memberCountRows[0]?.value ?? 1,
+            }
           })
           return Response.json({
             plan: {
@@ -27,6 +49,12 @@ export const Route = createFileRoute('/api/plans/me')({
               organizationId: principal.organizationId,
               plan: result.entitlement.tier,
               status: result.entitlement.status,
+              billingPeriod: result.billingPeriod,
+              currentPeriodEnd: result.currentPeriodEnd,
+              trialEndsAt: result.trialEndsAt,
+              notes: result.notes,
+              seatLimit: result.entitlement.seatLimit,
+              seatsUsed: result.seatsUsed,
             },
             limits: PLAN_LIMITS[result.entitlement.tier],
             usage: { savedSearches: result.savedSearches, savedBuilders: result.savedBuilders },

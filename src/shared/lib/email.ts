@@ -244,3 +244,150 @@ function organizationInvitationEmailHtml(organizationName: string, link: string)
   </body>
 </html>`
 }
+
+/**
+ * Deletion request confirmed — sent once when the 30-day grace period starts.
+ * Free-tier friendly: same optional-key pattern as every other sender here —
+ * no Resend key configured means log-and-return, zero cost, zero new dependency.
+ */
+export async function sendDeletionScheduledEmail(to: string, gracePeriodEndsAt: Date): Promise<SendResult> {
+  const formattedDate = gracePeriodEndsAt.toISOString().slice(0, 10)
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Deletion-scheduled email would be sent to:', to, '— grace ends', formattedDate, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Your BuilderHunt account deletion is scheduled',
+        html: deletionScheduledEmailHtml(formattedDate),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Deletion completed — sent by the purge worker (legal.ts's
+ * processPendingDeletions) right after the hard delete succeeds. The caller
+ * must capture the email address before calling performHardDelete, since the
+ * auth_users row (and its email) is gone once the delete transaction commits.
+ */
+export async function sendDeletionCompletedEmail(to: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Deletion-completed email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Your BuilderHunt account has been deleted',
+        html: deletionCompletedEmailHtml(),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Data export ready — sent once the synchronous export payload is stored. */
+export async function sendExportReadyEmail(to: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Export-ready email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Your BuilderHunt data export is ready',
+        html: exportReadyEmailHtml(),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function deletionScheduledEmailHtml(gracePeriodEndDate: string): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your account is scheduled for deletion</h1>
+    <p>We received a request to delete your BuilderHunt account. If you don't cancel it, your account and its
+      associated data will be permanently deleted on <strong>${gracePeriodEndDate}</strong>.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Sign in to cancel</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.85rem;">If you didn't request this, sign in and cancel it immediately from your privacy settings.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function deletionCompletedEmailHtml(): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your account has been deleted</h1>
+    <p>As requested, your BuilderHunt account and its associated data have been permanently deleted. This action
+      cannot be undone.</p>
+    <p style="color:#6b7280;font-size:0.85rem;">If you didn't request this, please contact us immediately — this email is the only record of the deletion.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function exportReadyEmailHtml(): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your data export is ready</h1>
+    <p>The data export you requested from BuilderHunt is ready to view.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.85rem;">This export link expires 7 days after the request. Request a new one anytime from your privacy settings.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}

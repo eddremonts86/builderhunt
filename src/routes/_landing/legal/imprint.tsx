@@ -29,7 +29,11 @@ function ImprintPage() {
           <p className="text-bh-text">
             <strong>BuilderHunt</strong>
             <br />
-            Operated by an individual developer (single-member LLC formation pending)
+            Operated by Eduardo Valdes Inerarte, individual developer.
+            <br />
+            Elmevej 4, Dragør, Denmark
+            <br />
+            <span className="text-bh-text-muted text-sm">A company will be formed before any production/paid launch outside this beta.</span>
           </p>
         </section>
 
@@ -56,11 +60,13 @@ function ImprintPage() {
         <section className="pt-4 border-t border-bh-border/40">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-1">Tax &amp; registration</h2>
           <p className="text-bh-text-muted text-sm leading-relaxed">
-            VAT ID: not yet assigned (pre-revenue beta).
+            VAT ID: not yet assigned (pre-revenue beta, operated by an individual — no company
+            has been formed yet).
             <br />
-            Tax residency: Spain (Barcelona, Madrid) and remote.
+            Registered address: Denmark (see Operator above).
             <br />
-            US tax filings via Stripe Tax (planned) when payments are enabled.
+            US tax filings via Stripe Tax would only apply once the deferred Stripe integration
+            trigger is reached (see pricing plan) — not active today.
           </p>
         </section>
 
@@ -72,9 +78,14 @@ function ImprintPage() {
         </section>
 
         <section className="pt-4 border-t border-bh-border/40">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-1">DMCA agent</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-1">DMCA / copyright reports</h2>
           <p className="text-bh-text-muted text-sm leading-relaxed">
-            To report copyright infringement, email <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent hover:underline">dmca@builderhunt.dev</a> with: (1) the copyrighted work, (2) the URL on BuilderHunt allegedly infringing, (3) your contact info, (4) a good-faith statement, (5) a statement under penalty of perjury that you are authorized to act for the owner. We respond within 5 business days.
+            No formal DMCA agent has been designated with the U.S. Copyright Office yet — this is
+            an informal reporting channel we monitor and respond to, not a registered agent
+            contact. To report copyright infringement, email <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent hover:underline">dmca@builderhunt.dev</a> with:
+            (1) the copyrighted work, (2) the URL on BuilderHunt allegedly infringing, (3) your
+            contact info, (4) a good-faith statement, (5) a statement under penalty of perjury
+            that you are authorized to act for the owner. We respond within 5 business days.
           </p>
         </section>
 

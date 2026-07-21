@@ -1,15 +1,19 @@
 import { randomId } from '~/lib/utils'
 import {
   cancelPendingDeletion,
+  findAccountEmail,
   findDeletionRequest,
   hardDeleteAccountSubject,
   insertAccountConsent,
   insertDeletionRequest,
   listAccountConsents,
+  listExpiredPendingDeletionRequests,
   listOwnedOrganizations,
   loadAccountExportSource,
   updateDeletionRequest,
 } from '~/shared/lib/repositories/account-privacy'
+import { sendDeletionCompletedEmail } from '~/shared/lib/email'
+import { log } from '~/shared/lib/log'
 
 const CURRENT_VERSIONS = {
   tos: 'v1.0',
@@ -45,9 +49,14 @@ export function recordConsent(userId: string, document: ConsentDocument, version
 export async function buildExportPayload(userId: string) {
   const source = await loadAccountExportSource(userId)
   if (!source) return null
+  const { trackedBuilders, plan, planChanges, planRequests, ...accountSubject } = source
   return {
     exportedAt: new Date().toISOString(),
-    accountSubject: source,
+    accountSubject,
+    trackedBuilders,
+    plan,
+    planChanges,
+    planRequests,
     tenantDataNotice: 'Organization resources require a separately authorized organization export.',
   }
 }
@@ -86,6 +95,48 @@ export const cancelDeletion = cancelPendingDeletion
 export async function performHardDelete(userId: string) {
   await assertNoOwnedOrganizations(userId)
   return hardDeleteAccountSubject(userId)
+}
+
+export interface ProcessPendingDeletionsResult {
+  processed: number
+  errors: number
+}
+
+/**
+ * Executes the deletion right the request/grace-period flow only promises:
+ * finds every `deletion_requests` row past its grace period, hard-deletes the
+ * subject, then marks the compliance row `completed`. Meant to be invoked by
+ * `POST /api/admin/legal/run-worker` on a daily cron — see plans/legal-and-compliance.
+ * Idempotent: a request already completed/cancelled, or still within its grace
+ * period, is never selected again.
+ */
+export async function processPendingDeletions(): Promise<ProcessPendingDeletionsResult> {
+  const due = await listExpiredPendingDeletionRequests()
+  let processed = 0
+  let errors = 0
+  for (const request of due) {
+    try {
+      // Capture the email before the hard delete removes the auth_users row.
+      const email = await findAccountEmail(request.userId)
+      await performHardDelete(request.userId)
+      await updateDeletionRequest(request.id, { status: 'completed', completedAt: new Date() })
+      processed++
+      if (email) {
+        // Best-effort — a failed send must not undo the completed deletion or
+        // block the next request in this batch.
+        try {
+          const sent = await sendDeletionCompletedEmail(email)
+          if (!sent.ok) log.error('legal.process_pending_deletions.email_failed', { error: sent.error, deletionRequestId: request.id })
+        } catch (error) {
+          log.error('legal.process_pending_deletions.email_failed', { error, deletionRequestId: request.id })
+        }
+      }
+    } catch (error) {
+      errors++
+      log.error('legal.process_pending_deletions.failed', { error, deletionRequestId: request.id })
+    }
+  }
+  return { processed, errors }
 }
 
 async function assertNoOwnedOrganizations(userId: string) {

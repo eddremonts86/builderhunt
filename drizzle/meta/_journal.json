@@ -134,6 +134,13 @@
       "when": 1784582746847,
       "tag": "0018_enrichment_worker_target_access",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1784611636686,
+      "tag": "0019_lean_manta",
+      "breakpoints": true
     }
   ]
 }

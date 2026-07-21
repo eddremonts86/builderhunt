@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { sendExportReadyEmail } from '~/shared/lib/email'
 import { buildExportPayload, EXPORT_TTL_MS } from '~/shared/lib/legal'
 import {
   createAccountExportRequest,
@@ -55,6 +56,10 @@ export const Route = createFileRoute('/api/me/data-export/')({
 
           const expiresAt = new Date(Date.now() + EXPORT_TTL_MS)
           await updateAccountExportRequest(id, { status: 'ready', payload: safePayload, expiresAt })
+
+          // A failed send must not fail the already-stored export.
+          const sent = await sendExportReadyEmail(session.user.email)
+          if (!sent.ok) console.error('[legal] export-ready email failed:', sent.error)
 
           return Response.json({ ok: true, id })
         } catch (err) {

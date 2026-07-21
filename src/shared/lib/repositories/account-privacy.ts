@@ -1,18 +1,24 @@
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, lt } from 'drizzle-orm'
 import { accountDb } from '../db/client'
 import {
+  alerts,
   authAccounts,
   authSessions,
   authUsers,
   authVerifications,
   builderClaimRequests,
   builderClaims,
+  builderNotes,
   builderProfileViews,
+  builders,
   dataExportRequests,
   deletionRequests,
   organizationMembers,
   organizations,
   planChanges,
+  planRequests,
+  plans,
+  savedQueries,
   userConsents,
 } from '../db/schema'
 
@@ -59,7 +65,7 @@ export async function loadAccountExportSource(userId: string) {
   }).from(authUsers).where(eq(authUsers.id, userId)).limit(1)
   if (!user) return null
 
-  const [account, consents, claimRequests, claims, profileViews, deletion, memberships] = await Promise.all([
+  const [account, consents, claimRequests, claims, profileViews, deletion, memberships, trackedBuilders, plan, requests, changes] = await Promise.all([
     accountDb.select({
       providerId: authAccounts.providerId,
       password: authAccounts.password,
@@ -103,6 +109,31 @@ export async function loadAccountExportSource(userId: string) {
     }).from(organizationMembers)
       .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
       .where(eq(organizationMembers.userId, userId)),
+    accountDb.select({
+      id: builders.id,
+      source: builders.source,
+      username: builders.username,
+      displayName: builders.displayName,
+      profileUrl: builders.profileUrl,
+      organizationId: builders.organizationId,
+      createdAt: builders.createdAt,
+    }).from(builders).where(eq(builders.userId, userId)),
+    accountDb.select({
+      plan: plans.plan,
+      status: plans.status,
+      planEndsAt: plans.planEndsAt,
+      trialEndsAt: plans.trialEndsAt,
+      createdAt: plans.createdAt,
+      updatedAt: plans.updatedAt,
+    }).from(plans).where(eq(plans.userId, userId)).limit(1),
+    accountDb.select({
+      id: planRequests.id,
+      requestedPlan: planRequests.requestedPlan,
+      status: planRequests.status,
+      message: planRequests.message,
+      createdAt: planRequests.createdAt,
+    }).from(planRequests).where(eq(planRequests.userId, userId)),
+    listAccountPlanChanges(userId),
   ])
   return {
     user,
@@ -113,6 +144,10 @@ export async function loadAccountExportSource(userId: string) {
     profileViews,
     deletion: deletion[0] ?? null,
     organizationMemberships: memberships,
+    trackedBuilders,
+    plan: plan[0] ?? null,
+    planChanges: changes,
+    planRequests: requests,
   }
 }
 
@@ -128,6 +163,17 @@ export async function findDeletionRequest(userId: string) {
   return row ?? null
 }
 
+/**
+ * Looks up the subject's email before a hard delete removes the auth_users row.
+ * Used by legal.ts's processPendingDeletions to send the deletion-completed email
+ * after the row (and its email column) are already gone.
+ */
+export async function findAccountEmail(userId: string): Promise<string | null> {
+  const [row] = await accountDb.select({ email: authUsers.email }).from(authUsers)
+    .where(eq(authUsers.id, userId)).limit(1)
+  return row?.email ?? null
+}
+
 export const insertDeletionRequest = (input: typeof deletionRequests.$inferInsert) => accountDb.insert(deletionRequests).values(input)
 export const updateDeletionRequest = (id: string, input: Partial<typeof deletionRequests.$inferInsert>) => accountDb
   .update(deletionRequests).set(input).where(eq(deletionRequests.id, id))
@@ -135,8 +181,23 @@ export const cancelPendingDeletion = (userId: string) => accountDb.update(deleti
   .set({ status: 'cancelled' })
   .where(and(eq(deletionRequests.userId, userId), eq(deletionRequests.status, 'pending')))
 
+export const listExpiredPendingDeletionRequests = () => accountDb.select({
+  id: deletionRequests.id,
+  userId: deletionRequests.userId,
+}).from(deletionRequests)
+  .where(and(eq(deletionRequests.status, 'pending'), lt(deletionRequests.gracePeriodEndsAt, new Date())))
+
 export function hardDeleteAccountSubject(userId: string) {
   return accountDb.transaction(async (tx) => {
+    // FK-safe order: `builder_notes.builder_id` and `alerts.query_id` have no ON DELETE
+    // action, so their referenced rows must go first or Postgres blocks the delete.
+    // `plans`/`plan_changes`/`plan_requests`/`user_consents`/`data_export_requests`/
+    // `onboarding_progress`/`roadmap_votes` already cascade from `auth_users` (see
+    // schema.ts) and need no explicit delete here; `alert_triggers` cascades from `alerts`.
+    await tx.delete(builderNotes).where(eq(builderNotes.userId, userId))
+    await tx.delete(alerts).where(eq(alerts.userId, userId))
+    await tx.delete(savedQueries).where(eq(savedQueries.userId, userId))
+    await tx.delete(builders).where(eq(builders.userId, userId))
     await tx.delete(authVerifications).where(eq(authVerifications.identifier, userId))
     await tx.delete(authSessions).where(eq(authSessions.userId, userId))
     await tx.delete(authAccounts).where(eq(authAccounts.userId, userId))

@@ -462,7 +462,9 @@ export const dataExportRequests = pgTable('data_export_requests', {
 
 export const deletionRequests = pgTable('deletion_requests', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().unique().references(() => authUsers.id, { onDelete: 'cascade' }),
+  // No FK to auth_users: this row is the compliance record that a hard delete happened,
+  // so it must outlive the user row the purge worker deletes (performHardDelete/legal.ts).
+  userId: text('user_id').notNull().unique(),
   status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'cancelled'
   gracePeriodEndsAt: timestamp('grace_period_ends_at', { withTimezone: true }).notNull(),
   completedAt: timestamp('completed_at', { withTimezone: true }),

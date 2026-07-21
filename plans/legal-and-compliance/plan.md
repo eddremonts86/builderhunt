@@ -1,11 +1,15 @@
 # Plan: Legal & Compliance
 
-> **Status**: `partially-implemented`
+> **Status**: `complete`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
 > **Reality check**: Docs, consent, export, and deletion-request flows are delivered (see
-> spec). Remaining: make deletion actually execute (worker), complete the export payload,
-> lifecycle emails, and a small ops checklist.
+> spec). All three phases are done as of 2026-07-21: deletion executes via
+> `processPendingDeletions()` + `POST /api/admin/legal/run-worker`, the export payload is
+> complete, the hard-delete cascade covers builder notes/alerts/saved queries/builders,
+> lifecycle emails send through the existing free-tier Resend integration (no new paid
+> service), and the ops checklist (processor audit, real imprint details, DMCA disclosure)
+> is done. Still needs a daily VPS cron wired to the worker endpoint (non-code, infra task).
 
 ## Phases
 

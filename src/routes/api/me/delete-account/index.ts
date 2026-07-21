@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { sendDeletionScheduledEmail } from '~/shared/lib/email'
 import {
   AccountDeletionOwnershipError,
   cancelDeletion,
@@ -27,12 +28,12 @@ export const Route = createFileRoute('/api/me/delete-account/')({
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 })
           const result = await requestDeletion(session.user.id)
-          // In dev: log the "email" to console (no Resend)
-          console.log(
-            `[legal] Account deletion ${result.alreadyPending ? 'already pending' : 'requested'} ` +
-            `for user ${session.user.id}. Grace ends ${result.gracePeriodEndsAt.toISOString()}. ` +
-            `Cancel: /dashboard/settings/privacy`,
-          )
+          // sendDeletionScheduledEmail already logs-and-returns when Resend is
+          // unconfigured (same no-cost fallback as every other sender in email.ts).
+          const sent = await sendDeletionScheduledEmail(session.user.email, result.gracePeriodEndsAt)
+          if (!sent.ok) {
+            console.error('[legal] deletion-scheduled email failed:', sent.error)
+          }
           return Response.json({ ok: true, ...result })
         } catch (err) {
           if (err instanceof AccountDeletionOwnershipError) {
