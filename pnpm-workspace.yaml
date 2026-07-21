@@ -7,6 +7,8 @@ allowBuilds:
   protobufjs: false
   sharp: false
   unrs-resolver: false
+overrides:
+  'js-yaml@>=4.0.0 <4.3.0': '>=4.3.0'
 onlyBuiltDependencies:
   - '@clerk/shared'
   - '@parcel/watcher'
