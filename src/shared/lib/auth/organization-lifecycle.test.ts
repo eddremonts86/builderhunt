@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   createOrganizationLifecycle,
+  generateOrganizationSlug,
   OrganizationLifecycleError,
   SeatLimitExceededError,
   normalizeInvitationEmail,
@@ -74,6 +75,24 @@ function membership(role: MembershipRecord['role'], overrides: Partial<Membershi
 describe('normalizeInvitationEmail', () => {
   it('trims and lowercases', () => {
     expect(normalizeInvitationEmail('  Foo@Example.COM ')).toBe('foo@example.com')
+  })
+})
+
+describe('generateOrganizationSlug', () => {
+  it('slugifies the name and appends a random suffix', () => {
+    const slug = generateOrganizationSlug('  Acme Corp!! ')
+    expect(slug).toMatch(/^acme-corp-[0-9a-f]{8}$/)
+  })
+
+  it('falls back to a generic base when the name has no slug-safe characters', () => {
+    const slug = generateOrganizationSlug('!!!')
+    expect(slug).toMatch(/^team-[0-9a-f]{8}$/)
+  })
+
+  it('never collides on repeated calls with the same name', () => {
+    const first = generateOrganizationSlug('Acme')
+    const second = generateOrganizationSlug('Acme')
+    expect(first).not.toBe(second)
   })
 })
 

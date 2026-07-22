@@ -66,7 +66,13 @@ function AdminFlyout({ pathname }: { pathname: string }) {
   const reposition = React.useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
-    setCoords({ top: rect.bottom + 8, left: rect.left + rect.width / 2 })
+    // Centering needs the panel's own rendered width, not `left` + `transform:
+    // translateX(-50%)` — the panel's `animate-fade-in-up` class runs a CSS
+    // animation on the `transform` property itself, which overrides any
+    // static inline transform value for the entire lifetime of the element
+    // (fill-mode `both`), silently discarding a positioning translate.
+    const panelWidth = panelRef.current?.getBoundingClientRect().width ?? 190
+    setCoords({ top: rect.bottom + 8, left: rect.left + rect.width / 2 - panelWidth / 2 })
   }, [])
 
   React.useEffect(() => {
@@ -121,7 +127,7 @@ function AdminFlyout({ pathname }: { pathname: string }) {
           role="menu"
           aria-label="Admin"
           className="fixed min-w-[190px] bg-bh-surface border border-bh-border rounded-2xl shadow-lg p-1.5 animate-fade-in-up"
-          style={{ zIndex: FLOATING_UI_Z, top: coords.top, left: coords.left, transform: 'translateX(-50%)' }}
+          style={{ zIndex: FLOATING_UI_Z, top: coords.top, left: coords.left }}
         >
           {ADMIN_NAV.map((n) => {
             const itemActive = pathname === n.to

@@ -19,10 +19,13 @@ let root: Root | null = null
 let fetchMock: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
-  fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+  fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
-    if (url.endsWith('/api/organizations')) {
+    if (url.endsWith('/api/organizations') && (init?.method ?? 'GET') === 'GET') {
       return new Response(JSON.stringify(organizations), { status: 200 })
+    }
+    if (url.endsWith('/api/organizations') && init?.method === 'POST') {
+      return new Response(JSON.stringify({ id: 'org-new', name: 'New Team', slug: 'new-team-abc123' }), { status: 200 })
     }
     if (url.endsWith('/api/organizations/switch')) {
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
@@ -97,5 +100,41 @@ describe('OrganizationSwitcher', () => {
     expect(switchCall).toBeDefined()
     const body = JSON.parse((switchCall![1] as RequestInit).body as string)
     expect(body).toEqual({ organizationId: 'org-b' })
+  })
+
+  it('creates a team with the typed name, then switches to it', async () => {
+    await mount('org-a')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    act(() => trigger.click())
+
+    const createTrigger = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.includes('Create team')) as HTMLButtonElement
+    expect(createTrigger).toBeDefined()
+    act(() => createTrigger.click())
+
+    const nameInput = document.querySelector('input[aria-label="New team name"]') as HTMLInputElement
+    const submitButton = document.querySelector('button[aria-label="Create team"]') as HTMLButtonElement
+    // React tracks controlled-input values on the instance to distinguish
+    // real input events from programmatic `.value =` assignments — setting
+    // through the prototype's native setter (bypassing that tracker) is
+    // required for the subsequent 'input' event to actually reach onChange.
+    const nativeValueSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!
+    await act(async () => {
+      nativeValueSetter.call(nameInput, 'New Team')
+      nameInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      submitButton.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const createCall = fetchMock.mock.calls.find(
+      ([input, init]) => String(input).endsWith('/api/organizations') && (init as RequestInit)?.method === 'POST',
+    )
+    expect(createCall).toBeDefined()
+    expect(JSON.parse((createCall![1] as RequestInit).body as string)).toEqual({ name: 'New Team' })
+
+    const switchCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/organizations/switch'))
+    expect(switchCall).toBeDefined()
+    expect(JSON.parse((switchCall![1] as RequestInit).body as string)).toEqual({ organizationId: 'org-new' })
   })
 })
