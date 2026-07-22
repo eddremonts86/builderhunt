@@ -254,14 +254,11 @@ async function checkAccountExportPrivacy() {
     !serializedB.includes(IDS.userA) && !serializedB.includes(IDS.orgA) && !serializedB.includes(IDS.legacyBuilderA),
     'checked userA/orgA/legacyBuilderA absence',
   )
-  // NOT checked here (known gap, not silently passing): `trackedBuilders` in
-  // buildExportPayload reads the tenant-private `builders` table without ever
-  // calling withTenantContext, so RLS's organization_id policy default-denies
-  // and the export silently omits every tracked builder — proven by
-  // `serializedA` never containing IDS.legacyBuilderA despite the row
-  // existing. Fixing this needs loadAccountExportSource to loop the user's
-  // memberships and read `builders` once per organization under its own
-  // tenant context; tracked separately in plans/security-and-multitenancy/tasks.md.
+  record(
+    'privacy: A\'s export does contain A\'s own tracked builder',
+    serializedA.includes(IDS.legacyBuilderA),
+    'checked legacyBuilderA presence',
+  )
 }
 
 async function checkWorkerIsolation() {

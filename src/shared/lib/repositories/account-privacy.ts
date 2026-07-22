@@ -4,6 +4,8 @@ import { accountDb } from '../db/client'
 // drizzle/0007_auth_broker.sql) — builderhunt_app has no grant on them, so
 // this account-subject export must read them through authDb, not accountDb.
 import { authDb } from '../db/auth-db'
+import { withTenantContext } from '../db/tenant-context'
+import type { OrganizationRole } from '../authorization/permissions'
 import {
   alerts,
   authAccounts,
@@ -69,7 +71,7 @@ export async function loadAccountExportSource(userId: string) {
   }).from(authUsers).where(eq(authUsers.id, userId)).limit(1)
   if (!user) return null
 
-  const [account, consents, claimRequests, claims, profileViews, deletion, memberships, trackedBuilders, plan, requests, changes] = await Promise.all([
+  const [account, consents, claimRequests, claims, profileViews, deletion, memberships, plan, requests, changes] = await Promise.all([
     authDb.select({
       providerId: authAccounts.providerId,
       password: authAccounts.password,
@@ -104,7 +106,14 @@ export async function loadAccountExportSource(userId: string) {
       gracePeriodEndsAt: deletionRequests.gracePeriodEndsAt,
       completedAt: deletionRequests.completedAt,
     }).from(deletionRequests).where(eq(deletionRequests.userId, userId)).limit(1),
-    accountDb.select({
+    // organizations/organization_members are tenant-private with RLS forced
+    // on organization_id — but better-auth's own auth-broker policy
+    // (drizzle/0008_tenant_rls.sql) grants builderhunt_auth unrestricted
+    // access to both (it needs to list every org a user can switch into), so
+    // read this specific "which orgs am I in" query through authDb instead
+    // of accountDb rather than trying to invent a per-org tenant context for
+    // a query whose whole purpose is discovering those org ids.
+    authDb.select({
       organizationId: organizations.id,
       name: organizations.name,
       slug: organizations.slug,
@@ -113,15 +122,6 @@ export async function loadAccountExportSource(userId: string) {
     }).from(organizationMembers)
       .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
       .where(eq(organizationMembers.userId, userId)),
-    accountDb.select({
-      id: builders.id,
-      source: builders.source,
-      username: builders.username,
-      displayName: builders.displayName,
-      profileUrl: builders.profileUrl,
-      organizationId: builders.organizationId,
-      createdAt: builders.createdAt,
-    }).from(builders).where(eq(builders.userId, userId)),
     accountDb.select({
       plan: plans.plan,
       status: plans.status,
@@ -139,6 +139,35 @@ export async function loadAccountExportSource(userId: string) {
     }).from(planRequests).where(eq(planRequests.userId, userId)),
     listAccountPlanChanges(userId),
   ])
+
+  // `builders` is tenant-private with RLS forced on organization_id — a plain
+  // accountDb query (no transaction-local app.organization_id) silently
+  // returns zero rows instead of erroring. The subject's tracked builders can
+  // live in any organization they belong to, so read once per membership
+  // under that organization's own tenant context and flatten the results.
+  const trackedBuildersByOrganization = await Promise.all(
+    memberships.map((membership) =>
+      withTenantContext(
+        {
+          userId,
+          organizationId: membership.organizationId,
+          role: membership.role as OrganizationRole,
+          requestId: crypto.randomUUID(),
+        },
+        (tx) => tx.select({
+          id: builders.id,
+          source: builders.source,
+          username: builders.username,
+          displayName: builders.displayName,
+          profileUrl: builders.profileUrl,
+          organizationId: builders.organizationId,
+          createdAt: builders.createdAt,
+        }).from(builders).where(eq(builders.userId, userId)),
+      ),
+    ),
+  )
+  const trackedBuilders = trackedBuildersByOrganization.flat()
+
   return {
     user,
     auth: account[0] ? { providerId: account[0].providerId, hasPassword: Boolean(account[0].password), createdAt: account[0].createdAt } : null,
@@ -156,7 +185,11 @@ export async function loadAccountExportSource(userId: string) {
 }
 
 export async function listOwnedOrganizations(userId: string) {
-  return accountDb.select({ organizationId: organizationMembers.organizationId })
+  // Same RLS shape as the memberships query in loadAccountExportSource above —
+  // read through authDb, which has unrestricted access via the auth-broker
+  // policy, not accountDb (which would silently return zero rows and let
+  // assertNoOwnedOrganizations wrongly conclude the user owns nothing).
+  return authDb.select({ organizationId: organizationMembers.organizationId })
     .from(organizationMembers)
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.role, 'owner')))
 }
