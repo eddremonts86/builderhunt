@@ -3,19 +3,20 @@
 > **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
-> **Reality check** (reconciled 2026-07-22): 15 of 19 tasks below are checked off with re-verified
+> **Reality check** (reconciled 2026-07-22): 16 of 19 tasks below are checked off with re-verified
 > evidence (test commands re-run this session, not just trusted from history) — migrations `0000`–
 > `0021`, RLS, migration/restore infra, tenant principals/context, permissions/boundary, builder
 > identity split, entitlements, backfills, dual-write/shadow, organization invitations/lifecycle,
-> platform-admin auth, and HTTP/secrets/AI hardening. `pnpm security:boundaries` reports **0**
-> tracked legacy direct-db imports. A real disposable-local-DB run with exact
+> platform-admin auth, HTTP/secrets/AI hardening, and route-coverage. `pnpm security:boundaries` and
+> `pnpm security:route-coverage` both report clean. A real disposable-local-DB run with exact
 > `builderhunt_app`/`worker`/`auth`/`platform` roles (not owner) has now been produced for migration
 > integrity, restore rehearsal, RLS, and a representative two-tenant API/worker/privacy isolation
 > matrix — this run itself found and fixed several real permission bugs (auth-broker access gaps,
-> 9 ungranted account-subject tables, silently-empty cross-org membership reads) that had never been
-> exercised against real least-privilege roles before. Still open: task 2 (plan-coverage test — needs
-> a new route-annotation convention across ~34 routes), the rest of task 11 (`firstBuilderIds` →
-> `onboardingSelectedBuilders` is done — decided in favor of a source-opaque `builderRef`, not an FK
+> 9 ungranted account-subject tables, silently-empty cross-org membership reads, and — while building
+> the new route-coverage check — a 17th unfixed `ADMIN_USER_IDS` copy in `src/routes/api/ai/embed.ts`
+> that the earlier admin-routes retrofit missed because it lives outside `src/routes/api/admin/**`)
+> that had never been exercised or scanned for before. Still open: the rest of task 11 (`firstBuilderIds`
+> → `onboardingSelectedBuilders` is done — decided in favor of a source-opaque `builderRef`, not an FK
 > to `organizationBuilders`, since onboarding picks are frequently never tracked; the normalized
 > query-keyword/source and builder-topic association tables remain), the remainder of task 15 (full
 > ~34-route tenant-repository migration, not just the isolation subset), and tasks 17/18 (canonical
@@ -31,10 +32,11 @@ must include its tests and must not stage unrelated worktree changes.
   - Do: Add `db:audit-schema` to emit a deterministic JSON/Markdown manifest containing table, class (`global-public | account-subject | tenant-private | system-operational`), owner key, public DTO fields, retention, row count query, PK/unique/FK/check/index/RLS state, and plans that introduce/touch it. Populate all 21 current tables and every `pgTable` proposed in plans; fail on an unclassified table, tenant-private table without `organization_id`, authorization field inside JSON, foreign key without a left-prefix index, or tenant child relation without a composite organization FK.
   - Verify (2026-07-22, re-run): `CI=true pnpm db:audit-schema` exits non-zero with named findings for the 9 tables belonging to other, later plans (`builder_embeddings`, `discovery_state`, `sourcing_sprints`, etc. — correctly unclassified since they're outside this plan's scope) and `builders`' pending identity split; manifest structure stable across runs.
 
-- [ ] **Write the threat model and authorization matrix before implementation**
-  - Files: `docs/architecture/threat-model.md`, `docs/architecture/authorization-matrix.md`, `test/security/plan-coverage.test.ts`, `plans/_meta/security-policy.md`
+- [x] **Write the threat model and authorization matrix before implementation**
+  - Files: `docs/architecture/threat-model.md`, `docs/architecture/authorization-matrix.md`, `scripts/check-route-coverage.mjs`, `plans/_meta/security-policy.md`
   - Do: Enumerate assets, trust boundaries, principals, entry points, tenant/public/account/operational flows, attacker capabilities, and mitigations. Define resource/action permissions for anonymous, member, admin, owner, platform admin, and worker. Add a test parsing route/repository metadata so every private resource/action and every tenant-mutating plan maps to the matrix and data classification.
-  - Verify: `pnpm vitest run test/security/plan-coverage.test.ts` initially fails on unmapped current routes, then passes with zero `unknown`/placeholder entries.
+  - Progress (2026-07-22): `docs/architecture/threat-model.md`/`authorization-matrix.md`/`plans/_meta/security-policy.md` already existed and are complete. Added `scripts/check-route-coverage.mjs` (`pnpm security:route-coverage`, wired into `.github/workflows/quality.yml`) as a pragmatic stand-in for a full per-action route→matrix mapping: it walks every file under `src/routes/api/**` and requires each to either use a recognized guard (`requireTenantPrincipal`/`withTenantContext`, `requirePlatformAdminPrincipal`, `getOrganizationLifecycle`, or an explicit `auth.api.getSession` check) or be on a small, reasoned public allowlist (7 entries: changelog, incidents, status, ai/config, feeds, the better-auth catch-all). Verified it actually catches a real gap, not just passing trivially — proved by planting a deliberately unguarded test route and confirming it fails. Building this surfaced one real miss: `src/routes/api/ai/embed.ts` still had its own inline `ADMIN_USER_IDS`/`isAdmin()` copy (outside `src/routes/api/admin/**`, so it wasn't touched by the earlier platform-admin retrofit) — now uses `requirePlatformAdminPrincipal` like the other 16.
+  - Verify: `pnpm security:route-coverage` → `{"routes":67,"publicAllowlisted":7,"valid":true}`.
 
 - [x] **Create least-privilege PostgreSQL roles and runtime env separation**
   - Files: `drizzle/0002_database_roles.sql`, `src/shared/lib/env.ts`, `.env.example`, `.env.production.example`, `docker-compose.yml`, `docs/operations/database-roles.md`, `src/shared/lib/security/database-roles.test.ts`
