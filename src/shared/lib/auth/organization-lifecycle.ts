@@ -117,7 +117,8 @@ export interface LifecycleDependencies {
   transferOwnershipRecord(organizationId: string, fromUserId: string, toUserId: string): Promise<void>
   deleteOrganizationRecord(organizationId: string): Promise<void>
   clearActiveOrganizationForUsers(organizationId: string, userIds: string[]): Promise<void>
-  sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<void>
+  /** `devLink` is set only when no real email provider is configured (dev mode) — the invite/resend UI shows it as a manual-share fallback, since no email is actually going out. */
+  sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<{ devLink?: string }>
   rateLimit(scope: string, id: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean }>
   audit: SecurityAuditSink
   now(): Date
@@ -234,7 +235,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
   async function inviteMember(
     request: Request,
     input: { organizationId: string; email: string; role: InvitableRole },
-  ): Promise<InvitationRecord> {
+  ): Promise<InvitationRecord & { devLink?: string }> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, input.organizationId)
     requireElevated(membership)
@@ -266,7 +267,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       throw error
     }
 
-    await deps.sendInvitationEmail(invitation.email, invitation.organizationName, invitation.id)
+    const { devLink } = await deps.sendInvitationEmail(invitation.email, invitation.organizationName, invitation.id)
     await audit(deps, {
       organizationId: input.organizationId,
       actorUserId: session.userId,
@@ -276,10 +277,10 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return invitation
+    return { ...invitation, devLink }
   }
 
-  async function resendInvitation(request: Request, invitationId: string): Promise<InvitationRecord> {
+  async function resendInvitation(request: Request, invitationId: string): Promise<InvitationRecord & { devLink?: string }> {
     const session = await requireSession(request, deps)
     const invitation = await deps.getInvitation(invitationId)
     if (!invitation) throw new OrganizationLifecycleError('Invitation not found', 404)
@@ -316,7 +317,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       }
       throw error
     }
-    await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
+    const { devLink } = await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
     await audit(deps, {
       organizationId: invitation.organizationId,
       actorUserId: session.userId,
@@ -326,7 +327,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
-    return fresh
+    return { ...fresh, devLink }
   }
 
   async function cancelInvitation(request: Request, invitationId: string): Promise<void> {
@@ -779,6 +780,7 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       const invitationUrl = new URL(`/team/invite/${encodeURIComponent(invitationId)}`, env.APP_URL).toString()
       const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl)
       if (!result.ok) throw new Error('Unable to deliver organization invitation')
+      return { devLink: result.devLink }
     },
 
     async rateLimit(scope, id, limit, windowSeconds) {
@@ -915,6 +917,54 @@ export async function listPendingInvitations(organizationId: string): Promise<In
     expiresAt: row.expiresAt,
     inviterId: row.inviterId,
   }))
+}
+
+/**
+ * "Am I invited anywhere?" — invitations are keyed by email, not user id (the
+ * invitee may not have an account yet when the invite is sent), so this is
+ * the only way a signed-in user's own pending invitations can ever surface
+ * without them having the original email/link in hand. Only ever call this
+ * with the CALLER'S OWN verified session email — never an arbitrary email a
+ * client could supply, or any authenticated user could enumerate who else
+ * has been invited where.
+ */
+export async function listInvitationsForEmail(email: string): Promise<InvitationRecord[]> {
+  const [{ and, eq }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationInvitations, organizations } = schema
+  const normalized = normalizeInvitationEmail(email)
+
+  const rows = await authDb
+    .select({
+      id: organizationInvitations.id,
+      organizationId: organizationInvitations.organizationId,
+      organizationName: organizations.name,
+      email: organizationInvitations.email,
+      role: organizationInvitations.role,
+      status: organizationInvitations.status,
+      expiresAt: organizationInvitations.expiresAt,
+      inviterId: organizationInvitations.inviterId,
+    })
+    .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+    .where(and(eq(organizationInvitations.email, normalized), eq(organizationInvitations.status, 'pending')))
+
+  const now = Date.now()
+  return rows
+    .map((row) => ({
+      id: row.id,
+      organizationId: row.organizationId,
+      organizationName: row.organizationName,
+      email: row.email,
+      role: (row.role ?? 'member') as InvitableRole,
+      status: row.status as InvitationRecord['status'],
+      expiresAt: row.expiresAt,
+      inviterId: row.inviterId,
+    }))
+    .filter((invitation) => invitation.expiresAt.getTime() > now)
 }
 
 export interface SeatUsageRecord {

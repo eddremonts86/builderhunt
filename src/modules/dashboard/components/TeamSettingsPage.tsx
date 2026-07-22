@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Users, UserPlus, Mail, Crown, Shield, X, LogOut, ArrowRightLeft, Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Users, UserPlus, Mail, Crown, Shield, X, LogOut, ArrowRightLeft, Trash2, RefreshCw, AlertTriangle, Link2, Check } from 'lucide-react'
 import {
   can,
   canChangeMemberRole,
@@ -25,6 +25,8 @@ export interface TeamSettingsPageProps {
   viewerUserId: string
   busy?: boolean
   error?: string | null
+  /** Set only for an invitation whose email was never actually sent (no email provider configured) — a manual-share fallback for exactly that invitation. */
+  devLinkByInvitationId?: Record<string, string>
   onInvite?: (email: string, role: InvitableRole) => void | Promise<void>
   onCancelInvite?: (invitationId: string) => void | Promise<void>
   onResendInvite?: (invitationId: string) => void | Promise<void>
@@ -44,6 +46,7 @@ export function TeamSettingsPage({
   viewerUserId,
   busy = false,
   error = null,
+  devLinkByInvitationId,
   onInvite,
   onCancelInvite,
   onResendInvite,
@@ -57,6 +60,18 @@ export function TeamSettingsPage({
   const [inviteRole, setInviteRole] = React.useState<InvitableRole>('member')
   const [transferTarget, setTransferTarget] = React.useState('')
   const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const [copiedInvitationId, setCopiedInvitationId] = React.useState<string | null>(null)
+
+  async function copyInviteLink(invitationId: string, link: string) {
+    try {
+      await navigator.clipboard.writeText(link)
+      setCopiedInvitationId(invitationId)
+      setTimeout(() => setCopiedInvitationId((current) => (current === invitationId ? null : current)), 2000)
+    } catch {
+      // Clipboard access can be denied by the browser — the link is still
+      // visible in the button's title attribute as a fallback.
+    }
+  }
 
   const viewer: TenantPrincipal = {
     userId: viewerUserId,
@@ -173,7 +188,28 @@ export function TeamSettingsPage({
                     <p className="text-xs text-bh-text-dim">
                       {ROLE_LABEL[invitation.role]} · expires {new Date(invitation.expiresAt).toLocaleDateString()}
                     </p>
+                    {devLinkByInvitationId?.[invitation.id] && (
+                      <p className="text-xs text-bh-warning mt-0.5">
+                        Couldn't send the email — copy the link to share it manually.
+                      </p>
+                    )}
                   </div>
+                  {devLinkByInvitationId?.[invitation.id] && (
+                    <button
+                      type="button"
+                      onClick={() => copyInviteLink(invitation.id, devLinkByInvitationId[invitation.id])}
+                      className="btn-ghost btn-sm"
+                      aria-label={`Copy invite link for ${invitation.email}`}
+                      title={devLinkByInvitationId[invitation.id]}
+                      data-testid={`copy-invitation-link-${invitation.id}`}
+                    >
+                      {copiedInvitationId === invitation.id ? (
+                        <Check className="w-3.5 h-3.5 text-bh-success" aria-hidden="true" />
+                      ) : (
+                        <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      )}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => (onResendInvite ?? noop)(invitation.id)}

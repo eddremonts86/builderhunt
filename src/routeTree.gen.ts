@@ -108,6 +108,7 @@ import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_das
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
+import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
@@ -636,6 +637,12 @@ const ApiOrganizationsMembersMemberIdRoute =
     path: '/api/organizations/members/$memberId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOrganizationsInvitationsMineRoute =
+  ApiOrganizationsInvitationsMineRouteImport.update({
+    id: '/api/organizations/invitations/mine',
+    path: '/api/organizations/invitations/mine',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrganizationsInvitationsInvitationIdRoute =
   ApiOrganizationsInvitationsInvitationIdRouteImport.update({
     id: '/api/organizations/invitations/$invitationId',
@@ -870,6 +877,7 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
+  '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -992,6 +1000,7 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
+  '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1118,6 +1127,7 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
+  '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1243,6 +1253,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/invitations/$invitationId'
+    | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
@@ -1365,6 +1376,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/invitations/$invitationId'
+    | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
@@ -1490,6 +1502,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/invitations/$invitationId'
+    | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
@@ -1578,6 +1591,7 @@ export interface RootRouteChildren {
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
+  ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
@@ -2290,6 +2304,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrganizationsMembersMemberIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/invitations/mine': {
+      id: '/api/organizations/invitations/mine'
+      path: '/api/organizations/invitations/mine'
+      fullPath: '/api/organizations/invitations/mine'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsMineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/invitations/$invitationId': {
       id: '/api/organizations/invitations/$invitationId'
       path: '/api/organizations/invitations/$invitationId'
@@ -2704,6 +2725,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
   ApiOrganizationsInvitationsInvitationIdRoute:
     ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
+  ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,

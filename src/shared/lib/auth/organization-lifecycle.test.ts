@@ -56,7 +56,7 @@ function buildDeps(overrides: Partial<LifecycleDependencies> = {}): LifecycleDep
     transferOwnershipRecord: vi.fn().mockResolvedValue(undefined),
     deleteOrganizationRecord: vi.fn().mockResolvedValue(undefined),
     clearActiveOrganizationForUsers: vi.fn().mockResolvedValue(undefined),
-    sendInvitationEmail: vi.fn().mockResolvedValue(undefined),
+    sendInvitationEmail: vi.fn().mockResolvedValue({}),
     rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
     audit: { write: vi.fn() },
     now: () => NOW,

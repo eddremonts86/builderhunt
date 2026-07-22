@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { RecommendationsSection } from './RecommendationsSection'
 import { OnboardingBanner } from './OnboardingBanner'
+import { PendingInvitationsBanner } from './PendingInvitationsBanner'
 import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
@@ -196,6 +197,7 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2/3) */}
         <div className="lg:col-span-2 space-y-6">
+          <PendingInvitationsBanner />
           <OnboardingBanner />
 
           {/* Quick actions (empty state if no builders tracked) */}

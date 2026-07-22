@@ -15,7 +15,7 @@ export const Route = createFileRoute('/api/organizations/invitations/$invitation
         try {
           const lifecycle = await getOrganizationLifecycle()
           const invitation = await lifecycle.resendInvitation(request, params.invitationId)
-          return Response.json(toInvitationSummaryDto(invitation))
+          return Response.json({ ...toInvitationSummaryDto(invitation), devLink: invitation.devLink })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response
