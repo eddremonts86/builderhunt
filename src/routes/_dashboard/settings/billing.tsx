@@ -72,7 +72,7 @@ function BillingSettingsPage() {
   const usage = usageQuery.data ?? []
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="billing-settings-page">
+    <div data-testid="billing-settings-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Crown className="w-6 h-6 text-bh-accent" aria-hidden="true" />
@@ -86,7 +86,7 @@ function BillingSettingsPage() {
       {entitlementQuery.isLoading ? (
         <p className="text-bh-text-muted mb-6">Loading…</p>
       ) : entitlementQuery.isError || !entitlementQuery.data ? (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-6 text-sm text-bh-danger">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-6 text-sm text-bh-danger">
           Unable to load billing right now.
         </div>
       ) : (
@@ -94,7 +94,7 @@ function BillingSettingsPage() {
       )}
 
       {usage.length > 0 && (
-        <section className="card p-5" data-testid="usage-section">
+        <section className="glass-panel p-5" data-testid="usage-section">
           <h2 className="font-semibold mb-1">Usage</h2>
           <p className="text-xs text-bh-text-dim mb-4">
             These are limits on how much you can keep saved at once, not a monthly quota — delete old items anytime

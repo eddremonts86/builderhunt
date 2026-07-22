@@ -12,16 +12,6 @@ import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import { builders, onboardingProgress, onboardingSelectedBuilders, savedQueries } from '~/shared/lib/db/schema'
 
-export const STARTER_QUERIES = [
-  'rust async runtime',
-  'indie hackers in EU',
-  'AI agents in production',
-  'react performance',
-  'python ML engineers',
-] as const
-
-export const TOTAL_STEPS = 3
-
 export interface OnboardingStatus {
   step: number
   completed: boolean

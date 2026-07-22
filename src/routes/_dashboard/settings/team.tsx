@@ -222,11 +222,11 @@ function TeamSettingsRoute() {
     )
 
   if (isLoading) {
-    return <div className="p-6 max-w-3xl mx-auto text-sm text-bh-text-muted" data-testid="team-settings-loading">Loading team…</div>
+    return <div className="text-sm text-bh-text-muted" data-testid="team-settings-loading">Loading team…</div>
   }
   if (error || !snapshot) {
     return (
-      <div className="p-6 max-w-3xl mx-auto text-sm text-bh-danger" data-testid="team-settings-error">
+      <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-4 text-sm text-bh-danger" data-testid="team-settings-error">
         Unable to load your team right now.
       </div>
     )

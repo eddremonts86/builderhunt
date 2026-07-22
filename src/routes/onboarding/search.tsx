@@ -2,7 +2,8 @@ import * as React from 'react'
 import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router'
 import { Search, X, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
-import { STARTER_QUERIES } from '~/shared/lib/onboarding'
+import { STARTER_QUERIES } from '~/shared/lib/onboarding-shared'
+import { Input } from '~/components/ui'
 
 export const Route = createFileRoute('/onboarding/search')({
   beforeLoad: async () => {
@@ -82,19 +83,19 @@ function SearchStep() {
             e.preventDefault()
             runSearch(query)
           }}
-          className="card p-4 mb-4"
+          className="glass-panel p-4 mb-4"
         >
           <label htmlFor="onboarding-q" className="text-xs uppercase tracking-wider text-bh-text-dim block mb-2">
             Or type your own
           </label>
           <div className="flex gap-2">
-            <input
+            <Input
               id="onboarding-q"
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. rust async, AI engineers, indie hackers"
-              className="input-field flex-1"
+              className="flex-1"
               data-testid="onboarding-query-input"
             />
             <button type="submit" disabled={!query.trim()} className="btn-primary" data-testid="onboarding-search">

@@ -70,7 +70,7 @@ function WelcomeStep() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {VALUE_PROPS.map((vp) => (
-            <div key={vp.title} className="card p-5">
+            <div key={vp.title} className="glass-panel p-5">
               <h3 className="font-semibold text-bh-text mb-2">{vp.title}</h3>
               <p className="text-sm text-bh-text-muted leading-relaxed">{vp.body}</p>
             </div>

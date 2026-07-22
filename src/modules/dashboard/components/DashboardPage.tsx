@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { motion } from 'motion/react'
 import { RecommendationsSection } from './RecommendationsSection'
 import { OnboardingBanner } from './OnboardingBanner'
 import { PendingInvitationsBanner } from './PendingInvitationsBanner'
@@ -9,6 +10,7 @@ import {
   MoreVertical, Loader2, Check, X, Clock,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
+import { fadeInUp, fadeInUpVariants, staggerContainer } from '~/shared/lib/motion/tokens'
 
 interface Stats {
   totalBuilders: number
@@ -89,13 +91,13 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div>
         <div className="animate-pulse space-y-6">
           <div className="h-8 w-48 bg-bh-surface rounded" />
           <div className="h-4 w-72 bg-bh-surface rounded" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="card h-24 bg-bh-surface/50" />
+              <div key={i} className="glass-panel h-24 bg-bh-surface/50" />
             ))}
           </div>
         </div>
@@ -158,7 +160,11 @@ export function DashboardPage() {
     : -1
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto">
+    <motion.div
+      initial={fadeInUp.initial}
+      animate={fadeInUp.animate}
+      transition={fadeInUp.transition}
+    >
       {/* Header */}
       <header className="mb-8 space-y-6">
         {/* Title block */}
@@ -186,11 +192,18 @@ export function DashboardPage() {
       {/* Stats */}
       <section aria-labelledby="stats-heading" className="mb-8">
         <h2 id="stats-heading" className="sr-only">Your stats</h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <motion.div
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4"
+          variants={staggerContainer()}
+          initial="hidden"
+          animate="visible"
+        >
           {statsData.map((s) => (
-            <StatCard key={s.label} {...s} />
+            <motion.div key={s.label} variants={fadeInUpVariants}>
+              <StatCard {...s} />
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
 
       {/* Bento Grid layout */}
@@ -222,7 +235,7 @@ export function DashboardPage() {
           <RecommendationsSection />
 
           {/* Weekly Shipping Activity Bento Card */}
-          <div className="card p-5">
+          <div className="glass-panel p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Activity className="w-4 h-4 text-bh-accent" aria-hidden="true" />
@@ -250,8 +263,8 @@ export function DashboardPage() {
                         <div
                           className={`w-full rounded-t-md transition-all duration-500 ease-out ${
                             isPeak
-                              ? 'bg-[#fbeee6] bg-striped-terracotta'
-                              : 'bg-zinc-50 bg-striped-neutral'
+                              ? 'bg-bh-accent-soft bg-striped-terracotta'
+                              : 'bg-bh-border-strong bg-striped-neutral'
                           }`}
                           style={{ height: `${heightPct}%` }}
                         />
@@ -277,7 +290,7 @@ export function DashboardPage() {
         {/* Right Column (1/3) */}
         <div className="lg:col-span-1 space-y-6">
           {/* Saved searches Bento Card */}
-          <div className="card p-5">
+          <div className="glass-panel p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 id="queries-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Bookmark className="w-4 h-4 text-bh-warning" aria-hidden="true" />
@@ -308,7 +321,7 @@ export function DashboardPage() {
           </div>
 
           {/* Recent builders Bento Card */}
-          <div className="card p-5">
+          <div className="glass-panel p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 id="builders-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Activity className="w-4 h-4 text-bh-success" aria-hidden="true" />
@@ -382,7 +395,7 @@ export function DashboardPage() {
           <strong>Heads up:</strong> {error}. Some data may be missing.
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
 
@@ -417,9 +430,9 @@ function StatCard({
   badge?: string
 }) {
   return (
-    <div className="card card-hover p-5">
+    <div className="glass-panel card-hover p-5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-light text-zinc-400">{label}</span>
+        <span className="text-xs font-light text-bh-text-dim">{label}</span>
         <div className={`w-7 h-7 rounded-md border flex items-center justify-center ${TONE_ICON[tone]}`}>
           <Icon className="w-3.5 h-3.5" aria-hidden="true" />
         </div>
@@ -429,7 +442,7 @@ function StatCard({
           {value.toLocaleString()}
         </span>
         {badge && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-bh-bg-alt text-bh-text-dim border border-bh-border">
             {badge}
           </span>
         )}

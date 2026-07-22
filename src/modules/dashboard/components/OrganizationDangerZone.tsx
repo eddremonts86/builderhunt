@@ -10,6 +10,7 @@ import {
   type OrganizationMemberDto,
   type OrganizationRole,
 } from '~/shared/lib/organizations/contracts'
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 /**
  * Extracted from TeamSettingsPage so the recent-auth challenge, the
@@ -66,7 +67,7 @@ export function OrganizationDangerZone({
   const nameMatches = confirmName.trim() === organizationName
 
   return (
-    <section className="card border-bh-danger/30 p-5" data-testid="team-danger-zone">
+    <section className="glass-panel border-bh-danger/30 p-5" data-testid="team-danger-zone">
       <h2 className="font-semibold flex items-center gap-2 text-bh-danger mb-4">
         <AlertTriangle className="w-4 h-4" aria-hidden="true" />
         Danger zone
@@ -80,7 +81,7 @@ export function OrganizationDangerZone({
         of a dead-end error string.
       */}
       {isStaleSession && (
-        <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 text-sm text-bh-warning" data-testid="stale-session-banner">
+        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 text-sm text-bh-warning" data-testid="stale-session-banner">
           <p>Your session isn't recent enough for this action.</p>
           <Link
             to="/auth/sign-in"
@@ -98,7 +99,7 @@ export function OrganizationDangerZone({
       )}
 
       {pendingDeletion && (
-        <div className="card border-bh-warning/30 bg-bh-warning/5 p-4 mb-4" data-testid="organization-deletion-warning">
+        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-4 mb-4" data-testid="organization-deletion-warning">
           <div className="flex items-start gap-3">
             <Clock className="w-4 h-4 text-bh-warning shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
@@ -142,24 +143,30 @@ export function OrganizationDangerZone({
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-bh-text-muted">Transfer ownership to another member.</p>
             <div className="flex items-center gap-2 shrink-0">
-              <select
-                value={transferTarget}
-                onChange={(e) => setTransferTarget(e.target.value)}
-                disabled={busy}
-                aria-label="Transfer ownership to"
-                className="text-sm rounded-lg border border-bh-border bg-bh-surface px-2 py-1.5"
-                data-testid="transfer-target-select"
-              >
-                <option value="">Select a member…</option>
-                {transferableMembers.map((m) => (
-                  <option key={m.userId} value={m.userId}>{m.name}</option>
-                ))}
-              </select>
+              {/* Fixed-width wrapper, not a width class on SelectTrigger: .input-field
+                  is unlayered CSS in globals.css, which always beats a plain Tailwind
+                  utility of equal specificity — a bare `w-48` on the trigger is ignored. */}
+              <div className="w-48 shrink-0">
+                <Select
+                  value={transferTarget}
+                  onValueChange={setTransferTarget}
+                  disabled={busy}
+                >
+                  <SelectTrigger aria-label="Transfer ownership to" className="text-sm" data-testid="transfer-target-select">
+                    <SelectValue placeholder="Select a member…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {transferableMembers.map((m) => (
+                      <SelectItem key={m.userId} value={m.userId}>{m.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <button
                 type="button"
                 onClick={() => transferTarget && (onTransferOwnership ?? noop)(transferTarget)}
                 disabled={busy || !transferTarget}
-                className="btn-danger-outline btn-sm"
+                className="btn-danger-outline text-sm"
                 data-testid="transfer-ownership-btn"
               >
                 <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
@@ -195,20 +202,20 @@ export function OrganizationDangerZone({
                   Type <strong className="text-bh-text">{organizationName}</strong> to confirm.
                 </label>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="text"
                     value={confirmName}
                     onChange={(e) => setConfirmName(e.target.value)}
                     placeholder={organizationName}
                     aria-label="Confirm organization name"
-                    className="flex-1 text-sm rounded-lg border border-bh-border bg-bh-surface px-3 py-1.5"
+                    className="flex-1 text-sm"
                     data-testid="confirm-organization-name-input"
                   />
                   <button
                     type="button"
                     onClick={() => (onRequestDeletion ?? noop)()}
                     disabled={busy || !nameMatches}
-                    className="btn-danger btn-sm shrink-0"
+                    className="btn-danger text-sm shrink-0"
                     data-testid="confirm-delete-organization-btn"
                   >
                     Schedule deletion
@@ -220,7 +227,7 @@ export function OrganizationDangerZone({
                       setConfirmName('')
                     }}
                     disabled={busy}
-                    className="btn-secondary btn-sm shrink-0"
+                    className="btn-secondary text-sm shrink-0"
                     data-testid="cancel-delete-organization-btn"
                   >
                     <X className="w-3 h-3" aria-hidden="true" />

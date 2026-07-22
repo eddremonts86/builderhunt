@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { STARTER_QUERIES, TOTAL_STEPS } from './onboarding'
+import { STARTER_QUERIES, TOTAL_STEPS } from './onboarding-shared'
 
 describe('onboarding constants', () => {
   it('has 5 starter queries', () => {

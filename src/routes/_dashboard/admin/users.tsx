@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Users, Edit3, X, Save } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 interface UserRow {
   userId: string
@@ -110,7 +111,7 @@ function AdminUsersPage() {
   )
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" data-testid="admin-users-page">
+    <div data-testid="admin-users-page">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -121,24 +122,24 @@ function AdminUsersPage() {
             Manage user plans. Free is the default. Pro/Team are admin-granted.
           </p>
         </div>
-        <input
+        <Input
           type="text"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           placeholder="Filter by name or email…"
-          className="input w-64"
+          className="w-64"
           data-testid="admin-users-filter"
         />
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="admin-users-error">{error}</div>
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="admin-users-error">{error}</div>
       )}
       {success && (
-        <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="admin-users-success">{success}</div>
+        <div className="glass-panel border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="admin-users-success">{success}</div>
       )}
 
-      <div className="card overflow-x-auto p-0">
+      <div className="glass-panel overflow-x-auto p-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">
@@ -165,32 +166,34 @@ function AdminUsersPage() {
                         <p className="text-xs text-bh-text-dim">{u.email}</p>
                       </td>
                       <td className="px-3 py-2">
-                        <select
+                        <Select
                           value={form.plan}
-                          onChange={(e) => setForm({ ...form, plan: e.target.value as PlanTier })}
-                          className="input"
-                          data-testid="admin-user-plan-select"
+                          onValueChange={(v) => setForm({ ...form, plan: v as PlanTier })}
                         >
-                          <option value="free">Free</option>
-                          <option value="pro">Pro</option>
-                          <option value="team">Team</option>
-                        </select>
+                          <SelectTrigger data-testid="admin-user-plan-select">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="free">Free</SelectItem>
+                            <SelectItem value="pro">Pro</SelectItem>
+                            <SelectItem value="team">Team</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </td>
                       <td className="px-3 py-2 text-bh-text-dim">—</td>
                       <td className="px-3 py-2">
-                        <input
+                        <Input
                           type="date"
                           value={form.planEndsAt}
                           onChange={(e) => setForm({ ...form, planEndsAt: e.target.value })}
-                          className="input"
                           data-testid="admin-user-ends-at"
                         />
-                        <input
+                        <Input
                           type="text"
                           value={form.reason}
                           onChange={(e) => setForm({ ...form, reason: e.target.value })}
                           placeholder="Reason (e.g. paid via bank)"
-                          className="input mt-1 w-full text-xs"
+                          className="mt-1 w-full text-xs"
                           data-testid="admin-user-reason"
                         />
                       </td>

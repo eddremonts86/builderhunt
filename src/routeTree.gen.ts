@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as OnboardingRouteRouteImport } from './routes/onboarding/route'
 import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
@@ -146,6 +147,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   path: '/robots.txt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OnboardingRouteRoute = OnboardingRouteRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRouteRoute = AuthRouteRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -165,24 +171,24 @@ const LandingIndexRoute = LandingIndexRouteImport.update({
   getParentRoute: () => LandingRouteRoute,
 } as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
-  id: '/onboarding/welcome',
-  path: '/onboarding/welcome',
-  getParentRoute: () => rootRouteImport,
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSuccessRoute = OnboardingSuccessRouteImport.update({
-  id: '/onboarding/success',
-  path: '/onboarding/success',
-  getParentRoute: () => rootRouteImport,
+  id: '/success',
+  path: '/success',
+  getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSearchRoute = OnboardingSearchRouteImport.update({
-  id: '/onboarding/search',
-  path: '/onboarding/search',
-  getParentRoute: () => rootRouteImport,
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const OnboardingSaveRoute = OnboardingSaveRouteImport.update({
-  id: '/onboarding/save',
-  path: '/onboarding/save',
-  getParentRoute: () => rootRouteImport,
+  id: '/save',
+  path: '/save',
+  getParentRoute: () => OnboardingRouteRoute,
 } as any)
 const BuildersBuilderIdRoute = BuildersBuilderIdRouteImport.update({
   id: '/builders/$builderId',
@@ -794,6 +800,7 @@ const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
+  '/onboarding': typeof OnboardingRouteRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/alerts': typeof DashboardAlertsRoute
@@ -920,6 +927,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
   '/auth': typeof AuthRouteRouteWithChildren
+  '/onboarding': typeof OnboardingRouteRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/alerts': typeof DashboardAlertsRoute
@@ -1047,6 +1055,7 @@ export interface FileRoutesById {
   '/_dashboard': typeof DashboardRouteRouteWithChildren
   '/_landing': typeof LandingRouteRouteWithChildren
   '/auth': typeof AuthRouteRouteWithChildren
+  '/onboarding': typeof OnboardingRouteRouteWithChildren
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_dashboard/alerts': typeof DashboardAlertsRoute
@@ -1176,6 +1185,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/onboarding'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/alerts'
@@ -1302,6 +1312,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/onboarding'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/alerts'
@@ -1428,6 +1439,7 @@ export interface FileRouteTypes {
     | '/_dashboard'
     | '/_landing'
     | '/auth'
+    | '/onboarding'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/_dashboard/alerts'
@@ -1557,15 +1569,12 @@ export interface RootRouteChildren {
   DashboardRouteRoute: typeof DashboardRouteRouteWithChildren
   LandingRouteRoute: typeof LandingRouteRouteWithChildren
   AuthRouteRoute: typeof AuthRouteRouteWithChildren
+  OnboardingRouteRoute: typeof OnboardingRouteRouteWithChildren
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiHealthRoute: typeof ApiHealthRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
-  OnboardingSaveRoute: typeof OnboardingSaveRoute
-  OnboardingSearchRoute: typeof OnboardingSearchRoute
-  OnboardingSuccessRoute: typeof OnboardingSuccessRoute
-  OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
@@ -1652,6 +1661,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RobotsDottxtRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/auth': {
       id: '/auth'
       path: '/auth'
@@ -1682,31 +1698,31 @@ declare module '@tanstack/react-router' {
     }
     '/onboarding/welcome': {
       id: '/onboarding/welcome'
-      path: '/onboarding/welcome'
+      path: '/welcome'
       fullPath: '/onboarding/welcome'
       preLoaderRoute: typeof OnboardingWelcomeRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/success': {
       id: '/onboarding/success'
-      path: '/onboarding/success'
+      path: '/success'
       fullPath: '/onboarding/success'
       preLoaderRoute: typeof OnboardingSuccessRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/search': {
       id: '/onboarding/search'
-      path: '/onboarding/search'
+      path: '/search'
       fullPath: '/onboarding/search'
       preLoaderRoute: typeof OnboardingSearchRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
     '/onboarding/save': {
       id: '/onboarding/save'
-      path: '/onboarding/save'
+      path: '/save'
       fullPath: '/onboarding/save'
       preLoaderRoute: typeof OnboardingSaveRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof OnboardingRouteRoute
     }
     '/builders/$builderId': {
       id: '/builders/$builderId'
@@ -2634,6 +2650,24 @@ const AuthRouteRouteWithChildren = AuthRouteRoute._addFileChildren(
   AuthRouteRouteChildren,
 )
 
+interface OnboardingRouteRouteChildren {
+  OnboardingSaveRoute: typeof OnboardingSaveRoute
+  OnboardingSearchRoute: typeof OnboardingSearchRoute
+  OnboardingSuccessRoute: typeof OnboardingSuccessRoute
+  OnboardingWelcomeRoute: typeof OnboardingWelcomeRoute
+}
+
+const OnboardingRouteRouteChildren: OnboardingRouteRouteChildren = {
+  OnboardingSaveRoute: OnboardingSaveRoute,
+  OnboardingSearchRoute: OnboardingSearchRoute,
+  OnboardingSuccessRoute: OnboardingSuccessRoute,
+  OnboardingWelcomeRoute: OnboardingWelcomeRoute,
+}
+
+const OnboardingRouteRouteWithChildren = OnboardingRouteRoute._addFileChildren(
+  OnboardingRouteRouteChildren,
+)
+
 interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
@@ -2705,15 +2739,12 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
   AuthRouteRoute: AuthRouteRouteWithChildren,
+  OnboardingRouteRoute: OnboardingRouteRouteWithChildren,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiHealthRoute: ApiHealthRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
-  OnboardingSaveRoute: OnboardingSaveRoute,
-  OnboardingSearchRoute: OnboardingSearchRoute,
-  OnboardingSuccessRoute: OnboardingSuccessRoute,
-  OnboardingWelcomeRoute: OnboardingWelcomeRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,

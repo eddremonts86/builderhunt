@@ -28,7 +28,7 @@ function SuccessStep() {
           You'll get fresh picks in your dashboard every day. Your saved searches run continuously across 12 sources.
         </p>
 
-        <div className="card p-5 mb-6 text-left">
+        <div className="glass-panel p-5 mb-6 text-left">
           <p className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim mb-3 flex items-center gap-2">
             <ListChecks className="w-3.5 h-3.5" aria-hidden="true" />
             What's next

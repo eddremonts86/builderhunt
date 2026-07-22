@@ -74,7 +74,7 @@ function AdminPlanRequestsPage() {
   const resolved = requests.filter((r) => r.status !== 'pending')
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" data-testid="admin-plan-requests-page">
+    <div data-testid="admin-plan-requests-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Inbox className="w-6 h-6 text-bh-accent" aria-hidden="true" />
@@ -86,7 +86,7 @@ function AdminPlanRequestsPage() {
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">{error}</div>
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">{error}</div>
       )}
 
       <section className="mb-6">
@@ -96,7 +96,7 @@ function AdminPlanRequestsPage() {
         {loading ? (
           <p className="text-sm text-bh-text-muted">Loading…</p>
         ) : pending.length === 0 ? (
-          <div className="card text-center py-8 text-bh-text-muted" data-testid="plan-requests-empty">
+          <div className="glass-panel text-center py-8 text-bh-text-muted" data-testid="plan-requests-empty">
             No pending requests. 🎉
           </div>
         ) : (
@@ -104,7 +104,7 @@ function AdminPlanRequestsPage() {
             {pending.map((r) => (
               <div
                 key={r.id}
-                className="card p-4 flex items-start gap-3"
+                className="glass-panel p-4 flex items-start gap-3"
                 data-testid={`plan-request-row-${r.id}`}
               >
                 <div className="flex-1 min-w-0">
@@ -169,7 +169,7 @@ function AdminPlanRequestsPage() {
             {resolved.slice(0, 10).map((r) => (
               <div
                 key={r.id}
-                className="card p-3 flex items-center gap-3 opacity-70"
+                className="glass-panel p-3 flex items-center gap-3 opacity-70"
                 data-testid={`plan-request-resolved-${r.id}`}
               >
                 <span className="text-sm">{r.userName ?? 'Unknown'}</span>

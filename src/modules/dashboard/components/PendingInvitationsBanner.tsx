@@ -31,7 +31,7 @@ export function PendingInvitationsBanner() {
 
   return (
     <div
-      className="card p-4 border-bh-accent/30 bg-bh-accent-soft/20"
+      className="glass-panel p-4 border-bh-accent/30 bg-bh-accent-soft/20"
       data-testid="pending-invitations-banner"
       role="status"
     >

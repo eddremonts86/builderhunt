@@ -128,7 +128,7 @@ function SaveStep() {
       )}
 
       {error && (
-        <div className="card border border-bh-danger/30 bg-bh-danger/10 p-4 mb-4" role="alert">
+        <div className="glass-panel border border-bh-danger/30 bg-bh-danger/10 p-4 mb-4" role="alert">
           <div className="flex items-start gap-2 text-bh-danger">
             <AlertCircle className="w-4 h-4 mt-0.5" aria-hidden="true" />
             <div>
@@ -143,7 +143,7 @@ function SaveStep() {
       )}
 
       {!loading && !error && results.length === 0 && (
-        <div className="card text-center py-12">
+        <div className="glass-panel text-center py-12">
           <p className="text-bh-text-muted">No results for "{searchedQuery}".</p>
           <Link to="/onboarding/search" className="btn-secondary btn-sm mt-3 inline-flex">
             Try a different query
@@ -158,7 +158,7 @@ function SaveStep() {
               const isSaved = savedIds.has(b.id)
               const isSaving = savingId === b.id
               return (
-                <article key={b.id} className="card p-4" data-testid="onboarding-builder-card" data-builder-id={b.id}>
+                <article key={b.id} className="glass-panel p-4" data-testid="onboarding-builder-card" data-builder-id={b.id}>
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-sm">
                       {(b.displayName ?? b.username)[0]?.toUpperCase()}

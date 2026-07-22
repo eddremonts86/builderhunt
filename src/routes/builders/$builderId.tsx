@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { BuilderProfilePage } from '~/modules/builder-profile/components/BuilderProfilePage'
 import { getPublicBuilder } from '~/shared/lib/public-data'
+import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 
 const SITE_URL = 'https://builderhunt.dev'
 const SITE_NAME = 'BuilderHunt'
@@ -55,5 +56,9 @@ export const Route = createFileRoute('/builders/$builderId')({
       ],
     }
   },
-  component: BuilderProfilePage,
+  component: () => (
+    <ThemeProvider>
+      <BuilderProfilePage />
+    </ThemeProvider>
+  ),
 })

@@ -7,6 +7,7 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
+import { Input } from '~/components/ui'
 
 interface OrganizationSummary {
   id: string
@@ -201,7 +202,7 @@ export function OrganizationSwitcher() {
           <div className="mt-1 pt-1 border-t border-bh-border/60">
             {creating ? (
               <form onSubmit={handleCreate} className="flex items-center gap-1.5 px-1 py-1">
-                <input
+                <Input
                   type="text"
                   autoFocus
                   required
@@ -210,7 +211,7 @@ export function OrganizationSwitcher() {
                   placeholder="Team name"
                   disabled={createBusy}
                   aria-label="New team name"
-                  className="flex-1 min-w-0 text-sm rounded-lg border border-bh-border bg-bh-surface px-2 py-1"
+                  className="flex-1 min-w-0 text-sm"
                 />
                 <button
                   type="submit"

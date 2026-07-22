@@ -6,6 +6,7 @@ import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
+import { Input, Textarea } from '~/components/ui'
 
 interface Builder {
   id: string
@@ -123,14 +124,14 @@ export function BuilderProfilePage() {
       <div className="p-8 max-w-5xl mx-auto">
         <Link
           to="/explore"
-          className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
+          className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded"
         >
           <ArrowLeft className="w-4 h-4" /> Back to explore
         </Link>
         <div className="card text-center py-12" data-testid="builder-not-found">
           <p className="text-bh-text-muted mb-2">This builder isn't in the public directory yet.</p>
           <p className="text-xs text-bh-text-dim">
-            Try the <Link to="/explore" className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5">explorer</Link> to
+            Try the <Link to="/explore" className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5">explorer</Link> to
             find active builders, or check back soon — claimed profiles are added regularly.
           </p>
         </div>
@@ -142,7 +143,7 @@ export function BuilderProfilePage() {
     <div className="p-8 max-w-5xl mx-auto">
       <Link
         to="/search"
-        className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded"
+        className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded"
       >
         <ArrowLeft className="w-4 h-4" /> Back to search
       </Link>
@@ -225,7 +226,7 @@ export function BuilderProfilePage() {
               href={builder.profileUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+              className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
             >
               <Code className="w-4 h-4" />
               {builder.username} <ExternalLink className="w-3 h-3" />
@@ -280,7 +281,7 @@ export function BuilderProfilePage() {
               <div className="flex flex-wrap items-center gap-2">
                 <Link
                   to="/me"
-                  className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                  className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                 >
                   <Sparkles className="w-4 h-4" /> Manage your profile
                 </Link>
@@ -298,7 +299,7 @@ export function BuilderProfilePage() {
                 <Lock className="w-4 h-4" />
                 <Link
                   to="/auth/sign-in"
-                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
                 >
                   Sign in
                 </Link>
@@ -311,7 +312,7 @@ export function BuilderProfilePage() {
                 {!claimOpen ? (
                   <button
                     onClick={() => setClaimOpen(true)}
-                    className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     data-event="claim_cta_click"
                   >
                     <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
@@ -322,26 +323,26 @@ export function BuilderProfilePage() {
                       Enter the email associated with this profile. We'll send a verification link.
                     </p>
                     <div className="flex gap-2 flex-wrap">
-                      <input
+                      <Input
                         type="email"
                         value={claimEmail}
                         onChange={e => setClaimEmail(e.target.value)}
                         placeholder="you@example.com"
                         required
-                        className="input-field flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                        className="flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                         autoFocus
                       />
                       <button
                         type="submit"
                         disabled={claimSending}
-                        className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                        className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                       >
                         {claimSending ? 'Sending…' : 'Send verification email'}
                       </button>
                       <button
                         type="button"
                         onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
-                        className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                        className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                       >
                         Cancel
                       </button>
@@ -361,7 +362,7 @@ export function BuilderProfilePage() {
                             <strong>Dev mode:</strong>{' '}
                             <a
                               href={claimMsg.devLink}
-                              className="underline break-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                              className="underline break-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
                             >
                               {claimMsg.devLink}
                             </a>
@@ -400,17 +401,17 @@ export function BuilderProfilePage() {
                 )}
 
                 <div className="flex gap-2">
-                  <textarea
+                  <Textarea
                     value={noteText}
                     onChange={e => setNoteText(e.target.value)}
                     placeholder="Add a note about this builder..."
-                    className="input-field flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    className="flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     rows={2}
                   />
                   <button
                     onClick={handleSaveNote}
                     disabled={savingNote || !noteText.trim()}
-                    className="btn-primary flex items-center gap-2 h-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    className="btn-primary flex items-center gap-2 h-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <Save className="w-4 h-4" />
                     {savingNote ? 'Saving...' : 'Save'}
@@ -421,7 +422,7 @@ export function BuilderProfilePage() {
               <p className="text-sm text-bh-text-muted">
                 <Link
                   to="/auth/sign-in"
-                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded px-0.5"
+                  className="text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
                 >
                   Sign in
                 </Link>

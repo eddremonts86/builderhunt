@@ -173,7 +173,7 @@ function PrivacySettingsPage() {
     : 0
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="privacy-settings-page">
+    <div data-testid="privacy-settings-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Shield className="w-6 h-6 text-bh-accent" aria-hidden="true" />
@@ -185,7 +185,7 @@ function PrivacySettingsPage() {
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="privacy-error">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="privacy-error">
           <p>{error}</p>
           {blockingOrganizations.length > 0 && (
             <ul className="mt-2 space-y-1" data-testid="blocking-organizations">
@@ -210,7 +210,7 @@ function PrivacySettingsPage() {
         </div>
       )}
       {success && (
-        <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="privacy-success">
+        <div className="glass-panel border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="privacy-success">
           <p>{success}</p>
           {referenceId && (
             <p className="text-xs text-bh-text-dim mt-1" data-testid="privacy-reference-id">Reference: {referenceId}</p>
@@ -220,7 +220,7 @@ function PrivacySettingsPage() {
 
       {/* Deletion warning */}
       {deletion && deletion.status === 'pending' && (
-        <div className="card border-bh-warning/30 bg-bh-warning/5 p-5 mb-6" data-testid="deletion-warning">
+        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-5 mb-6" data-testid="deletion-warning">
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-bh-warning shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
@@ -245,7 +245,7 @@ function PrivacySettingsPage() {
       )}
 
       {/* Data export */}
-      <section className="card p-5 mb-6" data-testid="export-section">
+      <section className="glass-panel p-5 mb-6" data-testid="export-section">
         <h2 className="font-semibold flex items-center gap-2 mb-2">
           <Download className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Export my data
@@ -297,7 +297,7 @@ function PrivacySettingsPage() {
       </section>
 
       {/* Delete account */}
-      <section className="card border-bh-danger/30 p-5 mb-6" data-testid="delete-section">
+      <section className="glass-panel border-bh-danger/30 p-5 mb-6" data-testid="delete-section">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="sm:pr-6">
             <h2 className="font-semibold flex items-center gap-2 text-bh-danger">
@@ -360,7 +360,7 @@ function PrivacySettingsPage() {
         )}
       </section>
 
-      <section className="card p-5">
+      <section className="glass-panel p-5">
         <h2 className="font-semibold flex items-center gap-2 mb-2">
           <CheckCircle2 className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Your rights

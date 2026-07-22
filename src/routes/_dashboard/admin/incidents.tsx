@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, Plus, Save, X } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
 type IncidentSeverity = 'minor' | 'major' | 'critical'
@@ -161,7 +162,7 @@ function AdminIncidentsPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" data-testid="admin-incidents-page">
+    <div data-testid="admin-incidents-page">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
@@ -184,13 +185,13 @@ function AdminIncidentsPage() {
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="card p-5 mb-6 space-y-3" data-testid="admin-incident-form">
+        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-incident-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New incident' : 'Edit incident'}
           </h2>
@@ -198,11 +199,11 @@ function AdminIncidentsPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Title
             </label>
-            <input
+            <Input
               type="text"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="input w-full"
+              className="w-full"
               placeholder="e.g. Search API slow responses"
               data-testid="admin-incident-title"
             />
@@ -211,10 +212,10 @@ function AdminIncidentsPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Description
             </label>
-            <textarea
+            <Textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="input w-full min-h-[80px]"
+              className="w-full min-h-[80px]"
               placeholder="What's broken, what users see, what we're doing about it."
               data-testid="admin-incident-description"
             />
@@ -225,16 +226,19 @@ function AdminIncidentsPage() {
                 <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                   Severity
                 </label>
-                <select
+                <Select
                   value={form.severity}
-                  onChange={(e) => setForm({ ...form, severity: e.target.value as IncidentSeverity })}
-                  className="input w-full"
-                  data-testid="admin-incident-severity"
+                  onValueChange={(v) => setForm({ ...form, severity: v as IncidentSeverity })}
                 >
-                  <option value="minor">Minor</option>
-                  <option value="major">Major</option>
-                  <option value="critical">Critical</option>
-                </select>
+                  <SelectTrigger className="w-full" data-testid="admin-incident-severity">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minor">Minor</SelectItem>
+                    <SelectItem value="major">Major</SelectItem>
+                    <SelectItem value="critical">Critical</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
@@ -291,7 +295,7 @@ function AdminIncidentsPage() {
           incidents.map((i) => (
             <div
               key={i.id}
-              className="card p-4 flex items-start gap-3"
+              className="glass-panel p-4 flex items-start gap-3"
               data-testid={`admin-incident-row-${i.id}`}
             >
               <div className="flex-1 min-w-0">

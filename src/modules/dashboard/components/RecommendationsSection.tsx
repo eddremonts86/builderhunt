@@ -89,7 +89,7 @@ export function RecommendationsSection() {
   return (
     <section
       aria-labelledby="for-you-heading"
-      className="card p-5 md:p-6"
+      className="glass-panel p-5 md:p-6"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -112,7 +112,7 @@ export function RecommendationsSection() {
             {loading && 'Loading recommendations…'}
           </p>
         </div>
-        {!loading && data?.meta?.reason !== 'no_saved_searches' && data?.recommendations.length !== 0 && (
+        {!loading && data?.meta?.reason !== 'no_saved_searches' && (
           <button
             type="button"
             onClick={() => { setRefreshing(true); load() }}
@@ -131,7 +131,7 @@ export function RecommendationsSection() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="card animate-pulse h-32 bg-bh-surface/40" />
+            <div key={i} className="glass-panel animate-pulse h-32 bg-bh-surface/40" />
           ))}
         </div>
       )}
@@ -166,13 +166,6 @@ export function RecommendationsSection() {
             We checked your saved searches against the latest data — nothing new this round.
             Run them again or add a new search to discover more.
           </p>
-        </div>
-      )}
-
-      {/* Error */}
-      {!loading && data?.meta?.reason === 'error' && (
-        <div className="py-2 text-sm text-bh-text-muted">
-          <p>Something went wrong loading recommendations.</p>
         </div>
       )}
 
@@ -225,7 +218,7 @@ function RecommendationCard({
 
   return (
     <article
-      className="card card-hover p-4 group relative flex flex-col justify-between"
+      className="glass-panel card-hover p-4 group relative flex flex-col justify-between"
       data-event="recommendation_view"
     >
       <button

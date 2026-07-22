@@ -1,18 +1,6 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
-
-function Logo({ size = 24 }: { size?: number }) {
-  return (
-    <span className="inline-flex items-center justify-center rounded-md shrink-0" style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }} aria-hidden="true">
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <path d="M5 4h7a4 4 0 0 1 4 4v1" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M16 4h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-7a4 4 0 0 0-4 4v3" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <path d="M8 20H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h7a4 4 0 0 0 4-4V7" stroke="white" strokeWidth="2.4" strokeLinecap="round" />
-        <circle cx="11" cy="12" r="1.9" fill="#06b6d4" />
-      </svg>
-    </span>
-  )
-}
+import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 
 export function Footer() {
   return (
@@ -22,7 +10,7 @@ export function Footer() {
           {/* Logo & Info */}
           <div className="col-span-2">
             <Link to="/" className="flex items-center gap-2.5 mb-4 group">
-              <Logo size={26} />
+              <BrandLogoMark size={26} />
               <span className="font-bold text-base tracking-tight text-bh-text group-hover:text-bh-accent transition-colors">BuilderHunt</span>
             </Link>
             <p className="text-sm text-bh-text-muted max-w-sm leading-relaxed mb-4">

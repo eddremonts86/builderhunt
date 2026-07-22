@@ -3,23 +3,8 @@ import { useNavigate, Link } from '@tanstack/react-router'
 import { signUpEmail } from '~/shared/lib/auth/client'
 import { Input, Button } from '~/components/ui'
 import { ArrowLeft, Check } from 'lucide-react'
-
-function LogoMark({ size = 32 }: { size?: number }) {
-  return (
-    <span
-      className="inline-flex items-center justify-center rounded-xl shrink-0"
-      style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
-      aria-hidden="true"
-    >
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <path d="M5 4h7a4 4 0 0 1 4 4v1" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M16 4h3a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-7a4 4 0 0 0-4 4v3" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <path d="M8 20H5a2 2 0 0 1-2-2v-2a2 2 0 0 1 2-2h7a4 4 0 0 0 4-4V7" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
-        <circle cx="11" cy="12" r="1.8" fill="#06b6d4" />
-      </svg>
-    </span>
-  )
-}
+import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
+import { ThemeToggle } from '~/shared/components/ThemeToggle'
 
 export function SignUpPage() {
   const navigate = useNavigate()
@@ -64,14 +49,17 @@ export function SignUpPage() {
   return (
     <div className="min-h-screen bg-app flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <Link to="/" className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to home
-        </Link>
+        <div className="flex items-center justify-between mb-8">
+          <Link to="/" className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to home
+          </Link>
+          <ThemeToggle />
+        </div>
 
         <div className="card-glow">
           <div className="p-8">
             <div className="flex items-center gap-3 mb-6">
-              <LogoMark />
+              <BrandLogoMark size={32} />
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
                 <p className="text-sm text-bh-text-muted">Free during public beta. No credit card.</p>
@@ -166,8 +154,8 @@ export function SignUpPage() {
 
         <p className="text-center text-xs text-bh-text-dim mt-6">
           By creating an account you agree to our{' '}
-          <a href="/terms" className="underline hover:text-bh-text-muted">Terms</a> and{' '}
-          <a href="/privacy" className="underline hover:text-bh-text-muted">Privacy</a>.
+          <Link to="/legal/terms" className="underline hover:text-bh-text-muted">Terms</Link> and{' '}
+          <Link to="/legal/privacy" className="underline hover:text-bh-text-muted">Privacy</Link>.
         </p>
       </div>
     </div>
