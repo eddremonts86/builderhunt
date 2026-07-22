@@ -2,7 +2,9 @@ import { Sun, Moon } from 'lucide-react'
 import { useTheme } from '~/shared/lib/theme/ThemeProvider'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 
-/** Segmented Light/Dark switch, always visible in the topbar (not tucked behind a menu). */
+/** Segmented Light/Dark switch, always visible in the topbar (not tucked behind a menu).
+ * Shared by the dashboard shell and the public/landing header — both mount their own
+ * ThemeProvider, so this only ever needs `useTheme()`. */
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
 
@@ -29,7 +31,7 @@ export function ThemeToggle() {
             }`}
           >
             <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            {option}
+            <span className="hidden sm:inline">{option}</span>
           </button>
         )
       })}

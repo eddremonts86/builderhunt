@@ -112,7 +112,7 @@ export function RecommendationsSection() {
             {loading && 'Loading recommendations…'}
           </p>
         </div>
-        {!loading && data?.meta?.reason !== 'no_saved_searches' && data?.recommendations.length !== 0 && (
+        {!loading && data?.meta?.reason !== 'no_saved_searches' && (
           <button
             type="button"
             onClick={() => { setRefreshing(true); load() }}
@@ -166,13 +166,6 @@ export function RecommendationsSection() {
             We checked your saved searches against the latest data — nothing new this round.
             Run them again or add a new search to discover more.
           </p>
-        </div>
-      )}
-
-      {/* Error */}
-      {!loading && data?.meta?.reason === 'error' && (
-        <div className="py-2 text-sm text-bh-text-muted">
-          <p>Something went wrong loading recommendations.</p>
         </div>
       )}
 

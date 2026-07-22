@@ -126,7 +126,7 @@ function MePage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
+      <div>
         <div className="animate-pulse space-y-4">
           <div className="h-8 w-48 bg-bh-surface rounded" />
           <div className="h-32 bg-bh-surface rounded" />
@@ -136,7 +136,7 @@ function MePage() {
   }
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+    <div>
       <header className="mb-8">
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1 flex items-center gap-3">
           Your profile

@@ -78,7 +78,7 @@ export function ExportsPage() {
   }, [builders])
 
   return (
-    <div className="p-6 md:p-8 max-w-4xl mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         <div className="w-11 h-11 rounded-xl bg-bh-accent-soft flex items-center justify-center shrink-0">
@@ -93,8 +93,8 @@ export function ExportsPage() {
       </div>
 
       {error && (
-        <div className="glass-panel mb-6 border-red-500/30 bg-red-500/5">
-          <p className="text-sm text-red-400">{error}</p>
+        <div className="glass-panel mb-6 border-bh-danger/30 bg-bh-danger/5">
+          <p className="text-sm text-bh-danger">{error}</p>
         </div>
       )}
 
@@ -139,7 +139,7 @@ export function ExportsPage() {
               </div>
             </div>
             <div className="sm:text-right shrink-0">
-              {downloadMsg && <p className="text-sm mb-2 text-red-400">{downloadMsg}</p>}
+              {downloadMsg && <p className="text-sm mb-2 text-bh-danger">{downloadMsg}</p>}
               <button
                 onClick={handleDownload}
                 disabled={downloading}
@@ -189,7 +189,7 @@ export function ExportsPage() {
                   type="button"
                   onClick={() => handleRemove(b.id)}
                   disabled={removingId === b.id}
-                  className="btn-ghost btn-sm shrink-0 text-red-400"
+                  className="btn-ghost btn-sm shrink-0 text-bh-danger"
                   title="Remove from tracked builders"
                 >
                   <Trash2 className="w-4 h-4" />

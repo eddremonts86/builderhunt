@@ -344,7 +344,10 @@ function NewSprintWizard() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8" data-testid="sprint-wizard">
+    <div data-testid="sprint-wizard">
+      {/* Wizard content stays a focused single column even though the page
+          canvas now matches every other dashboard page's width. */}
+      <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-xl bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center shrink-0">
           <Compass className="w-5 h-5 text-bh-accent" aria-hidden="true" />
@@ -598,6 +601,7 @@ function NewSprintWizard() {
         </motion.div>
       )}
       </AnimatePresence>
+      </div>
     </div>
   )
 }

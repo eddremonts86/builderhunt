@@ -258,7 +258,7 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
             <label htmlFor="explore-query" className="mb-2 block text-sm font-semibold text-bh-text">
               What kind of builder are you looking for?
             </label>
-            <div className="flex flex-col gap-3 rounded-2xl border border-bh-border bg-white p-2 shadow-[0_12px_32px_-18px_rgba(24,24,27,0.3)] sm:flex-row">
+            <div className="flex flex-col gap-3 rounded-2xl border border-bh-border bg-bh-surface p-2 shadow-[0_12px_32px_-18px_rgba(24,24,27,0.3)] sm:flex-row">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-bh-text-dim" aria-hidden="true" />
                 <Input
@@ -412,11 +412,11 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                 role="tab"
                 aria-selected={resultType === 'people'}
                 aria-controls="explore-result-panel"
-                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent ${resultType === 'people' ? 'bg-bh-text text-white shadow-sm' : 'text-bh-text-muted hover:bg-bh-surface-2 hover:text-bh-text'}`}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent ${resultType === 'people' ? 'bg-bh-accent text-[color:var(--color-bh-accent-contrast)] shadow-sm' : 'text-bh-text-muted hover:bg-bh-surface-2 hover:text-bh-text'}`}
                 data-testid="explore-tab-people"
               >
                 People
-                <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${resultType === 'people' ? 'bg-white/15 text-white' : 'bg-bh-surface-2 text-bh-text-dim'}`}>{people.length}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${resultType === 'people' ? 'bg-[color:var(--color-bh-accent-contrast)]/15 text-[color:var(--color-bh-accent-contrast)]' : 'bg-bh-surface-2 text-bh-text-dim'}`}>{people.length}</span>
               </Link>
               <Link
                 to="/explore"
@@ -425,11 +425,11 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                 role="tab"
                 aria-selected={resultType === 'resources'}
                 aria-controls="explore-result-panel"
-                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent ${resultType === 'resources' ? 'bg-bh-text text-white shadow-sm' : 'text-bh-text-muted hover:bg-bh-surface-2 hover:text-bh-text'}`}
+                className={`inline-flex min-h-10 items-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent ${resultType === 'resources' ? 'bg-bh-accent text-[color:var(--color-bh-accent-contrast)] shadow-sm' : 'text-bh-text-muted hover:bg-bh-surface-2 hover:text-bh-text'}`}
                 data-testid="explore-tab-resources"
               >
                 Resources
-                <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${resultType === 'resources' ? 'bg-white/15 text-white' : 'bg-bh-surface-2 text-bh-text-dim'}`}>{resources.length}</span>
+                <span className={`rounded-full px-2 py-0.5 text-xs tabular-nums ${resultType === 'resources' ? 'bg-[color:var(--color-bh-accent-contrast)]/15 text-[color:var(--color-bh-accent-contrast)]' : 'bg-bh-surface-2 text-bh-text-dim'}`}>{resources.length}</span>
               </Link>
             </nav>
           )}

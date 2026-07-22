@@ -125,8 +125,10 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 /* =============================================================================
-   Dark theme — dashboard-only, scoped via a `.dark` class on the shell root
-   (not <html>), so public/landing surfaces are never affected.
+   Dark theme — toggled via a `.dark` class on <html>, synced by whichever
+   ThemeProvider is currently mounted (dashboard shell, onboarding, or the
+   public/landing layout — see ThemeProvider.tsx). Every surface that reads
+   these tokens (cards, buttons, badges, icons) gets dark mode for free.
    ============================================================================= */
 .dark {
   --color-bh-bg: #0a0a0d;
@@ -142,6 +144,11 @@
   --color-bh-accent-glow: rgba(224, 115, 56, 0.4);
   --color-bh-danger-soft: rgba(220, 38, 38, 0.16);
   --color-bh-danger-glow: rgba(220, 38, 38, 0.4);
+  /* GitHub/DEV.to brand marks are near-black in their official light-mode
+     color — invisible against a near-black page. Swap to their own official
+     dark-mode ink so the marquee/badges on the landing page stay legible. */
+  --color-bh-github: #f0f6fc;
+  --color-bh-devto: #ffffff;
 }
 
 /* Alternate neon-green accent — toggle independently of theme via .accent-neon */
@@ -321,6 +328,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   padding: 1.5rem;
   box-shadow: 0 10px 30px -15px rgba(24, 24, 27, 0.03), 0 1px 3px rgba(24, 24, 27, 0.01) !important;
   transition: border-color 0.2s, transform 0.2s;
+}
+.dark .card {
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 .card-hover:hover {
   border-color: var(--color-bh-border-strong);
@@ -520,6 +531,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .badge-sourcehut { background: rgba(255, 102, 0, 0.08); color: #c2410c; border-color: rgba(255, 102, 0, 0.15); }
 .badge-success { background: rgba(22, 163, 74, 0.08); color: var(--color-bh-success); border-color: rgba(22, 163, 74, 0.15); }
 .badge-neutral { background: rgba(113, 113, 122, 0.08); color: var(--color-bh-text-muted); border-color: var(--color-bh-border); }
+
+/* GitHub/DEV.to badge fills are near-black tints — invisible on a dark page
+   (near-black-on-near-black). Their dark-mode ink (above) needs a matching
+   light-tinted fill/border instead of the light-mode near-black tint. */
+.dark .badge-github { background: rgba(240, 246, 252, 0.08); border-color: rgba(240, 246, 252, 0.18); }
+.dark .badge-devto { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
 
 /* =============================================================================
    Text gradient — for hero headlines

@@ -144,7 +144,7 @@ function SprintDossierPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8" data-testid="sprint-dossier">
+    <div data-testid="sprint-dossier">
       <div className="flex items-center gap-2 mb-1">
         <Compass className="w-5 h-5 text-bh-accent" />
         <h1 className="text-xl font-bold text-bh-text">{sprint?.name ?? 'Sprint'}</h1>

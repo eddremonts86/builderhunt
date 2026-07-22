@@ -101,7 +101,7 @@ function SprintsListPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8" data-testid="sprints-page">
+    <div data-testid="sprints-page">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <Compass className="w-5 h-5 text-bh-accent" />
@@ -128,7 +128,7 @@ function SprintsListPage() {
       </div>
 
       {runNote && <p className="text-sm text-bh-text-dim mb-4">{runNote}</p>}
-      {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
+      {error && <p className="text-sm text-bh-danger mb-4">{error}</p>}
 
       {loading ? (
         <p className="text-sm text-bh-text-dim">Loading…</p>

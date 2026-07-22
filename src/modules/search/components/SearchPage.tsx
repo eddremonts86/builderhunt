@@ -615,7 +615,7 @@ export function SearchPage() {
   /* ---------------------------------------------------------------------- */
 
   return (
-    <div className="p-6 md:p-8 max-w-6xl mx-auto">
+    <div>
       {/* Header — collapses to just a small title once results are on screen,
           so a returning search doesn't repeat a full-height intro every time. */}
       <header className={searched ? 'mb-4' : 'mb-8'}>

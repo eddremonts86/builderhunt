@@ -90,21 +90,21 @@ function AdminMetricsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 max-w-4xl mx-auto" data-testid="admin-metrics-page">
+      <div data-testid="admin-metrics-page">
         <p className="text-bh-text-muted">Loading…</p>
       </div>
     )
   }
   if (error || !data) {
     return (
-      <div className="p-6 max-w-4xl mx-auto" data-testid="admin-metrics-page">
+      <div data-testid="admin-metrics-page">
         <p className="text-bh-danger">{error ?? 'No data'}</p>
       </div>
     )
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" data-testid="admin-metrics-page">
+    <div data-testid="admin-metrics-page">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

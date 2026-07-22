@@ -166,7 +166,7 @@ export function OrganizationDangerZone({
                 type="button"
                 onClick={() => transferTarget && (onTransferOwnership ?? noop)(transferTarget)}
                 disabled={busy || !transferTarget}
-                className="btn-danger-outline btn-sm"
+                className="btn-danger-outline text-sm"
                 data-testid="transfer-ownership-btn"
               >
                 <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
@@ -215,7 +215,7 @@ export function OrganizationDangerZone({
                     type="button"
                     onClick={() => (onRequestDeletion ?? noop)()}
                     disabled={busy || !nameMatches}
-                    className="btn-danger btn-sm shrink-0"
+                    className="btn-danger text-sm shrink-0"
                     data-testid="confirm-delete-organization-btn"
                   >
                     Schedule deletion
@@ -227,7 +227,7 @@ export function OrganizationDangerZone({
                       setConfirmName('')
                     }}
                     disabled={busy}
-                    className="btn-secondary btn-sm shrink-0"
+                    className="btn-secondary text-sm shrink-0"
                     data-testid="cancel-delete-organization-btn"
                   >
                     <X className="w-3 h-3" aria-hidden="true" />

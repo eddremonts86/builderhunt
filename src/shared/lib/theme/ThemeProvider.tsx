@@ -22,14 +22,15 @@ function readStored<T extends string>(key: string, fallback: T, valid: readonly 
 }
 
 /**
- * Mounted only inside DashboardLayout (not the app root), but the `.dark`/`.accent-neon`
- * classes it manages are synced onto `<html>` for as long as this provider is mounted —
- * not onto its own subtree. Floating UI (menus, dialogs) portals to `document.body`,
- * which sits as a *sibling* of the dashboard shell's own wrapper div, not a descendant —
- * a class scoped to that wrapper div is invisible to anything portaled out of it. Syncing
- * to `<html>` on mount and removing it on unmount keeps portaled dashboard UI themed
- * correctly while still leaving public/landing routes untouched, since this provider
- * (and therefore the effect) only exists while a `_dashboard` route is mounted.
+ * Mounted per top-level layout (dashboard, onboarding, public/landing) rather than once at
+ * the app root, but the `.dark`/`.accent-neon` classes it manages are synced onto `<html>`
+ * for as long as a given instance is mounted — not onto its own subtree. Floating UI (menus,
+ * dialogs) portals to `document.body`, which sits as a *sibling* of any wrapper div, not a
+ * descendant — a class scoped to that wrapper div is invisible to anything portaled out of
+ * it. Syncing to `<html>` on mount and removing it on unmount keeps portaled UI themed
+ * correctly no matter which layout is currently mounted. Since the three layouts are mutually
+ * exclusive per route, only one instance is ever mounted at a time, and all instances share
+ * the same localStorage keys, so the theme/accent choice persists seamlessly across them.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = React.useState<Theme>(() => readStored(THEME_KEY, 'dark', ['dark', 'light']))

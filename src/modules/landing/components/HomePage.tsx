@@ -107,10 +107,10 @@ export function HomePage() {
             <div className="marquee-container">
               <div className="marquee-content">
                 {[
-                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-[#24292f]' },
-                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-[#ff4500]' },
-                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-[#d05300]' },
-                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-[#09090b]' },
+                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
+                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
+                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
+                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
                 ].map((s, idx) => (
                   <div key={`${s.name}-1-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
                     <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
@@ -127,10 +127,10 @@ export function HomePage() {
               </div>
               <div className="marquee-content" aria-hidden="true">
                 {[
-                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-[#24292f]' },
-                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-[#ff4500]' },
-                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-[#d05300]' },
-                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-[#09090b]' },
+                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
+                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
+                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
+                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
                 ].map((s, idx) => (
                   <div key={`${s.name}-2-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
                     <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
@@ -184,7 +184,7 @@ export function HomePage() {
                         </div>
                         <div className="flex flex-wrap gap-1 mt-2">
                           <span className="text-[10px] bg-bh-accent-soft border border-bh-accent/20 text-bh-accent px-1.5 py-0.5 rounded-full font-bold">GitHub</span>
-                          <span className="text-[10px] bg-[#ff4500]/10 border border-[#ff4500]/20 text-[#c03600] px-1.5 py-0.5 rounded-full font-bold">Reddit</span>
+                          <span className="badge badge-reddit text-[10px] px-1.5 py-0.5">Reddit</span>
                         </div>
                       </div>
                     )
@@ -216,7 +216,7 @@ export function HomePage() {
                         <span className="flex-1 bg-bh-surface border border-bh-border rounded-lg py-1 px-1.5 text-[10px] font-bold text-bh-text-muted inline-flex items-center justify-center gap-1">
                           <Download className="w-3 h-3" /> Export
                         </span>
-                        <span className="flex-1 bg-bh-accent text-white rounded-lg py-1 px-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1">
+                        <span className="flex-1 bg-bh-accent text-[color:var(--color-bh-accent-contrast)] rounded-lg py-1 px-1.5 text-[10px] font-bold inline-flex items-center justify-center gap-1">
                           <Bell className="w-3 h-3" /> Alerts
                         </span>
                       </div>
@@ -274,7 +274,7 @@ export function HomePage() {
                 {/* SVG Visual: Central Developer avatar connected to sources */}
                 <div className="mt-6 bg-bh-bg/40 border border-bh-border/50 rounded-xl p-4 flex items-center justify-center gap-6 h-28 relative overflow-hidden">
                   <div className="flex items-center gap-1.5 bg-bh-surface border border-bh-border/60 shadow-sm rounded-lg px-3 py-1.5 z-10">
-                    <div className="w-6 h-6 rounded-full bg-bh-accent flex items-center justify-center text-white text-[10px] font-bold">JD</div>
+                    <div className="w-6 h-6 rounded-full bg-bh-accent flex items-center justify-center text-[color:var(--color-bh-accent-contrast)] text-[10px] font-bold">JD</div>
                     <span className="text-xs font-bold text-bh-text">Developer Profile</span>
                   </div>
                   <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">

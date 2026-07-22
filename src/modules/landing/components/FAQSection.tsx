@@ -33,7 +33,7 @@ export function FAQSection() {
     <div className="space-y-3">
       {FAQ_ITEMS.map((item) => (
         <details key={item.q} className="group card hover:border-bh-border-strong mb-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between font-semibold text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] rounded-lg p-2">
+          <summary className="flex cursor-pointer list-none items-center justify-between font-semibold text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent rounded-lg p-2">
             <span>{item.q}</span>
             <ChevronDown
               className="w-5 h-5 text-bh-text-muted transition-transform duration-200 group-open:rotate-180"

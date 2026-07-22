@@ -179,7 +179,7 @@ function AlertsInboxPage() {
   const hasAlerts = userAlerts.length > 0
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="alerts-inbox-page">
+    <div data-testid="alerts-inbox-page">
       <header className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

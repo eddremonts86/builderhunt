@@ -72,7 +72,7 @@ function BillingSettingsPage() {
   const usage = usageQuery.data ?? []
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="billing-settings-page">
+    <div data-testid="billing-settings-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Crown className="w-6 h-6 text-bh-accent" aria-hidden="true" />

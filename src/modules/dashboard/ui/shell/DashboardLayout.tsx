@@ -11,7 +11,7 @@ import { Tooltip } from '~/shared/components/Tooltip'
 import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
 import { OrganizationSwitcher } from '~/modules/dashboard/components/OrganizationSwitcher'
 import { UserMenu } from '~/modules/dashboard/components/UserMenu'
-import { ThemeToggle } from '~/modules/dashboard/components/ThemeToggle'
+import { ThemeToggle } from '~/shared/components/ThemeToggle'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 import { motionTokens } from '~/shared/lib/motion/tokens'
 
@@ -115,9 +115,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         </div>
       </motion.header>
 
-      {/* Main */}
+      {/* Main — one canonical content width for every dashboard page, so
+          settings/sprints/search/admin all occupy the same horizontal
+          space instead of each page picking its own max-w-*. */}
       <main id="main-content" className="pt-24 pb-8 px-4 lg:px-8">
-        {children}
+        <div className="max-w-5xl mx-auto w-full">
+          {children}
+        </div>
       </main>
 
       <BackToTop />

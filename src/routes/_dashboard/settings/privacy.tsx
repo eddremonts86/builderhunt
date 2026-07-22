@@ -173,7 +173,7 @@ function PrivacySettingsPage() {
     : 0
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="privacy-settings-page">
+    <div data-testid="privacy-settings-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Shield className="w-6 h-6 text-bh-accent" aria-hidden="true" />

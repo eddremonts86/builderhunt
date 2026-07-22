@@ -91,7 +91,7 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-6xl mx-auto">
+      <div>
         <div className="animate-pulse space-y-6">
           <div className="h-8 w-48 bg-bh-surface rounded" />
           <div className="h-4 w-72 bg-bh-surface rounded" />
@@ -161,7 +161,6 @@ export function DashboardPage() {
 
   return (
     <motion.div
-      className="p-6 md:p-8 max-w-6xl mx-auto"
       initial={fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
@@ -264,8 +263,8 @@ export function DashboardPage() {
                         <div
                           className={`w-full rounded-t-md transition-all duration-500 ease-out ${
                             isPeak
-                              ? 'bg-[#fbeee6] bg-striped-terracotta'
-                              : 'bg-zinc-50 bg-striped-neutral'
+                              ? 'bg-bh-accent-soft bg-striped-terracotta'
+                              : 'bg-bh-border-strong bg-striped-neutral'
                           }`}
                           style={{ height: `${heightPct}%` }}
                         />
@@ -433,7 +432,7 @@ function StatCard({
   return (
     <div className="glass-panel card-hover p-5">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-light text-zinc-400">{label}</span>
+        <span className="text-xs font-light text-bh-text-dim">{label}</span>
         <div className={`w-7 h-7 rounded-md border flex items-center justify-center ${TONE_ICON[tone]}`}>
           <Icon className="w-3.5 h-3.5" aria-hidden="true" />
         </div>
@@ -443,7 +442,7 @@ function StatCard({
           {value.toLocaleString()}
         </span>
         {badge && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-500 border border-zinc-200">
+          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-bh-bg-alt text-bh-text-dim border border-bh-border">
             {badge}
           </span>
         )}

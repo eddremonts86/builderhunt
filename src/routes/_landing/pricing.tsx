@@ -109,7 +109,7 @@ function PricingPage() {
             type="button"
             onClick={() => setBillingPeriod('monthly')}
             className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${
-              billingPeriod === 'monthly' ? 'bg-bh-accent text-white' : 'text-bh-text-muted hover:text-bh-text'
+              billingPeriod === 'monthly' ? 'bg-bh-accent text-[color:var(--color-bh-accent-contrast)]' : 'text-bh-text-muted hover:text-bh-text'
             }`}
             data-testid="period-monthly"
           >
@@ -119,7 +119,7 @@ function PricingPage() {
             type="button"
             onClick={() => setBillingPeriod('annual')}
             className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${
-              billingPeriod === 'annual' ? 'bg-bh-accent text-white' : 'text-bh-text-muted hover:text-bh-text'
+              billingPeriod === 'annual' ? 'bg-bh-accent text-[color:var(--color-bh-accent-contrast)]' : 'text-bh-text-muted hover:text-bh-text'
             }`}
             data-testid="period-annual"
           >

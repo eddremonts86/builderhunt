@@ -6,6 +6,7 @@ import { useSession, signOut } from '~/shared/lib/auth/client'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
 import { useScrollSpy } from '~/shared/lib/useScrollSpy'
+import { ThemeToggle } from '~/shared/components/ThemeToggle'
 
 const NAV_LINKS = [
   { id: 'how-it-works', label: 'How it works' },
@@ -39,7 +40,7 @@ export function Header() {
 
   return (
     <header
-      className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-1.5 bg-bh-surface border border-bh-border/60 rounded-full shadow-lg px-2 py-1.5"
+      className="fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-1.5 glass-topbar rounded-full px-2 py-1.5"
       aria-label="Primary"
     >
       <Link to="/" className="flex items-center gap-2.5 group shrink-0 px-1.5" aria-label="BuilderHunt home">
@@ -82,6 +83,7 @@ export function Header() {
       </ul>
 
       <div className="flex items-center gap-2 shrink-0">
+        <ThemeToggle />
         {isAuthed ? (
           <>
             <LinkButton to="/dashboard" variant="secondary" className="btn-sm">

@@ -159,7 +159,7 @@ function AdminChangelogPage() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto" data-testid="admin-changelog-page">
+    <div data-testid="admin-changelog-page">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">

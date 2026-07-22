@@ -90,7 +90,7 @@ export function TeamSettingsPage({
   const seatsFull = snapshot.seatUsage.used >= snapshot.seatUsage.limit
 
   return (
-    <div className="p-6 max-w-3xl mx-auto" data-testid="team-settings-page">
+    <div data-testid="team-settings-page">
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
           <Users className="w-6 h-6 text-bh-accent" aria-hidden="true" />
@@ -295,7 +295,7 @@ export function TeamSettingsPage({
               <button
                 type="submit"
                 disabled={busy || seatsFull}
-                className="btn-primary btn-sm"
+                className="btn-primary text-sm"
                 data-testid="invite-submit-btn"
               >
                 <UserPlus className="w-4 h-4" aria-hidden="true" />
