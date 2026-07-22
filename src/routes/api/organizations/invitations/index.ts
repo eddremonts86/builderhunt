@@ -27,7 +27,10 @@ export const Route = createFileRoute('/api/organizations/invitations/')({
             email: parsed.data.email,
             role: parsed.data.role,
           })
-          return Response.json(toInvitationSummaryDto(invitation))
+          // `devLink` is only ever present when no real email provider is
+          // configured (dev mode) — the invitation was created but nothing
+          // was actually sent, so the admin gets a manual-share fallback.
+          return Response.json({ ...toInvitationSummaryDto(invitation), devLink: invitation.devLink })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response

@@ -20,6 +20,7 @@ import type {
 import {
   getOrganizationLifecycle,
   getSeatUsage,
+  listInvitationsForEmail,
   listMyOrganizations,
   listOrganizationMembers,
   listPendingInvitations,
@@ -34,6 +35,7 @@ export {
   can,
   getOrganizationLifecycle,
   getSeatUsage,
+  listInvitationsForEmail,
   listMyOrganizations,
   listOrganizationMembers,
   listPendingInvitations,
@@ -104,6 +106,23 @@ export function toOrganizationMemberDto(member: OrganizationMemberRecord): Organ
 
 export function toSeatUsageDto(usage: SeatUsageRecord): SeatUsageDto {
   return { used: usage.used, limit: usage.limit }
+}
+
+/** What a signed-in INVITEE sees about their own pending invitations — never their own email back, never who else was invited, just enough to decide whether to open and accept one. */
+export interface MyPendingInvitationDto {
+  id: string
+  organizationName: string
+  role: InvitableRole
+  expiresAt: string
+}
+
+export function toMyPendingInvitationDto(invitation: InvitationRecord): MyPendingInvitationDto {
+  return {
+    id: invitation.id,
+    organizationName: invitation.organizationName,
+    role: invitation.role,
+    expiresAt: invitation.expiresAt.toISOString(),
+  }
 }
 
 /** Everything `TeamSettingsPage` needs for one render — the viewer's own role travels alongside so the client can gate controls with the same `can()` used server-side, never a hand-rolled role check. */

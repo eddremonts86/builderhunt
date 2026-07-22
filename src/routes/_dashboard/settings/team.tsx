@@ -35,6 +35,10 @@ function TeamSettingsRoute() {
   const navigate = useNavigate()
   const [busy, setBusy] = React.useState(false)
   const [mutationError, setMutationError] = React.useState<string | null>(null)
+  // `devLink` only ever comes back when no real email provider is configured
+  // (dev mode) — the invitation exists but nothing was actually sent, so
+  // TeamSettingsPage shows a manual-share fallback for exactly that invitation.
+  const [devLinks, setDevLinks] = React.useState<Record<string, string>>({})
 
   const { data: snapshot, isLoading, error } = useQuery({
     queryKey: organizationQueryKey(activeOrganizationId, 'team'),
@@ -60,7 +64,11 @@ function TeamSettingsRoute() {
     navigate({ to: '/dashboard' })
   }
 
-  async function runMutation(action: () => Promise<Response>, fallbackErrorMessage: string, onSuccess: () => Promise<void>) {
+  async function runMutation(
+    action: () => Promise<Response>,
+    fallbackErrorMessage: string,
+    onSuccess: (body: unknown) => Promise<void> | void,
+  ) {
     setBusy(true)
     setMutationError(null)
     try {
@@ -69,12 +77,19 @@ function TeamSettingsRoute() {
         setMutationError(await parseErrorMessage(response, fallbackErrorMessage))
         return
       }
-      await onSuccess()
+      const body = await response.json().catch(() => ({}))
+      await onSuccess(body)
     } catch {
       setMutationError(fallbackErrorMessage)
     } finally {
       setBusy(false)
     }
+  }
+
+  function captureDevLink(body: unknown) {
+    if (!body || typeof body !== 'object' || !('id' in body) || !('devLink' in body)) return
+    const { id, devLink } = body as { id: string; devLink?: string }
+    if (devLink) setDevLinks((prev) => ({ ...prev, [id]: devLink }))
   }
 
   const handleChangeRole = (targetUserId: string, role: InvitableRole) =>
@@ -137,7 +152,10 @@ function TeamSettingsRoute() {
         body: JSON.stringify({ email, role }),
       }),
       'Failed to send invitation',
-      refreshSnapshot,
+      async (body) => {
+        captureDevLink(body)
+        await refreshSnapshot()
+      },
     )
 
   const handleCancelInvite = (invitationId: string) =>
@@ -147,7 +165,14 @@ function TeamSettingsRoute() {
         credentials: 'include',
       }),
       'Failed to cancel invitation',
-      refreshSnapshot,
+      async () => {
+        setDevLinks((prev) => {
+          const next = { ...prev }
+          delete next[invitationId]
+          return next
+        })
+        await refreshSnapshot()
+      },
     )
 
   const handleResendInvite = (invitationId: string) =>
@@ -157,7 +182,17 @@ function TeamSettingsRoute() {
         credentials: 'include',
       }),
       'Failed to resend invitation',
-      refreshSnapshot,
+      async (body) => {
+        // Resend cancels the old invitation and mints a fresh one — drop any
+        // stale link for the old id, the fresh id's link (if any) is captured below.
+        setDevLinks((prev) => {
+          const next = { ...prev }
+          delete next[invitationId]
+          return next
+        })
+        captureDevLink(body)
+        await refreshSnapshot()
+      },
     )
 
   if (isLoading) {
@@ -177,6 +212,7 @@ function TeamSettingsRoute() {
       viewerUserId={user.userId!}
       busy={busy}
       error={mutationError}
+      devLinkByInvitationId={devLinks}
       onInvite={handleInvite}
       onCancelInvite={handleCancelInvite}
       onResendInvite={handleResendInvite}
