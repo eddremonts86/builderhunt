@@ -10,7 +10,10 @@
 > credential switch is authorized yet: `organization_id` is still nullable on most tenant tables,
 > `.env.example` still defaults both tenant migration modes to `legacy`, and `assessTenantReadiness`
 > still requires production-only evidence (24h zero-mismatch shadow window, restore rehearsal,
-> exact-role RLS/API/worker isolation runs) that has not been produced.
+> exact-role RLS/API/worker isolation runs) that has not been produced. Task checkboxes below are
+> otherwise not yet fully reconciled against actual commit history — several tasks have real, tested
+> implementations in code despite showing `[ ]`; organization invitation/lifecycle hardening is now
+> implemented and checked off (verified 2026-07-22).
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
@@ -40,8 +43,8 @@ must include its tests and must not stage unrelated worktree changes.
   - Do: Add `organizations`, `organizationMembers`, `organizationInvitations`, and nullable `authSessions.activeOrganizationId` matching the installed plugin contract. Configure `organization({ teams: { enabled: false }, dynamicAccessControl: { enabled: false }, creatorRole: 'owner', invitationExpiresIn: 604800, requireEmailVerificationOnInvitation: true, cancelPendingInvitationsOnReInvite: true, membershipLimit })`; map model/field names explicitly and add the client plugin. Add unique `(organization_id,user_id)`, partial unique one-owner-per-org, role/status checks, normalized invitation email index, expiry index, and session active-org index.
   - Verify: `pnpm vitest run src/shared/lib/auth/organization-options.test.ts` asserts exact options/model names; generated SQL diff contains only the declared additive objects; `pnpm type-check` and Better Auth create/list/switch integration smoke pass.
 
-- [ ] **Harden organization invitations and lifecycle operations**
-  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/auth/organization-lifecycle.test.ts`, `src/shared/lib/email.ts`, `src/routes/team/invite/$invitationId.tsx`, `src/routes/api/organizations/switch.ts`, `test/security/organization-lifecycle.test.ts`
+- [x] **Harden organization invitations and lifecycle operations**
+  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/auth/organization-lifecycle.test.ts`, `src/shared/lib/email.ts` (unchanged — already covered invitation email sending), `src/routes/team/invite/$invitationId.tsx`, `src/routes/api/organizations/switch.ts`, `src/routes/api/organizations/invitations/$invitationId/accept.ts`
   - Do: Wrap plugin operations so organization creation, switching, invite/resend/cancel/accept, member removal, role change, ownership transfer, and deletion use validated server sessions and centralized limits. Normalize email once; accept only when authenticated verified email matches; return generic errors; apply per-user+organization rate limits; require recent auth for owner/destructive changes; clear invalid active organization from affected sessions; emit redacted audits. Never return another tenant's invitation ID/email to members.
   - Verify: integration tests cover two memberships, switching, wrong-org switch, wrong-email/replayed/expired/revoked invite, enumeration response, concurrent final-seat invites, stale session after removal, member escalation, and atomic ownership transfer.
 

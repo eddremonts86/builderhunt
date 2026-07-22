@@ -48,12 +48,14 @@ import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/se
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -119,6 +121,7 @@ import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/adm
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
@@ -316,6 +319,11 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
   path: '/dashboard/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
+  id: '/team/invite/$invitationId',
+  path: '/team/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
   id: '/api/sprints/preview',
   path: '/api/sprints/preview',
@@ -344,6 +352,11 @@ const ApiPlansRequestUpgradeRoute = ApiPlansRequestUpgradeRouteImport.update({
 const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   id: '/api/plans/me',
   path: '/api/plans/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
+  id: '/api/organizations/switch',
+  path: '/api/organizations/switch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
@@ -687,6 +700,12 @@ const ApiBuildersBuilderIdEvidenceIndexRoute =
     path: '/evidence/',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
+  ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
+    id: '/api/organizations/invitations/$invitationId/accept',
+    path: '/api/organizations/invitations/$invitationId/accept',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMeBuilderBuilderIdRestrictProcessingRoute =
   ApiMeBuilderBuilderIdRestrictProcessingRouteImport.update({
     id: '/restrict-processing',
@@ -757,12 +776,14 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
@@ -817,6 +838,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRoutesByTo {
@@ -869,12 +891,14 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
@@ -929,6 +953,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRoutesById {
@@ -985,12 +1010,14 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
@@ -1045,6 +1072,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
 export interface FileRouteTypes {
@@ -1100,12 +1128,14 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/team/invite/$invitationId'
     | '/dashboard/'
     | '/exports/'
     | '/me/'
@@ -1160,6 +1190,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1212,12 +1243,14 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/team/invite/$invitationId'
     | '/dashboard'
     | '/exports'
     | '/me'
@@ -1272,6 +1305,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence'
   id:
     | '__root__'
@@ -1327,12 +1361,14 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/team/invite/$invitationId'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
@@ -1387,6 +1423,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
+    | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
   fileRoutesById: FileRoutesById
 }
@@ -1418,12 +1455,14 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
+  ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
+  TeamInviteInvitationIdRoute: typeof TeamInviteInvitationIdRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
@@ -1460,6 +1499,7 @@ export interface RootRouteChildren {
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
+  ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1737,6 +1777,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/team/invite/$invitationId': {
+      id: '/team/invite/$invitationId'
+      path: '/team/invite/$invitationId'
+      fullPath: '/team/invite/$invitationId'
+      preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sprints/preview': {
       id: '/api/sprints/preview'
       path: '/api/sprints/preview'
@@ -1777,6 +1824,13 @@ declare module '@tanstack/react-router' {
       path: '/api/plans/me'
       fullPath: '/api/plans/me'
       preLoaderRoute: typeof ApiPlansMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/switch': {
+      id: '/api/organizations/switch'
+      path: '/api/organizations/switch'
+      fullPath: '/api/organizations/switch'
+      preLoaderRoute: typeof ApiOrganizationsSwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/onboarding/status': {
@@ -2234,6 +2288,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/organizations/invitations/$invitationId/accept': {
+      id: '/api/organizations/invitations/$invitationId/accept'
+      path: '/api/organizations/invitations/$invitationId/accept'
+      fullPath: '/api/organizations/invitations/$invitationId/accept'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/builder/$builderId/restrict-processing': {
       id: '/api/me/builder/$builderId/restrict-processing'
       path: '/restrict-processing'
@@ -2447,12 +2508,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
+  ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
+  TeamInviteInvitationIdRoute: TeamInviteInvitationIdRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
@@ -2489,6 +2552,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
+  ApiOrganizationsInvitationsInvitationIdAcceptRoute:
+    ApiOrganizationsInvitationsInvitationIdAcceptRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
