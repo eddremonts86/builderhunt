@@ -102,18 +102,32 @@ describe('TeamSettingsPage — authorization matrix', () => {
     expect(ids).not.toContain('delete-organization-btn')
   })
 
-  it('hides the invite form on a personal workspace even for its sole owner, and explains why', async () => {
-    const personal = baseSnapshot('owner')
-    personal.organization.isPersonal = true
-    personal.members = [personal.members[0]]
-    personal.pendingInvitations = []
-    personal.seatUsage = { used: 1, limit: 1 }
+  it('still renders the invite form on a personal-flagged org that has real seats (e.g. an admin-granted Team plan)', async () => {
+    const personalWithSeats = baseSnapshot('owner')
+    personalWithSeats.organization.isPersonal = true
+    personalWithSeats.members = [personalWithSeats.members[0]]
+    personalWithSeats.pendingInvitations = []
+    personalWithSeats.seatUsage = { used: 1, limit: 10 }
 
-    await render(personal, 'user-owner')
+    await render(personalWithSeats, 'user-owner')
     const ids = testIds()
 
-    expect(ids).toContain('personal-org-invite-note')
-    expect(ids).not.toContain('invite-form')
+    // `isPersonal` is a structural label (the auto-created default org), not
+    // a capacity rule — a personal org can legitimately have real seats, and
+    // must be invitable exactly like any team once it does.
+    expect(ids).toContain('invite-form')
+    const submitButton = container!.querySelector('[data-testid="invite-submit-btn"]') as HTMLButtonElement
+    expect(submitButton.disabled).toBe(false)
+  })
+
+  it('disables inviting once the real seat limit is reached, regardless of isPersonal', async () => {
+    const seatsFull = baseSnapshot('owner')
+    seatsFull.seatUsage = { used: 1, limit: 1 }
+
+    await render(seatsFull, 'user-owner')
+    const submitButton = container!.querySelector('[data-testid="invite-submit-btn"]') as HTMLButtonElement
+    expect(submitButton.disabled).toBe(true)
+    expect(submitButton.textContent).toContain('Seat limit reached')
   })
 
   it('never renders fields beyond the DTO shape, even when a fixture is contaminated with extra auth-shaped data', async () => {

@@ -121,7 +121,7 @@ export async function getTeamSnapshot(principal: TenantPrincipal): Promise<TeamS
     listMyOrganizations(principal.userId),
     listOrganizationMembers(principal.organizationId),
     listPendingInvitations(principal.organizationId),
-    getSeatUsage(principal.organizationId),
+    getSeatUsage(principal),
   ])
 
   const mine = myOrganizations.find((record) => record.organization.id === principal.organizationId)
