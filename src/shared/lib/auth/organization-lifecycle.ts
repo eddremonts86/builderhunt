@@ -292,13 +292,30 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     }
 
     await deps.cancelInvitationRecord(invitation.id)
-    const fresh = await deps.createInvitation({
-      organizationId: invitation.organizationId,
-      organizationName: invitation.organizationName,
-      email: invitation.email,
-      role: invitation.role,
-      inviterId: session.userId,
-    })
+    let fresh: InvitationRecord
+    try {
+      fresh = await deps.createInvitation({
+        organizationId: invitation.organizationId,
+        organizationName: invitation.organizationName,
+        email: invitation.email,
+        role: invitation.role,
+        inviterId: session.userId,
+      })
+    } catch (error) {
+      if (error instanceof SeatLimitExceededError) {
+        await audit(deps, {
+          organizationId: invitation.organizationId,
+          actorUserId: session.userId,
+          action: 'organization.invite.resend',
+          targetType: 'invitation',
+          targetId: invitation.id,
+          result: 'denied',
+          requestId: requestIdFrom(request),
+        })
+        throw new OrganizationLifecycleError('This organization has reached its member limit', 409)
+      }
+      throw error
+    }
     await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
     await audit(deps, {
       organizationId: invitation.organizationId,
