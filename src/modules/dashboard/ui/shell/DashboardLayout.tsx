@@ -19,6 +19,7 @@ const NAV = [
   { to: '/sprints', icon: Compass, label: 'Sprints', end: false },
   { to: '/exports', icon: Download, label: 'Exports', end: false },
   { to: '/alerts', icon: Mail, label: 'Alerts', end: false },
+  { to: '/settings/team', icon: Users, label: 'Team', end: false },
   { to: '/settings/billing', icon: CreditCard, label: 'Billing', end: false },
   { to: '/settings/privacy', icon: Shield, label: 'Privacy', end: false },
   { to: '/status', icon: Activity, label: 'Status', end: false },

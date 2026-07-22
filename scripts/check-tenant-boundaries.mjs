@@ -33,6 +33,11 @@ const globalDbAllowlist = new Set([
 const roleLiteralCheckAllowlist = new Set([
   'src/shared/lib/authorization/permissions.ts',
   'src/shared/lib/auth/organization-lifecycle.ts',
+  // contracts.ts IS the foundation's allowlisted export surface (see its own
+  // top-of-file comment) — its per-target-role helpers (canRemoveMember,
+  // etc.) exist precisely so Team UI files never need a literal comparison
+  // of their own, mirroring permissions.ts's `can()` rationale exactly.
+  'src/shared/lib/organizations/contracts.ts',
   'src/routes/api/builders/$builderId/evidence/$evidenceId.ts',
 ])
 const roleLiteralCheckPattern = /\.role\s*(===|!==)\s*['"]/

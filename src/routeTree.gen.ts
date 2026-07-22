@@ -56,6 +56,7 @@ import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/seman
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
 import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
@@ -79,6 +80,7 @@ import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal
 import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
 import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
 import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
+import { Route as DashboardSettingsTeamRouteImport } from './routes/_dashboard/settings/team'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
@@ -360,6 +362,11 @@ const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   path: '/api/plans/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrganizationsTeamRoute = ApiOrganizationsTeamRouteImport.update({
+  id: '/api/organizations/team',
+  path: '/api/organizations/team',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
   id: '/api/organizations/switch',
   path: '/api/organizations/switch',
@@ -473,6 +480,11 @@ const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
 const DashboardSprintsNewRoute = DashboardSprintsNewRouteImport.update({
   id: '/sprints/new',
   path: '/sprints/new',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSettingsTeamRoute = DashboardSettingsTeamRouteImport.update({
+  id: '/settings/team',
+  path: '/settings/team',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardSettingsPrivacyRoute =
@@ -760,6 +772,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
@@ -783,6 +796,7 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -876,6 +890,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
@@ -899,6 +914,7 @@ export interface FileRoutesByTo {
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -996,6 +1012,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/_dashboard/settings/team': typeof DashboardSettingsTeamRoute
   '/_dashboard/sprints/new': typeof DashboardSprintsNewRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
   '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
@@ -1019,6 +1036,7 @@ export interface FileRoutesById {
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
+  '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -1115,6 +1133,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/settings/team'
     | '/sprints/new'
     | '/blog/$slug'
     | '/changelog/$slug'
@@ -1138,6 +1157,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
     | '/api/organizations/switch'
+    | '/api/organizations/team'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1231,6 +1251,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/settings/team'
     | '/sprints/new'
     | '/blog/$slug'
     | '/changelog/$slug'
@@ -1254,6 +1275,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
     | '/api/organizations/switch'
+    | '/api/organizations/team'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1350,6 +1372,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
+    | '/_dashboard/settings/team'
     | '/_dashboard/sprints/new'
     | '/_landing/blog/$slug'
     | '/_landing/changelog/$slug'
@@ -1373,6 +1396,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
     | '/api/organizations/switch'
+    | '/api/organizations/team'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1468,6 +1492,7 @@ export interface RootRouteChildren {
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
+  ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
@@ -1846,6 +1871,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPlansMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/team': {
+      id: '/api/organizations/team'
+      path: '/api/organizations/team'
+      fullPath: '/api/organizations/team'
+      preLoaderRoute: typeof ApiOrganizationsTeamRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/switch': {
       id: '/api/organizations/switch'
       path: '/api/organizations/switch'
@@ -2005,6 +2037,13 @@ declare module '@tanstack/react-router' {
       path: '/sprints/new'
       fullPath: '/sprints/new'
       preLoaderRoute: typeof DashboardSprintsNewRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/settings/team': {
+      id: '/_dashboard/settings/team'
+      path: '/settings/team'
+      fullPath: '/settings/team'
+      preLoaderRoute: typeof DashboardSettingsTeamRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/settings/privacy': {
@@ -2349,6 +2388,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRoute
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
+  DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
@@ -2369,6 +2409,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRoute,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
+  DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
@@ -2529,6 +2570,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
+  ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,

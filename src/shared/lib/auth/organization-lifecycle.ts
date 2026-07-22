@@ -787,3 +787,100 @@ function isPersonalOrganizationMetadata(metadata: string | null): boolean {
     return false
   }
 }
+
+export interface OrganizationMemberRecord {
+  userId: string
+  name: string
+  email: string
+  role: OrganizationRole
+  joinedAt: Date
+}
+
+/** Team settings' member list — same authDb rationale as `listMyOrganizations`: RLS-forced tables this read discovers the scope for. */
+export async function listOrganizationMembers(organizationId: string): Promise<OrganizationMemberRecord[]> {
+  const [{ eq }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationMembers, authUsers } = schema
+
+  const rows = await authDb
+    .select({
+      userId: organizationMembers.userId,
+      name: authUsers.name,
+      email: authUsers.email,
+      role: organizationMembers.role,
+      joinedAt: organizationMembers.createdAt,
+    })
+    .from(organizationMembers)
+    .innerJoin(authUsers, eq(authUsers.id, organizationMembers.userId))
+    .where(eq(organizationMembers.organizationId, organizationId))
+
+  return rows.map((row) => ({ ...row, role: row.role as OrganizationRole }))
+}
+
+/** Pending invitations only — accepted/rejected/canceled ones aren't actionable from Team settings. */
+export async function listPendingInvitations(organizationId: string): Promise<InvitationRecord[]> {
+  const [{ and, eq }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationInvitations, organizations } = schema
+
+  const rows = await authDb
+    .select({
+      id: organizationInvitations.id,
+      organizationId: organizationInvitations.organizationId,
+      organizationName: organizations.name,
+      email: organizationInvitations.email,
+      role: organizationInvitations.role,
+      status: organizationInvitations.status,
+      expiresAt: organizationInvitations.expiresAt,
+      inviterId: organizationInvitations.inviterId,
+    })
+    .from(organizationInvitations)
+    .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+    .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
+
+  return rows.map((row) => ({
+    id: row.id,
+    organizationId: row.organizationId,
+    organizationName: row.organizationName,
+    email: row.email,
+    role: (row.role ?? 'member') as InvitableRole,
+    status: row.status as InvitationRecord['status'],
+    expiresAt: row.expiresAt,
+    inviterId: row.inviterId,
+  }))
+}
+
+export interface SeatUsageRecord {
+  used: number
+  limit: number
+}
+
+/** Accepted members plus usable (pending) invitations — mirrors the real dependency's `countSeats` used to enforce the atomic invite-time limit. */
+export async function getSeatUsage(organizationId: string): Promise<SeatUsageRecord> {
+  const [{ and, eq, count }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationMembers, organizationInvitations } = schema
+
+  const [members] = await authDb
+    .select({ value: count() })
+    .from(organizationMembers)
+    .where(eq(organizationMembers.organizationId, organizationId))
+  const [pendingInvitations] = await authDb
+    .select({ value: count() })
+    .from(organizationInvitations)
+    .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
+
+  return {
+    used: (members?.value ?? 0) + (pendingInvitations?.value ?? 0),
+    limit: ORGANIZATION_MEMBERSHIP_LIMIT,
+  }
+}
