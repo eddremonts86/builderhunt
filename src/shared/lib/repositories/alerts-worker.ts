@@ -1,5 +1,9 @@
 import { and, eq, sql } from 'drizzle-orm'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
+// auth_users is an auth-broker-only table (drizzle/0007_auth_broker.sql) —
+// builderhunt_worker has no grant on it, so the digest-email lookup must go
+// through authDb, not workerDb.
+import { authDb } from '../db/auth-db'
 import { alerts, alertTriggers, authUsers, builders, organizations } from '../db/schema'
 
 export function listWorkerOrganizationIds() {
@@ -67,7 +71,7 @@ export async function recordWorkerTrigger(
 }
 
 export async function findWorkerUserEmail(userId: string) {
-  const [user] = await workerDb.select({ email: authUsers.email }).from(authUsers)
+  const [user] = await authDb.select({ email: authUsers.email }).from(authUsers)
     .where(eq(authUsers.id, userId))
     .limit(1)
   return user?.email ?? null

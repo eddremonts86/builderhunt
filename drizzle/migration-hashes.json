@@ -80,6 +80,10 @@
     "0019_lean_manta": {
       "sql": "cfe72383d003dc024f51bb566a42aefc1932096ebccbacf7d2cf7eef28766e2a",
       "snapshot": "eb6d4f8006cb7b7a134d60a704ae468095ffa3e29e39e255b3973bce7a81a56e"
+    },
+    "0020_account_subject_grants": {
+      "sql": "0b88ea88b1b387fa753689ed1656c41312a4c04604dd95d54c3f3e40ad86dadc",
+      "snapshot": "38adc09bef48b5655879d199e35673c5f1446be5427d41341e1acf465c77f45e"
     }
   }
 }

@@ -21,6 +21,7 @@
     "db:backfill:resources": "tsx --env-file=.env scripts/db/backfills/resources.ts",
     "db:backfill:builders": "tsx --env-file=.env scripts/db/backfills/builders.ts",
     "test:rls:local": "node scripts/db/verify-rls-local.mjs",
+    "test:api-isolation:local": "tsx scripts/db/verify-api-isolation-local.mjs",
     "test:migrations:local": "node scripts/db/verify-migrations-local.mjs",
     "test:migration-integrity": "node scripts/db/verify-migration-integrity.mjs",
     "db:restore-test": "tsx scripts/db/restore-test.ts",

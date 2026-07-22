@@ -1,5 +1,9 @@
 import { and, desc, eq, lt } from 'drizzle-orm'
 import { accountDb } from '../db/client'
+// auth_users/auth_accounts are auth-broker-only tables (see
+// drizzle/0007_auth_broker.sql) — builderhunt_app has no grant on them, so
+// this account-subject export must read them through authDb, not accountDb.
+import { authDb } from '../db/auth-db'
 import {
   alerts,
   authAccounts,
@@ -54,7 +58,7 @@ export const listAccountPlanChanges = (userId: string) => accountDb.select({
 }).from(planChanges).where(eq(planChanges.userId, userId)).orderBy(desc(planChanges.createdAt)).limit(20)
 
 export async function loadAccountExportSource(userId: string) {
-  const [user] = await accountDb.select({
+  const [user] = await authDb.select({
     id: authUsers.id,
     name: authUsers.name,
     email: authUsers.email,
@@ -66,7 +70,7 @@ export async function loadAccountExportSource(userId: string) {
   if (!user) return null
 
   const [account, consents, claimRequests, claims, profileViews, deletion, memberships, trackedBuilders, plan, requests, changes] = await Promise.all([
-    accountDb.select({
+    authDb.select({
       providerId: authAccounts.providerId,
       password: authAccounts.password,
       createdAt: authAccounts.createdAt,
@@ -169,7 +173,7 @@ export async function findDeletionRequest(userId: string) {
  * after the row (and its email column) are already gone.
  */
 export async function findAccountEmail(userId: string): Promise<string | null> {
-  const [row] = await accountDb.select({ email: authUsers.email }).from(authUsers)
+  const [row] = await authDb.select({ email: authUsers.email }).from(authUsers)
     .where(eq(authUsers.id, userId)).limit(1)
   return row?.email ?? null
 }
@@ -187,17 +191,26 @@ export const listExpiredPendingDeletionRequests = () => accountDb.select({
 }).from(deletionRequests)
   .where(and(eq(deletionRequests.status, 'pending'), lt(deletionRequests.gracePeriodEndsAt, new Date())))
 
-export function hardDeleteAccountSubject(userId: string) {
-  return accountDb.transaction(async (tx) => {
+export async function hardDeleteAccountSubject(userId: string) {
+  // Two transactions, not one: auth_users/auth_sessions/auth_accounts/auth_verifications
+  // are auth-broker-only tables (drizzle/0007_auth_broker.sql revokes builderhunt_app's
+  // access to them), so they must be deleted through authDb's separate connection —
+  // there is no single Postgres transaction that spans both roles. Product-domain rows
+  // that reference auth_users (with no cascade) must be removed first in their own
+  // transaction, or the later auth_users delete fails on the FK.
+  await accountDb.transaction(async (tx) => {
     // FK-safe order: `builder_notes.builder_id` and `alerts.query_id` have no ON DELETE
     // action, so their referenced rows must go first or Postgres blocks the delete.
-    // `plans`/`plan_changes`/`plan_requests`/`user_consents`/`data_export_requests`/
-    // `onboarding_progress`/`roadmap_votes` already cascade from `auth_users` (see
-    // schema.ts) and need no explicit delete here; `alert_triggers` cascades from `alerts`.
     await tx.delete(builderNotes).where(eq(builderNotes.userId, userId))
     await tx.delete(alerts).where(eq(alerts.userId, userId))
     await tx.delete(savedQueries).where(eq(savedQueries.userId, userId))
     await tx.delete(builders).where(eq(builders.userId, userId))
+  })
+
+  await authDb.transaction(async (tx) => {
+    // `plans`/`plan_changes`/`plan_requests`/`user_consents`/`data_export_requests`/
+    // `onboarding_progress`/`roadmap_votes` already cascade from `auth_users` (see
+    // schema.ts) and need no explicit delete here; `alert_triggers` cascades from `alerts`.
     await tx.delete(authVerifications).where(eq(authVerifications.identifier, userId))
     await tx.delete(authSessions).where(eq(authSessions.userId, userId))
     await tx.delete(authAccounts).where(eq(authAccounts.userId, userId))

@@ -30,11 +30,14 @@ describe('legal admin run-worker route', () => {
 describe('hardDeleteAccountSubject FK-safe delete order', () => {
   it('deletes rows lacking an ON DELETE action before the tables they reference', async () => {
     const source = await readFile('src/shared/lib/repositories/account-privacy.ts', 'utf8')
-    const fnStart = source.indexOf('export function hardDeleteAccountSubject')
-    const fnBody = source.slice(fnStart, source.indexOf('\n}', fnStart))
+    const fnStart = source.indexOf('export async function hardDeleteAccountSubject')
+    const fnEnd = source.indexOf('\n}\n', fnStart)
+    const fnBody = source.slice(fnStart, fnEnd)
 
     // builder_notes.builder_id and alerts.query_id have no cascade — the rows they'd
-    // block must be deleted first, and auth_users (referenced by all of them) must be
+    // block must be deleted first (via accountDb, the product-domain connection), and
+    // auth_users (referenced by all of them, but only reachable via the separate
+    // authDb/builderhunt_auth connection — see drizzle/0007_auth_broker.sql) must be
     // deleted last so no cascade fires before these explicit deletes run.
     const order = ['builderNotes', 'alerts', 'savedQueries', 'builders', 'authUsers']
     const positions = order.map((table) => fnBody.indexOf(`tx.delete(${table})`))

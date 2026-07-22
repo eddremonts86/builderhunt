@@ -10,6 +10,13 @@ const authDbAllowlist = new Set([
   'src/shared/lib/auth/personal-organization.ts',
   'src/shared/lib/auth/tenant-principal.ts',
   'src/shared/lib/db/auth-db.ts',
+  // Both need narrow, specific reads/deletes against auth_users/auth_accounts/etc.
+  // (account-subject export/deletion; digest-email address lookup) that
+  // builderhunt_app/builderhunt_worker have no grant for post auth-broker
+  // (drizzle/0007_auth_broker.sql) — see account-privacy.test.ts for the
+  // FK-safe two-transaction delete order this depends on.
+  'src/shared/lib/repositories/account-privacy.ts',
+  'src/shared/lib/repositories/alerts-worker.ts',
 ])
 // Global-public data/health surfaces are explicitly allowed to read the
 // unscoped runtime db directly (static or dynamic import) — they never

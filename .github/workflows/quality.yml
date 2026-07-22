@@ -57,6 +57,14 @@ jobs:
           RLS_TEST_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
           RLS_TEST_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
         run: pnpm test:rls:local
+      - name: Two-tenant API/worker/privacy isolation (real routes, exact roles)
+        env:
+          OWNER_SEED_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+        run: pnpm test:api-isolation:local
       - name: Restore rehearsal
         run: |
           PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres builderhunt_security_test_ci_restore
