@@ -1,0 +1,741 @@
+import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
+import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
+import type { OrganizationRole } from '../authorization/permissions'
+
+/**
+ * Wraps the better-auth organization plugin's operations with the
+ * cross-cutting rules the plugin doesn't enforce on its own: centralized
+ * per-user+organization rate limits, a recent-auth requirement before
+ * owner/destructive changes, one generic error for every invitation-accept
+ * failure mode (so a bad request can't be used to enumerate emails or
+ * invitation state), and redacted audit events for every operation.
+ *
+ * Ownership transfer has no better-auth endpoint at all — `updateMemberRole`
+ * would momentarily violate the one-owner-per-organization unique index if
+ * the promote/demote happened in the wrong order within one statement, so
+ * the real implementation runs them as two sequential UPDATEs in one
+ * transaction (demote-then-promote), which never produces a transient
+ * duplicate "owner" row.
+ */
+
+export const RECENT_AUTH_MAX_AGE_SECONDS = 15 * 60
+
+const GENERIC_AUTH_ERROR = 'Authentication required'
+const GENERIC_MEMBERSHIP_ERROR = 'You do not have access to this organization'
+const GENERIC_INVITATION_ERROR = 'This invitation is no longer valid'
+const GENERIC_STALE_SESSION_ERROR = 'Please sign in again to continue'
+
+export class OrganizationLifecycleError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 401 | 403 | 404 | 409 | 429,
+  ) {
+    super(message)
+    this.name = 'OrganizationLifecycleError'
+  }
+}
+
+/** Thrown by `createInvitation` when the atomic seat check loses a race — never pre-computed by callers. */
+export class SeatLimitExceededError extends Error {
+  constructor() {
+    super('Organization seat limit reached')
+    this.name = 'SeatLimitExceededError'
+  }
+}
+
+export function normalizeInvitationEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+type InvitableRole = Exclude<OrganizationRole, 'owner'>
+
+export interface LifecycleSession {
+  userId: string
+  sessionId: string
+  email: string
+  emailVerified: boolean
+  activeOrganizationId: string | null
+  authenticatedAt: Date
+}
+
+export interface MembershipRecord {
+  organizationId: string
+  userId: string
+  role: OrganizationRole
+}
+
+export interface InvitationRecord {
+  id: string
+  organizationId: string
+  organizationName: string
+  email: string
+  role: InvitableRole
+  status: 'pending' | 'accepted' | 'rejected' | 'canceled'
+  expiresAt: Date
+  inviterId: string
+}
+
+export interface OrganizationRecord {
+  id: string
+  name: string
+  slug: string
+}
+
+export interface LifecycleDependencies {
+  getSession(request: Request): Promise<LifecycleSession | null>
+  findMembership(userId: string, organizationId: string): Promise<MembershipRecord | null>
+  countSeats(organizationId: string): Promise<number>
+  membershipLimit: number
+  createOrganization(input: { name: string; slug: string; ownerUserId: string }): Promise<OrganizationRecord>
+  setActiveOrganization(session: LifecycleSession, organizationId: string | null): Promise<void>
+  /** Throws `SeatLimitExceededError` when the atomic check fails — do not pre-check the limit here. */
+  createInvitation(input: {
+    organizationId: string
+    organizationName: string
+    email: string
+    role: InvitableRole
+    inviterId: string
+  }): Promise<InvitationRecord>
+  getInvitation(invitationId: string): Promise<InvitationRecord | null>
+  cancelInvitationRecord(invitationId: string): Promise<void>
+  acceptInvitationRecord(invitationId: string, userId: string): Promise<void>
+  removeMemberRecord(organizationId: string, userId: string): Promise<void>
+  updateMemberRoleRecord(organizationId: string, userId: string, role: InvitableRole): Promise<void>
+  transferOwnershipRecord(organizationId: string, fromUserId: string, toUserId: string): Promise<void>
+  deleteOrganizationRecord(organizationId: string): Promise<void>
+  clearActiveOrganizationForUsers(organizationId: string, userIds: string[]): Promise<void>
+  sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<void>
+  rateLimit(scope: string, id: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean }>
+  audit: SecurityAuditSink
+  now(): Date
+}
+
+function requestIdFrom(request: Request): string {
+  const candidate = request.headers.get('x-request-id')
+  return candidate && /^[A-Za-z0-9._:-]{1,128}$/.test(candidate) ? candidate : crypto.randomUUID()
+}
+
+async function requireSession(request: Request, deps: LifecycleDependencies): Promise<LifecycleSession> {
+  const session = await deps.getSession(request)
+  if (!session) throw new OrganizationLifecycleError(GENERIC_AUTH_ERROR, 401)
+  return session
+}
+
+async function requireMembership(
+  deps: LifecycleDependencies,
+  userId: string,
+  organizationId: string,
+): Promise<MembershipRecord> {
+  const membership = await deps.findMembership(userId, organizationId)
+  if (!membership) throw new OrganizationLifecycleError(GENERIC_MEMBERSHIP_ERROR, 403)
+  return membership
+}
+
+function requireElevated(membership: MembershipRecord): void {
+  if (membership.role !== 'owner' && membership.role !== 'admin') {
+    throw new OrganizationLifecycleError(GENERIC_MEMBERSHIP_ERROR, 403)
+  }
+}
+
+function requireOwner(membership: MembershipRecord): void {
+  if (membership.role !== 'owner') {
+    throw new OrganizationLifecycleError(GENERIC_MEMBERSHIP_ERROR, 403)
+  }
+}
+
+// Role changes, removal, ownership transfer, and deletion are irreversible or
+// security-sensitive enough that a hijacked long-lived session shouldn't be
+// able to perform them — require the session to have authenticated recently.
+function requireRecentAuthentication(session: LifecycleSession, deps: LifecycleDependencies): void {
+  const ageSeconds = (deps.now().getTime() - session.authenticatedAt.getTime()) / 1000
+  if (ageSeconds > RECENT_AUTH_MAX_AGE_SECONDS) {
+    throw new OrganizationLifecycleError(GENERIC_STALE_SESSION_ERROR, 401)
+  }
+}
+
+async function requireRateLimit(
+  deps: LifecycleDependencies,
+  scope: string,
+  id: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<void> {
+  const result = await deps.rateLimit(scope, id, limit, windowSeconds)
+  if (!result.allowed) {
+    throw new OrganizationLifecycleError('Too many requests, please try again later', 429)
+  }
+}
+
+async function audit(
+  deps: LifecycleDependencies,
+  input: {
+    organizationId: string | null
+    actorUserId: string | null
+    action: string
+    targetType: string
+    targetId: string | null
+    result: 'allowed' | 'denied' | 'failed'
+    requestId: string
+  },
+): Promise<void> {
+  await emitSecurityAudit(input, deps.audit)
+}
+
+export function createOrganizationLifecycle(deps: LifecycleDependencies) {
+  async function createOrganization(request: Request, input: { name: string; slug: string }): Promise<OrganizationRecord> {
+    const session = await requireSession(request, deps)
+    await requireRateLimit(deps, 'org-create', session.userId, 5, 60 * 60)
+
+    const organization = await deps.createOrganization({
+      name: input.name,
+      slug: input.slug,
+      ownerUserId: session.userId,
+    })
+    await audit(deps, {
+      organizationId: organization.id,
+      actorUserId: session.userId,
+      action: 'organization.create',
+      targetType: 'organization',
+      targetId: organization.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+    return organization
+  }
+
+  async function switchActiveOrganization(request: Request, organizationId: string): Promise<void> {
+    const session = await requireSession(request, deps)
+    await requireMembership(deps, session.userId, organizationId)
+    await deps.setActiveOrganization(session, organizationId)
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.switch',
+      targetType: 'organization',
+      targetId: organizationId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  async function inviteMember(
+    request: Request,
+    input: { organizationId: string; email: string; role: InvitableRole },
+  ): Promise<InvitationRecord> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, input.organizationId)
+    requireElevated(membership)
+    await requireRateLimit(deps, 'org-invite', `${session.userId}:${input.organizationId}`, 20, 60 * 60)
+
+    const email = normalizeInvitationEmail(input.email)
+    let invitation: InvitationRecord
+    try {
+      invitation = await deps.createInvitation({
+        organizationId: input.organizationId,
+        organizationName: '',
+        email,
+        role: input.role,
+        inviterId: session.userId,
+      })
+    } catch (error) {
+      if (error instanceof SeatLimitExceededError) {
+        await audit(deps, {
+          organizationId: input.organizationId,
+          actorUserId: session.userId,
+          action: 'organization.invite',
+          targetType: 'invitation',
+          targetId: null,
+          result: 'denied',
+          requestId: requestIdFrom(request),
+        })
+        throw new OrganizationLifecycleError('This organization has reached its member limit', 409)
+      }
+      throw error
+    }
+
+    await deps.sendInvitationEmail(invitation.email, invitation.organizationName, invitation.id)
+    await audit(deps, {
+      organizationId: input.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+    return invitation
+  }
+
+  async function resendInvitation(request: Request, invitationId: string): Promise<InvitationRecord> {
+    const session = await requireSession(request, deps)
+    const invitation = await deps.getInvitation(invitationId)
+    if (!invitation) throw new OrganizationLifecycleError('Invitation not found', 404)
+    const membership = await requireMembership(deps, session.userId, invitation.organizationId)
+    requireElevated(membership)
+    await requireRateLimit(deps, 'org-invite', `${session.userId}:${invitation.organizationId}`, 20, 60 * 60)
+
+    if (invitation.status !== 'pending') {
+      throw new OrganizationLifecycleError('This invitation can no longer be resent', 409)
+    }
+
+    await deps.cancelInvitationRecord(invitation.id)
+    const fresh = await deps.createInvitation({
+      organizationId: invitation.organizationId,
+      organizationName: invitation.organizationName,
+      email: invitation.email,
+      role: invitation.role,
+      inviterId: session.userId,
+    })
+    await deps.sendInvitationEmail(fresh.email, fresh.organizationName, fresh.id)
+    await audit(deps, {
+      organizationId: invitation.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite.resend',
+      targetType: 'invitation',
+      targetId: fresh.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+    return fresh
+  }
+
+  async function cancelInvitation(request: Request, invitationId: string): Promise<void> {
+    const session = await requireSession(request, deps)
+    const invitation = await deps.getInvitation(invitationId)
+    if (!invitation) throw new OrganizationLifecycleError('Invitation not found', 404)
+    const membership = await requireMembership(deps, session.userId, invitation.organizationId)
+    requireElevated(membership)
+
+    await deps.cancelInvitationRecord(invitation.id)
+    await audit(deps, {
+      organizationId: invitation.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite.cancel',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  // Every failure path here — missing, wrong email, unverified email, expired,
+  // already accepted/rejected/canceled — returns the exact same error and
+  // status so a caller can't use this endpoint to probe invitation state or
+  // harvest the invited email address.
+  async function acceptInvitation(request: Request, invitationId: string): Promise<{ organizationId: string }> {
+    const session = await requireSession(request, deps)
+    await requireRateLimit(deps, 'org-invite-accept', session.userId, 20, 60 * 60)
+
+    const invitation = await deps.getInvitation(invitationId)
+    const isValid =
+      invitation !== null &&
+      invitation.status === 'pending' &&
+      invitation.expiresAt.getTime() > deps.now().getTime() &&
+      session.emailVerified &&
+      normalizeInvitationEmail(session.email) === normalizeInvitationEmail(invitation.email)
+
+    if (!invitation || !isValid) {
+      await audit(deps, {
+        organizationId: invitation?.organizationId ?? null,
+        actorUserId: session.userId,
+        action: 'organization.invite.accept',
+        targetType: 'invitation',
+        targetId: invitationId,
+        result: 'denied',
+        requestId: requestIdFrom(request),
+      })
+      throw new OrganizationLifecycleError(GENERIC_INVITATION_ERROR, 403)
+    }
+
+    await deps.acceptInvitationRecord(invitation.id, session.userId)
+    await audit(deps, {
+      organizationId: invitation.organizationId,
+      actorUserId: session.userId,
+      action: 'organization.invite.accept',
+      targetType: 'invitation',
+      targetId: invitation.id,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+    return { organizationId: invitation.organizationId }
+  }
+
+  async function removeMember(request: Request, organizationId: string, targetUserId: string): Promise<void> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, organizationId)
+    requireElevated(membership)
+    requireRecentAuthentication(session, deps)
+
+    const target = await deps.findMembership(targetUserId, organizationId)
+    if (!target) throw new OrganizationLifecycleError('Member not found', 404)
+    if (target.role === 'owner') {
+      throw new OrganizationLifecycleError('Transfer ownership before removing the owner', 409)
+    }
+    // Only the owner may remove an admin; admins may remove members (and themselves).
+    if (membership.role === 'admin' && target.role === 'admin' && targetUserId !== session.userId) {
+      throw new OrganizationLifecycleError(GENERIC_MEMBERSHIP_ERROR, 403)
+    }
+
+    await deps.removeMemberRecord(organizationId, targetUserId)
+    await deps.clearActiveOrganizationForUsers(organizationId, [targetUserId])
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.member.remove',
+      targetType: 'member',
+      targetId: targetUserId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  // Role changes are owner-only: an admin cannot promote a member to admin or
+  // touch another admin's role, which is what would let a member escalate
+  // themselves via a compromised or over-trusted admin account.
+  async function changeMemberRole(
+    request: Request,
+    organizationId: string,
+    targetUserId: string,
+    role: InvitableRole,
+  ): Promise<void> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, organizationId)
+    requireOwner(membership)
+    requireRecentAuthentication(session, deps)
+
+    const target = await deps.findMembership(targetUserId, organizationId)
+    if (!target) throw new OrganizationLifecycleError('Member not found', 404)
+    if (target.role === 'owner') {
+      throw new OrganizationLifecycleError('Transfer ownership to change the owner', 409)
+    }
+
+    await deps.updateMemberRoleRecord(organizationId, targetUserId, role)
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.member.role-change',
+      targetType: 'member',
+      targetId: targetUserId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  async function transferOwnership(request: Request, organizationId: string, targetUserId: string): Promise<void> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, organizationId)
+    requireOwner(membership)
+    requireRecentAuthentication(session, deps)
+
+    const target = await deps.findMembership(targetUserId, organizationId)
+    if (!target) throw new OrganizationLifecycleError('Member not found', 404)
+    if (target.userId === session.userId) {
+      throw new OrganizationLifecycleError('You already own this organization', 409)
+    }
+
+    await deps.transferOwnershipRecord(organizationId, session.userId, targetUserId)
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.ownership-transfer',
+      targetType: 'member',
+      targetId: targetUserId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  async function deleteOrganization(request: Request, organizationId: string): Promise<void> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, organizationId)
+    requireOwner(membership)
+    requireRecentAuthentication(session, deps)
+
+    // No explicit session cleanup needed: authSessions.activeOrganizationId
+    // has ON DELETE SET NULL against organizations, so every member's stale
+    // active-org reference clears automatically when the row is gone.
+    await deps.deleteOrganizationRecord(organizationId)
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.delete',
+      targetType: 'organization',
+      targetId: organizationId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+  }
+
+  return {
+    createOrganization,
+    switchActiveOrganization,
+    inviteMember,
+    resendInvitation,
+    cancelInvitation,
+    acceptInvitation,
+    removeMember,
+    changeMemberRole,
+    transferOwnership,
+    deleteOrganization,
+  }
+}
+
+export type OrganizationLifecycle = ReturnType<typeof createOrganizationLifecycle>
+
+let cached: OrganizationLifecycle | null = null
+
+/** Lazily builds the real, database-backed lifecycle — mirrors `requireTenantPrincipal`'s dynamic-import pattern so pure unit tests never touch the DB module graph. */
+export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle> {
+  if (cached) return cached
+
+  const [{ and, eq, sql, count }, { auth }, { authDb }, schema, { rateLimit }, { sendOrganizationInvitationEmail }, { env }] =
+    await Promise.all([
+      import('drizzle-orm'),
+      import('./better-auth'),
+      import('../db/auth-db'),
+      import('../db/schema'),
+      import('../rate-limit'),
+      import('../email'),
+      import('../env'),
+    ])
+  const { organizations, organizationMembers, organizationInvitations, authSessions } = schema
+
+  function toRole(role: string): OrganizationRole {
+    return role as OrganizationRole
+  }
+
+  const realDependencies: LifecycleDependencies = {
+    async getSession(request) {
+      const result = await auth.api.getSession({ headers: request.headers })
+      if (!result) return null
+      return {
+        userId: result.user.id,
+        sessionId: result.session.id,
+        email: result.user.email,
+        emailVerified: result.user.emailVerified,
+        activeOrganizationId: result.session.activeOrganizationId ?? null,
+        authenticatedAt: new Date(result.session.createdAt),
+      }
+    },
+
+    async findMembership(userId, organizationId) {
+      const [row] = await authDb
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, organizationId)))
+        .limit(1)
+      return row ? { organizationId, userId, role: toRole(row.role) } : null
+    },
+
+    async countSeats(organizationId) {
+      const [members] = await authDb
+        .select({ value: count() })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.organizationId, organizationId))
+      const [pendingInvitations] = await authDb
+        .select({ value: count() })
+        .from(organizationInvitations)
+        .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
+      return (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
+    },
+
+    membershipLimit: ORGANIZATION_MEMBERSHIP_LIMIT,
+
+    async createOrganization(input) {
+      const organizationId = crypto.randomUUID()
+      await authDb.transaction(async (tx) => {
+        await tx.insert(organizations).values({ id: organizationId, name: input.name, slug: input.slug })
+        await tx.insert(organizationMembers).values({
+          id: crypto.randomUUID(),
+          organizationId,
+          userId: input.ownerUserId,
+          role: 'owner',
+        })
+      })
+      return { id: organizationId, name: input.name, slug: input.slug }
+    },
+
+    async setActiveOrganization(session, organizationId) {
+      await authDb
+        .update(authSessions)
+        .set({ activeOrganizationId: organizationId })
+        .where(eq(authSessions.id, session.sessionId))
+    },
+
+    async createInvitation(input) {
+      const id = crypto.randomUUID()
+      const expiresAt = new Date(Date.now() + 60 * 60 * 24 * 7 * 1000)
+
+      // Locks the organization's member rows for the rest of this transaction
+      // so a concurrent invite can't read the same seat count before either
+      // insert commits — the loser blocks here, then re-reads a count that
+      // already includes the winner's row and throws instead of overselling
+      // the seat. A real per-organization capacity constraint belongs in a
+      // migration (out of scope for this task's file list).
+      const organization = await authDb.transaction(async (tx) => {
+        await tx.execute(sql`select 1 from organization_members where organization_id = ${input.organizationId} for update`)
+        const [members] = await tx
+          .select({ value: count() })
+          .from(organizationMembers)
+          .where(eq(organizationMembers.organizationId, input.organizationId))
+        const [pendingInvitations] = await tx
+          .select({ value: count() })
+          .from(organizationInvitations)
+          .where(and(eq(organizationInvitations.organizationId, input.organizationId), eq(organizationInvitations.status, 'pending')))
+        const seats = (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
+        if (seats >= ORGANIZATION_MEMBERSHIP_LIMIT) throw new SeatLimitExceededError()
+
+        await tx.insert(organizationInvitations).values({
+          id,
+          organizationId: input.organizationId,
+          email: input.email,
+          role: input.role,
+          status: 'pending',
+          expiresAt,
+          inviterId: input.inviterId,
+        })
+
+        const [row] = await tx
+          .select({ name: organizations.name })
+          .from(organizations)
+          .where(eq(organizations.id, input.organizationId))
+          .limit(1)
+        return row
+      })
+
+      return {
+        id,
+        organizationId: input.organizationId,
+        organizationName: organization?.name ?? input.organizationName,
+        email: input.email,
+        role: input.role,
+        status: 'pending',
+        expiresAt,
+        inviterId: input.inviterId,
+      }
+    },
+
+    async getInvitation(invitationId) {
+      const [row] = await authDb
+        .select({
+          id: organizationInvitations.id,
+          organizationId: organizationInvitations.organizationId,
+          organizationName: organizations.name,
+          email: organizationInvitations.email,
+          role: organizationInvitations.role,
+          status: organizationInvitations.status,
+          expiresAt: organizationInvitations.expiresAt,
+          inviterId: organizationInvitations.inviterId,
+        })
+        .from(organizationInvitations)
+        .innerJoin(organizations, eq(organizations.id, organizationInvitations.organizationId))
+        .where(eq(organizationInvitations.id, invitationId))
+        .limit(1)
+      if (!row) return null
+      return {
+        id: row.id,
+        organizationId: row.organizationId,
+        organizationName: row.organizationName,
+        email: row.email,
+        role: (row.role ?? 'member') as InvitableRole,
+        status: row.status as InvitationRecord['status'],
+        expiresAt: row.expiresAt,
+        inviterId: row.inviterId,
+      }
+    },
+
+    async cancelInvitationRecord(invitationId) {
+      await authDb
+        .update(organizationInvitations)
+        .set({ status: 'canceled' })
+        .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
+    },
+
+    async acceptInvitationRecord(invitationId, userId) {
+      await authDb.transaction(async (tx) => {
+        const [invitation] = await tx
+          .update(organizationInvitations)
+          .set({ status: 'accepted' })
+          .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.status, 'pending')))
+          .returning({ organizationId: organizationInvitations.organizationId, role: organizationInvitations.role })
+        if (!invitation) return
+        await tx
+          .insert(organizationMembers)
+          .values({
+            id: crypto.randomUUID(),
+            organizationId: invitation.organizationId,
+            userId,
+            role: invitation.role ?? 'member',
+          })
+          .onConflictDoNothing()
+      })
+    },
+
+    async removeMemberRecord(organizationId, userId) {
+      await authDb
+        .delete(organizationMembers)
+        .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
+    },
+
+    async updateMemberRoleRecord(organizationId, userId, role) {
+      await authDb
+        .update(organizationMembers)
+        .set({ role })
+        .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, userId)))
+    },
+
+    // Two sequential UPDATEs in one transaction: demoting the current owner
+    // first removes the old "owner" index entry before the new one is
+    // inserted, so the partial unique index on (organization_id) WHERE
+    // role = 'owner' never sees two owners at once.
+    async transferOwnershipRecord(organizationId, fromUserId, toUserId) {
+      await authDb.transaction(async (tx) => {
+        await tx
+          .update(organizationMembers)
+          .set({ role: 'admin' })
+          .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, fromUserId)))
+        await tx
+          .update(organizationMembers)
+          .set({ role: 'owner' })
+          .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.userId, toUserId)))
+      })
+    },
+
+    async deleteOrganizationRecord(organizationId) {
+      await authDb.delete(organizations).where(eq(organizations.id, organizationId))
+    },
+
+    async clearActiveOrganizationForUsers(organizationId, userIds) {
+      if (userIds.length === 0) return
+      await authDb
+        .update(authSessions)
+        .set({ activeOrganizationId: null })
+        .where(and(eq(authSessions.activeOrganizationId, organizationId), sql`${authSessions.userId} = any(${userIds})`))
+    },
+
+    async sendInvitationEmail(email, organizationName, invitationId) {
+      const invitationUrl = new URL(`/team/invite/${encodeURIComponent(invitationId)}`, env.APP_URL).toString()
+      const result = await sendOrganizationInvitationEmail(email, organizationName, invitationUrl)
+      if (!result.ok) throw new Error('Unable to deliver organization invitation')
+    },
+
+    async rateLimit(scope, id, limit, windowSeconds) {
+      return rateLimit(scope, id, limit, windowSeconds)
+    },
+
+    // No sink wired to persistent storage yet — audits land in server logs
+    // (already redacted by emitSecurityAudit) until a durable sink exists.
+    audit: {
+      write(event) {
+        console.log('[security-audit]', JSON.stringify(event))
+      },
+    },
+
+    now() {
+      return new Date()
+    },
+  }
+
+  cached = createOrganizationLifecycle(realDependencies)
+  return cached
+}

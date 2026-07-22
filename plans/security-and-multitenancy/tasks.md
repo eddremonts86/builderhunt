@@ -4,9 +4,12 @@
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
 > **Reality check**: migrations `0001`–`0009` now provide the additive foundation and RLS has passed
-> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, and bootstrap checks. The 37
-> remaining legacy direct-db imports are tracked by `security:boundaries`; no destructive contract
-> migration or production credential switch is authorized until they reach zero and readiness passes.
+> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, and bootstrap checks.
+> `security:boundaries` now reports zero legacy direct-db imports (verified 2026-07-22). Task
+> checkboxes below are otherwise not yet reconciled against actual commit history — several other
+> tasks have real, tested implementations in code despite showing `[ ]`. No destructive contract
+> migration or production credential switch is authorized until backfill, dual-write/shadow
+> observation, and readiness checks pass in a real environment.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
@@ -36,8 +39,8 @@ must include its tests and must not stage unrelated worktree changes.
   - Do: Add `organizations`, `organizationMembers`, `organizationInvitations`, and nullable `authSessions.activeOrganizationId` matching the installed plugin contract. Configure `organization({ teams: { enabled: false }, dynamicAccessControl: { enabled: false }, creatorRole: 'owner', invitationExpiresIn: 604800, requireEmailVerificationOnInvitation: true, cancelPendingInvitationsOnReInvite: true, membershipLimit })`; map model/field names explicitly and add the client plugin. Add unique `(organization_id,user_id)`, partial unique one-owner-per-org, role/status checks, normalized invitation email index, expiry index, and session active-org index.
   - Verify: `pnpm vitest run src/shared/lib/auth/organization-options.test.ts` asserts exact options/model names; generated SQL diff contains only the declared additive objects; `pnpm type-check` and Better Auth create/list/switch integration smoke pass.
 
-- [ ] **Harden organization invitations and lifecycle operations**
-  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/auth/organization-lifecycle.test.ts`, `src/shared/lib/email.ts`, `src/routes/team/invite/$invitationId.tsx`, `src/routes/api/organizations/switch.ts`, `test/security/organization-lifecycle.test.ts`
+- [x] **Harden organization invitations and lifecycle operations**
+  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/auth/organization-lifecycle.test.ts`, `src/shared/lib/email.ts` (unchanged — already covered invitation email sending), `src/routes/team/invite/$invitationId.tsx`, `src/routes/api/organizations/switch.ts`, `src/routes/api/organizations/invitations/$invitationId/accept.ts`
   - Do: Wrap plugin operations so organization creation, switching, invite/resend/cancel/accept, member removal, role change, ownership transfer, and deletion use validated server sessions and centralized limits. Normalize email once; accept only when authenticated verified email matches; return generic errors; apply per-user+organization rate limits; require recent auth for owner/destructive changes; clear invalid active organization from affected sessions; emit redacted audits. Never return another tenant's invitation ID/email to members.
   - Verify: integration tests cover two memberships, switching, wrong-org switch, wrong-email/replayed/expired/revoked invite, enumeration response, concurrent final-seat invites, stale session after removal, member escalation, and atomic ownership transfer.
 

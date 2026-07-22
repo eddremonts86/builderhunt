@@ -47,9 +47,11 @@ import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/se
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -100,6 +102,7 @@ import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadma
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -289,6 +292,11 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
   path: '/dashboard/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
+  id: '/team/invite/$invitationId',
+  path: '/team/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   id: '/api/search/builders',
   path: '/api/search/builders',
@@ -302,6 +310,11 @@ const ApiPlansRequestUpgradeRoute = ApiPlansRequestUpgradeRouteImport.update({
 const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   id: '/api/plans/me',
   path: '/api/plans/me',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
+  id: '/api/organizations/switch',
+  path: '/api/organizations/switch',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
@@ -561,6 +574,12 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
+  ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
+    id: '/api/organizations/invitations/$invitationId/accept',
+    path: '/api/organizations/invitations/$invitationId/accept',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -610,9 +629,11 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
@@ -652,6 +673,7 @@ export interface FileRoutesByFullPath {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
@@ -700,9 +722,11 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
@@ -742,6 +766,7 @@ export interface FileRoutesByTo {
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -794,9 +819,11 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
+  '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
@@ -836,6 +863,7 @@ export interface FileRoutesById {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -887,9 +915,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/team/invite/$invitationId'
     | '/dashboard/'
     | '/exports/'
     | '/me/'
@@ -929,6 +959,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/organizations/invitations/$invitationId/accept'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -977,9 +1008,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/team/invite/$invitationId'
     | '/dashboard'
     | '/exports'
     | '/me'
@@ -1019,6 +1052,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export'
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
+    | '/api/organizations/invitations/$invitationId/accept'
   id:
     | '__root__'
     | '/_dashboard'
@@ -1070,9 +1104,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/switch'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
+    | '/team/invite/$invitationId'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
@@ -1112,6 +1148,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/organizations/invitations/$invitationId/accept'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1140,9 +1177,11 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
+  ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
+  TeamInviteInvitationIdRoute: typeof TeamInviteInvitationIdRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
@@ -1173,6 +1212,7 @@ export interface RootRouteChildren {
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
+  ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1443,6 +1483,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardDashboardIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/team/invite/$invitationId': {
+      id: '/team/invite/$invitationId'
+      path: '/team/invite/$invitationId'
+      fullPath: '/team/invite/$invitationId'
+      preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search/builders': {
       id: '/api/search/builders'
       path: '/api/search/builders'
@@ -1462,6 +1509,13 @@ declare module '@tanstack/react-router' {
       path: '/api/plans/me'
       fullPath: '/api/plans/me'
       preLoaderRoute: typeof ApiPlansMeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/switch': {
+      id: '/api/organizations/switch'
+      path: '/api/organizations/switch'
+      fullPath: '/api/organizations/switch'
+      preLoaderRoute: typeof ApiOrganizationsSwitchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/onboarding/status': {
@@ -1814,6 +1868,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/invitations/$invitationId/accept': {
+      id: '/api/organizations/invitations/$invitationId/accept'
+      path: '/api/organizations/invitations/$invitationId/accept'
+      fullPath: '/api/organizations/invitations/$invitationId/accept'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1958,9 +2019,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
+  ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
+  TeamInviteInvitationIdRoute: TeamInviteInvitationIdRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
@@ -1991,6 +2054,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
+  ApiOrganizationsInvitationsInvitationIdAcceptRoute:
+    ApiOrganizationsInvitationsInvitationIdAcceptRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
