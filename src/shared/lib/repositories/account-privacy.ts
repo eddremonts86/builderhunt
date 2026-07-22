@@ -1,4 +1,5 @@
-import { and, desc, eq, lt } from 'drizzle-orm'
+import { and, desc, eq, lt, ne } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { accountDb } from '../db/client'
 // auth_users/auth_accounts are auth-broker-only tables (see
 // drizzle/0007_auth_broker.sql) — builderhunt_app has no grant on them, so
@@ -184,13 +185,35 @@ export async function loadAccountExportSource(userId: string) {
   }
 }
 
-export async function listOwnedOrganizations(userId: string) {
+/**
+ * Organizations this user owns AND that have at least one other member —
+ * every account has its own solo personal organization (seatLimit 1,
+ * `buildPersonalOrganizationSeed`), so "owns an organization" alone is not
+ * the right block: that would refuse every account deletion, always. The
+ * real risk this guards against is orphaning OTHER people's access, which
+ * only exists once someone besides the deleting user is a member — inner
+ * joining against a second reference to organization_members for "a
+ * different user in the same org" naturally excludes solo ownership,
+ * personal or not (an upgraded personal org can carry real teammates, see
+ * team-accounts task 3's correction — this still needs to block on those).
+ */
+export async function listOwnedOrganizationsWithOtherMembers(userId: string) {
+  const otherMembers = alias(organizationMembers, 'other_members')
   // Same RLS shape as the memberships query in loadAccountExportSource above —
   // read through authDb, which has unrestricted access via the auth-broker
   // policy, not accountDb (which would silently return zero rows and let
-  // assertNoOwnedOrganizations wrongly conclude the user owns nothing).
-  return authDb.select({ organizationId: organizationMembers.organizationId })
+  // the ownership guard wrongly conclude the user owns nothing).
+  return authDb
+    .selectDistinct({
+      organizationId: organizationMembers.organizationId,
+      organizationName: organizations.name,
+    })
     .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .innerJoin(
+      otherMembers,
+      and(eq(otherMembers.organizationId, organizationMembers.organizationId), ne(otherMembers.userId, userId)),
+    )
     .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.role, 'owner')))
 }
 
@@ -217,6 +240,7 @@ export const updateDeletionRequest = (id: string, input: Partial<typeof deletion
 export const cancelPendingDeletion = (userId: string) => accountDb.update(deletionRequests)
   .set({ status: 'cancelled' })
   .where(and(eq(deletionRequests.userId, userId), eq(deletionRequests.status, 'pending')))
+  .returning({ id: deletionRequests.id })
 
 export const listExpiredPendingDeletionRequests = () => accountDb.select({
   id: deletionRequests.id,

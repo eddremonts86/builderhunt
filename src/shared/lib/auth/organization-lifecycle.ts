@@ -22,10 +22,17 @@ import type { PlanStatus, PlanTier } from '../billing-shared'
 
 export const RECENT_AUTH_MAX_AGE_SECONDS = 15 * 60
 
+// Matches the account-deletion grace period (legal.ts's GRACE_PERIOD_MS) for
+// consistent messaging — organization deletion does not reuse that table or
+// worker, but there's no reason its own policy window should differ.
+export const ORGANIZATION_DELETION_GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000
+
 const GENERIC_AUTH_ERROR = 'Authentication required'
 const GENERIC_MEMBERSHIP_ERROR = 'You do not have access to this organization'
 const GENERIC_INVITATION_ERROR = 'This invitation is no longer valid'
-const GENERIC_STALE_SESSION_ERROR = 'Please sign in again to continue'
+/** Exported so client UI can special-case this exact message with a "sign in again" CTA instead of a generic error banner — see OrganizationDangerZone.tsx. */
+export const STALE_SESSION_ERROR_MESSAGE = 'Please sign in again to continue'
+const GENERIC_STALE_SESSION_ERROR = STALE_SESSION_ERROR_MESSAGE
 
 export class OrganizationLifecycleError extends Error {
   constructor(
@@ -95,6 +102,13 @@ export interface OrganizationRecord {
   slug: string
 }
 
+export interface OrganizationDeletionRecord {
+  id: string
+  status: 'pending' | 'completed' | 'cancelled'
+  gracePeriodEndsAt: Date
+  requestedByUserId: string
+}
+
 export interface LifecycleDependencies {
   getSession(request: Request): Promise<LifecycleSession | null>
   findMembership(userId: string, organizationId: string): Promise<MembershipRecord | null>
@@ -116,7 +130,9 @@ export interface LifecycleDependencies {
   removeMemberRecord(organizationId: string, userId: string): Promise<void>
   updateMemberRoleRecord(organizationId: string, userId: string, role: InvitableRole): Promise<void>
   transferOwnershipRecord(organizationId: string, fromUserId: string, toUserId: string): Promise<void>
-  deleteOrganizationRecord(organizationId: string): Promise<void>
+  /** Upserts on `organizationId` (unique) so re-requesting after a cancel reuses the same row instead of erroring on a unique violation. */
+  requestOrganizationDeletionRecord(organizationId: string, requestedByUserId: string, gracePeriodEndsAt: Date): Promise<{ id: string }>
+  cancelOrganizationDeletionRecord(organizationId: string): Promise<{ id: string } | null>
   clearActiveOrganizationForUsers(organizationId: string, userIds: string[]): Promise<void>
   /** `devLink` is set only when no real email provider is configured (dev mode) — the invite/resend UI shows it as a manual-share fallback, since no email is actually going out. */
   sendInvitationEmail(email: string, organizationName: string, invitationId: string): Promise<{ devLink?: string }>
@@ -457,7 +473,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     })
   }
 
-  async function transferOwnership(request: Request, organizationId: string, targetUserId: string): Promise<void> {
+  async function transferOwnership(
+    request: Request,
+    organizationId: string,
+    targetUserId: string,
+  ): Promise<{ requestId: string }> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, organizationId)
     requireOwner(membership)
@@ -470,6 +490,7 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     }
 
     await deps.transferOwnershipRecord(organizationId, session.userId, targetUserId)
+    const requestId = requestIdFrom(request)
     await audit(deps, {
       organizationId,
       actorUserId: session.userId,
@@ -477,29 +498,60 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
       targetType: 'member',
       targetId: targetUserId,
       result: 'allowed',
-      requestId: requestIdFrom(request),
+      requestId,
     })
+    return { requestId }
   }
 
-  async function deleteOrganization(request: Request, organizationId: string): Promise<void> {
+  /**
+   * Schedules the organization for deletion after a grace period rather than
+   * deleting it immediately — mirrors the account-deletion UX (legal.ts) but
+   * deliberately doesn't reuse its table/worker: an organization's deletion
+   * affects every other member, not just the requester, so it gets its own
+   * `organization_deletion_requests` row and its own worker sweep
+   * (`processPendingOrganizationDeletions`). The actual hard delete only
+   * ever happens there, once the grace period has passed.
+   */
+  async function requestOrganizationDeletion(
+    request: Request,
+    organizationId: string,
+  ): Promise<{ id: string; gracePeriodEndsAt: Date }> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, organizationId)
     requireOwner(membership)
     requireRecentAuthentication(session, deps)
 
-    // No explicit session cleanup needed: authSessions.activeOrganizationId
-    // has ON DELETE SET NULL against organizations, so every member's stale
-    // active-org reference clears automatically when the row is gone.
-    await deps.deleteOrganizationRecord(organizationId)
+    const gracePeriodEndsAt = new Date(deps.now().getTime() + ORGANIZATION_DELETION_GRACE_PERIOD_MS)
+    const result = await deps.requestOrganizationDeletionRecord(organizationId, session.userId, gracePeriodEndsAt)
     await audit(deps, {
       organizationId,
       actorUserId: session.userId,
-      action: 'organization.delete',
+      action: 'organization.delete.requested',
       targetType: 'organization',
       targetId: organizationId,
       result: 'allowed',
       requestId: requestIdFrom(request),
     })
+    return { id: result.id, gracePeriodEndsAt }
+  }
+
+  /** Cancelling is the safe direction — no recent-auth challenge, same as the account-deletion cancel flow. */
+  async function cancelOrganizationDeletion(request: Request, organizationId: string): Promise<{ id: string | null }> {
+    const session = await requireSession(request, deps)
+    const membership = await requireMembership(deps, session.userId, organizationId)
+    requireOwner(membership)
+
+    const cancelled = await deps.cancelOrganizationDeletionRecord(organizationId)
+    await audit(deps, {
+      organizationId,
+      actorUserId: session.userId,
+      action: 'organization.delete.cancelled',
+      targetType: 'organization',
+      targetId: organizationId,
+      result: 'allowed',
+      requestId: requestIdFrom(request),
+    })
+    return { id: cancelled?.id ?? null }
   }
 
   return {
@@ -512,7 +564,8 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     removeMember,
     changeMemberRole,
     transferOwnership,
-    deleteOrganization,
+    requestOrganizationDeletion,
+    cancelOrganizationDeletion,
   }
 }
 
@@ -545,7 +598,7 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
     import('../db/tenant-context'),
     import('../repositories/entitlements'),
   ])
-  const { organizations, organizationMembers, organizationInvitations, authSessions } = schema
+  const { organizations, organizationMembers, organizationInvitations, organizationDeletionRequests, authSessions } = schema
 
   function toRole(role: string): OrganizationRole {
     return role as OrganizationRole
@@ -761,8 +814,25 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       })
     },
 
-    async deleteOrganizationRecord(organizationId) {
-      await authDb.delete(organizations).where(eq(organizations.id, organizationId))
+    async requestOrganizationDeletionRecord(organizationId, requestedByUserId, gracePeriodEndsAt) {
+      const [row] = await authDb
+        .insert(organizationDeletionRequests)
+        .values({ id: crypto.randomUUID(), organizationId, requestedByUserId, status: 'pending', gracePeriodEndsAt })
+        .onConflictDoUpdate({
+          target: organizationDeletionRequests.organizationId,
+          set: { requestedByUserId, status: 'pending', gracePeriodEndsAt, completedAt: null },
+        })
+        .returning({ id: organizationDeletionRequests.id })
+      return { id: row.id }
+    },
+
+    async cancelOrganizationDeletionRecord(organizationId) {
+      const [row] = await authDb
+        .update(organizationDeletionRequests)
+        .set({ status: 'cancelled' })
+        .where(and(eq(organizationDeletionRequests.organizationId, organizationId), eq(organizationDeletionRequests.status, 'pending')))
+        .returning({ id: organizationDeletionRequests.id })
+      return row ?? null
     },
 
     async clearActiveOrganizationForUsers(organizationId, userIds) {
@@ -1097,4 +1167,72 @@ export async function assertSeatLimitDowngradeIsSafe(organizationId: string, tar
     const seats = (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
     if (seats > targetSeatLimit) throw new SeatLimitExceededError()
   })
+}
+
+/** Team settings' danger-zone status read — same authDb rationale as `listPendingInvitations`: no tenant-context chicken-and-egg problem, and the caller (contracts.ts) already resolved a valid principal for this organization. */
+export async function getOrganizationDeletionStatus(organizationId: string): Promise<OrganizationDeletionRecord | null> {
+  const [{ and, eq }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationDeletionRequests } = schema
+
+  const [row] = await authDb
+    .select({
+      id: organizationDeletionRequests.id,
+      status: organizationDeletionRequests.status,
+      gracePeriodEndsAt: organizationDeletionRequests.gracePeriodEndsAt,
+      requestedByUserId: organizationDeletionRequests.requestedByUserId,
+    })
+    .from(organizationDeletionRequests)
+    .where(and(eq(organizationDeletionRequests.organizationId, organizationId), eq(organizationDeletionRequests.status, 'pending')))
+    .limit(1)
+  if (!row) return null
+  return { ...row, status: row.status as OrganizationDeletionRecord['status'] }
+}
+
+export interface ProcessPendingOrganizationDeletionsResult {
+  processed: number
+  errors: number
+}
+
+/**
+ * The organization-deletion grace-period worker — same shape as legal.ts's
+ * `processPendingDeletions` (account side) but deliberately its own sweep
+ * over `organization_deletion_requests`, not a shared code path: hard-deletes
+ * every organization whose pending request is past its grace period (the
+ * cascade removes members/invitations/entitlements/resources with it), then
+ * marks the request completed. A failed delete leaves that request untouched
+ * for the next run rather than losing track of it.
+ */
+export async function processPendingOrganizationDeletions(): Promise<ProcessPendingOrganizationDeletionsResult> {
+  const [{ and, eq, lt }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizations, organizationDeletionRequests } = schema
+
+  const due = await authDb
+    .select({ id: organizationDeletionRequests.id, organizationId: organizationDeletionRequests.organizationId })
+    .from(organizationDeletionRequests)
+    .where(and(eq(organizationDeletionRequests.status, 'pending'), lt(organizationDeletionRequests.gracePeriodEndsAt, new Date())))
+
+  let processed = 0
+  let errors = 0
+  for (const dueRequest of due) {
+    try {
+      await authDb.delete(organizations).where(eq(organizations.id, dueRequest.organizationId))
+      await authDb
+        .update(organizationDeletionRequests)
+        .set({ status: 'completed', completedAt: new Date() })
+        .where(eq(organizationDeletionRequests.id, dueRequest.id))
+      processed++
+    } catch (error) {
+      errors++
+      console.error('organization-lifecycle.process_pending_organization_deletions.failed', { error, organizationDeletionRequestId: dueRequest.id })
+    }
+  }
+  return { processed, errors }
 }

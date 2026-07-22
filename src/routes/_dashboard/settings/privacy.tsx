@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
-import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X } from 'lucide-react'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X, Users } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 
 interface ExportRecord {
@@ -19,6 +19,11 @@ interface DeletionRecord {
   createdAt: string
 }
 
+interface BlockingOrganization {
+  organizationId: string
+  organizationName: string
+}
+
 export const Route = createFileRoute('/_dashboard/settings/privacy')({
   beforeLoad: async () => {
     const user = await getAppAuthSession()
@@ -29,12 +34,15 @@ export const Route = createFileRoute('/_dashboard/settings/privacy')({
 })
 
 function PrivacySettingsPage() {
+  const navigate = useNavigate()
   const [exports, setExports] = React.useState<ExportRecord[]>([])
   const [deletion, setDeletion] = React.useState<DeletionRecord | null>(null)
   const [busy, setBusy] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [success, setSuccess] = React.useState<string | null>(null)
+  const [referenceId, setReferenceId] = React.useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
+  const [blockingOrganizations, setBlockingOrganizations] = React.useState<BlockingOrganization[]>([])
 
   const load = React.useCallback(async () => {
     try {
@@ -105,13 +113,22 @@ function PrivacySettingsPage() {
     setBusy(true)
     setError(null)
     setSuccess(null)
+    setReferenceId(null)
+    setBlockingOrganizations([])
     try {
       const res = await fetch('/api/me/delete-account', {
         method: 'POST',
         credentials: 'include',
       })
-      if (!res.ok) throw new Error('Failed')
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 409 && Array.isArray(data.organizations)) {
+        setBlockingOrganizations(data.organizations)
+        setError(data.error ?? 'Transfer ownership of your organizations before deleting your account')
+        return
+      }
+      if (!res.ok) throw new Error(data.error ?? 'Failed')
       setSuccess('Account scheduled for deletion. You have 30 days to cancel.')
+      setReferenceId(data.id ?? null)
       setConfirmDelete(false)
       await load()
     } catch (e) {
@@ -123,19 +140,32 @@ function PrivacySettingsPage() {
 
   const cancelDeletion = async () => {
     setBusy(true)
+    setReferenceId(null)
     try {
       const res = await fetch('/api/me/delete-account', {
         method: 'DELETE',
         credentials: 'include',
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error('Failed')
       setSuccess('Deletion cancelled. Your account is safe.')
+      setReferenceId(data.requestId ?? null)
       await load()
     } catch (e) {
       setError(String(e))
     } finally {
       setBusy(false)
     }
+  }
+
+  const goManageOrganization = async (organizationId: string) => {
+    await fetch('/api/organizations/switch', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId }),
+    })
+    navigate({ to: '/settings/team' })
   }
 
   const daysRemaining = deletion && deletion.status === 'pending'
@@ -156,12 +186,35 @@ function PrivacySettingsPage() {
 
       {error && (
         <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="privacy-error">
-          {error}
+          <p>{error}</p>
+          {blockingOrganizations.length > 0 && (
+            <ul className="mt-2 space-y-1" data-testid="blocking-organizations">
+              {blockingOrganizations.map((org) => (
+                <li key={org.organizationId} className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                    {org.organizationName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goManageOrganization(org.organizationId)}
+                    className="btn-ghost btn-sm text-bh-danger shrink-0"
+                    data-testid={`manage-org-${org.organizationId}`}
+                  >
+                    Transfer ownership
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
       {success && (
         <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="privacy-success">
-          {success}
+          <p>{success}</p>
+          {referenceId && (
+            <p className="text-xs text-bh-text-dim mt-1" data-testid="privacy-reference-id">Reference: {referenceId}</p>
+          )}
         </div>
       )}
 

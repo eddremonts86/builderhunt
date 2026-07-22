@@ -92,6 +92,10 @@
     "0022_platform_plan_entitlement_sync": {
       "sql": "62b7b0873b336abde8c918eee3b8062a301d0ef6e8c1e7f4fa41c394bcb6819c",
       "snapshot": "412b4bf2da04e9bec714ce3a8817ce495a8df8f2fc27f3f00e32bfb9c5d17197"
+    },
+    "0023_organization_deletion_requests": {
+      "sql": "68c29065d9fd6a674abab3b2737e246bc3a6410c6345b747c582f868cf10a93e",
+      "snapshot": "04d1516508b973127ddf6c96faa9f5fc0ced7e0eb46adf5b44aa87ab235517ef"
     }
   }
 }

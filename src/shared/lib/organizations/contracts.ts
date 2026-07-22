@@ -14,6 +14,7 @@ import type {
   InvitableRole,
   InvitationRecord,
   MyOrganizationRecord,
+  OrganizationDeletionRecord,
   OrganizationEntitlementRecord,
   OrganizationMemberRecord,
   OrganizationRecord,
@@ -21,6 +22,7 @@ import type {
 } from '../auth/organization-lifecycle'
 import {
   getOrganizationBillingDetail,
+  getOrganizationDeletionStatus,
   getOrganizationLifecycle,
   getSeatUsage,
   listInvitationsForEmail,
@@ -29,6 +31,7 @@ import {
   listPendingInvitations,
   OrganizationLifecycleError,
   SeatLimitExceededError,
+  STALE_SESSION_ERROR_MESSAGE,
 } from '../auth/organization-lifecycle'
 import { requireTenantPrincipal, TenantAuthorizationError } from '../auth/tenant-principal'
 
@@ -43,6 +46,7 @@ export {
   listOrganizationMembers,
   listPendingInvitations,
   requireTenantPrincipal,
+  STALE_SESSION_ERROR_MESSAGE,
 }
 export { OrganizationLifecycleError, SeatLimitExceededError, TenantAuthorizationError }
 
@@ -128,6 +132,15 @@ export function toMyPendingInvitationDto(invitation: InvitationRecord): MyPendin
   }
 }
 
+export interface OrganizationDeletionStatusDto {
+  id: string
+  gracePeriodEndsAt: string
+}
+
+export function toOrganizationDeletionStatusDto(record: OrganizationDeletionRecord): OrganizationDeletionStatusDto {
+  return { id: record.id, gracePeriodEndsAt: record.gracePeriodEndsAt.toISOString() }
+}
+
 /** Everything `TeamSettingsPage` needs for one render — the viewer's own role travels alongside so the client can gate controls with the same `can()` used server-side, never a hand-rolled role check. */
 export interface TeamSnapshotDto {
   organization: OrganizationSummaryDto
@@ -135,15 +148,18 @@ export interface TeamSnapshotDto {
   members: OrganizationMemberDto[]
   pendingInvitations: InvitationSummaryDto[]
   seatUsage: SeatUsageDto
+  /** Non-null only while this organization has a pending (not yet completed/cancelled) deletion request. */
+  pendingDeletion: OrganizationDeletionStatusDto | null
 }
 
 /** Composes the foundation reads behind `GET /api/organizations/team` so the route stays a thin auth-then-serialize wrapper with no direct DB access of its own. */
 export async function getTeamSnapshot(principal: TenantPrincipal): Promise<TeamSnapshotDto | null> {
-  const [myOrganizations, members, pendingInvitations, seatUsage] = await Promise.all([
+  const [myOrganizations, members, pendingInvitations, seatUsage, deletionStatus] = await Promise.all([
     listMyOrganizations(principal.userId),
     listOrganizationMembers(principal.organizationId),
     listPendingInvitations(principal.organizationId),
     getSeatUsage(principal),
+    getOrganizationDeletionStatus(principal.organizationId),
   ])
 
   const mine = myOrganizations.find((record) => record.organization.id === principal.organizationId)
@@ -155,6 +171,7 @@ export async function getTeamSnapshot(principal: TenantPrincipal): Promise<TeamS
     members: members.map(toOrganizationMemberDto),
     pendingInvitations: pendingInvitations.map(toInvitationSummaryDto),
     seatUsage: toSeatUsageDto(seatUsage),
+    pendingDeletion: deletionStatus ? toOrganizationDeletionStatusDto(deletionStatus) : null,
   }
 }
 

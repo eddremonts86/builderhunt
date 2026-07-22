@@ -1,17 +1,16 @@
 import * as React from 'react'
-import { Users, UserPlus, Mail, Crown, Shield, X, LogOut, ArrowRightLeft, Trash2, RefreshCw, AlertTriangle, Link2, Check } from 'lucide-react'
+import { Users, UserPlus, Mail, Crown, Shield, X, RefreshCw, Link2, Check } from 'lucide-react'
 import {
   can,
   canChangeMemberRole,
-  canLeaveOrganization,
   canRemoveMember,
-  canTransferOwnershipTo,
   isOwnerRole,
   type InvitableRole,
   type OrganizationRole,
   type TeamSnapshotDto,
   type TenantPrincipal,
 } from '~/shared/lib/organizations/contracts'
+import { OrganizationDangerZone } from './OrganizationDangerZone'
 
 /**
  * Pure presentation: every control's visibility comes from `can()` or one of
@@ -27,6 +26,8 @@ export interface TeamSettingsPageProps {
   error?: string | null
   /** Set only for an invitation whose email was never actually sent (no email provider configured) — a manual-share fallback for exactly that invitation. */
   devLinkByInvitationId?: Record<string, string>
+  /** Audit/reference id from the most recent danger-zone action (transfer/request-deletion/cancel) — passed through to OrganizationDangerZone. */
+  dangerZoneReferenceId?: string | null
   onInvite?: (email: string, role: InvitableRole) => void | Promise<void>
   onCancelInvite?: (invitationId: string) => void | Promise<void>
   onResendInvite?: (invitationId: string) => void | Promise<void>
@@ -34,7 +35,8 @@ export interface TeamSettingsPageProps {
   onRemoveMember?: (userId: string) => void | Promise<void>
   onLeave?: () => void | Promise<void>
   onTransferOwnership?: (userId: string) => void | Promise<void>
-  onDelete?: () => void | Promise<void>
+  onRequestDeletion?: () => void | Promise<void>
+  onCancelDeletion?: () => void | Promise<void>
 }
 
 const ROLE_LABEL: Record<OrganizationRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
@@ -47,6 +49,7 @@ export function TeamSettingsPage({
   busy = false,
   error = null,
   devLinkByInvitationId,
+  dangerZoneReferenceId = null,
   onInvite,
   onCancelInvite,
   onResendInvite,
@@ -54,12 +57,11 @@ export function TeamSettingsPage({
   onRemoveMember,
   onLeave,
   onTransferOwnership,
-  onDelete,
+  onRequestDeletion,
+  onCancelDeletion,
 }: TeamSettingsPageProps) {
   const [inviteEmail, setInviteEmail] = React.useState('')
   const [inviteRole, setInviteRole] = React.useState<InvitableRole>('member')
-  const [transferTarget, setTransferTarget] = React.useState('')
-  const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [copiedInvitationId, setCopiedInvitationId] = React.useState<string | null>(null)
 
   async function copyInviteLink(invitationId: string, link: string) {
@@ -82,9 +84,7 @@ export function TeamSettingsPage({
 
   const canInvite = can(viewer, 'organization:invite')
   const canManageMembers = can(viewer, 'organization:manage-members')
-  const canDelete = can(viewer, 'organization:delete')
   const seatsFull = snapshot.seatUsage.used >= snapshot.seatUsage.limit
-  const transferableMembers = snapshot.members.filter((m) => canTransferOwnershipTo(snapshot.viewerRole, viewerUserId, m.userId))
 
   return (
     <div className="p-6 max-w-3xl mx-auto" data-testid="team-settings-page">
@@ -282,102 +282,21 @@ export function TeamSettingsPage({
         </section>
       )}
 
-      {/* Danger zone */}
-      <section className="card border-bh-danger/30 p-5" data-testid="team-danger-zone">
-        <h2 className="font-semibold flex items-center gap-2 text-bh-danger mb-4">
-          <AlertTriangle className="w-4 h-4" aria-hidden="true" />
-          Danger zone
-        </h2>
-
-        <div className="flex flex-col gap-4">
-          {canLeaveOrganization(snapshot.viewerRole) && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-bh-text-muted">Leave this organization.</p>
-              <button
-                type="button"
-                onClick={() => (onLeave ?? noop)()}
-                disabled={busy}
-                className="btn-danger-outline btn-sm shrink-0"
-                data-testid="leave-organization-btn"
-              >
-                <LogOut className="w-4 h-4" aria-hidden="true" />
-                Leave
-              </button>
-            </div>
-          )}
-
-          {snapshot.viewerRole === 'owner' && transferableMembers.length > 0 && (
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm text-bh-text-muted">Transfer ownership to another member.</p>
-              <div className="flex items-center gap-2 shrink-0">
-                <select
-                  value={transferTarget}
-                  onChange={(e) => setTransferTarget(e.target.value)}
-                  disabled={busy}
-                  aria-label="Transfer ownership to"
-                  className="text-sm rounded-lg border border-bh-border bg-bh-surface px-2 py-1.5"
-                  data-testid="transfer-target-select"
-                >
-                  <option value="">Select a member…</option>
-                  {transferableMembers.map((m) => (
-                    <option key={m.userId} value={m.userId}>{m.name}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => transferTarget && (onTransferOwnership ?? noop)(transferTarget)}
-                  disabled={busy || !transferTarget}
-                  className="btn-danger-outline btn-sm"
-                  data-testid="transfer-ownership-btn"
-                >
-                  <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
-                  Transfer
-                </button>
-              </div>
-            </div>
-          )}
-
-          {canDelete && !snapshot.organization.isPersonal && (
-            <div className="flex items-center justify-between gap-3 pt-4 border-t border-bh-danger/20">
-              <p className="text-sm text-bh-text-muted max-w-[45ch]">
-                Permanently delete this organization and all its members' access. This cannot be undone.
-              </p>
-              {!confirmDelete ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="btn-danger-outline btn-sm shrink-0"
-                  data-testid="delete-organization-btn"
-                >
-                  <Trash2 className="w-4 h-4" aria-hidden="true" />
-                  Delete organization
-                </button>
-              ) : (
-                <div className="flex gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => (onDelete ?? noop)()}
-                    disabled={busy}
-                    className="btn-danger btn-sm"
-                    data-testid="confirm-delete-organization-btn"
-                  >
-                    Confirm delete
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmDelete(false)}
-                    disabled={busy}
-                    className="btn-secondary btn-sm"
-                    data-testid="cancel-delete-organization-btn"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
+      <OrganizationDangerZone
+        organizationName={snapshot.organization.name}
+        isPersonal={snapshot.organization.isPersonal}
+        viewerRole={snapshot.viewerRole}
+        viewerUserId={viewerUserId}
+        members={snapshot.members}
+        pendingDeletion={snapshot.pendingDeletion}
+        busy={busy}
+        error={error}
+        referenceId={dangerZoneReferenceId}
+        onLeave={onLeave}
+        onTransferOwnership={onTransferOwnership}
+        onRequestDeletion={onRequestDeletion}
+        onCancelDeletion={onCancelDeletion}
+      />
     </div>
   )
 }

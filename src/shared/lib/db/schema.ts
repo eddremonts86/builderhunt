@@ -110,6 +110,27 @@ export const organizationInvitations = pgTable(
   ],
 )
 
+export const organizationDeletionRequests = pgTable(
+  'organization_deletion_requests',
+  {
+    id: text('id').primaryKey(),
+    // No FK to organizations: this row is the compliance/audit record that a
+    // grace-period delete happened, so it must outlive the organizations row
+    // the worker eventually deletes (same rationale as deletionRequests
+    // above, for the account-level equivalent).
+    organizationId: text('organization_id').notNull().unique(),
+    requestedByUserId: text('requested_by_user_id').notNull(),
+    status: text('status').notNull().default('pending'), // 'pending' | 'completed' | 'cancelled'
+    gracePeriodEndsAt: timestamp('grace_period_ends_at', { withTimezone: true }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index('organization_deletion_requests_grace_period_idx').on(table.gracePeriodEndsAt),
+    check('organization_deletion_requests_status_check', sql`${table.status} in ('pending', 'completed', 'cancelled')`),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // App Tables
 // ---------------------------------------------------------------------------

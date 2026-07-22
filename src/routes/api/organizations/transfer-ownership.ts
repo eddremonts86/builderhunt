@@ -22,8 +22,8 @@ export const Route = createFileRoute('/api/organizations/transfer-ownership')({
 
           const principal = await requireTenantPrincipal(request)
           const lifecycle = await getOrganizationLifecycle()
-          await lifecycle.transferOwnership(request, principal.organizationId, parsed.data.targetUserId)
-          return Response.json({ ok: true })
+          const result = await lifecycle.transferOwnership(request, principal.organizationId, parsed.data.targetUserId)
+          return Response.json({ ok: true, requestId: result.requestId })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response

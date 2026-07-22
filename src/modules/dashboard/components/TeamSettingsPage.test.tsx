@@ -31,6 +31,7 @@ function baseSnapshot(viewerRole: TeamSnapshotDto['viewerRole']): TeamSnapshotDt
       { id: 'invite-1', email: 'pending@acme.test', role: 'member', status: 'pending', expiresAt: '2026-08-01T00:00:00.000Z' },
     ],
     seatUsage: { used: 4, limit: 10 },
+    pendingDeletion: null,
   }
 }
 

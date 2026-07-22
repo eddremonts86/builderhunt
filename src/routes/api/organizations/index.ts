@@ -44,15 +44,15 @@ export const Route = createFileRoute('/api/organizations/')({
         }
       },
 
-      // Deletes the caller's own active organization — never a client-chosen
-      // one — via `requireTenantPrincipal`. `deleteOrganization` itself
-      // enforces owner-only + recent-auth.
+      // Schedules the caller's own active organization for deletion after a
+      // grace period — never a client-chosen one, via `requireTenantPrincipal`.
+      // `requestOrganizationDeletion` itself enforces owner-only + recent-auth.
       DELETE: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
           const lifecycle = await getOrganizationLifecycle()
-          await lifecycle.deleteOrganization(request, principal.organizationId)
-          return Response.json({ ok: true })
+          const result = await lifecycle.requestOrganizationDeletion(request, principal.organizationId)
+          return Response.json({ ok: true, id: result.id, gracePeriodEndsAt: result.gracePeriodEndsAt.toISOString() })
         } catch (error) {
           const response = lifecycleErrorResponse(error)
           if (response) return response

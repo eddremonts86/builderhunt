@@ -54,7 +54,8 @@ function buildDeps(overrides: Partial<LifecycleDependencies> = {}): LifecycleDep
     removeMemberRecord: vi.fn().mockResolvedValue(undefined),
     updateMemberRoleRecord: vi.fn().mockResolvedValue(undefined),
     transferOwnershipRecord: vi.fn().mockResolvedValue(undefined),
-    deleteOrganizationRecord: vi.fn().mockResolvedValue(undefined),
+    requestOrganizationDeletionRecord: vi.fn().mockResolvedValue({ id: 'deletion-req-1' }),
+    cancelOrganizationDeletionRecord: vi.fn().mockResolvedValue({ id: 'deletion-req-1' }),
     clearActiveOrganizationForUsers: vi.fn().mockResolvedValue(undefined),
     sendInvitationEmail: vi.fn().mockResolvedValue({}),
     rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
@@ -465,22 +466,72 @@ describe('transferOwnership', () => {
   })
 })
 
-describe('deleteOrganization', () => {
-  it('only the owner may delete the organization', async () => {
+describe('requestOrganizationDeletion', () => {
+  it('only the owner may request deletion', async () => {
     const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
     const lifecycle = createOrganizationLifecycle(deps)
 
-    await expect(lifecycle.deleteOrganization(request, 'org-1')).rejects.toMatchObject({ status: 403 })
-    expect(deps.deleteOrganizationRecord).not.toHaveBeenCalled()
+    await expect(lifecycle.requestOrganizationDeletion(request, 'org-1')).rejects.toMatchObject({ status: 403 })
+    expect(deps.requestOrganizationDeletionRecord).not.toHaveBeenCalled()
   })
 
-  it('deletes when the owner has authenticated recently', async () => {
+  it('requires a recently authenticated session', async () => {
+    const staleSession = session({ authenticatedAt: new Date(NOW.getTime() - 20 * 60 * 1000) })
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(staleSession),
+      findMembership: vi.fn().mockResolvedValue(membership('owner')),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.requestOrganizationDeletion(request, 'org-1')).rejects.toMatchObject({ status: 401 })
+    expect(deps.requestOrganizationDeletionRecord).not.toHaveBeenCalled()
+  })
+
+  it('schedules deletion — a 30-day grace period from now, not an immediate delete — when the owner has authenticated recently', async () => {
     const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('owner')) })
     const lifecycle = createOrganizationLifecycle(deps)
 
-    await lifecycle.deleteOrganization(request, 'org-1')
+    const result = await lifecycle.requestOrganizationDeletion(request, 'org-1')
 
-    expect(deps.deleteOrganizationRecord).toHaveBeenCalledWith('org-1')
+    expect(deps.requestOrganizationDeletionRecord).toHaveBeenCalledWith(
+      'org-1',
+      'user-a',
+      new Date(NOW.getTime() + 30 * 24 * 60 * 60 * 1000),
+    )
+    expect(result).toEqual({ id: 'deletion-req-1', gracePeriodEndsAt: new Date(NOW.getTime() + 30 * 24 * 60 * 60 * 1000) })
+  })
+})
+
+describe('cancelOrganizationDeletion', () => {
+  it('only the owner may cancel a pending deletion', async () => {
+    const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')) })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.cancelOrganizationDeletion(request, 'org-1')).rejects.toMatchObject({ status: 403 })
+    expect(deps.cancelOrganizationDeletionRecord).not.toHaveBeenCalled()
+  })
+
+  it('does not require a recently authenticated session — cancelling is the safe direction', async () => {
+    const staleSession = session({ authenticatedAt: new Date(NOW.getTime() - 20 * 60 * 1000) })
+    const deps = buildDeps({
+      getSession: vi.fn().mockResolvedValue(staleSession),
+      findMembership: vi.fn().mockResolvedValue(membership('owner')),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    const result = await lifecycle.cancelOrganizationDeletion(request, 'org-1')
+    expect(result).toEqual({ id: 'deletion-req-1' })
+  })
+
+  it('returns a null id when there was nothing pending to cancel', async () => {
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('owner')),
+      cancelOrganizationDeletionRecord: vi.fn().mockResolvedValue(null),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    const result = await lifecycle.cancelOrganizationDeletion(request, 'org-1')
+    expect(result).toEqual({ id: null })
   })
 })
 

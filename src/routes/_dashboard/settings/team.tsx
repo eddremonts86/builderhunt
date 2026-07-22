@@ -35,6 +35,10 @@ function TeamSettingsRoute() {
   const navigate = useNavigate()
   const [busy, setBusy] = React.useState(false)
   const [mutationError, setMutationError] = React.useState<string | null>(null)
+  // Audit/reference id from the most recent danger-zone action (transfer,
+  // request-deletion, cancel-deletion) — no sensitive payload, just enough
+  // to point support at the right audit-log entry if something goes wrong.
+  const [dangerZoneReferenceId, setDangerZoneReferenceId] = React.useState<string | null>(null)
   // `devLink` only ever comes back when no real email provider is configured
   // (dev mode) — the invitation exists but nothing was actually sent, so
   // TeamSettingsPage shows a manual-share fallback for exactly that invitation.
@@ -92,6 +96,12 @@ function TeamSettingsRoute() {
     if (devLink) setDevLinks((prev) => ({ ...prev, [id]: devLink }))
   }
 
+  function captureReferenceId(body: unknown, key: 'id' | 'requestId') {
+    if (!body || typeof body !== 'object' || !(key in body)) return
+    const value = (body as Record<string, unknown>)[key]
+    setDangerZoneReferenceId(typeof value === 'string' ? value : null)
+  }
+
   const handleChangeRole = (targetUserId: string, role: InvitableRole) =>
     runMutation(
       () => fetch(`/api/organizations/members/${encodeURIComponent(targetUserId)}`, {
@@ -133,14 +143,30 @@ function TeamSettingsRoute() {
         body: JSON.stringify({ targetUserId }),
       }),
       'Failed to transfer ownership',
-      refreshSnapshot,
+      async (body) => {
+        captureReferenceId(body, 'requestId')
+        await refreshSnapshot()
+      },
     )
 
-  const handleDelete = () =>
+  const handleRequestDeletion = () =>
     runMutation(
       () => fetch('/api/organizations', { method: 'DELETE', credentials: 'include' }),
-      'Failed to delete organization',
-      leaveOrganizationContext,
+      'Failed to schedule organization deletion',
+      async (body) => {
+        captureReferenceId(body, 'id')
+        await refreshSnapshot()
+      },
+    )
+
+  const handleCancelDeletion = () =>
+    runMutation(
+      () => fetch('/api/organizations/deletion', { method: 'DELETE', credentials: 'include' }),
+      'Failed to cancel organization deletion',
+      async (body) => {
+        captureReferenceId(body, 'id')
+        await refreshSnapshot()
+      },
     )
 
   const handleInvite = (email: string, role: InvitableRole) =>
@@ -213,6 +239,7 @@ function TeamSettingsRoute() {
       busy={busy}
       error={mutationError}
       devLinkByInvitationId={devLinks}
+      dangerZoneReferenceId={dangerZoneReferenceId}
       onInvite={handleInvite}
       onCancelInvite={handleCancelInvite}
       onResendInvite={handleResendInvite}
@@ -220,7 +247,8 @@ function TeamSettingsRoute() {
       onRemoveMember={handleRemoveMember}
       onLeave={handleLeave}
       onTransferOwnership={handleTransferOwnership}
-      onDelete={handleDelete}
+      onRequestDeletion={handleRequestDeletion}
+      onCancelDeletion={handleCancelDeletion}
     />
   )
 }

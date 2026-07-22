@@ -8,7 +8,7 @@ import {
   insertDeletionRequest,
   listAccountConsents,
   listExpiredPendingDeletionRequests,
-  listOwnedOrganizations,
+  listOwnedOrganizationsWithOtherMembers,
   loadAccountExportSource,
   updateDeletionRequest,
 } from '~/shared/lib/repositories/account-privacy'
@@ -64,10 +64,15 @@ export async function buildExportPayload(userId: string) {
 export const EXPORT_TTL_MS = 7 * 24 * 60 * 60 * 1000
 export const GRACE_PERIOD_MS = 30 * 24 * 60 * 60 * 1000
 
+export interface BlockingOrganization {
+  organizationId: string
+  organizationName: string
+}
+
 export class AccountDeletionOwnershipError extends Error {
   readonly status = 409
-  constructor(readonly organizationIds: string[]) {
-    super('Transfer or delete owned organizations before deleting the account')
+  constructor(readonly organizations: BlockingOrganization[]) {
+    super('Transfer ownership of your organizations before deleting your account')
     this.name = 'AccountDeletionOwnershipError'
   }
 }
@@ -140,6 +145,6 @@ export async function processPendingDeletions(): Promise<ProcessPendingDeletions
 }
 
 async function assertNoOwnedOrganizations(userId: string) {
-  const owned = await listOwnedOrganizations(userId)
-  if (owned.length > 0) throw new AccountDeletionOwnershipError(owned.map((row) => row.organizationId))
+  const owned = await listOwnedOrganizationsWithOtherMembers(userId)
+  if (owned.length > 0) throw new AccountDeletionOwnershipError(owned)
 }
