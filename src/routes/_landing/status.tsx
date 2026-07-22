@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock } from 'lucide-react'
 import { useSession } from '~/shared/lib/auth/client'
 import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
+import { TenantQueryProvider } from '~/shared/components/TenantQueryProvider'
 
 interface Incident {
   id: string
@@ -168,7 +169,15 @@ function StatusPage() {
   // to work for signed-out visitors (public trust page) — so it can't live
   // under `_dashboard/*` (auth-gated). Wrap in the same shell client-side
   // when a session exists, so it doesn't feel like leaving the app.
-  return session?.user ? <DashboardLayout>{content}</DashboardLayout> : content
+  // `DashboardLayout`'s topbar renders `OrganizationSwitcher`, which needs a
+  // `QueryClient` — `_dashboard/route.tsx` provides one via
+  // `TenantQueryProvider`, but this route sits outside that tree entirely
+  // (that's the point, for signed-out visitors), so it must supply its own.
+  return session?.user ? (
+    <TenantQueryProvider activeOrganizationId={session.session?.activeOrganizationId ?? null}>
+      <DashboardLayout>{content}</DashboardLayout>
+    </TenantQueryProvider>
+  ) : content
 }
 
 function ComponentRow({ name, check }: { name: string; check: { name: string; ok: boolean; message?: string } }) {
