@@ -88,6 +88,10 @@
     "0021_onboarding_selected_builders": {
       "sql": "139310d485ff8e19d4d217057fae3a207c62315ac58d74b2e275870cf84a9c6f",
       "snapshot": "1a82553e82035b1abe339b7569dce58e3e777259478a510ec04ba604d45b4f05"
+    },
+    "0022_platform_plan_entitlement_sync": {
+      "sql": "62b7b0873b336abde8c918eee3b8062a301d0ef6e8c1e7f4fa41c394bcb6819c",
+      "snapshot": "412b4bf2da04e9bec714ce3a8817ce495a8df8f2fc27f3f00e32bfb9c5d17197"
     }
   }
 }

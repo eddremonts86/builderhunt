@@ -1,7 +1,7 @@
 import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { consoleSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
-import type { OrganizationRole } from '../authorization/permissions'
+import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
 
 /**
  * Wraps the better-auth organization plugin's operations with the
@@ -98,8 +98,6 @@ export interface LifecycleDependencies {
   getSession(request: Request): Promise<LifecycleSession | null>
   findMembership(userId: string, organizationId: string): Promise<MembershipRecord | null>
   countSeats(organizationId: string): Promise<number>
-  /** Personal workspaces are seeded with `seatLimit: 1` (see `personal-organization.ts`) — solo by design, never invitable. */
-  isPersonalOrganization(organizationId: string): Promise<boolean>
   membershipLimit: number
   createOrganization(input: { name: string; slug: string; ownerUserId: string }): Promise<OrganizationRecord>
   setActiveOrganization(session: LifecycleSession, organizationId: string | null): Promise<void>
@@ -240,9 +238,6 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, input.organizationId)
     requireElevated(membership)
-    if (await deps.isPersonalOrganization(input.organizationId)) {
-      throw new OrganizationLifecycleError('Personal workspaces cannot invite members — create a team instead', 400)
-    }
     await requireRateLimit(deps, 'org-invite', `${session.userId}:${input.organizationId}`, 20, 60 * 60)
 
     const email = normalizeInvitationEmail(input.email)
@@ -506,16 +501,27 @@ let cached: OrganizationLifecycle | null = null
 export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle> {
   if (cached) return cached
 
-  const [{ and, eq, sql, count }, { auth }, { authDb }, schema, { rateLimit }, { sendOrganizationInvitationEmail }, { env }] =
-    await Promise.all([
-      import('drizzle-orm'),
-      import('./better-auth'),
-      import('../db/auth-db'),
-      import('../db/schema'),
-      import('../rate-limit'),
-      import('../email'),
-      import('../env'),
-    ])
+  const [
+    { and, eq, sql, count },
+    { auth },
+    { authDb },
+    schema,
+    { rateLimit },
+    { sendOrganizationInvitationEmail },
+    { env },
+    { withTenantContext },
+    { getOrganizationEntitlement },
+  ] = await Promise.all([
+    import('drizzle-orm'),
+    import('./better-auth'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+    import('../rate-limit'),
+    import('../email'),
+    import('../env'),
+    import('../db/tenant-context'),
+    import('../repositories/entitlements'),
+  ])
   const { organizations, organizationMembers, organizationInvitations, authSessions } = schema
 
   function toRole(role: string): OrganizationRole {
@@ -557,15 +563,6 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       return (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
     },
 
-    async isPersonalOrganization(organizationId) {
-      const [row] = await authDb
-        .select({ metadata: organizations.metadata })
-        .from(organizations)
-        .where(eq(organizations.id, organizationId))
-        .limit(1)
-      return isPersonalOrganizationMetadata(row?.metadata ?? null)
-    },
-
     membershipLimit: ORGANIZATION_MEMBERSHIP_LIMIT,
 
     async createOrganization(input) {
@@ -593,12 +590,25 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       const id = crypto.randomUUID()
       const expiresAt = new Date(Date.now() + 60 * 60 * 24 * 7 * 1000)
 
+      // The real per-organization seat allowance lives in
+      // `organization_entitlements` — a tenant-private, RLS-forced table only
+      // `builderhunt_app` can read (via `withTenantContext`), not this
+      // function's `authDb`/`builderhunt_auth` connection. Read outside the
+      // lock below: entitlement changes (admin plan grants) are rare enough
+      // that a tiny staleness window here is an acceptable tradeoff against
+      // spanning two different database roles in one atomic transaction.
+      // `role` doesn't affect this read — the entitlement SELECT policy is
+      // keyed only on `app.organization_id`.
+      const entitlement = await withTenantContext(
+        { userId: input.inviterId, organizationId: input.organizationId, role: 'member', requestId: crypto.randomUUID() },
+        (tx) => getOrganizationEntitlement(tx, input.organizationId),
+      )
+
       // Locks the organization's member rows for the rest of this transaction
       // so a concurrent invite can't read the same seat count before either
       // insert commits — the loser blocks here, then re-reads a count that
       // already includes the winner's row and throws instead of overselling
-      // the seat. A real per-organization capacity constraint belongs in a
-      // migration (out of scope for this task's file list).
+      // the seat.
       const organization = await authDb.transaction(async (tx) => {
         await tx.execute(sql`select 1 from organization_members where organization_id = ${input.organizationId} for update`)
         const [members] = await tx
@@ -610,7 +620,7 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
           .from(organizationInvitations)
           .where(and(eq(organizationInvitations.organizationId, input.organizationId), eq(organizationInvitations.status, 'pending')))
         const seats = (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
-        if (seats >= ORGANIZATION_MEMBERSHIP_LIMIT) throw new SeatLimitExceededError()
+        if (seats >= entitlement.seatLimit) throw new SeatLimitExceededError()
 
         await tx.insert(organizationInvitations).values({
           id,
@@ -888,25 +898,37 @@ export interface SeatUsageRecord {
 }
 
 /** Accepted members plus usable (pending) invitations — mirrors the real dependency's `countSeats` used to enforce the atomic invite-time limit. */
-export async function getSeatUsage(organizationId: string): Promise<SeatUsageRecord> {
-  const [{ and, eq, count }, { authDb }, schema] = await Promise.all([
+/**
+ * Takes the full `TenantPrincipal` (not just an id) because the real seat
+ * *limit* — unlike the member/invitation counts — doesn't live in an
+ * auth-broker table at all: `organization_entitlements` is a tenant-private,
+ * RLS-forced table only `builderhunt_app` can read, gated on
+ * `app.organization_id` via `withTenantContext`. Using the hardcoded
+ * `ORGANIZATION_MEMBERSHIP_LIMIT` here (as this function used to) silently
+ * ignored a real, paid/admin-granted per-organization entitlement.
+ */
+export async function getSeatUsage(principal: TenantPrincipal): Promise<SeatUsageRecord> {
+  const [{ and, eq, count }, { authDb }, schema, { withTenantContext }, { getOrganizationEntitlement }] = await Promise.all([
     import('drizzle-orm'),
     import('../db/auth-db'),
     import('../db/schema'),
+    import('../db/tenant-context'),
+    import('../repositories/entitlements'),
   ])
   const { organizationMembers, organizationInvitations } = schema
 
   const [members] = await authDb
     .select({ value: count() })
     .from(organizationMembers)
-    .where(eq(organizationMembers.organizationId, organizationId))
+    .where(eq(organizationMembers.organizationId, principal.organizationId))
   const [pendingInvitations] = await authDb
     .select({ value: count() })
     .from(organizationInvitations)
-    .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
+    .where(and(eq(organizationInvitations.organizationId, principal.organizationId), eq(organizationInvitations.status, 'pending')))
+  const entitlement = await withTenantContext(principal, (tx) => getOrganizationEntitlement(tx, principal.organizationId))
 
   return {
     used: (members?.value ?? 0) + (pendingInvitations?.value ?? 0),
-    limit: ORGANIZATION_MEMBERSHIP_LIMIT,
+    limit: entitlement.seatLimit,
   }
 }

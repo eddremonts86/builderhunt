@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gte } from 'drizzle-orm'
+import { and, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
-import { PLAN_LIMITS, type LimitCheck, type LimitResource, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
+import { PLAN_LIMITS, PLAN_SEAT_LIMITS, type LimitCheck, type LimitResource, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
 import { authUsers, builders, planChanges, planRequests, plans, savedQueries } from '../db/schema'
 
@@ -36,6 +36,17 @@ export async function setPlatformUserPlan(
         set: { plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null, updatedAt: new Date() },
       })
     await tx.insert(planChanges).values({ id: randomId(), userId, fromPlan: from, toPlan: newPlan, changedBy, reason: reason ?? null })
+    // Keeps the user's personal organization's `organization_entitlements` row
+    // — the table every actual feature/seat-limit check reads — in sync with
+    // this admin grant. Without this, the two only ever matched by
+    // coincidence (see 0022's migration comment); this is the only ongoing
+    // writer, via a SECURITY DEFINER function since builderhunt_platform has
+    // no direct grant on organization_entitlements.
+    await tx.execute(sql`
+      select sync_personal_organization_entitlement(
+        ${userId}, ${newPlan}, 'active', ${PLAN_SEAT_LIMITS[newPlan]}, ${planEndsAt ?? null}
+      )
+    `)
   })
   return { from, to: newPlan }
 }

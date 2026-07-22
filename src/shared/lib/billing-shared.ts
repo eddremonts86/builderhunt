@@ -10,6 +10,14 @@ export const PLAN_LIMITS: Record<PlanTier, { savedSearches: number; savedBuilder
   team: { savedSearches: 200, savedBuilders: Infinity, rssSubscriptions: Infinity },
 }
 
+// Matches `organization_entitlements.seat_limit`'s own `between 1 and 10`
+// check constraint, and the "Up to 10 team seats" copy in PLAN_PRICING below.
+export const PLAN_SEAT_LIMITS: Record<PlanTier, number> = {
+  free: 1,
+  pro: 1,
+  team: 10,
+}
+
 // Plan: ai-sourcing-sprints. Counts only `status = 'active'` sprints per
 // organization (paused/completed never count against the limit). Gated via
 // the organization's entitlement tier (getOrganizationEntitlement), same
