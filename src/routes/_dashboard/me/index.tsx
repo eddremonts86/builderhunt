@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { BadgeCheck, ExternalLink, Sparkles, Edit3, X, Plus, Save } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { Input } from '~/components/ui'
 
 interface ClaimedBuilder {
   id: string
@@ -147,7 +148,7 @@ function MePage() {
       </header>
 
       {builders.length === 0 ? (
-        <div className="card text-center py-12">
+        <div className="glass-panel text-center py-12">
           <BadgeCheck className="w-10 h-10 text-bh-text-muted mx-auto mb-3" aria-hidden="true" />
           <h2 className="text-lg font-semibold text-bh-text mb-2">No claimed profiles yet</h2>
           <p className="text-sm text-bh-text-muted max-w-md mx-auto mb-4">
@@ -163,7 +164,7 @@ function MePage() {
           {builders.map(b => {
             const isEditing = editing === b.id
             return (
-              <div key={b.id} className="card">
+              <div key={b.id} className="glass-panel">
                 <div className="flex items-start gap-4 mb-4">
                   {b.avatarUrl || b.metadata?.avatarUrl ? (
                     <img
@@ -225,13 +226,13 @@ function MePage() {
                         )}
                       </div>
                       <div className="flex gap-2">
-                        <input
+                        <Input
                           type="text"
                           value={newTopic}
                           onChange={e => setNewTopic(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTopic() } }}
                           placeholder="Add a topic..."
-                          className="input-field flex-1"
+                          className="flex-1"
                         />
                         <button
                           type="button"

@@ -89,7 +89,7 @@ export function RecommendationsSection() {
   return (
     <section
       aria-labelledby="for-you-heading"
-      className="card p-5 md:p-6"
+      className="glass-panel p-5 md:p-6"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -131,7 +131,7 @@ export function RecommendationsSection() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="card animate-pulse h-32 bg-bh-surface/40" />
+            <div key={i} className="glass-panel animate-pulse h-32 bg-bh-surface/40" />
           ))}
         </div>
       )}
@@ -225,7 +225,7 @@ function RecommendationCard({
 
   return (
     <article
-      className="card card-hover p-4 group relative flex flex-col justify-between"
+      className="glass-panel card-hover p-4 group relative flex flex-col justify-between"
       data-event="recommendation_view"
     >
       <button

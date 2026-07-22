@@ -28,6 +28,7 @@ import {
   StackOverflowIcon,
 } from '~/modules/landing/components/BrandIcons'
 import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
+import { Input } from '~/components/ui'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
@@ -260,7 +261,7 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
             <div className="flex flex-col gap-3 rounded-2xl border border-bh-border bg-white p-2 shadow-[0_12px_32px_-18px_rgba(24,24,27,0.3)] sm:flex-row">
               <div className="relative min-w-0 flex-1">
                 <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-bh-text-dim" aria-hidden="true" />
-                <input
+                <Input
                   id="explore-query"
                   name="query"
                   type="search"
@@ -268,7 +269,7 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                   onChange={(event) => setInput(event.target.value)}
                   placeholder="Try “rust async runtime” or “developer advocates”…"
                   autoComplete="off"
-                  className="h-12 w-full rounded-xl border-0 bg-transparent pl-12 pr-4 text-base text-bh-text outline-none placeholder:text-bh-text-dim focus-visible:ring-2 focus-visible:ring-bh-accent/30"
+                  className="h-12 w-full !rounded-xl !border-0 !bg-transparent !pl-12 !pr-4 !py-0 !shadow-none text-base text-bh-text outline-none placeholder:text-bh-text-dim focus-visible:ring-2 focus-visible:ring-bh-accent/30"
                   data-testid="explore-input"
                 />
               </div>

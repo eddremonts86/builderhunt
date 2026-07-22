@@ -652,13 +652,13 @@ export function SearchPage() {
               className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-bh-text-dim pointer-events-none"
               aria-hidden="true"
             />
-            <input
+            <Input
               ref={inputRef}
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="e.g. rust async runtime, indie hackers, AI agents..."
-              className="input-field !pl-14 pr-32 py-3.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+              className="!pl-14 pr-32 py-3.5 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
               aria-label="Search keywords"
               autoComplete="off"
             />
@@ -812,13 +812,13 @@ export function SearchPage() {
               <label htmlFor="location-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
                 Location
               </label>
-              <input
+              <Input
                 id="location-input"
                 type="text"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="e.g. France, Spain, Brazil"
-                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 autoComplete="off"
               />
               <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
@@ -829,13 +829,13 @@ export function SearchPage() {
               <label htmlFor="language-input" className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1.5">
                 Primary language
               </label>
-              <input
+              <Input
                 id="language-input"
                 type="text"
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 placeholder="e.g. TypeScript, Rust, Go"
-                className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                 autoComplete="off"
               />
               <p className="text-[10px] text-bh-text-dim mt-1 leading-snug">
@@ -859,7 +859,7 @@ export function SearchPage() {
 
       {/* Inline save bar */}
       {showSave && (
-        <div className="card flex flex-wrap items-center gap-3 mb-6 animate-fade-in-up">
+        <div className="glass-panel flex flex-wrap items-center gap-3 mb-6 animate-fade-in-up">
           <Bookmark className="w-4 h-4 text-bh-warning shrink-0" aria-hidden="true" />
           <Input
             value={saveName}
@@ -989,7 +989,7 @@ export function SearchPage() {
       {error && (
         <div
           role="alert"
-          className="card border border-bh-danger/30 bg-bh-danger/10 text-bh-danger p-6 text-center"
+          className="glass-panel border border-bh-danger/30 bg-bh-danger/10 text-bh-danger p-6 text-center"
         >
           <p className="font-semibold mb-1">Search failed</p>
           <p className="text-sm">{error}</p>
@@ -1006,7 +1006,7 @@ export function SearchPage() {
 
       {/* Empty active tab (results exist but none in this kind) */}
       {searched && !loading && !error && results.length > 0 && sorted.length === 0 && (
-        <div className="card text-center py-12">
+        <div className="glass-panel text-center py-12">
           <div className="inline-flex w-12 h-12 rounded-xl bg-bh-surface-2 border border-bh-border items-center justify-center mb-3">
             {activeTab === 'people' ? <Users className="w-6 h-6 text-bh-text-muted" /> : <BookMarked className="w-6 h-6 text-bh-text-muted" />}
           </div>
@@ -1158,7 +1158,7 @@ function LandingState({
       {/* Sidebar — utility panels grouped together (tips, shortcuts, history)
           so the main column stays focused on real results. */}
       <div className="space-y-6 lg:self-start">
-        <aside aria-labelledby="tips-heading" className="card">
+        <aside aria-labelledby="tips-heading" className="glass-panel">
           <h2 id="tips-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2 mb-3">
             <Lightbulb className="w-3.5 h-3.5 text-bh-warning" aria-hidden="true" />
             Search tips
@@ -1174,7 +1174,7 @@ function LandingState({
         </aside>
 
         {/* Popular queries */}
-        <section aria-labelledby="popular-heading" className="card">
+        <section aria-labelledby="popular-heading" className="glass-panel">
           <h2 id="popular-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim mb-3 flex items-center gap-2">
             <TrendingUp className="w-3.5 h-3.5" /> Popular searches
           </h2>
@@ -1194,7 +1194,7 @@ function LandingState({
 
         {/* Recent searches */}
         {recent.length > 0 && (
-          <section aria-labelledby="recent-heading" className="card">
+          <section aria-labelledby="recent-heading" className="glass-panel">
             <div className="flex items-center justify-between mb-3">
               <h2 id="recent-heading" className="text-xs font-semibold uppercase tracking-widest text-bh-text-dim flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5" /> Your recent searches
@@ -1231,7 +1231,7 @@ function SearchSkeleton() {
   return (
     <ul className="space-y-3" role="list" aria-busy="true" aria-label="Loading search results">
       {[...Array(4)].map((_, i) => (
-        <li key={i} className="card animate-pulse">
+        <li key={i} className="glass-panel animate-pulse">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-full bg-bh-surface-2 shrink-0" />
             <div className="flex-1 space-y-2">
@@ -1248,7 +1248,7 @@ function SearchSkeleton() {
 
 function NoResults({ query, onTryPopular }: { query: string; onTryPopular: (q: string) => void }) {
   return (
-    <div className="card text-center py-16">
+    <div className="glass-panel text-center py-16">
       <div className="inline-flex w-14 h-14 rounded-2xl bg-bh-surface-2 border border-bh-border items-center justify-center mb-4">
         <Search className="w-7 h-7 text-bh-text-muted" aria-hidden="true" />
       </div>
@@ -1344,7 +1344,7 @@ function PersonResultCard({ builder, query, onToggleTrack, tracking }: { builder
   const displayTopics = [...matchedTopics.map((t) => ({ t, matched: true })), ...otherTopics.map((t) => ({ t, matched: false }))].slice(0, 6)
 
   return (
-    <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
+    <article className="glass-panel card-hover group rounded-3xl p-4">
       <div className="flex items-start gap-4">
         {/* Avatar */}
         {builder.avatarUrl ? (
@@ -1498,7 +1498,7 @@ function ResourceResultCard({ builder, query }: { builder: Builder; query: strin
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
 
   return (
-    <article className="card card-hover group rounded-3xl bg-bh-surface border-bh-border shadow-sm">
+    <article className="glass-panel card-hover group rounded-3xl p-4">
       <div className="flex items-start gap-4">
         {/* Icon */}
         <div
@@ -1692,7 +1692,7 @@ function SortMenu({ value, onChange }: { value: SortBy; onChange: (v: SortBy) =>
       {open && (
         <ul
           role="menu"
-          className="absolute right-0 mt-1 w-48 card p-1 z-10 animate-fade-in"
+          className="absolute right-0 mt-1 w-48 glass-panel p-1 z-10 animate-fade-in"
         >
           {options.map((opt) => (
             <li key={opt.value} role="none">

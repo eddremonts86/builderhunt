@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { BookOpen, Plus, Save, X, Trash2 } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { Input, Textarea } from '~/components/ui'
 
 interface ChangelogEntry {
   id: string
@@ -181,13 +182,13 @@ function AdminChangelogPage() {
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="card p-5 mb-6 space-y-3" data-testid="admin-changelog-form">
+        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-changelog-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New changelog entry' : 'Edit entry'}
           </h2>
@@ -195,11 +196,11 @@ function AdminChangelogPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Title
             </label>
-            <input
+            <Input
               type="text"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="input w-full"
+              className="w-full"
               placeholder="e.g. Smart alerts for new builder activity"
               data-testid="admin-changelog-title"
             />
@@ -209,11 +210,11 @@ function AdminChangelogPage() {
               <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                 Slug (auto from title if blank)
               </label>
-              <input
+              <Input
                 type="text"
                 value={form.slug}
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                className="input w-full"
+                className="w-full"
                 placeholder="smart-alerts"
                 data-testid="admin-changelog-slug"
               />
@@ -223,10 +224,10 @@ function AdminChangelogPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Content (markdown)
             </label>
-            <textarea
+            <Textarea
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
-              className="input w-full min-h-[200px] font-mono text-sm"
+              className="w-full min-h-[200px] font-mono text-sm"
               placeholder="Describe what shipped and why it matters…"
               data-testid="admin-changelog-content"
             />
@@ -284,7 +285,7 @@ function AdminChangelogPage() {
           entries.map((e) => (
             <div
               key={e.id}
-              className="card p-4 flex items-start gap-3"
+              className="glass-panel p-4 flex items-start gap-3"
               data-testid={`admin-changelog-row-${e.id}`}
             >
               <div className="flex-1 min-w-0">

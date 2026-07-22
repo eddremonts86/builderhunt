@@ -49,7 +49,7 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
 
   if (!isOwner && !isAdmin) {
     return (
-      <section className="card p-5 mb-6" data-testid="billing-card">
+      <section className="glass-panel p-5 mb-6" data-testid="billing-card">
         <div className="flex items-center gap-3" data-testid="billing-member-minimal">
           <Icon className={`w-5 h-5 ${entitlement.tier === 'pro' ? 'text-bh-accent' : entitlement.tier === 'team' ? 'text-bh-cyan' : 'text-bh-text-muted'}`} aria-hidden="true" />
           <p className="text-sm">
@@ -67,9 +67,9 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
   }
 
   return (
-    <section className="card p-5 mb-6" data-testid="billing-card">
+    <section className="glass-panel p-5 mb-6" data-testid="billing-card">
       {lapsed && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-danger" data-testid="billing-lapsed-banner">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-danger" data-testid="billing-lapsed-banner">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             <strong>This plan isn't in good standing.</strong>{' '}
@@ -80,7 +80,7 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
         </div>
       )}
       {entitlement.status === 'trialing' && (
-        <div className="card border-bh-cyan/30 bg-bh-cyan/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-cyan" data-testid="billing-trial-banner">
+        <div className="glass-panel border-bh-cyan/30 bg-bh-cyan/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-cyan" data-testid="billing-trial-banner">
           <Clock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             <strong>On a trial of the {entitlement.tier} plan.</strong>{' '}

@@ -14,7 +14,12 @@
   --animate-slide-in-up: slide-in-up 0.3s ease-out;
   --animate-pulse-soft: pulse-soft 2.5s ease-in-out infinite;
   --animate-gradient: gradient 8s linear infinite;
+  --animate-glow-pulse: glow-pulse 3s ease-in-out infinite;
 
+  @keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--color-bh-accent-glow); }
+    50% { box-shadow: 0 0 24px 2px var(--color-bh-accent-glow); }
+  }
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -42,7 +47,7 @@
   }
 
   /* Brand palette — Minimalist Light Theme */
-  --color-bh-bg: #f4f4f5;
+  --color-bh-bg: #ececf0;
   --color-bh-bg-alt: #f1f1f3;
   --color-bh-surface: #ffffff;
   --color-bh-surface-2: #fcfcfc;
@@ -55,6 +60,16 @@
   --color-bh-accent-hover: #ca5d25;
   --color-bh-accent-soft: rgba(224, 115, 56, 0.1);
   --color-bh-accent-glow: rgba(224, 115, 56, 0.25);
+  /* Text/icon color for content painted directly on a solid --color-bh-accent
+     fill (buttons, skip link, selection) — swapped per-accent below since a
+     bright accent (neon) needs dark text where a darker accent (brand) needs
+     light text; the accent color itself doesn't otherwise vary by theme. */
+  --color-bh-accent-contrast: #ffffff;
+  /* Rim/inset-highlight for solid-accent buttons — a light rim reads as a
+     highlight on a dark-ish accent (brand orange); the same light rim on a
+     bright accent (neon) just looks like a stray white ring, so it flips
+     alongside --color-bh-accent-contrast. */
+  --color-bh-accent-rim: rgba(255, 255, 255, 0.15);
   --color-bh-cyan: #0891b2;
   --color-bh-cyan-soft: rgba(8, 145, 178, 0.1);
   --color-bh-success: #16a34a;
@@ -64,21 +79,140 @@
   --color-bh-danger-soft: rgba(220, 38, 38, 0.08);
   --color-bh-danger-glow: rgba(220, 38, 38, 0.25);
 
+  /* Alternate ("neon") accent — opt-in via .accent-neon, dashboard-only experiment */
+  --color-bh-accent-alt: #39ff8c;
+  --color-bh-accent-alt-hover: #22e070;
+  --color-bh-accent-alt-soft: rgba(57, 255, 140, 0.12);
+  --color-bh-accent-alt-glow: rgba(57, 255, 140, 0.35);
+
   /* Source-specific badges contrast adjusted for light background */
   --color-bh-github: #24292f;
   --color-bh-reddit: #ff4500;
   --color-bh-hn: #d05300;
   --color-bh-devto: #09090b;
 
-  /* Semantic aliases */
-  --color-surface: var(--color-bh-surface);
-  --color-border: var(--color-bh-border);
+  /* shadcn/ui semantic tokens — aliased to the bh-* tokens above rather than a
+     separate palette, so every generated shadcn component automatically
+     tracks the existing light/dark + brand/neon theming with zero extra
+     wiring (these are CSS custom properties, resolved where used, so the
+     .dark/.accent-neon overrides on --color-bh-* below still apply here). */
+  --color-background: var(--color-bh-bg);
   --color-foreground: var(--color-bh-text);
-  --color-muted: var(--color-bh-text-muted);
-  --color-accent: var(--color-bh-accent);
+  --color-card: var(--color-bh-surface);
+  --color-card-foreground: var(--color-bh-text);
+  --color-popover: var(--color-bh-surface);
+  --color-popover-foreground: var(--color-bh-text);
+  --color-primary: var(--color-bh-accent);
+  --color-primary-foreground: var(--color-bh-accent-contrast);
+  --color-secondary: var(--color-bh-bg-alt);
+  --color-secondary-foreground: var(--color-bh-text);
+  --color-muted: var(--color-bh-bg-alt);
+  --color-muted-foreground: var(--color-bh-text-muted);
+  --color-accent: var(--color-bh-accent-soft);
+  --color-accent-foreground: var(--color-bh-text);
+  --color-destructive: var(--color-bh-danger);
+  --color-destructive-foreground: #ffffff;
+  --color-border: var(--color-bh-border);
+  --color-input: var(--color-bh-border);
+  --color-ring: var(--color-bh-accent);
+  --radius: 0.5rem;
+
+  /* Back-compat: kept for the couple of pre-shadcn call sites still using
+     the old bare "surface" alias name. */
+  --color-surface: var(--color-bh-surface);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+
+/* =============================================================================
+   Dark theme — dashboard-only, scoped via a `.dark` class on the shell root
+   (not <html>), so public/landing surfaces are never affected.
+   ============================================================================= */
+.dark {
+  --color-bh-bg: #0a0a0d;
+  --color-bh-bg-alt: #101014;
+  --color-bh-surface: #16161c;
+  --color-bh-surface-2: #1c1c24;
+  --color-bh-border: rgba(255, 255, 255, 0.08);
+  --color-bh-border-strong: rgba(255, 255, 255, 0.16);
+  --color-bh-text: #f4f4f5;
+  --color-bh-text-muted: #a1a1aa;
+  --color-bh-text-dim: #71717a;
+  --color-bh-accent-soft: rgba(224, 115, 56, 0.16);
+  --color-bh-accent-glow: rgba(224, 115, 56, 0.4);
+  --color-bh-danger-soft: rgba(220, 38, 38, 0.16);
+  --color-bh-danger-glow: rgba(220, 38, 38, 0.4);
+}
+
+/* Alternate neon-green accent — toggle independently of theme via .accent-neon */
+.accent-neon {
+  --color-bh-accent: var(--color-bh-accent-alt);
+  --color-bh-accent-hover: var(--color-bh-accent-alt-hover);
+  --color-bh-accent-soft: var(--color-bh-accent-alt-soft);
+  --color-bh-accent-glow: var(--color-bh-accent-alt-glow);
+  /* Neon green is too bright for white text (~1.6:1) — dark text clears AA. */
+  --color-bh-accent-contrast: #0a0a0d;
+  --color-bh-accent-rim: rgba(10, 10, 13, 0.18);
+}
+
+/* Neon is calibrated for dark surfaces, where bright-green-on-near-black is
+   exactly the "hacker terminal" look it's going for. On a light page the
+   same bright green fails as *text* everywhere it's used that way — badges,
+   links, tags all pair `--color-bh-accent` as foreground with
+   `--color-bh-accent-soft` as background, and a near-white tint of neon
+   green behind neon-green text is unreadable (~1.1:1). Since every one of
+   those call sites already reads from these same few variables, retuning
+   them here (once) for light + neon fixes every page that uses them,
+   instead of hunting down each `text-bh-accent`/`.badge`/`.eyebrow` site.
+   Selector must live on `<html>` (`:root`), not `.accent-neon` alone,
+   because both `.dark` and `.accent-neon` are toggled on the same element —
+   `.accent-neon` by itself can't tell whether `.dark` is also present. */
+:root.accent-neon:not(.dark) {
+  --color-bh-accent: #0f7a44;
+  --color-bh-accent-hover: #0c6339;
+  --color-bh-accent-soft: rgba(15, 122, 68, 0.1);
+  --color-bh-accent-glow: rgba(15, 122, 68, 0.25);
+  --color-bh-accent-contrast: #ffffff;
+  --color-bh-accent-rim: rgba(255, 255, 255, 0.15);
+}
+
+/* =============================================================================
+   Glass surfaces — dashboard shell/menus only. Reserve blur for elevated,
+   interactive containers (topbar, dropdowns, flagship cards), not every box.
+   ============================================================================= */
+:root {
+  /* Light mode sits on a near-white page (--color-bh-bg): a white-based
+     translucent border is invisible there, so the border leans dark instead. */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(24, 24, 27, 0.1);
+  --glass-highlight: rgba(255, 255, 255, 0.7);
+  --glass-shadow: 0 10px 30px -15px rgba(24, 24, 27, 0.08), 0 1px 3px rgba(24, 24, 27, 0.03);
+  --glass-blur: 20px;
+}
+.dark {
+  --glass-bg: rgba(22, 22, 28, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --glass-shadow: 0 8px 32px -12px rgba(0, 0, 0, 0.4);
+}
+
+.glass-panel {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: 20px;
+  padding: 1.5rem;
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+}
+
+.glass-topbar {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+}
 
 /* Hide native search input clear button (we render our own) */
 input[type="search"]::-webkit-search-cancel-button,
@@ -104,7 +238,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: var(--color-bh-accent); color: white; }
+::selection { background: var(--color-bh-accent); color: var(--color-bh-accent-contrast); }
 
 /* =============================================================================
    Accessibility — visible focus rings (WCAG 2.4.7)
@@ -119,6 +253,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   box-shadow: 0 0 0 2px #f4f4f5, 0 0 0 4px var(--color-bh-accent);
 }
 
+/* Respect reduced-motion preference for CSS-driven animation (JS motion
+   components handle their own useReducedMotion checks separately). */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* Skip link (WCAG 2.4.1) */
 .skip-link {
   position: absolute;
@@ -126,7 +271,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   left: 1rem;
   z-index: 100;
   background: var(--color-bh-accent);
-  color: white;
+  color: var(--color-bh-accent-contrast);
   padding: 0.75rem 1.25rem;
   border-radius: 0.5rem;
   font-weight: 600;
@@ -144,6 +289,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
     radial-gradient(ellipse 80% 50% at 50% -20%, rgba(224, 115, 56, 0.08), transparent),
     radial-gradient(ellipse 60% 50% at 80% 50%, rgba(8, 145, 178, 0.04), transparent);
   background-attachment: fixed;
+}
+.dark .bg-app {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -20%, var(--color-bh-accent-glow), transparent),
+    radial-gradient(ellipse 60% 50% at 80% 50%, rgba(8, 145, 178, 0.12), transparent);
 }
 
 .bg-grid {
@@ -202,12 +352,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    ============================================================================= */
 .btn-primary {
   background: linear-gradient(180deg, var(--color-bh-accent) 0%, var(--color-bh-accent-hover) 100%);
-  color: white;
+  color: var(--color-bh-accent-contrast);
   padding: 0.625rem 1.25rem;
   border-radius: 8px;
   font-weight: 600;
   font-size: 0.875rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--color-bh-accent-rim);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.2s, filter 0.15s;
   text-decoration: none;
@@ -215,11 +365,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 2px 8px -2px var(--color-bh-accent-glow), inset 0 1px 0 var(--color-bh-accent-rim);
 }
 .btn-primary:hover {
   filter: brightness(1.1);
-  box-shadow: 0 4px 12px var(--color-bh-accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px var(--color-bh-accent-glow), inset 0 1px 0 var(--color-bh-accent-rim);
   transform: translateY(-1px);
 }
 .btn-primary:active { transform: translateY(0); }
@@ -319,8 +469,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    Inputs
    ============================================================================= */
 .input-field {
-  background: var(--color-bh-bg);
-  border: 1px solid var(--color-bh-border);
+  /* A step lighter than the page/panel background it sits on (not --color-bh-bg
+     itself) — otherwise a dark input on a dark glass panel has no visible edge
+     and reads as a flat cutout instead of a control. */
+  background: var(--color-bh-surface);
+  border: 1px solid var(--color-bh-border-strong);
   border-radius: 8px;
   padding: 0.625rem 0.875rem;
   color: var(--color-bh-text);
@@ -329,6 +482,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
   font-family: inherit;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .input-field:focus {
   border-color: var(--color-bh-accent);
@@ -423,6 +577,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   white-space: nowrap;
   border-width: 0;
 }
+.accent-checkbox { accent-color: var(--color-bh-accent); }
 
 /* Spinner */
 .spinner {
@@ -468,10 +623,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
   color: var(--color-bh-text-muted);
   font-size: 0.8125rem;
   font-weight: 500;
-}
-
-:root {
-  --color-bh-bg: #ececf0 !important;
 }
 
 .bg-striped-terracotta {

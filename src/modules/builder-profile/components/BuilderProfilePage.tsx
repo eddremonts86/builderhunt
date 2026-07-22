@@ -6,6 +6,7 @@ import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
+import { Input, Textarea } from '~/components/ui'
 
 interface Builder {
   id: string
@@ -322,13 +323,13 @@ export function BuilderProfilePage() {
                       Enter the email associated with this profile. We'll send a verification link.
                     </p>
                     <div className="flex gap-2 flex-wrap">
-                      <input
+                      <Input
                         type="email"
                         value={claimEmail}
                         onChange={e => setClaimEmail(e.target.value)}
                         placeholder="you@example.com"
                         required
-                        className="input-field flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                        className="flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                         autoFocus
                       />
                       <button
@@ -400,11 +401,11 @@ export function BuilderProfilePage() {
                 )}
 
                 <div className="flex gap-2">
-                  <textarea
+                  <Textarea
                     value={noteText}
                     onChange={e => setNoteText(e.target.value)}
                     placeholder="Add a note about this builder..."
-                    className="input-field flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
+                    className="flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2"
                     rows={2}
                   />
                   <button

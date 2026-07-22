@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Bell, Check, Sparkles, ExternalLink, Clock, Plus, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 interface Trigger {
   id: string
@@ -208,18 +209,17 @@ function AlertsInboxPage() {
       {showForm && (
         <form
           onSubmit={createAlert}
-          className="card p-5 mb-6 space-y-4"
+          className="glass-panel p-5 mb-6 space-y-4"
           data-testid="alert-create-form"
         >
           <div>
             <label htmlFor="alert-name" className="block text-sm font-medium mb-1">Alert name</label>
-            <input
+            <Input
               id="alert-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g. Rust async runtime builders"
-              className="input-field"
               data-testid="alert-name-input"
             />
           </div>
@@ -227,28 +227,26 @@ function AlertsInboxPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label htmlFor="alert-event-type" className="block text-sm font-medium mb-1">Notify me when…</label>
-              <select
-                id="alert-event-type"
-                value={eventType}
-                onChange={(e) => setEventType(e.target.value)}
-                className="input-field"
-                data-testid="alert-event-type-select"
-              >
-                {EVENT_TYPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <Select value={eventType} onValueChange={setEventType}>
+                <SelectTrigger id="alert-event-type" data-testid="alert-event-type-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EVENT_TYPE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label htmlFor="alert-keywords" className="block text-sm font-medium mb-1">Using tech… (comma-separated)</label>
-              <input
+              <Input
                 id="alert-keywords"
                 type="text"
                 value={keywords}
                 onChange={(e) => setKeywords(e.target.value)}
                 placeholder="rust, async, webassembly"
-                className="input-field"
                 data-testid="alert-keywords-input"
               />
             </div>
@@ -257,45 +255,42 @@ function AlertsInboxPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label htmlFor="alert-min-stars" className="block text-sm font-medium mb-1">Min stars / followers</label>
-              <input
+              <Input
                 id="alert-min-stars"
                 type="number"
                 min={0}
                 value={minStars}
                 onChange={(e) => setMinStars(e.target.value)}
                 placeholder="0"
-                className="input-field"
                 data-testid="alert-min-stars-input"
               />
             </div>
 
             <div>
               <label htmlFor="alert-delivery" className="block text-sm font-medium mb-1">Delivery</label>
-              <select
-                id="alert-delivery"
-                value={deliveryChannel}
-                onChange={(e) => setDeliveryChannel(e.target.value as 'email' | 'dashboard')}
-                className="input-field"
-                data-testid="alert-delivery-select"
-              >
-                <option value="email">Email digest + dashboard</option>
-                <option value="dashboard">Dashboard only</option>
-              </select>
+              <Select value={deliveryChannel} onValueChange={(v) => setDeliveryChannel(v as 'email' | 'dashboard')}>
+                <SelectTrigger id="alert-delivery" data-testid="alert-delivery-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="email">Email digest + dashboard</SelectItem>
+                  <SelectItem value="dashboard">Dashboard only</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label htmlFor="alert-frequency" className="block text-sm font-medium mb-1">Digest frequency</label>
-              <select
-                id="alert-frequency"
-                value={frequency}
-                onChange={(e) => setFrequency(e.target.value as 'hourly' | 'daily' | 'weekly')}
-                className="input-field"
-                data-testid="alert-frequency-select"
-              >
-                {FREQUENCY_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
-                ))}
-              </select>
+              <Select value={frequency} onValueChange={(v) => setFrequency(v as 'hourly' | 'daily' | 'weekly')}>
+                <SelectTrigger id="alert-frequency" data-testid="alert-frequency-select">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FREQUENCY_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -318,12 +313,12 @@ function AlertsInboxPage() {
         <div className="animate-pulse space-y-6" aria-hidden="true">
           <div className="space-y-2">
             <div className="h-3 w-24 bg-bh-surface rounded" />
-            <div className="card h-14 bg-bh-surface/50" />
+            <div className="glass-panel h-14 bg-bh-surface/50" />
           </div>
           <div className="space-y-2">
             <div className="h-3 w-20 bg-bh-surface rounded" />
-            <div className="card h-20 bg-bh-surface/50" />
-            <div className="card h-20 bg-bh-surface/50" />
+            <div className="glass-panel h-20 bg-bh-surface/50" />
+            <div className="glass-panel h-20 bg-bh-surface/50" />
           </div>
         </div>
       ) : (
@@ -337,7 +332,7 @@ function AlertsInboxPage() {
                 {userAlerts.map((a) => {
                   const Icon = EVENT_ICONS[a.triggerConditions.eventType] ?? Bell
                   return (
-                    <div key={a.id} className="card p-3 flex items-center gap-3" data-testid={`alert-config-${a.id}`}>
+                    <div key={a.id} className="glass-panel p-3 flex items-center gap-3" data-testid={`alert-config-${a.id}`}>
                       <div className="w-9 h-9 rounded-full bg-bh-accent/10 flex items-center justify-center shrink-0">
                         <Icon className="w-4 h-4 text-bh-accent" aria-hidden="true" />
                       </div>
@@ -387,7 +382,7 @@ function AlertsInboxPage() {
             </div>
 
             {triggers.length === 0 ? (
-              <div className="card text-center py-12" data-testid="alerts-empty">
+              <div className="glass-panel text-center py-12" data-testid="alerts-empty">
                 <Bell className="w-8 h-8 text-bh-text-dim mx-auto mb-3" aria-hidden="true" />
                 <p className="text-bh-text-muted mb-2">
                   {hasAlerts ? 'No matches yet — sit tight.' : 'No alerts triggered yet.'}
@@ -406,7 +401,7 @@ function AlertsInboxPage() {
                   return (
                     <article
                       key={t.id}
-                      className={`card p-4 flex items-start gap-3 ${!t.readAt ? 'border-bh-accent/30 bg-bh-accent/5' : ''}`}
+                      className={`glass-panel p-4 flex items-start gap-3 ${!t.readAt ? 'border-bh-accent/30 bg-bh-accent/5' : ''}`}
                       data-testid={`alert-trigger-${t.id}`}
                     >
                       <div className="w-9 h-9 rounded-full bg-bh-accent/10 flex items-center justify-center shrink-0">

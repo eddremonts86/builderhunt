@@ -6,6 +6,7 @@ import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { getAICapability } from '~/shared/lib/ai/capabilities'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import { AIDownloadPrompt } from '~/shared/components/AIDownloadPrompt'
+import { Input, Textarea } from '~/components/ui'
 
 interface OutreachCopilotProps {
   builder: OutreachContext['builder']
@@ -160,17 +161,17 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
           {needsDownload && <AIDownloadPrompt />}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input
+            <Input
               type="text"
-              className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
               placeholder="Job title (e.g. Senior Rust Engineer)"
               value={jobTitle}
               onChange={e => setJobTitle(e.target.value)}
               data-testid="outreach-job-title"
             />
-            <input
+            <Input
               type="text"
-              className="input-field focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
               placeholder="Company name"
               value={company}
               onChange={e => setCompany(e.target.value)}
@@ -178,8 +179,8 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
             />
           </div>
 
-          <textarea
-            className="input-field w-full resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+          <Textarea
+            className="w-full resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
             rows={2}
             placeholder="Optional: short description of the role"
             value={description}

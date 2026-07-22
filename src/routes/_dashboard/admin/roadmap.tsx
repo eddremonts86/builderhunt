@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Map, Plus, Save, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 type RoadmapStatus = 'planned' | 'in_progress' | 'shipped'
 
@@ -200,13 +201,13 @@ function AdminRoadmapPage() {
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="card p-5 mb-6 space-y-3" data-testid="admin-roadmap-form">
+        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-roadmap-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New roadmap item' : 'Edit item'}
           </h2>
@@ -214,11 +215,11 @@ function AdminRoadmapPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Title
             </label>
-            <input
+            <Input
               type="text"
               value={form.title}
               onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="input w-full"
+              className="w-full"
               placeholder="e.g. Code fingerprinting"
               data-testid="admin-roadmap-title"
             />
@@ -227,10 +228,10 @@ function AdminRoadmapPage() {
             <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
               Description
             </label>
-            <textarea
+            <Textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="input w-full min-h-[80px]"
+              className="w-full min-h-[80px]"
               placeholder="What it is and why it matters."
               data-testid="admin-roadmap-description"
             />
@@ -240,26 +241,29 @@ function AdminRoadmapPage() {
               <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                 Status
               </label>
-              <select
+              <Select
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as RoadmapStatus })}
-                className="input w-full"
-                data-testid="admin-roadmap-status"
+                onValueChange={(v) => setForm({ ...form, status: v as RoadmapStatus })}
               >
-                {STATUS_OPTIONS.map((s) => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full" data-testid="admin-roadmap-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((s) => (
+                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                 Ship estimate
               </label>
-              <input
+              <Input
                 type="text"
                 value={form.shipEstimate}
                 onChange={(e) => setForm({ ...form, shipEstimate: e.target.value })}
-                className="input w-full"
+                className="w-full"
                 placeholder="Q3 2026"
                 data-testid="admin-roadmap-estimate"
               />
@@ -270,26 +274,29 @@ function AdminRoadmapPage() {
               <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                 Category
               </label>
-              <select
+              <Select
                 value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-                className="input w-full"
-                data-testid="admin-roadmap-category"
+                onValueChange={(v) => setForm({ ...form, category: v })}
               >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full" data-testid="admin-roadmap-category">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim block mb-1">
                 Sort order
               </label>
-              <input
+              <Input
                 type="number"
                 value={form.sortOrder}
                 onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value, 10) || 0 })}
-                className="input w-full"
+                className="w-full"
                 data-testid="admin-roadmap-sort"
               />
             </div>
@@ -327,7 +334,7 @@ function AdminRoadmapPage() {
           items.map((i) => (
             <div
               key={i.id}
-              className="card p-4 flex items-start gap-3"
+              className="glass-panel p-4 flex items-start gap-3"
               data-testid={`admin-roadmap-row-${i.id}`}
             >
               <div className="flex flex-col gap-1">

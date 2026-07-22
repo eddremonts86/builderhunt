@@ -93,7 +93,7 @@ export function ExportsPage() {
       </div>
 
       {error && (
-        <div className="card mb-6 border-red-500/30 bg-red-500/5">
+        <div className="glass-panel mb-6 border-red-500/30 bg-red-500/5">
           <p className="text-sm text-red-400">{error}</p>
         </div>
       )}
@@ -102,13 +102,13 @@ export function ExportsPage() {
         <div className="space-y-3 animate-pulse">
           <div className="h-20 bg-bh-surface/50 rounded-3xl" />
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="card h-16 bg-bh-surface/50" />
+            <div key={i} className="glass-panel h-16 bg-bh-surface/50" />
           ))}
         </div>
       )}
 
       {!loading && count === 0 && !error && (
-        <div className="card text-center py-14">
+        <div className="glass-panel text-center py-14">
           <div className="w-12 h-12 rounded-xl bg-bh-accent-soft flex items-center justify-center mx-auto mb-4">
             <Bookmark className="w-6 h-6 text-bh-accent" />
           </div>
@@ -125,7 +125,7 @@ export function ExportsPage() {
       {!loading && count > 0 && (
         <>
           {/* Toolbar: count + source mix + primary export action, all in one place */}
-          <div className="card mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <div className="glass-panel mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
             <div className="flex-1 min-w-0">
               <p className="text-2xl font-bold text-bh-text leading-none mb-1.5">
                 {count} <span className="text-base font-medium text-bh-text-muted">builder{count === 1 ? '' : 's'} tracked</span>
@@ -155,7 +155,7 @@ export function ExportsPage() {
             {builders!.map((b) => (
               <li
                 key={b.id}
-                className="card card-hover p-3 flex items-center gap-3"
+                className="glass-panel card-hover p-3 flex items-center gap-3"
                 data-testid={`tracked-builder-${b.id}`}
               >
                 {b.avatarUrl ? (

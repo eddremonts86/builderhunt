@@ -133,7 +133,7 @@ function SprintsListPage() {
       {loading ? (
         <p className="text-sm text-bh-text-dim">Loading…</p>
       ) : sprints.length === 0 ? (
-        <div className="card p-8 text-center">
+        <div className="glass-panel p-8 text-center">
           <p className="text-bh-text-muted mb-3">
             No sourcing sprints yet. A sprint saves a set of search-query variants and re-runs them in the
             background until it reaches a result quota.
@@ -145,7 +145,7 @@ function SprintsListPage() {
       ) : (
         <ul className="space-y-3">
           {sprints.map((sprint) => (
-            <li key={sprint.id} className="card p-4 flex items-center justify-between gap-4" data-testid="sprint-row">
+            <li key={sprint.id} className="glass-panel p-4 flex items-center justify-between gap-4" data-testid="sprint-row">
               <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} className="min-w-0 flex-1">
                 <p className="font-medium text-bh-text truncate">{sprint.name}</p>
                 <p className="text-xs text-bh-text-dim">

@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { LinkButton } from '~/components/ui'
+import { LinkButton, Input } from '~/components/ui'
 import {
   Sparkles, Target, ArrowRight, Check, Search,
   Bell, FileText, Download, Zap, Shield, Star
@@ -594,10 +594,10 @@ export function HomePage() {
               )}
             </div>
             <div className="max-w-md mx-auto mt-8 p-1 bg-bh-surface border border-bh-border/80 rounded-xl flex shadow-sm focus-within:ring-2 focus-within:ring-bh-accent/40 focus-within:border-bh-accent transition-all">
-              <input
+              <Input
                 type="email"
                 placeholder="Enter your email"
-                className="bg-transparent border-0 outline-none px-3 py-2 text-sm text-bh-text flex-grow placeholder:text-bh-text-dim"
+                className="!bg-transparent !border-0 !shadow-none !rounded-none !px-3 !py-2 text-sm text-bh-text flex-grow placeholder:text-bh-text-dim"
                 aria-label="Newsletter email input"
               />
               <button type="submit" className="btn-primary btn-sm px-4 rounded-lg font-bold">

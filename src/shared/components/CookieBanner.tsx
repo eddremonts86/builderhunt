@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Cookie, X, Settings } from 'lucide-react'
+import { Checkbox } from '~/components/ui'
 
 const STORAGE_KEY = 'bh_cookie_consent'
 
@@ -87,17 +88,16 @@ export function CookieBanner() {
         {showCustomize && (
           <div className="mb-3 space-y-2 p-3 rounded-lg bg-bh-bg-alt/40 border border-bh-border/50" data-testid="cookie-banner-customize">
             <label className="flex items-start gap-2 text-xs cursor-not-allowed">
-              <input type="checkbox" checked disabled className="mt-0.5" />
+              <Checkbox checked disabled className="mt-0.5" />
               <div>
                 <span className="font-semibold text-bh-text">Essential</span>
                 <p className="text-bh-text-muted">Session, auth, security — always on.</p>
               </div>
             </label>
             <label className="flex items-start gap-2 text-xs cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={functional}
-                onChange={(e) => setFunctional(e.target.checked)}
+                onCheckedChange={(checked) => setFunctional(checked === true)}
                 className="mt-0.5"
                 data-testid="cookie-banner-functional"
               />
@@ -107,10 +107,9 @@ export function CookieBanner() {
               </div>
             </label>
             <label className="flex items-start gap-2 text-xs cursor-pointer">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={analytics}
-                onChange={(e) => setAnalytics(e.target.checked)}
+                onCheckedChange={(checked) => setAnalytics(checked === true)}
                 className="mt-0.5"
                 data-testid="cookie-banner-analytics"
               />

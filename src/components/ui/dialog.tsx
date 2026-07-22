@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { createPortal } from 'react-dom'
+import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
+import { cn } from '~/shared/lib/utils'
 
 interface DialogProps {
   open: boolean
@@ -11,50 +12,36 @@ interface DialogProps {
 }
 
 /**
- * Centered overlay dialog — portal + backdrop, dismissable via Escape or a
- * backdrop click. The only prior modal in the app (TosModal) is
- * intentionally non-dismissable (forces ToS acceptance), so it doesn't
- * have this logic; this is the first reusable, closable one.
+ * Centered overlay dialog, now built on @radix-ui/react-dialog for real
+ * focus-trap/scroll-lock/portal behavior instead of the hand-rolled
+ * Escape-listener version — same (open, onClose, title, children, className)
+ * API as before, so existing callers (e.g. SearchPage's filters dialog)
+ * don't need to change.
  */
 export function Dialog({ open, onClose, title, children, className }: DialogProps) {
-  const titleId = React.useId()
-
-  React.useEffect(() => {
-    if (!open) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKeyDown)
-    return () => document.removeEventListener('keydown', onKeyDown)
-  }, [open, onClose])
-
-  if (!open) return null
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
-      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className={`card w-full max-w-[40rem] min-h-[566px] max-h-[90vh] overflow-y-auto p-6 relative animate-fade-in-up ${className ?? ''}`}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 id={titleId} className="text-lg font-semibold text-bh-text">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="p-1.5 rounded-lg text-bh-text-dim hover:text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>,
-    document.body,
+  return (
+    <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm animate-fade-in" />
+        <DialogPrimitive.Content
+          aria-describedby={undefined}
+          className={cn(
+            'card fixed left-1/2 top-1/2 z-50 w-full max-w-[40rem] min-h-[566px] max-h-[90vh] -translate-x-1/2 -translate-y-1/2 overflow-y-auto p-6 animate-fade-in-up focus:outline-none',
+            className,
+          )}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <DialogPrimitive.Title className="text-lg font-semibold text-bh-text">{title}</DialogPrimitive.Title>
+            <DialogPrimitive.Close
+              aria-label="Close"
+              className="p-1.5 rounded-lg text-bh-text-dim hover:text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
+            >
+              <X className="w-4 h-4" aria-hidden="true" />
+            </DialogPrimitive.Close>
+          </div>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   )
 }

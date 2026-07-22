@@ -5,6 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { ai } from '~/shared/lib/ai/client'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor, type SprintFilter } from '~/shared/lib/sprints-shared'
+import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 export const Route = createFileRoute('/_dashboard/sprints/$sprintId/')({
   beforeLoad: async () => {
@@ -165,37 +166,46 @@ function SprintDossierPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6">
         <div>
-          <div className="card p-4 mb-4 space-y-3">
+          <div className="glass-panel p-4 mb-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
-              <input
+              <Input
                 value={keywordInput}
                 onChange={(e) => setKeywordInput(e.target.value)}
                 placeholder="Filter keywords (comma separated)"
-                className="flex-1 min-w-[160px] rounded-md border border-bh-border bg-bh-surface/40 p-2 text-sm text-bh-text"
+                className="flex-1 min-w-[160px] text-sm"
               />
-              <input
-                value={minFollowersInput}
-                onChange={(e) => setMinFollowersInput(e.target.value)}
-                placeholder="Min followers"
-                className="w-32 rounded-md border border-bh-border bg-bh-surface/40 p-2 text-sm text-bh-text"
-              />
-              <select
-                value={sort}
-                onChange={(e) => changeSort(e.target.value as 'score' | 'date')}
-                className="rounded-md border border-bh-border bg-bh-surface/40 p-2 text-sm text-bh-text"
-              >
-                <option value="score">Sort: score</option>
-                <option value="date">Sort: newest</option>
-              </select>
+              {/* Fixed-width wrappers, not width classes on Input/SelectTrigger directly:
+                  .input-field is unlayered CSS in globals.css, which always beats a plain
+                  Tailwind utility of equal specificity — a bare `w-32`/`w-40` on the
+                  control itself is silently ignored and it re-claims the full row instead. */}
+              <div className="w-32 shrink-0">
+                <Input
+                  value={minFollowersInput}
+                  onChange={(e) => setMinFollowersInput(e.target.value)}
+                  placeholder="Min followers"
+                  className="text-sm"
+                />
+              </div>
+              <div className="w-40 shrink-0">
+                <Select value={sort} onValueChange={(v) => changeSort(v as 'score' | 'date')}>
+                  <SelectTrigger className="text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="score">Sort: score</SelectItem>
+                    <SelectItem value="date">Sort: newest</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <button type="button" onClick={applyFilters} className="btn-secondary px-3 py-2 text-sm">Apply</button>
             </div>
             <div className="flex items-center gap-2">
-              <input
+              <Input
                 value={instruction}
                 onChange={(e) => setInstruction(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && refine()}
                 placeholder='Refine with AI, e.g. "only github, remote"'
-                className="flex-1 rounded-md border border-bh-border bg-bh-surface/40 p-2 text-sm text-bh-text"
+                className="flex-1 text-sm"
                 data-testid="sprint-refine-input"
               />
               <button
@@ -262,7 +272,7 @@ function SprintDossierPage() {
           )}
         </div>
 
-        <aside className="card p-4 h-fit">
+        <aside className="glass-panel p-4 h-fit">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim mb-2">Locations</h2>
           <ul className="space-y-1 text-sm">
             {facets.map((facet) => (

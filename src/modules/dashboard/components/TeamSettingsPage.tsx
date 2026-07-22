@@ -10,6 +10,7 @@ import {
   type TeamSnapshotDto,
   type TenantPrincipal,
 } from '~/shared/lib/organizations/contracts'
+import { Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { OrganizationDangerZone } from './OrganizationDangerZone'
 
 /**
@@ -63,6 +64,8 @@ export function TeamSettingsPage({
   const [inviteEmail, setInviteEmail] = React.useState('')
   const [inviteRole, setInviteRole] = React.useState<InvitableRole>('member')
   const [copiedInvitationId, setCopiedInvitationId] = React.useState<string | null>(null)
+  const inviteEmailId = React.useId()
+  const inviteRoleId = React.useId()
 
   async function copyInviteLink(invitationId: string, link: string) {
     try {
@@ -99,13 +102,13 @@ export function TeamSettingsPage({
       </header>
 
       {error && (
-        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="team-error">
+        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="team-error">
           {error}
         </div>
       )}
 
       {/* Members */}
-      <section className="card p-5 mb-6" data-testid="members-section">
+      <section className="glass-panel p-5 mb-6" data-testid="members-section">
         <h2 className="font-semibold flex items-center gap-2 mb-4">
           <Shield className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Members
@@ -130,17 +133,30 @@ export function TeamSettingsPage({
                 </div>
 
                 {canChangeThisRole ? (
-                  <select
-                    value={member.role as InvitableRole}
-                    disabled={busy}
-                    onChange={(e) => (onChangeRole ?? noop)(member.userId, e.target.value as InvitableRole)}
-                    aria-label={`Change role for ${member.name}`}
-                    className="text-xs rounded-lg border border-bh-border bg-bh-surface px-2 py-1"
-                    data-testid={`role-select-${member.userId}`}
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="member">Member</option>
-                  </select>
+                  // Fixed-width wrapper, not a width class on SelectTrigger directly:
+                  // .input-field (globals.css) is unlayered CSS, which always beats a
+                  // plain (non-!important) Tailwind utility of equal specificity
+                  // regardless of source order — a `w-28` on the trigger itself is
+                  // silently ignored and it re-claims 100% of the flex row instead.
+                  <div className="w-28 shrink-0">
+                    <Select
+                      value={member.role as InvitableRole}
+                      disabled={busy}
+                      onValueChange={(v) => (onChangeRole ?? noop)(member.userId, v as InvitableRole)}
+                    >
+                      <SelectTrigger
+                        aria-label={`Change role for ${member.name}`}
+                        className="text-xs"
+                        data-testid={`role-select-${member.userId}`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="member">Member</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 ) : (
                   <span className="text-[10px] uppercase tracking-wider font-bold text-bh-text-dim flex items-center gap-1">
                     {isOwnerRole(member.role) && <Crown className="w-3 h-3" aria-hidden="true" />}
@@ -168,7 +184,7 @@ export function TeamSettingsPage({
 
       {/* Pending invitations */}
       {canManageMembers && (
-        <section className="card p-5 mb-6" data-testid="invitations-section">
+        <section className="glass-panel p-5 mb-6" data-testid="invitations-section">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <Mail className="w-4 h-4 text-bh-accent" aria-hidden="true" />
             Pending invitations
@@ -237,7 +253,7 @@ export function TeamSettingsPage({
 
           {canInvite && (
             <form
-              className="flex flex-col sm:flex-row gap-2"
+              className="grid grid-cols-1 sm:grid-cols-[1fr_140px_auto] gap-2 sm:items-end"
               onSubmit={(e) => {
                 e.preventDefault()
                 if (!inviteEmail.trim()) return
@@ -246,28 +262,36 @@ export function TeamSettingsPage({
               }}
               data-testid="invite-form"
             >
-              <input
-                type="email"
-                required
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="teammate@example.com"
-                disabled={busy || seatsFull}
-                aria-label="Invite email"
-                className="flex-1 text-sm rounded-lg border border-bh-border bg-bh-surface px-3 py-1.5"
-                data-testid="invite-email-input"
-              />
-              <select
-                value={inviteRole}
-                onChange={(e) => setInviteRole(e.target.value as InvitableRole)}
-                disabled={busy || seatsFull}
-                aria-label="Invite role"
-                className="text-sm rounded-lg border border-bh-border bg-bh-surface px-2 py-1.5"
-                data-testid="invite-role-select"
-              >
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
+              <div>
+                <Label htmlFor={inviteEmailId}>Email</Label>
+                <Input
+                  id={inviteEmailId}
+                  type="email"
+                  required
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="teammate@example.com"
+                  disabled={busy || seatsFull}
+                  className="mt-1 text-sm"
+                  data-testid="invite-email-input"
+                />
+              </div>
+              <div>
+                <Label htmlFor={inviteRoleId}>Role</Label>
+                <Select
+                  value={inviteRole}
+                  onValueChange={(v) => setInviteRole(v as InvitableRole)}
+                  disabled={busy || seatsFull}
+                >
+                  <SelectTrigger id={inviteRoleId} className="mt-1 w-full text-sm" data-testid="invite-role-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="member">Member</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <button
                 type="submit"
                 disabled={busy || seatsFull}
