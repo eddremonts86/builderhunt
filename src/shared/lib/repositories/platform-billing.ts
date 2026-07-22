@@ -44,7 +44,7 @@ export async function setPlatformUserPlan(
     // no direct grant on organization_entitlements.
     await tx.execute(sql`
       select sync_personal_organization_entitlement(
-        ${userId}, ${newPlan}, 'active', ${PLAN_SEAT_LIMITS[newPlan]}, ${planEndsAt ?? null}
+        ${userId}, ${newPlan}, 'active', ${PLAN_SEAT_LIMITS[newPlan]}, ${planEndsAt?.toISOString() ?? null}
       )
     `)
   })
