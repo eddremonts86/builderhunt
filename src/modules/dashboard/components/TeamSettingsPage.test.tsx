@@ -102,6 +102,20 @@ describe('TeamSettingsPage — authorization matrix', () => {
     expect(ids).not.toContain('delete-organization-btn')
   })
 
+  it('hides the invite form on a personal workspace even for its sole owner, and explains why', async () => {
+    const personal = baseSnapshot('owner')
+    personal.organization.isPersonal = true
+    personal.members = [personal.members[0]]
+    personal.pendingInvitations = []
+    personal.seatUsage = { used: 1, limit: 1 }
+
+    await render(personal, 'user-owner')
+    const ids = testIds()
+
+    expect(ids).toContain('personal-org-invite-note')
+    expect(ids).not.toContain('invite-form')
+  })
+
   it('never renders fields beyond the DTO shape, even when a fixture is contaminated with extra auth-shaped data', async () => {
     const contaminated = baseSnapshot('owner')
     // @ts-expect-error deliberately contaminating the fixture with fields the DTO doesn't declare

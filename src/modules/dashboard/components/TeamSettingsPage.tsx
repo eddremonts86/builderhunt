@@ -65,7 +65,7 @@ export function TeamSettingsPage({
     requestId: 'client',
   }
 
-  const canInvite = can(viewer, 'organization:invite')
+  const canInvite = can(viewer, 'organization:invite') && !snapshot.organization.isPersonal
   const canManageMembers = can(viewer, 'organization:manage-members')
   const canDelete = can(viewer, 'organization:delete')
   const seatsFull = snapshot.seatUsage.used >= snapshot.seatUsage.limit
@@ -197,6 +197,12 @@ export function TeamSettingsPage({
                 </li>
               ))}
             </ul>
+          )}
+
+          {snapshot.organization.isPersonal && (
+            <p className="text-sm text-bh-text-dim" data-testid="personal-org-invite-note">
+              Personal workspaces are solo — create a team from the organization switcher to invite others.
+            </p>
           )}
 
           {canInvite && (

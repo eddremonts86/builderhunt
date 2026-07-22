@@ -98,6 +98,8 @@ export interface LifecycleDependencies {
   getSession(request: Request): Promise<LifecycleSession | null>
   findMembership(userId: string, organizationId: string): Promise<MembershipRecord | null>
   countSeats(organizationId: string): Promise<number>
+  /** Personal workspaces are seeded with `seatLimit: 1` (see `personal-organization.ts`) — solo by design, never invitable. */
+  isPersonalOrganization(organizationId: string): Promise<boolean>
   membershipLimit: number
   createOrganization(input: { name: string; slug: string; ownerUserId: string }): Promise<OrganizationRecord>
   setActiveOrganization(session: LifecycleSession, organizationId: string | null): Promise<void>
@@ -238,6 +240,9 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, input.organizationId)
     requireElevated(membership)
+    if (await deps.isPersonalOrganization(input.organizationId)) {
+      throw new OrganizationLifecycleError('Personal workspaces cannot invite members — create a team instead', 400)
+    }
     await requireRateLimit(deps, 'org-invite', `${session.userId}:${input.organizationId}`, 20, 60 * 60)
 
     const email = normalizeInvitationEmail(input.email)
@@ -550,6 +555,15 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
         .from(organizationInvitations)
         .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
       return (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
+    },
+
+    async isPersonalOrganization(organizationId) {
+      const [row] = await authDb
+        .select({ metadata: organizations.metadata })
+        .from(organizations)
+        .where(eq(organizations.id, organizationId))
+        .limit(1)
+      return isPersonalOrganizationMetadata(row?.metadata ?? null)
     },
 
     membershipLimit: ORGANIZATION_MEMBERSHIP_LIMIT,
