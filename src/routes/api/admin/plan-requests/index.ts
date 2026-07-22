@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { SeatLimitExceededError } from '~/shared/lib/auth/organization-lifecycle'
 import {
   findPlanRequest,
   listPlanRequestsWithUsers,
@@ -56,6 +57,12 @@ export const Route = createFileRoute('/api/admin/plan-requests/')({
           })
           return Response.json({ ok: true })
         } catch (err) {
+          if (err instanceof SeatLimitExceededError) {
+            return Response.json(
+              { error: 'This user has more members in their personal workspace than the requested plan allows' },
+              { status: 409 },
+            )
+          }
           const response = platformAdminErrorResponse(err)
           if (response) return response
           console.error('admin plan requests resolve error:', err)

@@ -9,15 +9,18 @@
  */
 import type { OrganizationRole, PermissionAction, ResourceAuthorizationContext, TenantPrincipal } from '../authorization/permissions'
 import { can } from '../authorization/permissions'
+import type { PlanStatus, PlanTier } from '../billing-shared'
 import type {
   InvitableRole,
   InvitationRecord,
   MyOrganizationRecord,
+  OrganizationEntitlementRecord,
   OrganizationMemberRecord,
   OrganizationRecord,
   SeatUsageRecord,
 } from '../auth/organization-lifecycle'
 import {
+  getOrganizationBillingDetail,
   getOrganizationLifecycle,
   getSeatUsage,
   listInvitationsForEmail,
@@ -191,4 +194,64 @@ export function canLeaveOrganization(viewerRole: OrganizationRole): boolean {
 
 export function isOwnerRole(role: OrganizationRole): boolean {
   return role === 'owner'
+}
+
+/**
+ * Everything `OrganizationBillingCard` needs for one render. `paidActionsAllowed`
+ * mirrors `resolveEntitlementPolicy` (active/trialing status on a non-free
+ * tier) — false here is what "Team lapse" (an admin flips status to
+ * `past_due`/`canceled`, or a trial ends) looks like from the client's side;
+ * there's no separate suspension flag or expiry cron to build, membership
+ * rows are never touched, only paid-feature access.
+ */
+export interface OrganizationEntitlementDto {
+  organizationName: string
+  isPersonal: boolean
+  viewerRole: OrganizationRole
+  tier: PlanTier
+  status: PlanStatus
+  billingPeriod: 'none' | 'monthly' | 'annual'
+  currentPeriodEnd: string | null
+  trialEndsAt: string | null
+  notes: string | null
+  seatUsage: SeatUsageDto
+  paidActionsAllowed: boolean
+}
+
+export function toOrganizationEntitlementDto(
+  organization: OrganizationSummaryDto,
+  detail: OrganizationEntitlementRecord,
+  seatUsage: SeatUsageDto,
+): OrganizationEntitlementDto {
+  return {
+    organizationName: organization.name,
+    isPersonal: organization.isPersonal,
+    viewerRole: organization.role,
+    tier: detail.tier,
+    status: detail.status,
+    billingPeriod: detail.billingPeriod,
+    currentPeriodEnd: detail.currentPeriodEnd?.toISOString() ?? null,
+    trialEndsAt: detail.trialEndsAt?.toISOString() ?? null,
+    notes: detail.notes,
+    seatUsage,
+    paidActionsAllowed: detail.paidActionsAllowed,
+  }
+}
+
+/** Composes the foundation reads behind `GET /api/organizations/billing`, mirroring `getTeamSnapshot`'s shape. */
+export async function getOrganizationBillingSnapshot(principal: TenantPrincipal): Promise<OrganizationEntitlementDto | null> {
+  const [myOrganizations, detail, seatUsage] = await Promise.all([
+    listMyOrganizations(principal.userId),
+    getOrganizationBillingDetail(principal),
+    getSeatUsage(principal),
+  ])
+
+  const mine = myOrganizations.find((record) => record.organization.id === principal.organizationId)
+  if (!mine) return null
+
+  return toOrganizationEntitlementDto(
+    toOrganizationSummaryDto(mine.organization, mine.role, mine.isPersonal),
+    detail,
+    toSeatUsageDto(seatUsage),
+  )
 }

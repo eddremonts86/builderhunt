@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { SeatLimitExceededError } from '~/shared/lib/auth/organization-lifecycle'
 import { setUserPlan } from '~/shared/lib/billing'
 
 const UpdateBody = z.object({
@@ -36,6 +37,12 @@ export const Route = createFileRoute('/api/admin/users/$userId')({
           })
           return Response.json({ ok: true, ...result })
         } catch (err) {
+          if (err instanceof SeatLimitExceededError) {
+            return Response.json(
+              { error: 'This user has more members in their personal workspace than the new plan allows — remove members first' },
+              { status: 409 },
+            )
+          }
           const response = platformAdminErrorResponse(err)
           if (response) return response
           console.error('admin user patch error:', err)

@@ -59,6 +59,7 @@ import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
 import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
 import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
 import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
+import { Route as ApiOrganizationsBillingRouteImport } from './routes/api/organizations/billing'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -381,6 +382,11 @@ const ApiOrganizationsTeamRoute = ApiOrganizationsTeamRouteImport.update({
 const ApiOrganizationsSwitchRoute = ApiOrganizationsSwitchRouteImport.update({
   id: '/api/organizations/switch',
   path: '/api/organizations/switch',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsBillingRoute = ApiOrganizationsBillingRouteImport.update({
+  id: '/api/organizations/billing',
+  path: '/api/organizations/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
@@ -830,6 +836,7 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
@@ -953,6 +960,7 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
@@ -1080,6 +1088,7 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
@@ -1206,6 +1215,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/billing'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
@@ -1329,6 +1339,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/billing'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
@@ -1455,6 +1466,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/billing'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
@@ -1556,6 +1568,7 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
+  ApiOrganizationsBillingRoute: typeof ApiOrganizationsBillingRoute
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
   ApiOrganizationsTransferOwnershipRoute: typeof ApiOrganizationsTransferOwnershipRoute
@@ -1959,6 +1972,13 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/switch'
       fullPath: '/api/organizations/switch'
       preLoaderRoute: typeof ApiOrganizationsSwitchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/billing': {
+      id: '/api/organizations/billing'
+      path: '/api/organizations/billing'
+      fullPath: '/api/organizations/billing'
+      preLoaderRoute: typeof ApiOrganizationsBillingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/onboarding/status': {
@@ -2688,6 +2708,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
+  ApiOrganizationsBillingRoute: ApiOrganizationsBillingRoute,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,
   ApiOrganizationsTransferOwnershipRoute:
