@@ -17,7 +17,13 @@ TEST_MIGRATION_URL=... pnpm test:migrations:local
 RLS_TEST_APP_URL=... RLS_TEST_AUTH_URL=... pnpm test:rls:local
 ```
 
-Both scripts refuse any other database name. Backfills use stable cursors, small transactions,
+Both scripts refuse any other database name. **Caution**: `prepare-rls-fixture.mjs`
+runs `alter role ... password ...` against `builderhunt_app`/`builderhunt_auth`/`builderhunt_worker`/
+`builderhunt_platform` to set the known test passwords `RLS_TEST_*_URL` expects — but Postgres roles
+are cluster-wide, not per-database, so running this against a disposable database on the same
+Postgres cluster as your persistent dev database (e.g. local Docker Postgres) overwrites those roles'
+real passwords too, breaking the dev app until you `alter role ... password '<original>'` back to the
+values in `.env`. CI is unaffected (its Postgres service container is provisioned fresh per run). Backfills use stable cursors, small transactions,
 checkpoint counters, retryable forward execution, and non-sensitive conflict checksums. A rerun of a
 completed backfill must write nothing.
 
