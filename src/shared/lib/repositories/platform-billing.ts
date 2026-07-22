@@ -29,6 +29,17 @@ export async function setPlatformUserPlan(
   planEndsAt?: Date,
 ) {
   const from = (await getPlatformUserPlan(userId))?.plan ?? 'free'
+
+  // A personal organization can carry real seats above its own tier's usual
+  // limit (an admin grant can raise `seat_limit` independent of `tier` — see
+  // 0022's sync function) — so shrinking the tier back down must not be
+  // allowed to silently strand members over the new, smaller limit. Checked
+  // via authDb (organization-lifecycle.ts), not platformDb: this connection's
+  // role has no grant on organization_members, by design (least privilege).
+  const { personalOrganizationId } = await import('../migration/backfill')
+  const { assertSeatLimitDowngradeIsSafe } = await import('../auth/organization-lifecycle')
+  await assertSeatLimitDowngradeIsSafe(personalOrganizationId(userId), PLAN_SEAT_LIMITS[newPlan])
+
   await platformDb.transaction(async (tx) => {
     await tx.insert(plans).values({ userId, plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null })
       .onConflictDoUpdate({

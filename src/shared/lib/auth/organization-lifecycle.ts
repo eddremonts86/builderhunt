@@ -2,6 +2,7 @@ import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { consoleSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
+import type { PlanStatus, PlanTier } from '../billing-shared'
 
 /**
  * Wraps the better-auth organization plugin's operations with the
@@ -1006,4 +1007,94 @@ export async function getSeatUsage(principal: TenantPrincipal): Promise<SeatUsag
     used: (members?.value ?? 0) + (pendingInvitations?.value ?? 0),
     limit: entitlement.seatLimit,
   }
+}
+
+export interface OrganizationEntitlementRecord {
+  tier: PlanTier
+  status: PlanStatus
+  billingPeriod: 'none' | 'monthly' | 'annual'
+  currentPeriodEnd: Date | null
+  trialEndsAt: Date | null
+  notes: string | null
+  seatLimit: number
+  paidActionsAllowed: boolean
+}
+
+/**
+ * The active organization's real billing entitlement — tenant-private,
+ * RLS-forced table, so (unlike the membership/invitation reads above) this
+ * goes through `withTenantContext`/`builderhunt_app`, not authDb. Mirrors
+ * what `GET /api/plans/me` already read inline; centralized here so
+ * Team-account billing UI composes it through contracts.ts instead of a
+ * route importing `organization_entitlements` directly.
+ */
+export async function getOrganizationBillingDetail(principal: TenantPrincipal): Promise<OrganizationEntitlementRecord> {
+  const [{ eq }, schema, { withTenantContext }, { getOrganizationEntitlement }] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/schema'),
+    import('../db/tenant-context'),
+    import('../repositories/entitlements'),
+  ])
+  const { organizationEntitlements } = schema
+
+  return withTenantContext(principal, async (tx) => {
+    const [policy, detailRows] = await Promise.all([
+      getOrganizationEntitlement(tx, principal.organizationId),
+      tx
+        .select({
+          billingPeriod: organizationEntitlements.billingPeriod,
+          currentPeriodEnd: organizationEntitlements.currentPeriodEnd,
+          trialEndsAt: organizationEntitlements.trialEndsAt,
+          notes: organizationEntitlements.notes,
+        })
+        .from(organizationEntitlements)
+        .where(eq(organizationEntitlements.organizationId, principal.organizationId))
+        .limit(1),
+    ])
+    const detail = detailRows[0] ?? null
+    return {
+      tier: policy.tier,
+      status: policy.status,
+      billingPeriod: (detail?.billingPeriod ?? 'none') as 'none' | 'monthly' | 'annual',
+      currentPeriodEnd: detail?.currentPeriodEnd ?? null,
+      trialEndsAt: detail?.trialEndsAt ?? null,
+      notes: detail?.notes ?? null,
+      seatLimit: policy.seatLimit,
+      paidActionsAllowed: policy.paidActionsAllowed,
+    }
+  })
+}
+
+/**
+ * Race-safe guard against shrinking an organization below its current seat
+ * usage — the downgrade mirror of `createInvitation`'s atomic seat check
+ * above. Locks the same `organization_members` row set `for update` so a
+ * concurrent invite can't slip a member in between this count and whatever
+ * write the caller makes next; throws the same `SeatLimitExceededError` a
+ * concurrent invite race would. No product mutation calls a lower tier yet
+ * (no self-serve downgrade exists without Stripe), but the one real place a
+ * tier shrinks today — an admin plan grant, `setPlatformUserPlan` — calls
+ * this before writing the new (possibly smaller) seat limit.
+ */
+export async function assertSeatLimitDowngradeIsSafe(organizationId: string, targetSeatLimit: number): Promise<void> {
+  const [{ and, eq, count, sql }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationMembers, organizationInvitations } = schema
+
+  await authDb.transaction(async (tx) => {
+    await tx.execute(sql`select 1 from organization_members where organization_id = ${organizationId} for update`)
+    const [members] = await tx
+      .select({ value: count() })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId))
+    const [pendingInvitations] = await tx
+      .select({ value: count() })
+      .from(organizationInvitations)
+      .where(and(eq(organizationInvitations.organizationId, organizationId), eq(organizationInvitations.status, 'pending')))
+    const seats = (members?.value ?? 0) + (pendingInvitations?.value ?? 0)
+    if (seats > targetSeatLimit) throw new SeatLimitExceededError()
+  })
 }
