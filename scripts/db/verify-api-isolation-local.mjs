@@ -4,11 +4,14 @@
 // so RLS is genuinely enforced end-to-end — the same failure mode a bug in
 // `withTenantContext`/RLS policy would actually produce in production.
 //
-// Scope: covers saved-queries, organization-alerts, and builder tracking
-// (three representative tenant-private resources), account-export privacy
-// isolation, and alerts-worker cross-organization data isolation. This is
-// NOT the full ~34-route inventory in src/routes/api/** — see
-// plans/security-and-multitenancy/tasks.md task 15 for what remains.
+// Scope: covers saved-queries, organization-alerts, builder tracking, and
+// builder notes (four representative tenant-private resources),
+// account-export privacy isolation, and alerts-worker cross-organization
+// data isolation. This is NOT the full ~34-route inventory in
+// src/routes/api/** — see plans/security-and-multitenancy/tasks.md task 15
+// for what remains; every route in that inventory does have a verified auth
+// guard per scripts/check-route-coverage.mjs, so the gap here is test
+// breadth, not missing guards.
 //
 // Required env (set by the caller before running):
 //   DATABASE_URL             -> builderhunt_app role connection
@@ -103,6 +106,19 @@ async function seed() {
     ) values
       (${IDS.legacyBuilderA}, ${IDS.orgA}, ${IDS.userA}, 'github', 'iso-legacy-a', 'iso-legacy-a', 'https://github.com/iso-legacy-a', now(), now(), now()),
       (${IDS.legacyBuilderB}, ${IDS.orgB}, ${IDS.userB}, 'github', 'iso-legacy-b', 'iso-legacy-b', 'https://github.com/iso-legacy-b', now(), now(), now())
+  `
+  // `builder_notes.builder_id` still FKs to the legacy `builders` table, not
+  // `organization_builders` (the identity split never repointed it) — real
+  // production rows satisfy this because `trackOrganizationBuilder` always
+  // dual-writes both tables under the *same* id. Mirror that invariant here
+  // so the tracked-builder id (used by /api/builders/$builderId/notes) is
+  // legal, instead of masking a real FK requirement.
+  await owner`
+    insert into builders (
+      id, organization_id, user_id, source, source_id, username, profile_url, last_seen, created_at, updated_at
+    ) values
+      (${IDS.trackedA}, ${IDS.orgA}, ${IDS.userA}, 'github', 'iso-a', 'iso-a', 'https://github.com/iso-a', now(), now(), now()),
+      (${IDS.trackedB}, ${IDS.orgB}, ${IDS.userB}, 'github', 'iso-b', 'iso-b', 'https://github.com/iso-b', now(), now(), now())
   `
   await owner`
     insert into alerts (id, organization_id, user_id, name, keywords, enabled, trigger_conditions, delivery_channel, created_at)
@@ -237,6 +253,41 @@ async function checkBuilderTracking() {
   record('builder tracking: A cannot delete B\'s tracked row', deleteOther.status === 404, `status=${deleteOther.status}`)
 }
 
+async function checkBuilderNotes() {
+  const { Route } = await import('../../src/routes/api/builders/$builderId/notes.ts')
+  const { GET, POST } = Route.options.server.handlers
+
+  const createOnOther = await POST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/notes', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'should not land in org B' }),
+    }),
+    params: { builderId: IDS.trackedB },
+  })
+  record('builder notes: A cannot create a note on B\'s tracked row', createOnOther.status === 404, `status=${createOnOther.status}`)
+
+  const createOwn = await POST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/notes', {
+      method: 'POST',
+      body: JSON.stringify({ content: 'A\'s own note' }),
+    }),
+    params: { builderId: IDS.trackedA },
+  })
+  record('builder notes: A can create a note on A\'s own tracked row', createOwn.status === 200, `status=${createOwn.status}`)
+
+  const listOther = await (await GET({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/notes'),
+    params: { builderId: IDS.trackedB },
+  })).json()
+  record('builder notes: A sees no notes on B\'s tracked row', Array.isArray(listOther) && listOther.length === 0, JSON.stringify(listOther))
+
+  const listOwn = await (await GET({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/notes'),
+    params: { builderId: IDS.trackedA },
+  })).json()
+  record('builder notes: A sees A\'s own note', Array.isArray(listOwn) && listOwn.length === 1 && listOwn[0].content === 'A\'s own note', JSON.stringify(listOwn))
+}
+
 async function checkAccountExportPrivacy() {
   const { buildExportPayload } = await import('../../src/shared/lib/legal.ts')
   const payloadA = await buildExportPayload(IDS.userA)
@@ -283,6 +334,7 @@ async function main() {
   await checkSavedQueries()
   await checkAlerts()
   await checkBuilderTracking()
+  await checkBuilderNotes()
   await checkAccountExportPrivacy()
   await checkWorkerIsolation()
 
