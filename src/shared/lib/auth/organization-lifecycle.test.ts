@@ -317,6 +317,30 @@ describe('removeMember', () => {
     await expect(lifecycle.removeMember(request, 'org-1', 'user-b')).rejects.toMatchObject({ status: 403 })
   })
 
+  it('allows a plain member to remove themselves (leave), no elevation required', async () => {
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('member')),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await lifecycle.removeMember(request, 'org-1', 'user-a')
+
+    expect(deps.removeMemberRecord).toHaveBeenCalledWith('org-1', 'user-a')
+    expect(deps.clearActiveOrganizationForUsers).toHaveBeenCalledWith('org-1', ['user-a'])
+  })
+
+  it('still refuses a plain member removing someone else', async () => {
+    const deps = buildDeps({
+      findMembership: vi.fn(async (userId: string) =>
+        userId === 'user-a' ? membership('member') : membership('member', { userId: 'user-b' }),
+      ),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.removeMember(request, 'org-1', 'user-b')).rejects.toMatchObject({ status: 403 })
+    expect(deps.removeMemberRecord).not.toHaveBeenCalled()
+  })
+
   it('rejects removal from a session that has not authenticated recently', async () => {
     const staleSession = session({ authenticatedAt: new Date(NOW.getTime() - 20 * 60 * 1000) })
     const deps = buildDeps({

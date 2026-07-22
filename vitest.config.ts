@@ -15,7 +15,7 @@ process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? 'test-secret-
 export default defineConfig({
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'test/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.vinxi', '.output'],
     coverage: {
       provider: 'v8',

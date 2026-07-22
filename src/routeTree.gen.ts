@@ -56,6 +56,7 @@ import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/seman
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
 import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
 import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
@@ -105,6 +106,7 @@ import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/c
 import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
+import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
@@ -362,6 +364,12 @@ const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   path: '/api/plans/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrganizationsTransferOwnershipRoute =
+  ApiOrganizationsTransferOwnershipRouteImport.update({
+    id: '/api/organizations/transfer-ownership',
+    path: '/api/organizations/transfer-ownership',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrganizationsTeamRoute = ApiOrganizationsTeamRouteImport.update({
   id: '/api/organizations/team',
   path: '/api/organizations/team',
@@ -614,6 +622,12 @@ const ApiSprintsSprintIdResultsRoute =
     path: '/results',
     getParentRoute: () => ApiSprintsSprintIdRoute,
   } as any)
+const ApiOrganizationsMembersMemberIdRoute =
+  ApiOrganizationsMembersMemberIdRouteImport.update({
+    id: '/api/organizations/members/$memberId',
+    path: '/api/organizations/members/$memberId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
   id: '/api/me/data-export/$id',
   path: '/api/me/data-export/$id',
@@ -797,6 +811,7 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -840,6 +855,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
@@ -915,6 +931,7 @@ export interface FileRoutesByTo {
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -958,6 +975,7 @@ export interface FileRoutesByTo {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/sprints/$sprintId': typeof DashboardSprintsSprintIdIndexRoute
@@ -1037,6 +1055,7 @@ export interface FileRoutesById {
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
+  '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -1080,6 +1099,7 @@ export interface FileRoutesById {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/_dashboard/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
@@ -1158,6 +1178,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/status'
     | '/api/organizations/switch'
     | '/api/organizations/team'
+    | '/api/organizations/transfer-ownership'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1201,6 +1222,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
     | '/sprints/$sprintId/'
@@ -1276,6 +1298,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/status'
     | '/api/organizations/switch'
     | '/api/organizations/team'
+    | '/api/organizations/transfer-ownership'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1319,6 +1342,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
     | '/sprints/$sprintId'
@@ -1397,6 +1421,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/status'
     | '/api/organizations/switch'
     | '/api/organizations/team'
+    | '/api/organizations/transfer-ownership'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1440,6 +1465,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
     | '/_dashboard/sprints/$sprintId/'
@@ -1493,6 +1519,7 @@ export interface RootRouteChildren {
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
+  ApiOrganizationsTransferOwnershipRoute: typeof ApiOrganizationsTransferOwnershipRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
@@ -1524,6 +1551,7 @@ export interface RootRouteChildren {
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
+  ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
   ApiAdminMetricsIndexRoute: typeof ApiAdminMetricsIndexRoute
@@ -1871,6 +1899,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPlansMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/transfer-ownership': {
+      id: '/api/organizations/transfer-ownership'
+      path: '/api/organizations/transfer-ownership'
+      fullPath: '/api/organizations/transfer-ownership'
+      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/team': {
       id: '/api/organizations/team'
       path: '/api/organizations/team'
@@ -2213,6 +2248,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sprints/$sprintId/results'
       preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
       parentRoute: typeof ApiSprintsSprintIdRoute
+    }
+    '/api/organizations/members/$memberId': {
+      id: '/api/organizations/members/$memberId'
+      path: '/api/organizations/members/$memberId'
+      fullPath: '/api/organizations/members/$memberId'
+      preLoaderRoute: typeof ApiOrganizationsMembersMemberIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/me/data-export/$id': {
       id: '/api/me/data-export/$id'
@@ -2571,6 +2613,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,
+  ApiOrganizationsTransferOwnershipRoute:
+    ApiOrganizationsTransferOwnershipRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
@@ -2602,6 +2646,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
+  ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
   ApiAdminMetricsIndexRoute: ApiAdminMetricsIndexRoute,
