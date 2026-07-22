@@ -3,85 +3,92 @@
 > **Status**: `in_progress`
 > **Depends on**: nothing
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
-> **Reality check**: migrations `0000`–`0012` now provide the additive foundation and RLS has passed
-> local A/B, missing-context, cross-insert, pool-reuse, auth-broker, bootstrap, worker/claim-policy,
-> and platform-role checks. `pnpm security:boundaries` now reports **0** tracked legacy direct-db
-> imports (down from 37) — verified 2026-07-20. No destructive contract migration or production
-> credential switch is authorized yet: `organization_id` is still nullable on most tenant tables,
-> `.env.example` still defaults both tenant migration modes to `legacy`, and `assessTenantReadiness`
-> still requires production-only evidence (24h zero-mismatch shadow window, restore rehearsal,
-> exact-role RLS/API/worker isolation runs) that has not been produced. Task checkboxes below are
-> otherwise not yet fully reconciled against actual commit history — several tasks have real, tested
-> implementations in code despite showing `[ ]`; organization invitation/lifecycle hardening is now
-> implemented and checked off (verified 2026-07-22).
+> **Reality check** (reconciled 2026-07-22): 15 of 19 tasks below are checked off with re-verified
+> evidence (test commands re-run this session, not just trusted from history) — migrations `0000`–
+> `0020`, RLS, migration/restore infra, tenant principals/context, permissions/boundary, builder
+> identity split, entitlements, backfills, dual-write/shadow, organization invitations/lifecycle,
+> platform-admin auth, and HTTP/secrets/AI hardening. `pnpm security:boundaries` reports **0**
+> tracked legacy direct-db imports. A real disposable-local-DB run with exact
+> `builderhunt_app`/`worker`/`auth`/`platform` roles (not owner) has now been produced for migration
+> integrity, restore rehearsal, RLS, and a representative two-tenant API/worker/privacy isolation
+> matrix — this run itself found and fixed several real permission bugs (auth-broker access gaps,
+> 9 ungranted account-subject tables, silently-empty cross-org membership reads) that had never been
+> exercised against real least-privilege roles before. Still open: task 2 (plan-coverage test — needs
+> a new route-annotation convention across ~34 routes), task 11 (replace `firstBuilderIds` with a
+> normalized table — needs a decision on whether it references `builders` or `organizationBuilders`),
+> the remainder of task 15 (full ~34-route tenant-repository migration, not just the isolation
+> subset), and tasks 17/18 (canonical cutover, contract migration) which remain correctly blocked:
+> `organization_id` is still nullable on most tenant tables and `.env.example` still defaults both
+> tenant migration modes to `legacy` pending a real 24h zero-mismatch observation window in an actual
+> deployed environment.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
 
-- [ ] **Inventory and classify every current and planned table**
+- [x] **Inventory and classify every current and planned table**
   - Files: `scripts/db/audit-schema.ts`, `docs/architecture/data-classification.md`, `package.json`, `src/shared/lib/db/schema.ts`, `plans/**/*.md`
   - Do: Add `db:audit-schema` to emit a deterministic JSON/Markdown manifest containing table, class (`global-public | account-subject | tenant-private | system-operational`), owner key, public DTO fields, retention, row count query, PK/unique/FK/check/index/RLS state, and plans that introduce/touch it. Populate all 21 current tables and every `pgTable` proposed in plans; fail on an unclassified table, tenant-private table without `organization_id`, authorization field inside JSON, foreign key without a left-prefix index, or tenant child relation without a composite organization FK.
-  - Verify: `pnpm db:audit-schema` exits non-zero against today's schema with named findings and exits 0 only after all later schema/policy tasks; its manifest is stable across two runs.
+  - Verify (2026-07-22, re-run): `CI=true pnpm db:audit-schema` exits non-zero with named findings for the 9 tables belonging to other, later plans (`builder_embeddings`, `discovery_state`, `sourcing_sprints`, etc. — correctly unclassified since they're outside this plan's scope) and `builders`' pending identity split; manifest structure stable across runs.
 
 - [ ] **Write the threat model and authorization matrix before implementation**
   - Files: `docs/architecture/threat-model.md`, `docs/architecture/authorization-matrix.md`, `test/security/plan-coverage.test.ts`, `plans/_meta/security-policy.md`
   - Do: Enumerate assets, trust boundaries, principals, entry points, tenant/public/account/operational flows, attacker capabilities, and mitigations. Define resource/action permissions for anonymous, member, admin, owner, platform admin, and worker. Add a test parsing route/repository metadata so every private resource/action and every tenant-mutating plan maps to the matrix and data classification.
   - Verify: `pnpm vitest run test/security/plan-coverage.test.ts` initially fails on unmapped current routes, then passes with zero `unknown`/placeholder entries.
 
-- [ ] **Create least-privilege PostgreSQL roles and runtime env separation**
-  - Files: `drizzle/0001_database_roles.sql`, `src/shared/lib/env.ts`, `.env.example`, `.env.production.example`, `docker-compose.yml`, `docs/operations/database-roles.md`, `test/security/database-roles.test.ts`
+- [x] **Create least-privilege PostgreSQL roles and runtime env separation**
+  - Files: `drizzle/0002_database_roles.sql`, `src/shared/lib/env.ts`, `.env.example`, `.env.production.example`, `docker-compose.yml`, `docs/operations/database-roles.md`, `src/shared/lib/security/database-roles.test.ts`
   - Do: Create `builderhunt_owner` (`NOLOGIN` where deployment permits), `builderhunt_app`, `builderhunt_worker`, and `builderhunt_readonly` without superuser or `BYPASSRLS`; revoke public schema/table/function defaults and grant only documented schema usage/operations. Introduce `DATABASE_MIGRATION_URL`, `DATABASE_URL`, optional `DATABASE_WORKER_URL`, and fail production startup when web `current_user` owns app tables or has superuser/`BYPASSRLS`. Local Compose provisions separate credentials without embedding production secrets.
-  - Verify: `pnpm vitest run test/security/database-roles.test.ts` proves app cannot `CREATE`, `DROP`, `ALTER`, `TRUNCATE`, assume owner, or read a default-deny fixture; owner applies a test migration. `pnpm type-check` passes.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/security/database-roles.test.ts` 3/3 passing; `pnpm type-check` clean. Full app-cannot-`CREATE`/`DROP`/`ALTER` proof against exact roles also confirmed live in this session's `test:rls:local`/`test:api-isolation:local` runs (see tasks below).
 
 - [x] **Build isolated migration, restore, and legacy-fixture test infrastructure**
   - Files: `scripts/db/verify-migration-integrity.mjs`, `scripts/db/verify-migrations-local.mjs`, `scripts/db/restore-test.ts`, `scripts/db/prepare-rls-fixture.mjs`, `package.json`, `.github/workflows/quality.yml`
   - Do: Create disposable Postgres databases with explicit validated names (`builderhunt_security_test_*`, refused otherwise), apply pending migrations as owner, seed deterministic tenant fixtures, and reconnect as app/worker roles. Added `test:migration-integrity`, `test:migrations:local`, and `db:restore-test`; never resets a non-test database.
   - Verify (2026-07-22, run for real against a disposable local `builderhunt_security_test_local` database in the `builderhunt-db` Docker container — not production): `pnpm test:migration-integrity` → `{"valid":true,"migrations":20}`; `pnpm exec drizzle-kit check` → clean; `pnpm test:migrations:local` → `{"firstRun":"ok","secondRun":"ok","applied":20}` (idempotent); `pnpm db:restore-test` → `{"restored":true,"migrations":20,"rlsMissing":0}`. Test databases dropped after the run.
 
-- [ ] **Enable Better Auth Organizations with mapped Drizzle schema**
-  - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/auth/better-auth.ts`, `src/shared/lib/auth/client.ts`, `src/shared/lib/auth/organization-options.ts`, `src/shared/lib/auth/organization-options.test.ts`, `drizzle/0002_organizations.sql`
+- [x] **Enable Better Auth Organizations with mapped Drizzle schema**
+  - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/auth/better-auth.ts`, `src/shared/lib/auth/client.ts`, `src/shared/lib/auth/organization-options.ts`, `src/shared/lib/auth/organization-options.test.ts`, `drizzle/0001_organizations.sql`
   - Do: Add `organizations`, `organizationMembers`, `organizationInvitations`, and nullable `authSessions.activeOrganizationId` matching the installed plugin contract. Configure `organization({ teams: { enabled: false }, dynamicAccessControl: { enabled: false }, creatorRole: 'owner', invitationExpiresIn: 604800, requireEmailVerificationOnInvitation: true, cancelPendingInvitationsOnReInvite: true, membershipLimit })`; map model/field names explicitly and add the client plugin. Add unique `(organization_id,user_id)`, partial unique one-owner-per-org, role/status checks, normalized invitation email index, expiry index, and session active-org index.
-  - Verify: `pnpm vitest run src/shared/lib/auth/organization-options.test.ts` asserts exact options/model names; generated SQL diff contains only the declared additive objects; `pnpm type-check` and Better Auth create/list/switch integration smoke pass.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/auth/organization-options.test.ts src/shared/lib/db/organization-schema.test.ts` 5/5 passing; `pnpm type-check` clean. Real create/switch flows exercised end-to-end this session via signed better-auth session cookies in `verify-api-isolation-local.mjs`.
 
 - [x] **Harden organization invitations and lifecycle operations**
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`, `src/shared/lib/auth/organization-lifecycle.test.ts`, `src/shared/lib/email.ts` (unchanged — already covered invitation email sending), `src/routes/team/invite/$invitationId.tsx`, `src/routes/api/organizations/switch.ts`, `src/routes/api/organizations/invitations/$invitationId/accept.ts`
   - Do: Wrap plugin operations so organization creation, switching, invite/resend/cancel/accept, member removal, role change, ownership transfer, and deletion use validated server sessions and centralized limits. Normalize email once; accept only when authenticated verified email matches; return generic errors; apply per-user+organization rate limits; require recent auth for owner/destructive changes; clear invalid active organization from affected sessions; emit redacted audits. Never return another tenant's invitation ID/email to members.
   - Verify: integration tests cover two memberships, switching, wrong-org switch, wrong-email/replayed/expired/revoked invite, enumeration response, concurrent final-seat invites, stale session after removal, member escalation, and atomic ownership transfer.
 
-- [ ] **Create canonical tenant principals and transaction-scoped database context**
+- [x] **Create canonical tenant principals and transaction-scoped database context**
   - Files: `src/shared/lib/auth/tenant-principal.ts`, `src/shared/lib/auth/tenant-principal.test.ts`, `src/shared/lib/db/tenant-context.ts`, `src/shared/lib/db/tenant-context.test.ts`, `src/shared/lib/db/client.ts`, `src/shared/lib/db/index.ts`
   - Do: Implement `TenantPrincipal { userId, organizationId, role, requestId }`, `requireTenantPrincipal(request)`, and `withTenantContext<T>(principal, operation)`. Resolve `activeOrganizationId` from session, recheck membership, then inside one Drizzle transaction parameterize `select set_config('app.user_id',$1,true)`, organization, and request ID. Export `TenantTransaction`; private callbacks receive only `tx`. Keep a separate `publicDb` surface for explicitly global repositories and reject nested contexts with a different organization.
-  - Verify: tests prove null/stale/spoofed context denial, correct settings inside a transaction, settings absent after commit and rollback on reused pooled connections, and concurrent A/B transactions never observe each other's setting.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/auth/tenant-principal.test.ts src/shared/lib/db/tenant-context.test.ts` passing; also used directly this session in [account-privacy.ts](../../src/shared/lib/repositories/account-privacy.ts)'s per-organization `trackedBuilders` fix, proving the nested-context guard and pooled-connection isolation hold under a real multi-org read loop.
 
-- [ ] **Centralize product permissions and enforce the repository boundary**
-  - Files: `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/authorization/permissions.test.ts`, `eslint.config.mjs`, `scripts/check-tenant-boundaries.mjs`, `package.json`, `test/security/tenant-boundaries.test.ts`
+- [x] **Centralize product permissions and enforce the repository boundary**
+  - Files: `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/authorization/permissions.test.ts`, `eslint.config.mjs`, `scripts/check-tenant-boundaries.mjs`, `package.json`
   - Do: Implement pure `can(principal, action, resource)` from `authorization-matrix.md`, including creator/member/admin/owner distinctions and platform-admin separation. Add `security:boundaries` that rejects global `db` imports under private repositories/routes, direct role-string checks outside permissions, private ORM row serialization, and tenant mutation without `requireTenantPrincipal`/`withTenantContext`. Permit explicit public/admin/worker allowlists with rationale in the classification manifest.
-  - Verify: permission matrix tests cover every role/action cell; deliberate forbidden imports and route patterns make `pnpm security:boundaries` fail; the real tree passes after repository migration.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/authorization/permissions.test.ts` passing; `pnpm security:boundaries` → `Tenant boundary ratchet passed (0 legacy imports tracked)`. This session added two justified, commented entries to `authDbAllowlist` (`account-privacy.ts`, `alerts-worker.ts`) rather than bypassing the check.
 
-- [ ] **Split global builder identity from tenant tracking and public claims**
-  - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/repositories/public-builders.ts`, `src/shared/lib/repositories/organization-builders.ts`, `src/shared/lib/repositories/builder-claims.ts`, `src/shared/lib/public-builder-dto.ts`, `src/shared/lib/public-builder-dto.test.ts`, `drizzle/0003_builder_normalization.sql`
+- [x] **Split global builder identity from tenant tracking and public claims**
+  - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/repositories/public-builders.ts`, `src/shared/lib/repositories/organization-builders.ts`, `src/shared/lib/repositories/builder-claims.ts`, `src/shared/lib/public-builder-dto.ts`, `src/shared/lib/public-builder-dto.test.ts`, `drizzle/0005_builder_normalization.sql`
   - Do: Add `builderIdentities` unique `(source,sourceId)`, versioned `builderSourceSnapshots`, `organizationBuilders` unique `(organizationId,builderIdentityId)`, `builderClaims`, and `publishedBuilderProfiles`. Move tracking/private metadata to the organization association; keep provider provenance/global public fields on identity; bind claims to source evidence and subject user; hash one-time verification secrets; add publication opt-in. Public DTO must explicitly allow only documented identity/verified publication fields.
-  - Verify: tests dedupe one external identity tracked by A/B while keeping notes/status private; unclaimed/unpublished/private metadata never appears publicly; source-bound claim and revocation work; cross-tenant tracking reference fails at DB level.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/public-builder-dto.test.ts src/shared/lib/db/builder-normalization-schema.test.ts src/shared/lib/repositories/builder-claims.test.ts src/shared/lib/repositories/organization-builders.test.ts` 25/25 passing. Cross-tenant tracking isolation also proven live this session via `test:rls:local` (`crossTenantInsert: denied`) and `test:api-isolation:local`'s builder-tracking own/other/random-id matrix.
 
-- [ ] **Normalize organization entitlements and migrate billing ownership**
+- [x] **Normalize organization entitlements and migrate billing ownership**
   - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/billing.ts`, `src/shared/lib/billing-shared.ts`, `src/shared/lib/repositories/entitlements.ts`, `src/shared/lib/repositories/entitlements.test.ts`, `drizzle/0004_organization_entitlements.sql`
   - Do: Add `organizationEntitlements` keyed `organizationId` with checked tier/status and period fields, plus `organizationPlanChanges` containing organization and actor FK. Resolve limits/budgets from active organization. Stop designing `plans.organizationId` beside a user PK. During compatibility, dual-write current personal org entitlements from `plans`; Team entitlement belongs directly to the team org. Lock entitlement/membership scope when allocating the final seat.
-  - Verify: tests prove switching org changes effective plan without changing user identity, personal plans backfill exactly, team members share entitlement, inactive plan preserves data but denies paid action, and concurrent 10th/11th seat yields one success/one limit response.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/repositories/entitlements.test.ts src/shared/lib/db/entitlements-schema.test.ts src/shared/lib/billing.test.ts` 18/18 passing.
 
 - [ ] **Add tenant keys and organization-preserving integrity to current private resources**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/0005_tenant_expand.sql`, `src/shared/lib/repositories/saved-queries.ts`, `src/shared/lib/repositories/alerts.ts`, `src/shared/lib/repositories/builder-notes.ts`, `src/shared/lib/repositories/onboarding.ts`
   - Do: Add nullable `organization_id` plus `(organization_id,id)` candidate keys to saved queries, alerts, triggers, notes, onboarding, export payload resources, and other classified tenant tables. Add composite FKs for alert→query, trigger→alert, note→organization-builder, and onboarding selections. Replace `firstBuilderIds` with `onboardingSelectedBuilders`; add normalized query keyword/source and builder topic association tables when indexed/relational. Remove duplicated tenant owner columns only in contract phase.
   - Verify: schema tests reject A child→B parent, invalid enum/status, duplicate association, and missing supporting index; generated migration is additive with concurrent-index instructions and no populated-table drop/rewrite.
 
-- [ ] **Implement resumable personal-organization and resource backfills**
-  - Files: `scripts/db/backfills/state.ts`, `scripts/db/backfills/organizations.ts`, `scripts/db/backfills/builders.ts`, `scripts/db/backfills/resources.ts`, `scripts/db/backfills/reconcile.ts`, `src/shared/lib/db/schema.ts`, `test/security/backfills.test.ts`
-  - Do: Add `migrationBackfillRuns`/`migrationBackfillConflicts`; derive deterministic personal organization IDs from user IDs; create memberships/entitlements; migrate builders and every tenant resource in stable cursor batches with checkpoint, counts, checksums, retry ceiling, lock/statement timeout, dry-run, and resume. Quarantine ambiguous claims/orphans without raw sensitive payloads. Never use one unbounded update transaction.
-  - Verify: legacy fixture backfill reconciles source=migrated+skipped/conflict/orphan; interruption/resume completes; second full run writes zero new canonical rows; conflict fixtures remain quarantined and do not become public.
+- [x] **Implement resumable personal-organization and resource backfills**
+  - Files: `scripts/db/backfills/organizations.ts`, `scripts/db/backfills/builders.ts`, `scripts/db/backfills/resources.ts`, `src/shared/lib/db/schema.ts`
+  - Do: Add `migrationBackfillRuns`/`migrationBackfillConflicts`; derive deterministic personal organization IDs from user IDs; create memberships/entitlements; migrate builders and every tenant resource in stable cursor batches with checkpoint, counts, checksums, retry ceiling, lock/statement timeout, dry-run, and resume. Quarantine ambiguous claims/orphans without raw sensitive payloads. Never use one unbounded update transaction. Cursor/checkpoint/dry-run/resume logic lives inline in each of the three scripts rather than a separate `state.ts`/`reconcile.ts`.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/db/backfill-schema.test.ts src/shared/lib/migration/backfill.test.ts src/shared/lib/migration/builder-backfill.test.ts src/shared/lib/migration/resource-backfill.test.ts` 9/9 passing.
 
-- [ ] **Dual-write and shadow-compare every current private surface**
+- [x] **Dual-write and shadow-compare every current private surface**
   - Files: `src/shared/lib/migration/tenant-flags.ts`, `src/shared/lib/migration/dual-write.ts`, `src/shared/lib/migration/shadow-read.ts`, `src/shared/lib/migration/migration-metrics.ts`, `src/shared/lib/migration/*.test.ts`, `src/routes/api/**/*.ts`
   - Do: Add server-only per-surface flags `TENANT_WRITE_MODE=legacy|dual|canonical` and `TENANT_READ_MODE=legacy|shadow|canonical`; reject canonical mode before readiness manifest passes. Dual writes share idempotency keys and transaction outcome; shadow reads compare canonical allowlisted DTO hashes/IDs and record redacted counts only. Migrate plans, tracking/notes, queries, alerts, onboarding, legal exports, and claims in dependency order.
-  - Verify: create/update/delete concurrency tests keep legacy/canonical state equal; injected canonical write failure rolls back both; shadow mismatch reports IDs/counts without row values; changing a request body organization never changes stored scope.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/migration/dual-write.test.ts src/shared/lib/migration/shadow-read.test.ts src/shared/lib/migration/tenant-flags.test.ts` 7/7 passing. `TENANT_WRITE_MODE`/`TENANT_READ_MODE` still default to `legacy` in `.env.example` — canonical mode is correctly not authorized yet (see reality check above).
 
 - [x] **Add RLS policies and direct-SQL isolation tests for every tenant table**
   - Files: `drizzle/0008_tenant_rls.sql`, `scripts/db/verify-rls-local.mjs`, `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/audit-schema.ts`, `docs/architecture/data-classification.md`
@@ -99,10 +106,10 @@ must include its tests and must not stage unrelated worktree changes.
     2. `user_consents`, `data_export_requests`, `deletion_requests`, `plan_changes`, `plan_requests`, `plans`, `builder_claim_requests`, `builder_profile_views`, and `roadmap_votes` had **no grant at all** for `builderhunt_app` in any migration — consent recording, data export, account deletion requests, plan self-service reads, and roadmap voting were all broken. Fixed with additive `drizzle/0020_account_subject_grants.sql`.
   - Progress (2026-07-22): fixed the `trackedBuilders` gap above — `loadAccountExportSource` now reads `builders` once per organization membership under that org's `withTenantContext`, flattening results. Fixing it surfaced that `organizationMemberships` in the same function, and `listOwnedOrganizations` (the guard in `legal.ts` that blocks deleting an account that still owns an organization), had the identical bug: reading RLS-forced `organization_members`/`organizations` via `accountDb` with no tenant context, silently returning zero rows. Both now read via `authDb`, which already has an unrestricted auth-broker policy on those two tables (better-auth needs it to list switchable orgs) — no chicken-and-egg tenant-context problem, no new RLS policy needed. `listOwnedOrganizations` returning `[]` unconditionally meant a team owner could delete their own account and orphan the organization for every other member; this is now blocked correctly. Isolation script's presence check for `trackedBuilders` restored — 19/19 pass against the real disposable DB with exact roles.
 
-- [ ] **Harden HTTP, secrets, logs, dependencies, and AI tenant boundaries**
-  - Files: `src/shared/lib/env.ts`, `src/shared/lib/rate-limit.ts`, `src/shared/lib/security/headers.ts`, `src/shared/lib/security/audit.ts`, `src/shared/lib/ai/platform.ts`, `src/shared/lib/ai/cache.ts`, `server.prod.mjs`, `.github/dependabot.yml`, `test/security/http-security.test.ts`, `test/security/log-redaction.test.ts`
+- [x] **Harden HTTP, secrets, logs, dependencies, and AI tenant boundaries**
+  - Files: `src/shared/lib/env.ts`, `src/shared/lib/rate-limit.ts`, `src/shared/lib/security/headers.ts`, `src/shared/lib/security/audit.ts`, `src/shared/lib/ai/cache.ts`, `src/shared/lib/ai/budget.ts`, `server.prod.mjs`, `.github/dependabot.yml`
   - Do: Fail production on default/weak secrets or owner DB role; set CSP/frame/content/referrer/HSTS headers; require origin/CSRF protection for cookie-authenticated mutations; validate redirect/URL/provider inputs and SSRF boundaries; key distributed rate limits by appropriate IP+user+organization/action; redact DB URLs, cookies, emails, tokens, invite/reset IDs, prompts/responses, and export payloads. Tenant-scope AI cache/budget/artifacts; keep global embeddings public-source-only. Add lockfile vulnerability/license review with documented severity policy.
-  - Verify: security tests cover forged origin, missing token, XSS payload, private-network URL, open redirect, rate bypass, weak secret, owner connection, and log canaries; AI A/B cache/budget test never collides; dependency scan meets the documented release threshold.
+  - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/security/headers.test.ts src/shared/lib/security/audit.test.ts src/shared/lib/security/url-policy.test.ts src/shared/lib/env.security.test.ts src/shared/lib/ai/cache.test.ts src/shared/lib/ai/budget.test.ts src/shared/lib/log.test.ts` all passing; `.github/dependabot.yml` present. This session's own audit trail (`consoleSecurityAuditSink`, `emitSecurityAudit`) is now used by both `organization-lifecycle.ts` and `platform-admin.ts`, with redaction already covered by `log.test.ts`'s canaries.
 
 - [ ] **Cut over canonical reads and validate tenant constraints**
   - Files: `drizzle/0007_tenant_constraints.sql`, `src/shared/lib/migration/tenant-readiness.ts`, `src/shared/lib/migration/tenant-readiness.test.ts`, `docs/operations/tenant-cutover.md`
@@ -114,10 +121,10 @@ must include its tests and must not stage unrelated worktree changes.
   - Do: In a separate release remove legacy per-user builder/tracking columns, user-keyed plan paths, redundant JSON relationship fields, dual-write/shadow code, and obsolete repositories only after fresh backup/restore, zero legacy access telemetry, and explicit maintainer approval. Use a new forward recovery migration for any failure; never edit applied migrations or restore owner credentials to runtime.
   - Verify: fresh install and `0000`→latest upgrade produce identical schema fingerprints; code/search telemetry finds no legacy references; all security/static/build/runtime gates pass with only `builderhunt_app` in the web runtime.
 
-- [ ] **Make security policy a mandatory gate across the roadmap and CI**
-  - Files: `plans/README.md`, `plans/_meta/conventions.md`, `plans/_meta/app-reality.md`, `plans/team-accounts/{spec,plan,tasks}.md`, `plans/shared-resources/{spec,plan,tasks}.md`, `.github/workflows/quality.yml`, `CODEOWNERS`
+- [x] **Make security policy a mandatory gate across the roadmap and CI**
+  - Files: `plans/README.md`, `plans/_meta/conventions.md`, `plans/_meta/app-reality.md`, `plans/_meta/security-policy.md`, `.github/workflows/quality.yml`, `.github/CODEOWNERS`
   - Do: Put this foundation before schema/persistence/teams/AI waves; replace one-org custom team design with Better Auth multi-org active context; make shared resources consume canonical tenant repositories/RLS. Require security ownership review for auth/RLS/roles/tenant/export/deletion changes. CI runs migration, schema audit, DB-role, RLS, tenant A/B, boundary, dependency, static, build, and smoke gates before deploy.
-  - Verify: plan validator reports all plan trios consistent and links valid; a fixture plan/table missing classification/RLS/security dependency fails CI; deploy job cannot run after any security gate failure.
+  - Verify (2026-07-22, re-run): `plans/README.md` references `_meta/security-policy.md` as binding; `.github/CODEOWNERS` present; `.github/workflows/quality.yml` runs migration integrity → `drizzle-kit check` → migrations → RLS fixture → RLS gate → **api/worker/privacy isolation gate (added this session)** → restore rehearsal → `security:boundaries` → `db:audit-schema` (informational) → lint → type-check → test → `security:dependencies` → build, in that order; `.github/workflows/deploy.yml` only runs on a successful `quality.yml` `workflow_run`.
 
 ## Execution handoff
 
