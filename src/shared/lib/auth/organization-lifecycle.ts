@@ -734,3 +734,56 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
   cached = createOrganizationLifecycle(realDependencies)
   return cached
 }
+
+export interface MyOrganizationRecord {
+  organization: OrganizationRecord
+  role: OrganizationRole
+  isPersonal: boolean
+}
+
+/**
+ * "Which organizations am I in, and what's my role in each" — the read the
+ * Team-account switcher/settings surfaces need. Reads via authDb: like
+ * account-privacy.ts's `memberships` query, `organization_members`/
+ * `organizations` are RLS-forced by `organization_id`, and this is exactly
+ * the query that discovers those ids in the first place, so it can't be
+ * scoped to any single one. authDb already carries an unrestricted
+ * auth-broker policy on both tables (better-auth needs it to list
+ * switchable orgs) — no chicken-and-egg tenant-context problem.
+ */
+export async function listMyOrganizations(userId: string): Promise<MyOrganizationRecord[]> {
+  const [{ eq }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizations, organizationMembers } = schema
+
+  const rows = await authDb
+    .select({
+      id: organizations.id,
+      name: organizations.name,
+      slug: organizations.slug,
+      metadata: organizations.metadata,
+      role: organizationMembers.role,
+    })
+    .from(organizationMembers)
+    .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
+    .where(eq(organizationMembers.userId, userId))
+
+  return rows.map((row) => ({
+    organization: { id: row.id, name: row.name, slug: row.slug },
+    role: row.role as OrganizationRole,
+    isPersonal: isPersonalOrganizationMetadata(row.metadata),
+  }))
+}
+
+function isPersonalOrganizationMetadata(metadata: string | null): boolean {
+  if (!metadata) return false
+  try {
+    const parsed = JSON.parse(metadata) as { kind?: string }
+    return parsed?.kind === 'personal'
+  } catch {
+    return false
+  }
+}

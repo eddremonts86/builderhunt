@@ -10,6 +10,7 @@ import { BackToTop } from '~/shared/components/BackToTop'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 import { Tooltip, FLOATING_UI_Z } from '~/shared/components/Tooltip'
 import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
+import { OrganizationSwitcher } from '~/modules/dashboard/components/OrganizationSwitcher'
 
 /** Primary sections — rendered as icon pills in the floating topbar. */
 const NAV = [
@@ -208,6 +209,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
+          <OrganizationSwitcher />
           <Tooltip label="Account">
             <Link
               to="/me"

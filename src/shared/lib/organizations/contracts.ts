@@ -9,17 +9,18 @@
  */
 import type { OrganizationRole, PermissionAction, ResourceAuthorizationContext, TenantPrincipal } from '../authorization/permissions'
 import { can } from '../authorization/permissions'
-import type { InvitableRole, InvitationRecord, OrganizationRecord } from '../auth/organization-lifecycle'
+import type { InvitableRole, InvitationRecord, MyOrganizationRecord, OrganizationRecord } from '../auth/organization-lifecycle'
 import {
   getOrganizationLifecycle,
+  listMyOrganizations,
   OrganizationLifecycleError,
   SeatLimitExceededError,
 } from '../auth/organization-lifecycle'
 import { requireTenantPrincipal, TenantAuthorizationError } from '../auth/tenant-principal'
 
 export type { OrganizationRole, PermissionAction, ResourceAuthorizationContext, TenantPrincipal }
-export type { InvitableRole }
-export { can, getOrganizationLifecycle, requireTenantPrincipal }
+export type { InvitableRole, MyOrganizationRecord }
+export { can, getOrganizationLifecycle, listMyOrganizations, requireTenantPrincipal }
 export { OrganizationLifecycleError, SeatLimitExceededError, TenantAuthorizationError }
 
 export interface OrganizationSummaryDto {
@@ -57,6 +58,10 @@ export function toOrganizationSummaryDto(
   isPersonal: boolean,
 ): OrganizationSummaryDto {
   return { id: organization.id, name: organization.name, slug: organization.slug, role, isPersonal }
+}
+
+export function toOrganizationSummaryDtoList(records: MyOrganizationRecord[]): OrganizationSummaryDto[] {
+  return records.map((record) => toOrganizationSummaryDto(record.organization, record.role, record.isPersonal))
 }
 
 export function toInvitationSummaryDto(invitation: InvitationRecord): InvitationSummaryDto {

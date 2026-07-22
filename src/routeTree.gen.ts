@@ -36,6 +36,7 @@ import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
 import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
+import { Route as ApiOrganizationsIndexRouteImport } from './routes/api/organizations/index'
 import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
 import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
 import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
@@ -257,6 +258,11 @@ const ApiRecommendationsIndexRoute = ApiRecommendationsIndexRouteImport.update({
 const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
   id: '/api/queries/',
   path: '/api/queries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOrganizationsIndexRoute = ApiOrganizationsIndexRouteImport.update({
+  id: '/api/organizations/',
+  path: '/api/organizations/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiIncidentsIndexRoute = ApiIncidentsIndexRouteImport.update({
@@ -796,6 +802,7 @@ export interface FileRoutesByFullPath {
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
+  '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
@@ -911,6 +918,7 @@ export interface FileRoutesByTo {
   '/api/changelog': typeof ApiChangelogIndexRoute
   '/api/consent': typeof ApiConsentIndexRoute
   '/api/incidents': typeof ApiIncidentsIndexRoute
+  '/api/organizations': typeof ApiOrganizationsIndexRoute
   '/api/queries': typeof ApiQueriesIndexRoute
   '/api/recommendations': typeof ApiRecommendationsIndexRoute
   '/api/roadmap': typeof ApiRoadmapIndexRoute
@@ -1030,6 +1038,7 @@ export interface FileRoutesById {
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
+  '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
@@ -1148,6 +1157,7 @@ export interface FileRouteTypes {
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
+    | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
     | '/api/roadmap/'
@@ -1263,6 +1273,7 @@ export interface FileRouteTypes {
     | '/api/changelog'
     | '/api/consent'
     | '/api/incidents'
+    | '/api/organizations'
     | '/api/queries'
     | '/api/recommendations'
     | '/api/roadmap'
@@ -1381,6 +1392,7 @@ export interface FileRouteTypes {
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
+    | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
     | '/api/roadmap/'
@@ -1467,6 +1479,7 @@ export interface RootRouteChildren {
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
   ApiIncidentsIndexRoute: typeof ApiIncidentsIndexRoute
+  ApiOrganizationsIndexRoute: typeof ApiOrganizationsIndexRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
   ApiRoadmapIndexRoute: typeof ApiRoadmapIndexRoute
@@ -1691,6 +1704,13 @@ declare module '@tanstack/react-router' {
       path: '/api/queries'
       fullPath: '/api/queries/'
       preLoaderRoute: typeof ApiQueriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/': {
+      id: '/api/organizations/'
+      path: '/api/organizations'
+      fullPath: '/api/organizations/'
+      preLoaderRoute: typeof ApiOrganizationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/incidents/': {
@@ -2520,6 +2540,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
   ApiIncidentsIndexRoute: ApiIncidentsIndexRoute,
+  ApiOrganizationsIndexRoute: ApiOrganizationsIndexRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
   ApiRoadmapIndexRoute: ApiRoadmapIndexRoute,
