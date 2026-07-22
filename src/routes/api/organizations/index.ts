@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { generateOrganizationSlug, getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
+import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { listMyOrganizations, toOrganizationSummaryDtoList } from '~/shared/lib/organizations/contracts'
 
 const CreateBody = z.object({
@@ -42,12 +43,33 @@ export const Route = createFileRoute('/api/organizations/')({
           return Response.json({ error: 'Failed to create organization' }, { status: 500 })
         }
       },
+
+      // Deletes the caller's own active organization — never a client-chosen
+      // one — via `requireTenantPrincipal`. `deleteOrganization` itself
+      // enforces owner-only + recent-auth.
+      DELETE: async ({ request }) => {
+        try {
+          const principal = await requireTenantPrincipal(request)
+          const lifecycle = await getOrganizationLifecycle()
+          await lifecycle.deleteOrganization(request, principal.organizationId)
+          return Response.json({ ok: true })
+        } catch (error) {
+          const response = lifecycleErrorResponse(error)
+          if (response) return response
+          console.error('Organization delete error:', error)
+          return Response.json({ error: 'Failed to delete organization' }, { status: 500 })
+        }
+      },
     },
   },
 })
 
 function lifecycleErrorResponse(error: unknown) {
-  return error instanceof OrganizationLifecycleError
-    ? Response.json({ error: error.message }, { status: error.status })
-    : null
+  if (error instanceof OrganizationLifecycleError) {
+    return Response.json({ error: error.message }, { status: error.status })
+  }
+  if (error instanceof TenantAuthorizationError) {
+    return Response.json({ error: error.message }, { status: error.status })
+  }
+  return null
 }

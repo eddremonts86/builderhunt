@@ -376,7 +376,11 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
   async function removeMember(request: Request, organizationId: string, targetUserId: string): Promise<void> {
     const session = await requireSession(request, deps)
     const membership = await requireMembership(deps, session.userId, organizationId)
-    requireElevated(membership)
+    // Any member may remove themselves (leave) without elevation — only
+    // removing someone ELSE requires being an owner/admin.
+    if (targetUserId !== session.userId) {
+      requireElevated(membership)
+    }
     requireRecentAuthentication(session, deps)
 
     const target = await deps.findMembership(targetUserId, organizationId)
