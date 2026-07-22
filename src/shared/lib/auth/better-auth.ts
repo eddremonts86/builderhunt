@@ -50,11 +50,28 @@ export const auth = betterAuth({
     // signed-in user has no active organization and every tenant-scoped
     // route 403s via requireTenantPrincipal. Default to the user's earliest
     // membership (their personal workspace, created at signup).
+    //
+    // On a brand-new sign-up this hook fires before `ensurePersonalOrganization`
+    // (`user.create.after`) has actually run: better-auth's sign-up endpoint
+    // wraps user creation AND session creation in one `runWithTransaction`,
+    // and `create.after` hooks are queued via `queueAfterTransactionHook`
+    // (node_modules/@better-auth/core/dist/context/transaction.mjs) to fire
+    // only after that whole wrapped function resolves — which includes this
+    // very session-creation call. So the first lookup below reliably finds
+    // no membership yet. `ensurePersonalOrganization` is idempotent (its SQL
+    // uses `ON CONFLICT ... DO NOTHING`), so calling it here and re-querying
+    // is safe and self-healing regardless of better-auth's internal hook
+    // ordering, without adding a DB round trip to the common (existing-user
+    // sign-in) path.
     session: {
       create: {
         before: async (session) => {
           if (session.activeOrganizationId) return
-          const organizationId = await pickDefaultActiveOrganizationId(session.userId)
+          let organizationId = await pickDefaultActiveOrganizationId(session.userId)
+          if (!organizationId) {
+            await ensurePersonalOrganization(session.userId)
+            organizationId = await pickDefaultActiveOrganizationId(session.userId)
+          }
           if (!organizationId) return
           return { data: { activeOrganizationId: organizationId } }
         },

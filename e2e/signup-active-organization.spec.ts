@@ -31,14 +31,8 @@ const PASSWORD = 'e2e-Test-Passw0rd!'
  * Hits the sign-up endpoint directly (no UI, no reload, no manual org pick)
  * and asserts the very first session row already has a non-null
  * `active_organization_id` pointing at the user's personal workspace.
- *
- * Currently failing against real Postgres/better-auth — confirmed via this
- * exact test. Fixing the hook-ordering race is out of scope for the
- * team-accounts plan (auth infrastructure, not team-account behavior) and is
- * tracked as a standalone follow-up. Marked fixme so it documents the bug
- * without failing CI; flip to `test(...)` once the race is fixed.
  */
-test.fixme('a fresh sign-up session has a non-null active organization immediately', async ({ request }) => {
+test('a fresh sign-up session has a non-null active organization immediately', async ({ request }) => {
   const email = uniqueEmail('signup-active-org')
   const response = await request.post('/api/auth/sign-up/email', {
     data: { email, name: 'Active Org Test', password: PASSWORD },
