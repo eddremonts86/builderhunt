@@ -12,9 +12,10 @@ export const getAppAuthSession = createServerFn({ method: 'GET' }).handler(async
       email: session?.user?.email ?? null,
       name: session?.user?.name ?? null,
       image: session?.user?.image ?? null,
+      activeOrganizationId: session?.session?.activeOrganizationId ?? null,
     }
   } catch {
-    return { userId: null, email: null, name: null, image: null }
+    return { userId: null, email: null, name: null, image: null, activeOrganizationId: null }
   }
 })
 
