@@ -386,6 +386,30 @@ export const onboardingProgress = pgTable(
   }),
 )
 
+// `builderRef` stores the same opaque, source-specific id (e.g. `gh-123`,
+// `cb-repo-456`) that /api/search/builders already returns per result — these
+// are onboarding-time search picks, not FKs to `organizationBuilders`, since
+// the builder is frequently never imported/tracked at selection time.
+export const onboardingSelectedBuilders = pgTable(
+  'onboarding_selected_builders',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => onboardingProgress.userId, { onDelete: 'cascade' }),
+    builderRef: text('builder_ref').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('onboarding_selected_builders_user_builder_unique').on(table.userId, table.builderRef),
+    index('onboarding_selected_builders_organization_idx').on(table.organizationId),
+    foreignKey({
+      columns: [table.organizationId, table.userId],
+      foreignColumns: [onboardingProgress.organizationId, onboardingProgress.userId],
+      name: 'onboarding_selected_builders_organization_user_fk',
+    }),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // Status & Trust (Plan: status-and-trust)
 // ---------------------------------------------------------------------------

@@ -8,8 +8,9 @@
  * connection settings instead of a global unscoped `db` handle.
  */
 import { and, eq, sql } from 'drizzle-orm'
+import { randomId } from '~/lib/utils'
 import type { TenantTransaction } from '~/shared/lib/db/client'
-import { builders, onboardingProgress, savedQueries } from '~/shared/lib/db/schema'
+import { builders, onboardingProgress, onboardingSelectedBuilders, savedQueries } from '~/shared/lib/db/schema'
 
 export const STARTER_QUERIES = [
   'rust async runtime',
@@ -58,13 +59,18 @@ export async function getOnboardingStatus(
     }
   }
 
+  const selectedBuilders = await transaction
+    .select({ builderRef: onboardingSelectedBuilders.builderRef })
+    .from(onboardingSelectedBuilders)
+    .where(eq(onboardingSelectedBuilders.userId, userId))
+
   return {
     step: row.step,
     completed: row.completed,
     skipped: row.skipped,
     skippedCount: row.skippedCount,
     firstQueryId: row.firstQueryId,
-    firstBuilderIds: row.firstBuilderIds ?? [],
+    firstBuilderIds: selectedBuilders.map((selection) => selection.builderRef),
     eligible: await isEligibleForOnboarding(transaction, userId, row),
   }
 }
@@ -125,14 +131,18 @@ export async function advanceOnboarding(
     update.completedAt = new Date()
   }
 
-  if (patch.addBuilderId) {
-    update.firstBuilderIds = sql`COALESCE(${onboardingProgress.firstBuilderIds}, '[]'::jsonb) || ${JSON.stringify([patch.addBuilderId])}::jsonb`
-  }
-
   await transaction
     .update(onboardingProgress)
     .set(update)
     .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
+
+  if (patch.addBuilderId) {
+    await transaction
+      .insert(onboardingSelectedBuilders)
+      .values({ id: randomId(), organizationId, userId, builderRef: patch.addBuilderId })
+      .onConflictDoNothing()
+  }
+
   return getOnboardingStatus(transaction, organizationId, userId)
 }
 

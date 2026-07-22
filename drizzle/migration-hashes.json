@@ -84,6 +84,10 @@
     "0020_account_subject_grants": {
       "sql": "0b88ea88b1b387fa753689ed1656c41312a4c04604dd95d54c3f3e40ad86dadc",
       "snapshot": "38adc09bef48b5655879d199e35673c5f1446be5427d41341e1acf465c77f45e"
+    },
+    "0021_onboarding_selected_builders": {
+      "sql": "139310d485ff8e19d4d217057fae3a207c62315ac58d74b2e275870cf84a9c6f",
+      "snapshot": "1a82553e82035b1abe339b7569dce58e3e777259478a510ec04ba604d45b4f05"
     }
   }
 }

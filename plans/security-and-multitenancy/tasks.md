@@ -5,7 +5,7 @@
 > **Blocks**: [`team-accounts`](../team-accounts/tasks.md), [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md), [`ai-expansion`](../ai-expansion/tasks.md), [`semantic-search`](../semantic-search/tasks.md), [`ai-sourcing-sprints`](../ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../production-infrastructure/tasks.md)
 > **Reality check** (reconciled 2026-07-22): 15 of 19 tasks below are checked off with re-verified
 > evidence (test commands re-run this session, not just trusted from history) — migrations `0000`–
-> `0020`, RLS, migration/restore infra, tenant principals/context, permissions/boundary, builder
+> `0021`, RLS, migration/restore infra, tenant principals/context, permissions/boundary, builder
 > identity split, entitlements, backfills, dual-write/shadow, organization invitations/lifecycle,
 > platform-admin auth, and HTTP/secrets/AI hardening. `pnpm security:boundaries` reports **0**
 > tracked legacy direct-db imports. A real disposable-local-DB run with exact
@@ -14,13 +14,14 @@
 > matrix — this run itself found and fixed several real permission bugs (auth-broker access gaps,
 > 9 ungranted account-subject tables, silently-empty cross-org membership reads) that had never been
 > exercised against real least-privilege roles before. Still open: task 2 (plan-coverage test — needs
-> a new route-annotation convention across ~34 routes), task 11 (replace `firstBuilderIds` with a
-> normalized table — needs a decision on whether it references `builders` or `organizationBuilders`),
-> the remainder of task 15 (full ~34-route tenant-repository migration, not just the isolation
-> subset), and tasks 17/18 (canonical cutover, contract migration) which remain correctly blocked:
-> `organization_id` is still nullable on most tenant tables and `.env.example` still defaults both
-> tenant migration modes to `legacy` pending a real 24h zero-mismatch observation window in an actual
-> deployed environment.
+> a new route-annotation convention across ~34 routes), the rest of task 11 (`firstBuilderIds` →
+> `onboardingSelectedBuilders` is done — decided in favor of a source-opaque `builderRef`, not an FK
+> to `organizationBuilders`, since onboarding picks are frequently never tracked; the normalized
+> query-keyword/source and builder-topic association tables remain), the remainder of task 15 (full
+> ~34-route tenant-repository migration, not just the isolation subset), and tasks 17/18 (canonical
+> cutover, contract migration) which remain correctly blocked: `organization_id` is still nullable on
+> most tenant tables and `.env.example` still defaults both tenant migration modes to `legacy` pending
+> a real 24h zero-mismatch observation window in an actual deployed environment.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
@@ -76,9 +77,10 @@ must include its tests and must not stage unrelated worktree changes.
   - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/repositories/entitlements.test.ts src/shared/lib/db/entitlements-schema.test.ts src/shared/lib/billing.test.ts` 18/18 passing.
 
 - [ ] **Add tenant keys and organization-preserving integrity to current private resources**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0005_tenant_expand.sql`, `src/shared/lib/repositories/saved-queries.ts`, `src/shared/lib/repositories/alerts.ts`, `src/shared/lib/repositories/builder-notes.ts`, `src/shared/lib/repositories/onboarding.ts`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0003_tenant_expand.sql`, `src/shared/lib/repositories/saved-queries.ts`, `src/shared/lib/repositories/organization-alerts.ts`, `src/shared/lib/onboarding.ts`
   - Do: Add nullable `organization_id` plus `(organization_id,id)` candidate keys to saved queries, alerts, triggers, notes, onboarding, export payload resources, and other classified tenant tables. Add composite FKs for alert→query, trigger→alert, note→organization-builder, and onboarding selections. Replace `firstBuilderIds` with `onboardingSelectedBuilders`; add normalized query keyword/source and builder topic association tables when indexed/relational. Remove duplicated tenant owner columns only in contract phase.
   - Verify: schema tests reject A child→B parent, invalid enum/status, duplicate association, and missing supporting index; generated migration is additive with concurrent-index instructions and no populated-table drop/rewrite.
+  - Progress (2026-07-22): `firstBuilderIds` → `onboardingSelectedBuilders` done — `drizzle/0021_onboarding_selected_builders.sql` adds a normalized `onboarding_selected_builders(id, organization_id, user_id, builder_ref, created_at)` table (composite FK to `onboarding_progress.(organization_id, user_id)`, unique on `(user_id, builder_ref)`, its own RLS policies/grants mirroring `0008_tenant_rls.sql`'s pattern) and `onboarding.ts` now reads/writes through it instead of a jsonb array. `builderRef` intentionally stores the same opaque, source-specific string (`gh-123`, `cb-repo-456`) `/api/search/builders` already returns — it is **not** an FK to `organizationBuilders`, since onboarding-time picks are frequently never tracked/imported. Verified for real against a disposable DB with the exact `builderhunt_app` role: insert, duplicate-insert dedup, and multi-add all work correctly (`{"firstBuilderIds":["gh-123","gh-456"]}`); the old `first_builder_ids` jsonb column is left in place, unused, per the "remove only in contract phase" rule. Still open: the normalized query-keyword/source and builder-topic association tables this task also calls for.
 
 - [x] **Implement resumable personal-organization and resource backfills**
   - Files: `scripts/db/backfills/organizations.ts`, `scripts/db/backfills/builders.ts`, `scripts/db/backfills/resources.ts`, `src/shared/lib/db/schema.ts`
