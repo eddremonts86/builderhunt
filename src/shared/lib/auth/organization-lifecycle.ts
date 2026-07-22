@@ -48,6 +48,18 @@ export function normalizeInvitationEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
+/** A random suffix sidesteps `organizations.slug`'s unique constraint without a create-time collision retry loop — nothing today surfaces the slug to users, so a friendly one isn't worth the extra round trip. */
+export function generateOrganizationSlug(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  const suffix = crypto.randomUUID().slice(0, 8)
+  return base ? `${base}-${suffix}` : `team-${suffix}`
+}
+
 export type InvitableRole = Exclude<OrganizationRole, 'owner'>
 
 export interface LifecycleSession {

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Building2, Check, ChevronDown } from 'lucide-react'
+import { Building2, Check, ChevronDown, Plus } from 'lucide-react'
 import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
@@ -29,7 +29,10 @@ export function OrganizationSwitcher() {
   const [open, setOpen] = React.useState(false)
   const [switchingTo, setSwitchingTo] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
-  const [coords, setCoords] = React.useState({ top: 0, left: 0 })
+  const [creating, setCreating] = React.useState(false)
+  const [newTeamName, setNewTeamName] = React.useState('')
+  const [createBusy, setCreateBusy] = React.useState(false)
+  const [coords, setCoords] = React.useState({ top: 0, right: 0 })
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
 
@@ -43,7 +46,12 @@ export function OrganizationSwitcher() {
   const reposition = React.useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
-    setCoords({ top: rect.bottom + 8, left: rect.right })
+    // Right-edge anchoring in plain pixels, not `left` + `transform:
+    // translateX(-100%)` — the panel's `animate-fade-in-up` class runs a CSS
+    // animation on the `transform` property itself, which overrides any
+    // static inline transform value for the entire lifetime of the element
+    // (fill-mode `both`), silently discarding a positioning translate.
+    setCoords({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
   }, [])
 
   React.useEffect(() => {
@@ -101,6 +109,36 @@ export function OrganizationSwitcher() {
     }
   }
 
+  async function handleCreate(event: React.FormEvent) {
+    event.preventDefault()
+    const name = newTeamName.trim()
+    if (!name) return
+    setCreateBusy(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/organizations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(typeof body.error === 'string' ? body.error : 'Failed to create team')
+      }
+      setNewTeamName('')
+      setCreating(false)
+      // Reuses the switch flow so the freshly created org becomes active and
+      // every cached query clears, instead of leaving the new membership
+      // sitting unselected in a stale-until-refresh list.
+      await handleSwitch(body.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create team')
+    } finally {
+      setCreateBusy(false)
+    }
+  }
+
   if (organizations.length === 0) return null
 
   const trigger = (
@@ -128,7 +166,7 @@ export function OrganizationSwitcher() {
           role="menu"
           aria-label="Organizations"
           className="fixed min-w-[220px] bg-bh-surface border border-bh-border rounded-2xl shadow-lg p-1.5 animate-fade-in-up"
-          style={{ zIndex: FLOATING_UI_Z, top: coords.top, left: coords.left, transform: 'translateX(-100%)' }}
+          style={{ zIndex: FLOATING_UI_Z, top: coords.top, right: coords.right }}
         >
           {error && <p className="px-3 py-1.5 text-xs text-bh-danger" role="alert">{error}</p>}
           {organizations.map((org) => {
@@ -159,6 +197,41 @@ export function OrganizationSwitcher() {
               </button>
             )
           })}
+
+          <div className="mt-1 pt-1 border-t border-bh-border/60">
+            {creating ? (
+              <form onSubmit={handleCreate} className="flex items-center gap-1.5 px-1 py-1">
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={newTeamName}
+                  onChange={(e) => setNewTeamName(e.target.value)}
+                  placeholder="Team name"
+                  disabled={createBusy}
+                  aria-label="New team name"
+                  className="flex-1 min-w-0 text-sm rounded-lg border border-bh-border bg-bh-surface px-2 py-1"
+                />
+                <button
+                  type="submit"
+                  disabled={createBusy || newTeamName.trim().length < 2}
+                  className="btn-primary btn-sm shrink-0"
+                  aria-label="Create team"
+                >
+                  {createBusy ? '…' : 'Create'}
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-left text-bh-text-muted hover:text-bh-text hover:bg-bh-bg-alt transition-colors duration-150"
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                Create team
+              </button>
+            )}
+          </div>
         </div>,
         document.body,
       )}
