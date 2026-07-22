@@ -37,7 +37,7 @@ export const Route = createFileRoute('/api/me/delete-account/')({
           return Response.json({ ok: true, ...result })
         } catch (err) {
           if (err instanceof AccountDeletionOwnershipError) {
-            return Response.json({ error: err.message, organizationIds: err.organizationIds }, { status: err.status })
+            return Response.json({ error: err.message, organizations: err.organizations }, { status: err.status })
           }
           console.error('delete account error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
@@ -47,8 +47,8 @@ export const Route = createFileRoute('/api/me/delete-account/')({
         try {
           const session = await auth.api.getSession({ headers: request.headers })
           if (!session?.user?.id) return Response.json({ error: 'Unauthorized' }, { status: 401 })
-          await cancelDeletion(session.user.id)
-          return Response.json({ ok: true })
+          const [cancelled] = await cancelDeletion(session.user.id)
+          return Response.json({ ok: true, requestId: cancelled?.id ?? null })
         } catch (err) {
           console.error('cancel deletion error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })

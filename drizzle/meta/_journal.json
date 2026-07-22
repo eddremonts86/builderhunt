@@ -162,6 +162,13 @@
       "when": 1784731409584,
       "tag": "0022_platform_plan_entitlement_sync",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1784740010754,
+      "tag": "0023_organization_deletion_requests",
+      "breakpoints": true
     }
   ]
 }

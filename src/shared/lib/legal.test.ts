@@ -3,24 +3,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mocks = vi.hoisted(() => ({
   listExpiredPendingDeletionRequests: vi.fn(),
   hardDeleteAccountSubject: vi.fn(),
-  listOwnedOrganizations: vi.fn(),
+  listOwnedOrganizationsWithOtherMembers: vi.fn(),
   updateDeletionRequest: vi.fn(),
   loadAccountExportSource: vi.fn(),
   findAccountEmail: vi.fn(),
   sendDeletionCompletedEmail: vi.fn(),
+  findDeletionRequest: vi.fn(),
+  insertDeletionRequest: vi.fn(),
 }))
 
 vi.mock('~/shared/lib/repositories/account-privacy', () => ({
   listExpiredPendingDeletionRequests: mocks.listExpiredPendingDeletionRequests,
   hardDeleteAccountSubject: mocks.hardDeleteAccountSubject,
-  listOwnedOrganizations: mocks.listOwnedOrganizations,
+  listOwnedOrganizationsWithOtherMembers: mocks.listOwnedOrganizationsWithOtherMembers,
   updateDeletionRequest: mocks.updateDeletionRequest,
   loadAccountExportSource: mocks.loadAccountExportSource,
   findAccountEmail: mocks.findAccountEmail,
   cancelPendingDeletion: vi.fn(),
-  findDeletionRequest: vi.fn(),
+  findDeletionRequest: mocks.findDeletionRequest,
   insertAccountConsent: vi.fn(),
-  insertDeletionRequest: vi.fn(),
+  insertDeletionRequest: mocks.insertDeletionRequest,
   listAccountConsents: vi.fn(),
 }))
 
@@ -29,11 +31,14 @@ vi.mock('~/shared/lib/email', () => ({
 }))
 
 import {
+  AccountDeletionOwnershipError,
   CURRENT_CONSENT_VERSIONS,
   GRACE_PERIOD_MS,
   EXPORT_TTL_MS,
   buildExportPayload,
+  performHardDelete,
   processPendingDeletions,
+  requestDeletion,
   type ConsentDocument,
 } from './legal'
 
@@ -63,7 +68,7 @@ describe('legal constants', () => {
 describe('processPendingDeletions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.listOwnedOrganizations.mockResolvedValue([])
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([])
     mocks.findAccountEmail.mockResolvedValue(null)
     mocks.sendDeletionCompletedEmail.mockResolvedValue({ ok: true })
   })
@@ -155,13 +160,73 @@ describe('processPendingDeletions', () => {
     // ownership changed after the request was created, performHardDelete would throw and
     // the request should be retried on the next run rather than silently skipped.
     mocks.listExpiredPendingDeletionRequests.mockResolvedValue([{ id: 'req-1', userId: 'user-1' }])
-    mocks.listOwnedOrganizations.mockResolvedValue([{ organizationId: 'org-1' }])
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([{ organizationId: 'org-1', organizationName: 'Acme' }])
 
     const result = await processPendingDeletions()
 
     expect(result).toEqual({ processed: 0, errors: 1 })
     expect(mocks.hardDeleteAccountSubject).not.toHaveBeenCalled()
     expect(mocks.updateDeletionRequest).not.toHaveBeenCalled()
+  })
+})
+
+describe('requestDeletion / performHardDelete — ownership guard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.findDeletionRequest.mockResolvedValue(null)
+    mocks.insertDeletionRequest.mockResolvedValue(undefined)
+  })
+
+  it('allows a sole owner of a solo (personal) organization to schedule deletion', async () => {
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([])
+
+    const result = await requestDeletion('user-1')
+
+    expect(result.alreadyPending).toBe(false)
+    expect(mocks.insertDeletionRequest).toHaveBeenCalled()
+  })
+
+  it('blocks scheduling deletion while the user owns an organization with other members', async () => {
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Acme' },
+    ])
+
+    await expect(requestDeletion('user-1')).rejects.toThrow(AccountDeletionOwnershipError)
+    expect(mocks.insertDeletionRequest).not.toHaveBeenCalled()
+  })
+
+  it('carries the blocking organizations (id + name) on the thrown error, for the UI to link into a transfer flow', async () => {
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Acme' },
+      { organizationId: 'org-2', organizationName: 'Widgets Co' },
+    ])
+
+    const error = await requestDeletion('user-1').catch((e) => e)
+    expect(error).toBeInstanceOf(AccountDeletionOwnershipError)
+    expect(error.organizations).toEqual([
+      { organizationId: 'org-1', organizationName: 'Acme' },
+      { organizationId: 'org-2', organizationName: 'Widgets Co' },
+    ])
+  })
+
+  it('transferring ownership away unblocks scheduling (guard re-reads live state each call)', async () => {
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValueOnce([
+      { organizationId: 'org-1', organizationName: 'Acme' },
+    ])
+    await expect(requestDeletion('user-1')).rejects.toThrow(AccountDeletionOwnershipError)
+
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValueOnce([])
+    const result = await requestDeletion('user-1')
+    expect(result.alreadyPending).toBe(false)
+  })
+
+  it('performHardDelete re-checks ownership too, as defense in depth against a stale scheduled request', async () => {
+    mocks.listOwnedOrganizationsWithOtherMembers.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Acme' },
+    ])
+
+    await expect(performHardDelete('user-1')).rejects.toThrow(AccountDeletionOwnershipError)
+    expect(mocks.hardDeleteAccountSubject).not.toHaveBeenCalled()
   })
 })
 
