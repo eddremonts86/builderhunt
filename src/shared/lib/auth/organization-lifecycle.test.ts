@@ -44,6 +44,7 @@ function buildDeps(overrides: Partial<LifecycleDependencies> = {}): LifecycleDep
     getSession: vi.fn().mockResolvedValue(session()),
     findMembership: vi.fn().mockResolvedValue(null),
     countSeats: vi.fn().mockResolvedValue(1),
+    isPersonalOrganization: vi.fn().mockResolvedValue(false),
     membershipLimit: 10,
     createOrganization: vi.fn().mockResolvedValue({ id: 'org-1', name: 'Acme', slug: 'acme' }),
     setActiveOrganization: vi.fn().mockResolvedValue(undefined),
@@ -146,6 +147,19 @@ describe('inviteMember', () => {
     await expect(
       lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' }),
     ).rejects.toMatchObject({ status: 403 })
+    expect(deps.createInvitation).not.toHaveBeenCalled()
+  })
+
+  it('rejects invites to a personal organization, even from its owner', async () => {
+    const deps = buildDeps({
+      findMembership: vi.fn().mockResolvedValue(membership('owner')),
+      isPersonalOrganization: vi.fn().mockResolvedValue(true),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(
+      lifecycle.inviteMember(request, { organizationId: 'org-1', email: 'x@example.com', role: 'member' }),
+    ).rejects.toMatchObject({ status: 400 })
     expect(deps.createInvitation).not.toHaveBeenCalled()
   })
 
