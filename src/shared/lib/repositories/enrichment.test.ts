@@ -40,7 +40,7 @@ describe('enrichment repository boundary', () => {
 
   it('the admin run-worker route requires admin auth with no caller-selected target', async () => {
     const source = await readFile('src/routes/api/admin/enrichment/run-worker.ts', 'utf8')
-    expect(source).toContain('isAdmin')
+    expect(source).toContain('requirePlatformAdminPrincipal')
     expect(source).not.toContain('params.')
   })
 })

@@ -21,7 +21,7 @@ describe('account privacy repository boundary', () => {
 describe('legal admin run-worker route', () => {
   it('requires admin auth and selects no caller-provided target', async () => {
     const source = await readFile('src/routes/api/admin/legal/run-worker.ts', 'utf8')
-    expect(source).toContain('isAdmin')
+    expect(source).toContain('requirePlatformAdminPrincipal')
     expect(source).not.toContain('params.')
     expect(source).toContain('processPendingDeletions')
   })

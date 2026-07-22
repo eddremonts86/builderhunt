@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { auth } from '~/shared/lib/auth/better-auth'
+import { parseAdminUserIds } from '~/shared/lib/auth/platform-admin'
 
 export const getAppAuthSession = createServerFn({ method: 'GET' }).handler(async () => {
   try {
@@ -34,8 +35,8 @@ export const getIsAppAdmin = createServerFn({ method: 'GET' }).handler(async () 
     const session = await auth.api.getSession({ headers })
     const userId = session?.user?.id
     if (!userId) return false
-    const adminIds = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-    return adminIds.length > 0 && adminIds.includes(userId)
+    const adminIds = parseAdminUserIds(process.env.ADMIN_USER_IDS)
+    return adminIds.has(userId)
   } catch {
     return false
   }

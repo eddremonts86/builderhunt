@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { randomId } from '~/lib/utils'
 import { createPlatformRoadmapItem, listPlatformRoadmap } from '~/shared/lib/repositories/platform-content'
-
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
 const CreateBody = z.object({
   title: z.string().min(1).max(200),
@@ -15,33 +13,25 @@ const CreateBody = z.object({
   sortOrder: z.number().int().default(0),
 })
 
-function isAdmin(userId: string): boolean {
-  return ADMIN_IDS.length > 0 && ADMIN_IDS.includes(userId)
-}
-
 export const Route = createFileRoute('/api/admin/roadmap/')({
   component: () => null,
   server: {
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          await requirePlatformAdminPrincipal(request)
           const rows = await listPlatformRoadmap()
           return Response.json(rows)
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin roadmap list error:', err)
           return Response.json([])
         }
       },
       POST: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          const principal = await requirePlatformAdminPrincipal(request)
           const body = await request.json().catch(() => ({}))
           const parsed = CreateBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
@@ -57,8 +47,16 @@ export const Route = createFileRoute('/api/admin/roadmap/')({
             sortOrder: parsed.data.sortOrder,
             shippedAt: parsed.data.status === 'shipped' ? new Date() : null,
           })
+          await auditPlatformAdminAction(principal, {
+            action: 'admin.roadmap.create',
+            targetType: 'roadmap',
+            targetId: id,
+            result: 'allowed',
+          })
           return Response.json({ ok: true, id })
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin roadmap create error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

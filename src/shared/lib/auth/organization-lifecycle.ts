@@ -1,4 +1,5 @@
 import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
+import { consoleSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import type { OrganizationRole } from '../authorization/permissions'
 
@@ -723,13 +724,7 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       return rateLimit(scope, id, limit, windowSeconds)
     },
 
-    // No sink wired to persistent storage yet — audits land in server logs
-    // (already redacted by emitSecurityAudit) until a durable sink exists.
-    audit: {
-      write(event) {
-        console.log('[security-audit]', JSON.stringify(event))
-      },
-    },
+    audit: consoleSecurityAuditSink,
 
     now() {
       return new Date()

@@ -1,9 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { updatePlatformIncident } from '~/shared/lib/repositories/platform-content'
-
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
 
 const UpdateBody = z.object({
   status: z.enum(['investigating', 'identified', 'monitoring', 'resolved']).optional(),
@@ -11,20 +9,13 @@ const UpdateBody = z.object({
   description: z.string().optional(),
 })
 
-function isAdmin(userId: string): boolean {
-  return ADMIN_IDS.length > 0 && ADMIN_IDS.includes(userId)
-}
-
 export const Route = createFileRoute('/api/admin/incidents/$id')({
   component: () => null,
   server: {
     handlers: {
       PATCH: async ({ request, params }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          const principal = await requirePlatformAdminPrincipal(request)
           const body = await request.json().catch(() => ({}))
           const parsed = UpdateBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
@@ -39,8 +30,16 @@ export const Route = createFileRoute('/api/admin/incidents/$id')({
           if (parsed.data.description !== undefined) update.description = parsed.data.description
 
           const updated = await updatePlatformIncident(params.id, update)
+          await auditPlatformAdminAction(principal, {
+            action: 'admin.incident.update',
+            targetType: 'incident',
+            targetId: params.id,
+            result: 'allowed',
+          })
           return Response.json(updated)
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin incident patch error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

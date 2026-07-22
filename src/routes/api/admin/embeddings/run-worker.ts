@@ -1,11 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { runEmbeddingsWorker } from '~/lib/semantic/embed-worker'
-
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-function isAdmin(userId: string): boolean {
-  return ADMIN_IDS.length > 0 && ADMIN_IDS.includes(userId)
-}
 
 /**
  * Manually (or via external scheduler) runs the semantic-search embeddings
@@ -21,13 +16,18 @@ export const Route = createFileRoute('/api/admin/embeddings/run-worker')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          const principal = await requirePlatformAdminPrincipal(request)
           const result = await runEmbeddingsWorker()
+          await auditPlatformAdminAction(principal, {
+            action: 'admin.worker.run',
+            targetType: 'worker',
+            targetId: 'embeddings',
+            result: 'allowed',
+          })
           return Response.json({ ok: true, ...result })
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('embeddings run-worker error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

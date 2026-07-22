@@ -1,17 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import {
   findPlanRequest,
   listPlanRequestsWithUsers,
   resolvePlanRequest,
   setUserPlan,
 } from '~/shared/lib/billing'
-
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-function isAdmin(userId: string) {
-  return ADMIN_IDS.length > 0 && ADMIN_IDS.includes(userId)
-}
 
 const ResolveBody = z.object({
   requestId: z.string(),
@@ -25,23 +20,19 @@ export const Route = createFileRoute('/api/admin/plan-requests/')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          await requirePlatformAdminPrincipal(request)
           const rows = await listPlanRequestsWithUsers()
           return Response.json(rows)
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin plan requests error:', err)
           return Response.json([])
         }
       },
       POST: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          const principal = await requirePlatformAdminPrincipal(request)
           const body = await request.json().catch(() => ({}))
           const parsed = ResolveBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
@@ -53,11 +44,20 @@ export const Route = createFileRoute('/api/admin/plan-requests/')({
             if (req) {
               // Default 30 days from now
               const endsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-              await setUserPlan(req.userId, req.requestedPlan as 'pro' | 'team', session.user.id, parsed.data.reason, endsAt)
+              await setUserPlan(req.userId, req.requestedPlan as 'pro' | 'team', principal.userId, parsed.data.reason, endsAt)
             }
           }
+          await auditPlatformAdminAction(principal, {
+            action: 'admin.plan-request.resolve',
+            targetType: 'plan-request',
+            targetId: parsed.data.requestId,
+            result: 'allowed',
+            details: { decision: parsed.data.decision },
+          })
           return Response.json({ ok: true })
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin plan requests resolve error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }

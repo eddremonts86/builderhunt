@@ -1,13 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auth } from '~/shared/lib/auth/better-auth'
+import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { metrics } from '~/shared/lib/metrics'
 import { getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
-
-const ADMIN_IDS = (process.env.ADMIN_USER_IDS ?? '').split(',').filter(Boolean)
-function isAdmin(userId: string) {
-  return ADMIN_IDS.length > 0 && ADMIN_IDS.includes(userId)
-}
 
 export const Route = createFileRoute('/api/admin/metrics/')({
   component: () => null,
@@ -15,10 +10,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const session = await auth.api.getSession({ headers: request.headers })
-          if (!session?.user?.id || !isAdmin(session.user.id)) {
-            return Response.json({ error: 'Forbidden' }, { status: 403 })
-          }
+          await requirePlatformAdminPrincipal(request)
 
           // In-process metrics
           const inProcess = metrics.get()
@@ -53,6 +45,8 @@ export const Route = createFileRoute('/api/admin/metrics/')({
             },
           })
         } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
           console.error('admin metrics error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }
