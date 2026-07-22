@@ -210,6 +210,17 @@ describe('resendInvitation', () => {
     await expect(lifecycle.resendInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 409 })
     expect(deps.cancelInvitationRecord).not.toHaveBeenCalled()
   })
+
+  it('translates a concurrent final-seat race into a 409, not an uncaught error', async () => {
+    const createInvitation = vi.fn().mockRejectedValue(new SeatLimitExceededError())
+    const deps = buildDeps({ findMembership: vi.fn().mockResolvedValue(membership('admin')), createInvitation })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.resendInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 409 })
+    // The old invitation is still canceled — resend doesn't leave a stale
+    // pending row behind just because the replacement lost the seat race.
+    expect(deps.cancelInvitationRecord).toHaveBeenCalledWith('invite-1')
+  })
 })
 
 describe('cancelInvitation', () => {
@@ -218,6 +229,23 @@ describe('cancelInvitation', () => {
     const lifecycle = createOrganizationLifecycle(deps)
 
     await expect(lifecycle.cancelInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('refuses a cross-org cancel — being elevated in your OWN org grants nothing against another org\'s invitation', async () => {
+    // The caller is an owner of 'org-1' (their own org) but the invitation
+    // being canceled belongs to 'org-2' — cancelInvitation must check
+    // membership against the INVITATION's organization, never the caller's
+    // own/active one, or any admin could cancel any other org's invites.
+    const deps = buildDeps({
+      getInvitation: vi.fn().mockResolvedValue(invitation({ organizationId: 'org-2' })),
+      findMembership: vi.fn(async (_userId: string, organizationId: string) =>
+        organizationId === 'org-1' ? membership('owner') : null,
+      ),
+    })
+    const lifecycle = createOrganizationLifecycle(deps)
+
+    await expect(lifecycle.cancelInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 403 })
+    expect(deps.cancelInvitationRecord).not.toHaveBeenCalled()
   })
 })
 

@@ -90,6 +90,7 @@ import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashbo
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
+import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
 import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
@@ -107,6 +108,7 @@ import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_das
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
+import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
@@ -538,6 +540,12 @@ const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
   path: '/admin/changelog',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const ApiOrganizationsInvitationsIndexRoute =
+  ApiOrganizationsInvitationsIndexRouteImport.update({
+    id: '/api/organizations/invitations/',
+    path: '/api/organizations/invitations/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMePlanChangesIndexRoute = ApiMePlanChangesIndexRouteImport.update({
   id: '/api/me/plan-changes/',
   path: '/api/me/plan-changes/',
@@ -626,6 +634,12 @@ const ApiOrganizationsMembersMemberIdRoute =
   ApiOrganizationsMembersMemberIdRouteImport.update({
     id: '/api/organizations/members/$memberId',
     path: '/api/organizations/members/$memberId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsInvitationsInvitationIdRoute =
+  ApiOrganizationsInvitationsInvitationIdRouteImport.update({
+    id: '/api/organizations/invitations/$invitationId',
+    path: '/api/organizations/invitations/$invitationId',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
@@ -734,9 +748,9 @@ const ApiBuildersBuilderIdEvidenceIndexRoute =
   } as any)
 const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
   ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
-    id: '/api/organizations/invitations/$invitationId/accept',
-    path: '/api/organizations/invitations/$invitationId/accept',
-    getParentRoute: () => rootRouteImport,
+    id: '/accept',
+    path: '/accept',
+    getParentRoute: () => ApiOrganizationsInvitationsInvitationIdRoute,
   } as any)
 const ApiMeBuilderBuilderIdRestrictProcessingRoute =
   ApiMeBuilderBuilderIdRestrictProcessingRouteImport.update({
@@ -855,6 +869,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -872,6 +887,7 @@ export interface FileRoutesByFullPath {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -975,6 +991,7 @@ export interface FileRoutesByTo {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
@@ -992,6 +1009,7 @@ export interface FileRoutesByTo {
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1099,6 +1117,7 @@ export interface FileRoutesById {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1116,6 +1135,7 @@ export interface FileRoutesById {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1222,6 +1242,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
@@ -1239,6 +1260,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -1342,6 +1364,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
@@ -1359,6 +1382,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export'
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
+    | '/api/organizations/invitations'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -1465,6 +1489,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
@@ -1482,6 +1507,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -1551,6 +1577,7 @@ export interface RootRouteChildren {
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
+  ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
@@ -1565,7 +1592,7 @@ export interface RootRouteChildren {
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
-  ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2137,6 +2164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminChangelogRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/api/organizations/invitations/': {
+      id: '/api/organizations/invitations/'
+      path: '/api/organizations/invitations'
+      fullPath: '/api/organizations/invitations/'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/plan-changes/': {
       id: '/api/me/plan-changes/'
       path: '/api/me/plan-changes'
@@ -2254,6 +2288,13 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/members/$memberId'
       fullPath: '/api/organizations/members/$memberId'
       preLoaderRoute: typeof ApiOrganizationsMembersMemberIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/invitations/$invitationId': {
+      id: '/api/organizations/invitations/$invitationId'
+      path: '/api/organizations/invitations/$invitationId'
+      fullPath: '/api/organizations/invitations/$invitationId'
+      preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/me/data-export/$id': {
@@ -2391,10 +2432,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/organizations/invitations/$invitationId/accept': {
       id: '/api/organizations/invitations/$invitationId/accept'
-      path: '/api/organizations/invitations/$invitationId/accept'
+      path: '/accept'
       fullPath: '/api/organizations/invitations/$invitationId/accept'
       preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiOrganizationsInvitationsInvitationIdRoute
     }
     '/api/me/builder/$builderId/restrict-processing': {
       id: '/api/me/builder/$builderId/restrict-processing'
@@ -2583,6 +2624,21 @@ const ApiMeBuilderBuilderIdRouteWithChildren =
     ApiMeBuilderBuilderIdRouteChildren,
   )
 
+interface ApiOrganizationsInvitationsInvitationIdRouteChildren {
+  ApiOrganizationsInvitationsInvitationIdAcceptRoute: typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+}
+
+const ApiOrganizationsInvitationsInvitationIdRouteChildren: ApiOrganizationsInvitationsInvitationIdRouteChildren =
+  {
+    ApiOrganizationsInvitationsInvitationIdAcceptRoute:
+      ApiOrganizationsInvitationsInvitationIdAcceptRoute,
+  }
+
+const ApiOrganizationsInvitationsInvitationIdRouteWithChildren =
+  ApiOrganizationsInvitationsInvitationIdRoute._addFileChildren(
+    ApiOrganizationsInvitationsInvitationIdRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
@@ -2646,6 +2702,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
+  ApiOrganizationsInvitationsInvitationIdRoute:
+    ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
@@ -2660,8 +2718,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
-  ApiOrganizationsInvitationsInvitationIdAcceptRoute:
-    ApiOrganizationsInvitationsInvitationIdAcceptRoute,
+  ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

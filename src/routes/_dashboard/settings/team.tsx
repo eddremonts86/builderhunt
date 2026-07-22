@@ -128,6 +128,38 @@ function TeamSettingsRoute() {
       leaveOrganizationContext,
     )
 
+  const handleInvite = (email: string, role: InvitableRole) =>
+    runMutation(
+      () => fetch('/api/organizations/invitations', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, role }),
+      }),
+      'Failed to send invitation',
+      refreshSnapshot,
+    )
+
+  const handleCancelInvite = (invitationId: string) =>
+    runMutation(
+      () => fetch(`/api/organizations/invitations/${encodeURIComponent(invitationId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      }),
+      'Failed to cancel invitation',
+      refreshSnapshot,
+    )
+
+  const handleResendInvite = (invitationId: string) =>
+    runMutation(
+      () => fetch(`/api/organizations/invitations/${encodeURIComponent(invitationId)}`, {
+        method: 'POST',
+        credentials: 'include',
+      }),
+      'Failed to resend invitation',
+      refreshSnapshot,
+    )
+
   if (isLoading) {
     return <div className="p-6 max-w-3xl mx-auto text-sm text-bh-text-muted" data-testid="team-settings-loading">Loading team…</div>
   }
@@ -139,15 +171,15 @@ function TeamSettingsRoute() {
     )
   }
 
-  // Invite/cancel/resend still have no backing HTTP route (task 6's scope —
-  // organization-lifecycle.ts implements and tests them, but no route calls
-  // them yet), so those three controls remain inert for now.
   return (
     <TeamSettingsPage
       snapshot={snapshot}
       viewerUserId={user.userId!}
       busy={busy}
       error={mutationError}
+      onInvite={handleInvite}
+      onCancelInvite={handleCancelInvite}
+      onResendInvite={handleResendInvite}
       onChangeRole={handleChangeRole}
       onRemoveMember={handleRemoveMember}
       onLeave={handleLeave}
