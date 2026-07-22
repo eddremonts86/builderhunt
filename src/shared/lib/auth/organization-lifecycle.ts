@@ -506,7 +506,7 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
   if (cached) return cached
 
   const [
-    { and, eq, sql, count },
+    { and, eq, sql, count, inArray },
     { auth },
     { authDb },
     schema,
@@ -748,10 +748,14 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
 
     async clearActiveOrganizationForUsers(organizationId, userIds) {
       if (userIds.length === 0) return
+      // `sql`...= any(${userIds})`` looks right but the postgres.js driver
+      // can't serialize a plain JS array through a raw template interpolation
+      // this way — it sends a malformed array literal and every call fails.
+      // `inArray` handles the parameterization correctly.
       await authDb
         .update(authSessions)
         .set({ activeOrganizationId: null })
-        .where(and(eq(authSessions.activeOrganizationId, organizationId), sql`${authSessions.userId} = any(${userIds})`))
+        .where(and(eq(authSessions.activeOrganizationId, organizationId), inArray(authSessions.userId, userIds)))
     },
 
     async sendInvitationEmail(email, organizationName, invitationId) {
