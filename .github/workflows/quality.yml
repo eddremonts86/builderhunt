@@ -79,5 +79,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm type-check
       - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: End-to-end team-accounts journey
+        run: pnpm test:e2e -- e2e/team-accounts.spec.ts
       - run: pnpm security:dependencies
       - run: pnpm build
