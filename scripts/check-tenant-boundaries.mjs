@@ -25,6 +25,17 @@ const globalDbAllowlist = new Set([
   'src/routes/api/status/index.ts',
   'src/shared/lib/public-data.ts',
 ])
+// Only these pre-existing files compare `.role` against a role literal
+// directly. Everything else — including all Team-account UI/route files —
+// must call `can()` from authorization/permissions.ts instead of
+// reimplementing role logic inline (plans/team-accounts/tasks.md's own
+// "Lock Team consumers to foundation contracts" requirement).
+const roleLiteralCheckAllowlist = new Set([
+  'src/shared/lib/authorization/permissions.ts',
+  'src/shared/lib/auth/organization-lifecycle.ts',
+  'src/routes/api/builders/$builderId/evidence/$evidenceId.ts',
+])
+const roleLiteralCheckPattern = /\.role\s*(===|!==)\s*['"]/
 
 const files = await sourceFiles(sourceRoot)
 const actualLegacy = new Set()
@@ -42,6 +53,9 @@ for (const absolutePath of files) {
   }
   if (/from\s+['"][^'"]*auth-db['"]/.test(source) && !authDbAllowlist.has(path)) {
     findings.push(`${path}: auth broker import is not allowlisted`)
+  }
+  if (roleLiteralCheckPattern.test(source) && !roleLiteralCheckAllowlist.has(path)) {
+    findings.push(`${path}: role literal comparison outside permissions.ts — use can() instead`)
   }
 }
 

@@ -48,7 +48,7 @@ export function normalizeInvitationEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-type InvitableRole = Exclude<OrganizationRole, 'owner'>
+export type InvitableRole = Exclude<OrganizationRole, 'owner'>
 
 export interface LifecycleSession {
   userId: string

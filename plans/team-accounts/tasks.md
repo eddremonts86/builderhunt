@@ -1,6 +1,6 @@
 # Tasks: Team Account Experience
 
-> **Status**: `pending`
+> **Status**: `in_progress`
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md)
 > **Blocks**: [`shared-resources`](../shared-resources/tasks.md), [`activity-feed`](../activity-feed/tasks.md),
 > [`stripe-billing-platform`](../stripe-billing-platform/tasks.md)
@@ -8,10 +8,10 @@
 > one-org membership constraint, or `plans.organizationId`. It consumes the implemented and tested
 > Better Auth organization/tenant/RLS foundation.
 
-- [ ] **Lock Team consumers to foundation contracts**
-  - Files: `src/shared/lib/organizations/contracts.ts`, `src/shared/lib/organizations/contracts.test.ts`, `src/shared/lib/auth/tenant-principal.ts`, `src/shared/lib/authorization/permissions.ts`
+- [x] **Lock Team consumers to foundation contracts**
+  - Files: `src/shared/lib/organizations/contracts.ts`, `src/shared/lib/organizations/contracts.test.ts`, `src/shared/lib/auth/tenant-principal.ts`, `src/shared/lib/authorization/permissions.ts`, `scripts/check-tenant-boundaries.mjs`
   - Do: Export allowlisted `OrganizationSummaryDto`, `OrganizationMemberDto`, `InvitationSummaryDto`, `SeatUsageDto`, lifecycle error codes, and typed service functions from the security foundation. Add boundary tests forbidding Team modules from importing DB/schema tables or implementing role checks directly.
-  - Verify: contract tests pass and deliberate `db`/schema import or `role ===` check inside Team routes fails `pnpm security:boundaries`.
+  - Verify (2026-07-22): `pnpm vitest run src/shared/lib/organizations/contracts.test.ts` 4/4 passing; `pnpm security:boundaries` now also rejects any file comparing `.role` to a string literal outside `permissions.ts`/`organization-lifecycle.ts` (proved by planting a deliberate violation and watching the gate fail on it) — this is a forward-looking ratchet, since no Team UI files exist yet. `OrganizationMemberDto`'s backing "list members with name/email" service doesn't exist in `organization-lifecycle.ts` yet; deferred to the task that actually wires member-listing routes rather than stubbed here.
 
 - [ ] **Create an organization-aware dashboard query provider**
   - Files: `src/shared/components/TenantQueryProvider.tsx`, `src/shared/lib/auth/client.ts`, `src/shared/lib/query-keys.ts`, `src/shared/lib/query-keys.test.ts`, `src/routes/_dashboard/route.tsx`
