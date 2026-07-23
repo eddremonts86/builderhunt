@@ -851,3 +851,405 @@ export const builderProcessingRestrictions = pgTable(
     check('builder_processing_restrictions_status_check', sql`${table.status} in ('active', 'withdrawn')`),
   ],
 )
+
+// ---------------------------------------------------------------------------
+// Stripe Billing Platform Tables (plans/stripe-billing-platform/spec.md §Data model)
+// ---------------------------------------------------------------------------
+
+export const billingCustomers = pgTable(
+  'billing_customers',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    livemode: boolean('livemode').notNull(),
+    stripeCustomerId: text('stripe_customer_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_customers_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_customers_org_livemode_unique').on(table.organizationId, table.livemode),
+    uniqueIndex('billing_customers_stripe_customer_id_unique').on(table.stripeCustomerId),
+  ],
+)
+
+export const billingSubscriptions = pgTable(
+  'billing_subscriptions',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    customerId: text('customer_id').notNull().references(() => billingCustomers.id, { onDelete: 'restrict' }),
+    livemode: boolean('livemode').notNull(),
+    catalogKey: text('catalog_key').notNull(),
+    tier: text('tier').notNull(),
+    interval: text('interval').notNull(),
+    catalogVersion: integer('catalog_version').notNull(),
+    stripeSubscriptionId: text('stripe_subscription_id').notNull(),
+    stripeStatus: text('stripe_status').notNull(),
+    currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
+    currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+    scheduledChange: jsonb('scheduled_change').$type<{ catalogKey: string; effectiveAt: string } | null>().default(null),
+    gracePeriodEndsAt: timestamp('grace_period_ends_at', { withTimezone: true }),
+    paymentBlockedAt: timestamp('payment_blocked_at', { withTimezone: true }),
+    cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+    canceledAt: timestamp('canceled_at', { withTimezone: true }),
+    providerSyncedAt: timestamp('provider_synced_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_subscriptions_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_subscriptions_stripe_subscription_id_unique').on(table.stripeSubscriptionId),
+    // Only one non-canceled base subscription per org/livemode — the state machine schedules
+    // cancellation at period end rather than deleting the row, so this excludes canceled rows only.
+    uniqueIndex('billing_subscriptions_org_livemode_active_unique')
+      .on(table.organizationId, table.livemode)
+      .where(sql`${table.canceledAt} is null`),
+    foreignKey({
+      columns: [table.organizationId, table.customerId],
+      foreignColumns: [billingCustomers.organizationId, billingCustomers.id],
+      name: 'billing_subscriptions_organization_customer_fk',
+    }),
+    check('billing_subscriptions_tier_check', sql`${table.tier} in ('pro', 'pro_max', 'team')`),
+    check('billing_subscriptions_interval_check', sql`${table.interval} in ('monthly', 'annual')`),
+  ],
+)
+
+export const billingCheckoutAttempts = pgTable(
+  'billing_checkout_attempts',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    livemode: boolean('livemode').notNull(),
+    action: text('action').notNull(),
+    catalogKey: text('catalog_key').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    consentVersions: jsonb('consent_versions').$type<{ terms: string; privacy: string }>().notNull(),
+    stripeCheckoutSessionId: text('stripe_checkout_session_id'),
+    status: text('status').notNull().default('open'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_checkout_attempts_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_checkout_attempts_org_idempotency_unique').on(table.organizationId, table.idempotencyKey),
+    check('billing_checkout_attempts_action_check', sql`${table.action} in ('subscription', 'credits')`),
+    check('billing_checkout_attempts_status_check', sql`${table.status} in ('open', 'complete', 'expired', 'canceled')`),
+  ],
+)
+
+/** System operational: platform/worker-only, no organization scope — one row per Stripe event. */
+export const billingWebhookEvents = pgTable(
+  'billing_webhook_events',
+  {
+    id: text('id').primaryKey(),
+    livemode: boolean('livemode').notNull(),
+    stripeEventId: text('stripe_event_id').notNull(),
+    apiVersion: text('api_version').notNull(),
+    objectType: text('object_type').notNull(),
+    eventType: text('event_type').notNull(),
+    receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
+    processedAt: timestamp('processed_at', { withTimezone: true }),
+    status: text('status').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
+    // Minimized, encrypted-at-rest raw payload (spec.md §Operations) — never the plain Stripe body.
+    payloadEncrypted: text('payload_encrypted').notNull(),
+    lastError: text('last_error'),
+  },
+  (table) => [
+    uniqueIndex('billing_webhook_events_livemode_stripe_event_id_unique').on(table.livemode, table.stripeEventId),
+    index('billing_webhook_events_status_next_attempt_idx').on(table.status, table.nextAttemptAt),
+    check('billing_webhook_events_status_check', sql`${table.status} in ('pending', 'processing', 'processed', 'failed', 'ignored')`),
+    check('billing_webhook_events_attempts_check', sql`${table.attempts} >= 0`),
+  ],
+)
+
+export const billingCreditGrants = pgTable(
+  'billing_credit_grants',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    sourceReference: text('source_reference'),
+    stripePaymentReference: text('stripe_payment_reference'),
+    // Set only for subscription-window grants, e.g. `${subscriptionId}:2026-08` — unique when present.
+    monthlyWindowKey: text('monthly_window_key'),
+    originalUnits: integer('original_units').notNull(),
+    remainingUnits: integer('remaining_units').notNull(),
+    state: text('state').notNull().default('active'),
+    activeAt: timestamp('active_at', { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_credit_grants_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_credit_grants_monthly_window_unique')
+      .on(table.monthlyWindowKey)
+      .where(sql`${table.monthlyWindowKey} is not null`),
+    index('billing_credit_grants_org_state_expiry_idx').on(table.organizationId, table.state, table.expiresAt),
+    check(
+      'billing_credit_grants_source_check',
+      sql`${table.source} in ('subscription_monthly', 'subscription_annual_window', 'pack', 'legacy_manual', 'promotional', 'operator_trial')`,
+    ),
+    check('billing_credit_grants_state_check', sql`${table.state} in ('active', 'frozen', 'expired', 'revoked')`),
+    check(
+      'billing_credit_grants_units_check',
+      sql`${table.originalUnits} >= 0 and ${table.remainingUnits} >= 0 and ${table.remainingUnits} <= ${table.originalUnits}`,
+    ),
+  ],
+)
+
+export const billingCreditReservations = pgTable(
+  'billing_credit_reservations',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    operation: text('operation').notNull(),
+    rateCardVersion: integer('rate_card_version').notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    maximumUnits: integer('maximum_units').notNull(),
+    settledUnits: integer('settled_units'),
+    state: text('state').notNull().default('reserved'),
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }).defaultNow().notNull(),
+    deadlineAt: timestamp('deadline_at', { withTimezone: true }).notNull(),
+    settlementGraceEndsAt: timestamp('settlement_grace_ends_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_credit_reservations_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_credit_reservations_org_idempotency_unique').on(table.organizationId, table.idempotencyKey),
+    check('billing_credit_reservations_state_check', sql`${table.state} in ('reserved', 'settled', 'released', 'expired')`),
+    check(
+      'billing_credit_reservations_units_check',
+      sql`${table.maximumUnits} >= 0 and (${table.settledUnits} is null or (${table.settledUnits} >= 0 and ${table.settledUnits} <= ${table.maximumUnits}))`,
+    ),
+  ],
+)
+
+export const billingCreditAllocations = pgTable(
+  'billing_credit_allocations',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    reservationId: text('reservation_id').notNull().references(() => billingCreditReservations.id, { onDelete: 'restrict' }),
+    grantId: text('grant_id').notNull().references(() => billingCreditGrants.id, { onDelete: 'restrict' }),
+    allocatedUnits: integer('allocated_units').notNull(),
+    consumedUnits: integer('consumed_units').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_credit_allocations_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_credit_allocations_reservation_grant_unique').on(table.reservationId, table.grantId),
+    foreignKey({
+      columns: [table.organizationId, table.reservationId],
+      foreignColumns: [billingCreditReservations.organizationId, billingCreditReservations.id],
+      name: 'billing_credit_allocations_organization_reservation_fk',
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.grantId],
+      foreignColumns: [billingCreditGrants.organizationId, billingCreditGrants.id],
+      name: 'billing_credit_allocations_organization_grant_fk',
+    }),
+    // Cross-row conservation (allocated <= grant.remaining, consumed <= reservation.settled) is an
+    // application/transaction invariant — a single-row CHECK cannot see sibling rows.
+    check(
+      'billing_credit_allocations_units_check',
+      sql`${table.allocatedUnits} >= 0 and ${table.consumedUnits} >= 0 and ${table.consumedUnits} <= ${table.allocatedUnits}`,
+    ),
+  ],
+)
+
+/** Append-only — entries are never updated or deleted; mistakes use compensating entries only. */
+export const billingLedgerEntries = pgTable(
+  'billing_ledger_entries',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    entryType: text('entry_type').notNull(),
+    grantId: text('grant_id').references(() => billingCreditGrants.id, { onDelete: 'restrict' }),
+    reservationId: text('reservation_id').references(() => billingCreditReservations.id, { onDelete: 'restrict' }),
+    unitsDelta: integer('units_delta').notNull(),
+    sourceIdempotencyKey: text('source_idempotency_key').notNull(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_ledger_entries_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_ledger_entries_org_source_idempotency_unique').on(table.organizationId, table.sourceIdempotencyKey),
+    index('billing_ledger_entries_org_created_idx').on(table.organizationId, table.createdAt),
+    foreignKey({
+      columns: [table.organizationId, table.grantId],
+      foreignColumns: [billingCreditGrants.organizationId, billingCreditGrants.id],
+      name: 'billing_ledger_entries_organization_grant_fk',
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.reservationId],
+      foreignColumns: [billingCreditReservations.organizationId, billingCreditReservations.id],
+      name: 'billing_ledger_entries_organization_reservation_fk',
+    }),
+    check(
+      'billing_ledger_entries_entry_type_check',
+      sql`${table.entryType} in ('grant', 'reserve', 'release', 'consume', 'expire', 'freeze', 'unfreeze', 'revoke', 'adjust')`,
+    ),
+  ],
+)
+
+export const billingProviderUsage = pgTable(
+  'billing_provider_usage',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    operation: text('operation').notNull(),
+    reservationId: text('reservation_id').references(() => billingCreditReservations.id, { onDelete: 'set null' }),
+    providerRequestId: text('provider_request_id'),
+    units: integer('units').notNull(),
+    estimatedCostCents: integer('estimated_cost_cents').notNull(),
+    actualCostCents: integer('actual_cost_cents'),
+    currency: text('currency').notNull().default('usd'),
+    reconciliationState: text('reconciliation_state').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_provider_usage_organization_id_id_unique').on(table.organizationId, table.id),
+    index('billing_provider_usage_org_created_idx').on(table.organizationId, table.createdAt),
+    check('billing_provider_usage_units_check', sql`${table.units} >= 0`),
+    check('billing_provider_usage_reconciliation_check', sql`${table.reconciliationState} in ('pending', 'matched', 'mismatched')`),
+  ],
+)
+
+/** One row per organization — owner-configured, disabled by default (spec.md §Packs and auto-recharge). */
+export const billingAutoRechargeRules = pgTable(
+  'billing_auto_recharge_rules',
+  {
+    organizationId: text('organization_id').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    enabled: boolean('enabled').notNull().default(false),
+    packCatalogKey: text('pack_catalog_key'),
+    balanceThresholdUnits: integer('balance_threshold_units'),
+    monthlyCapCents: integer('monthly_cap_cents'),
+    state: text('state').notNull().default('inactive'),
+    lastFailureAt: timestamp('last_failure_at', { withTimezone: true }),
+    lastFailureReason: text('last_failure_reason'),
+    consentVersion: text('consent_version'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('billing_auto_recharge_rules_state_check', sql`${table.state} in ('inactive', 'active', 'paused_needs_auth', 'paused_failed')`),
+    // $1,000 absolute monthly cap (spec.md §Packs and auto-recharge), in smallest currency units.
+    check('billing_auto_recharge_rules_cap_check', sql`${table.monthlyCapCents} is null or ${table.monthlyCapCents} <= 100000`),
+  ],
+)
+
+export const billingRefunds = pgTable(
+  'billing_refunds',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    subscriptionId: text('subscription_id').references(() => billingSubscriptions.id, { onDelete: 'restrict' }),
+    grantId: text('grant_id').references(() => billingCreditGrants.id, { onDelete: 'restrict' }),
+    requestedByUserId: text('requested_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    operatorUserId: text('operator_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    idempotencyKey: text('idempotency_key').notNull(),
+    policyDecision: text('policy_decision').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    stripeRefundId: text('stripe_refund_id'),
+    revisedServiceEndAt: timestamp('revised_service_end_at', { withTimezone: true }),
+    creditRevocationUnits: integer('credit_revocation_units'),
+    state: text('state').notNull().default('pending'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_refunds_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_refunds_org_idempotency_unique').on(table.organizationId, table.idempotencyKey),
+    foreignKey({
+      columns: [table.organizationId, table.subscriptionId],
+      foreignColumns: [billingSubscriptions.organizationId, billingSubscriptions.id],
+      name: 'billing_refunds_organization_subscription_fk',
+    }),
+    foreignKey({
+      columns: [table.organizationId, table.grantId],
+      foreignColumns: [billingCreditGrants.organizationId, billingCreditGrants.id],
+      name: 'billing_refunds_organization_grant_fk',
+    }),
+    check(
+      'billing_refunds_policy_check',
+      sql`${table.policyDecision} in ('full_unused_pack', 'partial_pack_operator', 'full_subscription_invoice', 'partial_subscription_operator')`,
+    ),
+    check('billing_refunds_state_check', sql`${table.state} in ('pending', 'succeeded', 'failed', 'repair_needed')`),
+    check('billing_refunds_amount_check', sql`${table.amountCents} >= 0`),
+  ],
+)
+
+/** System operational: platform-only, no organization scope. */
+export const billingReconciliationRuns = pgTable(
+  'billing_reconciliation_runs',
+  {
+    id: text('id').primaryKey(),
+    windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+    windowEnd: timestamp('window_end', { withTimezone: true }).notNull(),
+    countsChecked: jsonb('counts_checked').$type<Record<string, number>>().notNull(),
+    mismatches: jsonb('mismatches').$type<Array<{ type: string; reference: string; detail: string }>>().notNull().default([]),
+    repairs: jsonb('repairs').$type<Array<{ type: string; reference: string; action: string }>>().notNull().default([]),
+    result: text('result').notNull().default('clean'),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('billing_reconciliation_runs_window_idx').on(table.windowStart, table.windowEnd),
+    check('billing_reconciliation_runs_result_check', sql`${table.result} in ('clean', 'mismatches_found', 'repairs_applied')`),
+  ],
+)
+
+/** Platform-private: versioned seller configuration, no CPR/card/bank data (spec.md §Seller, country, currency, and tax configuration). */
+export const billingSellerProfiles = pgTable(
+  'billing_seller_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    version: integer('version').notNull(),
+    legalName: text('legal_name').notNull(),
+    publicBusinessAddress: text('public_business_address').notNull(),
+    establishmentCountry: text('establishment_country').notNull(),
+    approvedTaxIds: jsonb('approved_tax_ids').$type<string[]>().notNull().default([]),
+    supportEmail: text('support_email').notNull(),
+    statementDescriptor: text('statement_descriptor').notNull(),
+    countryAllowlist: jsonb('country_allowlist').$type<string[]>().notNull().default([]),
+    taxRegistrations: jsonb('tax_registrations')
+      .$type<Array<{ country: string; registrationId: string; effectiveAt: string }>>()
+      .notNull()
+      .default([]),
+    effectiveAt: timestamp('effective_at', { withTimezone: true }).notNull(),
+    createdByUserId: text('created_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_seller_profiles_version_unique').on(table.version),
+    check('billing_seller_profiles_version_check', sql`${table.version} >= 1`),
+  ],
+)
+
+export const billingTermsAcceptances = pgTable(
+  'billing_terms_acceptances',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    termsVersion: text('terms_version').notNull(),
+    privacyVersion: text('privacy_version').notNull(),
+    commercialAction: text('commercial_action').notNull(),
+    referenceId: text('reference_id'),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_terms_acceptances_organization_id_id_unique').on(table.organizationId, table.id),
+    index('billing_terms_acceptances_org_action_idx').on(table.organizationId, table.commercialAction, table.acceptedAt),
+    check('billing_terms_acceptances_action_check', sql`${table.commercialAction} in ('checkout_subscription', 'checkout_credits', 'auto_recharge')`),
+  ],
+)

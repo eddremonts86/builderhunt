@@ -108,6 +108,10 @@
     "0026_deleted_user_sentinel": {
       "sql": "7c4428ac63c3c5bfcf570cf3e26b767c3db4b0b1972735d02fb98c1775f63897",
       "snapshot": "3fef41fc9ef931c17912c10fde695930c0cf86b8540ee796feedac2680f62086"
+    },
+    "0027_overconfident_angel": {
+      "sql": "7d8d75baff21936e75261382b098f5dc6d66e7a4e8e273eaeae9e23a37b762b5",
+      "snapshot": "3cb4dcc9bb1457cdd135de8434be5bf8f49d50315fe37bfcac683c032eb6d60a"
     }
   }
 }

@@ -1,9 +1,10 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (4/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
-> SDK/client/catalog/fake-provider built; the rest of §1 ("Validate Stripe Products and Prices") and
-> everything after it needs a real Stripe sandbox account and business/legal sign-off not available in
-> this session — see `docs/operations/stripe-launch-register.md`)
+> **Status**: `in_progress` (5/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
+> SDK/client/catalog/fake-provider built, all 14 billing/credit tables added in an additive migration;
+> "Validate Stripe Products and Prices" still needs a real Stripe sandbox account and business/legal
+> sign-off not available in this session — see `docs/operations/stripe-launch-register.md`. RLS/grants
+> for the new tables are the next task, not yet started.)
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md),
 > [`team-accounts`](../team-accounts/tasks.md)
 > **Blocks**: [`calendar-scheduling-interview-intelligence`](../calendar-scheduling-interview-intelligence/tasks.md)
@@ -57,10 +58,11 @@
 
 ## 2. Additive schema and isolation
 
-- [ ] **Add billing and credit tables in an additive migration**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0020_stripe_billing.sql`, `drizzle/meta/_journal.json`, `drizzle/migration-hashes.json`, `src/shared/lib/db/billing-schema.test.ts`
+- [x] **Add billing and credit tables in an additive migration**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0027_overconfident_angel.sql`, `drizzle/meta/_journal.json`, `drizzle/migration-hashes.json`, `src/shared/lib/db/billing-schema.test.ts`
   - Do: Add every table and invariant from `spec.md`: customers, subscriptions, attempts, webhook inbox, grants, reservations, allocations, append-only ledger, provider usage, auto-recharge, refunds, reconciliation, seller profiles, and terms acceptances. Use the next available migration number if `0020` is taken; do not modify `0019`. Add unique live-subscription/window/idempotency constraints, non-negative checks, and organization-preserving references.
   - Verify: `pnpm db:generate && pnpm test:migration-integrity && pnpm test:migrations:local && pnpm vitest run src/shared/lib/db/billing-schema.test.ts` passes on empty and populated snapshots.
+  - Progress (2026-07-23): added all 14 tables from spec.md's Data model table to `schema.ts`, following existing conventions exactly (organization-preserving composite FKs against each parent's `(organization_id, id)` unique index — same idiom as `alerts`→`saved_queries`; CHECK constraints for every bounded enum/non-negative-units invariant; append-only `billing_ledger_entries` deliberately has no `updatedAt`). `0027` landed as the next available slot (`0019`–`0026` all already existed from prior sessions' work, confirmed via `drizzle/meta/_journal.json`, not just directory listing). One real bug caught and fixed before commit: drizzle-kit's generated statement order for a *brand-new* multi-table migration is `CREATE TABLE` → `ALTER TABLE ADD CONSTRAINT` (FKs) → `CREATE INDEX`, but several composite FKs here reference a *sibling new table's* `(organization_id, id)` unique index (e.g. `billing_credit_allocations` → `billing_credit_reservations`) — Postgres rejects a composite FK if the referenced unique index doesn't exist yet, so the generated ordering fails on a fresh database (this differs from `ALTER TABLE ADD COLUMN`-style tenant-expansion migrations like `0003`, where drizzle-kit orders indexes before FKs). Fixed by hand-reordering the generated file's statement blocks (`CREATE TABLE` → `CREATE INDEX` → `ALTER TABLE ADD CONSTRAINT`) via a script that splits on `--> statement-breakpoint`, classifies, and regroups — verified no statement was lost (75 in, 75 out) and the file had not been applied anywhere yet, so hand-editing was safe. Regenerated `drizzle/migration-hashes.json` via `verify-migration-integrity.mjs --write`. Verified against a real disposable `builderhunt_security_test_*` Postgres (created/dropped on the running `builderhunt-db` pgvector/pg16 container): both first and second `migrate()` runs succeed (idempotency). Bumped a hardcoded migration count in `src/shared/lib/db/migration-integrity.test.ts` (27→28). Full suite: `pnpm type-check` clean, `pnpm lint` 0 errors (same 55 pre-existing warnings), `pnpm security:boundaries` clean, `pnpm vitest run` 734/734 (up from 719 — 15 new tests in `billing-schema.test.ts`). RLS/grants deliberately NOT added here — that's the next, separate tasks.md item ("Apply billing RLS and runtime-role policy"), matching this codebase's established split (table-creation migration first, RLS/grants migration second — see `0024`'s retroactive fix for `sourcing_sprints`, which never got a timely RLS migration). Until that lands, these 14 tables have zero grants to any runtime role and are therefore inaccessible (fail-closed by omission), not merely RLS-unprotected.
 
 - [ ] **Apply billing RLS and runtime-role policy**
   - Files: `drizzle/0020_stripe_billing.sql`, `scripts/db/verify-rls-local.mjs`, `test/security/billing-tenant-isolation.test.ts`, `docs/operations/database-roles.md`
