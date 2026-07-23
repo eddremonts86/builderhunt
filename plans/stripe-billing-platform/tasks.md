@@ -1139,10 +1139,86 @@ migration, dunning/recovery) implemented, tested, and committed.
 
 ## 9. Customer and operator experiences
 
-- [ ] **Replace billing summary API with the canonical organization DTO**
+- [x] **Replace billing summary API with the canonical organization DTO**
   - Files: `src/routes/api/billing/summary.ts`, `src/routes/api/billing/summary.test.ts`, `src/routes/api/plans/me.ts`, `src/shared/lib/billing/contracts.ts`
   - Do: Return role-minimized plan, period, payment/grace/scheduled state, seats, credit grants/expiry, usage, invoice links, billing contact, and capabilities. Keep `/api/plans/me` compatibility during migration then delegate to canonical service; serialize unlimited limits explicitly, not JSON `Infinity`.
   - Verify: Free/Pro/Pro Max/Team, manual/Stripe, owner/admin/member, A/B, past-due/canceled/disputed DTO snapshots pass.
+  - Progress (2026-07-23): New `GET /api/billing/summary` — role-minimized per spec.md §Permissions and UX
+    exactly as worded: owner/admin (`canReadBillingSummary`) get the full `OrganizationBillingSummaryDto`;
+    a plain member gets only `BillingAvailabilityDto` (`{ capabilities: { paidActionsAllowed } }`) — no
+    plan/period/seats/credit-grant/refund data at all, computed by a separate, deliberately cheap
+    `getBillingAvailability` that skips every read a member can't see.
+    **"Invoice links" scope decision**: confirmed by reading `provider.ts`'s full `BillingProvider`
+    interface, `stripe-provider.ts`, and `fake-provider.ts` that no invoice-listing capability exists
+    anywhere in this codebase — no invoice id/URL is ever persisted, and `ReconciliationObjectType`/
+    `RefreshableObjectType` cover `customers|subscriptions|payment_intents|refunds|checkout_session`,
+    never `invoice`. Building a new Stripe `invoices.list` provider method would be scope creep beyond
+    "replace the summary API." The DTO instead exposes `capabilities.canOpenPortal` (owner-only,
+    already-built `/api/billing/portal` is where invoices/receipts genuinely live per that route's own
+    header comment) rather than inventing a fake invoice-link field.
+    **"Billing contact" scope decision**: `billing/billing-contact.ts` doesn't exist yet — it's §9 task
+    4, not started. `billingContact: BillingContactSummaryDto | null` is typed into the DTO now (so the
+    shape doesn't need a second breaking change later) but always `null` until that task lands —
+    explicitly commented, not a silent stub.
+    New DTOs in `contracts.ts`: `BillingGraceStateDto`, `BillingScheduledChangeDto`, `BillingSeatsDto`,
+    `BillingUsageDto`, `BillingUsageLimitsDto` (unlimited = explicit `null`, never a raw `Infinity` a JSON
+    response can't actually carry), `BillingCapabilitiesDto`, `BillingContactSummaryDto`,
+    `OrganizationBillingSummaryDto` (the full elevated shape), `BillingAvailabilityDto` (member shape).
+    New composer `getOrganizationBillingSummary(principal)` reads, in parallel: `getOrganizationEntitlement`
+    (tier/status/seatLimit/paidActionsAllowed — unchanged), a new `getOrganizationEntitlementPeriod`
+    (`repositories/entitlements.ts` — `billingPeriod`/`currentPeriodEnd`/`trialEndsAt`/`notes` off
+    `organization_entitlements`, kept in sync with a real Stripe subscription by `subscriptions.ts`'s
+    existing projection, so this is correct for BOTH a Stripe-driven and a manually-granted org),
+    `findFullActiveBillingSubscription` (extended with 2 new selected columns —
+    `gracePeriodEndsAt`/`paymentBlockedAt` — for the grace/scheduled-change section; `null` when no
+    active subscription row exists, e.g. free/manual orgs), the existing customer/credit-grant/refund/
+    terms-acceptance reads, usage counts, and — outside the tenant transaction, in parallel —
+    `getSeatUsage(principal)` (`auth/organization-lifecycle.ts`'s existing, already-correct
+    accepted-plus-pending-invitation seat count; more accurate than `/api/plans/me`'s old accepted-only
+    member count, and nothing depended on the old number's exact value — see below).
+    `/api/plans/me` (legacy) now delegates entirely to `getOrganizationBillingSummary` — confirmed via a
+    dedicated research pass that its only 3 live consumers (`settings/billing/index.tsx`'s two usage
+    bars, `SearchPage.tsx`'s plan-tier gate) read only `plan.plan`/`limits.savedSearches`/
+    `limits.savedBuilders`/`usage.savedSearches`/`usage.savedBuilders` — every other field
+    (`status`/`billingPeriod`/`currentPeriodEnd`/`trialEndsAt`/`notes`/`seatLimit`/`seatsUsed`/
+    `pricing`/`signedOut`) has zero live readers, so delegating (including switching `seatsUsed` to the
+    more accurate `getSeatUsage` count) changes no observable frontend behavior. This route keeps its
+    own pre-existing no-role-gate access model unchanged (unlike the new canonical route) — deliberately,
+    to preserve exact backward compatibility during migration.
+    16 new/extended `contracts.test.ts` pure-mapping tests for the 3 new `toX` functions (grace state,
+    scheduled change, usage limits) — including one asserting `toBillingUsageLimitsDto` maps a raw
+    `Infinity` input to an explicit `null` that survives a real `JSON.parse(JSON.stringify(...))`
+    round-trip unchanged. 5 new `summary.test.ts` route tests (owner and admin both get the full
+    summary — admin's `canOpenPortal` correctly `false`; a member gets ONLY the availability DTO, never
+    touching `getOrganizationBillingSummary`; 401 propagation; 500 without leaking the underlying error).
+    **Known, pre-existing testability limit** (not introduced by this task): `getOrganizationBillingSummary`
+    calls `withTenantContext`, which — unlike every `TenantTransaction`-scoped repository function in
+    this codebase — has no way to redirect to a disposable test database (no `db` override parameter
+    exists on it at all); the exact same limitation already applied to the pre-existing, previously
+    fully-untested `getBillingSummary` this function extends. Real-DB coverage for this task instead
+    comes from (a) the already-tested repository primitives it composes (`getOrganizationEntitlement`,
+    `findFullActiveBillingSubscription`, etc. — all independently covered in their own test files), (b)
+    the pure `toX` mapping tests, (c) the route-level mock tests, and (d) live verification against the
+    actual running dev server.
+    Live-verified against the running dev server: `GET /api/billing/summary` for a real Team-tier,
+    owner-role session returned the full real DTO (`tier: "team"`, `seats: {limit:10, used:2}`,
+    `limits: {savedSearches:200, savedBuilders:null, rssSubscriptions:null}` — confirmed `null`, never
+    `Infinity`, on the wire — `capabilities` all `true`); `GET /api/plans/me` for the SAME session
+    returned byte-identical `plan`/`limits`/`usage` values to the pre-migration shape; `/settings/billing`
+    rendered its usage bars correctly from the delegated data ("1 / 200" saved searches, "16 / ∞" saved
+    builders); no console errors.
+    `pnpm type-check` (clean); `pnpm lint` (0 errors in every file this task touched); targeted vitest
+    (`contracts.test.ts` 16/16, `summary.test.ts` 5/5, `entitlements.test.ts` 14/14, `billing.test.ts`
+    8/8, `subscription-changes.test.ts` 39/39 — confirming the `FullBillingSubscriptionRecord`/
+    `findFullActiveBillingSubscription` extension broke nothing); `pnpm security:boundaries` (0 legacy
+    imports); route-coverage (93 routes — +1 for `/api/billing/summary`, 8 allowlisted, valid).
+    **Unrelated pre-existing issue found, not fixed here**: `pnpm vitest run
+    src/shared/lib/billing/dependency-contracts.test.ts` has one pre-existing failure — `risk.ts`'s
+    `listRiskExceptions`/`revokeRiskException` (§8 task 3) take a bare `organizationId: string`, tripping
+    the billing module's own "no bare organizationId" boundary check, since those two are genuinely
+    platform-operator-only (no `TenantPrincipal` exists in that call path) and the regex-based check has
+    no exemption for that case. Confirmed via `git stash`/re-run that this predates and is unrelated to
+    this task's own diff. Flagged as a separate follow-up rather than scope-creeping into an unrelated fix.
 
 - [ ] **Build complete organization billing settings**
   - Files: `src/routes/_dashboard/settings/billing.tsx`, `src/modules/billing/BillingSettingsPage.tsx`, `src/modules/billing/BillingSettingsPage.test.tsx`, `src/modules/billing/PlanChangePreview.tsx`, `src/modules/billing/CreditBalance.tsx`

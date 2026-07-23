@@ -73,6 +73,7 @@ import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/st
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
+import { Route as ApiBillingSummaryRouteImport } from './routes/api/billing/summary'
 import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
 import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
@@ -476,6 +477,11 @@ const ApiBuildersTrackRoute = ApiBuildersTrackRouteImport.update({
 const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
   id: '/api/builders/$builderId',
   path: '/api/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingSummaryRoute = ApiBillingSummaryRouteImport.update({
+  id: '/api/billing/summary',
+  path: '/api/billing/summary',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBillingRefundsRoute = ApiBillingRefundsRouteImport.update({
@@ -984,6 +990,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1130,6 +1137,7 @@ export interface FileRoutesByTo {
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1281,6 +1289,7 @@ export interface FileRoutesById {
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
+  '/api/billing/summary': typeof ApiBillingSummaryRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1431,6 +1440,7 @@ export interface FileRouteTypes {
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/billing/refunds'
+    | '/api/billing/summary'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1577,6 +1587,7 @@ export interface FileRouteTypes {
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/billing/refunds'
+    | '/api/billing/summary'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1727,6 +1738,7 @@ export interface FileRouteTypes {
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/billing/refunds'
+    | '/api/billing/summary'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1845,6 +1857,7 @@ export interface RootRouteChildren {
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
   ApiBillingRefundsRoute: typeof ApiBillingRefundsRoute
+  ApiBillingSummaryRoute: typeof ApiBillingSummaryRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
@@ -2371,6 +2384,13 @@ declare module '@tanstack/react-router' {
       path: '/api/builders/$builderId'
       fullPath: '/api/builders/$builderId'
       preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/summary': {
+      id: '/api/billing/summary'
+      path: '/api/billing/summary'
+      fullPath: '/api/billing/summary'
+      preLoaderRoute: typeof ApiBillingSummaryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/billing/refunds': {
@@ -3200,6 +3220,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
   ApiBillingRefundsRoute: ApiBillingRefundsRoute,
+  ApiBillingSummaryRoute: ApiBillingSummaryRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,

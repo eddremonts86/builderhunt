@@ -4,9 +4,12 @@ import {
   toBillingCreditGrantSummaryDto,
   toBillingCreditReservationSummaryDto,
   toBillingCustomerSummaryDto,
+  toBillingGraceStateDto,
   toBillingRefundSummaryDto,
+  toBillingScheduledChangeDto,
   toBillingSubscriptionSummaryDto,
   toBillingTermsAcceptanceSummaryDto,
+  toBillingUsageLimitsDto,
 } from './contracts'
 
 describe('billing contracts — DTO mapping', () => {
@@ -165,5 +168,41 @@ describe('billing contracts — DTO mapping', () => {
     expect(dto).not.toHaveProperty('stripeRefundId')
     expect(dto).not.toHaveProperty('requestedByUserId')
     expect(dto).not.toHaveProperty('organizationId')
+  })
+
+  it('maps a null subscription to an all-null grace state (free/manual org, nothing to freeze)', () => {
+    expect(toBillingGraceStateDto(null)).toEqual({ gracePeriodEndsAt: null, paymentBlockedAt: null })
+  })
+
+  it('maps a subscription with active grace/payment-block timestamps', () => {
+    const dto = toBillingGraceStateDto({
+      gracePeriodEndsAt: new Date('2026-07-30T00:00:00Z'),
+      paymentBlockedAt: new Date('2026-07-31T00:00:00Z'),
+    })
+    expect(dto).toEqual({ gracePeriodEndsAt: '2026-07-30T00:00:00.000Z', paymentBlockedAt: '2026-07-31T00:00:00.000Z' })
+  })
+
+  it('maps a null or undefined scheduledChange to null', () => {
+    expect(toBillingScheduledChangeDto(null)).toBeNull()
+    expect(toBillingScheduledChangeDto(undefined)).toBeNull()
+  })
+
+  it('passes a real scheduledChange through unchanged (effectiveAt is already a string in the jsonb column)', () => {
+    expect(toBillingScheduledChangeDto({ catalogKey: 'team_annual', effectiveAt: '2026-08-01T00:00:00.000Z' }))
+      .toEqual({ catalogKey: 'team_annual', effectiveAt: '2026-08-01T00:00:00.000Z' })
+  })
+
+  it('maps a finite limit through unchanged', () => {
+    expect(toBillingUsageLimitsDto({ savedSearches: 50, savedBuilders: 200, rssSubscriptions: 10 }))
+      .toEqual({ savedSearches: 50, savedBuilders: 200, rssSubscriptions: 10 })
+  })
+
+  it('maps Infinity (unlimited) to an explicit null, never a JS Infinity value on the DTO', () => {
+    const dto = toBillingUsageLimitsDto({ savedSearches: 50, savedBuilders: Infinity, rssSubscriptions: Infinity })
+    expect(dto).toEqual({ savedSearches: 50, savedBuilders: null, rssSubscriptions: null })
+    expect(Number.isFinite(dto.savedBuilders)).toBe(false)
+    expect(dto.savedBuilders).not.toBe(Infinity)
+    // Round-trips through real JSON exactly like the raw Infinity value always silently did — but now by declared contract, not by accident.
+    expect(JSON.parse(JSON.stringify(dto))).toEqual({ savedSearches: 50, savedBuilders: null, rssSubscriptions: null })
   })
 })

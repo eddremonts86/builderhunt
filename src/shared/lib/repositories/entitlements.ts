@@ -91,6 +91,38 @@ export async function getOrganizationEntitlement(
   return resolveEntitlementPolicy(row ?? null, Boolean(subscriptionRow?.paymentBlockedAt))
 }
 
+export interface EntitlementPeriod {
+  billingPeriod: string
+  currentPeriodEnd: Date | null
+  trialEndsAt: Date | null
+  notes: string | null
+}
+
+/**
+ * The manual/legacy period fields on `organization_entitlements` itself — kept in sync with a real
+ * Stripe subscription by `subscriptions.ts`'s `projectSubscriptionEntitlement` (§7 task 1), so this
+ * is correct for BOTH a Stripe-driven org and a manually-granted one (which has no `billing_subscriptions`
+ * row at all). Separate from `getOrganizationEntitlement`'s own `EntitlementPolicy` since period/notes
+ * are display detail, not an authorization decision.
+ */
+export async function getOrganizationEntitlementPeriod(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<EntitlementPeriod> {
+  const [row] = await transaction
+    .select({
+      billingPeriod: organizationEntitlements.billingPeriod,
+      currentPeriodEnd: organizationEntitlements.currentPeriodEnd,
+      trialEndsAt: organizationEntitlements.trialEndsAt,
+      notes: organizationEntitlements.notes,
+    })
+    .from(organizationEntitlements)
+    .where(eq(organizationEntitlements.organizationId, organizationId))
+    .limit(1)
+
+  return row ?? { billingPeriod: 'none', currentPeriodEnd: null, trialEndsAt: null, notes: null }
+}
+
 function asTier(value: string): EntitlementTier {
   if (value === 'free' || value === 'pro' || value === 'pro_max' || value === 'team') return value
   throw new Error('Invalid organization entitlement tier')

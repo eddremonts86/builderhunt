@@ -146,6 +146,8 @@ export interface FullBillingSubscriptionRecord extends BillingSubscriptionRecord
   currentPeriodStart: Date | null
   scheduledChange: { catalogKey: string; effectiveAt: string } | null
   providerSyncedAt: Date
+  gracePeriodEndsAt: Date | null
+  paymentBlockedAt: Date | null
 }
 
 /** Every column `subscription-changes.ts` needs to preview/apply a plan change — `findActiveBillingSubscription`'s own select deliberately omits these for its lighter (read-summary) callers. */
@@ -172,6 +174,8 @@ export async function findFullActiveBillingSubscription(
       cancelAtPeriodEnd: billingSubscriptions.cancelAtPeriodEnd,
       canceledAt: billingSubscriptions.canceledAt,
       providerSyncedAt: billingSubscriptions.providerSyncedAt,
+      gracePeriodEndsAt: billingSubscriptions.gracePeriodEndsAt,
+      paymentBlockedAt: billingSubscriptions.paymentBlockedAt,
     })
     .from(billingSubscriptions)
     .where(and(
