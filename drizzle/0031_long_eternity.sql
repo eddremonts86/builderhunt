@@ -1,0 +1,1 @@
+ALTER TABLE "billing_auto_recharge_rules" ADD COLUMN "pending_payment_intent_id" text;

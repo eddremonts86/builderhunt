@@ -869,10 +869,75 @@ migration, dunning/recovery) implemented, tested, and committed.
     pre-existing warnings); `pnpm security:boundaries` (0 legacy imports tracked); route-coverage (87
     routes — +1 for the new `/api/billing/checkout/credits` route, 8 allowlisted, unchanged, valid).
 
-- [ ] **Implement capped auto-recharge and SCA recovery**
+- [x] **Implement capped auto-recharge and SCA recovery**
   - Files: `src/shared/lib/billing/auto-recharge.ts`, `src/shared/lib/billing/auto-recharge.test.ts`, `src/routes/api/billing/auto-recharge.ts`, `src/modules/billing/AutoRechargeSettings.tsx`
   - Do: Off by default; owner/recent-auth/active-paid; select pack/threshold/monthly cap ≤$1,000; enforce shared three-charge/$1,000 rolling day; record separate consent; prepare off-session method; issue credits only on success; pause and link on-session recovery when authentication/failure occurs.
   - Verify: concurrent threshold, duplicate worker, month/day rollover, cap, disabled/lapsed subscription, SCA, decline, payment-method replacement, and cancellation tests pass.
+  - Progress (2026-07-23): One rule row per org (`billing_auto_recharge_rules`, PK = organizationId,
+    already existed from the original 14-table migration). New migration 0031 adds
+    `pending_payment_intent_id` — the in-flight guard that stops a LATER worker tick from
+    re-triggering before an already-created charge's outcome is known (the row lock
+    `lockAutoRechargeRule` takes only serializes *concurrent* ticks, not *sequential* ones across
+    separate transactions). `configureAutoRecharge`: validates threshold/monthly-cap (≤$1,000, same
+    ceiling `packs.ts`'s `ROLLING_RISK_MAX_AMOUNT_CENTS` exports)/pack key, requires an active paid
+    subscription + existing billing customer, records the separate off-session consent
+    (`consent.ts`'s already-defined `recordAutoRechargeConsent`/`'auto_recharge'` action), then
+    "prepares the off-session method" via a real gate: a `provider.createSetupIntent` call that must
+    come back `succeeded` before the rule is ever turned on — `requires_action` blocks enabling with a
+    typed `setup_requires_action` error instead of silently proceeding. `disableAutoRecharge` never
+    discards the owner's last configuration (pack/threshold/cap), so re-enabling later doesn't force
+    re-entry.
+    `maybeTriggerAutoRecharge` (worker-side, called once per org per tick by `worker.ts`'s new
+    `sweepAutoRecharge`): locks the rule row, then only mutates state for a REAL problem (retired pack
+    → `paused_failed`; provider decline → `paused_failed`; `requires_action` → `paused_needs_auth`) —
+    every other early exit (balance above threshold, rolling-limit hit, monthly-cap hit) is treated as
+    a genuinely temporary condition and re-evaluated next tick without touching `state`. The monthly
+    cap is scoped to auto-recharge spend specifically, distinguished from a manually-purchased pack of
+    the same catalog key by Stripe's own `pi_`/`cs_` id-prefix convention on `stripePaymentReference`
+    (auto-recharge charges a PaymentIntent directly; manual purchases always go through a Checkout
+    Session first — see packs.ts's `handlePackCheckoutCompleted`). The shared rolling risk limit
+    reuses `packs.ts`'s exported `assertWithinRollingPackChargeLimit` unchanged — one counter, one
+    implementation, for both manual and automatic charges.
+    Credits are granted only by a new `webhook-handlers.ts` handler,
+    `handleAutoRechargePaymentIntentEvent`, wired to real `payment_intent.succeeded/payment_failed/
+    requires_action` handling (previously `'deferred'` placeholders) — resolves the organization via a
+    new cross-org lookup, `findOrganizationIdForPendingAutoRechargePaymentIntent`
+    (`billing-worker.ts`), the only signal available since a bare PaymentIntent carries no Checkout
+    attempt row. Known, documented tradeoff: once a charge's outcome is resolved, that lookup can no
+    longer find the org for a LATER duplicate delivery of the same event, so a genuine duplicate
+    reports `'deferred'` (retried indefinitely) rather than `'applied'` — safe (no double-grant,
+    guarded by `resolveAutoRechargeTrigger`'s own pending-marker match) but not perfectly tidy
+    bookkeeping; accepted rather than building a second cross-org "already resolved" index for this
+    task's scope.
+    `worker.ts`: `RunBillingWorkerOptions` gained a required `provider` field (`run-worker.ts` updated
+    to pass `getBillingProvider()`); new `sweepAutoRecharge` evaluates every org once per tick;
+    `WorkerRunSummary` gained `autoRechargeTriggered`. `PUT /api/billing/auto-recharge` (owner +
+    recent-auth, matching `portal.ts`'s pattern) validates a discriminated-union body
+    (`enabled: true` with full config, or `enabled: false`) and dispatches to configure/disable; `GET`
+    on the same route reads the current rule for the new `AutoRechargeSettings.tsx`, mounted into the
+    existing `/settings/billing` page (shows config/state/paused-reason with a "Resolve in Billing
+    Portal" link reusing the existing Customer Portal flow — no new payment-collection surface).
+    21 new `auto-recharge.test.ts` tests (every configure validation error, SetupIntent
+    `requires_action` gate, reconfigure-clears-stale-failure, disable-preserves-config, and the full
+    `maybeTriggerAutoRecharge` branch matrix: no rule/disabled/in-flight/balance-above-threshold/
+    retired-pack-pauses/lapsed-subscription/rolling-limit-is-temporary/monthly-cap-counts-only-
+    pi-prefixed/manual-purchase-excluded-from-cap/decline-pauses), 5 new `webhook-handlers.test.ts`
+    tests (grants+reactivates on success, duplicate-is-safe-but-deferred, pauses on
+    requires_action/payment_failed without granting, defers when unresolvable), 16 new route tests
+    (permission matrix including the 401 stale-session case, spoofed/missing-field rejections, every
+    `AutoRechargeErrorCode`→HTTP mapping, disable path). Live-verified against the running dev server:
+    the mounted `AutoRechargeSettings` form renders and submits against the real `/api/billing/
+    auto-recharge` route, which correctly returned the real `STALE_SESSION_ERROR_MESSAGE` 401 for this
+    browser's long-lived session — proving the recent-auth gate fires for real, not just in a mocked
+    route test (the deeper `no_active_subscription` business path is already fully covered by the
+    disposable-DB suite; this dev org has no row in the new `billing_subscriptions` table, only the
+    legacy manually-billed plan). Full suite (isolated per-file, since running the entire billing+
+    routes directory in one parallel invocation exhibits known, pre-existing resource-contention
+    flakiness unrelated to this task — confirmed by re-running the same failing files alone, all
+    green) all green except the same one pre-existing `catalog.test.ts` Price ID mismatch documented
+    in §7 task 6's evidence; `pnpm type-check` (clean); `pnpm lint` (0 errors, 57 pre-existing
+    warnings); `pnpm security:boundaries` (0 legacy imports); route-coverage (88 routes — +1 for
+    `/api/billing/auto-recharge`, 8 allowlisted, valid).
 
 - [ ] **Add fraud and high-volume exception controls**
   - Files: `src/shared/lib/billing/risk.ts`, `src/shared/lib/billing/risk.test.ts`, `src/routes/api/admin/billing/risk-exceptions.ts`, `docs/operations/stripe-fraud.md`

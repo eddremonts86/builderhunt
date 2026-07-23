@@ -4,8 +4,14 @@ import type Stripe from 'stripe'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
 import { billingCreditGrants, billingCustomers, billingSubscriptions, billingWebhookEvents, organizations } from '../db/schema'
+import { FakeBillingProvider } from './fake-provider'
 import type { EventRetriever } from './worker'
 import { replayBillingWebhookEvent, ReplayError, runBillingWorker } from './worker'
+
+// No fixture in this file ever configures `billing_auto_recharge_rules` for an organization, so
+// `sweepAutoRecharge` (worker.ts) finds nothing eligible and never calls any provider method here —
+// this exists purely to satisfy `RunBillingWorkerOptions.provider`'s type.
+const provider = new FakeBillingProvider()
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -62,7 +68,7 @@ describe('runBillingWorker — basic claim and process', () => {
     const { id, stripeEventId } = await insertPendingEvent()
     const retriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
 
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.claimedEvents).toBe(1)
     expect(summary.processedEvents).toBe(1)
@@ -75,8 +81,8 @@ describe('runBillingWorker — basic claim and process', () => {
     const { stripeEventId } = await insertPendingEvent()
     const retriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
 
-    await runBillingWorker({ retriever, db })
-    const second = await runBillingWorker({ retriever, db })
+    await runBillingWorker({ retriever, provider, db })
+    const second = await runBillingWorker({ retriever, provider, db })
 
     expect(second.claimedEvents).toBe(0)
   })
@@ -89,7 +95,7 @@ describe('runBillingWorker — basic claim and process', () => {
     } as unknown as Stripe.Event
     const retriever = fakeRetriever(new Map([[stripeEventId, deferredEvent]]))
 
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.deferredEvents).toBe(1)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -101,7 +107,7 @@ describe('runBillingWorker — basic claim and process', () => {
     const { id, stripeEventId } = await insertPendingEvent()
     const retriever = fakeRetriever(new Map([[stripeEventId, 'missing']]))
 
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.deadLetteredEvents).toBe(1)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -116,8 +122,8 @@ describe('runBillingWorker — concurrent claims never double-process the same r
     const retriever = fakeRetriever(eventMap)
 
     const [first, second] = await Promise.all([
-      runBillingWorker({ retriever, db, batchSize: 10 }),
-      runBillingWorker({ retriever, db, batchSize: 10 }),
+      runBillingWorker({ retriever, provider, db, batchSize: 10 }),
+      runBillingWorker({ retriever, provider, db, batchSize: 10 }),
     ])
 
     const claimedIds = [...first.eventResults, ...second.eventResults].map((r) => r.eventRowId)
@@ -135,7 +141,7 @@ describe('runBillingWorker — crashed lease reclaim', () => {
     const { id, stripeEventId } = await insertPendingEvent({ status: 'processing', nextAttemptAt: new Date(Date.now() - 60_000), attempts: 1 })
     const retriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
 
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.claimedEvents).toBe(1)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -146,7 +152,7 @@ describe('runBillingWorker — crashed lease reclaim', () => {
     const { stripeEventId } = await insertPendingEvent({ status: 'processing', nextAttemptAt: new Date(Date.now() + 60_000), attempts: 1 })
     const retriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
 
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.claimedEvents).toBe(0)
   })
@@ -157,7 +163,7 @@ describe('runBillingWorker — poison event handling', () => {
     const { id, stripeEventId } = await insertPendingEvent({ attempts: 0 })
     const retriever = fakeRetriever(new Map([[stripeEventId, new Error('processing exploded')]]))
 
-    const summary = await runBillingWorker({ retriever, db, maxAttempts: 8 })
+    const summary = await runBillingWorker({ retriever, provider, db, maxAttempts: 8 })
 
     expect(summary.retryScheduledEvents).toBe(1)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -170,7 +176,7 @@ describe('runBillingWorker — poison event handling', () => {
     const { id, stripeEventId } = await insertPendingEvent({ attempts: 7 })
     const retriever = fakeRetriever(new Map([[stripeEventId, new Error('still exploding')]]))
 
-    const summary = await runBillingWorker({ retriever, db, maxAttempts: 8 })
+    const summary = await runBillingWorker({ retriever, provider, db, maxAttempts: 8 })
 
     expect(summary.deadLetteredEvents).toBe(1)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -181,10 +187,10 @@ describe('runBillingWorker — poison event handling', () => {
   it('a dead-lettered event is never claimed again automatically', async () => {
     const { id, stripeEventId } = await insertPendingEvent({ attempts: 7 })
     const retriever = fakeRetriever(new Map([[stripeEventId, new Error('boom')]]))
-    await runBillingWorker({ retriever, db, maxAttempts: 8 })
+    await runBillingWorker({ retriever, provider, db, maxAttempts: 8 })
 
     const secondRunRetriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
-    const summary = await runBillingWorker({ retriever: secondRunRetriever, db })
+    const summary = await runBillingWorker({ retriever: secondRunRetriever, provider, db })
 
     expect(summary.claimedEvents).toBe(0)
     const [row] = await db.select().from(billingWebhookEvents).where(eq(billingWebhookEvents.id, id))
@@ -207,7 +213,7 @@ describe('replayBillingWebhookEvent', () => {
   it('replaying an already-processed event is a safe idempotent no-op', async () => {
     const { id, stripeEventId } = await insertPendingEvent()
     const retriever = fakeRetriever(new Map([[stripeEventId, unrecognizedEvent(stripeEventId)]]))
-    await runBillingWorker({ retriever, db })
+    await runBillingWorker({ retriever, provider, db })
 
     const result = await replayBillingWebhookEvent(id, { retriever, db })
 
@@ -233,7 +239,7 @@ describe('runBillingWorker — credit grant expiry sweep', () => {
     })
 
     const retriever = fakeRetriever(new Map())
-    const summary = await runBillingWorker({ retriever, db })
+    const summary = await runBillingWorker({ retriever, provider, db })
 
     expect(summary.expiredGrants).toBeGreaterThanOrEqual(1)
     const [grant] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
@@ -253,7 +259,7 @@ describe('runBillingWorker — credit grant expiry sweep', () => {
     })
 
     const retriever = fakeRetriever(new Map())
-    await runBillingWorker({ retriever, db })
+    await runBillingWorker({ retriever, provider, db })
 
     const [grant] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
     expect(grant.state).toBe('active')
@@ -281,7 +287,7 @@ describe('runBillingWorker — annual subscription grant sweep', () => {
     const { stripeSubscriptionId } = await seedAnnualSubscription()
     const retriever = fakeRetriever(new Map())
 
-    const summary = await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+    const summary = await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-06-01T00:00:00Z') })
 
     expect(summary.annualGrantsIssued).toBeGreaterThanOrEqual(4) // windows 2-5 by June 1
     const rows = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
@@ -293,8 +299,8 @@ describe('runBillingWorker — annual subscription grant sweep', () => {
     const retriever = fakeRetriever(new Map())
     const now = () => new Date('2026-06-01T00:00:00Z')
 
-    await runBillingWorker({ retriever, db, now })
-    await runBillingWorker({ retriever, db, now })
+    await runBillingWorker({ retriever, provider, db, now })
+    await runBillingWorker({ retriever, provider, db, now })
 
     // Scoped to THIS test's own subscription — the worker sweeps every organization in the
     // shared disposable database, so `summary.annualGrantsIssued` itself is not exclusive to
@@ -307,7 +313,7 @@ describe('runBillingWorker — annual subscription grant sweep', () => {
     const { stripeSubscriptionId } = await seedAnnualSubscription({ stripeStatus: 'canceled' })
     const retriever = fakeRetriever(new Map())
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-06-01T00:00:00Z') })
 
     const rows = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
     expect(rows).toHaveLength(0)
@@ -317,11 +323,11 @@ describe('runBillingWorker — annual subscription grant sweep', () => {
     const { stripeSubscriptionId } = await seedAnnualSubscription()
     const retriever = fakeRetriever(new Map())
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-03-01T00:00:00Z') }) // window 2 only
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-03-01T00:00:00Z') }) // window 2 only
     const rowsAfterFirst = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
     expect(rowsAfterFirst).toHaveLength(1)
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-04-01T00:00:00Z') }) // window 3 becomes due
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-04-01T00:00:00Z') }) // window 3 becomes due
     const rowsAfterSecond = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
     expect(rowsAfterSecond).toHaveLength(2)
   })
@@ -352,7 +358,7 @@ describe('runBillingWorker — non-payment block sweep', () => {
     })
     const retriever = fakeRetriever(new Map())
 
-    const summary = await runBillingWorker({ retriever, db, now: () => new Date('2026-01-09T00:00:00Z') })
+    const summary = await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-01-09T00:00:00Z') })
 
     expect(summary.paymentBlocksApplied).toBeGreaterThanOrEqual(1)
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
@@ -365,7 +371,7 @@ describe('runBillingWorker — non-payment block sweep', () => {
     const { stripeSubscriptionId } = await seedGracePeriodSubscription(new Date('2026-01-08T00:00:00Z'))
     const retriever = fakeRetriever(new Map())
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-01-05T00:00:00Z') })
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-01-05T00:00:00Z') })
 
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
     expect(row.paymentBlockedAt).toBeNull()
@@ -376,11 +382,11 @@ describe('runBillingWorker — non-payment block sweep', () => {
     const retriever = fakeRetriever(new Map())
     const now = () => new Date('2026-01-09T00:00:00Z')
 
-    await runBillingWorker({ retriever, db, now })
+    await runBillingWorker({ retriever, provider, db, now })
     const [firstRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
     const firstBlockedAt = firstRow.paymentBlockedAt
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-02-01T00:00:00Z') })
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-02-01T00:00:00Z') })
     const [secondRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
 
     expect(secondRow.paymentBlockedAt?.toISOString()).toBe(firstBlockedAt?.toISOString())
@@ -400,7 +406,7 @@ describe('runBillingWorker — non-payment block sweep', () => {
     })
     const retriever = fakeRetriever(new Map())
 
-    await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+    await runBillingWorker({ retriever, provider, db, now: () => new Date('2026-06-01T00:00:00Z') })
 
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
     expect(row.paymentBlockedAt).toBeNull()

@@ -2,6 +2,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   authUsers,
+  billingAutoRechargeRules,
   billingCheckoutAttempts,
   billingCreditGrants,
   billingCreditReservations,
@@ -581,4 +582,173 @@ export async function listBillingRefunds(
     .from(billingRefunds)
     .where(eq(billingRefunds.organizationId, organizationId))
     .orderBy(desc(billingRefunds.createdAt))
+}
+
+// ---------------------------------------------------------------------------
+// Auto-recharge (plans/stripe-billing-platform/tasks.md §8 "Implement capped
+// auto-recharge and SCA recovery") — one row per organization
+// (`billing_auto_recharge_rules.organization_id` is its own primary key).
+// ---------------------------------------------------------------------------
+
+export interface BillingAutoRechargeRuleRecord {
+  organizationId: string
+  ownerUserId: string
+  enabled: boolean
+  packCatalogKey: string | null
+  balanceThresholdUnits: number | null
+  monthlyCapCents: number | null
+  state: string
+  lastFailureAt: Date | null
+  lastFailureReason: string | null
+  consentVersion: string | null
+  pendingPaymentIntentId: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export async function findAutoRechargeRule(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingAutoRechargeRules)
+    .where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    .limit(1)
+  return row ?? null
+}
+
+/** Row-locked fetch — the worker's trigger decision (`auto-recharge.ts`'s `maybeTriggerAutoRecharge`) must lock this row before deciding, so two concurrent sweep ticks for the same organization can't both decide to charge. */
+export async function lockAutoRechargeRule(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingAutoRechargeRules)
+    .where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    .for('update')
+    .limit(1)
+  return row ?? null
+}
+
+export interface UpsertAutoRechargeRuleInput {
+  organizationId: string
+  ownerUserId: string
+  enabled: boolean
+  packCatalogKey: string
+  balanceThresholdUnits: number
+  monthlyCapCents: number
+  state: string
+  consentVersion: string
+}
+
+/** The only write path for owner-initiated configuration — always resets `pendingPaymentIntentId`/`lastFailureAt`/`lastFailureReason` to null: a fresh configuration is a fresh start, never carrying over a stale in-flight marker or failure reason from before the owner changed anything. */
+export async function upsertAutoRechargeRule(
+  transaction: TenantTransaction,
+  input: UpsertAutoRechargeRuleInput,
+): Promise<BillingAutoRechargeRuleRecord> {
+  const [row] = await transaction
+    .insert(billingAutoRechargeRules)
+    .values({ ...input, pendingPaymentIntentId: null, lastFailureAt: null, lastFailureReason: null })
+    .onConflictDoUpdate({
+      target: billingAutoRechargeRules.organizationId,
+      set: {
+        ownerUserId: input.ownerUserId,
+        enabled: input.enabled,
+        packCatalogKey: input.packCatalogKey,
+        balanceThresholdUnits: input.balanceThresholdUnits,
+        monthlyCapCents: input.monthlyCapCents,
+        state: input.state,
+        consentVersion: input.consentVersion,
+        pendingPaymentIntentId: null,
+        lastFailureAt: null,
+        lastFailureReason: null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning()
+  return row
+}
+
+/** Owner-initiated disable — never touches `packCatalogKey`/`balanceThresholdUnits`/`monthlyCapCents`/`consentVersion`, so re-enabling later can default back to the owner's last configuration rather than forcing them to re-enter it. */
+export async function disableAutoRechargeRule(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .update(billingAutoRechargeRules)
+    .set({ enabled: false, state: 'inactive', pendingPaymentIntentId: null, updatedAt: new Date() })
+    .where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    .returning()
+  return row ?? null
+}
+
+/** Pauses a rule BEFORE any charge was ever attempted (e.g. its configured pack retired) — distinct from `resolveAutoRechargeTrigger`, which resolves an already-in-flight charge's outcome and requires a matching `pendingPaymentIntentId` to do so. */
+export async function pauseAutoRechargeRule(
+  transaction: TenantTransaction,
+  organizationId: string,
+  update: { state: string; lastFailureAt: Date; lastFailureReason: string },
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .update(billingAutoRechargeRules)
+    .set({
+      state: update.state,
+      lastFailureAt: update.lastFailureAt,
+      lastFailureReason: update.lastFailureReason,
+      pendingPaymentIntentId: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    .returning()
+  return row ?? null
+}
+
+/**
+ * Atomically claims the right to trigger a new off-session charge — only succeeds (returns a row)
+ * when the rule is still `active` and has no other charge already in flight. Callers MUST have
+ * already locked the row via `lockAutoRechargeRule` in the same transaction (this function's own
+ * `WHERE` is the second half of that check-then-act, not a substitute for the lock: the lock is what
+ * makes two concurrent transactions serialize instead of both reading "eligible" before either
+ * writes).
+ */
+export async function claimAutoRechargeTrigger(
+  transaction: TenantTransaction,
+  organizationId: string,
+  paymentIntentId: string,
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .update(billingAutoRechargeRules)
+    .set({ pendingPaymentIntentId: paymentIntentId, updatedAt: new Date() })
+    .where(and(
+      eq(billingAutoRechargeRules.organizationId, organizationId),
+      eq(billingAutoRechargeRules.state, 'active'),
+      isNull(billingAutoRechargeRules.pendingPaymentIntentId),
+    ))
+    .returning()
+  return row ?? null
+}
+
+/** Resolves an in-flight charge's outcome — no-ops if `pendingPaymentIntentId` no longer matches (a duplicate/out-of-order webhook delivery arriving after the marker was already cleared by an earlier delivery of the SAME event). */
+export async function resolveAutoRechargeTrigger(
+  transaction: TenantTransaction,
+  organizationId: string,
+  expectedPaymentIntentId: string,
+  update: { state: string; lastFailureAt?: Date | null; lastFailureReason?: string | null },
+): Promise<BillingAutoRechargeRuleRecord | null> {
+  const [row] = await transaction
+    .update(billingAutoRechargeRules)
+    .set({
+      pendingPaymentIntentId: null,
+      state: update.state,
+      lastFailureAt: update.lastFailureAt ?? null,
+      lastFailureReason: update.lastFailureReason ?? null,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(billingAutoRechargeRules.organizationId, organizationId),
+      eq(billingAutoRechargeRules.pendingPaymentIntentId, expectedPaymentIntentId),
+    ))
+    .returning()
+  return row ?? null
 }

@@ -5,6 +5,7 @@ import { Crown } from 'lucide-react'
 import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { OrganizationBillingCard } from '~/modules/dashboard/components/OrganizationBillingCard'
+import { AutoRechargeSettings } from '~/modules/billing/AutoRechargeSettings'
 import type { OrganizationEntitlementDto } from '~/shared/lib/organizations/contracts'
 import type { LimitCheck, LimitResource } from '~/shared/lib/billing-shared'
 
@@ -87,6 +88,10 @@ function BillingSettingsPage() {
       ) : (
         <OrganizationBillingCard entitlement={entitlementQuery.data} />
       )}
+
+      <div className="mb-6">
+        <AutoRechargeSettings />
+      </div>
 
       {usage.length > 0 && (
         <section className="glass-panel p-5" data-testid="usage-section">

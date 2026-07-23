@@ -2,7 +2,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
+import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
 import { computeAnniversary } from './annual-grants'
 import { PACK_CATALOG, SUBSCRIPTION_CATALOG } from './catalog'
 import { processStripeWebhookEvent } from './webhook-handlers'
@@ -38,6 +38,25 @@ async function seedCustomer(organizationId: string, livemode = false): Promise<s
   const stripeCustomerId = `cus_${customerId}`
   await db.insert(billingCustomers).values({ id: customerId, organizationId, livemode, stripeCustomerId })
   return stripeCustomerId
+}
+
+async function seedAutoRechargeRule(organizationId: string, userId: string, pendingPaymentIntentId: string): Promise<void> {
+  await db.insert(billingAutoRechargeRules).values({
+    organizationId, ownerUserId: userId, enabled: true, packCatalogKey: 'starter_300',
+    balanceThresholdUnits: 50, monthlyCapCents: 10_000, state: 'active', pendingPaymentIntentId,
+  })
+}
+
+function paymentIntentEvent(
+  id: string,
+  paymentIntentId: string,
+  type: 'payment_intent.succeeded' | 'payment_intent.payment_failed' | 'payment_intent.requires_action',
+  created = 1780000000,
+) {
+  return {
+    id, type, created, livemode: false, api_version: '2026-06-24.dahlia',
+    data: { object: { id: paymentIntentId, object: 'payment_intent' } },
+  } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
 }
 
 async function readEntitlement(organizationId: string) {
@@ -605,6 +624,78 @@ describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
     expect(attempt.status).toBe('expired')
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
     expect(grants).toHaveLength(0)
+  })
+})
+
+describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)', () => {
+  it('grants pack credits and reactivates the rule on payment_intent.succeeded', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const paymentIntentId = `pi_${uniqueId('pi')}`
+    await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
+
+    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.succeeded'), { db })
+
+    expect(result.outcome).toBe('applied')
+    const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    expect(rule.state).toBe('active')
+    expect(rule.pendingPaymentIntentId).toBeNull()
+    const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, 'pack')))
+    expect(grants).toHaveLength(1)
+    expect(grants[0].originalUnits).toBe(PACK_CATALOG.starter_300.credits)
+    expect(grants[0].stripePaymentReference).toBe(paymentIntentId)
+  })
+
+  it('duplicate delivery of the same succeeded PaymentIntent never grants credits twice', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const paymentIntentId = `pi_${uniqueId('pi')}`
+    await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
+    const event = paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.succeeded')
+
+    const first = await processStripeWebhookEvent(event, { db })
+    // The first delivery already cleared `pendingPaymentIntentId` on success, so a duplicate second
+    // delivery of the SAME event can no longer resolve an organization for it — deferred, not
+    // applied, but still safe: `resolveAutoRechargeTrigger`'s own pending-marker match means a
+    // duplicate can never re-grant even if it WERE resolved. This is a known, documented tradeoff
+    // (see webhook-handlers.ts's `handleAutoRechargePaymentIntentEvent` module comment), not a
+    // correctness gap in the ledger.
+    const second = await processStripeWebhookEvent(event, { db })
+
+    expect(first.outcome).toBe('applied')
+    expect(second.outcome).toBe('deferred')
+    const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, 'pack')))
+    expect(grants).toHaveLength(1)
+  })
+
+  it('pauses the rule as paused_needs_auth on payment_intent.requires_action, without granting credits', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const paymentIntentId = `pi_${uniqueId('pi')}`
+    await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
+
+    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.requires_action'), { db })
+
+    const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    expect(rule.state).toBe('paused_needs_auth')
+    expect(rule.pendingPaymentIntentId).toBeNull()
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
+    expect(grants).toHaveLength(0)
+  })
+
+  it('pauses the rule as paused_failed on payment_intent.payment_failed, without granting credits', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const paymentIntentId = `pi_${uniqueId('pi')}`
+    await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
+
+    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.payment_failed'), { db })
+
+    const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
+    expect(rule.state).toBe('paused_failed')
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
+    expect(grants).toHaveLength(0)
+  })
+
+  it('defers a PaymentIntent event with no matching pending auto-recharge rule', async () => {
+    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), 'pi_never_seen', 'payment_intent.succeeded'), { db })
+    expect(result.outcome).toBe('deferred')
   })
 })
 

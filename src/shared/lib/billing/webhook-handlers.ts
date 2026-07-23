@@ -13,14 +13,14 @@
  *
  * Required families (spec.md): Checkout completed/expired; invoice paid/payment failed;
  * subscription created/updated/deleted; PaymentIntent succeeded/failed/action required; refund
- * created/updated/failed; and dispute created/updated/closed/funds reinstated. The first three
- * families are fully actionable today (customers/checkout/credits/subscriptions already exist).
- * PaymentIntent, refund, and dispute events currently have nothing to reconcile against — packs
- * (§8 task 1), refund review (§8 task 4), and dispute handling (§8 tasks 2-3) are later, dedicated
- * tasks — so those events are recorded as `'deferred'`, a distinct, honest outcome from `'ignored'`
- * (a genuinely unrecognized event type): "deferred" means the worker (§6 task 3) should leave the
- * row pending and revisit it once that later infrastructure exists, never that nothing needs to
- * happen.
+ * created/updated/failed; and dispute created/updated/closed/funds reinstated. The first four
+ * families are fully actionable today (customers/checkout/credits/subscriptions/packs/auto-recharge
+ * all exist — see `handlePackCheckoutCompleted` and `handleAutoRechargePaymentIntentEvent`). Refund
+ * and dispute events still have nothing to reconcile against — refund review (§8 task 4) and dispute
+ * handling (§8 task 5) are later, dedicated tasks — so those events are recorded as `'deferred'`, a
+ * distinct, honest outcome from `'ignored'` (a genuinely unrecognized event type): "deferred" means
+ * the worker (§6 task 3) should leave the row pending and revisit it once that later infrastructure
+ * exists, never that nothing needs to happen.
  *
  * Webhook events reference Stripe object ids (customer/subscription/checkout-session), never our
  * organizationId — resolving "which organization does this belong to" needs the cross-org lookup
@@ -33,11 +33,12 @@ import { computeAnniversary } from './annual-grants'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
-import { findBillingCustomer } from '../repositories/billing'
+import { findAutoRechargeRule, findBillingCustomer, resolveAutoRechargeTrigger } from '../repositories/billing'
 import {
   clearBillingSubscriptionPaymentBlock,
   findBillingCheckoutAttemptByStripeSessionId,
   findFullBillingSubscriptionByStripeId,
+  findOrganizationIdForPendingAutoRechargePaymentIntent,
   findOrganizationIdForStripeCheckoutSession,
   findOrganizationIdForStripeCustomer,
   findOrganizationIdForStripeSubscription,
@@ -99,15 +100,11 @@ export async function processStripeWebhookEvent(
       return handleInvoicePaymentFailed(event, db)
 
     case 'payment_intent.succeeded':
+      return handleAutoRechargePaymentIntentEvent(event, 'succeeded', db)
     case 'payment_intent.payment_failed':
+      return handleAutoRechargePaymentIntentEvent(event, 'payment_failed', db)
     case 'payment_intent.requires_action':
-      // Pack purchases (§8 task 1) grant on `checkout.session.completed` instead — every pack
-      // Checkout uses the restricted immediate-settlement payment methods (card/link), so Stripe
-      // only sends that event once payment has actually succeeded, and the Checkout attempt row
-      // already carries the organizationId/catalogKey a PaymentIntent-only event would lack. These
-      // PaymentIntent events remain unreconciled until auto-recharge (§8 task 2) creates
-      // off-session PaymentIntents directly, with no Checkout Session to key off of.
-      return { outcome: 'deferred', detail: `${event.type}: auto-recharge is not built yet (plans/stripe-billing-platform/tasks.md §8 task 2)` }
+      return handleAutoRechargePaymentIntentEvent(event, 'requires_action', db)
 
     case 'charge.refunded':
     case 'refund.created':
@@ -194,6 +191,73 @@ async function handlePackCheckoutCompleted(
       ? `Checkout session ${stripeCheckoutSessionId} already granted pack credits — duplicate delivery, no-op`
       : `Granted ${catalogEntry.credits} pack credits for checkout attempt ${attempt.id}`,
   }
+}
+
+/**
+ * Resolves the outcome of an off-session auto-recharge charge (§8 task 2). Unlike a Checkout
+ * Session, a bare PaymentIntent carries no Checkout attempt row to key off of — the only cross-org
+ * signal is `billing_auto_recharge_rules.pending_payment_intent_id`
+ * (`findOrganizationIdForPendingAutoRechargePaymentIntent`), set the moment
+ * `auto-recharge.ts`'s `maybeTriggerAutoRecharge` creates the charge. A PaymentIntent event whose org
+ * can no longer be found this way (already resolved by an earlier delivery of the SAME event, or
+ * never ours) stays `'deferred'` rather than `'ignored'` — safe (no double-grant, no double-charge:
+ * `resolveAutoRechargeTrigger`'s own `pendingPaymentIntentId` match guards that), if not perfectly
+ * tidy in the webhook-inbox row's own bookkeeping for an already-resolved duplicate.
+ */
+async function handleAutoRechargePaymentIntentEvent(
+  event: Stripe.Event,
+  outcome: 'succeeded' | 'payment_failed' | 'requires_action',
+  db: PostgresJsDatabase | typeof workerDb,
+): Promise<WebhookHandlerOutcome> {
+  const paymentIntent = event.data.object as Stripe.PaymentIntent
+  const eventTimestamp = new Date(event.created * 1000)
+
+  const organizationId = await findOrganizationIdForPendingAutoRechargePaymentIntent(paymentIntent.id, db)
+  if (!organizationId) {
+    return { outcome: 'deferred', detail: `No auto-recharge rule has a pending charge for PaymentIntent ${paymentIntent.id} (not ours, or already resolved)` }
+  }
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const rule = await findAutoRechargeRule(tx, organizationId)
+    if (!rule || rule.pendingPaymentIntentId !== paymentIntent.id) {
+      return { outcome: 'applied', detail: `Auto-recharge trigger for PaymentIntent ${paymentIntent.id} already resolved — duplicate delivery, no-op` }
+    }
+
+    if (outcome === 'succeeded') {
+      const catalogEntry = rule.packCatalogKey ? resolvePackCatalogEntryByKey(rule.packCatalogKey) : null
+      if (catalogEntry) {
+        await grantCredits(tx, {
+          grantId: randomUUID(),
+          ledgerEntryId: randomUUID(),
+          organizationId,
+          source: 'pack',
+          sourceReference: catalogEntry.key,
+          stripePaymentReference: paymentIntent.id,
+          units: catalogEntry.credits,
+          expiresAt: computeAnniversary(eventTimestamp, catalogEntry.expiryMonths),
+          idempotencyKey: `auto-recharge-grant:${paymentIntent.id}`,
+        })
+      }
+      await resolveAutoRechargeTrigger(tx, organizationId, paymentIntent.id, { state: 'active' })
+      return { outcome: 'applied', detail: `Auto-recharge charge ${paymentIntent.id} succeeded — credits granted, rule reactivated` }
+    }
+
+    if (outcome === 'requires_action') {
+      await resolveAutoRechargeTrigger(tx, organizationId, paymentIntent.id, {
+        state: 'paused_needs_auth',
+        lastFailureAt: eventTimestamp,
+        lastFailureReason: 'Additional authentication required for this off-session charge',
+      })
+      return { outcome: 'applied', detail: `Auto-recharge charge ${paymentIntent.id} requires authentication — paused` }
+    }
+
+    await resolveAutoRechargeTrigger(tx, organizationId, paymentIntent.id, {
+      state: 'paused_failed',
+      lastFailureAt: eventTimestamp,
+      lastFailureReason: 'Off-session payment failed',
+    })
+    return { outcome: 'applied', detail: `Auto-recharge charge ${paymentIntent.id} failed — paused` }
+  }, db)
 }
 
 async function handleSubscriptionUpsert(

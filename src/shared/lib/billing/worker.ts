@@ -6,10 +6,11 @@
  * other `run-worker.ts` route in this codebase) rather than a new mechanism.
  *
  * Grace-period blocking after 7 days is now built (§7 task 6, `dunning.ts`) and swept below.
- * Deduplicated notices and auto-recharge processing (§8 task 5, not yet built) remain OUT of this
- * worker's scope today — no notification channel or auto-recharge infrastructure exists yet for it
- * to drive. Adding that sweep is a small, additive extension of `runBillingWorker` once it lands —
- * not a redesign.
+ * Auto-recharge triggering (§8 task 2, `auto-recharge.ts`) is also swept below —
+ * `sweepAutoRecharge` evaluates every organization's rule once per tick via `maybeTriggerAutoRecharge`,
+ * which does its own row-locking so two overlapping worker runs can't double-charge the same org.
+ * Deduplicated financial notices (§10) remain OUT of this worker's scope today — no notification
+ * channel exists yet for it to drive.
  *
  * ## Why the worker re-fetches from Stripe's Events API, not our own stored payload
  *
@@ -38,9 +39,11 @@ import {
   withWorkerOrganization,
 } from '../repositories/billing-worker'
 import { issueAnnualSubscriptionGrants } from './annual-grants'
+import { maybeTriggerAutoRecharge } from './auto-recharge'
 import { resolveSubscriptionCatalogEntryByKey } from './catalog'
 import { expireCreditGrant } from './credits'
 import { freezeIncludedGrantsForNonPayment, shouldBlockForNonPayment } from './dunning'
+import type { BillingProvider } from './provider'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
 export interface EventRetriever {
@@ -63,6 +66,8 @@ export function createStripeEventRetriever(): EventRetriever {
 
 export interface RunBillingWorkerOptions {
   retriever: EventRetriever
+  /** Used by `sweepAutoRecharge` to create off-session PaymentIntents — the same DI seam every other billing service function takes. */
+  provider: BillingProvider
   /** Defaults to the real `workerDb` singleton — tests inject a disposable database. */
   db?: PostgresJsDatabase | typeof workerDb
   /** How many pending/retryable events to claim in one run. */
@@ -90,6 +95,7 @@ export interface WorkerRunSummary {
   expiredGrants: number
   annualGrantsIssued: number
   paymentBlocksApplied: number
+  autoRechargeTriggered: number
   eventResults: WebhookEventProcessingResult[]
 }
 
@@ -274,6 +280,24 @@ async function sweepNonPaymentBlocks(db: PostgresJsDatabase | typeof workerDb, n
   return blocked
 }
 
+/**
+ * Evaluates every organization's auto-recharge rule once (§8 task 2) — each org's decision runs in
+ * its own `withWorkerOrganization` transaction, so `maybeTriggerAutoRecharge`'s row lock only ever
+ * contends with ANOTHER concurrent worker run touching the SAME org, never across different orgs in
+ * this same sweep.
+ */
+async function sweepAutoRecharge(db: PostgresJsDatabase | typeof workerDb, provider: BillingProvider, now: Date): Promise<number> {
+  const orgIds = await listWorkerOrganizationIds(db)
+  let triggered = 0
+  for (const { id: organizationId } of orgIds) {
+    await withWorkerOrganization(organizationId, async (tx) => {
+      const outcome = await maybeTriggerAutoRecharge(tx as WorkerTransaction, organizationId, { provider, now })
+      if (outcome.triggered) triggered += 1
+    }, db)
+  }
+  return triggered
+}
+
 export async function runBillingWorker(options: RunBillingWorkerOptions): Promise<WorkerRunSummary> {
   const db = options.db ?? workerDb
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
@@ -290,6 +314,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
   const expiredGrants = await sweepExpiredCreditGrants(db, now)
   const annualGrantsIssued = await sweepAnnualSubscriptionGrants(db, now)
   const paymentBlocksApplied = await sweepNonPaymentBlocks(db, now)
+  const autoRechargeTriggered = await sweepAutoRecharge(db, options.provider, now)
 
   return {
     claimedEvents: claimed.length,
@@ -300,6 +325,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
     expiredGrants,
     annualGrantsIssued,
     paymentBlocksApplied,
+    autoRechargeTriggered,
     eventResults,
   }
 }

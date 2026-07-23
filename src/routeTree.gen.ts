@@ -74,6 +74,7 @@ import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$sl
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
 import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
@@ -474,6 +475,11 @@ const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
 const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
   id: '/api/billing/portal',
   path: '/api/billing/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingAutoRechargeRoute = ApiBillingAutoRechargeRouteImport.update({
+  id: '/api/billing/auto-recharge',
+  path: '/api/billing/auto-recharge',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -936,6 +942,7 @@ export interface FileRoutesByFullPath {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
@@ -1075,6 +1082,7 @@ export interface FileRoutesByTo {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
@@ -1219,6 +1227,7 @@ export interface FileRoutesById {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
@@ -1362,6 +1371,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
@@ -1501,6 +1511,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
@@ -1644,6 +1655,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/auto-recharge'
     | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
@@ -1757,6 +1769,7 @@ export interface RootRouteChildren {
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
@@ -2288,6 +2301,13 @@ declare module '@tanstack/react-router' {
       path: '/api/billing/portal'
       fullPath: '/api/billing/portal'
       preLoaderRoute: typeof ApiBillingPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/auto-recharge': {
+      id: '/api/billing/auto-recharge'
+      path: '/api/billing/auto-recharge'
+      fullPath: '/api/billing/auto-recharge'
+      preLoaderRoute: typeof ApiBillingAutoRechargeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -3054,6 +3074,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAiEmbedRoute: ApiAiEmbedRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,

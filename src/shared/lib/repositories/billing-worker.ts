@@ -19,7 +19,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
-import { billingCheckoutAttempts, billingCustomers, billingSubscriptions, organizations } from '../db/schema'
+import { billingAutoRechargeRules, billingCheckoutAttempts, billingCustomers, billingSubscriptions, organizations } from '../db/schema'
 
 /**
  * `db` defaults to the real `workerDb` singleton in production; tests inject a disposable database
@@ -92,6 +92,19 @@ export function findOrganizationIdForStripeCheckoutSession(
   return findOwningOrganizationId(async (tx, organizationId) => {
     const [row] = await tx.select({ id: billingCheckoutAttempts.id }).from(billingCheckoutAttempts)
       .where(and(eq(billingCheckoutAttempts.organizationId, organizationId), eq(billingCheckoutAttempts.stripeCheckoutSessionId, stripeCheckoutSessionId)))
+      .limit(1)
+    return Boolean(row)
+  }, db)
+}
+
+/** Resolves which organization a `payment_intent.*` event belongs to when it was created for auto-recharge (§8 task 2) — the ONLY cross-org signal for a bare PaymentIntent event, since (unlike Checkout Sessions) it never goes through `billing_checkout_attempts`. Only matches while the charge is still marked in-flight (`pending_payment_intent_id`); once resolved this stops matching, exactly like `findBillingCheckoutAttemptByStripeSessionId`'s own attempt-row lookup stops mattering once its status leaves `open`. */
+export function findOrganizationIdForPendingAutoRechargePaymentIntent(
+  paymentIntentId: string,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<string | null> {
+  return findOwningOrganizationId(async (tx, organizationId) => {
+    const [row] = await tx.select({ id: billingAutoRechargeRules.organizationId }).from(billingAutoRechargeRules)
+      .where(and(eq(billingAutoRechargeRules.organizationId, organizationId), eq(billingAutoRechargeRules.pendingPaymentIntentId, paymentIntentId)))
       .limit(1)
     return Boolean(row)
   }, db)

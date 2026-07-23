@@ -1137,6 +1137,11 @@ export const billingAutoRechargeRules = pgTable(
     lastFailureAt: timestamp('last_failure_at', { withTimezone: true }),
     lastFailureReason: text('last_failure_reason'),
     consentVersion: text('consent_version'),
+    // Set the moment an off-session recharge PaymentIntent is created, cleared once its outcome
+    // (succeeded/failed/requires_action) is known — the in-flight guard that stops the worker from
+    // triggering a second charge for the same balance-crossing event before the first one resolves.
+    // A NOT NULL value here means "do not evaluate this rule for a new trigger."
+    pendingPaymentIntentId: text('pending_payment_intent_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
