@@ -70,9 +70,13 @@ exists. `_meta/security-policy.md` defines the required replacement architecture
 - **Claimable profiles**: claim request + verify endpoints, claim fields on `builders`,
   `/api/builders/$builderId/claim`, gist/bio verification (`claim/verify.ts`).
 - **Onboarding**: `onboarding_progress`, status/complete/skip endpoints, `/onboarding` routes.
-- **Billing v1 (manual, no Stripe)**: `plans` table, `PLAN_LIMITS`/`PLAN_PRICING` in
-  `billing-shared.ts` (free/pro/team: $0/$19/$99), limit enforcement (`billing.ts`),
-  plan-change requests + admin approval (`plan_requests`, admin UI). **No payment processor.**
+- **Billing v1 (manual, no Stripe)**: `plans` table (legacy, per-user, migration-evidence only),
+  `organization_entitlements` (canonical, per-org — see `security-and-multitenancy`),
+  `PLAN_LIMITS`/`PLAN_PRICING` in `billing-shared.ts` (free/pro/team: $0/$19/$199), limit
+  enforcement (`billing.ts`, `repositories/entitlements.ts`), plan-change requests + admin approval
+  (`plan_requests`, admin UI). **No payment processor yet** — `stripe-billing-platform` plan is
+  `in_progress` (dependency contracts pinned in `src/shared/lib/billing/`; see
+  `docs/operations/stripe-launch-register.md` for launch gates). It supersedes `pricing-and-billing`.
 - **Legal & privacy**: /legal/\* pages, consent API, data export requests, account deletion.
 - **Status & trust**: /status page, incidents (+admin), health endpoint, metrics (admin).
 - **Changelog + roadmap**: public pages, votes, admin CRUD.

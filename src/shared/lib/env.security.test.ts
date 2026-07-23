@@ -88,3 +88,56 @@ describe('production enrichment security (plan: stealth-scraping)', () => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
   })
 })
+
+describe('stripe billing security (plan: stripe-billing-platform)', () => {
+  it('boots with billing disabled and no stripe env set (default-safe)', () => {
+    const parsed = parseEnvironment(productionEnvironment)
+    expect(parsed.STRIPE_BILLING_ENABLED).toBe('false')
+  })
+
+  it('accepts a fully valid enabled test-mode configuration', () => {
+    const parsed = parseEnvironment({
+      ...productionEnvironment,
+      STRIPE_BILLING_ENABLED: 'true',
+      STRIPE_SECRET_KEY: 'sk_test_abc123',
+      STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
+      STRIPE_API_VERSION: '2025-01-01.acacia',
+    })
+    expect(parsed.STRIPE_BILLING_ENABLED).toBe('true')
+  })
+
+  it.each([
+    ['missing secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
+    ['malformed secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'not-a-real-key', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
+    ['missing webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
+    ['malformed webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'not-a-real-secret', STRIPE_API_VERSION: '2025-01-01.acacia' }],
+    ['missing API version', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123' }],
+    ['live key outside production', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_live_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', NODE_ENV: 'development' }],
+  ])('rejects %s (fails closed)', (_label, override) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
+  })
+
+  // Unlike enrichment, this must fail closed in every environment, not just
+  // production — sandbox testing with real Stripe test keys happens well
+  // before the plan's live-rollout phase.
+  it('fails closed outside production too (not gated behind the production-only checks)', () => {
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      NODE_ENV: 'development',
+      STRIPE_BILLING_ENABLED: 'true',
+      // no STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET/STRIPE_API_VERSION set
+    })).toThrow()
+  })
+
+  it('accepts a valid enabled test-mode configuration outside production', () => {
+    const parsed = parseEnvironment({
+      ...productionEnvironment,
+      NODE_ENV: 'development',
+      STRIPE_BILLING_ENABLED: 'true',
+      STRIPE_SECRET_KEY: 'sk_test_abc123',
+      STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
+      STRIPE_API_VERSION: '2025-01-01.acacia',
+    })
+    expect(parsed.STRIPE_BILLING_ENABLED).toBe('true')
+  })
+})

@@ -59,6 +59,14 @@ const zodEnv = z.object({
   ENRICHMENT_RAW_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
   ENRICHMENT_ACCEPTED_RETENTION_DAYS: z.coerce.number().int().positive().default(180),
   ENRICHMENT_USER_AGENT: z.string().default('BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)'),
+  // Plan: stripe-billing-platform. Disabled by default; enabling requires
+  // every gate in docs/operations/stripe-launch-register.md to have
+  // evidence first. Test/live key mismatch, or enabling with any of these
+  // unset, must fail closed — never silently fall back to a stub provider.
+  STRIPE_BILLING_ENABLED: z.enum(['true', 'false']).default('false'),
+  STRIPE_SECRET_KEY: z.string().optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  STRIPE_API_VERSION: z.string().optional(),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
@@ -66,6 +74,35 @@ const zodEnv = z.object({
       path: ['BETTER_AUTH_SECRET'],
       message: 'BETTER_AUTH_SECRET is required — generate with: openssl rand -hex 32',
     })
+  }
+
+  // Unlike the enrichment/production-only checks below, this must fail
+  // closed in every environment (dev/test/production) — sandbox testing
+  // with real Stripe test keys is expected well before Phase 15's live
+  // rollout, so "enabled but misconfigured" must never silently degrade.
+  if (data.STRIPE_BILLING_ENABLED === 'true') {
+    if (!data.STRIPE_SECRET_KEY) {
+      context.addIssue({ code: 'custom', path: ['STRIPE_SECRET_KEY'], message: 'STRIPE_SECRET_KEY is required when STRIPE_BILLING_ENABLED=true' })
+    } else if (!/^sk_(test|live)_/.test(data.STRIPE_SECRET_KEY)) {
+      context.addIssue({ code: 'custom', path: ['STRIPE_SECRET_KEY'], message: 'STRIPE_SECRET_KEY must start with sk_test_ or sk_live_' })
+    }
+    if (!data.STRIPE_WEBHOOK_SECRET) {
+      context.addIssue({ code: 'custom', path: ['STRIPE_WEBHOOK_SECRET'], message: 'STRIPE_WEBHOOK_SECRET is required when STRIPE_BILLING_ENABLED=true' })
+    } else if (!/^whsec_/.test(data.STRIPE_WEBHOOK_SECRET)) {
+      context.addIssue({ code: 'custom', path: ['STRIPE_WEBHOOK_SECRET'], message: 'STRIPE_WEBHOOK_SECRET must start with whsec_' })
+    }
+    if (!data.STRIPE_API_VERSION) {
+      context.addIssue({ code: 'custom', path: ['STRIPE_API_VERSION'], message: 'STRIPE_API_VERSION is required when STRIPE_BILLING_ENABLED=true — pin the exact version the SDK/webhook endpoint/fixtures share' })
+    }
+    // Mixed test/live mode: a live secret key paired with a webhook secret
+    // minted for a different (test-mode) endpoint — or vice versa — is a
+    // classic misconfiguration Stripe's own dashboard won't catch for you.
+    // We can't verify the webhook secret's mode from its value alone (it's
+    // an opaque token), so this only catches the key/env-name mismatch: a
+    // live key outside NODE_ENV=production is never intentional here.
+    if (data.STRIPE_SECRET_KEY?.startsWith('sk_live_') && data.NODE_ENV !== 'production') {
+      context.addIssue({ code: 'custom', path: ['STRIPE_SECRET_KEY'], message: 'A live Stripe secret key must never be used outside NODE_ENV=production' })
+    }
   }
 
   if (data.NODE_ENV !== 'production') return
