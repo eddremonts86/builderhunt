@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { runEmbeddingsWorker } from '~/lib/semantic/embed-worker'
 
 /**
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/api/admin/embeddings/run-worker')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const principal = await requirePlatformAdminPrincipal(request)
+          const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
           const result = await runEmbeddingsWorker()
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',

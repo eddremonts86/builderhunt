@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { runDiscoveryWorker } from '~/lib/discovery/worker'
 
 /**
@@ -16,7 +17,7 @@ export const Route = createFileRoute('/api/admin/discovery/run-worker')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const principal = await requirePlatformAdminPrincipal(request)
+          const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
           const result = await runDiscoveryWorker()
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',

@@ -1,5 +1,23 @@
 @import 'tailwindcss';
 
+/* Self-hosted fonts (previously Google Fonts — removed to stop a CSP
+   style-src violation and to avoid leaking visitor IPs to Google). Variable
+   woff2 files live in public/fonts/ and cover the full 100–900 weight axis. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/inter-latin-wght-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2');
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* =============================================================================

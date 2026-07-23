@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { processPendingOrganizationDeletions } from '~/shared/lib/auth/organization-lifecycle'
 import { processPendingDeletions } from '~/shared/lib/legal'
 
@@ -18,7 +19,7 @@ export const Route = createFileRoute('/api/admin/legal/run-worker')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const principal = await requirePlatformAdminPrincipal(request)
+          const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
           const [accounts, organizations] = await Promise.all([
             processPendingDeletions(),
             processPendingOrganizationDeletions(),

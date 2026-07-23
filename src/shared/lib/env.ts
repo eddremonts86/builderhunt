@@ -15,6 +15,10 @@ const zodEnv = z.object({
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
   DATABASE_PLATFORM_URL: z.string().min(1).optional(),
+  // Shared secret that lets a VPS crontab trigger the admin run-worker
+  // endpoints unattended (see src/shared/lib/auth/cron.ts). Optional: when
+  // unset, only a platform-admin session can run the workers.
+  CRON_SECRET: z.string().optional(),
   TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy'),
   TENANT_WRITE_MODE: z.enum(['legacy', 'dual', 'canonical']).default('legacy'),
   TENANT_CANONICAL_READY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
