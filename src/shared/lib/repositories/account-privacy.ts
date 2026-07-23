@@ -20,14 +20,23 @@ import {
   builders,
   dataExportRequests,
   deletionRequests,
+  organizationBuilders,
   organizationMembers,
   organizations,
   planChanges,
   planRequests,
   plans,
+  publishedBuilderProfiles,
   savedQueries,
+  sourcingSprints,
   userConsents,
 } from '../db/schema'
+
+// A permanent system row (drizzle/0026_deleted_user_sentinel.sql) that
+// organization-owned resources' `creator_user_id` gets reassigned to on
+// account deletion, instead of being deleted themselves — see
+// hardDeleteAccountSubject below for why.
+export const DELETED_USER_SENTINEL_ID = 'system-deleted-user'
 
 export const listAccountConsents = (userId: string) => accountDb.select().from(userConsents)
   .where(eq(userConsents.userId, userId)).orderBy(desc(userConsents.acceptedAt))
@@ -249,21 +258,61 @@ export const listExpiredPendingDeletionRequests = () => accountDb.select({
   .where(and(eq(deletionRequests.status, 'pending'), lt(deletionRequests.gracePeriodEndsAt, new Date())))
 
 export async function hardDeleteAccountSubject(userId: string) {
+  // `builder_notes`/`alerts`/`saved_queries`/`builders` are tenant-private
+  // with RLS forced on organization_id — a plain `accountDb.transaction()`
+  // with no `app.organization_id` set silently deletes ZERO rows (RLS
+  // denies, no error), same failure mode `loadAccountExportSource` above
+  // was fixed for on the read side. The subject's rows can live in any
+  // organization they belong to, so delete once per membership under that
+  // organization's own tenant context — each iteration's delete only
+  // touches that org's rows for this user, enforced by RLS, not by an
+  // explicit organizationId filter in the query.
+  const memberships = await authDb.select({
+    organizationId: organizationMembers.organizationId,
+    role: organizationMembers.role,
+  }).from(organizationMembers).where(eq(organizationMembers.userId, userId))
+
+  await Promise.all(
+    memberships.map((membership) =>
+      withTenantContext(
+        {
+          userId,
+          organizationId: membership.organizationId,
+          role: membership.role as OrganizationRole,
+          requestId: crypto.randomUUID(),
+        },
+        // FK-safe order: `builder_notes.builder_id` and `alerts.query_id`
+        // have no ON DELETE action, so their referenced rows must go
+        // first or Postgres blocks the delete.
+        async (tx) => {
+          await tx.delete(builderNotes).where(eq(builderNotes.userId, userId))
+          await tx.delete(alerts).where(eq(alerts.userId, userId))
+          await tx.delete(savedQueries).where(eq(savedQueries.userId, userId))
+          await tx.delete(builders).where(eq(builders.userId, userId))
+          // `organization_builders`/`sourcing_sprints` are organization-owned,
+          // not this user's private data — reassign the creator reference
+          // to the permanent sentinel instead of deleting them, or `onDelete:
+          // 'restrict'` on creator_user_id blocks the auth_users delete below
+          // forever, for any user who ever tracked a builder or ran a sprint.
+          await tx.update(organizationBuilders).set({ creatorUserId: DELETED_USER_SENTINEL_ID })
+            .where(eq(organizationBuilders.creatorUserId, userId))
+          await tx.update(sourcingSprints).set({ creatorUserId: DELETED_USER_SENTINEL_ID })
+            .where(eq(sourcingSprints.creatorUserId, userId))
+          // Unlike the two tables above, this genuinely IS the user's own
+          // data (their self-published claimed profile) — delete it, not
+          // reassign it. Its RLS policy is scoped by `app.user_id`, not
+          // organization, so any membership's tenant context clears it;
+          // safe to repeat across iterations (a second delete matches 0 rows).
+          await tx.delete(publishedBuilderProfiles).where(eq(publishedBuilderProfiles.publishedByUserId, userId))
+        },
+      ),
+    ),
+  )
+
   // Two transactions, not one: auth_users/auth_sessions/auth_accounts/auth_verifications
   // are auth-broker-only tables (drizzle/0007_auth_broker.sql revokes builderhunt_app's
   // access to them), so they must be deleted through authDb's separate connection —
-  // there is no single Postgres transaction that spans both roles. Product-domain rows
-  // that reference auth_users (with no cascade) must be removed first in their own
-  // transaction, or the later auth_users delete fails on the FK.
-  await accountDb.transaction(async (tx) => {
-    // FK-safe order: `builder_notes.builder_id` and `alerts.query_id` have no ON DELETE
-    // action, so their referenced rows must go first or Postgres blocks the delete.
-    await tx.delete(builderNotes).where(eq(builderNotes.userId, userId))
-    await tx.delete(alerts).where(eq(alerts.userId, userId))
-    await tx.delete(savedQueries).where(eq(savedQueries.userId, userId))
-    await tx.delete(builders).where(eq(builders.userId, userId))
-  })
-
+  // there is no single Postgres transaction that spans both roles.
   await authDb.transaction(async (tx) => {
     // `plans`/`plan_changes`/`plan_requests`/`user_consents`/`data_export_requests`/
     // `onboarding_progress`/`roadmap_votes` already cascade from `auth_users` (see

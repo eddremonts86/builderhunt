@@ -1,8 +1,9 @@
-import { and, count, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
 import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
 import { authUsers, planChanges, planRequests, plans } from '../db/schema'
+import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
 export async function getPlatformUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {
   if (!userId) return null
@@ -114,10 +115,14 @@ export function listPlatformPlanRequests() {
 }
 
 export async function getPlatformAccountMetrics(oneDayAgo: Date, oneWeekAgo: Date) {
+  // Excludes DELETED_USER_SENTINEL_ID (drizzle/0026_deleted_user_sentinel.sql)
+  // — a permanent system row, not a real account, that would otherwise
+  // permanently inflate totalUsers by one.
+  const notSentinel = ne(authUsers.id, DELETED_USER_SENTINEL_ID)
   const [[total], [daily], [weekly]] = await Promise.all([
-    platformDb.select({ value: count() }).from(authUsers),
-    platformDb.select({ value: count() }).from(authUsers).where(gte(authUsers.createdAt, oneDayAgo)),
-    platformDb.select({ value: count() }).from(authUsers).where(gte(authUsers.createdAt, oneWeekAgo)),
+    platformDb.select({ value: count() }).from(authUsers).where(notSentinel),
+    platformDb.select({ value: count() }).from(authUsers).where(and(notSentinel, gte(authUsers.createdAt, oneDayAgo))),
+    platformDb.select({ value: count() }).from(authUsers).where(and(notSentinel, gte(authUsers.createdAt, oneWeekAgo))),
   ])
   return {
     totalUsers: Number(total?.value ?? 0),

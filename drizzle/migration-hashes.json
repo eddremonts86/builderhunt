@@ -104,6 +104,10 @@
     "0025_public_tables_app_grants": {
       "sql": "2d873ebae41854fc20599bc83ac74e55fe9e8d33873b2d08e7a68a5cacb185c1",
       "snapshot": "5749f3ca52dbc65f77221f11741b722451c5c60a728b032bf4fb6cb76487c570"
+    },
+    "0026_deleted_user_sentinel": {
+      "sql": "7c4428ac63c3c5bfcf570cf3e26b767c3db4b0b1972735d02fb98c1775f63897",
+      "snapshot": "3fef41fc9ef931c17912c10fde695930c0cf86b8540ee796feedac2680f62086"
     }
   }
 }

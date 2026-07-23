@@ -11,10 +11,13 @@
 // recent-builders/recommendations, subject-only `/api/me/**` routes
 // (data-export, delete-account, verified builder claims, evidence-provenance,
 // restrict-processing, org-tracked builders), the two grant-only public
-// tables (builder_embeddings, discovery_state), account-export privacy, and
-// alerts-worker cross-organization isolation. Still not the full ~34-route
-// inventory in src/routes/api/** — the admin/*/run-worker endpoints and a
-// couple of read-only public routes (changelog/roadmap public GETs, status,
+// tables (builder_embeddings, discovery_state), account-export privacy,
+// alerts-worker cross-organization isolation, and the legal/run-worker
+// pending-deletion sweep (real hard-delete, own/other-due-date matrix). Still
+// not the full ~34-route inventory in src/routes/api/** — the alerts/
+// discovery/embeddings/enrichment/sprints run-worker endpoints (all call a
+// live external network search/embedding/enrichment provider) and a couple
+// of read-only public routes (changelog/roadmap public GETs, status,
 // incidents public feed) remain uncovered; every route in the full inventory
 // does have a verified auth guard per scripts/check-route-coverage.mjs, so
 // any remaining gap is test breadth, not missing guards. Routes that only
@@ -878,6 +881,36 @@ async function checkMeSubjectRoutes() {
   )
 }
 
+// The only admin/*/run-worker endpoint with no live external network call
+// (alerts/discovery/embeddings/enrichment/sprints run-workers all call
+// searchBuilders or a real embedding/enrichment provider). Must run LAST —
+// this hard-deletes user A's entire account, which every earlier check in
+// this file depends on existing. `checkMeSubjectRoutes` already created (and
+// cancelled) a deletion_requests row for A, so this UPDATEs that row back to
+// due rather than INSERTing — `deletion_requests.user_id` is unique.
+async function checkLegalRunWorker() {
+  await owner`
+    update deletion_requests
+    set status = 'pending', grace_period_ends_at = now() - interval '1 day'
+    where user_id = ${IDS.userA}
+  `
+  await owner`
+    insert into deletion_requests (id, user_id, status, grace_period_ends_at)
+    values ('iso-deletion-b', ${IDS.userB}, 'pending', now() + interval '10 days')
+  `
+
+  const { processPendingDeletions } = await import('../../src/shared/lib/legal.ts')
+  const result = await processPendingDeletions()
+  record('legal run-worker: processes exactly A\'s due request, not B\'s not-yet-due one', result.processed === 1 && result.errors === 0, JSON.stringify(result))
+
+  const [remainingA] = await owner`select id from auth_users where id = ${IDS.userA}`
+  const [remainingB] = await owner`select id from auth_users where id = ${IDS.userB}`
+  record('legal run-worker: A\'s account is hard-deleted, B\'s is untouched', !remainingA && !!remainingB, JSON.stringify({ remainingA, remainingB }))
+
+  const [depB] = await owner`select status from deletion_requests where user_id = ${IDS.userB}`
+  record('legal run-worker: B\'s not-due deletion request is left pending, unprocessed', depB?.status === 'pending', JSON.stringify(depB))
+}
+
 async function checkAccountExportPrivacy() {
   const { buildExportPayload } = await import('../../src/shared/lib/legal.ts')
   const payloadA = await buildExportPayload(IDS.userA)
@@ -945,6 +978,7 @@ async function main() {
   // assuming no such legitimate cross-reference exists yet.
   await checkAdminContentManagement()
   await checkMeSubjectRoutes()
+  await checkLegalRunWorker()
 
   const failed = results.filter((r) => !r.pass)
   console.log(JSON.stringify({ total: results.length, passed: results.length - failed.length, failed: failed.length, results }, null, 2))

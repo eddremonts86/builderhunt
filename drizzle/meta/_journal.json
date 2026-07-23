@@ -183,6 +183,13 @@
       "when": 1784792156986,
       "tag": "0025_public_tables_app_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1784797447978,
+      "tag": "0026_deleted_user_sentinel",
+      "breakpoints": true
     }
   ]
 }
