@@ -171,6 +171,8 @@ export interface CreateBillingCheckoutAttemptInput {
   catalogKey: string
   idempotencyKey: string
   consentVersions: { terms: string; privacy: string }
+  /** Set once the provider-side Checkout Session exists — null only for the brief window (if any) before a caller knows it, per the schema's nullable column. */
+  stripeCheckoutSessionId?: string
   expiresAt: Date
 }
 
@@ -192,6 +194,26 @@ export async function createBillingCheckoutAttempt(
 ): Promise<BillingCheckoutAttemptRecord> {
   const [row] = await transaction.insert(billingCheckoutAttempts).values(input).returning()
   return row
+}
+
+/**
+ * Same insert, but tolerates losing a race to a concurrent caller inserting the same
+ * `(organizationId, idempotencyKey)` pair (drizzle/0027's `billing_checkout_attempts_org_idempotency_unique`)
+ * — returns `null` instead of throwing. Safe to call unconditionally after the provider-side
+ * Checkout Session already exists: because `billing/checkout.ts` derives the provider idempotency
+ * key from the same `(organizationId, idempotencyKey)` pair, the loser's own `session` value is
+ * already identical to the winner's, so it never needs to re-read this row to answer the caller.
+ */
+export async function createBillingCheckoutAttemptIfAbsent(
+  transaction: TenantTransaction,
+  input: CreateBillingCheckoutAttemptInput,
+): Promise<BillingCheckoutAttemptRecord | null> {
+  const [row] = await transaction
+    .insert(billingCheckoutAttempts)
+    .values(input)
+    .onConflictDoNothing({ target: [billingCheckoutAttempts.organizationId, billingCheckoutAttempts.idempotencyKey] })
+    .returning()
+  return row ?? null
 }
 
 /** Looks up a checkout attempt by its idempotency key so a retried request returns the original attempt instead of creating a second one. */

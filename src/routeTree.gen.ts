@@ -121,6 +121,7 @@ import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/buil
 import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
+import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
@@ -714,6 +715,12 @@ const ApiBuildersBuilderIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBillingCheckoutSubscriptionRoute =
+  ApiBillingCheckoutSubscriptionRouteImport.update({
+    id: '/api/billing/checkout/subscription',
+    path: '/api/billing/checkout/subscription',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
   id: '/api/alerts/triggers/$id',
   path: '/api/alerts/triggers/$id',
@@ -906,6 +913,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1034,6 +1042,7 @@ export interface FileRoutesByTo {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1166,6 +1175,7 @@ export interface FileRoutesById {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1297,6 +1307,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1425,6 +1436,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1556,6 +1568,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1649,6 +1662,7 @@ export interface RootRouteChildren {
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
+  ApiBillingCheckoutSubscriptionRoute: typeof ApiBillingCheckoutSubscriptionRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
@@ -2457,6 +2471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/billing/checkout/subscription': {
+      id: '/api/billing/checkout/subscription'
+      path: '/api/billing/checkout/subscription'
+      fullPath: '/api/billing/checkout/subscription'
+      preLoaderRoute: typeof ApiBillingCheckoutSubscriptionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/alerts/triggers/$id': {
       id: '/api/alerts/triggers/$id'
       path: '/api/alerts/triggers/$id'
@@ -2837,6 +2858,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
+  ApiBillingCheckoutSubscriptionRoute: ApiBillingCheckoutSubscriptionRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,

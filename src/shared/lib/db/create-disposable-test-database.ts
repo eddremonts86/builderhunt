@@ -35,7 +35,12 @@ export async function createDisposableTestDatabase(namePrefix: string) {
   const admin = postgres(adminUrl.toString(), { max: 1, prepare: false })
   await admin.unsafe(`CREATE DATABASE ${databaseName}`)
 
-  const client = postgres(databaseUrl.toString(), { max: 1, prepare: false })
+  // max: 5 (not 1) — some tests legitimately need a second connection borrowed from this same pool
+  // while a `db.transaction(...)` callback is still in flight on another (e.g. `billing/checkout.ts`
+  // reading the platform-scoped seller profile via its own injected `db` mid-transaction). With
+  // max: 1, that inner borrow would deadlock forever waiting for the connection the outer
+  // transaction is still holding.
+  const client = postgres(databaseUrl.toString(), { max: 5, prepare: false })
   const db = drizzle(client)
 
   await admin`select pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`

@@ -197,10 +197,45 @@
     pre-existing unrelated `catalog.test.ts` failure. `pnpm type-check`/`pnpm lint`/
     `pnpm security:boundaries` clean.
 
-- [ ] **Build subscription Checkout endpoint**
+- [x] **Build subscription Checkout endpoint**
   - Files: `src/shared/lib/billing/checkout.ts`, `src/shared/lib/billing/checkout.test.ts`, `src/routes/api/billing/checkout/subscription.ts`, `src/routes/api/billing/checkout/subscription.test.ts`
   - Do: Owner-only catalog-key request; validate readiness, country, existing subscription, consent, URLs, and attempt idempotency. Create subscription-mode Checkout with USD Price, automatic tax, billing address, tax ID, customer updates, promotion codes, and approved immediate card/wallet methods.
   - Verify: API matrix covers owner/admin/member, spoofed org/amount/Price/URL, duplicate request, existing subscription, non-Denmark country, disabled billing, and provider timeout.
+  - Progress (2026-07-23): `checkout.ts`'s `createSubscriptionCheckout(transaction, principal, input, {provider})`
+    never checks `principal.role` itself (the route enforces owner-only via `requireBillingPermission`)
+    and resolves everything server-side from a client `catalogKey`/`country`/idempotency key — a
+    duplicate-request idempotency-key lookup runs FIRST and short-circuits to a fresh
+    `provider.getCheckoutSession` read; then in order: return-URL origin allowlisting
+    (`env.APP_URL` prefix), catalog-key resolution (`unknown_catalog_key` if unknown/retired),
+    seller-profile-recorded ("billing configured at all") and country-allowlist gates, existing-
+    active-subscription rejection, `ensureBillingCustomer`, `recordCheckoutConsent` (validates all 7
+    disclosures), then the provider Checkout Session call — itself using a two-layer idempotency key
+    (provider key derived only from `(organizationId, idempotencyKey)`, plus a new
+    `createBillingCheckoutAttemptIfAbsent` DB insert tolerating a concurrent-race conflict) so a lost-
+    response retry or genuine concurrent caller converges on the SAME session either way. Extended
+    `BillingProvider`'s `CreateCheckoutSessionInput`/`BillingCheckoutSession` with the Stripe Tax/
+    collection/payment-method-type fields the spec requires (`automaticTax`, `billingAddressCollection`,
+    `taxIdCollection`, `allowPromotionCodes`, `paymentMethodTypes`), echoed back onto the fake
+    provider's session object so tests can assert on them directly without a separate spy. The route
+    (`api/billing/checkout/subscription.ts`) is a thin owner-only, Zod-`.strict()`-validated wrapper
+    mapping each `CheckoutErrorCode` to its HTTP status (503/403/400/409/400/502) — established a new
+    testing pattern for this codebase's first TanStack Start API-route test: `Route.options.server
+    .handlers.POST({request})` invoked directly, `requireTenantPrincipal`/`createSubscriptionCheckout`/
+    `getBillingProvider` mocked, the REAL `requireBillingPermission` exercised unmocked to prove the
+    route actually wires up owner-only enforcement end-to-end. 12 new checkout.ts tests (disposable-DB,
+    covering every rejection reason, the Stripe Tax/collection/payment-method assertions via a live
+    round-trip through the fake provider, duplicate-request replay, concurrent-request convergence, and
+    a provider-timeout stub subclass) plus 16 new route tests (owner/admin/member matrix, spoofed
+    org/amount/Price fields rejected by strict-schema 400s, spoofed redirect URLs, every
+    CheckoutErrorCode-to-status mapping, generic-500 fallback). Also found and fixed a second
+    connection-pool deadlock in `create-disposable-test-database.ts`: the disposable test client's
+    `max: 1` pool meant a function called mid-transaction that borrows a SECOND connection from the
+    same pool (checkout.ts's `getCurrentSellerProfile(sellerProfileDb)`, injected as the same disposable
+    `db`) would deadlock forever waiting for the connection its own outer `db.transaction(...)` was
+    still holding; raised to `max: 5` (admin's advisory-lock connection is untouched, still `max: 1`).
+    Full suite 262/262 minus the same pre-existing unrelated `catalog.test.ts` failure.
+    `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries` clean; `routeTree.gen.ts` regenerated via
+    the running dev server (additive-only diff, confirmed via `git diff --stat`).
 
 - [ ] **Build pending Checkout return experience**
   - Files: `src/routes/_dashboard/settings/billing/return.tsx`, `src/modules/billing/CheckoutReturn.tsx`, `src/modules/billing/CheckoutReturn.test.tsx`, `src/routeTree.gen.ts`

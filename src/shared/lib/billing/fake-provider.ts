@@ -109,6 +109,11 @@ export class FakeBillingProvider implements BillingProvider {
       metadata: {},
       createdAt: now,
       updatedAt: now,
+      automaticTax: input.automaticTax ?? false,
+      billingAddressCollection: input.billingAddressCollection ?? 'auto',
+      taxIdCollection: input.taxIdCollection ?? false,
+      allowPromotionCodes: input.allowPromotionCodes ?? false,
+      paymentMethodTypes: input.paymentMethodTypes ?? [],
     }
     this.checkoutSessions.set(sessionId, session)
     this.idempotency.set(dedupeKey, sessionId)

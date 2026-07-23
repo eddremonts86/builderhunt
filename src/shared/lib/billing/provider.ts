@@ -51,6 +51,12 @@ export interface BillingCheckoutSession {
   metadata: Record<string, string>
   createdAt: string
   updatedAt: string
+  /** Echoes back the Checkout-time settings this session was created with — lets callers/tests confirm the required spec.md disclosures/collection settings were actually requested, without a separate spy. */
+  automaticTax: boolean
+  billingAddressCollection: 'auto' | 'required'
+  taxIdCollection: boolean
+  allowPromotionCodes: boolean
+  paymentMethodTypes: string[]
 }
 
 export type SubscriptionStatus = 'active' | 'past_due' | 'canceled' | 'trialing' | 'incomplete'
@@ -110,6 +116,14 @@ export interface CreateCheckoutSessionInput {
   cancelUrl: string
   idempotencyKey: string
   scenario?: BillingScenario
+  /** Stripe Tax — spec.md: "Checkout uses subscription mode, automatic tax, billing address, tax-ID collection, ...". The fake provider accepts and ignores these; a future real adapter translates them into the matching `stripe.checkout.sessions.create` parameters. */
+  automaticTax?: boolean
+  billingAddressCollection?: 'auto' | 'required'
+  taxIdCollection?: boolean
+  allowPromotionCodes?: boolean
+  customerUpdate?: { address?: 'auto'; name?: 'auto' }
+  /** Restricts Checkout to methods that settle immediately (never ACH/SEPA/vouchers) — see `billing/checkout.ts`'s `APPROVED_IMMEDIATE_PAYMENT_METHOD_TYPES`. */
+  paymentMethodTypes?: string[]
 }
 
 export interface CreatePortalSessionInput {
