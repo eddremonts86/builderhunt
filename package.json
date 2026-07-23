@@ -34,7 +34,8 @@
     "db:migrate": "tsx --env-file=.env scripts/db/create-db.ts && drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/db/seed.ts",
-    "db:seed:admin": "tsx --env-file=.env scripts/db/seed-admin.ts"
+    "db:seed:admin": "tsx --env-file=.env scripts/db/seed-admin.ts",
+    "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",
