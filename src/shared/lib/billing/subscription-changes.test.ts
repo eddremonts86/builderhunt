@@ -21,6 +21,7 @@ vi.mock('../organizations/contracts', async (importOriginal) => {
 })
 
 import {
+  cancelSubscriptionAtPeriodEnd,
   changeSubscription,
   classifySubscriptionChange,
   computeUpgradeCreditDelta,
@@ -487,5 +488,54 @@ describe('changeSubscription', () => {
     expect(first.creditDelta).toBe(second.creditDelta)
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
     expect(grants).toHaveLength(1)
+  })
+})
+
+describe('cancelSubscriptionAtPeriodEnd', () => {
+  let provider: FakeBillingProvider
+  beforeEach(() => { provider = new FakeBillingProvider() })
+
+  it('schedules cancellation for the current period end and marks cancelAtPeriodEnd', async () => {
+    const principal = await freshOrgWithOwner()
+    const periodEnd = new Date('2026-04-01T00:00:00Z')
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { currentPeriodEnd: periodEnd })
+
+    const result = await db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
+
+    expect(result).toEqual({ cancelAtPeriodEnd: true, effectiveAt: periodEnd.toISOString() })
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.cancelAtPeriodEnd).toBe(true)
+    expect(row.canceledAt).toBeNull() // never immediately terminated
+    expect(row.stripeStatus).toBe('active') // access continues through the paid period
+  })
+
+  it('never cancels immediately — the provider is asked for atPeriodEnd: true, never an immediate cancellation', async () => {
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider)
+    const cancelSpy = vi.spyOn(provider, 'cancelSubscription')
+
+    await db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
+
+    expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({ atPeriodEnd: true }))
+  })
+
+  it('a duplicate cancellation request is an idempotent no-op, not an error', async () => {
+    const principal = await freshOrgWithOwner()
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider)
+    const cancelSpy = vi.spyOn(provider, 'cancelSubscription')
+
+    const first = await db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
+    const second = await db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
+
+    expect(first).toEqual(second)
+    expect(cancelSpy).toHaveBeenCalledTimes(1) // the second call recognizes it's already scheduled and never re-calls the provider
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.cancelAtPeriodEnd).toBe(true)
+  })
+
+  it('rejects when there is no active subscription', async () => {
+    const principal = await freshOrgWithOwner()
+    await expect(db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider })))
+      .rejects.toMatchObject({ code: 'no_active_subscription' })
   })
 })

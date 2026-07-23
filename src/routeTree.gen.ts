@@ -126,6 +126,7 @@ import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
 import { Route as ApiBillingSubscriptionPreviewRouteImport } from './routes/api/billing/subscription/preview'
 import { Route as ApiBillingSubscriptionChangeRouteImport } from './routes/api/billing/subscription/change'
+import { Route as ApiBillingSubscriptionCancelRouteImport } from './routes/api/billing/subscription/cancel'
 import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
 import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
@@ -752,6 +753,12 @@ const ApiBillingSubscriptionChangeRoute =
     path: '/api/billing/subscription/change',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiBillingSubscriptionCancelRoute =
+  ApiBillingSubscriptionCancelRouteImport.update({
+    id: '/api/billing/subscription/cancel',
+    path: '/api/billing/subscription/cancel',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBillingCheckoutSubscriptionRoute =
   ApiBillingCheckoutSubscriptionRouteImport.update({
     id: '/api/billing/checkout/subscription',
@@ -980,6 +987,7 @@ export interface FileRoutesByFullPath {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -1117,6 +1125,7 @@ export interface FileRoutesByTo {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -1259,6 +1268,7 @@ export interface FileRoutesById {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
@@ -1400,6 +1410,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
@@ -1537,6 +1548,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
@@ -1678,6 +1690,7 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
@@ -1780,6 +1793,7 @@ export interface RootRouteChildren {
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBillingCheckoutStatusRoute: typeof ApiBillingCheckoutStatusRoute
   ApiBillingCheckoutSubscriptionRoute: typeof ApiBillingCheckoutSubscriptionRoute
+  ApiBillingSubscriptionCancelRoute: typeof ApiBillingSubscriptionCancelRoute
   ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
   ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
@@ -2626,6 +2640,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBillingSubscriptionChangeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/subscription/cancel': {
+      id: '/api/billing/subscription/cancel'
+      path: '/api/billing/subscription/cancel'
+      fullPath: '/api/billing/subscription/cancel'
+      preLoaderRoute: typeof ApiBillingSubscriptionCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/billing/checkout/subscription': {
       id: '/api/billing/checkout/subscription'
       path: '/api/billing/checkout/subscription'
@@ -3062,6 +3083,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBillingCheckoutStatusRoute: ApiBillingCheckoutStatusRoute,
   ApiBillingCheckoutSubscriptionRoute: ApiBillingCheckoutSubscriptionRoute,
+  ApiBillingSubscriptionCancelRoute: ApiBillingSubscriptionCancelRoute,
   ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
   ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,

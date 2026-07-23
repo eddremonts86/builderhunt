@@ -685,10 +685,58 @@
     `checkout.test.ts`'s already-confirmed-flaky concurrent-idempotency-key test — 795 passing);
     `pnpm type-check`/`pnpm lint` (0 errors)/`pnpm security:boundaries`/route-coverage all clean.
 
-- [ ] **Implement cancellation and renewal-safe price migration**
+- [x] **Implement cancellation and renewal-safe price migration**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/routes/api/billing/subscription/cancel.ts`, `src/shared/lib/billing/price-migrations.ts`, `src/shared/lib/billing/price-migrations.test.ts`
   - Do: Schedule owner cancellation at period end; version catalog Price changes, enforce notice/effective date, preserve annual term, and migrate at renewal without retroactive charge or indefinite grandfather promise.
   - Verify: Test Clocks show cancellation/update events and old/new Price at exact renewal; duplicate scheduler is no-op.
+  - Progress (2026-07-23): `cancelSubscriptionAtPeriodEnd` (new export on `subscription-changes.ts`) is
+    always scheduled, never immediate — mirrors the change matrix's own downgrade rule rather than
+    inventing separate cancellation semantics. Idempotent by design (a second call while already
+    `cancelAtPeriodEnd` is a same-result no-op, not an error — a duplicate click or client retry never
+    double-cancels or errors confusingly); the provider's own `cancelSubscription({atPeriodEnd:true})`
+    call carries no idempotency key by its existing interface, so this function's OWN early-return
+    check is what makes repeats safe, not the provider. New `POST /api/billing/subscription/cancel`
+    route (owner-only, no request body — nothing to validate, matching `CancelSubscriptionInput`'s own
+    shape) + new `markBillingSubscriptionCancelAtPeriodEnd` repository function (sets ONLY
+    `cancelAtPeriodEnd`, never `canceledAt` — that's exclusively `handleSubscriptionUpsert`/
+    `handleSubscriptionDeleted`'s job once Stripe's own webhook confirms the subscription actually
+    terminated; this route's optimistic local write is a UI-responsiveness mirror of an action just
+    taken, not a second source of truth).
+    **Scope decision on price migration** (documented in `price-migrations.ts`'s own module comment):
+    this catalog has never actually had a second version of any entry — every key is still its
+    original `version: 1`, and catalog.ts's own file header forbids retroactively rewriting a
+    released entry's history. A real price change would need catalog.ts to gain genuine multi-version
+    STORAGE (how an old Price ID/amount is retained once superseded) — an unresolved architecture
+    question this task's own file list doesn't include a schema/migration for, and one with no real
+    decision to build against yet (no price change has been announced). What IS fully built and
+    tested: the TIMING invariant itself, generic over whatever the eventual version-history source
+    turns out to be. `resolvePriceMigration(candidate, now)` is pure: a price INCREASE is withheld
+    until a 30-day notice clock (spec.md) has elapsed even past the renewal boundary; a DECREASE needs
+    no notice but still waits for the renewal boundary; nothing EVER migrates before the subscriber's
+    own `currentPeriodEnd` — which is exactly what makes an annual subscriber's price "unchanged
+    through the paid year" fall out for free (the same boundary check, just naturally later), and
+    exactly what makes migration "no retroactive charge" (a Price only ever swaps at a point nothing
+    has been charged for yet). `applyDuePriceMigration` re-reads the subscription's CURRENT
+    `catalogVersion` from the database itself before acting (never trusting a caller-supplied
+    snapshot) — this alone is what makes a duplicate/overlapping application a true no-op that never
+    even calls the provider a second time, not merely relying on the provider's own idempotency to
+    silently absorb a repeat call. Wiring a periodic worker sweep (the counterpart to
+    `annual-grants.ts`'s) across every subscription is explicitly deferred until a real price change
+    is actually decided, since there is nothing for such a sweep to migrate anyone to today.
+    9 new `subscription-changes.test.ts` cancellation tests (schedules at period end and marks the
+    flag without touching `canceledAt`/`stripeStatus`, confirms the provider is asked for
+    `atPeriodEnd: true` specifically — never an immediate cancellation, a duplicate request is an
+    idempotent no-op that never re-calls the provider, rejects with no active subscription), 6 new
+    `cancel.test.ts` route tests (owner/admin/member permission matrix, `no_active_subscription`
+    mapped to 409, generic 500 fallback). 10 new `price-migrations.test.ts` tests (up-to-date no-op,
+    increase withheld until notice elapses even past renewal, migrates once BOTH conditions clear,
+    the exact 30-day boundary instant inclusive on one side, a decrease needing no notice but still
+    waiting for renewal, never migrating mid-annual-term despite long-elapsed notice, the exact
+    renewal-boundary instant inclusive, real disposable-database integration for
+    `applyDuePriceMigration` — does-nothing/applies/duplicate-never-calls-the-provider-twice). Full
+    suite 816 total minus the same pre-existing unrelated `catalog.test.ts` failure (815 passing);
+    `pnpm type-check`/`pnpm lint` (0 errors)/`pnpm security:boundaries`/route-coverage (86 routes, 8
+    allowlisted — unchanged, confirming the new route is correctly auth-gated) all clean.
 
 - [ ] **Implement seven-day dunning and recovery**
   - Files: `src/shared/lib/billing/dunning.ts`, `src/shared/lib/billing/dunning.test.ts`, `src/shared/lib/billing/worker.ts`, `src/shared/lib/repositories/entitlements.ts`

@@ -223,6 +223,18 @@ export async function scheduleBillingSubscriptionChange(
     .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
 }
 
+/** Owner-initiated cancellation — optimistic local mirror of the provider call that just succeeded; `webhook-handlers.ts`'s `handleSubscriptionUpsert` keeps this in sync from Stripe's own `cancel_at_period_end` field on every future update regardless. Never sets `canceledAt`: that's only written once the subscription actually terminates (`handleSubscriptionDeleted`). */
+export async function markBillingSubscriptionCancelAtPeriodEnd(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({ cancelAtPeriodEnd: true })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
 export interface CreateBillingSubscriptionInput {
   id: string
   organizationId: string

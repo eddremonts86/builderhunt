@@ -38,6 +38,7 @@ import { findGrantedByIdempotencyKey, grantCredits } from './credits'
 import {
   applyImmediateSubscriptionChange,
   findFullActiveBillingSubscription,
+  markBillingSubscriptionCancelAtPeriodEnd,
   scheduleBillingSubscriptionChange,
   type FullBillingSubscriptionRecord,
 } from '../repositories/billing'
@@ -373,4 +374,36 @@ export async function changeSubscription(
   }
 
   return { applied: 'immediate', newCatalogKey: newCatalogEntry.key, effectiveAt: now.toISOString(), creditDelta }
+}
+
+export interface CancelSubscriptionResult {
+  cancelAtPeriodEnd: true
+  effectiveAt: string
+}
+
+/**
+ * Owner-initiated cancellation — always scheduled for the current billing period's end, never
+ * immediate (spec.md: "Downgrade, cancellation, or annual to monthly: SCHEDULED for the Stripe
+ * billing period's end"). Idempotent: a second call while already scheduled is a no-op, not an
+ * error — a duplicate click or a client retry never double-cancels or errors confusingly.
+ */
+export async function cancelSubscriptionAtPeriodEnd(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  options: SubscriptionChangeOptions,
+): Promise<CancelSubscriptionResult> {
+  const now = (options.now ?? (() => new Date()))()
+  const livemode = isLiveMode()
+  const subscription = await findFullActiveBillingSubscription(transaction, principal.organizationId, livemode)
+  if (!subscription) throw new SubscriptionChangeError('No active subscription for this organization', 'no_active_subscription')
+
+  const effectiveAt = (subscription.currentPeriodEnd ?? now).toISOString()
+  if (subscription.cancelAtPeriodEnd) {
+    return { cancelAtPeriodEnd: true, effectiveAt }
+  }
+
+  await options.provider.cancelSubscription({ subscriptionId: subscription.stripeSubscriptionId, atPeriodEnd: true })
+  await markBillingSubscriptionCancelAtPeriodEnd(transaction, principal.organizationId, subscription.stripeSubscriptionId)
+
+  return { cancelAtPeriodEnd: true, effectiveAt }
 }
