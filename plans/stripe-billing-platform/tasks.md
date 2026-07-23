@@ -323,10 +323,43 @@
 
 ## 6. Webhooks and workers
 
-- [ ] **Implement signed durable Stripe webhook receipt**
+- [x] **Implement signed durable Stripe webhook receipt**
   - Files: `src/routes/api/webhooks/stripe.ts`, `src/routes/api/webhooks/stripe.test.ts`, `src/shared/lib/billing/webhook-inbox.ts`, `src/shared/lib/billing/webhook-inbox.test.ts`
   - Do: Read raw bytes, verify current/rotating secrets, enforce API version/livemode, insert unique event before `2xx`, retain minimized encrypted payload under schedule, and redact logs/errors. Do not require user session or parse JSON before signature verification.
   - Verify: official signed fixtures pass; tampered body/signature, old timestamp, wrong mode/version fail; duplicate event returns `2xx` with one row.
+  - Progress (2026-07-23): `webhook-inbox.ts`'s `receiveStripeWebhook(input, options)` verifies
+    `Stripe-Signature` via `Stripe.webhooks.constructEvent` against every currently-configured secret
+    in order (current, then previous during a rotation window — new `STRIPE_WEBHOOK_SECRET_PREVIOUS`
+    env var), never parsing the body as JSON until that verification succeeds. Rejects an
+    `api_version`/`livemode` mismatch against the pinned expectation, then inserts one row per unique
+    `(livemode, stripeEventId)` via `onConflictDoNothing` — a duplicate delivery is a successful
+    no-op (still 2xx, zero new rows). The route (`POST /api/webhooks/stripe`) requires no user
+    session at all (added to `check-route-coverage.mjs`'s public allowlist with a stated reason —
+    Stripe cannot hold a session, signature verification IS the auth) and reads `request.text()`
+    directly rather than `.json()`, so nothing is parsed before the signature check. New
+    `src/shared/lib/crypto/webhook-payload.ts` adds this codebase's first symmetric-encryption
+    helper (AES-256-GCM via `node:crypto`, fresh IV per call, `iv:authTag:ciphertext` hex format) for
+    the `billing_webhook_events.payload_encrypted` column — a new `WEBHOOK_PAYLOAD_ENCRYPTION_KEY`
+    env var (required when `STRIPE_BILLING_ENABLED=true`, 64 hex chars) backs it. The stored payload
+    is deliberately minimized (`minimizeForStorage`: event id/type/timestamps and the affected
+    object's id/type only) — handlers re-fetch current provider state rather than trusting embedded
+    fields, so nothing more needs to be retained, and card numbers/emails embedded in the real Stripe
+    object are proven absent from the encrypted-then-decrypted stored value in a dedicated test.
+    "Official signed fixtures" means literally that: every webhook-inbox test signs its own fixture
+    event via `Stripe.webhooks.generateTestHeaderString` (the same SDK function Stripe's own webhook
+    testing docs recommend), not a hand-rolled HMAC — proving the verification path is compatible
+    with Stripe's actual signing scheme, not just an internal round-trip. 9 new crypto tests
+    (round-trip, fresh-IV-per-call, wrong-key/tampered-ciphertext/tampered-tag all fail via GCM's
+    auth tag rather than silently returning garbage, malformed-format rejection, fail-closed default
+    when no key configured), 15 new webhook-inbox tests (accepted fixture, exactly-one-row,
+    duplicate-is-2xx-no-op, missing/tampered/wrong-secret signature, stale timestamp, api-version/
+    livemode mismatch in both directions, previous-secret rotation acceptance, zero-secrets-configured
+    rejection, minimized-payload proof), 11 new route tests (raw body/header passthrough including a
+    literal `null` header, every rejection code mapped to 400, generic 500 fallback, no-session-
+    required). Also extended `env.security.test.ts` for the two new env fields (11 new cases) since
+    `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` is now required whenever `STRIPE_BILLING_ENABLED=true`. Full
+    suite 373/373 minus the same pre-existing unrelated `catalog.test.ts` failure; `pnpm type-check`/
+    `pnpm lint`/`pnpm security:boundaries`/route-coverage all clean; `routeTree.gen.ts` regenerated.
 
 - [ ] **Implement idempotent monotonic event handlers**
   - Files: `src/shared/lib/billing/webhook-handlers.ts`, `src/shared/lib/billing/webhook-handlers.test.ts`, `src/shared/lib/billing/subscription-state.ts`, `src/shared/lib/billing/subscription-state.test.ts`

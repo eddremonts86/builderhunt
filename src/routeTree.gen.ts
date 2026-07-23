@@ -51,6 +51,7 @@ import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/ind
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
+import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
@@ -350,6 +351,11 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
 const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
   id: '/team/invite/$invitationId',
   path: '/team/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
+  id: '/api/webhooks/stripe',
+  path: '/api/webhooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
@@ -910,6 +916,7 @@ export interface FileRoutesByFullPath {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -1042,6 +1049,7 @@ export interface FileRoutesByTo {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -1179,6 +1187,7 @@ export interface FileRoutesById {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -1315,6 +1324,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/webhooks/stripe'
     | '/team/invite/$invitationId'
     | '/dashboard/'
     | '/exports/'
@@ -1447,6 +1457,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/webhooks/stripe'
     | '/team/invite/$invitationId'
     | '/dashboard'
     | '/exports'
@@ -1583,6 +1594,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/webhooks/stripe'
     | '/team/invite/$invitationId'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -1689,6 +1701,7 @@ export interface RootRouteChildren {
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
+  ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute
   TeamInviteInvitationIdRoute: typeof TeamInviteInvitationIdRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
@@ -2030,6 +2043,13 @@ declare module '@tanstack/react-router' {
       path: '/team/invite/$invitationId'
       fullPath: '/team/invite/$invitationId'
       preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/webhooks/stripe': {
+      id: '/api/webhooks/stripe'
+      path: '/api/webhooks/stripe'
+      fullPath: '/api/webhooks/stripe'
+      preLoaderRoute: typeof ApiWebhooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sprints/preview': {
@@ -2931,6 +2951,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
+  ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,
   TeamInviteInvitationIdRoute: TeamInviteInvitationIdRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,

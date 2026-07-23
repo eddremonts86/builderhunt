@@ -66,7 +66,13 @@ const zodEnv = z.object({
   STRIPE_BILLING_ENABLED: z.enum(['true', 'false']).default('false'),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  // Set only while rotating the webhook endpoint secret — the receipt endpoint accepts a signature
+  // verified by either secret during the overlap window, then this is unset once rotation completes.
+  STRIPE_WEBHOOK_SECRET_PREVIOUS: z.string().optional(),
   STRIPE_API_VERSION: z.string().optional(),
+  // AES-256-GCM key (64 hex chars = 32 bytes) for the minimized webhook payload retained in
+  // `billing_webhook_events.payload_encrypted` (spec.md §Operations: "encrypted where retained").
+  WEBHOOK_PAYLOAD_ENCRYPTION_KEY: z.string().optional(),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
@@ -93,6 +99,11 @@ const zodEnv = z.object({
     }
     if (!data.STRIPE_API_VERSION) {
       context.addIssue({ code: 'custom', path: ['STRIPE_API_VERSION'], message: 'STRIPE_API_VERSION is required when STRIPE_BILLING_ENABLED=true — pin the exact version the SDK/webhook endpoint/fixtures share' })
+    }
+    if (!data.WEBHOOK_PAYLOAD_ENCRYPTION_KEY) {
+      context.addIssue({ code: 'custom', path: ['WEBHOOK_PAYLOAD_ENCRYPTION_KEY'], message: 'WEBHOOK_PAYLOAD_ENCRYPTION_KEY is required when STRIPE_BILLING_ENABLED=true — generate with: openssl rand -hex 32' })
+    } else if (!/^[0-9a-f]{64}$/i.test(data.WEBHOOK_PAYLOAD_ENCRYPTION_KEY)) {
+      context.addIssue({ code: 'custom', path: ['WEBHOOK_PAYLOAD_ENCRYPTION_KEY'], message: 'WEBHOOK_PAYLOAD_ENCRYPTION_KEY must be 64 hex characters (32 bytes) — generate with: openssl rand -hex 32' })
     }
     // Mixed test/live mode: a live secret key paired with a webhook secret
     // minted for a different (test-mode) endpoint — or vice versa — is a

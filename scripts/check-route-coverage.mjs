@@ -22,6 +22,7 @@ const publicAllowlist = new Map([
   ['src/routes/api/status/index.ts', 'operational health check; touches no tenant or account data'],
   ['src/routes/api/ai/config.ts', 'documented public-safe AI feature-flag config, no secrets'],
   ['src/routes/api/feeds/$searchId.ts', 'documented public RSS feed, gated by a capability token rather than a session'],
+  ['src/routes/api/webhooks/stripe.ts', 'Stripe cannot hold a user session — Stripe-Signature verification (receiveStripeWebhook) is the entire authentication mechanism, enforced before any DB write'],
 ])
 
 const guardPatterns = [

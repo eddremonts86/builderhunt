@@ -95,6 +95,8 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
     expect(parsed.STRIPE_BILLING_ENABLED).toBe('false')
   })
 
+  const VALID_ENCRYPTION_KEY = 'a'.repeat(64)
+
   it('accepts a fully valid enabled test-mode configuration', () => {
     const parsed = parseEnvironment({
       ...productionEnvironment,
@@ -102,17 +104,21 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
       STRIPE_SECRET_KEY: 'sk_test_abc123',
       STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
       STRIPE_API_VERSION: '2025-01-01.acacia',
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
     })
     expect(parsed.STRIPE_BILLING_ENABLED).toBe('true')
   })
 
   it.each([
-    ['missing secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
-    ['malformed secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'not-a-real-key', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
-    ['missing webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
-    ['malformed webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'not-a-real-secret', STRIPE_API_VERSION: '2025-01-01.acacia' }],
-    ['missing API version', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123' }],
-    ['live key outside production', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_live_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', NODE_ENV: 'development' }],
+    ['missing secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY }],
+    ['malformed secret key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'not-a-real-key', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY }],
+    ['missing webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY }],
+    ['malformed webhook secret', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'not-a-real-secret', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY }],
+    ['missing API version', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY }],
+    ['live key outside production', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_live_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY, NODE_ENV: 'development' }],
+    ['missing webhook payload encryption key', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia' }],
+    ['malformed webhook payload encryption key (too short)', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 'abc123' }],
+    ['malformed webhook payload encryption key (non-hex)', { STRIPE_BILLING_ENABLED: 'true', STRIPE_SECRET_KEY: 'sk_test_abc123', STRIPE_WEBHOOK_SECRET: 'whsec_abc123', STRIPE_API_VERSION: '2025-01-01.acacia', WEBHOOK_PAYLOAD_ENCRYPTION_KEY: 'z'.repeat(64) }],
   ])('rejects %s (fails closed)', (_label, override) => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
   })
@@ -125,7 +131,7 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
       ...productionEnvironment,
       NODE_ENV: 'development',
       STRIPE_BILLING_ENABLED: 'true',
-      // no STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET/STRIPE_API_VERSION set
+      // no STRIPE_SECRET_KEY/STRIPE_WEBHOOK_SECRET/STRIPE_API_VERSION/WEBHOOK_PAYLOAD_ENCRYPTION_KEY set
     })).toThrow()
   })
 
@@ -137,7 +143,21 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
       STRIPE_SECRET_KEY: 'sk_test_abc123',
       STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
       STRIPE_API_VERSION: '2025-01-01.acacia',
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
     })
     expect(parsed.STRIPE_BILLING_ENABLED).toBe('true')
+  })
+
+  it('accepts an optional STRIPE_WEBHOOK_SECRET_PREVIOUS during a rotation window', () => {
+    const parsed = parseEnvironment({
+      ...productionEnvironment,
+      STRIPE_BILLING_ENABLED: 'true',
+      STRIPE_SECRET_KEY: 'sk_test_abc123',
+      STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
+      STRIPE_WEBHOOK_SECRET_PREVIOUS: 'whsec_previous123',
+      STRIPE_API_VERSION: '2025-01-01.acacia',
+      WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
+    })
+    expect(parsed.STRIPE_WEBHOOK_SECRET_PREVIOUS).toBe('whsec_previous123')
   })
 })
