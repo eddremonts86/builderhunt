@@ -29,7 +29,9 @@ import { and, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { billingWebhookEvents } from '../db/schema'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { listActiveBillingCreditGrants } from '../repositories/billing'
-import { listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import { listActiveAnnualBillingSubscriptions, listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import { issueAnnualSubscriptionGrants } from './annual-grants'
+import { resolveSubscriptionCatalogEntryByKey } from './catalog'
 import { expireCreditGrant } from './credits'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
@@ -78,6 +80,7 @@ export interface WorkerRunSummary {
   deadLetteredEvents: number
   retryScheduledEvents: number
   expiredGrants: number
+  annualGrantsIssued: number
   eventResults: WebhookEventProcessingResult[]
 }
 
@@ -207,6 +210,36 @@ async function sweepExpiredCreditGrants(db: PostgresJsDatabase | typeof workerDb
   return expired
 }
 
+/**
+ * Windows 2-12 of every annual subscription still in good standing
+ * (§7 "Issue annual subscription credits monthly") — a subscription that
+ * lapses into any other status (canceled, unpaid, past_due, paused) simply
+ * stops appearing in `listActiveAnnualBillingSubscriptions`, so no further
+ * windows are ever issued for it; nothing needs to explicitly "stop" a
+ * lapsed subscription's future grants.
+ */
+async function sweepAnnualSubscriptionGrants(db: PostgresJsDatabase | typeof workerDb, now: Date): Promise<number> {
+  const orgIds = await listWorkerOrganizationIds(db)
+  let issued = 0
+  for (const { id: organizationId } of orgIds) {
+    await withWorkerOrganization(organizationId, async (tx) => {
+      const subscriptions = await listActiveAnnualBillingSubscriptions(tx as WorkerTransaction, organizationId)
+      for (const subscription of subscriptions) {
+        if (!subscription.currentPeriodStart || !subscription.currentPeriodEnd) continue
+        const catalogEntry = resolveSubscriptionCatalogEntryByKey(subscription.catalogKey)
+        if (!catalogEntry) continue
+        issued += await issueAnnualSubscriptionGrants(tx as WorkerTransaction, organizationId, {
+          stripeSubscriptionId: subscription.stripeSubscriptionId,
+          monthlyCredits: catalogEntry.monthlyCredits,
+          currentPeriodStart: subscription.currentPeriodStart,
+          currentPeriodEnd: subscription.currentPeriodEnd,
+        }, now)
+      }
+    }, db)
+  }
+  return issued
+}
+
 export async function runBillingWorker(options: RunBillingWorkerOptions): Promise<WorkerRunSummary> {
   const db = options.db ?? workerDb
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
@@ -221,6 +254,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
   }
 
   const expiredGrants = await sweepExpiredCreditGrants(db, now)
+  const annualGrantsIssued = await sweepAnnualSubscriptionGrants(db, now)
 
   return {
     claimedEvents: claimed.length,
@@ -229,6 +263,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
     deadLetteredEvents: eventResults.filter((r) => r.result === 'dead_lettered').length,
     retryScheduledEvents: eventResults.filter((r) => r.result === 'retry_scheduled').length,
     expiredGrants,
+    annualGrantsIssued,
     eventResults,
   }
 }

@@ -29,6 +29,7 @@
 import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type Stripe from 'stripe'
+import { computeAnniversary } from './annual-grants'
 import { resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
 import { findBillingCustomer } from '../repositories/billing'
@@ -311,8 +312,14 @@ async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | t
 
     const periodEnd = toDate(invoice.period_end) ?? new Date(event.created * 1000 + 30 * 24 * 60 * 60 * 1000)
     const source = subscription.interval === 'annual' ? 'subscription_annual_window' : 'subscription_monthly'
+    // An annual subscription's own recorded periodStart is the billing anchor: this invoice's
+    // credits are window 1 of 12 (annual-grants.ts issues windows 2-12), so — per spec.md — they
+    // expire at the FIRST calendar anniversary, not at the full year's end.
+    const expiresAt = subscription.interval === 'annual' && subscription.currentPeriodStart
+      ? computeAnniversary(subscription.currentPeriodStart, 1)
+      : periodEnd
     const monthlyWindowKey = subscription.interval === 'annual'
-      ? `${stripeSubscriptionId}:${periodEnd.toISOString().slice(0, 7)}`
+      ? `${stripeSubscriptionId}:window-1`
       : undefined
 
     try {
@@ -325,7 +332,7 @@ async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | t
         stripePaymentReference: invoice.id,
         monthlyWindowKey,
         units: catalogEntry.monthlyCredits,
-        expiresAt: periodEnd,
+        expiresAt,
         idempotencyKey: `invoice-grant:${invoice.id}`,
       })
       return {

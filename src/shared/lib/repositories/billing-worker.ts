@@ -151,6 +151,33 @@ export async function findFullBillingSubscriptionByStripeId(
   return row ?? null
 }
 
+export interface ActiveAnnualBillingSubscriptionRecord {
+  stripeSubscriptionId: string
+  catalogKey: string
+  currentPeriodStart: Date | null
+  currentPeriodEnd: Date | null
+}
+
+/** Annual subscriptions in good standing (`active`/`trialing`) for the sweep that issues the remaining 11 monthly credit windows (plans/stripe-billing-platform/tasks.md §7 "Issue annual subscription credits monthly") — stops naturally once a subscription lapses into any other status. */
+export async function listActiveAnnualBillingSubscriptions(
+  transaction: WorkerTransaction,
+  organizationId: string,
+): Promise<ActiveAnnualBillingSubscriptionRecord[]> {
+  return transaction
+    .select({
+      stripeSubscriptionId: billingSubscriptions.stripeSubscriptionId,
+      catalogKey: billingSubscriptions.catalogKey,
+      currentPeriodStart: billingSubscriptions.currentPeriodStart,
+      currentPeriodEnd: billingSubscriptions.currentPeriodEnd,
+    })
+    .from(billingSubscriptions)
+    .where(and(
+      eq(billingSubscriptions.organizationId, organizationId),
+      eq(billingSubscriptions.interval, 'annual'),
+      sql`${billingSubscriptions.stripeStatus} in ('active', 'trialing')`,
+    ))
+}
+
 export interface UpdateBillingSubscriptionFromStripeInput {
   stripeStatus: string
   currentPeriodStart: Date | null

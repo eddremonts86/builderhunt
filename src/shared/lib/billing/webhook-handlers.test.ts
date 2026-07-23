@@ -57,13 +57,15 @@ async function seedCheckoutAttempt(organizationId: string, userId: string, strip
 async function seedSubscription(
   organizationId: string,
   customerId: string,
-  overrides: Partial<{ stripeSubscriptionId: string; stripeStatus: string; providerSyncedAt: Date; catalogKey: string; tier: string; interval: string }> = {},
+  overrides: Partial<{ stripeSubscriptionId: string; stripeStatus: string; providerSyncedAt: Date; catalogKey: string; tier: string; interval: string; currentPeriodStart: Date; currentPeriodEnd: Date }> = {},
 ): Promise<string> {
   const stripeSubscriptionId = overrides.stripeSubscriptionId ?? `sub_${uniqueId('sub')}`
   await db.insert(billingSubscriptions).values({
     id: uniqueId('subrow'), organizationId, customerId, livemode: false,
     catalogKey: overrides.catalogKey ?? 'pro_monthly', tier: overrides.tier ?? 'pro', interval: overrides.interval ?? 'monthly', catalogVersion: 1,
     stripeSubscriptionId, stripeStatus: overrides.stripeStatus ?? 'active',
+    currentPeriodStart: overrides.currentPeriodStart ?? null,
+    currentPeriodEnd: overrides.currentPeriodEnd ?? null,
     providerSyncedAt: overrides.providerSyncedAt ?? new Date('2026-01-01T00:00:00Z'),
   })
   return stripeSubscriptionId
@@ -388,6 +390,27 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     expect(second.outcome).toBe('applied')
     const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentReference, invoiceId)))
     expect(grants).toHaveLength(1)
+  })
+
+  it('an annual subscription\'s first invoice expires at the first monthly anniversary, not the full year — the remaining 11 windows are the worker\'s job', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
+    const currentPeriodStart = new Date('2026-01-31T00:00:00Z')
+    const currentPeriodEnd = new Date('2027-01-31T00:00:00Z')
+    const subscriptionId = await seedSubscription(organizationId, customerRow.id, {
+      catalogKey: 'pro_max_annual', tier: 'pro_max', interval: 'annual', currentPeriodStart, currentPeriodEnd,
+    })
+    const invoiceId = `in_${uniqueId('invoice')}`
+
+    await processStripeWebhookEvent(
+      invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, periodEnd: Math.floor(currentPeriodEnd.getTime() / 1000), created: Math.floor(currentPeriodStart.getTime() / 1000) }),
+      { db },
+    )
+
+    const [grant] = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentReference, invoiceId)))
+    expect(grant.expiresAt.toISOString()).toBe(new Date('2026-02-28T00:00:00Z').toISOString())
+    expect(grant.originalUnits).toBe(SUBSCRIPTION_CATALOG.pro_max_annual.monthlyCredits)
   })
 
   it('a second, different invoice for the same monthly subscription grants a second, separate batch', async () => {

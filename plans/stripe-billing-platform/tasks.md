@@ -521,10 +521,60 @@
     unrelated `catalog.test.ts` failure (703 passing); `pnpm type-check`/`pnpm lint` (0 errors)/
     `pnpm security:boundaries`/route-coverage all clean.
 
-- [ ] **Issue annual subscription credits monthly**
+- [x] **Issue annual subscription credits monthly**
   - Files: `src/shared/lib/billing/annual-grants.ts`, `src/shared/lib/billing/annual-grants.test.ts`, `src/shared/lib/billing/worker.ts`
   - Do: Derive calendar anniversaries from Stripe anchor, clamp to month end, issue first grant after annual payment and next 11 idempotently, stop after cancellation/unpaid/dispute/contract end, and never grant whole-year allowance upfront.
   - Verify: Test Clock/unit cases cover Jan 29/30/31, leap day, DST-independent UTC, duplicate worker, late worker, upgrade, cancellation, and annual renewal.
+  - Progress (2026-07-23): `annual-grants.ts`'s `computeAnniversary(anchor, monthsAhead)` is the pure
+    UTC-only date-math core (`getUTCFullYear`/`Date.UTC` throughout, never a local-time method) —
+    advances by calendar months and clamps to the target month's actual last day (Jan 31 → Feb 28, or
+    Feb 29 in a leap year; the clamp never carries forward once the target month is long enough
+    again). `deriveDueAnnualGrantWindows(subscriptionStart, periodEnd, now)` is pure and stateless:
+    windows 2-12 (window 1 is `handleInvoicePaid`'s own grant from task 6.2/7.1), each due once its
+    anniversary has passed, window 12's end pinned to the subscription's real `periodEnd` rather than
+    a recomputed anniversary (avoids drift from Stripe's own authoritative date).
+    `issueAnnualSubscriptionGrants(tx, organizationId, subscription, now)` grants every due-but-not-
+    yet-granted window via the existing `grantCredits` (idempotent by `annual-grant:<subId>:<index>`,
+    unique by `monthlyWindowKey: <subId>:window-<index>`) — a poison/duplicate window is swallowed
+    (`CreditLedgerError` code `monthly_window_already_granted`), never re-thrown. Wired into
+    `worker.ts`'s daily sweep as `sweepAnnualSubscriptionGrants` (new `annualGrantsIssued` field on
+    `WorkerRunSummary`), using a new `listActiveAnnualBillingSubscriptions` repository query
+    (`repositories/billing-worker.ts`) filtered to `interval = 'annual' AND stripeStatus IN
+    ('active','trialing')` — a subscription that lapses into ANY other status (canceled, unpaid,
+    past_due, paused) simply stops appearing in that query, so no explicit "stop" logic is needed;
+    future windows are never granted for it again. "Upgrade" (mid-year tier change) needs no special
+    handling either: the sweep always resolves the CURRENT `catalogKey`'s `monthlyCredits` fresh on
+    every run, so a tier change before the next anniversary is picked up automatically. "Annual
+    renewal" also needs no special handling: a fresh year's `customer.subscription.updated` event
+    updates `currentPeriodStart`/`currentPeriodEnd` (task 6.2's existing handler), and the new
+    `invoice.paid` for that renewal grants window 1 of the new year exactly as before — window
+    numbering (2-12) is relative to each subscription's own current period, never global.
+    **Found and fixed a real spec deviation while building this**: `handleInvoicePaid`'s existing
+    annual-window-1 grant (built in task 6.2) expired at the invoice's `period_end` — the FULL YEAR —
+    instead of the first monthly anniversary as spec.md requires ("each grant expires at the next
+    anniversary"). Fixed by computing window 1's `expiresAt` via this module's own
+    `computeAnniversary(currentPeriodStart, 1)` and renaming its `monthlyWindowKey` to the same
+    `<subId>:window-1` scheme the new windows use (previously a differently-shaped month-string key)
+    for one coherent key space across all 12 windows. 16 new `annual-grants.ts` tests (Jan 29/30/31
+    anchors including the leap-year non-clamp/clamp split, no-carry-forward-of-the-clamp, year
+    rollover, time-of-day preservation as the DST-independence proof, inclusive boundary, late-worker
+    catch-up of all 11 windows at once, idempotent duplicate calls, and a duplicate-plus-later-run
+    convergence test), 4 new `worker.ts` integration tests (issues due windows, duplicate run issues
+    nothing new, canceled subscription never gets a window, a later run picks up only the newly-due
+    window) — asserting on each test's OWN subscription's grant rows by `sourceReference`, not the
+    worker-run summary total, since `sweepAnnualSubscriptionGrants` — like the pre-existing expiry
+    sweep — scans every organization in the shared test database, so a summary-level exact count is
+    not a safe assertion across a test file's full run (matches this file's own pre-existing
+    `toBeGreaterThanOrEqual` convention). One new `webhook-handlers.test.ts` test locks in the fixed
+    window-1 expiry. A real, initially-miscounted bug was caught and fixed during this: the first
+    draft counted every successful `grantCredits` call as "issued" even when it returned
+    `replayed: true` (an idempotent no-op) — fixed to only count `!result.replayed`. Full suite 676
+    total minus the same pre-existing unrelated `catalog.test.ts` failure (675 passing) — one
+    unrelated, pre-existing flaky test (`checkout.test.ts`'s concurrent-idempotency-key test, a real
+    race between the fake provider's random customer id and a live unique constraint) reproduced once
+    under full-suite load and passed 3/3 in isolation before and after this task's changes, confirmed
+    unrelated by reverting to the prior commit; `pnpm type-check`/`pnpm lint` (0 errors)/
+    `pnpm security:boundaries`/route-coverage all clean.
 
 - [ ] **Implement subscription preview and change matrix**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/shared/lib/billing/subscription-changes.test.ts`, `src/routes/api/billing/subscription/preview.ts`, `src/routes/api/billing/subscription/change.ts`

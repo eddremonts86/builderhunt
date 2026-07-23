@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import type Stripe from 'stripe'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { billingCreditGrants, billingCustomers, billingWebhookEvents, organizations } from '../db/schema'
+import { billingCreditGrants, billingCustomers, billingSubscriptions, billingWebhookEvents, organizations } from '../db/schema'
 import type { EventRetriever } from './worker'
 import { replayBillingWebhookEvent, ReplayError, runBillingWorker } from './worker'
 
@@ -257,5 +257,72 @@ describe('runBillingWorker — credit grant expiry sweep', () => {
 
     const [grant] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
     expect(grant.state).toBe('active')
+  })
+})
+
+describe('runBillingWorker — annual subscription grant sweep', () => {
+  async function seedAnnualSubscription(overrides: Partial<{ stripeStatus: string }> = {}): Promise<{ organizationId: string; stripeSubscriptionId: string }> {
+    const organizationId = uniqueId('org')
+    await db.insert(organizations).values({ id: organizationId, name: organizationId, slug: organizationId, createdAt: new Date() })
+    const customerId = uniqueId('cust')
+    await db.insert(billingCustomers).values({ id: customerId, organizationId, livemode: false, stripeCustomerId: `cus_${customerId}` })
+    const stripeSubscriptionId = `sub_${uniqueId('sub')}`
+    await db.insert(billingSubscriptions).values({
+      id: uniqueId('subrow'), organizationId, customerId, livemode: false,
+      catalogKey: 'pro_max_annual', tier: 'pro_max', interval: 'annual', catalogVersion: 1,
+      stripeSubscriptionId, stripeStatus: overrides.stripeStatus ?? 'active',
+      currentPeriodStart: new Date('2026-01-31T00:00:00Z'), currentPeriodEnd: new Date('2027-01-31T00:00:00Z'),
+      providerSyncedAt: new Date('2026-01-31T00:00:00Z'),
+    })
+    return { organizationId, stripeSubscriptionId }
+  }
+
+  it('issues due monthly windows for an active annual subscription', async () => {
+    const { stripeSubscriptionId } = await seedAnnualSubscription()
+    const retriever = fakeRetriever(new Map())
+
+    const summary = await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+
+    expect(summary.annualGrantsIssued).toBeGreaterThanOrEqual(4) // windows 2-5 by June 1
+    const rows = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(rows.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('a duplicate worker run issues nothing new', async () => {
+    const { stripeSubscriptionId } = await seedAnnualSubscription()
+    const retriever = fakeRetriever(new Map())
+    const now = () => new Date('2026-06-01T00:00:00Z')
+
+    await runBillingWorker({ retriever, db, now })
+    await runBillingWorker({ retriever, db, now })
+
+    // Scoped to THIS test's own subscription — the worker sweeps every organization in the
+    // shared disposable database, so `summary.annualGrantsIssued` itself is not exclusive to
+    // this test's rows and isn't a safe assertion target here (unlike the row count below).
+    const rows = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(rows).toHaveLength(4)
+  })
+
+  it('never issues a window for a canceled subscription', async () => {
+    const { stripeSubscriptionId } = await seedAnnualSubscription({ stripeStatus: 'canceled' })
+    const retriever = fakeRetriever(new Map())
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+
+    const rows = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(rows).toHaveLength(0)
+  })
+
+  it('a later run picks up the next window without re-granting earlier ones', async () => {
+    const { stripeSubscriptionId } = await seedAnnualSubscription()
+    const retriever = fakeRetriever(new Map())
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-03-01T00:00:00Z') }) // window 2 only
+    const rowsAfterFirst = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(rowsAfterFirst).toHaveLength(1)
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-04-01T00:00:00Z') }) // window 3 becomes due
+    const rowsAfterSecond = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(rowsAfterSecond).toHaveLength(2)
   })
 })
