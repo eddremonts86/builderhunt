@@ -6,6 +6,7 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { OrganizationBillingCard } from '~/modules/dashboard/components/OrganizationBillingCard'
 import { AutoRechargeSettings } from '~/modules/billing/AutoRechargeSettings'
+import { BillingContact } from '~/modules/billing/BillingContact'
 import type { OrganizationEntitlementDto } from '~/shared/lib/organizations/contracts'
 import type { LimitCheck, LimitResource } from '~/shared/lib/billing-shared'
 
@@ -92,6 +93,10 @@ function BillingSettingsPage() {
       <div className="mb-6">
         <AutoRechargeSettings />
       </div>
+
+      <section className="glass-panel p-5 mb-6">
+        <BillingContact />
+      </section>
 
       {usage.length > 0 && (
         <section className="glass-panel p-5" data-testid="usage-section">

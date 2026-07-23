@@ -76,6 +76,7 @@ import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/
 import { Route as ApiBillingSummaryRouteImport } from './routes/api/billing/summary'
 import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
 import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingContactRouteImport } from './routes/api/billing/contact'
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
@@ -132,6 +133,7 @@ import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/buil
 import { Route as ApiBillingSubscriptionPreviewRouteImport } from './routes/api/billing/subscription/preview'
 import { Route as ApiBillingSubscriptionChangeRouteImport } from './routes/api/billing/subscription/change'
 import { Route as ApiBillingSubscriptionCancelRouteImport } from './routes/api/billing/subscription/cancel'
+import { Route as ApiBillingContactVerifyRouteImport } from './routes/api/billing/contact/verify'
 import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
 import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
 import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
@@ -494,6 +496,11 @@ const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
   path: '/api/billing/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBillingContactRoute = ApiBillingContactRouteImport.update({
+  id: '/api/billing/contact',
+  path: '/api/billing/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBillingAutoRechargeRoute = ApiBillingAutoRechargeRouteImport.update({
   id: '/api/billing/auto-recharge',
   path: '/api/billing/auto-recharge',
@@ -793,6 +800,11 @@ const ApiBillingSubscriptionCancelRoute =
     path: '/api/billing/subscription/cancel',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiBillingContactVerifyRoute = ApiBillingContactVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => ApiBillingContactRoute,
+} as any)
 const ApiBillingCheckoutSubscriptionRoute =
   ApiBillingCheckoutSubscriptionRouteImport.update({
     id: '/api/billing/checkout/subscription',
@@ -988,6 +1000,7 @@ export interface FileRoutesByFullPath {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
+  '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1052,6 +1065,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/contact/verify': typeof ApiBillingContactVerifyRoute
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
@@ -1135,6 +1149,7 @@ export interface FileRoutesByTo {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
+  '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1199,6 +1214,7 @@ export interface FileRoutesByTo {
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/contact/verify': typeof ApiBillingContactVerifyRoute
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
@@ -1287,6 +1303,7 @@ export interface FileRoutesById {
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
+  '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1351,6 +1368,7 @@ export interface FileRoutesById {
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/contact/verify': typeof ApiBillingContactVerifyRoute
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
@@ -1438,6 +1456,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
+    | '/api/billing/contact'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1502,6 +1521,7 @@ export interface FileRouteTypes {
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/contact/verify'
     | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
@@ -1585,6 +1605,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
+    | '/api/billing/contact'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1649,6 +1670,7 @@ export interface FileRouteTypes {
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/contact/verify'
     | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
@@ -1736,6 +1758,7 @@ export interface FileRouteTypes {
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
+    | '/api/billing/contact'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1800,6 +1823,7 @@ export interface FileRouteTypes {
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/contact/verify'
     | '/api/billing/subscription/cancel'
     | '/api/billing/subscription/change'
     | '/api/billing/subscription/preview'
@@ -1855,6 +1879,7 @@ export interface RootRouteChildren {
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
+  ApiBillingContactRoute: typeof ApiBillingContactRouteWithChildren
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
   ApiBillingRefundsRoute: typeof ApiBillingRefundsRoute
   ApiBillingSummaryRoute: typeof ApiBillingSummaryRoute
@@ -2407,6 +2432,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBillingPortalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/contact': {
+      id: '/api/billing/contact'
+      path: '/api/billing/contact'
+      fullPath: '/api/billing/contact'
+      preLoaderRoute: typeof ApiBillingContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/billing/auto-recharge': {
       id: '/api/billing/auto-recharge'
       path: '/api/billing/auto-recharge'
@@ -2799,6 +2831,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBillingSubscriptionCancelRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/contact/verify': {
+      id: '/api/billing/contact/verify'
+      path: '/verify'
+      fullPath: '/api/billing/contact/verify'
+      preLoaderRoute: typeof ApiBillingContactVerifyRouteImport
+      parentRoute: typeof ApiBillingContactRoute
+    }
     '/api/billing/checkout/subscription': {
       id: '/api/billing/checkout/subscription'
       path: '/api/billing/checkout/subscription'
@@ -3135,6 +3174,17 @@ const OnboardingRouteRouteWithChildren = OnboardingRouteRoute._addFileChildren(
   OnboardingRouteRouteChildren,
 )
 
+interface ApiBillingContactRouteChildren {
+  ApiBillingContactVerifyRoute: typeof ApiBillingContactVerifyRoute
+}
+
+const ApiBillingContactRouteChildren: ApiBillingContactRouteChildren = {
+  ApiBillingContactVerifyRoute: ApiBillingContactVerifyRoute,
+}
+
+const ApiBillingContactRouteWithChildren =
+  ApiBillingContactRoute._addFileChildren(ApiBillingContactRouteChildren)
+
 interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
@@ -3218,6 +3268,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
+  ApiBillingContactRoute: ApiBillingContactRouteWithChildren,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
   ApiBillingRefundsRoute: ApiBillingRefundsRoute,
   ApiBillingSummaryRoute: ApiBillingSummaryRoute,

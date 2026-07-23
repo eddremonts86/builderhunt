@@ -1295,10 +1295,79 @@ migration, dunning/recovery) implemented, tested, and committed.
     role-literal violation described above, clean (0 findings) after the fix; route-coverage unchanged
     (no new routes, this task only touched an existing page and a session helper).
 
-- [ ] **Add verified billing contact management**
+- [x] **Add verified billing contact management**
   - Files: `src/shared/lib/billing/billing-contact.ts`, `src/shared/lib/billing/billing-contact.test.ts`, `src/routes/api/billing/contact.ts`, `src/modules/billing/BillingContact.tsx`, `src/shared/lib/email.ts`
   - Do: Owner/recent-auth set and verify separate email; send invoices/receipts/renewal/failure while critical messages also reach owner; grant no membership/authority and audit changes with minimal data.
   - Verify: unverified/wrong-org/replayed token, admin/member mutation, delivery dedupe, redaction, and address-change tests pass.
+  - Progress (2026-07-24): New `billing_contacts` table (migration 0037 create + hand-written 0038 RLS
+    grants — `app: SELECT/INSERT/UPDATE` since this is owner-initiated self-service exactly like
+    `billing_auto_recharge_rules`, `worker: SELECT` for notification lookups, `platform: SELECT` for
+    future support tooling). One row per organization (PK'd directly on `organization_id`, no surrogate
+    id) — setting a NEW email always overwrites any prior row outright, matching "set and verify a
+    separate email," not a permanent contact history.
+    Verification mirrors `repositories/builder-claims.ts`'s existing token-in-link pattern exactly
+    (confirmed via research this was the only real precedent in the codebase — Better Auth's own
+    email-verification-on-signup is never wired up, and the GDPR export flow uses no token at all): a
+    random 32-byte token is emailed, only its SHA-256 hash (namespaced `builderhunt:billing-contact:v1:`)
+    is ever persisted, and `verifyPendingBillingContact` (`repositories/billing-contacts.ts`) scopes the
+    lookup to the CALLER's own `organizationId` AND the exact hash AND `status = 'pending'` AND
+    unexpired — a leaked or replayed link from a different organization, an already-verified contact, or
+    an expired one all return `null` indistinguishably (no oracle for guessing a valid token).
+    New `PermissionAction` `'billing:contact'` (owner-only, added to `authorization/permissions.ts`'s
+    `can()`) and `canManageBillingContact`/added to `RECENT_AUTH_REQUIRED_BILLING_ACTIONS` in
+    `billing/permissions.ts` — that set's own doc comment already anticipated this action by name
+    ("payment method, billing contact, auto-recharge, and refund changes") before this task existed.
+    New `billing/billing-contact.ts`: `setBillingContact` (calls `requireBillingPermission` internally,
+    upserts a pending row, audits `billing.contact.set` via the SAME `emitSecurityAudit`/
+    `consoleSecurityAuditSink` mechanism `organization-lifecycle.ts` already uses for every owner
+    mutation — confirmed via research there is no separate "tenant audit" table anywhere in this
+    codebase, both platform-admin and tenant-owner audits already funnel through the identical
+    console-only, redacted-`details` sink), `verifyBillingContact` (audits `billing.contact.verify` with
+    `result: 'denied'` on any failed attempt), `getVerifiedBillingContact` (only ever returns a
+    `verified` contact, never a still-`pending` one — a caller displaying "your billing contact" must
+    never show an unconfirmed address as if it were active).
+    **First-ever outbound billing email in this codebase** (confirmed via research: zero email sends
+    existed anywhere in `billing/` before this task). 3 new `email.ts` senders following the file's
+    existing hand-rolled-template convention exactly: `sendBillingContactVerificationEmail`,
+    `sendBillingReceiptEmail`, `sendBillingPaymentFailedEmail` — all dev-mode-safe (log + `devLink`,
+    no `RESEND_API_KEY` required).
+    Wired into `webhook-handlers.ts`: `handleInvoicePaid` sends a receipt to the owner + verified
+    contact (deduped by address) — but ONLY on a genuinely new grant (`!result.replayed`), never on a
+    duplicate/retried delivery, satisfying "delivery dedupe" using `grantCredits`'s own existing
+    idempotency check rather than inventing a second dedup mechanism. `handleInvoicePaymentFailed`
+    sends the payment-failed notice — ALWAYS also to the owner, satisfying "critical messages also
+    reach owner" literally — gated on a NEW return value from `markBillingSubscriptionGraceStart`
+    (extended from `Promise<void>` to `Promise<boolean>`, indicating whether grace was JUST started
+    versus already in progress) so a retried `invoice.payment_failed` for the same still-in-grace
+    subscription sends the notice at most once per grace window, not once per delivery.
+    New `/api/billing/contact` (GET: owner/admin via `billing:read`; PUT: owner + recent-auth via
+    `billing:contact`, matching the exact `auto-recharge.ts` route pattern) and a separate
+    `/api/billing/contact/verify` (GET, click-through redirect) mirroring
+    `api/builders/claim/verify.ts`'s exact callback-URL-on-signed-out pattern. New
+    `modules/billing/BillingContact.tsx` (shows the current verified contact or "none yet," a form to
+    set/replace it, and the dev-mode verification link) mounted into `settings/billing/index.tsx`
+    alongside the existing `AutoRechargeSettings` card.
+    14 new `billing-contact.test.ts` tests (pending creation, admin/member rejection, stale/missing
+    session rejection, overwrite-replaces-a-verified-contact, correct/wrong/cross-org/expired/replayed
+    verification, and org-scoped read isolation), 9 new route tests across `contact.test.ts` (4) and
+    `contact/verify.test.ts` (4) plus overlap, 2 new `webhook-handlers.test.ts` dedup tests (exactly one
+    receipt email on first grant and none on replay; exactly one payment-failed notice per grace window
+    and none on a retried delivery) confirming the delivery-dedup requirement concretely, not just by
+    inspection.
+    Live-verified against the running dev server: `GET /api/billing/contact` for a real session
+    returned `{"contact":null}` (no contact set yet); the `/settings/billing` page renders the new
+    Billing Contact card correctly (dark-glass theme, "No verified billing contact yet," working email
+    input); submitting a new contact email correctly returned the real
+    `STALE_SESSION_ERROR_MESSAGE` 401 for this browser's long-lived session — the same recent-auth
+    behavior already proven live for auto-recharge/portal/refunds in earlier §8 tasks — proving the
+    route/permission/recent-auth wiring end to end; the deeper set→verify→read lifecycle is already
+    fully covered by the disposable-DB suite.
+    `pnpm type-check` (clean); `pnpm lint` (0 errors in every file this task touched); targeted vitest
+    (`billing-contact.test.ts` 14/14, `contact.test.ts` 9/9, `contact/verify.test.ts` 4/4,
+    `webhook-handlers.test.ts` 60/60 — confirming the `markBillingSubscriptionGraceStart` signature
+    change and the new email wiring broke nothing existing); `pnpm security:boundaries` (0 legacy
+    imports); route-coverage (95 routes — +2 for `/api/billing/contact` and
+    `/api/billing/contact/verify`, 8 allowlisted, valid).
 
 - [ ] **Integrate billing into ownership transfer**
   - Files: `src/modules/dashboard/components/OrganizationDangerZone.tsx`, `src/shared/lib/organizations/ownership.ts`, `src/shared/lib/organizations/ownership.test.ts`, `src/shared/lib/email.ts`

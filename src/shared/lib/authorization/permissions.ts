@@ -26,6 +26,7 @@ export type PermissionAction =
   | 'billing:refund'
   | 'billing:portal'
   | 'billing:auto-recharge'
+  | 'billing:contact'
 
 export interface ResourceAuthorizationContext {
   creatorUserId?: string | null
@@ -63,6 +64,7 @@ export function can(
     case 'billing:refund':
     case 'billing:portal':
     case 'billing:auto-recharge':
+    case 'billing:contact':
       return principal.role === 'owner'
     case 'resource:read':
       return (

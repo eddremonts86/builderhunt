@@ -1,11 +1,22 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { and, eq } from 'drizzle-orm'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingRefunds, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
+import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingRefunds, billingSubscriptions, organizationEntitlements, organizationMembers, organizations } from '../db/schema'
 import { computeAnniversary } from './annual-grants'
 import { PACK_CATALOG, SUBSCRIPTION_CATALOG } from './catalog'
-import { processStripeWebhookEvent } from './webhook-handlers'
+
+const emailMocks = vi.hoisted(() => ({
+  sendBillingReceiptEmail: vi.fn().mockResolvedValue({ ok: true }),
+  sendBillingPaymentFailedEmail: vi.fn().mockResolvedValue({ ok: true }),
+}))
+
+vi.mock('../email', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../email')>()
+  return { ...actual, sendBillingReceiptEmail: emailMocks.sendBillingReceiptEmail, sendBillingPaymentFailedEmail: emailMocks.sendBillingPaymentFailedEmail }
+})
+
+const { processStripeWebhookEvent } = await import('./webhook-handlers')
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -25,12 +36,21 @@ afterAll(async () => {
   await drop()
 })
 
+beforeEach(() => {
+  emailMocks.sendBillingReceiptEmail.mockClear()
+  emailMocks.sendBillingPaymentFailedEmail.mockClear()
+})
+
 async function seedOrganization(): Promise<{ organizationId: string; userId: string }> {
   const organizationId = uniqueId('org')
   await db.insert(organizations).values({ id: organizationId, name: organizationId, slug: organizationId, createdAt: new Date() })
   const userId = uniqueId('user')
   await db.insert(authUsers).values({ id: userId, name: userId, email: `${userId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
   return { organizationId, userId }
+}
+
+async function seedOwnerMembership(organizationId: string, userId: string): Promise<void> {
+  await db.insert(organizationMembers).values({ id: uniqueId('member'), organizationId, userId, role: 'owner' })
 }
 
 async function seedCustomer(organizationId: string, livemode = false): Promise<string> {
@@ -514,6 +534,33 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
     expect(grants).toHaveLength(1)
   })
+
+  it('sends exactly one receipt email to the owner on a successful grant, and none again on a duplicate delivery (§9 task 4)', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    await seedOwnerMembership(organizationId, userId)
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
+    const subscriptionId = await seedSubscription(organizationId, customerRow.id)
+    const event = invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 })
+
+    await processStripeWebhookEvent(event, { db })
+    expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledTimes(1)
+    expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledWith(`${userId}@test.invalid`, expect.any(Object))
+
+    await processStripeWebhookEvent(event, { db })
+    expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledTimes(1)
+  })
+
+  it('never sends a receipt email when the organization has no owner and no billing contact', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
+    const subscriptionId = await seedSubscription(organizationId, customerRow.id)
+
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+
+    expect(emailMocks.sendBillingReceiptEmail).not.toHaveBeenCalled()
+  })
 })
 
 describe('processStripeWebhookEvent — invoice.payment_failed', () => {
@@ -562,6 +609,21 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
 
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
     expect(row.gracePeriodEndsAt).toBeNull()
+  })
+
+  it('sends exactly one payment-failed notice to the owner when grace starts, and none again on a duplicate delivery for the same still-in-grace subscription (§9 task 4)', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    await seedOwnerMembership(organizationId, userId)
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
+    const subscriptionId = await seedSubscription(organizationId, customerRow.id)
+
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+    expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledTimes(1)
+    expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledWith(`${userId}@test.invalid`)
+
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1790000000 }), { db })
+    expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledTimes(1)
   })
 })
 

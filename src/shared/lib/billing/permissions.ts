@@ -60,6 +60,11 @@ export function canConfigureAutoRecharge(principal: TenantPrincipal): boolean {
   return can(principal, 'billing:auto-recharge')
 }
 
+/** Set or change the verified billing contact email — owner only (§9 task 4: grants no membership/authority of its own). */
+export function canManageBillingContact(principal: TenantPrincipal): boolean {
+  return can(principal, 'billing:contact')
+}
+
 /**
  * Actions sensitive enough that a hijacked long-lived session shouldn't be able to perform them
  * without a fresh sign-in — mirrors `organization-lifecycle.ts`'s `requireRecentAuthentication`
@@ -72,6 +77,7 @@ export const RECENT_AUTH_REQUIRED_BILLING_ACTIONS: ReadonlySet<BillingPermission
   'billing:refund',
   'billing:portal',
   'billing:auto-recharge',
+  'billing:contact',
 ])
 
 /** Structurally compatible with `organization-lifecycle.ts`'s `LifecycleSession` without importing its (unexported) type — the same duck-typed-interface pattern as `TenantTransactionLike` in `db/tenant-context.ts`. */

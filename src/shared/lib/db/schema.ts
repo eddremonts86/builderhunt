@@ -1236,6 +1236,33 @@ export const billingDisputes = pgTable(
 )
 
 /**
+ * Verified billing contact (plans/stripe-billing-platform/tasks.md §9 "Add verified billing contact
+ * management") — one current contact email per organization, owner-set and self-verified (mirrors
+ * `billing_auto_recharge_rules`' shape: PK'd directly on `organization_id`, no surrogate id, since
+ * this is mutable current state, not an append-only ledger). Setting a NEW email while a PREVIOUS one
+ * is `verified` overwrites it outright (`billing/billing-contact.ts`'s own module comment) — this is
+ * "set and verify a separate email," not a permanent history of every past contact.
+ */
+export const billingContacts = pgTable(
+  'billing_contacts',
+  {
+    organizationId: text('organization_id').primaryKey().references(() => organizations.id, { onDelete: 'cascade' }),
+    email: text('email').notNull(),
+    status: text('status').notNull().default('pending'),
+    /** SHA-256 of the emailed verification token — the raw token is never stored, mirroring `builder_claims.verification_secret_hash`. */
+    verificationSecretHash: text('verification_secret_hash'),
+    verificationExpiresAt: timestamp('verification_expires_at', { withTimezone: true }),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    setByUserId: text('set_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('billing_contacts_status_check', sql`${table.status} in ('pending', 'verified')`),
+  ],
+)
+
+/**
  * Append-only velocity signal for fraud/high-volume exception controls (plans/stripe-billing-platform/
  * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
  * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session

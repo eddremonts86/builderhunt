@@ -348,6 +348,106 @@ export async function sendExportReadyEmail(to: string): Promise<SendResult> {
   }
 }
 
+/** Verify a newly-set billing contact email (plans/stripe-billing-platform/tasks.md §9 task 4). */
+export async function sendBillingContactVerificationEmail(to: string, link: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Billing contact verification email would be sent to:', to)
+    console.log('   Link:', link, '\n')
+    return { ok: true, devLink: link }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Confirm your BuilderHunt billing contact email',
+        html: billingContactVerificationEmailHtml(link),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export interface BillingReceiptDetails {
+  description: string
+  amountCents: number
+  currency: string
+}
+
+/** A successful subscription/pack payment — receipt only, never sent for a $0 or manually-granted change. */
+export async function sendBillingReceiptEmail(to: string, details: BillingReceiptDetails): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Billing receipt email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Your BuilderHunt receipt',
+        html: billingReceiptEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** A failed subscription payment attempt — this and its grace-period consequences (see dunning.ts) are critical enough that this sender is always ALSO called for the organization owner, even when a separate billing contact exists (plans/stripe-billing-platform/tasks.md §9 task 4: "critical messages also reach owner"). */
+export async function sendBillingPaymentFailedEmail(to: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Billing payment-failed email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Action needed: your BuilderHunt payment failed',
+        html: billingPaymentFailedEmailHtml(),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 function deletionScheduledEmailHtml(gracePeriodEndDate: string): string {
   return `<!doctype html>
 <html>
@@ -387,6 +487,52 @@ function exportReadyEmailHtml(): string {
       <a href="https://builderhunt.dev/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">This export link expires 7 days after the request. Request a new one anytime from your privacy settings.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function billingContactVerificationEmailHtml(link: string): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Confirm your billing contact email</h1>
+    <p>Someone set this address as the billing contact for a BuilderHunt organization. Confirm it to start receiving
+      receipts and payment notices at this address.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="${link}" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Confirm this email</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.85rem;">This link expires in 24 hours. If you didn't expect this, you can safely ignore it — this address grants no account access.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function billingReceiptEmailHtml(details: { description: string; amountCents: number; currency: string }): string {
+  const amount = `${(details.amountCents / 100).toFixed(2)} ${details.currency.toUpperCase()}`
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Receipt from BuilderHunt</h1>
+    <p>${details.description} — <strong>${amount}</strong>.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View billing</a>
+    </p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function billingPaymentFailedEmailHtml(): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your payment didn't go through</h1>
+    <p>We couldn't process your latest BuilderHunt subscription payment. Update your payment method to avoid
+      losing access when your grace period ends.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
+    </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
 </html>`

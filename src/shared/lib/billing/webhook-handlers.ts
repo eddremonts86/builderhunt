@@ -31,14 +31,17 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type Stripe from 'stripe'
 import { computeAnniversary } from './annual-grants'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
+import { getVerifiedBillingContact } from './billing-contact'
 import { grantCredits } from './credits'
 import { recordDisputeFundsReinstated, recordDisputeOpened, resolveDispute, updateDisputeStripeStatus } from './disputes'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
 import { applyCreditRevocationForRefund } from './refunds'
+import { sendBillingPaymentFailedEmail, sendBillingReceiptEmail } from '../email'
 import {
   findAutoRechargeRule,
   findBillingCustomer,
   findBillingRefundByStripeRefundId,
+  findOrganizationOwnerEmail,
   resolveAutoRechargeTrigger,
   updateBillingRefundState,
 } from '../repositories/billing'
@@ -590,6 +593,12 @@ async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | t
         expiresAt,
         idempotencyKey: `invoice-grant:${invoice.id}`,
       })
+      // Only on a genuinely NEW grant, never on a duplicate/retried delivery replay — §9 task 4's
+      // "delivery dedupe" requirement: `grantCredits`'s own idempotency check already tells us
+      // definitively whether this is the first time this invoice was applied.
+      if (!result.replayed) {
+        await sendInvoiceReceipt(tx, organizationId, invoice)
+      }
       return {
         outcome: 'applied',
         detail: result.replayed
@@ -619,10 +628,41 @@ async function handleInvoicePaymentFailed(event: Stripe.Event, db: PostgresJsDat
 
   return withWorkerOrganization(organizationId, async (tx) => {
     const gracePeriodEndsAt = new Date(event.created * 1000 + GRACE_PERIOD_MS)
-    await markBillingSubscriptionGraceStart(tx, organizationId, stripeSubscriptionId, gracePeriodEndsAt)
+    const graceJustStarted = await markBillingSubscriptionGraceStart(tx, organizationId, stripeSubscriptionId, gracePeriodEndsAt)
+    // Payment failure is critical enough that it ALWAYS also reaches the owner, even when a separate
+    // billing contact exists (§9 task 4) — and, like the receipt above, sent at most once per grace
+    // window, never on a duplicate/retried delivery.
+    if (graceJustStarted) {
+      await sendPaymentFailedNotice(tx, organizationId)
+    }
     return {
       outcome: 'applied',
       detail: `Grace period marker set for subscription ${stripeSubscriptionId} (ends ${gracePeriodEndsAt.toISOString()}) — the dunning worker (§7 task 6) owns acting on it`,
     }
   }, db)
+}
+
+/** §9 task 4: sends a receipt to the verified billing contact (if any) AND the owner — never only one, so an org without a separate contact still gets its receipt at the owner's own address. */
+async function sendInvoiceReceipt(tx: WorkerTransaction, organizationId: string, invoice: Stripe.Invoice): Promise<void> {
+  const recipients = await billingNotificationRecipients(tx, organizationId)
+  const details = { description: `Payment received for invoice ${invoice.number ?? invoice.id}`, amountCents: invoice.amount_paid, currency: invoice.currency }
+  await Promise.all(recipients.map((to) => sendBillingReceiptEmail(to, details)))
+}
+
+/** §9 task 4: "critical messages also reach owner" — payment failure always reaches the owner regardless of whether a separate billing contact is also notified. */
+async function sendPaymentFailedNotice(tx: WorkerTransaction, organizationId: string): Promise<void> {
+  const recipients = await billingNotificationRecipients(tx, organizationId)
+  await Promise.all(recipients.map((to) => sendBillingPaymentFailedEmail(to)))
+}
+
+/** The owner's account email, plus the verified billing contact's if one exists and differs — deduped so a contact that happens to match the owner's own address never receives two identical emails. */
+async function billingNotificationRecipients(tx: WorkerTransaction, organizationId: string): Promise<string[]> {
+  const [ownerEmail, contact] = await Promise.all([
+    findOrganizationOwnerEmail(tx, organizationId),
+    getVerifiedBillingContact(tx, organizationId),
+  ])
+  const recipients = new Set<string>()
+  if (ownerEmail) recipients.add(ownerEmail)
+  if (contact) recipients.add(contact.email)
+  return Array.from(recipients)
 }

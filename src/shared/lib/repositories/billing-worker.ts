@@ -277,14 +277,21 @@ export async function updateBillingSubscriptionFromStripe(
     .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
 }
 
-/** Records the first-failure timestamp exactly once (an already-set `gracePeriodEndsAt` is left untouched) — the seven-day grace/block worker (plans/stripe-billing-platform/tasks.md §7 "Implement seven-day dunning and recovery") owns acting on it. */
+/**
+ * Records the first-failure timestamp exactly once (an already-set `gracePeriodEndsAt` is left
+ * untouched) — the seven-day grace/block worker (plans/stripe-billing-platform/tasks.md §7
+ * "Implement seven-day dunning and recovery") owns acting on it. Returns whether THIS call actually
+ * started the grace period (`true`) versus a no-op because one was already in progress (`false`) —
+ * §9 task 4's payment-failed notification email uses this to send exactly once per grace window,
+ * never on a duplicate/retried webhook delivery.
+ */
 export async function markBillingSubscriptionGraceStart(
   transaction: WorkerTransaction,
   organizationId: string,
   stripeSubscriptionId: string,
   gracePeriodEndsAt: Date,
-): Promise<void> {
-  await transaction
+): Promise<boolean> {
+  const rows = await transaction
     .update(billingSubscriptions)
     .set({ gracePeriodEndsAt })
     .where(and(
@@ -292,6 +299,8 @@ export async function markBillingSubscriptionGraceStart(
       eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId),
       sql`${billingSubscriptions.gracePeriodEndsAt} is null`,
     ))
+    .returning({ id: billingSubscriptions.id })
+  return rows.length > 0
 }
 
 /** Clears a grace-period marker once payment recovers before the worker ever acted on it. */
