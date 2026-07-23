@@ -3,6 +3,7 @@ import { Link } from '@tanstack/react-router'
 import { Crown, Users, Sparkles, Check, ArrowRight, AlertTriangle, Clock } from 'lucide-react'
 import { isOwnerRole, type OrganizationEntitlementDto } from '~/shared/lib/organizations/contracts'
 import { PLAN_PRICING } from '~/shared/lib/billing-shared'
+import { SUBSCRIPTION_CATALOG } from '~/shared/lib/billing/catalog'
 
 /**
  * Pure presentation, gated the same way `TeamSettingsPage` gates its own
@@ -20,7 +21,19 @@ export interface OrganizationBillingCardProps {
 const PLAN_ICONS: Record<OrganizationEntitlementDto['tier'], React.ComponentType<{ className?: string }>> = {
   free: Sparkles,
   pro: Crown,
+  pro_max: Crown,
   team: Users,
+}
+
+// `PLAN_PRICING`'s keys predate Pro Max (see catalog.ts's own module doc: the
+// legacy manual system is frozen at free/pro/team and never gets a Pro Max
+// entry). `capitalize`-ing the raw tier string would render "Pro_max" —
+// this is the one place that needs a real display label instead.
+const TIER_LABELS: Record<OrganizationEntitlementDto['tier'], string> = {
+  free: 'Free',
+  pro: 'Pro',
+  pro_max: 'Pro Max',
+  team: 'Team',
 }
 
 function formatDate(iso: string | null): string | null {
@@ -28,11 +41,21 @@ function formatDate(iso: string | null): string | null {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
+/** Pro Max only exists in the new Stripe catalog, never in `PLAN_PRICING` — its real price is read from there instead of guessed. */
 function formatPrice(tier: OrganizationEntitlementDto['tier'], billingPeriod: OrganizationEntitlementDto['billingPeriod']): string {
+  if (tier === 'pro_max') {
+    const entry = billingPeriod === 'annual' ? SUBSCRIPTION_CATALOG.pro_max_annual : SUBSCRIPTION_CATALOG.pro_max_monthly
+    return billingPeriod === 'annual' ? `$${entry.amountCents / 100}/year` : `$${entry.amountCents / 100}/month`
+  }
   const pricing = PLAN_PRICING[tier]
   if (tier === 'free' || pricing.monthly === 0) return 'Free'
   if (billingPeriod === 'annual') return `$${pricing.annual}/year`
   return `$${pricing.monthly}/month`
+}
+
+/** Pro Max's real monthly AI-credit allowance (from the catalog), used instead of `PLAN_PRICING`'s marketing feature-bullet copy, which has no Pro Max entry. */
+function proMaxCreditsLine(): string {
+  return `${SUBSCRIPTION_CATALOG.pro_max_monthly.monthlyCredits} AI credits per month`
 }
 
 export function OrganizationBillingCard({ entitlement }: OrganizationBillingCardProps) {
@@ -51,10 +74,10 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
     return (
       <section className="glass-panel p-5 mb-6" data-testid="billing-card">
         <div className="flex items-center gap-3" data-testid="billing-member-minimal">
-          <Icon className={`w-5 h-5 ${entitlement.tier === 'pro' ? 'text-bh-accent' : entitlement.tier === 'team' ? 'text-bh-cyan' : 'text-bh-text-muted'}`} aria-hidden="true" />
+          <Icon className={`w-5 h-5 ${entitlement.tier === 'pro' || entitlement.tier === 'pro_max' ? 'text-bh-accent' : entitlement.tier === 'team' ? 'text-bh-cyan' : 'text-bh-text-muted'}`} aria-hidden="true" />
           <p className="text-sm">
             <span className="font-semibold capitalize">{entitlement.organizationName}</span> is on the{' '}
-            <span className="font-semibold capitalize">{entitlement.tier}</span> plan.
+            <span className="font-semibold">{TIER_LABELS[entitlement.tier]}</span> plan.
           </p>
         </div>
         {lapsed && (
@@ -83,7 +106,7 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
         <div className="glass-panel border-bh-cyan/30 bg-bh-cyan/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-cyan" data-testid="billing-trial-banner">
           <Clock className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
-            <strong>On a trial of the {entitlement.tier} plan.</strong>{' '}
+            <strong>On a trial of the {TIER_LABELS[entitlement.tier]} plan.</strong>{' '}
             {formatDate(entitlement.trialEndsAt)
               ? `It ends ${formatDate(entitlement.trialEndsAt)}.`
               : "We'll email the owner before it ends."}
@@ -92,10 +115,10 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
       )}
 
       <div className="flex items-center gap-3 mb-3">
-        <Icon className={`w-6 h-6 ${entitlement.tier === 'pro' ? 'text-bh-accent' : entitlement.tier === 'team' ? 'text-bh-cyan' : 'text-bh-text-muted'}`} aria-hidden="true" />
+        <Icon className={`w-6 h-6 ${entitlement.tier === 'pro' || entitlement.tier === 'pro_max' ? 'text-bh-accent' : entitlement.tier === 'team' ? 'text-bh-cyan' : 'text-bh-text-muted'}`} aria-hidden="true" />
         <div className="flex-1">
-          <h2 className="text-lg font-semibold capitalize" data-testid="billing-plan-name">
-            {entitlement.tier} plan <span className="font-normal text-bh-text-muted">· {formatPrice(entitlement.tier, entitlement.billingPeriod)}</span>
+          <h2 className="text-lg font-semibold" data-testid="billing-plan-name">
+            {TIER_LABELS[entitlement.tier]} plan <span className="font-normal text-bh-text-muted">· {formatPrice(entitlement.tier, entitlement.billingPeriod)}</span>
           </h2>
           <p className="text-xs text-bh-text-dim">
             {entitlement.status === 'active' ? 'Active and in good standing' : `Status: ${entitlement.status}`}
@@ -122,7 +145,7 @@ export function OrganizationBillingCard({ entitlement }: OrganizationBillingCard
       </p>
 
       <ul className="grid sm:grid-cols-2 gap-x-4 gap-y-1.5 mb-3" data-testid="billing-features">
-        {PLAN_PRICING[entitlement.tier].features.map((feature) => (
+        {(entitlement.tier === 'pro_max' ? [proMaxCreditsLine()] : PLAN_PRICING[entitlement.tier].features).map((feature) => (
           <li key={feature} className="flex items-center gap-2 text-sm text-bh-text-muted">
             <Check className="w-3.5 h-3.5 text-bh-success shrink-0" aria-hidden="true" />
             {feature}

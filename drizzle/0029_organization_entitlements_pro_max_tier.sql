@@ -1,0 +1,2 @@
+ALTER TABLE "organization_entitlements" DROP CONSTRAINT "organization_entitlements_tier_check";--> statement-breakpoint
+ALTER TABLE "organization_entitlements" ADD CONSTRAINT "organization_entitlements_tier_check" CHECK ("organization_entitlements"."tier" in ('free', 'pro', 'pro_max', 'team'));

@@ -6,7 +6,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { log } from '~/shared/lib/log'
-import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
+import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import {
   countOrganizationBuilders,
   findOrganizationBuilderBySource,
@@ -58,7 +58,7 @@ export const Route = createFileRoute('/api/builders/track')({
                 parsed.data.sourceId,
               ),
             ])
-            const limit = PLAN_LIMITS[entitlement.tier].savedBuilders
+            const limit = PLAN_LIMITS[resolveLegacyPlanTier(entitlement.tier)].savedBuilders
             if (!existing && current >= limit) return { tracked: null, current, limit, plan: entitlement.tier }
             const tracked = await trackOrganizationBuilder(tx, {
               id: randomId(),

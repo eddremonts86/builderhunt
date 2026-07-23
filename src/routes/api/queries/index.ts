@@ -9,7 +9,7 @@ import { executeTenantRead } from '~/shared/lib/migration/shadow-read'
 import { resolveTenantMigrationModes } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { createFeedCapability } from '~/shared/lib/security/feed-capability'
-import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
+import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import {
   countSavedQueries,
   createSavedQuery,
@@ -75,7 +75,7 @@ export const Route = createFileRoute('/api/queries/')({
           const result = await withTenantContext(principal, async (tx) => {
             const entitlement = await getOrganizationEntitlement(tx, principal.organizationId)
             const current = await countSavedQueries(tx, principal.organizationId)
-            const limit = PLAN_LIMITS[entitlement.tier].savedSearches
+            const limit = PLAN_LIMITS[resolveLegacyPlanTier(entitlement.tier)].savedSearches
             if (current >= limit) return { query: null, limit, current, plan: entitlement.tier }
             const query = await createSavedQuery(tx, {
               id: randomId(),

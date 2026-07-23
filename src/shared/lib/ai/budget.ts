@@ -7,6 +7,7 @@
 
 import { getRedis } from '~/shared/lib/redis'
 import type { EntitlementPolicy } from '~/shared/lib/repositories/entitlements'
+import { resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 import type { AITaskDefinition } from './tasks'
 
@@ -65,7 +66,7 @@ export async function checkAndConsumeBudget(
   entitlement: Pick<EntitlementPolicy, 'tier'>,
   task: Pick<AITaskDefinition, 'id' | 'allowances'>,
 ): Promise<BudgetResult> {
-  const limit = task.allowances[entitlement.tier]
+  const limit = task.allowances[resolveLegacyPlanTier(entitlement.tier)]
   const dateKey = utcDateKey()
   const key = budgetKey(principal.organizationId, principal.userId, task.id, dateKey)
 

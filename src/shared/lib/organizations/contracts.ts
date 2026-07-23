@@ -9,7 +9,8 @@
  */
 import type { OrganizationRole, PermissionAction, ResourceAuthorizationContext, TenantPrincipal } from '../authorization/permissions'
 import { can } from '../authorization/permissions'
-import type { PlanStatus, PlanTier } from '../billing-shared'
+import type { PlanStatus } from '../billing-shared'
+import type { EntitlementTier } from '../repositories/entitlements'
 import type {
   InvitableRole,
   InvitationRecord,
@@ -225,7 +226,7 @@ export interface OrganizationEntitlementDto {
   organizationName: string
   isPersonal: boolean
   viewerRole: OrganizationRole
-  tier: PlanTier
+  tier: EntitlementTier
   status: PlanStatus
   billingPeriod: 'none' | 'monthly' | 'annual'
   currentPeriodEnd: string | null

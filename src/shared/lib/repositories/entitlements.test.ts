@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolveEntitlementPolicy } from './entitlements'
+import { resolveEntitlementPolicy, resolveLegacyPlanTier } from './entitlements'
 
 describe('organization entitlement policy', () => {
   it('defaults a missing entitlement to the free plan', () => {
@@ -16,5 +16,26 @@ describe('organization entitlement policy', () => {
     const team = resolveEntitlementPolicy({ tier: 'team', status: 'active', seatLimit: 10 })
     expect(personal.tier).toBe('pro')
     expect(team.tier).toBe('team')
+  })
+
+  it('accepts the Stripe-native pro_max tier (only projectSubscriptionEntitlement writes it, never a manual grant)', () => {
+    const policy = resolveEntitlementPolicy({ tier: 'pro_max', status: 'active', seatLimit: 1 })
+    expect(policy).toMatchObject({ tier: 'pro_max', active: true, paidActionsAllowed: true, seatLimit: 1 })
+  })
+
+  it('rejects an invalid tier string', () => {
+    expect(() => resolveEntitlementPolicy({ tier: 'bogus', status: 'active', seatLimit: 1 })).toThrow()
+  })
+})
+
+describe('resolveLegacyPlanTier', () => {
+  it('passes free/pro/team through unchanged', () => {
+    expect(resolveLegacyPlanTier('free')).toBe('free')
+    expect(resolveLegacyPlanTier('pro')).toBe('pro')
+    expect(resolveLegacyPlanTier('team')).toBe('team')
+  })
+
+  it('maps pro_max to team — the most generous existing legacy tier, until a Pro-Max-specific entry is designed', () => {
+    expect(resolveLegacyPlanTier('pro_max')).toBe('team')
   })
 })

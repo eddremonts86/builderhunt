@@ -566,7 +566,7 @@ export const organizationEntitlements = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    check('organization_entitlements_tier_check', sql`${table.tier} in ('free', 'pro', 'team')`),
+    check('organization_entitlements_tier_check', sql`${table.tier} in ('free', 'pro', 'pro_max', 'team')`),
     check('organization_entitlements_status_check', sql`${table.status} in ('active', 'past_due', 'canceled', 'trialing')`),
     check('organization_entitlements_period_check', sql`${table.billingPeriod} in ('none', 'monthly', 'annual')`),
     check('organization_entitlements_seat_limit_check', sql`${table.seatLimit} between 1 and 10`),

@@ -47,6 +47,7 @@ import {
 import { workerDb } from '../db/worker-db'
 import { billingSubscriptions } from '../db/schema'
 import { resolveSubscriptionTransition } from './subscription-state'
+import { projectSubscriptionEntitlement } from './subscriptions'
 
 export type WebhookHandlerOutcome =
   | { outcome: 'applied'; detail: string }
@@ -203,6 +204,14 @@ async function handleSubscriptionUpsert(
         canceledAt: toDate(subscription.canceled_at),
         providerSyncedAt: eventTimestamp,
       })
+      await projectSubscriptionEntitlement(tx, organizationId, {
+        tier: catalogEntry.tier,
+        stripeStatus: subscription.status,
+        interval: catalogEntry.interval,
+        currentPeriodStart: toDate(item.current_period_start),
+        currentPeriodEnd: toDate(item.current_period_end),
+        seatLimit: catalogEntry.seatLimit,
+      })
       return { outcome: 'applied', detail: `Created subscription record for ${subscription.id} (${isNewSubscriptionRecord ? 'first sighting' : 'resolved via customer'})` }
     }
 
@@ -216,6 +225,17 @@ async function handleSubscriptionUpsert(
     })
     if (subscription.status === 'active' || subscription.status === 'trialing') {
       await clearBillingSubscriptionGrace(tx, organizationId, subscription.id)
+    }
+    const existingCatalogEntry = resolveSubscriptionCatalogEntryByKey(existing.catalogKey)
+    if (existingCatalogEntry) {
+      await projectSubscriptionEntitlement(tx, organizationId, {
+        tier: existingCatalogEntry.tier,
+        stripeStatus: subscription.status,
+        interval: existingCatalogEntry.interval,
+        currentPeriodStart: toDate(item.current_period_start),
+        currentPeriodEnd: toDate(item.current_period_end),
+        seatLimit: existingCatalogEntry.seatLimit,
+      })
     }
     return { outcome: 'applied', detail: `Updated subscription ${subscription.id} to status ${subscription.status} (${decision.reason})` }
   }, db)
@@ -250,6 +270,17 @@ async function handleSubscriptionDeleted(event: Stripe.Event, db: PostgresJsData
       canceledAt: toDate(subscription.canceled_at) ?? eventTimestamp,
       providerSyncedAt: eventTimestamp,
     })
+    const existingCatalogEntry = resolveSubscriptionCatalogEntryByKey(existing.catalogKey)
+    if (existingCatalogEntry) {
+      await projectSubscriptionEntitlement(tx, organizationId, {
+        tier: existingCatalogEntry.tier,
+        stripeStatus: 'canceled',
+        interval: existingCatalogEntry.interval,
+        currentPeriodStart: existing.currentPeriodStart,
+        currentPeriodEnd: existing.currentPeriodEnd,
+        seatLimit: existingCatalogEntry.seatLimit,
+      })
+    }
     return { outcome: 'applied', detail: `Subscription ${subscription.id} marked canceled` }
   }, db)
 }

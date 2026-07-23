@@ -464,10 +464,62 @@
 
 ## 7. Subscription lifecycle
 
-- [ ] **Project paid subscription and monthly renewal state**
+- [x] **Project paid subscription and monthly renewal state**
   - Files: `src/shared/lib/billing/subscriptions.ts`, `src/shared/lib/billing/subscriptions.test.ts`, `src/shared/lib/repositories/entitlements.ts`, `src/shared/lib/repositories/entitlements.test.ts`
   - Do: On authoritative paid state, project tier/status/period/seat limit into organization entitlement and issue one monthly included grant. Add Pro Max/status variants and preserve manual authority until voluntary cutover.
   - Verify: initial/renewal duplicate invoices grant once; unpaid/redirect events grant none; entitlement and grant commit atomically.
+  - Progress (2026-07-23): `subscriptions.ts`'s `projectSubscriptionEntitlement(tx, organizationId,
+    subscription)` upserts `organization_entitlements` from `billing_subscriptions`' current
+    authoritative state, called from the exact same `WorkerTransaction` as the `billing_subscriptions`
+    write in `webhook-handlers.ts`'s `handleSubscriptionUpsert` (both created and updated branches)
+    and `handleSubscriptionDeleted` — one commit, never a subscription row with a stale entitlement or
+    vice versa. The monthly credit grant itself was already fully built in task 6.2's
+    `handleInvoicePaid` (idempotent by `invoice-grant:<invoiceId>`) — this task's job was exclusively
+    the tier/status/period/seat-limit projection that was still missing. Pure `resolveEntitlementProjection`
+    maps a Stripe subscription status to one of the entitlement's 4 statuses via
+    `mapStripeStatusToEntitlementStatus`: `active`/`trialing` pass through, `past_due`/`unpaid`/`paused`
+    all become `past_due` (none is good standing), `canceled` passes through (tier is preserved, not
+    reset to free — `resolveEntitlementPolicy`'s `active` check already denies paid actions on any
+    non-active/trialing status regardless of tier), and `incomplete`/`incomplete_expired` return `null`
+    (never a successful initial payment — nothing is projected, so the organization keeps whatever
+    entitlement it already had, satisfying "preserve manual authority until voluntary cutover":
+    `projectSubscriptionEntitlement` is only ever called for an organization that owns a real Stripe
+    subscription event in the first place, so every other manually-billed organization is completely
+    untouched).
+    **Pro Max required a schema change**: `organization_entitlements_tier_check` hardcoded
+    `('free','pro','team')` — writing a real Pro Max subscriber's tier would have rolled back the
+    whole transaction. New migration `drizzle/0029_organization_entitlements_pro_max_tier.sql` widens
+    it to include `pro_max` (verified: `subscriptions.test.ts` and `webhook-handlers.test.ts` each have
+    a dedicated test that writes a `pro_max` entitlement row against a real disposable database).
+    Deliberately did NOT touch `organization_plan_changes`'s `to_tier`/`from_tier` CHECKs or the
+    `sync_personal_organization_entitlement` SQL function — both belong exclusively to the legacy
+    manual-grant audit trail, which can never produce Pro Max (only a real Stripe subscription can).
+    `EntitlementPolicy.tier` widens to a new `EntitlementTier = PlanTier | 'pro_max'` type
+    (`repositories/entitlements.ts`) rather than widening the global `PlanTier` itself — `PlanTier`
+    also drives the legacy manual per-user plan system's `Record<PlanTier, ...>` tables
+    (`PLAN_LIMITS`/`PLAN_SEAT_LIMITS`/`SOURCING_SPRINT_LIMITS`/`PLAN_PRICING`/AI task `allowances`),
+    none of which has a Pro Max entry yet — a product/copy decision (icon, marketing feature-bullet
+    text, exact allowance numbers), not a technical one, and explicitly out of this task's scope. New
+    `resolveLegacyPlanTier(tier)` maps `pro_max → team` as an interim, safe-by-generosity default
+    (Team sits at the top of every one of those tables today, so a paying Pro Max customer is never
+    under-served) at the 6 call sites that index those tables with an entitlement tier
+    (`ai/budget.ts`, `routes/api/builders/track.ts`, `routes/api/plans/me.ts`,
+    `routes/api/sprints/index.ts`, `routes/api/sprints/$sprintId.ts`, `routes/api/queries/index.ts`).
+    `OrganizationBillingCard.tsx` (the one real UI surface that renders an organization's entitlement
+    tier today) needed a small, correctness-only fix rather than the same generosity-default trick,
+    since `PLAN_PRICING[tier]` would have shown a paying Pro Max customer Team's price/feature copy:
+    it now reads Pro Max's real price from `SUBSCRIPTION_CATALOG` and shows a factual
+    catalog-derived credits line instead of inventing marketing copy, plus a `TIER_LABELS` map so the
+    tier renders as "Pro Max" instead of "Pro_max". A full Pro-Max-specific legacy-limits pass (its own
+    saved-search/sprint/AI-allowance numbers, dedicated icon/copy) is flagged as a follow-up requiring
+    product input, not silently done. 15 new tests across `subscriptions.test.ts` (pure status-mapping,
+    pure projection, and disposable-database integration: insert/upsert/pro_max-write/incomplete-no-op/
+    cancel-preserves-tier), 4 new/extended `webhook-handlers.test.ts` assertions (entitlement projected
+    on first sighting, pro_max first sighting, incomplete never projects, update re-projects, delete
+    preserves tier and cancels status), 4 new `entitlements.test.ts` cases (pro_max accepted, invalid
+    tier rejected, `resolveLegacyPlanTier` mapping). Full suite 704 total minus the same pre-existing
+    unrelated `catalog.test.ts` failure (703 passing); `pnpm type-check`/`pnpm lint` (0 errors)/
+    `pnpm security:boundaries`/route-coverage all clean.
 
 - [ ] **Issue annual subscription credits monthly**
   - Files: `src/shared/lib/billing/annual-grants.ts`, `src/shared/lib/billing/annual-grants.test.ts`, `src/shared/lib/billing/worker.ts`

@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { SOURCING_SPRINT_LIMITS } from '~/shared/lib/billing-shared'
-import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
+import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import { updateSprintSchema } from '~/shared/lib/sprints-shared'
 import {
   deleteSprint,
@@ -38,7 +38,7 @@ export const Route = createFileRoute('/api/sprints/$sprintId')({
           const sprint = await withTenantContext(principal, async (tx) => {
             if ('action' in parsed.data) {
               const entitlement = await getOrganizationEntitlement(tx, principal.organizationId)
-              const limit = SOURCING_SPRINT_LIMITS[entitlement.tier]
+              const limit = SOURCING_SPRINT_LIMITS[resolveLegacyPlanTier(entitlement.tier)]
               return setSprintLifecycle(tx, principal.organizationId, params.sprintId, parsed.data.action, limit)
             }
             if ('name' in parsed.data) return renameSprint(tx, principal.organizationId, params.sprintId, parsed.data.name)

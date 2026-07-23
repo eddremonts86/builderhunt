@@ -2,7 +2,8 @@ import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
 import { consoleSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
-import type { PlanStatus, PlanTier } from '../billing-shared'
+import type { PlanStatus } from '../billing-shared'
+import type { EntitlementTier } from '../repositories/entitlements'
 
 /**
  * Wraps the better-auth organization plugin's operations with the
@@ -1080,7 +1081,7 @@ export async function getSeatUsage(principal: TenantPrincipal): Promise<SeatUsag
 }
 
 export interface OrganizationEntitlementRecord {
-  tier: PlanTier
+  tier: EntitlementTier
   status: PlanStatus
   billingPeriod: 'none' | 'monthly' | 'annual'
   currentPeriodEnd: Date | null

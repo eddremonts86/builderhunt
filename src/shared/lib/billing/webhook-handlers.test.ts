@@ -2,7 +2,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizations } from '../db/schema'
+import { authUsers, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
 import { SUBSCRIPTION_CATALOG } from './catalog'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
@@ -37,6 +37,11 @@ async function seedCustomer(organizationId: string, livemode = false): Promise<s
   const stripeCustomerId = `cus_${customerId}`
   await db.insert(billingCustomers).values({ id: customerId, organizationId, livemode, stripeCustomerId })
   return stripeCustomerId
+}
+
+async function readEntitlement(organizationId: string) {
+  const [row] = await db.select().from(organizationEntitlements).where(eq(organizationEntitlements.organizationId, organizationId)).limit(1)
+  return row ?? null
 }
 
 async function seedCheckoutAttempt(organizationId: string, userId: string, stripeCheckoutSessionId: string): Promise<string> {
@@ -184,9 +189,44 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
     expect(row.tier).toBe('team')
     expect(row.interval).toBe('monthly')
     expect(row.stripeStatus).toBe('active')
+
+    const entitlement = await readEntitlement(organizationId)
+    expect(entitlement).toMatchObject({ tier: 'team', status: 'active', billingPeriod: 'monthly', seatLimit: 10 })
   })
 
-  it('applies a newer status update on an existing subscription', async () => {
+  it('projects a pro_max entitlement on first sighting (requires the widened tier CHECK constraint)', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const subscriptionId = `sub_${uniqueId('sub')}`
+
+    await processStripeWebhookEvent(
+      subscriptionEvent(uniqueId('evt'), 'customer.subscription.created', {
+        subscriptionId, customerId: stripeCustomerId, status: 'active', created: 1780000000,
+        priceId: SUBSCRIPTION_CATALOG.pro_max_monthly.stripePriceId.test!,
+      }),
+      { db },
+    )
+
+    const entitlement = await readEntitlement(organizationId)
+    expect(entitlement).toMatchObject({ tier: 'pro_max', status: 'active', seatLimit: 1 })
+  })
+
+  it('does not project an entitlement for an incomplete (never-paid) subscription', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const subscriptionId = `sub_${uniqueId('sub')}`
+
+    await processStripeWebhookEvent(
+      subscriptionEvent(uniqueId('evt'), 'customer.subscription.created', {
+        subscriptionId, customerId: stripeCustomerId, status: 'incomplete', created: 1780000000,
+      }),
+      { db },
+    )
+
+    expect(await readEntitlement(organizationId)).toBeNull()
+  })
+
+  it('applies a newer status update on an existing subscription and re-projects the entitlement in the same transaction', async () => {
     const { organizationId } = await seedOrganization()
     const stripeCustomerId = await seedCustomer(organizationId)
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
@@ -202,6 +242,9 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
     expect(result.outcome).toBe('applied')
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
     expect(row.stripeStatus).toBe('past_due')
+
+    const entitlement = await readEntitlement(organizationId)
+    expect(entitlement).toMatchObject({ tier: 'pro', status: 'past_due' })
   })
 
   it('rejects a stale (delayed/out-of-order) status update older than the current state', async () => {
@@ -306,6 +349,9 @@ describe('processStripeWebhookEvent — subscription deleted', () => {
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
     expect(row.stripeStatus).toBe('canceled')
     expect(row.canceledAt).not.toBeNull()
+
+    const entitlement = await readEntitlement(organizationId)
+    expect(entitlement).toMatchObject({ tier: 'pro', status: 'canceled' })
   })
 })
 

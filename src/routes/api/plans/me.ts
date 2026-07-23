@@ -4,7 +4,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { PLAN_LIMITS, PLAN_PRICING } from '~/shared/lib/billing-shared'
 import { organizationEntitlements, organizationMembers } from '~/shared/lib/db/schema'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
-import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
+import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import { countOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 import { countSavedQueries } from '~/shared/lib/repositories/saved-queries'
 
@@ -56,7 +56,7 @@ export const Route = createFileRoute('/api/plans/me')({
               seatLimit: result.entitlement.seatLimit,
               seatsUsed: result.seatsUsed,
             },
-            limits: PLAN_LIMITS[result.entitlement.tier],
+            limits: PLAN_LIMITS[resolveLegacyPlanTier(result.entitlement.tier)],
             usage: { savedSearches: result.savedSearches, savedBuilders: result.savedBuilders },
             pricing: PLAN_PRICING,
             signedOut: false,
