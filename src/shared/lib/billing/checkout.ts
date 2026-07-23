@@ -21,6 +21,7 @@ import {
   findActiveBillingSubscription,
   findBillingCustomer,
   findBillingCheckoutAttemptByIdempotencyKey,
+  findLatestBillingCheckoutAttempt,
 } from '../repositories/billing'
 import { getCurrentSellerProfile } from './seller-profile'
 import { idempotencyKeyFor, isLiveMode } from './stripe-client'
@@ -171,4 +172,53 @@ export async function createSubscriptionCheckout(
   })
 
   return { checkoutUrl: session.url, status: session.status }
+}
+
+/**
+ * What `src/modules/billing/CheckoutReturn.tsx` polls after Stripe redirects the customer back —
+ * spec.md: "Redirect success remains `pending`; only verified provider state activates access."
+ * The return URL itself carries no attempt identifier this reads (Stripe's own `{CHECKOUT_SESSION_ID}`
+ * placeholder, or any `status`/`success` query parameter a caller might append, is never consulted
+ * here or by the route that calls this) — an attacker crafting a URL with a forged success indicator
+ * changes nothing, since every field below is re-derived from the authenticated principal's own
+ * organization state.
+ *
+ * `'succeeded'` requires an actual active subscription row — the only authoritative signal, written
+ * by the webhook handler (plans/stripe-billing-platform/tasks.md §6, not yet built) once Stripe
+ * confirms payment. Until that handler exists, a real Checkout completed via the fake provider stays
+ * `'pending'` forever, which is the correct, safe default: this function never promotes anything to
+ * `'succeeded'` on its own say-so. `'failed'` is not yet reachable from here for the same reason —
+ * it depends on subscription/payment-intent state §6 will also populate — but is kept in the type so
+ * the UI already renders it correctly the moment that data exists.
+ */
+export type CheckoutReturnState = 'no_attempt' | 'pending' | 'succeeded' | 'failed' | 'expired'
+
+export interface CheckoutReturnStatus {
+  state: CheckoutReturnState
+}
+
+export interface GetCheckoutReturnStatusOptions {
+  provider: BillingProvider
+}
+
+export async function getCheckoutReturnStatus(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  options: GetCheckoutReturnStatusOptions,
+): Promise<CheckoutReturnStatus> {
+  const livemode = isLiveMode()
+
+  const activeSubscription = await findActiveBillingSubscription(transaction, principal.organizationId, livemode)
+  if (activeSubscription) return { state: 'succeeded' }
+
+  const attempt = await findLatestBillingCheckoutAttempt(transaction, principal.organizationId, 'subscription')
+  if (!attempt) return { state: 'no_attempt' }
+  if (attempt.status === 'expired' || attempt.status === 'canceled') return { state: 'expired' }
+  if (!attempt.stripeCheckoutSessionId) return { state: 'pending' }
+
+  const session = await options.provider.getCheckoutSession(attempt.stripeCheckoutSessionId)
+  if (session?.status === 'expired') return { state: 'expired' }
+  // `'open'` and `'complete'` both mean "still waiting for the webhook to activate the
+  // subscription" — the active-subscription check above is the only path to `'succeeded'`.
+  return { state: 'pending' }
 }

@@ -237,10 +237,44 @@
     `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries` clean; `routeTree.gen.ts` regenerated via
     the running dev server (additive-only diff, confirmed via `git diff --stat`).
 
-- [ ] **Build pending Checkout return experience**
+- [x] **Build pending Checkout return experience**
   - Files: `src/routes/_dashboard/settings/billing/return.tsx`, `src/modules/billing/CheckoutReturn.tsx`, `src/modules/billing/CheckoutReturn.test.tsx`, `src/routeTree.gen.ts`
   - Do: Show pending/succeeded/failed/expired states by polling internal summary; never trust URL status or grant access. Include safe recovery and accessibility semantics.
   - Verify: component/E2E tests prove forged success parameters do nothing and delayed webhook resolves without duplicate navigation or access.
+  - Progress (2026-07-23): `checkout.ts` gains `getCheckoutReturnStatus(transaction, principal, {provider})`
+    — reads no URL/query input at all (there is nothing for a caller to forge): `'succeeded'` requires
+    an actual active-subscription row (the only authoritative signal, written by the not-yet-built §6
+    webhook handler), `'expired'` comes from the checkout attempt's own terminal status or a
+    `provider.getCheckoutSession` refresh, everything else is `'pending'`. New
+    `findLatestBillingCheckoutAttempt` repo query finds "the attempt I just started" without an
+    attempt id in the URL. New `GET /api/billing/checkout/status` route (owner/admin read-only via
+    `canReadBillingSummary`) exposes it. `settings/billing.tsx` was split into a layout (`<Outlet/>`,
+    now carrying the auth `beforeLoad`) plus `settings/billing/index.tsx` (the existing billing
+    overview, unchanged behavior) and the new `settings/billing/return.tsx`, mirroring the
+    `_landing/changelog.tsx` flat+directory precedent already in this codebase.
+    `modules/billing/CheckoutReturn.tsx` polls the status endpoint (react-query, 3s interval, stops
+    once terminal), reads nothing from `location.search`, navigates to `/settings/billing` exactly
+    once via a ref guard when it first sees `'succeeded'`, and renders a distinct accessible view
+    (`role="status" aria-live="polite"`, always-present recovery link) per state including a
+    generic-error fallback and a dedicated no-attempt view. 5 new checkout.ts tests
+    (no_attempt/pending/succeeded/expired, plus a "delayed webhook" test that inserts the
+    subscription row between two polls — standing in for the unbuilt webhook handler — and confirms
+    the transition), 6 new status-route tests (owner/admin allowed, member 403, forged
+    `?status=success&session_id=...` query params proven to have zero effect, error mapping), and 10
+    new CheckoutReturn.test.tsx tests (every state's view, exactly-once navigation proven via a
+    `queryClient.refetchQueries` — simulated delayed webhook — with a second refetch still reporting
+    `'succeeded'` confirmed NOT to navigate again, the forged-URL-does-nothing proof, the always-present
+    recovery link, the `role="status"`/`aria-live` a11y check). Full suite 282/282 minus the same
+    pre-existing unrelated `catalog.test.ts` failure; `pnpm type-check`/`pnpm lint`/
+    `pnpm security:boundaries`/route-coverage all clean; `routeTree.gen.ts` regenerated (additive
+    diff plus the expected `/settings/billing` layout restructure). Live browser verification of the
+    rendered page was attempted but blocked by a pre-existing, unrelated local dev-database migration
+    drift (an old `deletion_requests` FK-constraint migration fails against this machine's dev
+    Postgres, so billing tables were never created there — confirmed via direct inspection, not
+    something this task's migrations caused); flagged as a separate background task
+    (`task_d28a81ab`) rather than fixed here, since repairing shared dev-DB migration history is a
+    distinct, more delicate piece of work. The full automated suite above is the verification of
+    record for this task.
 
 - [ ] **Create restricted Customer Portal sessions**
   - Files: `src/shared/lib/billing/portal.ts`, `src/shared/lib/billing/portal.test.ts`, `src/routes/api/billing/portal.ts`, `docs/operations/stripe-customer-portal.md`

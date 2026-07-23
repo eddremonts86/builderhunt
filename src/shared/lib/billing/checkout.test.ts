@@ -6,7 +6,7 @@ import { authUsers, organizationMembers, organizations } from '../db/schema'
 import { env } from '../env'
 import { createBillingCustomer, createBillingSubscription, findBillingCheckoutAttemptByIdempotencyKey } from '../repositories/billing'
 import { createSellerProfileVersion, type SellerProfileInput } from './seller-profile'
-import { APPROVED_IMMEDIATE_PAYMENT_METHOD_TYPES, CheckoutError, createSubscriptionCheckout } from './checkout'
+import { APPROVED_IMMEDIATE_PAYMENT_METHOD_TYPES, CheckoutError, createSubscriptionCheckout, getCheckoutReturnStatus } from './checkout'
 import { BillingProviderError, type CreateCheckoutSessionInput } from './provider'
 import type { CheckoutDisclosures } from './consent'
 import { FakeBillingProvider } from './fake-provider'
@@ -225,5 +225,94 @@ describe('createSubscriptionCheckout', () => {
       const attempt = await db.transaction((tx) => findBillingCheckoutAttemptByIdempotencyKey(tx, principal.organizationId, idempotencyKey))
       expect(attempt).toBeNull()
     })
+  })
+})
+
+describe('getCheckoutReturnStatus', () => {
+  let provider: FakeBillingProvider
+
+  beforeEach(() => {
+    provider = new FakeBillingProvider()
+  })
+
+  it('reports no_attempt when the organization has never started a checkout', async () => {
+    const principal = await freshOrgWithOwner()
+
+    const result = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+
+    expect(result).toEqual({ state: 'no_attempt' })
+  })
+
+  it('reports pending for a freshly-created, still-open checkout attempt', async () => {
+    const principal = await freshOrgWithOwner()
+    const platformAdminId = uniqueId('platform-admin')
+    await db.insert(authUsers).values({ id: platformAdminId, name: platformAdminId, email: `${platformAdminId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
+    await createSellerProfileVersion(DENMARK_SELLER_PROFILE, platformAdminId, db)
+    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db }))
+
+    const result = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+
+    expect(result).toEqual({ state: 'pending' })
+  })
+
+  it('reports succeeded once an active subscription exists, regardless of the checkout attempt\'s own status', async () => {
+    const principal = await freshOrgWithOwner()
+    const customerId = uniqueId('customer')
+    await db.transaction((tx) => createBillingCustomer(tx, { id: customerId, organizationId: principal.organizationId, livemode: false, stripeCustomerId: `cus_${customerId}` }))
+    await db.transaction((tx) => createBillingSubscription(tx, {
+      id: uniqueId('sub'), organizationId: principal.organizationId, customerId, livemode: false,
+      catalogKey: 'pro_monthly', tier: 'pro', interval: 'monthly', catalogVersion: 1,
+      stripeSubscriptionId: uniqueId('stripe-sub'), stripeStatus: 'active',
+    }))
+
+    const result = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+
+    expect(result).toEqual({ state: 'succeeded' })
+  })
+
+  it('a delayed webhook (simulated by the subscription appearing between two polls) resolves pending -> succeeded, with no separate signal needed to trigger it', async () => {
+    const principal = await freshOrgWithOwner()
+    const platformAdminId = uniqueId('platform-admin')
+    await db.insert(authUsers).values({ id: platformAdminId, name: platformAdminId, email: `${platformAdminId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
+    await createSellerProfileVersion(DENMARK_SELLER_PROFILE, platformAdminId, db)
+    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db }))
+
+    const firstPoll = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+    expect(firstPoll).toEqual({ state: 'pending' })
+
+    // Stands in for the not-yet-built webhook handler (plans/stripe-billing-platform/tasks.md §6)
+    // activating the subscription after Stripe confirms payment. createSubscriptionCheckout above
+    // already provisioned the org's billing_customers row, so reuse it instead of inserting a
+    // second one for the same (organizationId, livemode) pair.
+    const { findBillingCustomer } = await import('../repositories/billing')
+    const existingCustomer = await db.transaction((tx) => findBillingCustomer(tx, principal.organizationId, false))
+    const customerId = existingCustomer!.id
+    await db.transaction((tx) => createBillingSubscription(tx, {
+      id: uniqueId('sub'), organizationId: principal.organizationId, customerId, livemode: false,
+      catalogKey: 'pro_monthly', tier: 'pro', interval: 'monthly', catalogVersion: 1,
+      stripeSubscriptionId: uniqueId('stripe-sub'), stripeStatus: 'active',
+    }))
+
+    const secondPoll = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+    expect(secondPoll).toEqual({ state: 'succeeded' })
+  })
+
+  it('reports expired once the checkout attempt\'s own status is expired', async () => {
+    const principal = await freshOrgWithOwner()
+    const { createBillingCheckoutAttempt } = await import('../repositories/billing')
+    await db.transaction((tx) => createBillingCheckoutAttempt(tx, {
+      id: uniqueId('attempt'), organizationId: principal.organizationId, actorUserId: principal.userId,
+      livemode: false, action: 'subscription', catalogKey: 'pro_monthly', idempotencyKey: uniqueId('idem'),
+      consentVersions: { terms: 'v1.0', privacy: 'v1.0' }, stripeCheckoutSessionId: undefined,
+      expiresAt: new Date(Date.now() - 1000),
+    }))
+    const { and, eq } = await import('drizzle-orm')
+    const { billingCheckoutAttempts } = await import('../db/schema')
+    await db.update(billingCheckoutAttempts).set({ status: 'expired' })
+      .where(and(eq(billingCheckoutAttempts.organizationId, principal.organizationId)))
+
+    const result = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
+
+    expect(result).toEqual({ state: 'expired' })
   })
 })

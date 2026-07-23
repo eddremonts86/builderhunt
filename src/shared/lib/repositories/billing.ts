@@ -243,6 +243,34 @@ export async function findBillingCheckoutAttemptByIdempotencyKey(
   return row ?? null
 }
 
+/** The most recent attempt of this action for the org, regardless of idempotency key — what a pending Checkout return page polls to find "the attempt I just started," since the return URL itself carries no attempt identifier a client could forge. */
+export async function findLatestBillingCheckoutAttempt(
+  transaction: TenantTransaction,
+  organizationId: string,
+  action: 'subscription' | 'credits',
+): Promise<BillingCheckoutAttemptRecord | null> {
+  const [row] = await transaction
+    .select({
+      id: billingCheckoutAttempts.id,
+      organizationId: billingCheckoutAttempts.organizationId,
+      actorUserId: billingCheckoutAttempts.actorUserId,
+      action: billingCheckoutAttempts.action,
+      catalogKey: billingCheckoutAttempts.catalogKey,
+      idempotencyKey: billingCheckoutAttempts.idempotencyKey,
+      status: billingCheckoutAttempts.status,
+      stripeCheckoutSessionId: billingCheckoutAttempts.stripeCheckoutSessionId,
+      expiresAt: billingCheckoutAttempts.expiresAt,
+    })
+    .from(billingCheckoutAttempts)
+    .where(and(
+      eq(billingCheckoutAttempts.organizationId, organizationId),
+      eq(billingCheckoutAttempts.action, action),
+    ))
+    .orderBy(desc(billingCheckoutAttempts.createdAt))
+    .limit(1)
+  return row ?? null
+}
+
 export interface BillingTermsAcceptanceRecord {
   id: string
   organizationId: string

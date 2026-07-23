@@ -109,6 +109,7 @@ import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/met
 import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
 import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
 import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
+import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
@@ -122,6 +123,7 @@ import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './route
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
 import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
+import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
@@ -134,6 +136,7 @@ import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/adm
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
@@ -646,6 +649,12 @@ const DashboardSprintsSprintIdIndexRoute =
     path: '/sprints/$sprintId/',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
+const DashboardSettingsBillingIndexRoute =
+  DashboardSettingsBillingIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => DashboardSettingsBillingRoute,
+  } as any)
 const DashboardBuilderBuilderIdIndexRoute =
   DashboardBuilderBuilderIdIndexRouteImport.update({
     id: '/builder/$builderId/',
@@ -721,6 +730,12 @@ const ApiBillingCheckoutSubscriptionRoute =
     path: '/api/billing/checkout/subscription',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiBillingCheckoutStatusRoute =
+  ApiBillingCheckoutStatusRouteImport.update({
+    id: '/api/billing/checkout/status',
+    path: '/api/billing/checkout/status',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
   id: '/api/alerts/triggers/$id',
   path: '/api/alerts/triggers/$id',
@@ -786,6 +801,12 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DashboardSettingsBillingReturnRoute =
+  DashboardSettingsBillingReturnRouteImport.update({
+    id: '/return',
+    path: '/return',
+    getParentRoute: () => DashboardSettingsBillingRoute,
+  } as any)
 const ApiBuildersBuilderIdEvidenceIndexRoute =
   ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
     id: '/evidence/',
@@ -846,7 +867,7 @@ export interface FileRoutesByFullPath {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
-  '/settings/billing': typeof DashboardSettingsBillingRoute
+  '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
@@ -901,6 +922,7 @@ export interface FileRoutesByFullPath {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -913,6 +935,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
@@ -926,6 +949,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
@@ -975,7 +999,6 @@ export interface FileRoutesByTo {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
-  '/settings/billing': typeof DashboardSettingsBillingRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
@@ -1030,6 +1053,7 @@ export interface FileRoutesByTo {
   '/api/roadmap': typeof ApiRoadmapIndexRoute
   '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
+  '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -1042,6 +1066,7 @@ export interface FileRoutesByTo {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
@@ -1055,6 +1080,7 @@ export interface FileRoutesByTo {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
+  '/settings/billing': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents': typeof ApiAdminIncidentsIndexRoute
@@ -1108,7 +1134,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
-  '/_dashboard/settings/billing': typeof DashboardSettingsBillingRoute
+  '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/_dashboard/settings/team': typeof DashboardSettingsTeamRoute
   '/_dashboard/sprints/new': typeof DashboardSprintsNewRoute
@@ -1163,6 +1189,7 @@ export interface FileRoutesById {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -1175,6 +1202,7 @@ export interface FileRoutesById {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
@@ -1188,6 +1216,7 @@ export interface FileRoutesById {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/_dashboard/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/_dashboard/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
@@ -1295,6 +1324,7 @@ export interface FileRouteTypes {
     | '/api/roadmap/'
     | '/api/sprints/'
     | '/api/status/'
+    | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
@@ -1307,6 +1337,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
@@ -1320,6 +1351,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
+    | '/settings/billing/'
     | '/sprints/$sprintId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
@@ -1369,7 +1401,6 @@ export interface FileRouteTypes {
     | '/admin/plan-requests'
     | '/admin/roadmap'
     | '/admin/users'
-    | '/settings/billing'
     | '/settings/privacy'
     | '/settings/team'
     | '/sprints/new'
@@ -1424,6 +1455,7 @@ export interface FileRouteTypes {
     | '/api/roadmap'
     | '/api/sprints'
     | '/api/status'
+    | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
@@ -1436,6 +1468,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
@@ -1449,6 +1482,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
+    | '/settings/billing'
     | '/sprints/$sprintId'
     | '/api/admin/changelog'
     | '/api/admin/incidents'
@@ -1556,6 +1590,7 @@ export interface FileRouteTypes {
     | '/api/roadmap/'
     | '/api/sprints/'
     | '/api/status/'
+    | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
@@ -1568,6 +1603,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
@@ -1581,6 +1617,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
+    | '/_dashboard/settings/billing/'
     | '/_dashboard/sprints/$sprintId/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
@@ -1662,6 +1699,7 @@ export interface RootRouteChildren {
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
+  ApiBillingCheckoutStatusRoute: typeof ApiBillingCheckoutStatusRoute
   ApiBillingCheckoutSubscriptionRoute: typeof ApiBillingCheckoutSubscriptionRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
@@ -2387,6 +2425,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSprintsSprintIdIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/settings/billing/': {
+      id: '/_dashboard/settings/billing/'
+      path: '/'
+      fullPath: '/settings/billing/'
+      preLoaderRoute: typeof DashboardSettingsBillingIndexRouteImport
+      parentRoute: typeof DashboardSettingsBillingRoute
+    }
     '/_dashboard/builder/$builderId/': {
       id: '/_dashboard/builder/$builderId/'
       path: '/builder/$builderId'
@@ -2478,6 +2523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBillingCheckoutSubscriptionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/checkout/status': {
+      id: '/api/billing/checkout/status'
+      path: '/api/billing/checkout/status'
+      fullPath: '/api/billing/checkout/status'
+      preLoaderRoute: typeof ApiBillingCheckoutStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/alerts/triggers/$id': {
       id: '/api/alerts/triggers/$id'
       path: '/api/alerts/triggers/$id'
@@ -2562,6 +2614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_dashboard/settings/billing/return': {
+      id: '/_dashboard/settings/billing/return'
+      path: '/return'
+      fullPath: '/settings/billing/return'
+      preLoaderRoute: typeof DashboardSettingsBillingReturnRouteImport
+      parentRoute: typeof DashboardSettingsBillingRoute
+    }
     '/api/builders/$builderId/evidence/': {
       id: '/api/builders/$builderId/evidence/'
       path: '/evidence'
@@ -2600,6 +2659,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface DashboardSettingsBillingRouteChildren {
+  DashboardSettingsBillingReturnRoute: typeof DashboardSettingsBillingReturnRoute
+  DashboardSettingsBillingIndexRoute: typeof DashboardSettingsBillingIndexRoute
+}
+
+const DashboardSettingsBillingRouteChildren: DashboardSettingsBillingRouteChildren =
+  {
+    DashboardSettingsBillingReturnRoute: DashboardSettingsBillingReturnRoute,
+    DashboardSettingsBillingIndexRoute: DashboardSettingsBillingIndexRoute,
+  }
+
+const DashboardSettingsBillingRouteWithChildren =
+  DashboardSettingsBillingRoute._addFileChildren(
+    DashboardSettingsBillingRouteChildren,
+  )
+
 interface DashboardRouteRouteChildren {
   DashboardAlertsRoute: typeof DashboardAlertsRoute
   DashboardAdminBillingRoute: typeof DashboardAdminBillingRoute
@@ -2609,7 +2684,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
-  DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRoute
+  DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
   DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
@@ -2631,7 +2706,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
-  DashboardSettingsBillingRoute: DashboardSettingsBillingRoute,
+  DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
   DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
@@ -2858,6 +2933,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
+  ApiBillingCheckoutStatusRoute: ApiBillingCheckoutStatusRoute,
   ApiBillingCheckoutSubscriptionRoute: ApiBillingCheckoutSubscriptionRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
