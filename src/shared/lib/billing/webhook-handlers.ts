@@ -33,7 +33,15 @@ import { computeAnniversary } from './annual-grants'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
-import { findAutoRechargeRule, findBillingCustomer, resolveAutoRechargeTrigger } from '../repositories/billing'
+import { applyCreditRevocationForRefund } from './refunds'
+import {
+  findAutoRechargeRule,
+  findBillingCustomer,
+  findBillingRefundByStripeRefundId,
+  resolveAutoRechargeTrigger,
+  updateBillingRefundState,
+} from '../repositories/billing'
+import { findCreditGrant } from '../repositories/billing-ledger'
 import {
   clearBillingSubscriptionPaymentBlock,
   findBillingCheckoutAttemptByStripeSessionId,
@@ -41,6 +49,7 @@ import {
   findOrganizationIdForPendingAutoRechargePaymentIntent,
   findOrganizationIdForStripeCheckoutSession,
   findOrganizationIdForStripeCustomer,
+  findOrganizationIdForStripeRefund,
   findOrganizationIdForStripeSubscription,
   markBillingSubscriptionGraceStart,
   updateBillingCheckoutAttemptStatus,
@@ -106,17 +115,22 @@ export async function processStripeWebhookEvent(
     case 'payment_intent.requires_action':
       return handleAutoRechargePaymentIntentEvent(event, 'requires_action', db)
 
-    case 'charge.refunded':
-    case 'refund.created':
     case 'refund.updated':
     case 'refund.failed':
-      return { outcome: 'deferred', detail: `${event.type}: refund review is not built yet (§8 task 4)` }
+      return handleRefundStatusEvent(event, db)
+    case 'refund.created':
+    case 'charge.refunded':
+      // Informational only — this app already records the refund synchronously the moment it sends
+      // it to the provider (`markBillingRefundProviderRefund` in `refunds.ts`'s
+      // `processPendingPackRefund`). `refund.updated`/`refund.failed` carry the actionable status
+      // transition; these two events add nothing our own state doesn't already have.
+      return { outcome: 'ignored', detail: `${event.type}: informational only, no actionable state beyond what refund.updated/refund.failed already carry` }
 
     case 'charge.dispute.created':
     case 'charge.dispute.updated':
     case 'charge.dispute.closed':
     case 'charge.dispute.funds_reinstated':
-      return { outcome: 'deferred', detail: `${event.type}: dispute handling is not built yet (§8 tasks 2-3)` }
+      return { outcome: 'deferred', detail: `${event.type}: dispute handling is not built yet (§8 task 5)` }
 
     default:
       return { outcome: 'ignored', detail: `Unrecognized event type: ${event.type}` }
@@ -147,7 +161,7 @@ async function handleCheckoutSessionStatus(
     // no subsequent invoice for a one-shot payment-mode Checkout the way subscriptions have
     // `invoice.paid`. See this file's top-of-file comment and `handlePackCheckoutCompleted` below.
     if (attempt.action === 'credits' && session.mode === 'payment' && status === 'complete') {
-      return handlePackCheckoutCompleted(tx, organizationId, attempt, session.id, eventTimestamp)
+      return handlePackCheckoutCompleted(tx, organizationId, attempt, session.id, extractId(session.payment_intent), eventTimestamp)
     }
 
     return { outcome: 'applied', detail: `Checkout attempt ${attempt.id} marked ${status}` }
@@ -167,6 +181,7 @@ async function handlePackCheckoutCompleted(
   organizationId: string,
   attempt: { id: string; catalogKey: string },
   stripeCheckoutSessionId: string,
+  stripePaymentIntentId: string | null,
   eventTimestamp: Date,
 ): Promise<WebhookHandlerOutcome> {
   const catalogEntry = resolvePackCatalogEntryByKey(attempt.catalogKey)
@@ -181,6 +196,7 @@ async function handlePackCheckoutCompleted(
     source: 'pack',
     sourceReference: catalogEntry.key,
     stripePaymentReference: stripeCheckoutSessionId,
+    stripePaymentIntentId: stripePaymentIntentId ?? undefined,
     units: catalogEntry.credits,
     expiresAt: computeAnniversary(eventTimestamp, catalogEntry.expiryMonths),
     idempotencyKey: `pack-grant:${stripeCheckoutSessionId}`,
@@ -233,6 +249,7 @@ async function handleAutoRechargePaymentIntentEvent(
           source: 'pack',
           sourceReference: catalogEntry.key,
           stripePaymentReference: paymentIntent.id,
+          stripePaymentIntentId: paymentIntent.id,
           units: catalogEntry.credits,
           expiresAt: computeAnniversary(eventTimestamp, catalogEntry.expiryMonths),
           idempotencyKey: `auto-recharge-grant:${paymentIntent.id}`,
@@ -257,6 +274,44 @@ async function handleAutoRechargePaymentIntentEvent(
       lastFailureReason: 'Off-session payment failed',
     })
     return { outcome: 'applied', detail: `Auto-recharge charge ${paymentIntent.id} failed — paused` }
+  }, db)
+}
+
+/**
+ * Resolves the async outcome of a refund this app already sent to the provider (§8 task 4,
+ * `refunds.ts`'s `processPendingPackRefund`) — the only cross-org signal is the
+ * `stripe_refund_id` this app itself set when sending it. A refund whose provider status came back
+ * `succeeded` synchronously already had its credit revocation applied at send time; this handler
+ * exists for the case where it did not (a real refund is often `pending` before settling), and for
+ * `refund.failed`.
+ */
+async function handleRefundStatusEvent(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+  const stripeRefund = event.data.object as Stripe.Refund
+  const organizationId = await findOrganizationIdForStripeRefund(stripeRefund.id, db)
+  if (!organizationId) {
+    return { outcome: 'deferred', detail: `No refund record found yet for Stripe refund ${stripeRefund.id}` }
+  }
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const refund = await findBillingRefundByStripeRefundId(tx, organizationId, stripeRefund.id)
+    if (!refund) return { outcome: 'deferred', detail: `Refund row not found inside org scope for ${stripeRefund.id}` }
+    if (refund.state === 'succeeded' || refund.state === 'failed') {
+      return { outcome: 'applied', detail: `Refund ${refund.id} already ${refund.state} — duplicate delivery, no-op` }
+    }
+
+    if (stripeRefund.status === 'succeeded') {
+      await updateBillingRefundState(tx, organizationId, refund.id, 'succeeded')
+      if (refund.grantId) {
+        const grant = await findCreditGrant(tx, organizationId, refund.grantId)
+        if (grant) await applyCreditRevocationForRefund(tx, organizationId, refund, grant)
+      }
+      return { outcome: 'applied', detail: `Refund ${refund.id} succeeded — credits revoked` }
+    }
+    if (stripeRefund.status === 'failed' || stripeRefund.status === 'canceled') {
+      await updateBillingRefundState(tx, organizationId, refund.id, 'failed')
+      return { outcome: 'applied', detail: `Refund ${refund.id} marked failed` }
+    }
+    return { outcome: 'applied', detail: `Refund ${refund.id} still ${stripeRefund.status} — awaiting resolution` }
   }, db)
 }
 

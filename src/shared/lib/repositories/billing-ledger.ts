@@ -18,6 +18,7 @@ export interface BillingCreditGrantRecord {
   source: string
   sourceReference: string | null
   stripePaymentReference: string | null
+  stripePaymentIntentId: string | null
   monthlyWindowKey: string | null
   originalUnits: number
   remainingUnits: number
@@ -34,6 +35,7 @@ export interface InsertCreditGrantInput {
   source: string
   sourceReference?: string
   stripePaymentReference?: string
+  stripePaymentIntentId?: string
   monthlyWindowKey?: string
   originalUnits: number
   remainingUnits: number

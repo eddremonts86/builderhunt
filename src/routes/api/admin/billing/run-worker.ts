@@ -33,6 +33,7 @@ export const Route = createFileRoute('/api/admin/billing/run-worker')({
               annualGrantsIssued: summary.annualGrantsIssued,
               paymentBlocksApplied: summary.paymentBlocksApplied,
               autoRechargeTriggered: summary.autoRechargeTriggered,
+              refundsProcessed: summary.refundsProcessed,
             },
           })
           return Response.json({

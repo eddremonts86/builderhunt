@@ -27,7 +27,7 @@ import postgres from 'postgres'
 const MIGRATION_ADVISORY_LOCK_KEY = 918_273_645_102_938
 
 export async function createDisposableTestDatabase(namePrefix: string) {
-  const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:postgres@localhost:5432/builderhunt')
+  const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:***@localhost:5432/builderhunt')
   const databaseName = `builderhunt_security_test_${namePrefix}_${randomUUID().replace(/-/g, '').slice(0, 16)}`
   const databaseUrl = new URL(adminUrl.toString())
   databaseUrl.pathname = `/${databaseName}`
@@ -53,6 +53,64 @@ export async function createDisposableTestDatabase(namePrefix: string) {
   return {
     db,
     databaseName,
+    databaseUrl: databaseUrl.toString(),
+    async drop(): Promise<void> {
+      await client.end({ timeout: 5 })
+      await admin.unsafe(`DROP DATABASE IF EXISTS ${databaseName}`)
+      await admin.end({ timeout: 5 })
+    },
+  }
+}
+
+/**
+ * Wave 1 Task 1 — E2E per-worker disposable database.
+ *
+ * Same shape as `createDisposableTestDatabase`, but pinned to the E2E
+ * name prefix (`builderhunt_security_test_e2e_*`) so the harness can
+ * reliably distinguish worker databases from vitest disposable databases
+ * during cleanup, and the worker is identified by its `workerIndex`
+ * (Playwright's `TEST_PARALLEL_INDEX`) rather than a free-form label.
+ *
+ * The migration advisory lock is reused from the existing helper to
+ * preserve the same cluster-wide serialization guarantee — the E2E
+ * spec runs two workers concurrently, so the same `ALTER ROLE` race
+ * that motivated the lock for vitest applies here too.
+ */
+export async function createE2EWorkerDatabase(workerIndex: number) {
+  const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:***@localhost:5432/builderhunt')
+  const databaseName = `builderhunt_security_test_e2e_w${workerIndex}_${randomUUID().replace(/-/g, '').slice(0, 16)}`
+  const databaseUrl = new URL(adminUrl.toString())
+  databaseUrl.pathname = `/${databaseName}`
+
+  const admin = postgres(adminUrl.toString(), { max: 1, prepare: false })
+  await admin.unsafe(`CREATE DATABASE ${databaseName}`)
+
+  // max: 5 — same rationale as `createDisposableTestDatabase`. The app
+  // server (vite dev) plus the test process both open connections to
+  // this database, and transactions in the app may borrow a second
+  // connection from the same pool.
+  const client = postgres(databaseUrl.toString(), { max: 5, prepare: false })
+  const db = drizzle(client)
+
+  try {
+    await migrateWithRetry(db)
+    // Roles are cluster-wide, while CONNECT is database-specific. Give the
+    // E2E roles deterministic test-only credentials and explicitly grant
+    // access to this worker database after migrations create the roles.
+    for (const role of ['builderhunt_app', 'builderhunt_auth', 'builderhunt_worker', 'builderhunt_platform']) {
+      await admin.unsafe(`ALTER ROLE ${role} PASSWORD 'builderhunt_e2e'`)
+      await admin.unsafe(`GRANT CONNECT ON DATABASE ${databaseName} TO ${role}`)
+    }
+  } catch (error) {
+    await client.end({ timeout: 5 }).catch(() => {})
+    await admin.end({ timeout: 5 }).catch(() => {})
+    throw error
+  }
+
+  return {
+    db,
+    databaseName,
+    databaseUrl: databaseUrl.toString(),
     async drop(): Promise<void> {
       await client.end({ timeout: 5 })
       await admin.unsafe(`DROP DATABASE IF EXISTS ${databaseName}`)

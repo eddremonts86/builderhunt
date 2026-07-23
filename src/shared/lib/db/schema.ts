@@ -975,6 +975,12 @@ export const billingCreditGrants = pgTable(
     source: text('source').notNull(),
     sourceReference: text('source_reference'),
     stripePaymentReference: text('stripe_payment_reference'),
+    // The Stripe PaymentIntent id backing this grant's charge — distinct from
+    // stripePaymentReference (which is the Checkout Session id for manually-purchased packs,
+    // `cs_...`, kept as-is so auto-recharge.ts's `pi_`/`cs_` prefix distinction still works).
+    // Refunds (§8 task 4) need the actual PaymentIntent id regardless of purchase path — a
+    // Checkout Session id cannot be passed to Stripe's refund API directly.
+    stripePaymentIntentId: text('stripe_payment_intent_id'),
     // Set only for subscription-window grants, e.g. `${subscriptionId}:2026-08` — unique when present.
     monthlyWindowKey: text('monthly_window_key'),
     originalUnits: integer('original_units').notNull(),

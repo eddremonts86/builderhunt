@@ -73,6 +73,7 @@ import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/st
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
+import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
 import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -92,6 +93,7 @@ import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboar
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
+import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
 import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
@@ -143,6 +145,7 @@ import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/adm
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
+import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
@@ -473,6 +476,11 @@ const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
   path: '/api/builders/$builderId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBillingRefundsRoute = ApiBillingRefundsRouteImport.update({
+  id: '/api/billing/refunds',
+  path: '/api/billing/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
   id: '/api/billing/portal',
   path: '/api/billing/portal',
@@ -568,6 +576,11 @@ const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
 const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
   id: '/admin/roadmap',
   path: '/admin/roadmap',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminRefundsRoute = DashboardAdminRefundsRouteImport.update({
+  id: '/admin/refunds',
+  path: '/admin/refunds',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardAdminPlanRequestsRoute =
@@ -851,6 +864,11 @@ const ApiAdminBillingRiskExceptionsRoute =
     path: '/api/admin/billing/risk-exceptions',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminBillingRefundsRoute = ApiAdminBillingRefundsRouteImport.update({
+  id: '/api/admin/billing/refunds',
+  path: '/api/admin/billing/refunds',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminBillingConfigurationRoute =
   ApiAdminBillingConfigurationRouteImport.update({
     id: '/api/admin/billing/configuration',
@@ -932,6 +950,7 @@ export interface FileRoutesByFullPath {
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
+  '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
@@ -951,6 +970,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -995,6 +1015,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -1074,6 +1095,7 @@ export interface FileRoutesByTo {
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
+  '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
@@ -1092,6 +1114,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1136,6 +1159,7 @@ export interface FileRoutesByTo {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -1219,6 +1243,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
+  '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
@@ -1238,6 +1263,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
+  '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1282,6 +1308,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
@@ -1364,6 +1391,7 @@ export interface FileRouteTypes {
     | '/admin/incidents'
     | '/admin/metrics'
     | '/admin/plan-requests'
+    | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
     | '/settings/billing'
@@ -1383,6 +1411,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
+    | '/api/billing/refunds'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1427,6 +1456,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
@@ -1506,6 +1536,7 @@ export interface FileRouteTypes {
     | '/admin/incidents'
     | '/admin/metrics'
     | '/admin/plan-requests'
+    | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
     | '/settings/privacy'
@@ -1524,6 +1555,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
+    | '/api/billing/refunds'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1568,6 +1600,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
@@ -1650,6 +1683,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
     | '/_dashboard/admin/plan-requests'
+    | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
@@ -1669,6 +1703,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/portal'
+    | '/api/billing/refunds'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1713,6 +1748,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
@@ -1784,6 +1820,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
+  ApiBillingRefundsRoute: typeof ApiBillingRefundsRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
@@ -1819,6 +1856,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
+  ApiAdminBillingRefundsRoute: typeof ApiAdminBillingRefundsRoute
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
@@ -2310,6 +2348,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/billing/refunds': {
+      id: '/api/billing/refunds'
+      path: '/api/billing/refunds'
+      fullPath: '/api/billing/refunds'
+      preLoaderRoute: typeof ApiBillingRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/billing/portal': {
       id: '/api/billing/portal'
       path: '/api/billing/portal'
@@ -2441,6 +2486,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/roadmap'
       fullPath: '/admin/roadmap'
       preLoaderRoute: typeof DashboardAdminRoadmapRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/refunds': {
+      id: '/_dashboard/admin/refunds'
+      path: '/admin/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof DashboardAdminRefundsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/admin/plan-requests': {
@@ -2800,6 +2852,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingRiskExceptionsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/refunds': {
+      id: '/api/admin/billing/refunds'
+      path: '/api/admin/billing/refunds'
+      fullPath: '/api/admin/billing/refunds'
+      preLoaderRoute: typeof ApiAdminBillingRefundsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/configuration': {
       id: '/api/admin/billing/configuration'
       path: '/api/admin/billing/configuration'
@@ -2889,6 +2948,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
+  DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
@@ -2911,6 +2971,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
+  DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
@@ -3097,6 +3158,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
+  ApiBillingRefundsRoute: ApiBillingRefundsRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
@@ -3133,6 +3195,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
+  ApiAdminBillingRefundsRoute: ApiAdminBillingRefundsRoute,
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,

@@ -44,6 +44,7 @@ import { resolveSubscriptionCatalogEntryByKey } from './catalog'
 import { expireCreditGrant } from './credits'
 import { freezeIncludedGrantsForNonPayment, shouldBlockForNonPayment } from './dunning'
 import type { BillingProvider } from './provider'
+import { listPendingPackRefundIds, processPendingPackRefund } from './refunds'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
 export interface EventRetriever {
@@ -96,6 +97,7 @@ export interface WorkerRunSummary {
   annualGrantsIssued: number
   paymentBlocksApplied: number
   autoRechargeTriggered: number
+  refundsProcessed: number
   eventResults: WebhookEventProcessingResult[]
 }
 
@@ -298,6 +300,26 @@ async function sweepAutoRecharge(db: PostgresJsDatabase | typeof workerDb, provi
   return triggered
 }
 
+/**
+ * Sends every decided-but-not-yet-sent pack refund to the provider (§8 task 4) — subscription
+ * refund decisions are deliberately skipped here (`processPendingPackRefund` itself no-ops on
+ * those; see `refunds.ts`'s top-of-file comment for why that mechanism isn't built yet).
+ */
+async function sweepPendingRefunds(db: PostgresJsDatabase | typeof workerDb, provider: BillingProvider): Promise<number> {
+  const orgIds = await listWorkerOrganizationIds(db)
+  let processed = 0
+  for (const { id: organizationId } of orgIds) {
+    await withWorkerOrganization(organizationId, async (tx) => {
+      const refundIds = await listPendingPackRefundIds(tx as WorkerTransaction, organizationId)
+      for (const refundId of refundIds) {
+        const outcome = await processPendingPackRefund(tx as WorkerTransaction, organizationId, refundId, { provider })
+        if (outcome.processed) processed += 1
+      }
+    }, db)
+  }
+  return processed
+}
+
 export async function runBillingWorker(options: RunBillingWorkerOptions): Promise<WorkerRunSummary> {
   const db = options.db ?? workerDb
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
@@ -315,6 +337,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
   const annualGrantsIssued = await sweepAnnualSubscriptionGrants(db, now)
   const paymentBlocksApplied = await sweepNonPaymentBlocks(db, now)
   const autoRechargeTriggered = await sweepAutoRecharge(db, options.provider, now)
+  const refundsProcessed = await sweepPendingRefunds(db, options.provider)
 
   return {
     claimedEvents: claimed.length,
@@ -326,6 +349,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
     annualGrantsIssued,
     paymentBlocksApplied,
     autoRechargeTriggered,
+    refundsProcessed,
     eventResults,
   }
 }

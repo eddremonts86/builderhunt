@@ -19,7 +19,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
-import { billingAutoRechargeRules, billingCheckoutAttempts, billingCustomers, billingSubscriptions, organizations } from '../db/schema'
+import { billingAutoRechargeRules, billingCheckoutAttempts, billingCustomers, billingRefunds, billingSubscriptions, organizations } from '../db/schema'
 
 /**
  * `db` defaults to the real `workerDb` singleton in production; tests inject a disposable database
@@ -105,6 +105,19 @@ export function findOrganizationIdForPendingAutoRechargePaymentIntent(
   return findOwningOrganizationId(async (tx, organizationId) => {
     const [row] = await tx.select({ id: billingAutoRechargeRules.organizationId }).from(billingAutoRechargeRules)
       .where(and(eq(billingAutoRechargeRules.organizationId, organizationId), eq(billingAutoRechargeRules.pendingPaymentIntentId, paymentIntentId)))
+      .limit(1)
+    return Boolean(row)
+  }, db)
+}
+
+/** Resolves which organization a `refund.*`/`charge.refunded` event belongs to (§8 task 4) — the only cross-org signal for a bare refund event is the `stripe_refund_id` this app itself set on `billing_refunds` when it sent the refund to the provider (`markBillingRefundProviderRefund`). */
+export function findOrganizationIdForStripeRefund(
+  stripeRefundId: string,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<string | null> {
+  return findOwningOrganizationId(async (tx, organizationId) => {
+    const [row] = await tx.select({ id: billingRefunds.id }).from(billingRefunds)
+      .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.stripeRefundId, stripeRefundId)))
       .limit(1)
     return Boolean(row)
   }, db)

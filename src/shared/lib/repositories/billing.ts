@@ -584,6 +584,171 @@ export async function listBillingRefunds(
     .orderBy(desc(billingRefunds.createdAt))
 }
 
+/** The complete row — `BillingRefundRecord` above is deliberately narrower (the read-only billing-summary DTO's shape); processing/deciding a refund (§8 task 4) needs every column. */
+export interface FullBillingRefundRecord {
+  id: string
+  organizationId: string
+  subscriptionId: string | null
+  grantId: string | null
+  requestedByUserId: string
+  operatorUserId: string | null
+  idempotencyKey: string
+  policyDecision: string
+  amountCents: number
+  stripeRefundId: string | null
+  revisedServiceEndAt: Date | null
+  creditRevocationUnits: number | null
+  state: string
+  createdAt: Date
+  updatedAt: Date
+}
+
+/** `ON CONFLICT DO NOTHING` on the org+idempotencyKey unique index, then re-select — same idempotent-insert-or-fetch pattern as `createBillingCheckoutAttemptIfAbsent`, so a retried owner request returns the original row instead of a duplicate-key error. */
+export async function createBillingRefundRequestIfAbsent(
+  transaction: TenantTransaction,
+  input: CreateBillingRefundRequestInput,
+): Promise<FullBillingRefundRecord> {
+  await transaction.insert(billingRefunds).values(input).onConflictDoNothing({
+    target: [billingRefunds.organizationId, billingRefunds.idempotencyKey],
+  })
+  const existing = await findBillingRefundByIdempotencyKey(transaction, input.organizationId, input.idempotencyKey)
+  if (!existing) throw new Error(`Refund request ${input.id} vanished immediately after insert-or-fetch`)
+  return existing
+}
+
+export async function findBillingRefundByIdempotencyKey(
+  transaction: TenantTransaction,
+  organizationId: string,
+  idempotencyKey: string,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingRefunds)
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.idempotencyKey, idempotencyKey)))
+    .limit(1)
+  return row ?? null
+}
+
+export async function findBillingRefundByStripeRefundId(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeRefundId: string,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingRefunds)
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.stripeRefundId, stripeRefundId)))
+    .limit(1)
+  return row ?? null
+}
+
+export async function findFullBillingRefund(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingRefunds)
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.id, id)))
+    .limit(1)
+  return row ?? null
+}
+
+/** Row-locked fetch — worker processing (`refunds.ts`'s `processPendingPackRefund`) must lock this row for the ENTIRE duration of the provider call, so a second concurrent worker tick blocks instead of also sending the refund to Stripe. */
+export async function lockBillingRefund(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingRefunds)
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.id, id)))
+    .for('update')
+    .limit(1)
+  return row ?? null
+}
+
+export async function listPendingBillingRefundsWithoutProviderRefund(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<FullBillingRefundRecord[]> {
+  return transaction
+    .select()
+    .from(billingRefunds)
+    .where(and(
+      eq(billingRefunds.organizationId, organizationId),
+      eq(billingRefunds.state, 'pending'),
+      isNull(billingRefunds.stripeRefundId),
+    ))
+}
+
+export interface OperatorRefundDecisionInput {
+  operatorUserId: string
+  policyDecision: 'full_unused_pack' | 'partial_pack_operator' | 'full_subscription_invoice' | 'partial_subscription_operator'
+  amountCents: number
+  revisedServiceEndAt?: Date
+  creditRevocationUnits?: number
+}
+
+/** Platform-operator decision on an owner-submitted (or operator-initiated) request — only ever succeeds from `state = 'pending'` with no provider refund sent yet, so a decision can never silently override a request already in flight or resolved. */
+export async function recordOperatorRefundDecision(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+  input: OperatorRefundDecisionInput,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .update(billingRefunds)
+    .set({
+      operatorUserId: input.operatorUserId,
+      policyDecision: input.policyDecision,
+      amountCents: input.amountCents,
+      revisedServiceEndAt: input.revisedServiceEndAt,
+      creditRevocationUnits: input.creditRevocationUnits,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(billingRefunds.organizationId, organizationId),
+      eq(billingRefunds.id, id),
+      eq(billingRefunds.state, 'pending'),
+      isNull(billingRefunds.stripeRefundId),
+    ))
+    .returning()
+  return row ?? null
+}
+
+/** Records that the provider refund was sent (or already exists via idempotent replay) — set BEFORE the provider call resolves is never correct (we don't yet know the id); this is called only after `provider.createRefund` returns. */
+export async function markBillingRefundProviderRefund(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+  update: { stripeRefundId: string; state: string },
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .update(billingRefunds)
+    .set({ stripeRefundId: update.stripeRefundId, state: update.state, updatedAt: new Date() })
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.id, id)))
+    .returning()
+  return row ?? null
+}
+
+/** Resolves an in-flight refund's final outcome — used both by worker follow-up when the provider already returned a terminal status, and by the `refund.updated`/`charge.refunded`/`refund.failed` webhook once Stripe confirms it asynchronously. */
+export async function updateBillingRefundState(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+  state: string,
+): Promise<FullBillingRefundRecord | null> {
+  const [row] = await transaction
+    .update(billingRefunds)
+    .set({ state, updatedAt: new Date() })
+    .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.id, id)))
+    .returning()
+  return row ?? null
+}
+
 // ---------------------------------------------------------------------------
 // Auto-recharge (plans/stripe-billing-platform/tasks.md §8 "Implement capped
 // auto-recharge and SCA recovery") — one row per organization

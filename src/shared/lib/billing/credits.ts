@@ -40,6 +40,7 @@ export interface GrantCreditsInput {
   source: 'subscription_monthly' | 'subscription_annual_window' | 'subscription_upgrade_delta' | 'pack' | 'legacy_manual' | 'promotional' | 'operator_trial'
   sourceReference?: string
   stripePaymentReference?: string
+  stripePaymentIntentId?: string
   monthlyWindowKey?: string
   units: number
   expiresAt: Date
@@ -98,6 +99,7 @@ export async function grantCredits(transaction: TenantTransaction, input: GrantC
     source: input.source,
     sourceReference: input.sourceReference,
     stripePaymentReference: input.stripePaymentReference,
+    stripePaymentIntentId: input.stripePaymentIntentId,
     monthlyWindowKey: input.monthlyWindowKey,
     originalUnits: input.units,
     remainingUnits: input.units,

@@ -992,10 +992,76 @@ migration, dunning/recovery) implemented, tested, and committed.
     security:boundaries` (0 legacy imports); route-coverage (89 routes — +1 for
     `/api/admin/billing/risk-exceptions`, 8 allowlisted, valid).
 
-- [ ] **Implement refund request and operator workflow**
+- [x] **Implement refund request and operator workflow**
   - Files: `src/shared/lib/billing/refunds.ts`, `src/shared/lib/billing/refunds.test.ts`, `src/routes/api/billing/refunds.ts`, `src/routes/api/admin/billing/refunds.ts`, `src/modules/admin/billing/RefundQueue.tsx`
   - Do: Allow unused-pack request; operator preview/decision for full/partial pack and subscription exceptions; set revised service end; create idempotent Stripe refund; revoke only eligible unused linked credits; preserve consumed history/unrelated packs; lock conflicts and expose repair state.
   - Verify: full/partial, provider timeout/failure, internal failure, duplicate/out-of-order webhook, concurrent consumption, and retry tests never over-refund/double-revoke.
+  - Progress (2026-07-23): Pack refunds are fully implemented and processed; subscription refunds
+    (`full_subscription_invoice`/`partial_subscription_operator`) can be DECIDED (policy/amount/
+    revised-service-end recorded) but are NOT processed — a deliberate, documented scope boundary
+    (see `refunds.ts`'s module comment): no function anywhere in this codebase (confirmed by reading
+    `subscription-changes.ts` in full) implements immediately ending a subscription's paid period —
+    every existing cancellation/downgrade path there is deliberately scheduled at the NEXT period
+    end, never immediate — so building that mechanism honestly belongs to its own task rather than a
+    rushed addition here. A subscription refund decision stays visibly `pending` (an operator can see
+    it, not a silent no-op) until that follow-up exists.
+    **Real architectural gap found and fixed while wiring pack refunds**: Stripe's refund API needs a
+    PaymentIntent id, but a manually-purchased pack's grant only ever stored the Checkout SESSION id
+    (`stripePaymentReference`, kept for auto-recharge.ts's `pi_`/`cs_` monthly-cap distinction — could
+    not be repurposed). New migration 0034 adds `billing_credit_grants.stripe_payment_intent_id`,
+    populated from the real `Stripe.Checkout.Session.payment_intent` field already present on the
+    webhook payload (`handlePackCheckoutCompleted`) and from the PaymentIntent id directly for
+    auto-recharge grants (`handleAutoRechargePaymentIntentEvent`) — no provider/fake-provider changes
+    needed since this field is native to the real Stripe webhook object, not something the
+    `BillingProvider` abstraction needed to expose.
+    New `billing/refunds.ts`: `requestPackRefund` (owner, self-service) accepts ONLY a fully-unused
+    pack grant (`remainingUnits === originalUnits`) — a partially-used one is rejected with a message
+    to contact support, matching spec.md's "no self-service" rule literally. `decideRefund` (platform
+    operator) records policy/amount/revocation decisions, guarded to only succeed while
+    `state = 'pending' AND stripe_refund_id IS NULL` (new `recordOperatorRefundDecision` repository
+    function) — a decision can never override a request already sent to the provider.
+    `processPendingPackRefund` (worker, wired into `worker.ts`'s new `sweepPendingRefunds`) locks the
+    refund row (new `lockBillingRefund`) for the ENTIRE provider call, sends an idempotent
+    `provider.createRefund` (keyed `refund:${refund.id}`), and — only on an immediately-`succeeded`
+    provider status — applies the compensating revocation: `full_unused_pack` fully `revokeCreditGrant`s
+    (correct since the grant is, by construction, 100% unused); `partial_pack_operator` uses
+    `adjustCreditGrant` for exactly the operator's `creditRevocationUnits`, provably never touching
+    already-consumed units. A grant missing or with no PaymentIntent is marked `repair_needed`
+    (visible, not silently skipped); a provider decline is marked `failed`, with the grant left
+    completely untouched. A `pending`/unresolved provider status is finalized later by two new
+    webhook handlers, `refund.updated`/`refund.failed` (`handleRefundStatusEvent`, resolving the org
+    via a new cross-org lookup `findOrganizationIdForStripeRefund` keyed on `stripe_refund_id`) —
+    `refund.created`/`charge.refunded` are correctly reclassified from the old blanket `'deferred'`
+    placeholder to `'ignored'` (informational only; this app already records the refund synchronously
+    when it sends it).
+    New `/api/billing/refunds` (owner + recent-auth, matching `portal.ts`'s/`billing:refund`'s
+    existing gate) and `/api/admin/billing/refunds` (GET list + PUT decide, platform-admin + audited,
+    reusing §8 task 3's `withPlatformOrganization` rather than a second cross-org helper). New
+    `RefundQueue.tsx` (org-id lookup, pending-row "Decide" inline form) mounted at a new
+    `/admin/refunds` page, linked from the admin section of `UserMenu.tsx`.
+    15 new `refunds.test.ts` tests (full/partial creation and rejection paths, operator decision
+    conflict guard, full processing success + credit revocation, partial processing preserving
+    consumed history, idempotent re-processing no-op, repair_needed on an unrefundable grant, failed
+    on provider decline leaving the grant untouched, subscription decisions correctly left
+    unprocessed), 6 new `webhook-handlers.test.ts` tests (succeeded finalizes + revokes,
+    failed finalizes without touching the grant, duplicate-delivery-of-resolved is a safe no-op, plus
+    the reclassified deferred/ignored family assertions), 12 new owner-route tests + 6 new
+    admin-route tests (permission matrices, spoofed/invalid body rejection, every `RefundErrorCode`→
+    HTTP mapping, audit-call assertions). Live-verified against the running dev server: `GET
+    /api/admin/billing/refunds?organizationId=<real org>` returns `{"refunds":[]}` for a real
+    organization with none yet, and `POST /api/billing/refunds` correctly returns the real
+    `STALE_SESSION_ERROR_MESSAGE` 401 for this browser's long-lived session (same recent-auth
+    behavior already proven live for auto-recharge in §8 task 2) — proving the route/auth wiring end
+    to end; the deeper business-logic paths are already fully covered by the disposable-DB suite.
+    Also fixed, out of this task's own scope but blocking all verification: a different concurrent
+    editing session had left `src/shared/lib/db/create-disposable-test-database.ts` with a syntax
+    error (two function bodies spliced together mid-edit) that broke `pnpm type-check` for the entire
+    repo — restored to valid syntax matching its own already-written doc comment and existing caller
+    (`e2e/harness/database.ts`), left uncommitted for that other session to reconcile.
+    Full suite (isolated per-file, per the known parallel-directory resource-contention caveat
+    documented in §8 tasks 2-3's evidence) all green; `pnpm type-check` (clean); `pnpm lint` (0 errors
+    in every file this task touched); `pnpm security:boundaries` (0 legacy imports); route-coverage
+    (91 routes — +2 for `/api/billing/refunds` and `/api/admin/billing/refunds`, 8 allowlisted, valid).
 
 - [ ] **Implement dispute freeze, outcome, and alerts**
   - Files: `src/shared/lib/billing/disputes.ts`, `src/shared/lib/billing/disputes.test.ts`, `src/shared/lib/billing/webhook-handlers.ts`, `src/modules/admin/billing/DisputeQueue.tsx`, `docs/operations/stripe-disputes.md`

@@ -1,0 +1,1 @@
+ALTER TABLE "billing_credit_grants" ADD COLUMN "stripe_payment_intent_id" text;

@@ -2,7 +2,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
+import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingRefunds, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
 import { computeAnniversary } from './annual-grants'
 import { PACK_CATALOG, SUBSCRIPTION_CATALOG } from './catalog'
 import { processStripeWebhookEvent } from './webhook-handlers'
@@ -704,8 +704,10 @@ describe('processStripeWebhookEvent — deferred and ignored families', () => {
     'payment_intent.succeeded',
     'payment_intent.payment_failed',
     'payment_intent.requires_action',
-    'charge.refunded',
-    'refund.created',
+    // refund.updated/refund.failed: deferred here for a DIFFERENT reason than "not built yet" — a
+    // real handler exists (handleRefundStatusEvent), but this generic fixture's refund id ('x')
+    // matches no `billing_refunds` row, so the org can't be resolved — same "deferred until
+    // resolvable" semantics as every other cross-org lookup in this file.
     'refund.updated',
     'refund.failed',
     'charge.dispute.created',
@@ -718,9 +720,87 @@ describe('processStripeWebhookEvent — deferred and ignored families', () => {
     expect(result.outcome).toBe('deferred')
   })
 
+  it.each(['charge.refunded', 'refund.created'] as const)('reports %s as ignored (informational only, no actionable state)', async (type) => {
+    const event = { id: uniqueId('evt'), type, created: 1780000000, livemode: false, api_version: '2026-06-24.dahlia', data: { object: { id: 'x', object: 'x' } } } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
+    const result = await processStripeWebhookEvent(event, { db })
+    expect(result.outcome).toBe('ignored')
+  })
+
   it('reports a genuinely unrecognized event type as ignored', async () => {
     const event = { id: uniqueId('evt'), type: 'some.future.event.type', created: 1780000000, livemode: false, api_version: '2026-06-24.dahlia', data: { object: { id: 'x', object: 'x' } } } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
     const result = await processStripeWebhookEvent(event, { db })
     expect(result.outcome).toBe('ignored')
+  })
+})
+
+describe('processStripeWebhookEvent — refund status resolution (§8 task 4)', () => {
+  function refundStatusEvent(id: string, stripeRefundId: string, status: string, type: 'refund.updated' | 'refund.failed', created = 1780000000) {
+    return {
+      id, type, created, livemode: false, api_version: '2026-06-24.dahlia',
+      data: { object: { id: stripeRefundId, object: 'refund', status } },
+    } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
+  }
+
+  it('finalizes a succeeded refund and revokes the linked grant', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const grantId = uniqueId('grant')
+    await db.insert(billingCreditGrants).values({
+      id: grantId, organizationId, source: 'pack', sourceReference: 'starter_300',
+      stripePaymentIntentId: `pi_${uniqueId('pi')}`, originalUnits: 300, remainingUnits: 300,
+      expiresAt: new Date('2099-01-01T00:00:00Z'),
+    })
+    const stripeRefundId = `re_${uniqueId('re')}`
+    await db.insert(billingRefunds).values({
+      id: uniqueId('refund'), organizationId, requestedByUserId: userId, grantId,
+      idempotencyKey: uniqueId('idem'), policyDecision: 'full_unused_pack', amountCents: 1500,
+      stripeRefundId, state: 'pending',
+    })
+
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db })
+
+    expect(result.outcome).toBe('applied')
+    const [refundRow] = await db.select().from(billingRefunds).where(eq(billingRefunds.stripeRefundId, stripeRefundId))
+    expect(refundRow.state).toBe('succeeded')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('revoked')
+  })
+
+  it('marks a refund failed on refund.failed, without touching the grant', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const grantId = uniqueId('grant')
+    await db.insert(billingCreditGrants).values({
+      id: grantId, organizationId, source: 'pack', sourceReference: 'starter_300',
+      stripePaymentIntentId: `pi_${uniqueId('pi')}`, originalUnits: 300, remainingUnits: 300,
+      expiresAt: new Date('2099-01-01T00:00:00Z'),
+    })
+    const stripeRefundId = `re_${uniqueId('re')}`
+    await db.insert(billingRefunds).values({
+      id: uniqueId('refund'), organizationId, requestedByUserId: userId, grantId,
+      idempotencyKey: uniqueId('idem'), policyDecision: 'full_unused_pack', amountCents: 1500,
+      stripeRefundId, state: 'pending',
+    })
+
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'failed', 'refund.failed'), { db })
+
+    expect(result.outcome).toBe('applied')
+    const [refundRow] = await db.select().from(billingRefunds).where(eq(billingRefunds.stripeRefundId, stripeRefundId))
+    expect(refundRow.state).toBe('failed')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('active')
+  })
+
+  it('duplicate delivery of an already-resolved refund is a safe no-op', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const stripeRefundId = `re_${uniqueId('re')}`
+    await db.insert(billingRefunds).values({
+      id: uniqueId('refund'), organizationId, requestedByUserId: userId,
+      idempotencyKey: uniqueId('idem'), policyDecision: 'full_unused_pack', amountCents: 1500,
+      stripeRefundId, state: 'succeeded',
+    })
+
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db })
+
+    expect(result.outcome).toBe('applied')
+    expect(result.detail).toMatch(/already succeeded/)
   })
 })
