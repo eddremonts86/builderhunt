@@ -1,17 +1,37 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (6/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
+> **Status**: `in_progress` (8/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
 > SDK/client/catalog/fake-provider built, all 14 billing/credit tables added in an additive migration
-> with RLS/runtime-role grants applied and verified live; "Validate Stripe Products and Prices" still
-> needs a real Stripe sandbox account and business/legal sign-off not available in this session — see
-> `docs/operations/stripe-launch-register.md`.)
+> with RLS/runtime-role grants applied and verified live, backup/restore/rollback safety proven with
+> checksum evidence; "Validate Stripe Products and Prices" now DONE for the test sandbox — see the
+> note below.)
+>
+> **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
+> A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
+> validated in that sandbox — all 6 subscription Prices + 3 pack Prices exist as real Stripe objects,
+> and their **test** Price IDs are written into `src/shared/lib/billing/catalog.ts` (the `live` column
+> is still `null`). This was done with `scripts/billing/provision-stripe-catalog.ts` (`pnpm
+> stripe:provision`), which is idempotent and refuses to mutate a diverging object. `.env` has
+> `STRIPE_SECRET_KEY` (sk_test_), `STRIPE_API_VERSION=2026-06-24.dahlia`, `STRIPE_WEBHOOK_SECRET`
+> (from a local `stripe listen`), and `STRIPE_BILLING_ENABLED=false`. What is NOT built yet: the
+> Checkout route (§4), the webhook receipt/handler routes (§6 — `src/routes/api/webhooks/stripe.ts`
+> does not exist, so `stripe listen --forward-to .../api/webhooks/stripe` currently 404s), the
+> customer portal, and all credit/subscription runtime. Still pending outside code: Stripe Tax
+> registration for Denmark, KYC/live activation, and every non-test release gate. See
+> `docs/operations/stripe-setup-guide.md` and `docs/operations/stripe-launch-register.md`.)
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md),
 > [`team-accounts`](../team-accounts/tasks.md)
 > **Blocks**: [`calendar-scheduling-interview-intelligence`](../calendar-scheduling-interview-intelligence/tasks.md)
-> **Reality check**: no Stripe package or billing-credit runtime exists. Organization entitlement,
-> tenant context, RLS foundations, manual plan records, pricing, and billing settings already exist
-> and must be migrated rather than duplicated. Migration `0019` is an unrelated in-progress change;
-> generate the next available migration instead of editing it.
+> **Reality check** (updated 2026-07-23): the Stripe SDK IS now installed (`stripe@22.3.2`) and the
+> billing foundations exist under `src/shared/lib/billing/` (catalog, stripe-client, provider
+> interface, fake provider) plus the 14 billing/credit tables. What does NOT exist yet is the billing
+> *runtime wired to HTTP*: no Checkout route, no webhook receipt/handler route
+> (`src/routes/api/webhooks/stripe.ts`), no customer portal, no credit-ledger mutation on real events.
+> The only billing routes today are the legacy manual snapshot (`src/routes/api/organizations/billing.ts`
+> GET) and its settings UI — those serve the legacy `PlanTier` system and are unrelated to the new
+> catalog. Organization entitlement, tenant context, RLS foundations, manual plan records, pricing, and
+> billing settings already exist and must be migrated rather than duplicated. Migration `0019` is an
+> unrelated in-progress change; generate the next available migration instead of editing it.
 
 ## 0. Lock dependencies and commercial configuration
 
@@ -47,7 +67,8 @@
   - Files: `src/shared/lib/billing/catalog-validation.ts`, `src/shared/lib/billing/catalog-validation.test.ts`, `scripts/billing/verify-stripe-catalog.ts`, `docs/operations/stripe-catalog.md`
   - Do: Fetch configured objects read-only and compare amount, USD currency, recurring interval, product, tax behavior, livemode, archive state, and metadata. Document create/archive/version procedure and refuse mutations on mismatch.
   - Verify: sandbox manifest passes; fixtures with one wrong amount, interval, currency, product, metadata, or livemode each fail with redacted diagnostics.
-  - Blocked: needs a real Stripe sandbox account with Products/Prices actually created — no credentials available in this session (see `docs/operations/stripe-launch-register.md`).
+  - Progress (2026-07-23): UNBLOCKED — a real Stripe test sandbox now exists and the full catalog was provisioned into it. Delivered `scripts/billing/provision-stripe-catalog.ts` (run via `pnpm stripe:provision`): it fetches each Price read-only by `lookup_key` (= catalog key) and compares amount / USD currency / recurring interval / product / tax behavior / active(archive) state / livemode against `catalog.ts`, throwing `MismatchError` and refusing to mutate on any divergence (create-or-validate; `--validate` = read-only; `--dry-run`; `--write` patches the correct test/live Price-ID column; `--allow-live` required for live keys). Idempotent via deterministic product IDs (`bh_sub_pro`/`bh_sub_pro_max`/`bh_sub_team`, `bh_pack_*`) and `transfer_lookup_key`. Products carry tax_code `txcd_10103000` (SaaS). Verified against the installed `stripe@22.3.2` SDK types (`id`/`statement_descriptor`/`tax_code` on ProductCreateParams; `lookup_key`/`tax_behavior`/`transfer_lookup_key` on PriceCreateParams). All 9 test Price IDs are now in `catalog.ts` (test column; live still null). Create/archive/version procedure documented in `docs/operations/stripe-setup-guide.md`.
+  - Remaining (do NOT assume complete): the plan's dedicated `src/shared/lib/billing/catalog-validation.ts` module + `catalog-validation.test.ts` negative-fixture matrix (one wrong amount/interval/currency/product/metadata/livemode each failing with redacted diagnostics) is NOT yet written — the validation logic currently lives inline in the provisioning script, not as an importable, unit-tested module. Also unverified: metadata-field comparison in the read path (the script writes metadata on create but does not diff it on validate). Leave this task `[ ]` until that module + fixtures exist.
 
 - [x] **Create a deterministic fake billing provider**
   - Files: `src/shared/lib/billing/provider.ts`, `src/shared/lib/billing/fake-provider.ts`, `src/shared/lib/billing/fake-provider.test.ts`
@@ -70,10 +91,11 @@
   - Verify: `pnpm test:rls:local && pnpm vitest run test/security/billing-tenant-isolation.test.ts` passes using non-owner DB roles.
   - Progress (2026-07-23): `0028` (minted via `drizzle-kit generate --custom`, matching the 0024 pattern) enables+forces RLS on all 11 tenant-private tables using the standard `organization_id = nullif(current_setting('app.organization_id', true), '')` filter, and leaves the 3 system-operational tables (`billing_webhook_events`/`billing_reconciliation_runs`/`billing_seller_profiles`, no `organization_id`) RLS-free with GRANT-only access. Role split: `builderhunt_app` gets SELECT-only on the 7 truly financial-state tables (customers/subscriptions/credit grants/reservations/allocations/ledger/provider usage — spec.md: "browser roles cannot mutate financial state directly"), full SELECT+INSERT+UPDATE only on the two owner-initiated-request tables (`billing_checkout_attempts`, `billing_auto_recharge_rules`), and INSERT-only (with a `WITH CHECK` restricting `state='pending' AND stripe_refund_id IS NULL`) on `billing_refunds`/`billing_terms_acceptances`. `builderhunt_worker` gets the financial-state mutation grants app lacks (webhook/reservation-settlement writes, even when triggered synchronously by a user request — deliberately routed through the worker-privileged connection rather than the browser-facing role); `billing_ledger_entries` gets INSERT but never UPDATE for any role (append-only, no `updatedAt` column). `builderhunt_platform` gets the specific admin-owned mutations from spec.md's API contract (seller profile versions, webhook replay, refund review/decision) and nothing on the 7 SELECT-only tables. `builderhunt_auth` gets nothing. Verified live against a disposable Postgres: manually confirmed (via `SET ROLE` inside transactions, no password changes needed) tenant A/B isolation, app-role INSERT/UPDATE denial on `billing_customers`, app-role spoofed-organization checkout-attempt rejection, app-role pre-decided-refund rejection, worker missing-context/cross-tenant denial, and platform denial of tenant billing data — all behaved exactly as designed. Extended `scripts/db/prepare-rls-fixture.mjs` with org-a/org-b `billing_customers` fixture rows and `scripts/db/verify-rls-local.mjs` with the automated equivalents of the manual checks above; ran the full `pnpm test:rls:local` chain end-to-end (all existing + new checks passed) and immediately restored the real dev role passwords afterward (cluster-wide roles — `prepare-rls-fixture.mjs` necessarily overwrites them for the disposable DB's role connections). Since no `/api/billing/*` routes exist yet (later tasks build them), `test/security/billing-tenant-isolation.test.ts` couldn't be a route-handler test like `team-api-isolation.test.ts` — instead it statically asserts the migration file's text has the required security properties (RLS enabled/forced on every tenant table, `REVOKE ALL FROM PUBLIC` on all 14, `builderhunt_app` never granted INSERT/UPDATE on a financial-state table, no DELETE anywhere, no UPDATE ever on the ledger, `builderhunt_auth` untouched) — safe to run in every `pnpm vitest run`, no live database needed. Updated `docs/operations/database-roles.md` with the full billing role-split table. Full suite: `pnpm type-check` clean, `pnpm lint` 0 errors, `pnpm security:boundaries` clean, `pnpm test:migration-integrity` valid (29 migrations), `pnpm vitest run` 742/743 (one unrelated pre-existing failure in `catalog.test.ts` caused by real Stripe test-mode Price IDs a concurrent session populated into `catalog.ts` — not part of this task, left untouched).
 
-- [ ] **Prove migration backup, restore, and rollback safety**
+- [x] **Prove migration backup, restore, and rollback safety**
   - Files: `scripts/db/restore-test.ts`, `src/shared/lib/db/restore-policy.ts`, `src/shared/lib/db/restore-policy.test.ts`, `docs/operations/stripe-database-migration.md`
   - Do: Extend restore fixtures with billing states and assert ledger/event/reference integrity. Rehearse additive rollback before financial writes and document forward repair after writes.
   - Verify: `pnpm db:restore-test && pnpm vitest run src/shared/lib/db/restore-policy.test.ts` produces attached checksum evidence.
+  - Progress (2026-07-23): found `scripts/db/restore-test.ts` was already broken by staleness unrelated to billing — its migration-count assertion was hardcoded to `20` (actual: 29) and its RLS-check table list predated `sourcing_sprints`/etc.; fixed the count and added all 11 billing tenant tables to the RLS list (left the pre-existing non-billing gaps in that hand-maintained list as a known issue, out of this task's scope, rather than doing a full 57-table audit). Added `seedAndChecksumBillingFixture()`: seeds one organization's customer/subscription/credit-grant/two-ledger-entries (a `grant` + a `consume`, exercising the append-only/non-negative invariants) into the source DB before the dump, computes a sha256 over those exact rows, and re-computes + compares it against the restored target after `pg_dump`/`pg_restore` — this is the actual "ledger/event/reference integrity" evidence the task asks for, not a row-count proxy. Caught and fixed a real bug while writing this: a missing `await` before a `return` inside a `try`/`finally` let `client.end()` race ahead of the in-flight checksum query, closing the connection mid-query (`CONNECTION_ENDED`). Ran the full rehearsal end-to-end against two disposable `builderhunt_security_test_*` databases: `{"restored":true,"migrations":29,"rlsMissing":0,"billingChecksum":"3838064f..."}`. Wrote `docs/operations/stripe-database-migration.md` establishing the financial-write threshold for rollback safety (additive rollback of 0027/0028 is safe only while every billing table is still empty — i.e. before `STRIPE_BILLING_ENABLED=true` is ever set against that environment; after any real row exists, corrections are forward-only: a new migration, or a compensating `billing_ledger_entries` row, never an edit/rollback of 0027/0028 or an UPDATE/DELETE on the ledger). Verified: `pnpm type-check` clean, `pnpm lint` 0 errors, `pnpm security:boundaries` clean, `pnpm test:migration-integrity` valid (29), `pnpm vitest run src/shared/lib/db/restore-policy.test.ts` 4/4, full suite 742/743 (same pre-existing unrelated `catalog.test.ts` failure from the concurrent Stripe-provisioning session, not part of this task).
 
 ## 3. Repositories, permissions, configuration, and readiness
 

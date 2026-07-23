@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import postgres from 'postgres'
 import { assertRestoreTestTargets } from '../../src/shared/lib/db/restore-policy'
@@ -6,6 +7,8 @@ const sourceUrl = process.env.RESTORE_TEST_SOURCE_URL
 const targetUrl = process.env.RESTORE_TEST_TARGET_URL
 if (!sourceUrl || !targetUrl) throw new Error('RESTORE_TEST_SOURCE_URL and RESTORE_TEST_TARGET_URL are required')
 assertRestoreTestTargets(sourceUrl, targetUrl)
+
+const sourceChecksum = await seedAndChecksumBillingFixture(sourceUrl)
 
 await restore(sourceUrl, targetUrl)
 
@@ -24,14 +27,107 @@ try {
         'organization_entitlements', 'organization_plan_changes', 'organization_builders',
         'builders', 'saved_queries', 'alerts', 'alert_triggers', 'builder_notes', 'onboarding_progress',
         'builder_claims', 'published_builder_profiles',
+        // stripe-billing-platform tenant-private tables (drizzle/0027, 0028) — the system-operational
+        // ones (billing_webhook_events/billing_reconciliation_runs/billing_seller_profiles) have no
+        // organization_id and are correctly excluded from this RLS check.
+        'billing_customers', 'billing_subscriptions', 'billing_checkout_attempts',
+        'billing_credit_grants', 'billing_credit_reservations', 'billing_credit_allocations',
+        'billing_ledger_entries', 'billing_provider_usage', 'billing_auto_recharge_rules',
+        'billing_refunds', 'billing_terms_acceptances',
       ])})
       and (not c.relrowsecurity or not c.relforcerowsecurity)
   `
-  if (migrations?.count !== 20) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
+  if (migrations?.count !== 29) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
   if (rls?.missing !== 0) throw new Error(`Restored RLS manifest has ${rls?.missing ?? 0} missing policies`)
-  console.log(JSON.stringify({ restored: true, migrations: migrations.count, rlsMissing: rls.missing }))
+
+  const targetChecksum = await checksumBillingFixture(target)
+  if (targetChecksum !== sourceChecksum) {
+    throw new Error(`Restored billing ledger/grant/event checksum mismatch: source=${sourceChecksum} target=${targetChecksum}`)
+  }
+
+  console.log(JSON.stringify({
+    restored: true,
+    migrations: migrations.count,
+    rlsMissing: rls.missing,
+    billingChecksum: targetChecksum,
+  }))
 } finally {
   await target.end({ timeout: 5 })
+}
+
+/**
+ * Seeds one organization's worth of billing state (customer, subscription, a credit grant, and the
+ * ledger entries that grant/consume it) directly into the source database, then returns a sha256
+ * checksum over the exact rows that must survive dump/restore byte-for-byte — this is the
+ * "ledger/event/reference integrity" the backup/restore task requires evidence for, not just a
+ * migration/RLS shape check. Ledger entries are append-only in the real system (see
+ * billing_ledger_entries having no updatedAt column); a mismatched checksum here means the restore
+ * silently dropped or reordered financial history, which no row-count check would catch.
+ */
+async function seedAndChecksumBillingFixture(url: string) {
+  const client = postgres(url, { max: 1, prepare: false })
+  try {
+    await client`
+      insert into organizations (id, name, slug, created_at)
+      values ('restore-test-org', 'Restore Test Org', 'restore-test-org', now())
+      on conflict (id) do nothing
+    `
+    await client`
+      insert into auth_users (id, name, email, email_verified, created_at, updated_at)
+      values ('restore-test-user', 'Restore Test', 'restore-test@test.invalid', true, now(), now())
+      on conflict (id) do nothing
+    `
+    await client`
+      insert into billing_customers (id, organization_id, livemode, stripe_customer_id, created_at, updated_at)
+      values ('restore-test-cust', 'restore-test-org', false, 'cus_restore_test', now(), now())
+      on conflict (id) do nothing
+    `
+    await client`
+      insert into billing_subscriptions (
+        id, organization_id, customer_id, livemode, catalog_key, tier, interval, catalog_version,
+        stripe_subscription_id, stripe_status, provider_synced_at, created_at, updated_at
+      ) values (
+        'restore-test-sub', 'restore-test-org', 'restore-test-cust', false, 'pro_monthly', 'pro', 'monthly', 1,
+        'sub_restore_test', 'active', now(), now(), now()
+      )
+      on conflict (id) do nothing
+    `
+    await client`
+      insert into billing_credit_grants (
+        id, organization_id, source, original_units, remaining_units, state, active_at, expires_at, created_at, updated_at
+      ) values (
+        'restore-test-grant', 'restore-test-org', 'subscription_monthly', 140, 90, 'active', now(), now() + interval '30 days', now(), now()
+      )
+      on conflict (id) do nothing
+    `
+    await client`
+      insert into billing_ledger_entries (
+        id, organization_id, entry_type, grant_id, units_delta, source_idempotency_key, created_at
+      ) values
+        ('restore-test-ledger-grant', 'restore-test-org', 'grant', 'restore-test-grant', 140, 'restore-test-grant-idem', now()),
+        ('restore-test-ledger-consume', 'restore-test-org', 'consume', 'restore-test-grant', -50, 'restore-test-consume-idem', now())
+      on conflict (id) do nothing
+    `
+    return await checksumBillingFixture(client)
+  } finally {
+    await client.end({ timeout: 5 })
+  }
+}
+
+async function checksumBillingFixture(client: ReturnType<typeof postgres>) {
+  const rows = await client`
+    select 'customer' as kind, id, stripe_customer_id as reference from billing_customers where organization_id = 'restore-test-org'
+    union all
+    select 'subscription', id, stripe_subscription_id from billing_subscriptions where organization_id = 'restore-test-org'
+    union all
+    select 'grant', id, remaining_units::text from billing_credit_grants where organization_id = 'restore-test-org'
+    union all
+    select 'ledger', id, units_delta::text from billing_ledger_entries where organization_id = 'restore-test-org'
+    order by kind, id
+  `
+  const hash = createHash('sha256')
+  for (const row of rows) hash.update(`${row.kind}:${row.id}:${row.reference}`)
+  return hash.digest('hex')
 }
 
 async function restore(source: string, target: string) {
