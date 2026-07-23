@@ -87,7 +87,10 @@ function tryServeStatic(pathname, res) {
   if (!stat.isFile()) return false;
   const ext = extname(filePath).toLowerCase();
   const mime = MIME[ext] ?? 'application/octet-stream';
-  const isHashedAsset = /\/assets\//.test(safePath);
+  // Only content-hashed filenames (e.g. index-BmSZZem9.js) are safe to cache
+  // immutably. Stable, unhashed names (e.g. globals.css — see vite.config.ts)
+  // must NOT be immutable, or a redeploy that changes them would be ignored.
+  const isHashedAsset = /\/assets\/.*-[A-Za-z0-9_]{8,}\.[a-z0-9]+$/i.test(safePath);
   res.writeHead(200, {
     ...securityHeaders(),
     'Content-Type': mime,
