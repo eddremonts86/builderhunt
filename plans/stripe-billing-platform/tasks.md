@@ -1,13 +1,14 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (12/~40 tasks — §0-§3 complete: dependency contracts pinned, launch
-> register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit tables
-> added in an additive migration with RLS/runtime-role grants applied and verified live,
+> **Status**: `in_progress` (13/~40 tasks — §0-§3 complete, §4 started: dependency contracts pinned,
+> launch register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit
+> tables added in an additive migration with RLS/runtime-role grants applied and verified live,
 > backup/restore/rollback safety proven with checksum evidence, tenant-safe billing repositories/DTOs
 > built, owner/admin/member billing permissions centralized, private seller/country configuration
-> built (route+page+component), and a pure fail-closed live-readiness gate implemented and wired to
-> `pnpm billing:check-readiness`; "Validate Stripe Products and Prices" now DONE for the test sandbox — see
-> the note below.)
+> built (route+page+component), a pure fail-closed live-readiness gate implemented and wired to
+> `pnpm billing:check-readiness`, and the append-only credit grant/balance ledger implemented with
+> property-tested conservation invariants; "Validate Stripe Products and Prices" now DONE for the
+> test sandbox — see the note below.)
 >
 > **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
 > A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
@@ -128,10 +129,11 @@
 
 ## 4. Credit ledger
 
-- [ ] **Implement append-only grant and balance logic**
+- [x] **Implement append-only grant and balance logic**
   - Files: `src/shared/lib/billing/credits.ts`, `src/shared/lib/billing/credits.test.ts`, `src/shared/lib/repositories/billing-ledger.ts`, `src/shared/lib/repositories/billing-ledger.test.ts`
   - Do: Add idempotent grant/expire/freeze/unfreeze/revoke/adjust operations with integer units, source links, earliest-expiry available balance, active-paid pack eligibility, and compensating entries only.
   - Verify: unit/property tests prove conservation and non-negative totals across randomized sequences and duplicate idempotency keys.
+  - Progress (2026-07-23): `repositories/billing-ledger.ts` is the raw, `TenantTransaction`-first data-access layer (insert/find/list only — no business logic) over `billing_credit_grants`/`billing_ledger_entries`, following the established repository convention. `billing/credits.ts` is the one caller allowed to mutate through it, implementing `grantCredits`/`expireCreditGrant`/`freezeCreditGrant`/`unfreezeCreditGrant`/`revokeCreditGrant`/`adjustCreditGrant`, each: idempotent via `findLedgerEntryByIdempotencyKey` checked first (a replay returns the original grant+entry, never mutates twice), refusing a second grant for an already-used `monthlyWindowKey` (annual-subscription anniversary windows), and writing exactly one ledger entry per call — `adjustCreditGrant` is the only correction path, refusing any delta that would push `remainingUnits` outside `[0, originalUnits]`. `getAvailableCreditBalance`/`getAvailableCreditGrantsByEarliestExpiry` sum/order only grants that are both `active` and not yet past `expiresAt` (a grant the expiry sweep hasn't processed yet must not count as spendable), ordered earliest-expiry-first per spec.md's consumption order. `isActivePaidSubscription` is the pure predicate pack-purchase eligibility will gate on (`stripeStatus in ('active','trialing')`) — deliberately separate from the legacy manual-billing system's `resolveEntitlementPolicy`, since this new catalog's subscriptions table has its own status vocabulary. Added `fast-check@4.9.0` as a devDependency (first property-testing library in this codebase) specifically because this task's own verify line asks for property tests, not as a general addition. The property test (`credits.test.ts`) runs 25 randomized freeze/unfreeze/adjust sequences (0-12 ops each) against a real disposable database, asserting after EVERY single operation that `0 <= remainingUnits <= originalUnits`, and at the end that `remainingUnits` exactly equals `originalUnits` plus the sum of every non-`grant` ledger entry's `unitsDelta` for that grant — i.e. the denormalized balance never drifts from the append-only ledger that's supposed to explain it; expected rejections (invalid state transition, out-of-bounds adjustment) are caught and must leave the grant provably unchanged, not silently swallowed. 24/24 tests total (9 repository + 15 credits, including the property test) pass reliably across repeated runs, alongside the prior 3 disposable-DB test files now running in parallel — confirmed the shared retry-with-backoff helper from the previous task still holds under 4-way parallelism. Verified: `pnpm type-check` clean, `pnpm lint` 0 errors, `pnpm security:boundaries` clean (including the billing-module boundary test — no bare `organizationId: string` first params, no forbidden imports), `pnpm build` succeeds, full suite stable at 834/835 across repeated runs (same pre-existing unrelated `catalog.test.ts` failure), zero orphaned disposable databases after the run.
 
 - [ ] **Implement atomic reservation lifecycle**
   - Files: `src/shared/lib/billing/reservations.ts`, `src/shared/lib/billing/reservations.test.ts`, `src/shared/lib/repositories/billing-ledger.ts`
