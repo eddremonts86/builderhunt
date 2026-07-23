@@ -63,6 +63,13 @@ try {
       ('claim-b', 'identity-b', 'user-b', 'email', 'b@test.invalid', 'verified', now())
     on conflict (id) do nothing
   `
+  await owner`
+    insert into billing_customers (id, organization_id, livemode, stripe_customer_id, created_at, updated_at)
+    values
+      ('billing-cust-a', 'org-a', false, 'cus_test_a', now(), now()),
+      ('billing-cust-b', 'org-b', false, 'cus_test_b', now(), now())
+    on conflict (id) do nothing
+  `
   console.log(JSON.stringify({ prepared: true, database: databaseName }))
 } finally {
   await owner.end({ timeout: 5 })

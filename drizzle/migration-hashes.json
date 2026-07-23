@@ -112,6 +112,10 @@
     "0027_overconfident_angel": {
       "sql": "7d8d75baff21936e75261382b098f5dc6d66e7a4e8e273eaeae9e23a37b762b5",
       "snapshot": "3cb4dcc9bb1457cdd135de8434be5bf8f49d50315fe37bfcac683c032eb6d60a"
+    },
+    "0028_billing_rls_grants": {
+      "sql": "52c9c3d32958e5f14134d2eade9b1ac41f650ade6e0e249219dfd660b83011a2",
+      "snapshot": "3d2966504306dcc6d145b8855ef7f6db88561462ba3e0049acb38848a0ef8675"
     }
   }
 }

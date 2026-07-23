@@ -74,6 +74,95 @@ try {
   }
   if (!crossSubjectClaimDenied) throw new Error('Cross-subject claim insert was not denied')
 
+  const billingMissing = await app`select id from billing_customers`
+  if (billingMissing.length !== 0) throw new Error('Missing context exposed billing customers')
+  const scopedBilling = (organizationId) => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    return transaction`select id from billing_customers order by id`
+  })
+  const [billingTenantA, billingTenantB] = await Promise.all([scopedBilling('org-a'), scopedBilling('org-b')])
+  assertIds(billingTenantA, ['billing-cust-a'], 'billing customer org-a isolation')
+  assertIds(billingTenantB, ['billing-cust-b'], 'billing customer org-b isolation')
+
+  // billing_customers is financial state — the app role gets SELECT only, never INSERT/UPDATE,
+  // even inside its own tenant (spec.md: "Browser roles cannot mutate financial state directly").
+  let appBillingInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_customers (id, organization_id, livemode, stripe_customer_id, created_at, updated_at)
+        values ('billing-cust-hack', 'org-a', false, 'cus_hack', now(), now())
+      `
+    })
+  } catch (error) {
+    appBillingInsertDenied = error?.code === '42501'
+  }
+  if (!appBillingInsertDenied) throw new Error('App role inserted financial-state billing row')
+
+  let appBillingUpdateDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_customers set stripe_customer_id = 'hacked' where id = 'billing-cust-a'`
+    })
+  } catch (error) {
+    appBillingUpdateDenied = error?.code === '42501'
+  }
+  if (!appBillingUpdateDenied) throw new Error('App role updated financial-state billing row')
+
+  // billing_checkout_attempts is the one owner-initiated table the app role CAN write —
+  // but only within its own tenant, never a spoofed organization_id.
+  let checkoutSpoofDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_checkout_attempts (
+          id, organization_id, actor_user_id, livemode, action, catalog_key, idempotency_key,
+          consent_versions, status, expires_at, created_at, updated_at
+        ) values (
+          'attempt-cross', 'org-b', 'user-a', false, 'subscription', 'pro_monthly', 'idem-cross',
+          '{"terms":"v1","privacy":"v1"}', 'open', now() + interval '1 hour', now(), now()
+        )
+      `
+    })
+  } catch (error) {
+    checkoutSpoofDenied = error?.code === '42501'
+  }
+  if (!checkoutSpoofDenied) throw new Error('App role created a checkout attempt under a spoofed organization')
+
+  const billingWorkerMissing = await worker`select id from billing_customers`
+  if (billingWorkerMissing.length !== 0) throw new Error('Worker missing context exposed billing customers')
+  const workerBillingA = await worker.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select id from billing_customers order by id`
+  })
+  assertIds(workerBillingA, ['billing-cust-a'], 'worker billing org-a isolation')
+  let workerBillingCrossTenantDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-b', true)`
+      await transaction`update billing_customers set stripe_customer_id = 'cross-tenant-hack' where id = 'billing-cust-a'`
+    })
+    const [unchanged] = await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      return transaction`select stripe_customer_id from billing_customers where id = 'billing-cust-a'`
+    })
+    workerBillingCrossTenantDenied = unchanged?.stripe_customer_id === 'cus_test_a'
+  } catch {
+    workerBillingCrossTenantDenied = true
+  }
+  if (!workerBillingCrossTenantDenied) throw new Error('Worker cross-tenant billing update was not denied')
+
+  let platformBillingDenied = false
+  try {
+    await platform`select id from billing_customers`
+  } catch (error) {
+    platformBillingDenied = error?.code === '42501'
+  }
+  if (!platformBillingDenied) throw new Error('Platform role accessed tenant billing customer data')
+
   const organizations = await auth`select id from organizations order by id`
   const organizationIds = organizations.map((row) => row.id)
   if (!organizationIds.includes('org-a') || !organizationIds.includes('org-b')) {
@@ -168,6 +257,15 @@ try {
     workerAuthColumns: 'restricted',
     platformProductAccess: 'denied',
     personalOrganizationBootstrap: 'atomic',
+    billingTenantA: billingTenantA.map((row) => row.id),
+    billingTenantB: billingTenantB.map((row) => row.id),
+    appBillingInsert: 'denied',
+    appBillingUpdate: 'denied',
+    checkoutAttemptSpoof: 'denied',
+    workerBillingMissingContext: 'denied',
+    workerBillingTenantIsolation: workerBillingA.map((row) => row.id),
+    workerBillingCrossTenantUpdate: 'denied',
+    platformBillingAccess: 'denied',
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end()])
