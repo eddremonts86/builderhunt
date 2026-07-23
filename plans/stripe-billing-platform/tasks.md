@@ -1225,10 +1225,75 @@ migration, dunning/recovery) implemented, tested, and committed.
   - Do: Replace manual copy with plan/change/cancel, grace/recovery, invoices/Portal, balance by source/expiry, usage, pack purchase, auto-recharge, verified billing email, 30/7/1 warnings, pending/refund/dispute states, and owner/admin/member controls. Preserve data-access messaging.
   - Verify: role/state snapshots, keyboard/screen-reader/mobile tests, forged client controls, and E2E Checkout-return paths pass.
 
-- [ ] **Update pricing for the approved catalog**
+- [x] **Update pricing for the approved catalog**
   - Files: `src/routes/_landing/pricing.tsx`, `src/routes/_landing/pricing.test.tsx`, `src/shared/lib/billing-shared.ts`, `test/test-pricing-and-billing.mjs`
   - Do: Show Free/Pro/Pro Max/Team, monthly/annual, exact USD amounts, included credits, Team 10 seats, tax exclusion, pack table, expiry, no-rollover, plan-vs-pack distinction, and account-aware Checkout CTA. Remove stale $99 Team/manual-payment claims.
   - Verify: pricing snapshots and content tests assert exact catalog/terms and no unsupported promise.
+  - Progress (2026-07-24): Rewrote `pricing.tsx` to source ALL pricing/credits/seat data from
+    `billing/catalog.ts` (`listActiveSubscriptionCatalog`/`listActivePackCatalog`/`TIER_PRESENTATION`)
+    instead of the legacy `PLAN_PRICING`/`PLAN_LIMITS` — confirmed via a dedicated research pass that
+    `catalog.ts`'s own header comment explicitly forbids mutating `PlanTier`/`PLAN_PRICING` to match it
+    (Team's real price changed $99→$199, and Pro Max is entirely new; existing manually-billed orgs
+    must keep their legacy price). **`billing-shared.ts` itself is deliberately left untouched** —
+    `PLAN_LIMITS`/`PLAN_PRICING` still have real, load-bearing consumers outside the pricing page
+    (`api/builders/track.ts`, `api/queries/index.ts`, `api/plans/me.ts`'s compatibility shim, the
+    canonical `/api/billing/summary` DTO from task 9.1) that must keep their exact current values;
+    `catalog.test.ts` already asserts `'pro_max' in PLAN_PRICING === false`, which a data change would
+    have broken. The task's own file list including `billing-shared.ts` turned out to require no data
+    edit once the design decision was to switch pricing.tsx's import instead of the constant.
+    Now shows all 4 tiers (Free/Pro/Pro Max/Team) with real catalog USD amounts (Pro $19/mo·$182/yr,
+    Pro Max $79/mo·$758/yr, Team $199/mo·$1,910/yr — never the stale $99), an explicit "+ applicable
+    tax" note per spec.md's tax-exclusive display requirement, real `monthlyCredits` per tier, and a
+    new credit-pack table (`listActivePackCatalog`) with price/credits/12-month-no-rollover expiry text
+    — plus a "plan vs. pack" distinction paragraph. Rewrote the FAQ to remove the stale "we manage
+    subscriptions manually (no Stripe yet)" claim and the inaccurate "Admin sets your plan back to
+    Free" cancellation claim, replacing both with the real, already-built self-service mechanisms
+    (Stripe Checkout activates immediately; `api/billing/subscription/cancel.ts` is a real, existing
+    owner-self-service cancel-at-period-end route).
+    **Account-aware Checkout CTA**: signed-out → shows a real "Please sign in" prompt (link to
+    `/auth/sign-in`, not just static text) on click, never silently no-ops. Signed-in non-owner (admin/
+    member) → "Ask your workspace owner to upgrade" (spec.md: "Members see only feature availability
+    and an owner-contact action"), no button at all — not even a disabled one that implies a broken
+    feature. Signed-in owner → an inline `SubscribeCta` disclosure panel (billing country + one
+    consolidated consent checkbox covering the same 7 disclosure facts `/api/billing/checkout/
+    subscription` requires, all of which are already stated in plain language elsewhere on this same
+    page — seven separate checkboxes for facts already visible would be clutter, not clarity) that
+    calls the REAL `/api/billing/checkout/subscription` route with a real `crypto.randomUUID()`
+    idempotency key and redirects to the returned `checkoutUrl` on success, or shows the real server
+    error inline on failure (e.g. `subscription_exists` for an org with an existing real Stripe
+    subscription — directing such an existing paying customer to a plan-CHANGE flow instead of a new
+    Checkout is §9 task 2's job, not this public marketing page's).
+    Extended `getAppOrganizationPlan` (`billing-session.ts`) to return `canSubscribe:
+    canMutateBilling(principal)` (derived server-side via `can()`) instead of a raw `role` string — the
+    first implementation exposed `principal.role` directly to the client component and compared it with
+    `!== 'owner'`, which `pnpm security:boundaries` correctly flagged as a role-literal-comparison
+    violation (this codebase requires every role decision to route through `can()`); fixed by moving the
+    permission check server-side, matching every other billing permission check in this codebase.
+    7 new `pricing.test.tsx` tests covering the extracted `formatUsd` helper and the `SubscribeCta`
+    component in isolation (button→disclosure-form expansion, confirm button disabled until the
+    checkbox is checked, the exact POST body sent including the idempotency key and both disclosure
+    and country fields, redirect to the real returned `checkoutUrl`, and server-error display without
+    a redirect) — `PricingPage` itself is not unit-tested directly (it's tightly coupled to the file
+    route's own `Route.useLoaderData()`, unlike `SubscribeCta`, which takes plain props); full-page
+    content/catalog-correctness coverage instead comes from `test/test-pricing-and-billing.mjs`'s
+    pricing section (updated to match the real testids and assert the real $199 Team price, the
+    absence of the stale $99, the real annual price switch, the pack table, and the FAQ no longer
+    claiming "no Stripe yet") plus live browser verification.
+    Live-verified against the running dev server: all 4 tier cards render with the real catalog prices
+    and the "+ applicable tax" note; the monthly/annual toggle correctly switches Pro/Pro Max/Team to
+    $182/$758/$1,910 per year; the pack table shows $15/$45/$299 with "12 months, no rollover"; the
+    logged-in owner session's actual current plan (Team) correctly shows "Your current plan"; clicking
+    "Subscribe to Pro" expanded the real disclosure form (country pre-filled "DK", confirm button
+    correctly disabled until the checkbox is checked); confirming it issued a REAL
+    `POST /api/billing/checkout/subscription` (200, since this dev org's Team status comes from a
+    manually-granted legacy entitlement with no real `billing_subscriptions` row to trip the
+    `subscription_exists` guard) and the client correctly redirected to the fake provider's returned
+    `checkoutUrl`; mobile (375px) layout stacks the tier cards correctly; no console errors.
+    `pnpm type-check` (clean); `pnpm lint` (0 errors in every file touched); targeted vitest
+    (`pricing.test.tsx` 7/7, `permissions.test.ts` 27/27, `entitlements.test.ts` 14/14 — confirming the
+    `getAppOrganizationPlan` change broke nothing); `pnpm security:boundaries` — initially caught the
+    role-literal violation described above, clean (0 findings) after the fix; route-coverage unchanged
+    (no new routes, this task only touched an existing page and a session helper).
 
 - [ ] **Add verified billing contact management**
   - Files: `src/shared/lib/billing/billing-contact.ts`, `src/shared/lib/billing/billing-contact.test.ts`, `src/routes/api/billing/contact.ts`, `src/modules/billing/BillingContact.tsx`, `src/shared/lib/email.ts`

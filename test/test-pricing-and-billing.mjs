@@ -44,7 +44,10 @@ async function run() {
   const page = await context.newPage()
 
   // ====================================================================
-  // /pricing — public
+  // /pricing — public (plans/stripe-billing-platform/tasks.md §9 task 3 — real
+  // catalog.ts-driven page: Free/Pro/Pro Max/Team, real Stripe amounts, a pack
+  // table, and an account-aware Checkout CTA — replaces the old $99 Team /
+  // manual-payment content this script used to assert against.)
   // ====================================================================
   console.log('\n📋 /pricing — public pricing page')
   await page.goto(`${BASE}/pricing`, { waitUntil: 'networkidle' })
@@ -52,36 +55,52 @@ async function run() {
   const h1 = await page.textContent('h1')
   check('pricing h1 visible', h1 === 'Pricing', `h1: ${h1}`)
 
-  // 3 tier cards
-  const freeTier = await page.$('[data-testid="pricing-tier-free"]')
-  const proTier = await page.$('[data-testid="pricing-tier-pro"]')
-  const teamTier = await page.$('[data-testid="pricing-tier-team"]')
+  // 4 tier cards
+  const freeTier = await page.$('[data-testid="plan-free"]')
+  const proTier = await page.$('[data-testid="plan-pro"]')
+  const proMaxTier = await page.$('[data-testid="plan-pro_max"]')
+  const teamTier = await page.$('[data-testid="plan-team"]')
   check('shows Free tier', !!freeTier)
   check('shows Pro tier', !!proTier)
+  check('shows Pro Max tier', !!proMaxTier)
   check('shows Team tier', !!teamTier)
+
+  // Team is the real catalog price ($199/mo), never the stale legacy $99.
+  const teamBody = await page.textContent('[data-testid="plan-team"]')
+  check('Team shows the real $199/mo catalog price, not the stale $99', teamBody?.includes('$199') ?? false, `body: ${teamBody?.slice(0, 120)}`)
+  check('Team never shows the stale legacy $99 price', !(teamBody?.includes('$99') ?? true), `body: ${teamBody?.slice(0, 120)}`)
 
   // Billing period toggle
   const monthlyBtn = await page.$('[data-testid="period-monthly"]')
   const annualBtn = await page.$('[data-testid="period-annual"]')
   check('has monthly/annual toggle', !!monthlyBtn && !!annualBtn)
 
-  // Click annual
+  // Click annual — price switches to the annual catalog amount and the /yr suffix.
   if (annualBtn) {
     await annualBtn.click()
     await page.waitForTimeout(300)
-    const proBody = await page.textContent('[data-testid="pricing-tier-pro"]')
-    check('annual shows discount hint', proBody?.includes('annually') ?? false, `body: ${proBody?.slice(0, 100)}`)
+    const proBodyAnnual = await page.textContent('[data-testid="plan-pro"]')
+    check('annual switches Pro to the annual price and /yr suffix', proBodyAnnual?.includes('$182') && proBodyAnnual?.includes('/yr'), `body: ${proBodyAnnual?.slice(0, 120)}`)
   }
   await monthlyBtn.click()
   await page.waitForTimeout(200)
 
+  // Tax-exclusion, pack table, and plan-vs-pack distinction
+  check('paid tiers note tax exclusion', (await page.textContent('[data-testid="plan-pro"]'))?.includes('applicable tax') ?? false)
+  const packTable = await page.$('[data-testid="pricing-pack-table"]')
+  check('has a credit pack table', !!packTable)
+  const packBody = await page.textContent('[data-testid="pricing-packs"]')
+  check('pack section explains no rollover / expiry', (packBody?.includes('never roll over') || packBody?.includes('no rollover')) ?? false, `body: ${packBody?.slice(0, 160)}`)
+
   // Comparison table
-  const comparison = await page.$('[data-testid="pricing-comparison"]')
+  const comparison = await page.$('[data-testid="pricing-features"]')
   check('has comparison table', !!comparison)
 
   // FAQ
   const faq = await page.$('[data-testid="pricing-faq"]')
   check('has FAQ', !!faq)
+  const faqBody = await page.textContent('[data-testid="pricing-faq"]')
+  check('FAQ no longer claims manual/no-Stripe billing', !(faqBody?.toLowerCase().includes('no stripe yet') ?? true), `body: ${faqBody?.slice(0, 160)}`)
   await page.screenshot({ path: '/tmp/builderhunt-pricing.png', fullPage: true })
 
   // ====================================================================
