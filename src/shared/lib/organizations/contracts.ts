@@ -80,6 +80,20 @@ export interface SeatUsageDto {
   limit: number
 }
 
+/**
+ * Owner-visible reason a Team-to-one-seat-tier subscription downgrade cannot be sent to Stripe yet
+ * (plans/stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). `currentSeatsUsed`
+ * mirrors `SeatUsageDto.used` exactly (accepted members plus usable/pending invitations) — the same
+ * count the seat-limit invite-time guard already enforces, so the number an owner sees here always
+ * matches what `/settings/team` shows them. Never implies membership was or will be changed
+ * automatically — the owner must free seats themselves before retrying.
+ */
+export interface SeatDowngradeBlockerDto {
+  currentSeatsUsed: number
+  targetSeatLimit: number
+  manageTeamUrl: '/settings/team'
+}
+
 export function toOrganizationSummaryDto(
   organization: OrganizationRecord,
   role: OrganizationRole,

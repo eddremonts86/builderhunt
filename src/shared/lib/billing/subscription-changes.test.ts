@@ -1,12 +1,25 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { eq } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TenantPrincipal } from '../authorization/permissions'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
 import { authUsers, billingCreditGrants, billingCustomers, billingSubscriptions, organizationMembers, organizations } from '../db/schema'
 import { SUBSCRIPTION_CATALOG } from './catalog'
 import { BillingProviderError, type ChangeSubscriptionInput as ProviderChangeSubscriptionInput } from './provider'
 import { FakeBillingProvider } from './fake-provider'
+
+// `getSeatUsage` (organizations/contracts.ts) reads through its own hardcoded `authDb` singleton —
+// a separate database connection from this file's disposable test database, with no injection seam
+// — so seeding `organizationMembers`/`organizationInvitations` rows here would never be visible to
+// it. The seat-blocker tests below control its result directly instead; every other test in this
+// file relies on the default (plenty of room) set in `beforeEach`, matching how those tests already
+// behaved before the seat-blocker check existed.
+const mocks = vi.hoisted(() => ({ getSeatUsage: vi.fn() }))
+vi.mock('../organizations/contracts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../organizations/contracts')>()
+  return { ...actual, getSeatUsage: mocks.getSeatUsage }
+})
+
 import {
   changeSubscription,
   classifySubscriptionChange,
@@ -144,6 +157,11 @@ beforeAll(async () => {
   drop = disposable.drop
 })
 
+beforeEach(() => {
+  mocks.getSeatUsage.mockReset()
+  mocks.getSeatUsage.mockResolvedValue({ used: 1, limit: 10 }) // plenty of room by default
+})
+
 afterAll(async () => {
   await drop()
 })
@@ -252,6 +270,37 @@ describe('previewSubscriptionChange', () => {
     await expect(db.transaction((tx) => previewSubscriptionChange(tx, principal, { newCatalogKey: 'pro_monthly' }, { provider })))
       .rejects.toMatchObject({ code: 'no_active_subscription' })
   })
+
+  it('surfaces a seat blocker proactively when active members exceed the target one-seat tier', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 3, limit: 10 }) // 3 accepted members, Team's limit
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+
+    const preview = await db.transaction((tx) => previewSubscriptionChange(tx, principal, { newCatalogKey: 'pro_monthly' }, { provider }))
+
+    expect(preview.timing).toBe('scheduled')
+    expect(preview.seatBlocker).toEqual({ currentSeatsUsed: 3, targetSeatLimit: 1, manageTeamUrl: '/settings/team' })
+  })
+
+  it('counts a usable (pending) invitation the same as an accepted member toward the blocker', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 2, limit: 10 }) // 1 accepted member + 1 pending invitation
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+
+    const preview = await db.transaction((tx) => previewSubscriptionChange(tx, principal, { newCatalogKey: 'pro_monthly' }, { provider }))
+
+    expect(preview.seatBlocker).toMatchObject({ currentSeatsUsed: 2, targetSeatLimit: 1 })
+  })
+
+  it('shows no blocker when exactly at the target seat limit', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 1, limit: 10 }) // exactly one seat in use
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+
+    const preview = await db.transaction((tx) => previewSubscriptionChange(tx, principal, { newCatalogKey: 'pro_monthly' }, { provider }))
+
+    expect(preview.seatBlocker).toBeUndefined()
+  })
 })
 
 describe('changeSubscription', () => {
@@ -326,6 +375,61 @@ describe('changeSubscription', () => {
     expect(row.scheduledChange).toEqual({ catalogKey: 'pro_monthly', effectiveAt: periodEnd.toISOString() })
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
     expect(grants).toHaveLength(0)
+  })
+
+  it('refuses to schedule (and never touches the provider) while accepted members exceed the target seat limit', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 3, limit: 10 })
+    const principal = await freshOrgWithOwner()
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+    const changeSpy = vi.spyOn(provider, 'changeSubscription')
+    const preview = await previewAndFingerprint(principal, 'pro_monthly')
+
+    await expect(db.transaction((tx) => changeSubscription(tx, principal, { newCatalogKey: 'pro_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('idem') }, { provider })))
+      .rejects.toMatchObject({ code: 'seat_limit_exceeded', seatBlocker: { currentSeatsUsed: 3, targetSeatLimit: 1, manageTeamUrl: '/settings/team' } })
+
+    expect(changeSpy).not.toHaveBeenCalled()
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.catalogKey).toBe('team_monthly')
+    expect(row.scheduledChange).toBeNull()
+  })
+
+  it('refuses to schedule while a usable (pending) invitation alone exceeds the target seat limit', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 2, limit: 10 }) // 1 accepted member + 1 pending invitation
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+    const preview = await previewAndFingerprint(principal, 'pro_monthly')
+
+    await expect(db.transaction((tx) => changeSubscription(tx, principal, { newCatalogKey: 'pro_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('idem') }, { provider })))
+      .rejects.toMatchObject({ code: 'seat_limit_exceeded' })
+  })
+
+  it('allows the downgrade once seats are freed down to exactly the target limit', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 1, limit: 10 })
+    const principal = await freshOrgWithOwner()
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+    const preview = await previewAndFingerprint(principal, 'pro_monthly')
+
+    const result = await db.transaction((tx) => changeSubscription(tx, principal, { newCatalogKey: 'pro_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('idem') }, { provider }))
+
+    expect(result.applied).toBe('scheduled')
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.scheduledChange).toEqual({ catalogKey: 'pro_monthly', effectiveAt: row.currentPeriodEnd?.toISOString() })
+  })
+
+  it('two concurrent downgrade requests while over the seat limit both refuse, never scheduling either', async () => {
+    mocks.getSeatUsage.mockResolvedValue({ used: 5, limit: 10 })
+    const principal = await freshOrgWithOwner()
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider, { catalogKey: 'team_monthly', tier: 'team', interval: 'monthly' })
+    const preview = await previewAndFingerprint(principal, 'pro_monthly')
+
+    const results = await Promise.allSettled([
+      db.transaction((tx) => changeSubscription(tx, principal, { newCatalogKey: 'pro_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('idem') }, { provider })),
+      db.transaction((tx) => changeSubscription(tx, principal, { newCatalogKey: 'pro_monthly', fingerprint: preview.fingerprint, idempotencyKey: uniqueId('idem') }, { provider })),
+    ])
+
+    expect(results.every((r) => r.status === 'rejected')).toBe(true)
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.scheduledChange).toBeNull()
   })
 
   it('rejects a stale preview once the subscription has changed since it was generated', async () => {

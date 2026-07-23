@@ -18,6 +18,7 @@ const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, numb
   stale_preview: 409,
   payment_failed: 402,
   requires_action: 402,
+  seat_limit_exceeded: 409,
 }
 
 export const Route = createFileRoute('/api/billing/subscription/preview')({

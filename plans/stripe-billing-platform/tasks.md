@@ -640,10 +640,50 @@
     `pnpm security:boundaries`/route-coverage (85 routes, 8 allowlisted — unchanged, confirming both
     new routes are correctly auth-gated) all clean.
 
-- [ ] **Enforce Team downgrade seat blockers**
+- [x] **Enforce Team downgrade seat blockers**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/shared/lib/billing/subscription-changes.test.ts`, `src/shared/lib/organizations/contracts.ts`, `src/modules/billing/PlanChangePreview.tsx`
   - Do: Before sending downgrade, query authoritative accepted members plus usable invitations; require one total and zero invitations, return owner-visible blocker DTOs linking `/settings/team`, and never evict/cancel automatically.
   - Verify: active/invited/concurrent final-seat tests prove Stripe receives no update until the invariant holds.
+  - Progress (2026-07-23): Reuses the EXACT same seat count `getSeatUsage` (organization-lifecycle.ts,
+    already shipped by plans/team-accounts) already enforces at invite time — "accepted members plus
+    usable invitations" — so an owner never sees two different seat numbers for the same organization
+    from two different features. New `resolveSeatDowngradeBlocker(principal, targetSeatLimit)` in
+    `subscription-changes.ts` compares that count against the TARGET catalog entry's own `seatLimit`
+    (1 for pro/pro_max, 10 for team) — general and correct by construction, not hardcoded to "team
+    specifically." New `SeatDowngradeBlockerDto` in `organizations/contracts.ts`
+    (`{currentSeatsUsed, targetSeatLimit, manageTeamUrl: '/settings/team'}`) — the same allowlisted-DTO
+    boundary every other Team-account-facing surface goes through, never a raw row. Checked ONLY in
+    the scheduled (downgrade) path — upgrades only ever increase or hold seat capacity, so there's
+    nothing to block. `previewSubscriptionChange` surfaces the blocker proactively as an optional
+    `seatBlocker` field on an otherwise-normal 200 response (so an owner sees WHY before attempting
+    anything); `changeSubscription` enforces it for real — checked before the fingerprint, before any
+    write — throwing `SubscriptionChangeError('seat_limit_exceeded', seatBlocker)` and calling
+    `scheduleBillingSubscriptionChange`/the provider ZERO times. New `PlanChangePreview.tsx` (a
+    reusable, not-yet-wired-into-a-page component — the route surface is §9's job) fetches the preview,
+    renders the resolved charge/credit/effective-date numbers, and — when `seatBlocker` is present —
+    a blocking banner linking to `/settings/team` with the confirm button disabled; never evicts a
+    member or cancels an invitation itself.
+    **Real architectural constraint discovered while writing tests**: `getSeatUsage` reads through its
+    own hardcoded `authDb` singleton with no dependency-injection seam — a separate database
+    connection from `subscription-changes.test.ts`'s disposable test database — so seeding
+    `organizationMembers`/`organizationInvitations` rows in the test database would never be visible
+    to it. Resolved by mocking `getSeatUsage` itself (`vi.mock('../organizations/contracts', ...)`,
+    partial mock preserving every other real export) with a safe "plenty of room" default in
+    `beforeEach`, overridden per-test for the seat-blocker scenarios — the disposable-database
+    integration style continues for everything else in the file (subscription state, credit grants,
+    provider interaction). 7 new `subscription-changes.test.ts` tests (preview shows the blocker
+    proactively at 3 seats vs. Team→one-seat, a pending invitation alone counted the same as an
+    accepted member, no blocker exactly at the limit, change refuses and never calls
+    `provider.changeSubscription` while blocked — asserted via `vi.spyOn`, a pending-invitation-only
+    block, an allowed downgrade once seats are freed to exactly the limit, two concurrent blocked
+    requests both refusing and neither ever writing `scheduledChange`). 8 new
+    `PlanChangePreview.test.tsx` tests (loading/error states, resolved-preview rendering, the seat
+    banner rendering with a real `/settings/team` link and a disabled confirm button, no banner when
+    unblocked, a successful confirm posting the preview's own fingerprint verbatim, an inline error on
+    a failed change without calling `onChanged`, conditional cancel-button rendering). Full suite 797
+    total minus the same two pre-existing unrelated failures (`catalog.test.ts`'s Price ID and
+    `checkout.test.ts`'s already-confirmed-flaky concurrent-idempotency-key test — 795 passing);
+    `pnpm type-check`/`pnpm lint` (0 errors)/`pnpm security:boundaries`/route-coverage all clean.
 
 - [ ] **Implement cancellation and renewal-safe price migration**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/routes/api/billing/subscription/cancel.ts`, `src/shared/lib/billing/price-migrations.ts`, `src/shared/lib/billing/price-migrations.test.ts`

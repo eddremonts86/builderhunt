@@ -31,6 +31,7 @@
 import { randomUUID } from 'node:crypto'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
+import { getSeatUsage, type SeatDowngradeBlockerDto } from '../organizations/contracts'
 import { computeAnniversary } from './annual-grants'
 import { resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogKey, type SubscriptionCatalogEntry } from './catalog'
 import { findGrantedByIdempotencyKey, grantCredits } from './credits'
@@ -43,6 +44,22 @@ import {
 import { BillingProviderError, type BillingProvider } from './provider'
 import { idempotencyKeyFor, isLiveMode } from './stripe-client'
 
+/**
+ * Team-to-one-seat-tier downgrades must never be sent to Stripe while the organization still has
+ * more accepted members plus usable invitations than the target tier's seat limit allows
+ * (plans/stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). Reuses the
+ * SAME seat count (`getSeatUsage`) the invite-time limit already enforces — an owner never sees two
+ * different seat numbers for the same organization from two different features.
+ */
+export async function resolveSeatDowngradeBlocker(
+  principal: TenantPrincipal,
+  targetSeatLimit: number,
+): Promise<SeatDowngradeBlockerDto | null> {
+  const seatUsage = await getSeatUsage(principal)
+  if (seatUsage.used <= targetSeatLimit) return null
+  return { currentSeatsUsed: seatUsage.used, targetSeatLimit, manageTeamUrl: '/settings/team' }
+}
+
 export type SubscriptionChangeErrorCode =
   | 'no_active_subscription'
   | 'unknown_catalog_key'
@@ -51,9 +68,15 @@ export type SubscriptionChangeErrorCode =
   | 'stale_preview'
   | 'payment_failed'
   | 'requires_action'
+  | 'seat_limit_exceeded'
 
 export class SubscriptionChangeError extends Error {
-  constructor(message: string, readonly code: SubscriptionChangeErrorCode) {
+  constructor(
+    message: string,
+    readonly code: SubscriptionChangeErrorCode,
+    /** Populated for `seat_limit_exceeded` — the owner-visible blocker to render, never an instruction to evict/cancel anything automatically. */
+    readonly seatBlocker?: SeatDowngradeBlockerDto,
+  ) {
     super(message)
     this.name = 'SubscriptionChangeError'
   }
@@ -174,6 +197,8 @@ export interface SubscriptionChangePreview {
   effectiveAt: string
   /** Echo back verbatim to `changeSubscription` — proves the subscription hasn't changed since this preview was computed. Never a charge amount. */
   fingerprint: string
+  /** Present only for a downgrade the organization's current seat usage doesn't yet allow — shown proactively so an owner sees why BEFORE attempting to confirm, not just as a rejection after the fact. */
+  seatBlocker?: SeatDowngradeBlockerDto
 }
 
 export interface SubscriptionChangeOptions {
@@ -194,6 +219,7 @@ export async function previewSubscriptionChange(
 
   let creditDelta = 0
   let effectiveAt = now.toISOString()
+  let seatBlocker: SeatDowngradeBlockerDto | null = null
   if (classification.timing === 'immediate' && classification.direction === 'upgrade' && currentCatalogEntry.tier !== newCatalogEntry.tier) {
     const window = resolveCurrentCreditWindow(
       { interval: currentCatalogEntry.interval, currentPeriodStart: subscription.currentPeriodStart ?? now, currentPeriodEnd: subscription.currentPeriodEnd ?? now },
@@ -202,6 +228,7 @@ export async function previewSubscriptionChange(
     creditDelta = computeUpgradeCreditDelta({ oldMonthlyCredits: currentCatalogEntry.monthlyCredits, newMonthlyCredits: newCatalogEntry.monthlyCredits, window, now })
   } else if (classification.timing === 'scheduled') {
     effectiveAt = (subscription.currentPeriodEnd ?? now).toISOString()
+    seatBlocker = await resolveSeatDowngradeBlocker(principal, newCatalogEntry.seatLimit)
   }
 
   return {
@@ -215,6 +242,7 @@ export async function previewSubscriptionChange(
     creditDelta,
     effectiveAt,
     fingerprint: subscriptionFingerprint(subscription),
+    ...(seatBlocker ? { seatBlocker } : {}),
   }
 }
 
@@ -260,6 +288,18 @@ export async function changeSubscription(
   }
 
   if (classification.timing === 'scheduled') {
+    // Never send Stripe (or even record our own schedule) while current seat usage exceeds the
+    // target tier's limit — checked before the fingerprint, since this is the invariant an owner
+    // most needs surfaced clearly, and it's independent of whether the preview itself went stale.
+    const seatBlocker = await resolveSeatDowngradeBlocker(principal, newCatalogEntry.seatLimit)
+    if (seatBlocker) {
+      throw new SubscriptionChangeError(
+        `Cannot schedule this downgrade: ${seatBlocker.currentSeatsUsed} seats in use exceeds the ${seatBlocker.targetSeatLimit}-seat limit for ${newCatalogEntry.key}`,
+        'seat_limit_exceeded',
+        seatBlocker,
+      )
+    }
+
     // A scheduled change never touches `providerSyncedAt` (see `scheduleBillingSubscriptionChange`),
     // so its fingerprint check here is never self-invalidated by our own prior work the way the
     // immediate path's would be — a genuine mismatch here always means something else changed the

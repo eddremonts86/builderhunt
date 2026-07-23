@@ -20,6 +20,7 @@ const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, numb
   stale_preview: 409,
   payment_failed: 402,
   requires_action: 402,
+  seat_limit_exceeded: 409,
 }
 
 export const Route = createFileRoute('/api/billing/subscription/change')({
@@ -44,7 +45,10 @@ export const Route = createFileRoute('/api/billing/subscription/change')({
             return Response.json({ error: error.message }, { status: error.status })
           }
           if (error instanceof SubscriptionChangeError) {
-            return Response.json({ error: error.message, code: error.code }, { status: SUBSCRIPTION_CHANGE_ERROR_STATUS[error.code] })
+            return Response.json(
+              { error: error.message, code: error.code, ...(error.seatBlocker ? { seatBlocker: error.seatBlocker } : {}) },
+              { status: SUBSCRIPTION_CHANGE_ERROR_STATUS[error.code] },
+            )
           }
           console.error('Subscription change error:', error)
           return Response.json({ error: 'Failed to change subscription' }, { status: 500 })
