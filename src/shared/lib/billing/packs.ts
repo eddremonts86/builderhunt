@@ -37,6 +37,7 @@ import { recordCheckoutConsent, type CheckoutDisclosures } from './consent'
 import { ensureBillingCustomer } from './customers'
 import { isActivePaidSubscription } from './credits'
 import { BillingProviderError, type BillingProvider } from './provider'
+import { assertNotRiskBlocked, recordPaymentFailure, RiskBlockedError } from './risk'
 import {
   createBillingCheckoutAttemptIfAbsent,
   findActiveBillingSubscription,
@@ -53,6 +54,7 @@ export type PackCheckoutErrorCode =
   | 'unknown_catalog_key'
   | 'no_active_subscription'
   | 'risk_limit_exceeded'
+  | 'risk_blocked'
   | 'invalid_url'
   | 'provider_error'
 
@@ -115,6 +117,8 @@ export interface CreatePackCheckoutOptions {
   provider: BillingProvider
   /** Overrides where `getCurrentSellerProfile` reads from — same DI pattern `checkout.ts` uses. */
   sellerProfileDb?: PostgresJsDatabase
+  /** Overrides where `risk.ts`'s `recordPaymentFailure` writes its independent, always-committed risk event — defaults to the real `runtimeDb`; tests inject a disposable database. */
+  riskDb?: PostgresJsDatabase
 }
 
 function assertAllowedReturnUrl(url: string, field: 'successUrl' | 'cancelUrl'): void {
@@ -129,7 +133,7 @@ export async function createPackCheckout(
   input: CreatePackCheckoutInput,
   options: CreatePackCheckoutOptions,
 ): Promise<PackCheckoutResult> {
-  const { provider, sellerProfileDb } = options
+  const { provider, sellerProfileDb, riskDb } = options
   const livemode = isLiveMode()
 
   // Duplicate-request replay first — same reasoning as `createSubscriptionCheckout`: a retried call
@@ -171,6 +175,13 @@ export async function createPackCheckout(
 
   await assertWithinRollingPackChargeLimit(transaction, principal.organizationId, catalogEntry.amountCents)
 
+  try {
+    await assertNotRiskBlocked(transaction, principal.organizationId)
+  } catch (error) {
+    if (error instanceof RiskBlockedError) throw new PackCheckoutError(error.message, 'risk_blocked')
+    throw error
+  }
+
   await ensureBillingCustomer(transaction, principal, { provider })
   const customer = await findBillingCustomer(transaction, principal.organizationId, livemode)
   if (!customer) {
@@ -200,6 +211,7 @@ export async function createPackCheckout(
     })
   } catch (error) {
     if (error instanceof BillingProviderError) {
+      await recordPaymentFailure(principal.organizationId, error.message, riskDb)
       throw new PackCheckoutError(`Checkout provider error: ${error.message}`, 'provider_error')
     }
     throw error

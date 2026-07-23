@@ -939,10 +939,58 @@ migration, dunning/recovery) implemented, tested, and committed.
     warnings); `pnpm security:boundaries` (0 legacy imports); route-coverage (88 routes — +1 for
     `/api/billing/auto-recharge`, 8 allowlisted, valid).
 
-- [ ] **Add fraud and high-volume exception controls**
+- [x] **Add fraud and high-volume exception controls**
   - Files: `src/shared/lib/billing/risk.ts`, `src/shared/lib/billing/risk.test.ts`, `src/routes/api/admin/billing/risk-exceptions.ts`, `docs/operations/stripe-fraud.md`
   - Do: Consume Radar/3DS results, track failure/payment-method/dispute velocity, block only new purchases, and allow platform operator to issue time-bounded reasoned exceptions that never bypass successful payment or ledger rules.
   - Verify: abuse fixtures trigger review; unrelated data stays available; expired exception closes; operator/admin/org role matrix and audit tests pass.
+  - Progress (2026-07-23): Two new tables (migration 0032 create + 0033 RLS/grants, mirroring the
+    0027/0028 split): append-only `billing_risk_events` (`payment_failure`/`card_rotation`/
+    `dispute_opened` — only `payment_failure` is populated today) and platform-operator-write-only
+    `billing_risk_exceptions` (reason/issuer/issued-at/expires-at/nullable revoked-at). New
+    `repositories/billing-risk.ts` adds `withPlatformOrganization` (mirrors
+    `billing-worker.ts`'s `withWorkerOrganization`, scoping a `platformDb`-role transaction to one
+    organization's RLS context so an operator can act on an org they have no ambient tenant session
+    for) plus the raw read/write functions.
+    New `billing/risk.ts`: `assertNotRiskBlocked` throws once an organization hits
+    `PAYMENT_FAILURE_VELOCITY_THRESHOLD` (3) failures in the trailing 24h AND has no currently-active
+    operator exception; a no-op otherwise. "Consume Radar/3DS results" — this codebase's
+    `BillingProvider` boundary has no separate Radar score, so the signal consumed is the practical
+    one every real integration acts on: a `BillingProviderError` from Checkout/PaymentIntent creation
+    IS that decision. "Track failure/payment-method/dispute velocity" — only failure velocity has
+    data to track today; `card_rotation`/`dispute_opened` are already valid `eventType`s so a future
+    payment-method-tracking task and §8 task 5 (disputes) can call `recordRiskEvent` directly, a pure
+    additive integration. "Block only new purchases" — `assertNotRiskBlocked` is called from exactly
+    two CREATION paths (`packs.ts`'s `createPackCheckout`, `auto-recharge.ts`'s
+    `maybeTriggerAutoRecharge`), never a read or data/export path. "Never bypasses successful payment
+    or ledger rules" — `issueRiskException`/`revokeRiskException` touch nothing in `credits.ts`; they
+    only ever affect whether `assertNotRiskBlocked` throws.
+    **Real bug found and fixed while wiring this up**: `recordPaymentFailure`'s first draft took the
+    caller's own `TenantTransaction` — but `packs.ts`'s Checkout-creation catch block records the
+    failure and then re-throws, and that throw propagates out through `withTenantContext`'s
+    `database.transaction(...)` wrapper, which **rolls back everything written inside it**, including
+    the risk event that most needed to survive the failure. Fixed by making `recordPaymentFailure`
+    open its own independent, always-committed transaction (via `runtimeDb`, overridable for tests)
+    keyed only by organizationId — never the failing transaction. Caught by the test asserting the
+    event was actually persisted after a decline, not by inspection.
+    New `/api/admin/billing/risk-exceptions` (platform-admin only, audited): `GET` lists an org's
+    exceptions, `POST` issues one (validates duration ≤30 days via `MAX_RISK_EXCEPTION_DURATION_MS`),
+    `DELETE` revokes early. New `docs/operations/stripe-fraud.md` documents the exact scope
+    (what's implemented vs. deliberately deferred) and the operator workflow with runnable `curl`
+    examples.
+    13 new `risk.test.ts` tests (below/at/above threshold, window boundary, active/expired/revoked
+    exception, issue validation, list/revoke including double-revoke no-op), 2 new `packs.test.ts`
+    tests (blocks at threshold, records an event on decline), 1 new `auto-recharge.test.ts` test
+    (blocks without pausing — a temporary condition, not a rule failure), 8 new
+    `risk-exceptions.test.ts` route tests (auth, validation, error-code mapping, audit calls). Live-
+    verified against the running dev server: issued a real 60-second exception for this session's own
+    organization (`POST` → 200 with the real row), then revoked it (`DELETE` → 200,
+    `revokedAt` populated) — full real round-trip against the real dev database, not just mocks.
+    Full suite (isolated per-file, per the same known parallel-directory resource-contention caveat
+    documented in §8 task 2's evidence) all green; `pnpm type-check` (clean); `pnpm lint` (0 errors in
+    every file this task touched — one unrelated pre-existing lint error surfaced in an untracked
+    `e2e/harness/cache.ts` file this task never created or touched, left alone); `pnpm
+    security:boundaries` (0 legacy imports); route-coverage (89 routes — +1 for
+    `/api/admin/billing/risk-exceptions`, 8 allowlisted, valid).
 
 - [ ] **Implement refund request and operator workflow**
   - Files: `src/shared/lib/billing/refunds.ts`, `src/shared/lib/billing/refunds.test.ts`, `src/routes/api/billing/refunds.ts`, `src/routes/api/admin/billing/refunds.ts`, `src/modules/admin/billing/RefundQueue.tsx`

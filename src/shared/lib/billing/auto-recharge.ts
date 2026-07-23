@@ -26,6 +26,7 @@
  * Portal (`billing/portal.ts`) for that on-session recovery — no new payment-collection surface.
  */
 import { randomUUID } from 'node:crypto'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { CURRENT_CONSENT_VERSIONS } from '../legal'
@@ -34,6 +35,7 @@ import { recordAutoRechargeConsent } from './consent'
 import { getAvailableCreditBalance, isActivePaidSubscription } from './credits'
 import { assertWithinRollingPackChargeLimit, ROLLING_RISK_MAX_AMOUNT_CENTS } from './packs'
 import { BillingProviderError, type BillingProvider } from './provider'
+import { assertNotRiskBlocked, recordPaymentFailure } from './risk'
 import {
   claimAutoRechargeTrigger,
   disableAutoRechargeRule,
@@ -162,6 +164,8 @@ export function getAutoRechargeRuleForOwner(
 export interface MaybeTriggerAutoRechargeOptions {
   provider: BillingProvider
   now?: Date
+  /** Overrides where `risk.ts`'s `recordPaymentFailure` writes its independent, always-committed risk event — defaults to the real `runtimeDb`; tests inject a disposable database. */
+  riskDb?: PostgresJsDatabase
 }
 
 export type AutoRechargeTriggerOutcome =
@@ -235,6 +239,15 @@ export async function maybeTriggerAutoRecharge(
     return { triggered: false, reason: 'shared rolling 24h risk limit reached' }
   }
 
+  // §8 task 3 fraud/high-volume exception controls — a temporary condition like the rolling limit
+  // above, never a rule-pausing failure: it lifts automatically once failures age out of the
+  // window, or immediately once a platform operator issues a reviewed exception (`risk.ts`).
+  try {
+    await assertNotRiskBlocked(transaction, organizationId, now)
+  } catch {
+    return { triggered: false, reason: 'blocked pending fraud review' }
+  }
+
   const customer = await findBillingCustomer(transaction, organizationId, livemode)
   if (!customer) return { triggered: false, reason: 'no billing customer on file' }
 
@@ -247,10 +260,12 @@ export async function maybeTriggerAutoRecharge(
       idempotencyKey: idempotencyKeyFor('auto-recharge-charge', organizationId, randomUUID()),
     })
   } catch (error) {
+    const detail = error instanceof BillingProviderError ? error.message : 'Off-session charge failed'
+    await recordPaymentFailure(organizationId, detail, options.riskDb)
     await pauseAutoRechargeRule(transaction, organizationId, {
       state: 'paused_failed',
       lastFailureAt: now,
-      lastFailureReason: error instanceof BillingProviderError ? error.message : 'Off-session charge failed',
+      lastFailureReason: detail,
     })
     return { triggered: false, reason: 'provider declined the off-session charge' }
   }

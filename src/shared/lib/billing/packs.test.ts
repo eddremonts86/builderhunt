@@ -20,6 +20,7 @@ import {
 import { BillingProviderError, type CreateCheckoutSessionInput } from './provider'
 import type { CheckoutDisclosures } from './consent'
 import { FakeBillingProvider } from './fake-provider'
+import { PAYMENT_FAILURE_VELOCITY_THRESHOLD, recordPaymentFailure } from './risk'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -248,7 +249,7 @@ describe('createPackCheckout', () => {
       const idempotencyKey = uniqueId('timeout-idem')
 
       await expect(db.transaction((tx) => createPackCheckout(
-        tx, principal, baseInput({ idempotencyKey }), { provider: new TimeoutProvider(), sellerProfileDb: db },
+        tx, principal, baseInput({ idempotencyKey }), { provider: new TimeoutProvider(), sellerProfileDb: db, riskDb: db },
       ))).rejects.toBeInstanceOf(PackCheckoutError)
 
       const attempt = await db.transaction((tx) => findBillingCheckoutAttemptByIdempotencyKey(tx, principal.organizationId, idempotencyKey))
@@ -272,6 +273,34 @@ describe('createPackCheckout', () => {
 
       await expect(db.transaction((tx) => createPackCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db })))
         .resolves.toMatchObject({ status: 'complete' })
+    })
+
+    it('blocks a pack purchase once the org has hit the payment-failure velocity threshold (§8 task 3)', async () => {
+      const principal = await freshOrgWithOwner()
+      await grantActiveSubscription(principal.organizationId)
+      for (let i = 0; i < PAYMENT_FAILURE_VELOCITY_THRESHOLD; i += 1) {
+        await recordPaymentFailure(principal.organizationId, `decline ${i}`, db)
+      }
+
+      await expect(db.transaction((tx) => createPackCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db })))
+        .rejects.toMatchObject({ code: 'risk_blocked' })
+    })
+
+    it('records a risk event when the Checkout provider declines', async () => {
+      const principal = await freshOrgWithOwner()
+      await grantActiveSubscription(principal.organizationId)
+      class DeclineProvider extends FakeBillingProvider {
+        override async createCheckoutSession(): Promise<never> {
+          throw new BillingProviderError('Your card was declined.', 'decline')
+        }
+      }
+
+      await expect(db.transaction((tx) => createPackCheckout(tx, principal, baseInput(), { provider: new DeclineProvider(), sellerProfileDb: db, riskDb: db })))
+        .rejects.toMatchObject({ code: 'provider_error' })
+
+      const { listRecentRiskEvents } = await import('../repositories/billing-risk')
+      const events = await db.transaction((tx) => listRecentRiskEvents(tx, principal.organizationId, 'payment_failure', new Date(Date.now() - 60_000)))
+      expect(events).toHaveLength(1)
     })
   })
 })

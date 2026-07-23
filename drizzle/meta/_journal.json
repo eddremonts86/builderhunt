@@ -225,6 +225,20 @@
       "when": 1784838035856,
       "tag": "0031_long_eternity",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1784839233574,
+      "tag": "0032_chief_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1784839286992,
+      "tag": "0033_billing_risk_rls_grants",
+      "breakpoints": true
     }
   ]
 }

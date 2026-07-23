@@ -31,6 +31,7 @@ const PACK_CHECKOUT_ERROR_STATUS: Record<PackCheckoutErrorCode, number> = {
   unknown_catalog_key: 400,
   no_active_subscription: 403,
   risk_limit_exceeded: 429,
+  risk_blocked: 403,
   invalid_url: 400,
   provider_error: 502,
 }

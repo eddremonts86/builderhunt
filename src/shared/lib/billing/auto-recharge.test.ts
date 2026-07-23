@@ -308,11 +308,25 @@ describe('maybeTriggerAutoRecharge', () => {
     }
     const principal = await configuredOrg()
 
-    const outcome = await db.transaction((tx) => maybeTriggerAutoRecharge(tx, principal.organizationId, { provider: new DeclineProvider() }))
+    const outcome = await db.transaction((tx) => maybeTriggerAutoRecharge(tx, principal.organizationId, { provider: new DeclineProvider(), riskDb: db }))
 
     expect(outcome).toEqual({ triggered: false, reason: 'provider declined the off-session charge' })
     const rule = await readRule(principal.organizationId)
     expect(rule?.state).toBe('paused_failed')
     expect(rule?.pendingPaymentIntentId).toBeNull()
+  })
+
+  it('does not trigger, and does not pause, once the org has hit the payment-failure velocity threshold (§8 task 3)', async () => {
+    const principal = await configuredOrg()
+    const { PAYMENT_FAILURE_VELOCITY_THRESHOLD, recordPaymentFailure } = await import('./risk')
+    for (let i = 0; i < PAYMENT_FAILURE_VELOCITY_THRESHOLD; i += 1) {
+      await recordPaymentFailure(principal.organizationId, `decline ${i}`, db)
+    }
+
+    const outcome = await db.transaction((tx) => maybeTriggerAutoRecharge(tx, principal.organizationId, { provider }))
+
+    expect(outcome).toEqual({ triggered: false, reason: 'blocked pending fraud review' })
+    const rule = await readRule(principal.organizationId)
+    expect(rule?.state).toBe('active')
   })
 })

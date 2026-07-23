@@ -142,6 +142,7 @@ import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/ad
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
+import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
@@ -844,6 +845,12 @@ const ApiAdminBillingRunWorkerRoute =
     path: '/api/admin/billing/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminBillingRiskExceptionsRoute =
+  ApiAdminBillingRiskExceptionsRouteImport.update({
+    id: '/api/admin/billing/risk-exceptions',
+    path: '/api/admin/billing/risk-exceptions',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminBillingConfigurationRoute =
   ApiAdminBillingConfigurationRouteImport.update({
     id: '/api/admin/billing/configuration',
@@ -988,6 +995,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1128,6 +1136,7 @@ export interface FileRoutesByTo {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1273,6 +1282,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1417,6 +1427,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
@@ -1557,6 +1568,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
@@ -1701,6 +1713,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
@@ -1806,6 +1819,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
+  ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
@@ -2779,6 +2793,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/risk-exceptions': {
+      id: '/api/admin/billing/risk-exceptions'
+      path: '/api/admin/billing/risk-exceptions'
+      fullPath: '/api/admin/billing/risk-exceptions'
+      preLoaderRoute: typeof ApiAdminBillingRiskExceptionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/configuration': {
       id: '/api/admin/billing/configuration'
       path: '/api/admin/billing/configuration'
@@ -3112,6 +3133,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
+  ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,

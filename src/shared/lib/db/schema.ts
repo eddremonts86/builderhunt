@@ -1193,6 +1193,52 @@ export const billingRefunds = pgTable(
   ],
 )
 
+/**
+ * Append-only velocity signal for fraud/high-volume exception controls (plans/stripe-billing-platform/
+ * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
+ * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session
+ * decline) — `risk.ts` only ever reads this table, never writes it directly, mirroring
+ * `billing_ledger_entries`' own append-only, single-writer-per-event-type convention.
+ */
+export const billingRiskEvents = pgTable(
+  'billing_risk_events',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventType: text('event_type').notNull(),
+    detail: text('detail'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_risk_events_organization_id_id_unique').on(table.organizationId, table.id),
+    index('billing_risk_events_org_type_created_idx').on(table.organizationId, table.eventType, table.createdAt),
+    check('billing_risk_events_type_check', sql`${table.eventType} in ('payment_failure', 'card_rotation', 'dispute_opened')`),
+  ],
+)
+
+/**
+ * Platform-operator-issued, time-bounded, reasoned exceptions that lift `risk.ts`'s velocity block
+ * for one organization — never a substitute for a successful payment or a bypass of any ledger rule
+ * (the exception only unblocks attempting a NEW purchase; the purchase itself must still succeed
+ * through the normal Checkout/PaymentIntent path to grant anything).
+ */
+export const billingRiskExceptions = pgTable(
+  'billing_risk_exceptions',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    issuedByUserId: text('issued_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    issuedAt: timestamp('issued_at', { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('billing_risk_exceptions_organization_id_id_unique').on(table.organizationId, table.id),
+    index('billing_risk_exceptions_org_expires_idx').on(table.organizationId, table.expiresAt),
+  ],
+)
+
 /** System operational: platform-only, no organization scope. */
 export const billingReconciliationRuns = pgTable(
   'billing_reconciliation_runs',
