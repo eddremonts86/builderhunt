@@ -19,7 +19,7 @@
 import { and, eq, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
-import { billingAutoRechargeRules, billingCheckoutAttempts, billingCustomers, billingRefunds, billingSubscriptions, organizations } from '../db/schema'
+import { billingAutoRechargeRules, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingDisputes, billingRefunds, billingSubscriptions, organizations } from '../db/schema'
 
 /**
  * `db` defaults to the real `workerDb` singleton in production; tests inject a disposable database
@@ -118,6 +118,32 @@ export function findOrganizationIdForStripeRefund(
   return findOwningOrganizationId(async (tx, organizationId) => {
     const [row] = await tx.select({ id: billingRefunds.id }).from(billingRefunds)
       .where(and(eq(billingRefunds.organizationId, organizationId), eq(billingRefunds.stripeRefundId, stripeRefundId)))
+      .limit(1)
+    return Boolean(row)
+  }, db)
+}
+
+/** Resolves which organization a `charge.dispute.created` event belongs to (§8 task 5) — the only signal available at creation time is the disputed PaymentIntent, matched against `billing_credit_grants.stripe_payment_intent_id` (the same column §8 task 4's refunds already populate for every pack grant). Subscription disputes are out of scope — see `billing/disputes.ts`'s module comment. */
+export function findOrganizationIdForDisputedPaymentIntent(
+  stripePaymentIntentId: string,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<string | null> {
+  return findOwningOrganizationId(async (tx, organizationId) => {
+    const [row] = await tx.select({ id: billingCreditGrants.id }).from(billingCreditGrants)
+      .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentIntentId, stripePaymentIntentId)))
+      .limit(1)
+    return Boolean(row)
+  }, db)
+}
+
+/** Resolves which organization a `charge.dispute.updated`/`charge.dispute.closed`/`charge.dispute.funds_reinstated` event belongs to — keyed on OUR OWN `stripe_dispute_id`, set the moment `charge.dispute.created` first recorded it. */
+export function findOrganizationIdForStripeDispute(
+  stripeDisputeId: string,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<string | null> {
+  return findOwningOrganizationId(async (tx, organizationId) => {
+    const [row] = await tx.select({ id: billingDisputes.id }).from(billingDisputes)
+      .where(and(eq(billingDisputes.organizationId, organizationId), eq(billingDisputes.stripeDisputeId, stripeDisputeId)))
       .limit(1)
     return Boolean(row)
   }, db)

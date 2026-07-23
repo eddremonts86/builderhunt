@@ -1063,10 +1063,79 @@ migration, dunning/recovery) implemented, tested, and committed.
     in every file this task touched); `pnpm security:boundaries` (0 legacy imports); route-coverage
     (91 routes — +2 for `/api/billing/refunds` and `/api/admin/billing/refunds`, 8 allowlisted, valid).
 
-- [ ] **Implement dispute freeze, outcome, and alerts**
+- [x] **Implement dispute freeze, outcome, and alerts**
   - Files: `src/shared/lib/billing/disputes.ts`, `src/shared/lib/billing/disputes.test.ts`, `src/shared/lib/billing/webhook-handlers.ts`, `src/modules/admin/billing/DisputeQueue.tsx`, `docs/operations/stripe-disputes.md`
   - Do: Freeze linked pack grant or immediately block disputed subscription without grace; preserve data/unrelated grants; restore still-valid state on win; revoke linked unused state/end entitlement on loss; alert evidence deadlines and reconcile reinstated funds.
   - Verify: pack/subscription win/loss/partial refund/funds-reinstated replay matrix passes and unrelated ledger hashes remain unchanged.
+  - Progress (2026-07-23): **Pack disputes only** — subscription disputes are a deliberate, documented
+    gap, for the exact same reason §8 task 4's subscription refunds are (see `refunds.ts`'s own module
+    comment): resolving "which organization/subscription" from a bare disputed PaymentIntent requires
+    knowing that PaymentIntent belongs to a specific subscription invoice, and this codebase never
+    records an invoice's PaymentIntent id anywhere — only `billing_credit_grants.stripe_payment_intent_id`
+    is populated (packs/auto-recharge, from §8 task 4's own migration 0034). A disputed
+    subscription-invoice PaymentIntent simply cannot be resolved to an organization today; its webhook
+    events stay `'deferred'` forever — visible and retried, never silently dropped or misattributed.
+    Building that resolution mechanism honestly belongs to its own task, matching the exact precedent
+    §8 task 4 already set for subscription refunds.
+    New schema: `billing_disputes` table (migration 0035 create + hand-written 0036 RLS grants,
+    `app`: SELECT only, `worker`: SELECT/INSERT/UPDATE, `platform`: SELECT only — no operator "decide"
+    mutation exists for disputes, unlike refunds, since evidence submission and the won/lost outcome
+    both live entirely in the Stripe Dashboard). `grant_id` is nullable with a composite FK to
+    `billing_credit_grants(organization_id, id)`; `outcome` is a CHECK-constrained `'open' | 'won' |
+    'lost'` distinct from Stripe's own free-text `stripe_status`, which is synced verbatim on every
+    event for display.
+    New `repositories/billing-disputes.ts` (`createDisputeIfAbsent` idempotent on the
+    `(organization_id, stripe_dispute_id)` unique index, `findDisputeByStripeId`, `listDisputes`,
+    `updateDisputeStatus`, `markDisputeFundsReinstated`) and two new cross-org lookups in
+    `repositories/billing-worker.ts` (`findOrganizationIdForDisputedPaymentIntent`, matching only pack/
+    auto-recharge grants by design; `findOrganizationIdForStripeDispute`, for every event after
+    `created`) plus `findCreditGrantByStripePaymentIntentId` in `repositories/billing-ledger.ts`.
+    New `billing/disputes.ts`: `recordDisputeOpened` creates the dispute row and, only if the linked
+    grant is still `active` (never re-freezing one an unrelated event already revoked), `freezeCreditGrant`s
+    it. `resolveDispute` is the ONLY function that ever sets a terminal `outcome` — `won` `unfreezeCreditGrant`s
+    the linked grant back to active, anything else (`lost`, or Stripe's ambiguous `warning_closed`)
+    `revokeCreditGrant`s it permanently, defensively treating an ambiguous closure as a loss rather than
+    silently restoring access; it is a no-op (returns the already-resolved row) on a duplicate
+    `charge.dispute.closed` delivery, even one reporting a different result than what was already
+    recorded. `recordDisputeFundsReinstated` records `funds_reinstated_at` as a pure accounting fact —
+    it deliberately never reverses a `lost` dispute's revocation, since `revokeCreditGrant` is a
+    one-way terminal transition by design (no "un-revoke" primitive exists anywhere in this codebase);
+    reinstated funds are a downstream reconciliation fact for §10 (not yet built) to consume.
+    Wired into `webhook-handlers.ts`: `handleDisputeCreated` (`charge.dispute.created`), `handleDisputeUpdated`
+    (`charge.dispute.updated`, status/evidence-deadline sync only, never touches outcome),
+    `handleDisputeClosed` (`charge.dispute.closed`), `handleDisputeFundsReinstated`
+    (`charge.dispute.funds_reinstated`) — all four resolve their organization via the new cross-org
+    lookups before doing anything, `'deferred'` if unresolved.
+    "Alert evidence deadlines": no notification channel exists yet in this codebase (§10, not yet
+    built). `evidence_due_by` is stored on every row and surfaced prominently in the new read-only
+    `DisputeQueue.tsx` admin view — a real, honest implementation of "alert" given today's
+    infrastructure, not a stub. New `/api/admin/billing/disputes` (GET only, platform-admin,
+    reuses §8 tasks 3/4's `withPlatformOrganization` rather than a third cross-org helper) mounted at
+    `/admin/disputes`, linked from `UserMenu.tsx`'s admin section (new `ShieldAlert` icon).
+    14 new `disputes.test.ts` tests (open+freeze, idempotent duplicate `created` delivery, no-grant
+    dispute, no-re-freeze-of-already-revoked-grant, status sync, won/lost/ambiguous-`warning_closed`
+    resolution, idempotent duplicate `closed` delivery never flips an already-resolved outcome, no-op
+    on missing dispute for every mutator, funds-reinstated never reverses a loss, and org-scoped
+    listing), 9 new `webhook-handlers.test.ts` tests covering all four dispute events end to end
+    (ignored-vs-deferred distinction on `created` with/without a `payment_intent`, freeze-on-create,
+    status-sync-without-outcome-change, won-unfreezes, lost-revokes, ambiguous-`warning_closed`-treated-
+    as-lost, funds-reinstated-does-not-reverse) plus fixing the pre-existing generic deferred/ignored
+    `it.each` list (moved `charge.dispute.created` out of it, since the generic zero-`payment_intent`
+    fixture now correctly reports `'ignored'` for that event specifically, a genuinely different and
+    correct reason than every other still-deferred event in that list).
+    Live-verified against the running dev server: seeded a real pack grant + open dispute directly in
+    the dev database for a real organization, confirmed `GET /api/admin/billing/disputes?organizationId=<real org>`
+    and the `/admin/disputes` page both render the real row (reason, amount, Stripe status, outcome,
+    evidence-due timestamp) through the actual route/RLS/UI wiring — not just the disposable-DB test
+    suite: screenshot confirmed the dark-glass admin shell renders correctly and the new "Disputes"
+    entry in `UserMenu.tsx`'s admin section navigates to it (initially appeared missing from a
+    `read_page` accessibility-tree check at a clipped viewport height — a taller viewport confirmed it
+    was only ever a screenshot-clipping artifact, not a rendering bug; the served bundle already
+    contained the new entry throughout). Demo rows removed from the dev database after verification.
+    Full suite (isolated per-file, per the known parallel-directory resource-contention caveat
+    documented in §8 tasks 2-4's evidence) all green; `pnpm type-check` (clean); `pnpm lint` (0 errors
+    in every file this task touched); `pnpm security:boundaries` (0 legacy imports tracked);
+    route-coverage (92 routes — +1 for `/api/admin/billing/disputes`, 8 allowlisted, valid).
 
 ## 9. Customer and operator experiences
 

@@ -1200,6 +1200,42 @@ export const billingRefunds = pgTable(
 )
 
 /**
+ * Chargeback tracking (plans/stripe-billing-platform/tasks.md §8 "Implement dispute freeze,
+ * outcome, and alerts"). Pack disputes only (see `billing/disputes.ts`'s module comment for why
+ * subscription disputes are a documented, separate gap) — `grantId` is therefore always set for a
+ * row this app itself created.
+ */
+export const billingDisputes = pgTable(
+  'billing_disputes',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    grantId: text('grant_id').references(() => billingCreditGrants.id, { onDelete: 'restrict' }),
+    stripeDisputeId: text('stripe_dispute_id').notNull(),
+    stripePaymentIntentId: text('stripe_payment_intent_id').notNull(),
+    amountCents: integer('amount_cents').notNull(),
+    reason: text('reason'),
+    stripeStatus: text('stripe_status').notNull(),
+    outcome: text('outcome').notNull().default('open'),
+    evidenceDueBy: timestamp('evidence_due_by', { withTimezone: true }),
+    fundsReinstatedAt: timestamp('funds_reinstated_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_disputes_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('billing_disputes_org_stripe_dispute_unique').on(table.organizationId, table.stripeDisputeId),
+    foreignKey({
+      columns: [table.organizationId, table.grantId],
+      foreignColumns: [billingCreditGrants.organizationId, billingCreditGrants.id],
+      name: 'billing_disputes_organization_grant_fk',
+    }),
+    check('billing_disputes_outcome_check', sql`${table.outcome} in ('open', 'won', 'lost')`),
+    check('billing_disputes_amount_check', sql`${table.amountCents} >= 0`),
+  ],
+)
+
+/**
  * Append-only velocity signal for fraud/high-volume exception controls (plans/stripe-billing-platform/
  * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
  * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session

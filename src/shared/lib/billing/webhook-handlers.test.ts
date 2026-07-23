@@ -710,7 +710,10 @@ describe('processStripeWebhookEvent — deferred and ignored families', () => {
     // resolvable" semantics as every other cross-org lookup in this file.
     'refund.updated',
     'refund.failed',
-    'charge.dispute.created',
+    // charge.dispute.created is deliberately excluded from this generic fixture list — see the
+    // dedicated dispute describe block below: its handler branches on `dispute.payment_intent`
+    // BEFORE any cross-org lookup, and this generic fixture's synthetic object has no such field
+    // (reports 'ignored', not 'deferred', for a genuinely different and correct reason).
     'charge.dispute.updated',
     'charge.dispute.closed',
     'charge.dispute.funds_reinstated',
@@ -802,5 +805,184 @@ describe('processStripeWebhookEvent — refund status resolution (§8 task 4)', 
 
     expect(result.outcome).toBe('applied')
     expect(result.detail).toMatch(/already succeeded/)
+  })
+})
+
+describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => {
+  function disputeEvent(
+    id: string,
+    type: 'charge.dispute.created' | 'charge.dispute.updated' | 'charge.dispute.closed' | 'charge.dispute.funds_reinstated',
+    dispute: { id: string; payment_intent?: string; amount?: number; reason?: string; status: string; evidence_details?: { due_by: number | null } },
+    created = 1780000000,
+  ) {
+    return {
+      id, type, created, livemode: false, api_version: '2026-06-24.dahlia',
+      data: { object: { object: 'dispute', ...dispute } },
+    } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
+  }
+
+  async function seedPackGrant(organizationId: string, stripePaymentIntentId: string): Promise<string> {
+    const grantId = uniqueId('grant')
+    await db.insert(billingCreditGrants).values({
+      id: grantId, organizationId, source: 'pack', sourceReference: 'starter_300',
+      stripePaymentIntentId, originalUnits: 300, remainingUnits: 300,
+      expiresAt: new Date('2099-01-01T00:00:00Z'),
+    })
+    return grantId
+  }
+
+  it('charge.dispute.created with no payment_intent on the object is ignored, not deferred', async () => {
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: uniqueId('dp'), status: 'needs_response' }),
+      { db },
+    )
+    expect(result.outcome).toBe('ignored')
+  })
+
+  it('charge.dispute.created defers when no pack grant matches the disputed PaymentIntent', async () => {
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: uniqueId('dp'), payment_intent: 'pi_never_seen', status: 'needs_response' }),
+      { db },
+    )
+    expect(result.outcome).toBe('deferred')
+  })
+
+  it('charge.dispute.created records the dispute and freezes the linked grant', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', {
+        id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, reason: 'fraudulent', status: 'needs_response',
+        evidence_details: { due_by: 1781000000 },
+      }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('frozen')
+  })
+
+  it('charge.dispute.updated defers when no dispute row exists yet for that Stripe dispute id', async () => {
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.updated', { id: uniqueId('dp'), status: 'warning_under_review' }),
+      { db },
+    )
+    expect(result.outcome).toBe('deferred')
+  })
+
+  it('charge.dispute.updated syncs status without changing the outcome or grant state', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
+      { db },
+    )
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.updated', { id: stripeDisputeId, status: 'warning_under_review' }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('frozen')
+  })
+
+  it('charge.dispute.closed as won unfreezes the linked grant', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
+      { db },
+    )
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'won' }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('active')
+  })
+
+  it('charge.dispute.closed as lost revokes the linked grant', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
+      { db },
+    )
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'lost' }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('revoked')
+  })
+
+  it('charge.dispute.closed with an ambiguous warning_closed status defensively treats it as lost, never silently restoring access', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
+      { db },
+    )
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'warning_closed' }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('revoked')
+  })
+
+  it('charge.dispute.funds_reinstated defers when no dispute row exists yet', async () => {
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.funds_reinstated', { id: uniqueId('dp'), status: 'lost' }),
+      { db },
+    )
+    expect(result.outcome).toBe('deferred')
+  })
+
+  it('charge.dispute.funds_reinstated records the accounting fact without reversing a lost dispute\'s revocation', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripePaymentIntentId = `pi_${uniqueId('pi')}`
+    const grantId = await seedPackGrant(organizationId, stripePaymentIntentId)
+    const stripeDisputeId = uniqueId('dp')
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
+      { db },
+    )
+    await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'lost' }),
+      { db },
+    )
+
+    const result = await processStripeWebhookEvent(
+      disputeEvent(uniqueId('evt'), 'charge.dispute.funds_reinstated', { id: stripeDisputeId, status: 'lost' }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('revoked')
   })
 })

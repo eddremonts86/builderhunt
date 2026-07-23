@@ -63,6 +63,20 @@ export async function findCreditGrant(
   return row ?? null
 }
 
+/** The pack grant a disputed PaymentIntent paid for (§8 task 5) — the same column §8 task 4's refunds use, read the other direction. */
+export async function findCreditGrantByStripePaymentIntentId(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripePaymentIntentId: string,
+): Promise<BillingCreditGrantRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingCreditGrants)
+    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentIntentId, stripePaymentIntentId)))
+    .limit(1)
+  return row ?? null
+}
+
 /** Every eligible-to-consume grant, earliest expiry first — the order every consumption/reservation path must follow (spec.md: earliest-expiring grants are used first). */
 export async function listActiveCreditGrantsByEarliestExpiry(
   transaction: TenantTransaction,

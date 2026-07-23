@@ -97,6 +97,7 @@ import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/a
 import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
+import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
@@ -146,6 +147,7 @@ import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/chan
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
 import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
+import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
@@ -599,6 +601,11 @@ const DashboardAdminIncidentsRoute = DashboardAdminIncidentsRouteImport.update({
   path: '/admin/incidents',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardAdminDisputesRoute = DashboardAdminDisputesRouteImport.update({
+  id: '/admin/disputes',
+  path: '/admin/disputes',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
   id: '/admin/changelog',
   path: '/admin/changelog',
@@ -869,6 +876,11 @@ const ApiAdminBillingRefundsRoute = ApiAdminBillingRefundsRouteImport.update({
   path: '/api/admin/billing/refunds',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminBillingDisputesRoute = ApiAdminBillingDisputesRouteImport.update({
+  id: '/api/admin/billing/disputes',
+  path: '/api/admin/billing/disputes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminBillingConfigurationRoute =
   ApiAdminBillingConfigurationRouteImport.update({
     id: '/api/admin/billing/configuration',
@@ -947,6 +959,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
@@ -1015,6 +1028,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1092,6 +1106,7 @@ export interface FileRoutesByTo {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
@@ -1159,6 +1174,7 @@ export interface FileRoutesByTo {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1240,6 +1256,7 @@ export interface FileRoutesById {
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/_dashboard/admin/disputes': typeof DashboardAdminDisputesRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
@@ -1308,6 +1325,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1388,6 +1406,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
     | '/admin/plan-requests'
@@ -1456,6 +1475,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/disputes'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1533,6 +1553,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
     | '/admin/plan-requests'
@@ -1600,6 +1621,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/disputes'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1680,6 +1702,7 @@ export interface FileRouteTypes {
     | '/_landing/'
     | '/_dashboard/admin/billing'
     | '/_dashboard/admin/changelog'
+    | '/_dashboard/admin/disputes'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
     | '/_dashboard/admin/plan-requests'
@@ -1748,6 +1771,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/disputes'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1856,6 +1880,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
+  ApiAdminBillingDisputesRoute: typeof ApiAdminBillingDisputesRoute
   ApiAdminBillingRefundsRoute: typeof ApiAdminBillingRefundsRoute
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
@@ -2516,6 +2541,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminIncidentsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/disputes': {
+      id: '/_dashboard/admin/disputes'
+      path: '/admin/disputes'
+      fullPath: '/admin/disputes'
+      preLoaderRoute: typeof DashboardAdminDisputesRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/changelog': {
       id: '/_dashboard/admin/changelog'
       path: '/admin/changelog'
@@ -2859,6 +2891,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingRefundsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/disputes': {
+      id: '/api/admin/billing/disputes'
+      path: '/api/admin/billing/disputes'
+      fullPath: '/api/admin/billing/disputes'
+      preLoaderRoute: typeof ApiAdminBillingDisputesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/configuration': {
       id: '/api/admin/billing/configuration'
       path: '/api/admin/billing/configuration'
@@ -2945,6 +2984,7 @@ interface DashboardRouteRouteChildren {
   DashboardAlertsRoute: typeof DashboardAlertsRoute
   DashboardAdminBillingRoute: typeof DashboardAdminBillingRoute
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
+  DashboardAdminDisputesRoute: typeof DashboardAdminDisputesRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
@@ -2968,6 +3008,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAlertsRoute: DashboardAlertsRoute,
   DashboardAdminBillingRoute: DashboardAdminBillingRoute,
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
+  DashboardAdminDisputesRoute: DashboardAdminDisputesRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
@@ -3195,6 +3236,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
+  ApiAdminBillingDisputesRoute: ApiAdminBillingDisputesRoute,
   ApiAdminBillingRefundsRoute: ApiAdminBillingRefundsRoute,
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,

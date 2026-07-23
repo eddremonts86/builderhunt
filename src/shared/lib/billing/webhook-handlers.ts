@@ -32,6 +32,7 @@ import type Stripe from 'stripe'
 import { computeAnniversary } from './annual-grants'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
+import { recordDisputeFundsReinstated, recordDisputeOpened, resolveDispute, updateDisputeStripeStatus } from './disputes'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
 import { applyCreditRevocationForRefund } from './refunds'
 import {
@@ -41,14 +42,16 @@ import {
   resolveAutoRechargeTrigger,
   updateBillingRefundState,
 } from '../repositories/billing'
-import { findCreditGrant } from '../repositories/billing-ledger'
+import { findCreditGrant, findCreditGrantByStripePaymentIntentId } from '../repositories/billing-ledger'
 import {
   clearBillingSubscriptionPaymentBlock,
   findBillingCheckoutAttemptByStripeSessionId,
   findFullBillingSubscriptionByStripeId,
+  findOrganizationIdForDisputedPaymentIntent,
   findOrganizationIdForPendingAutoRechargePaymentIntent,
   findOrganizationIdForStripeCheckoutSession,
   findOrganizationIdForStripeCustomer,
+  findOrganizationIdForStripeDispute,
   findOrganizationIdForStripeRefund,
   findOrganizationIdForStripeSubscription,
   markBillingSubscriptionGraceStart,
@@ -127,10 +130,13 @@ export async function processStripeWebhookEvent(
       return { outcome: 'ignored', detail: `${event.type}: informational only, no actionable state beyond what refund.updated/refund.failed already carry` }
 
     case 'charge.dispute.created':
+      return handleDisputeCreated(event, db)
     case 'charge.dispute.updated':
+      return handleDisputeUpdated(event, db)
     case 'charge.dispute.closed':
+      return handleDisputeClosed(event, db)
     case 'charge.dispute.funds_reinstated':
-      return { outcome: 'deferred', detail: `${event.type}: dispute handling is not built yet (§8 task 5)` }
+      return handleDisputeFundsReinstated(event, db)
 
     default:
       return { outcome: 'ignored', detail: `Unrecognized event type: ${event.type}` }
@@ -312,6 +318,82 @@ async function handleRefundStatusEvent(event: Stripe.Event, db: PostgresJsDataba
       return { outcome: 'applied', detail: `Refund ${refund.id} marked failed` }
     }
     return { outcome: 'applied', detail: `Refund ${refund.id} still ${stripeRefund.status} — awaiting resolution` }
+  }, db)
+}
+
+/**
+ * `charge.dispute.created` (§8 task 5) — resolves the organization via the disputed PaymentIntent
+ * against `billing_credit_grants.stripe_payment_intent_id` (only ever populated for pack/
+ * auto-recharge grants — see `disputes.ts`'s module comment for why a subscription-invoice dispute
+ * stays `'deferred'` here rather than silently dropped).
+ */
+async function handleDisputeCreated(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+  const dispute = event.data.object as Stripe.Dispute
+  const stripePaymentIntentId = extractId(dispute.payment_intent)
+  if (!stripePaymentIntentId) return { outcome: 'ignored', detail: `Dispute ${dispute.id} has no PaymentIntent` }
+
+  const organizationId = await findOrganizationIdForDisputedPaymentIntent(stripePaymentIntentId, db)
+  if (!organizationId) {
+    return { outcome: 'deferred', detail: `No pack grant found yet for disputed PaymentIntent ${stripePaymentIntentId} (not ours, a subscription dispute out of this task's scope, or not yet observed)` }
+  }
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const grant = await findCreditGrantByStripePaymentIntentId(tx, organizationId, stripePaymentIntentId)
+    const result = await recordDisputeOpened(tx, {
+      organizationId,
+      grantId: grant?.id ?? null,
+      stripeDisputeId: dispute.id,
+      stripePaymentIntentId,
+      amountCents: dispute.amount,
+      reason: dispute.reason ?? null,
+      stripeStatus: dispute.status,
+      evidenceDueBy: toDate(dispute.evidence_details?.due_by),
+    })
+    return { outcome: 'applied', detail: `Dispute ${result.stripeDisputeId} recorded${grant ? ` — grant ${grant.id} frozen` : ' (no linked grant)'}` }
+  }, db)
+}
+
+/** `charge.dispute.updated` — status/evidence-deadline sync only, never an outcome transition. */
+async function handleDisputeUpdated(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+  const dispute = event.data.object as Stripe.Dispute
+  const organizationId = await findOrganizationIdForStripeDispute(dispute.id, db)
+  if (!organizationId) return { outcome: 'deferred', detail: `No dispute record found yet for ${dispute.id}` }
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const updated = await updateDisputeStripeStatus(tx, organizationId, dispute.id, dispute.status, toDate(dispute.evidence_details?.due_by))
+    if (!updated) return { outcome: 'deferred', detail: `Dispute row not found inside org scope for ${dispute.id}` }
+    return { outcome: 'applied', detail: `Dispute ${dispute.id} status synced to ${dispute.status}` }
+  }, db)
+}
+
+/** `charge.dispute.closed` — the only path that ever changes `outcome` (won/lost), restoring or revoking the linked grant accordingly. */
+async function handleDisputeClosed(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+  const dispute = event.data.object as Stripe.Dispute
+  const organizationId = await findOrganizationIdForStripeDispute(dispute.id, db)
+  if (!organizationId) return { outcome: 'deferred', detail: `No dispute record found yet for ${dispute.id}` }
+
+  // Stripe's dispute.status at 'closed' time is one of 'won'/'lost' (also 'warning_closed' for an
+  // early-stage warning that closes without a formal outcome — treated as 'lost' defensively: never
+  // silently restore access on an ambiguous closure).
+  const outcome = dispute.status === 'won' ? 'won' : 'lost'
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const resolved = await resolveDispute(tx, organizationId, { stripeDisputeId: dispute.id, outcome, stripeStatus: dispute.status })
+    if (!resolved) return { outcome: 'deferred', detail: `Dispute row not found inside org scope for ${dispute.id}` }
+    return { outcome: 'applied', detail: `Dispute ${dispute.id} closed as ${outcome}` }
+  }, db)
+}
+
+/** `charge.dispute.funds_reinstated` — see `disputes.ts`'s module comment for why this only records an accounting fact, never reverses a lost dispute's credit revocation. */
+async function handleDisputeFundsReinstated(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+  const dispute = event.data.object as Stripe.Dispute
+  const organizationId = await findOrganizationIdForStripeDispute(dispute.id, db)
+  if (!organizationId) return { outcome: 'deferred', detail: `No dispute record found yet for ${dispute.id}` }
+
+  return withWorkerOrganization(organizationId, async (tx) => {
+    const updated = await recordDisputeFundsReinstated(tx, organizationId, dispute.id, new Date(event.created * 1000))
+    if (!updated) return { outcome: 'deferred', detail: `Dispute row not found inside org scope for ${dispute.id}` }
+    return { outcome: 'applied', detail: `Dispute ${dispute.id} funds reinstated recorded` }
   }, db)
 }
 
