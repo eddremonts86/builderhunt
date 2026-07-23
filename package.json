@@ -35,6 +35,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/db/seed.ts",
     "db:seed:admin": "tsx --env-file=.env scripts/db/seed-admin.ts",
+    "stripe:provision": "tsx --env-file=.env scripts/billing/provision-stripe-catalog.ts",
     "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts"
   },
   "dependencies": {

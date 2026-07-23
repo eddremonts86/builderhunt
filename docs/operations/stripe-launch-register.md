@@ -62,8 +62,10 @@
 
 ## Release gates (must all have evidence before `STRIPE_BILLING_ENABLED=true` in production)
 
-- [ ] Sandbox catalog manifest validated against live Stripe Products/Prices (task "Validate Stripe
-      Products and Prices before mutation").
+- [x] Sandbox catalog manifest validated against live Stripe Products/Prices (task "Validate Stripe
+      Products and Prices before mutation"). 2026-07-23: all 9 catalog Prices created in the test
+      sandbox and validated (amount/USD/interval/product/tax-behavior/active) via
+      `pnpm stripe:provision`; test Price IDs written into `catalog.ts`. Live column still null.
 - [ ] Signed webhook fixture + duplicate/reordered/delayed/invalid-signature test matrix passes.
 - [ ] Credit ledger property/concurrency tests pass (non-negative balance, no double-spend).
 - [ ] Tenant A/B isolation and platform/organization role matrix pass under real RLS roles.
@@ -81,3 +83,8 @@
 
 - 2026-07-23 — register created (task 0.2). All gates start `_pending_`; no Stripe account, catalog,
   or legal-document work has happened yet.
+- 2026-07-23 — Stripe test account created (Denmark, individual). Test API keys in `.env`
+  (`STRIPE_BILLING_ENABLED=false`). SDK pinned `stripe@22.3.2`; API version pinned
+  `2026-06-24.dahlia`. Catalog provisioned and validated in the test sandbox via
+  `scripts/billing/provision-stripe-catalog.ts` — "Validate Stripe Products and Prices" gate met
+  for test. Still pending: Stripe Tax registration, webhook endpoint/secret, KYC/live activation.

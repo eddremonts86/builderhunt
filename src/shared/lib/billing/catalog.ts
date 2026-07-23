@@ -64,32 +64,32 @@ const EFFECTIVE_AT = '2026-07-23'
 export const SUBSCRIPTION_CATALOG: Record<SubscriptionCatalogKey, SubscriptionCatalogEntry> = {
   pro_monthly: {
     key: 'pro_monthly', tier: 'pro', interval: 'monthly', amountCents: 1900, monthlyCredits: 140, seatLimit: 1,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQVFV1TKaJ4hmg4wESYRA', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   pro_annual: {
     key: 'pro_annual', tier: 'pro', interval: 'annual', amountCents: 18200, monthlyCredits: 140, seatLimit: 1,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQVFV1TKaJ4hmSrIQtfDl', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   pro_max_monthly: {
     key: 'pro_max_monthly', tier: 'pro_max', interval: 'monthly', amountCents: 7900, monthlyCredits: 700, seatLimit: 1,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQWFV1TKaJ4hms2z9CyNc', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   pro_max_annual: {
     key: 'pro_max_annual', tier: 'pro_max', interval: 'annual', amountCents: 75800, monthlyCredits: 700, seatLimit: 1,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQXFV1TKaJ4hm7dgeuzZO', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   team_monthly: {
     key: 'team_monthly', tier: 'team', interval: 'monthly', amountCents: 19900, monthlyCredits: 2100, seatLimit: 10,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQYFV1TKaJ4hmoseJQE1o', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   team_annual: {
     key: 'team_annual', tier: 'team', interval: 'annual', amountCents: 191000, monthlyCredits: 2100, seatLimit: 10,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQYFV1TKaJ4hmHjdL2IX3', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
 }
@@ -97,17 +97,17 @@ export const SUBSCRIPTION_CATALOG: Record<SubscriptionCatalogKey, SubscriptionCa
 export const PACK_CATALOG: Record<PackCatalogKey, PackCatalogEntry> = {
   starter_300: {
     key: 'starter_300', amountCents: 1500, credits: 300, expiryMonths: 12,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQZFV1TKaJ4hmws9hYFGH', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   scale_1000: {
     key: 'scale_1000', amountCents: 4500, credits: 1000, expiryMonths: 12,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQaFV1TKaJ4hmoGRpN32j', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
   max_5000: {
     key: 'max_5000', amountCents: 29900, credits: 5000, expiryMonths: 12,
-    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: null, live: null },
+    version: 1, currency: 'usd', taxBehavior: 'exclusive', stripePriceId: { test: 'price_1TwKQbFV1TKaJ4hmjxAhqdqJ', live: null },
     effectiveAt: EFFECTIVE_AT, retiredAt: null,
   },
 }

@@ -1,6 +1,6 @@
 # BuilderHunt implementation roadmap
 
-This directory is the implementation backlog for BuilderHunt. It contains 45 plan
+This directory is the implementation backlog for BuilderHunt. It contains 47 plan
 records plus the shared planning policy in [`_meta/`](./_meta/). Each plan is a trio:
 `spec.md` defines the outcome, `plan.md` defines the delivery sequence, and `tasks.md`
 is the executable checklist.
@@ -197,6 +197,7 @@ flowchart LR
 ### Foundations and business
 
 - [`security-and-multitenancy`](./security-and-multitenancy/spec.md)
+- [`abuse-and-usage-integrity`](./abuse-and-usage-integrity/spec.md)
 - [`production-infrastructure`](./production-infrastructure/spec.md)
 - [`pricing-and-billing`](./pricing-and-billing/spec.md)
 - [`legal-and-compliance`](./legal-and-compliance/spec.md)
@@ -251,6 +252,7 @@ flowchart LR
 
 ### Release audits
 
+- [`design-modernization`](./design-modernization/spec.md)
 - [`audit-accessibility`](./audit-accessibility/spec.md)
 - [`audit-conversion`](./audit-conversion/spec.md)
 - [`audit-performance-qa`](./audit-performance-qa/spec.md)
