@@ -1,6 +1,7 @@
 import { and, desc, eq, isNull } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
+  authUsers,
   billingCheckoutAttempts,
   billingCreditGrants,
   billingCreditReservations,
@@ -8,6 +9,7 @@ import {
   billingRefunds,
   billingSubscriptions,
   billingTermsAcceptances,
+  organizationMembers,
 } from '../db/schema'
 
 /**
@@ -58,6 +60,38 @@ export async function createBillingCustomer(
 ): Promise<BillingCustomerRecord> {
   const [row] = await transaction.insert(billingCustomers).values(input).returning()
   return row
+}
+
+/**
+ * Same insert, but tolerates losing a race to a concurrent caller inserting the same
+ * `(organizationId, livemode)` pair (drizzle/0027's `billing_customers_org_livemode_unique`) —
+ * returns `null` instead of throwing so the caller can re-`findBillingCustomer` and return the
+ * row the winner created (`billing/customers.ts`'s `ensureBillingCustomer`).
+ */
+export async function createBillingCustomerIfAbsent(
+  transaction: TenantTransaction,
+  input: CreateBillingCustomerInput,
+): Promise<BillingCustomerRecord | null> {
+  const [row] = await transaction
+    .insert(billingCustomers)
+    .values(input)
+    .onConflictDoNothing({ target: [billingCustomers.organizationId, billingCustomers.livemode] })
+    .returning()
+  return row ?? null
+}
+
+/** The org's current owner's account email — the only email `billing/customers.ts` ever sends to Stripe (never candidate/product data). Returns null if the organization somehow has no owner row (should not happen given `organization_members_one_owner_unique`, but this is a read, not an invariant enforcement). */
+export async function findOrganizationOwnerEmail(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<string | null> {
+  const [row] = await transaction
+    .select({ email: authUsers.email })
+    .from(organizationMembers)
+    .innerJoin(authUsers, eq(organizationMembers.userId, authUsers.id))
+    .where(and(eq(organizationMembers.organizationId, organizationId), eq(organizationMembers.role, 'owner')))
+    .limit(1)
+  return row?.email ?? null
 }
 
 export interface BillingSubscriptionRecord {

@@ -151,10 +151,29 @@
 
 ## 5. Checkout, consent, and customer lifecycle
 
-- [ ] **Create organization Stripe Customers idempotently**
+- [x] **Create organization Stripe Customers idempotently**
   - Files: `src/shared/lib/billing/customers.ts`, `src/shared/lib/billing/customers.test.ts`, `src/shared/lib/billing/stripe-provider.ts`
   - Do: Resolve active organization, create/reuse one Customer per livemode, use opaque organization metadata, keep billing email separate, and handle timeout/retry with a stable operation key. Never copy candidate/product data into Stripe.
   - Verify: concurrent creation and lost-response retry create one Customer; test/live IDs cannot cross; metadata/DTO snapshots contain no sensitive fields.
+  - Progress (2026-07-23): `stripe-provider.ts` is a provider-selection seam — `getBillingProvider()`
+    returns the deterministic `FakeBillingProvider` singleton while `STRIPE_BILLING_ENABLED=false`
+    (true today; `.env.example` explicitly gates this until §10 certifies a real adapter) and throws
+    loudly rather than silently faking success if the flag is ever flipped on before that adapter
+    exists. `customers.ts`'s `ensureBillingCustomer(transaction, principal, { provider })` resolves
+    the org owner's account email (new `findOrganizationOwnerEmail` repo query — never
+    candidate/product data), and creates/reuses one `billing_customers` row per
+    `(organizationId, livemode)` using a two-layer idempotency: a provider-side operation key
+    derived only from `(organizationId, livemode)` (stable across retries/concurrent callers, so a
+    lost-response retry or a genuine race resolves to the SAME Stripe-side customer), plus a new
+    `createBillingCustomerIfAbsent` repo function (`onConflictDoNothing` on
+    `billing_customers_org_livemode_unique`) so the loser of a concurrent DB-insert race re-reads
+    and returns the winner's row instead of erroring. 22 new tests (customers.test.ts: idempotent
+    create, concurrent-race convergence via `Promise.all`, lost-response retry, no-owner error,
+    DTO-has-no-sensitive-fields, test/live isolation proven at the repository level;
+    stripe-provider.test.ts: fake-provider selection + singleton reuse/reset) plus 2 new
+    repository-layer tests, all passing; full suite 192/192 (excluding the pre-existing, unrelated
+    `catalog.test.ts` failure from a concurrent session's Stripe Price ID provisioning work).
+    `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries` clean.
 
 - [ ] **Implement versioned commercial consent**
   - Files: `src/shared/lib/billing/consent.ts`, `src/shared/lib/billing/consent.test.ts`, `src/shared/lib/legal.ts`, `src/shared/lib/legal.test.ts`
