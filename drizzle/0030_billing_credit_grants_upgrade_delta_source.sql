@@ -1,0 +1,2 @@
+ALTER TABLE "billing_credit_grants" DROP CONSTRAINT "billing_credit_grants_source_check";--> statement-breakpoint
+ALTER TABLE "billing_credit_grants" ADD CONSTRAINT "billing_credit_grants_source_check" CHECK ("billing_credit_grants"."source" in ('subscription_monthly', 'subscription_annual_window', 'subscription_upgrade_delta', 'pack', 'legacy_manual', 'promotional', 'operator_trial'));

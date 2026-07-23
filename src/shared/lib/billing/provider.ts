@@ -140,6 +140,7 @@ export interface ChangeSubscriptionInput {
   subscriptionId: string
   newPriceId: string
   idempotencyKey: string
+  scenario?: BillingScenario
 }
 
 export interface CancelSubscriptionInput {

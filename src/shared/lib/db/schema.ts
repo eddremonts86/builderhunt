@@ -993,7 +993,7 @@ export const billingCreditGrants = pgTable(
     index('billing_credit_grants_org_state_expiry_idx').on(table.organizationId, table.state, table.expiresAt),
     check(
       'billing_credit_grants_source_check',
-      sql`${table.source} in ('subscription_monthly', 'subscription_annual_window', 'pack', 'legacy_manual', 'promotional', 'operator_trial')`,
+      sql`${table.source} in ('subscription_monthly', 'subscription_annual_window', 'subscription_upgrade_delta', 'pack', 'legacy_manual', 'promotional', 'operator_trial')`,
     ),
     check('billing_credit_grants_state_check', sql`${table.state} in ('active', 'frozen', 'expired', 'revoked')`),
     check(

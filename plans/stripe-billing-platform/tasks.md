@@ -576,10 +576,69 @@
     unrelated by reverting to the prior commit; `pnpm type-check`/`pnpm lint` (0 errors)/
     `pnpm security:boundaries`/route-coverage all clean.
 
-- [ ] **Implement subscription preview and change matrix**
+- [x] **Implement subscription preview and change matrix**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/shared/lib/billing/subscription-changes.test.ts`, `src/routes/api/billing/subscription/preview.ts`, `src/routes/api/billing/subscription/change.ts`
   - Do: Fetch Stripe preview; return charge/tax/effective/renewal/refill/credit delta. Apply paid upgrades with immediate invoice/pending update and ceiling delta grant; monthly-to-annual immediately without duplicate grant; schedule downgrade/annual-to-monthly. Reject stale preview and client amount.
   - Verify: sandbox/unit matrix covers every tier/interval pair, payment failure, SCA, proration, concurrent request, stale preview, and exact delta arithmetic.
+  - Progress (2026-07-23): `subscription-changes.ts`'s `classifySubscriptionChange(current, next)` is the
+    pure decision core implementing spec.md's exact change matrix by comparing tier rank (pro <
+    pro_max < team) and interval rank (monthly < annual): same-interval tier increase OR same-tier
+    monthly→annual is `{direction:'upgrade', timing:'immediate'}`; same-interval tier decrease OR
+    same-tier annual→monthly is `{direction:'downgrade', timing:'scheduled'}`; identical tier+interval
+    is `'lateral'`; a simultaneous tier-AND-interval change (not enumerated by spec.md) is
+    conservatively scheduled, never charged immediately — a documented fallback, not a silent gap.
+    `resolveCurrentCreditWindow` finds which credit window `now` falls in — trivial for a monthly
+    subscriber (the whole period), but for an annual subscriber walks the same 12 calendar-anniversary
+    windows `annual-grants.ts` (task 7.2) already established, so an upgrade's ceiling-delta credits
+    always expire with the CURRENT MONTHLY window, never the full year. `computeUpgradeCreditDelta`
+    is spec.md's exact formula: `ceil((new allowance - old allowance) * remaining seconds / window
+    seconds)`, zero for any non-increase or an already-ended window.
+    **Stale-preview protection** uses no new table: the preview response carries a `fingerprint`
+    (`<stripeSubscriptionId>:<providerSyncedAt ISO>`) the client echoes back to `/change`; a mismatch
+    means something else (a webhook, a concurrent different change) touched the subscription since
+    the preview was computed. **Apply only after successful payment**: `changeSubscription` inspects
+    BOTH a thrown `BillingProviderError` (decline/timeout → `payment_failed`) AND the returned
+    subscription's own `status` (anything but `active`, e.g. SCA-pending `incomplete` → new
+    `requires_action` error) before ever calling `applyImmediateSubscriptionChange` — neither
+    outcome touches our own state. Downgrades/cadence-decreases never call the provider at all; they
+    only write the ALREADY-schema'd `billing_subscriptions.scheduledChange` (`{catalogKey,
+    effectiveAt}`) — enacting it at renewal is explicitly task 7.5's job ("Implement cancellation and
+    renewal-safe price migration"), not this task's.
+    **Real bug found and fixed while building the concurrent-request/retry tests**: the fingerprint
+    check is self-invalidating for the immediate-apply path, since `applyImmediateSubscriptionChange`
+    itself bumps `providerSyncedAt` — a legitimate client retry (or the loser of a genuinely
+    concurrent identical request) would see its OWN prior success reported as `stale_preview`. Fixed
+    by checking FIRST whether the subscription is already on the target `catalogKey` (true for both a
+    genuinely lateral request and a retried/raced upgrade that already landed) and, if so, replaying
+    the ORIGINAL result — including the real credit delta, read back via a new `findGrantedByIdempotencyKey`
+    export on `credits.ts` (a read-only counterpart to `grantCredits`'s internal replay check) —
+    instead of recomputing it from the now-already-matching tiers (which would wrongly yield 0). A
+    scheduled change's fingerprint check is NOT self-invalidating (`scheduleBillingSubscriptionChange`
+    never touches `providerSyncedAt`), so it keeps a plain equality check.
+    Extended `BillingProvider`'s `ChangeSubscriptionInput` with an optional `scenario` (matching every
+    other mutating input) and `FakeBillingProvider.changeSubscription` to honor `decline`/`timeout`
+    (throws, matching `createCheckoutSession`/`createPaymentIntent`) and `sca_required` (returns
+    `status: 'incomplete'`, matching real Stripe's behavior when an immediate proration's payment
+    needs 3DS). New `repositories/billing.ts` additions: `findFullActiveBillingSubscription` (adds
+    `currentPeriodStart`/`scheduledChange`/`providerSyncedAt`/`catalogVersion` to the existing
+    lighter `findActiveBillingSubscription`), `applyImmediateSubscriptionChange`,
+    `scheduleBillingSubscriptionChange`. New migration `drizzle/0030_billing_credit_grants_upgrade_delta_source.sql`
+    widens `billing_credit_grants_source_check` to add `'subscription_upgrade_delta'` (a proration
+    delta grant is neither a monthly/annual subscription grant nor a pack/manual/promo/trial grant —
+    needed its own source value for accurate ledger provenance). 44 new tests: `subscription-changes.test.ts`
+    (28 — full 3-tier×2-interval classification matrix, credit-window resolution for both interval
+    types, the ceiling formula including start/end/zero-delta boundaries, and disposable-database
+    integration covering every scenario in this task's own verify line: upgrade/monthly-to-annual/
+    downgrade previews and applies, retried and genuinely concurrent requests converging on one
+    grant, stale-preview rejection, payment decline, and SCA-required), 16 new route tests
+    (`preview.test.ts`/`change.test.ts` — owner/admin/member permission matrix, spoofed-field/strict-
+    schema rejection including a client-supplied amount, every `SubscriptionChangeErrorCode` mapped to
+    its HTTP status, generic 500 fallback). Full suite 782 total minus the same pre-existing unrelated
+    `catalog.test.ts` failure (781 passing) — confirmed by running with reduced worker parallelism
+    (`--pool=forks --maxWorkers=2`) after the full-file-count sweep hit disposable-database connection
+    contention (hook timeouts) unrelated to this task's code; `pnpm type-check`/`pnpm lint` (0 errors)/
+    `pnpm security:boundaries`/route-coverage (85 routes, 8 allowlisted — unchanged, confirming both
+    new routes are correctly auth-gated) all clean.
 
 - [ ] **Enforce Team downgrade seat blockers**
   - Files: `src/shared/lib/billing/subscription-changes.ts`, `src/shared/lib/billing/subscription-changes.test.ts`, `src/shared/lib/organizations/contracts.ts`, `src/modules/billing/PlanChangePreview.tsx`

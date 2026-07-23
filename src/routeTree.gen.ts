@@ -124,6 +124,8 @@ import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/buil
 import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
+import { Route as ApiBillingSubscriptionPreviewRouteImport } from './routes/api/billing/subscription/preview'
+import { Route as ApiBillingSubscriptionChangeRouteImport } from './routes/api/billing/subscription/change'
 import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
 import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
@@ -738,6 +740,18 @@ const ApiBuildersBuilderIdClaimRoute =
     path: '/claim',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBillingSubscriptionPreviewRoute =
+  ApiBillingSubscriptionPreviewRouteImport.update({
+    id: '/api/billing/subscription/preview',
+    path: '/api/billing/subscription/preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiBillingSubscriptionChangeRoute =
+  ApiBillingSubscriptionChangeRouteImport.update({
+    id: '/api/billing/subscription/change',
+    path: '/api/billing/subscription/change',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBillingCheckoutSubscriptionRoute =
   ApiBillingCheckoutSubscriptionRouteImport.update({
     id: '/api/billing/checkout/subscription',
@@ -966,6 +980,8 @@ export interface FileRoutesByFullPath {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
+  '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1101,6 +1117,8 @@ export interface FileRoutesByTo {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
+  '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1241,6 +1259,8 @@ export interface FileRoutesById {
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
+  '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
+  '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
@@ -1380,6 +1400,8 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/change'
+    | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1515,6 +1537,8 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/change'
+    | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1654,6 +1678,8 @@ export interface FileRouteTypes {
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
+    | '/api/billing/subscription/change'
+    | '/api/billing/subscription/preview'
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
@@ -1754,6 +1780,8 @@ export interface RootRouteChildren {
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBillingCheckoutStatusRoute: typeof ApiBillingCheckoutStatusRoute
   ApiBillingCheckoutSubscriptionRoute: typeof ApiBillingCheckoutSubscriptionRoute
+  ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
+  ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
@@ -2584,6 +2612,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdClaimRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/billing/subscription/preview': {
+      id: '/api/billing/subscription/preview'
+      path: '/api/billing/subscription/preview'
+      fullPath: '/api/billing/subscription/preview'
+      preLoaderRoute: typeof ApiBillingSubscriptionPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/subscription/change': {
+      id: '/api/billing/subscription/change'
+      path: '/api/billing/subscription/change'
+      fullPath: '/api/billing/subscription/change'
+      preLoaderRoute: typeof ApiBillingSubscriptionChangeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/billing/checkout/subscription': {
       id: '/api/billing/checkout/subscription'
       path: '/api/billing/checkout/subscription'
@@ -3020,6 +3062,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBillingCheckoutStatusRoute: ApiBillingCheckoutStatusRoute,
   ApiBillingCheckoutSubscriptionRoute: ApiBillingCheckoutSubscriptionRoute,
+  ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
+  ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,

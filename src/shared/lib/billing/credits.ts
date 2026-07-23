@@ -37,7 +37,7 @@ export interface GrantCreditsInput {
   grantId: string
   ledgerEntryId: string
   organizationId: string
-  source: 'subscription_monthly' | 'subscription_annual_window' | 'pack' | 'legacy_manual' | 'promotional' | 'operator_trial'
+  source: 'subscription_monthly' | 'subscription_annual_window' | 'subscription_upgrade_delta' | 'pack' | 'legacy_manual' | 'promotional' | 'operator_trial'
   sourceReference?: string
   stripePaymentReference?: string
   monthlyWindowKey?: string
@@ -51,6 +51,25 @@ export interface CreditMutationResult {
   ledgerEntry: BillingLedgerEntryRecord
   /** True when this call found an existing ledger entry for the idempotency key and replayed it, rather than mutating anything new. */
   replayed: boolean
+}
+
+/**
+ * Read-only replay lookup for a caller that needs to know WHETHER a given `idempotencyKey` was
+ * already fully processed — without attempting a new grant (and without needing to know the
+ * original `units`/`expiresAt` again just to ask). `subscription-changes.ts` uses this to recognize
+ * a retried or raced request that already succeeded, distinct from `grantCredits`'s own internal
+ * check (which requires the full input to also perform the grant if none exists yet).
+ */
+export async function findGrantedByIdempotencyKey(
+  transaction: TenantTransaction,
+  organizationId: string,
+  idempotencyKey: string,
+): Promise<CreditMutationResult | null> {
+  const ledgerEntry = await findLedgerEntryByIdempotencyKey(transaction, organizationId, idempotencyKey)
+  if (!ledgerEntry) return null
+  const grant = ledgerEntry.grantId ? await findCreditGrant(transaction, organizationId, ledgerEntry.grantId) : null
+  if (!grant) throw new CreditLedgerError('Idempotency key already used by an entry with no matching grant', 'idempotency_conflict')
+  return { grant, ledgerEntry, replayed: true }
 }
 
 /** Grants a new batch of credits. Idempotent by `idempotencyKey`; also refuses a second grant for the same `monthlyWindowKey` (annual-subscription anniversary windows are granted at most once each — spec.md). */

@@ -140,6 +140,89 @@ export async function findActiveBillingSubscription(
   return row ?? null
 }
 
+export interface FullBillingSubscriptionRecord extends BillingSubscriptionRecord {
+  catalogVersion: number
+  currentPeriodStart: Date | null
+  scheduledChange: { catalogKey: string; effectiveAt: string } | null
+  providerSyncedAt: Date
+}
+
+/** Every column `subscription-changes.ts` needs to preview/apply a plan change — `findActiveBillingSubscription`'s own select deliberately omits these for its lighter (read-summary) callers. */
+export async function findFullActiveBillingSubscription(
+  transaction: TenantTransaction,
+  organizationId: string,
+  livemode: boolean,
+): Promise<FullBillingSubscriptionRecord | null> {
+  const [row] = await transaction
+    .select({
+      id: billingSubscriptions.id,
+      organizationId: billingSubscriptions.organizationId,
+      customerId: billingSubscriptions.customerId,
+      livemode: billingSubscriptions.livemode,
+      catalogKey: billingSubscriptions.catalogKey,
+      tier: billingSubscriptions.tier,
+      interval: billingSubscriptions.interval,
+      catalogVersion: billingSubscriptions.catalogVersion,
+      stripeSubscriptionId: billingSubscriptions.stripeSubscriptionId,
+      stripeStatus: billingSubscriptions.stripeStatus,
+      currentPeriodStart: billingSubscriptions.currentPeriodStart,
+      currentPeriodEnd: billingSubscriptions.currentPeriodEnd,
+      scheduledChange: billingSubscriptions.scheduledChange,
+      cancelAtPeriodEnd: billingSubscriptions.cancelAtPeriodEnd,
+      canceledAt: billingSubscriptions.canceledAt,
+      providerSyncedAt: billingSubscriptions.providerSyncedAt,
+    })
+    .from(billingSubscriptions)
+    .where(and(
+      eq(billingSubscriptions.organizationId, organizationId),
+      eq(billingSubscriptions.livemode, livemode),
+      isNull(billingSubscriptions.canceledAt),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
+export interface ApplyImmediateSubscriptionChangeInput {
+  catalogKey: string
+  tier: 'pro' | 'pro_max' | 'team'
+  interval: 'monthly' | 'annual'
+  catalogVersion: number
+  providerSyncedAt: Date
+}
+
+/** Applies an immediate plan change (upgrade, or monthly-to-annual at the same tier) — clears any stale `scheduledChange` from an earlier, superseded request. */
+export async function applyImmediateSubscriptionChange(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+  input: ApplyImmediateSubscriptionChangeInput,
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({
+      catalogKey: input.catalogKey,
+      tier: input.tier,
+      interval: input.interval,
+      catalogVersion: input.catalogVersion,
+      scheduledChange: null,
+      providerSyncedAt: input.providerSyncedAt,
+    })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
+/** Records a pending downgrade/cadence change to apply at the current period's end — never mutates `catalogKey`/`tier`/`interval` directly; task 7.5's renewal-time migration owns enacting it. */
+export async function scheduleBillingSubscriptionChange(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+  scheduledChange: { catalogKey: string; effectiveAt: string },
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({ scheduledChange })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
 export interface CreateBillingSubscriptionInput {
   id: string
   organizationId: string

@@ -211,6 +211,13 @@
       "when": 1784824036767,
       "tag": "0029_organization_entitlements_pro_max_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1784825627325,
+      "tag": "0030_billing_credit_grants_upgrade_delta_source",
+      "breakpoints": true
     }
   ]
 }

@@ -155,17 +155,23 @@ export class FakeBillingProvider implements BillingProvider {
     const existingId = this.idempotency.get(dedupeKey)
     if (existingId) return this.subscriptions.get(existingId)!
 
+    assertNotDeclineOrTimeout(input.scenario)
     const existing = this.subscriptions.get(input.subscriptionId)
     const now = new Date()
     const periodEnd = new Date(now)
     periodEnd.setMonth(periodEnd.getMonth() + 1)
+    // A `sca_required` change never silently succeeds — it lands the subscription in `incomplete`,
+    // matching real Stripe behavior when the payment backing an immediate proration needs further
+    // authentication. Callers must treat this the same as any other non-`active` outcome: the price
+    // change is NOT applied to our own state until a later event confirms it.
+    const status = input.scenario === 'sca_required' ? 'incomplete' : 'active'
     const subscription: BillingSubscription = existing
-      ? { ...existing, priceId: input.newPriceId, updatedAt: now.toISOString() }
+      ? { ...existing, priceId: status === 'incomplete' ? existing.priceId : input.newPriceId, status, updatedAt: now.toISOString() }
       : {
           id: input.subscriptionId,
           customerId: id('cus'),
-          status: 'active',
-          priceId: input.newPriceId,
+          status,
+          priceId: status === 'incomplete' ? id('price') : input.newPriceId,
           currentPeriodEnd: periodEnd.toISOString(),
           cancelAtPeriodEnd: false,
           createdAt: now.toISOString(),
