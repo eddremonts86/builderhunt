@@ -29,7 +29,7 @@ export const Route = createFileRoute('/api/queries/')({
           const queries = await withTenantContext(principal, (tx) => executeTenantRead(modes.read, {
             surface: 'saved-queries',
             requestId: principal.requestId,
-            legacy: () => listLegacySavedQueries(tx, principal.userId),
+            legacy: () => listLegacySavedQueries(tx, principal.userId, principal.organizationId),
             canonical: () => listSavedQueries(tx, principal.organizationId),
             recordMismatch: recordMigrationMismatch,
           }))

@@ -136,7 +136,12 @@ export function DashboardPage() {
     },
     {
       label: 'Saved searches',
-      value: stats?.savedQueries ?? 0,
+      // Derived from the live `queries` list (already refetched after
+      // create/delete) rather than the separate `stats.savedQueries` count,
+      // which only loads once on mount and otherwise goes stale — e.g. right
+      // after deleting a saved search, the list below updates immediately
+      // but this count wouldn't until a full page reload.
+      value: queries.length,
       icon: Bookmark,
       tone: 'warning' as const,
       hint: 'Hunts you can re-run anytime',

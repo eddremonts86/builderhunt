@@ -35,9 +35,18 @@ export function listRecentSavedQueries(
     .limit(limit)
 }
 
-export function listLegacySavedQueries(transaction: TenantTransaction, userId: string) {
+/**
+ * "Legacy" here means the pre-multi-org read path (saved_queries scoped by
+ * userId only, from before organizationId existed on this table). Every row
+ * has carried a NOT NULL organizationId for a long time now, so the legacy
+ * path must filter on it too — a user who belongs to more than one
+ * organization (the common personal-workspace + team case) would otherwise
+ * see every org's saved searches merged together, regardless of which
+ * organization is currently active.
+ */
+export function listLegacySavedQueries(transaction: TenantTransaction, userId: string, organizationId: string) {
   return transaction.select().from(savedQueries)
-    .where(eq(savedQueries.userId, userId))
+    .where(and(eq(savedQueries.userId, userId), eq(savedQueries.organizationId, organizationId)))
     .orderBy(savedQueries.createdAt)
 }
 

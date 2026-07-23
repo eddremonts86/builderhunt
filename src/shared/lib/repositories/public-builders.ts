@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { publicDb } from '../db/client'
-import { builderIdentities, publishedBuilderProfiles } from '../db/schema'
+import { builderClaims, builderIdentities, publishedBuilderProfiles } from '../db/schema'
 
 export async function findPublishedBuilderProfile(builderIdentityId: string) {
   const [profile] = await publicDb.select({
@@ -23,4 +23,20 @@ export async function findPublishedBuilderProfile(builderIdentityId: string) {
     .where(eq(publishedBuilderProfiles.builderIdentityId, builderIdentityId))
     .limit(1)
   return profile ?? null
+}
+
+/**
+ * The one verified claim on a builder identity, if any — regardless of who
+ * holds it. Used to render the "Claimed"/"is this your profile" state on
+ * `/builder/:id`, which (unlike the public/claimed-and-published path above)
+ * needs to know claim status even for tracked-but-unpublished builders.
+ */
+export async function findVerifiedBuilderClaim(builderIdentityId: string) {
+  const [claim] = await publicDb.select({
+    subjectUserId: builderClaims.subjectUserId,
+    verifiedAt: builderClaims.verifiedAt,
+  }).from(builderClaims)
+    .where(and(eq(builderClaims.builderIdentityId, builderIdentityId), eq(builderClaims.status, 'verified')))
+    .limit(1)
+  return claim ?? null
 }

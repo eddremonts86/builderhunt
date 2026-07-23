@@ -9,8 +9,10 @@ interface Builder {
   displayName?: string | null
   kind?: 'person' | 'repo'
   source: string
+  sourceId: string
   profileUrl: string
   bio?: string | null
+  avatarUrl?: string | null
   followersCount?: number
   topics?: string[]
   score?: number
@@ -76,18 +78,38 @@ function SaveStep() {
   const saveOne = async (builder: Builder) => {
     setSavingId(builder.id)
     try {
-      // Mark in onboarding progress (just intent — actual builder save
-      // happens later via the dashboard's save flow, or this counts as
-      // soft "I like this" tracking for the activation funnel).
-      const res = await fetch('/api/onboarding/complete', {
+      // Actually track the builder (same endpoint Search's "Track" button
+      // uses) so the "radar is live" promise on the success step is true —
+      // these builders show up in Exports/Recent builders/the dashboard
+      // count afterwards, not just as an onboarding-progress flag.
+      const trackRes = await fetch('/api/builders/track', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: builder.source,
+          sourceId: builder.sourceId,
+          username: builder.username,
+          displayName: builder.displayName,
+          avatarUrl: builder.avatarUrl,
+          bio: builder.bio,
+          profileUrl: builder.profileUrl,
+          followersCount: builder.followersCount,
+          topics: builder.topics,
+          score: builder.score,
+        }),
+      })
+      if (trackRes.ok) {
+        setSavedIds((prev) => new Set([...prev, builder.id]))
+      }
+      // Onboarding progress is separate bookkeeping (drives the "resume
+      // onboarding" banner elsewhere) — record intent regardless.
+      await fetch('/api/onboarding/complete', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ builderId: builder.id }),
-      })
-      if (res.ok) {
-        setSavedIds((prev) => new Set([...prev, builder.id]))
-      }
+      }).catch(() => {})
     } catch {
       // ignore
     } finally {
@@ -97,6 +119,18 @@ function SaveStep() {
 
   const finish = async () => {
     if (savedIds.size < REQUIRED_SAVES) return
+    // Actually save the search that was just used, so "your saved searches
+    // run continuously" on the success step is true from the start.
+    await fetch('/api/queries', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: searchedQuery,
+        keywords: [searchedQuery],
+        sources: ['github', 'reddit', 'hn', 'devto', 'lobsters'],
+      }),
+    }).catch(() => {})
     await fetch('/api/onboarding/complete', {
       method: 'POST',
       credentials: 'include',

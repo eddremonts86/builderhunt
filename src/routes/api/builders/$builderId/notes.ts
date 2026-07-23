@@ -6,6 +6,7 @@ import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import {
   createOrganizationBuilderNote,
   listOrganizationBuilderNotes,
+  resolveOrganizationBuilderId,
 } from '~/shared/lib/repositories/organization-builders'
 
 const NoteBody = z.object({ content: z.string().trim().min(1).max(10_000) })
@@ -17,9 +18,11 @@ export const Route = createFileRoute('/api/builders/$builderId/notes')({
       GET: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const notes = await withTenantContext(principal, (tx) =>
-            listOrganizationBuilderNotes(tx, principal.organizationId, params.builderId),
-          )
+          const notes = await withTenantContext(principal, async (tx) => {
+            const resolvedId = await resolveOrganizationBuilderId(tx, principal.organizationId, params.builderId)
+            if (!resolvedId) return []
+            return listOrganizationBuilderNotes(tx, principal.organizationId, resolvedId)
+          })
           return Response.json(notes)
         } catch (error) {
           const response = tenantAuthorizationResponse(error)
@@ -35,13 +38,17 @@ export const Route = createFileRoute('/api/builders/$builderId/notes')({
           if (!parsed.success) {
             return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })
           }
-          const note = await withTenantContext(principal, (tx) => createOrganizationBuilderNote(tx, {
-            id: randomId(),
-            organizationId: principal.organizationId,
-            userId: principal.userId,
-            builderId: params.builderId,
-            content: parsed.data.content,
-          }))
+          const note = await withTenantContext(principal, async (tx) => {
+            const resolvedId = await resolveOrganizationBuilderId(tx, principal.organizationId, params.builderId)
+            if (!resolvedId) return null
+            return createOrganizationBuilderNote(tx, {
+              id: randomId(),
+              organizationId: principal.organizationId,
+              userId: principal.userId,
+              builderId: resolvedId,
+              content: parsed.data.content,
+            })
+          })
           if (!note) return Response.json({ error: 'Builder not found' }, { status: 404 })
           return Response.json(note)
         } catch (error) {

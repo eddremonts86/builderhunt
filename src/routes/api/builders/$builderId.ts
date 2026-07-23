@@ -4,10 +4,11 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import {
   deleteOrganizationBuilder,
-  findOrganizationBuilderByIdentity,
+  findOrganizationBuilderByEitherId,
+  resolveOrganizationBuilderId,
   updateOrganizationBuilder,
 } from '~/shared/lib/repositories/organization-builders'
-import { findPublishedBuilderProfile } from '~/shared/lib/repositories/public-builders'
+import { findPublishedBuilderProfile, findVerifiedBuilderClaim } from '~/shared/lib/repositories/public-builders'
 
 const PatchBody = z.object({
   topics: z.array(z.string().min(1).max(40)).max(20).optional(),
@@ -37,10 +38,11 @@ export const Route = createFileRoute('/api/builders/$builderId')({
           }
           if (principal) {
             const tenantBuilder = await withTenantContext(principal, (tx) =>
-              findOrganizationBuilderByIdentity(tx, principal!.organizationId, params.builderId),
+              findOrganizationBuilderByEitherId(tx, principal!.organizationId, params.builderId),
             )
             if (tenantBuilder) {
               const privateMetadata = tenantBuilder.privateMetadata as { topics?: string[]; country?: string; language?: string }
+              const claim = await findVerifiedBuilderClaim(tenantBuilder.identityId)
               return Response.json({
                 id: tenantBuilder.identityId,
                 source: tenantBuilder.source,
@@ -53,12 +55,23 @@ export const Route = createFileRoute('/api/builders/$builderId')({
                 language: privateMetadata.language ?? tenantBuilder.language,
                 country: privateMetadata.country ?? tenantBuilder.country,
                 topics: privateMetadata.topics ?? [],
+                isClaimed: Boolean(claim),
+                isVerified: Boolean(claim),
+                claimedByUserId: claim?.subjectUserId ?? null,
+                claimedAt: claim?.verifiedAt ?? null,
               })
             }
           }
           const builder = await findPublishedBuilderProfile(params.builderId)
           if (!builder) return Response.json({ error: 'Builder not found' }, { status: 404 })
-          return Response.json(builder)
+          const claim = await findVerifiedBuilderClaim(builder.id)
+          return Response.json({
+            ...builder,
+            isClaimed: Boolean(claim),
+            isVerified: Boolean(claim),
+            claimedByUserId: claim?.subjectUserId ?? null,
+            claimedAt: claim?.verifiedAt ?? null,
+          })
         } catch (error) {
           console.error('Builder fetch error:', error)
           return Response.json({ error: 'Failed to fetch builder' }, { status: 500 })
@@ -74,9 +87,11 @@ export const Route = createFileRoute('/api/builders/$builderId')({
           if (Object.keys(parsed.data).length === 0) {
             return Response.json({ error: 'No fields to update' }, { status: 400 })
           }
-          const updated = await withTenantContext(principal, (tx) =>
-            updateOrganizationBuilder(tx, principal.organizationId, params.builderId, parsed.data),
-          )
+          const updated = await withTenantContext(principal, async (tx) => {
+            const resolvedId = await resolveOrganizationBuilderId(tx, principal.organizationId, params.builderId)
+            if (!resolvedId) return null
+            return updateOrganizationBuilder(tx, principal.organizationId, resolvedId, parsed.data)
+          })
           if (!updated) return Response.json({ error: 'Builder not found' }, { status: 404 })
           return Response.json(updated)
         } catch (error) {
@@ -89,9 +104,11 @@ export const Route = createFileRoute('/api/builders/$builderId')({
       DELETE: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const deleted = await withTenantContext(principal, (tx) =>
-            deleteOrganizationBuilder(tx, principal.organizationId, params.builderId),
-          )
+          const deleted = await withTenantContext(principal, async (tx) => {
+            const resolvedId = await resolveOrganizationBuilderId(tx, principal.organizationId, params.builderId)
+            if (!resolvedId) return false
+            return deleteOrganizationBuilder(tx, principal.organizationId, resolvedId)
+          })
           if (!deleted) return Response.json({ error: 'Builder not found' }, { status: 404 })
           return Response.json({ success: true })
         } catch (error) {

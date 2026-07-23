@@ -150,6 +150,40 @@ export async function findOrganizationBuilderByIdentity(
 }
 
 /**
+ * Two id spaces exist for a tracked builder: `organizationBuilders.id`
+ * (== legacy `builders.id`, generated together — see `trackOrganizationBuilder`)
+ * and the global `builderIdentities.id`. Different call sites historically
+ * picked one or the other (GET /api/builders/:id resolves by identity id;
+ * PATCH/DELETE and the notes sub-routes resolve by organizationBuilders.id),
+ * so a value that works for one silently 404s on another. This tries both,
+ * identity id first since that's what the one working navigation path
+ * (Dashboard "Recent builders" -> builder profile) actually passes.
+ */
+export async function findOrganizationBuilderByEitherId(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+) {
+  const byIdentity = await findOrganizationBuilderByIdentity(transaction, organizationId, id)
+  if (byIdentity) return byIdentity
+  return findOrganizationBuilder(transaction, organizationId, id)
+}
+
+/**
+ * Resolves either id space down to the canonical `organizationBuilders.id`
+ * (the id `builders`/`builderNotes` rows are actually keyed on). See
+ * `findOrganizationBuilderByEitherId` for why both spaces need supporting.
+ */
+export async function resolveOrganizationBuilderId(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+): Promise<string | null> {
+  const row = await findOrganizationBuilderByEitherId(transaction, organizationId, id)
+  return row?.id ?? null
+}
+
+/**
  * Persists an AI enrichment artifact (plan: ai-profile-enrichment) into the
  * tracked builder's `privateMetadata.aiEnrichment` key, alongside any
  * existing topics/language/country overrides already stored there. Never
