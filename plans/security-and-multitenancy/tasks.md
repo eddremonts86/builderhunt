@@ -23,6 +23,47 @@
 > cutover, contract migration) which remain correctly blocked: `organization_id` is still nullable on
 > most tenant tables and `.env.example` still defaults both tenant migration modes to `legacy` pending
 > a real 24h zero-mismatch observation window in an actual deployed environment.
+>
+> **Update (2026-07-23)**: extended `scripts/db/verify-api-isolation-local.mjs` from the original
+> 4-route subset (saved-queries, alerts, builder tracking/notes) to 13 route groups — sprints
+> (list/detail/results), builder enrichment/evidence/claim, plans + plan-changes + request-upgrade,
+> builder export, organization team/members, dashboard stats/recent-builders/recommendations, plus
+> a direct check of the search-annotation tenant scoping shared by both search routes. Re-ran against
+> a fresh disposable local DB with the exact non-owner roles: `pnpm test:migrations:local` (25
+> migrations, idempotent), `pnpm exec drizzle-kit check` (clean), `pnpm test:api-isolation:local` →
+> 59/59 checks pass. **This run found and fixed a real, previously-undiscovered production bug**:
+> `sourcing_sprints`/`sprint_results` (drizzle/0015_loud_nitro.sql, plan `ai-sourcing-sprints`) were
+> created after the tenant-RLS migration (0008) and the worker-role migration (0010) and were never
+> added to either — RLS was never enabled and `builderhunt_app`/`builderhunt_worker` had **no grant at
+> all** on either table. Every sprint route (list/create/detail/results) and the sprints background
+> worker have been completely broken against the real least-privilege runtime roles since the feature
+> shipped; it had only ever been exercised against the owner role in dev/tests. Fixed with
+> `drizzle/0024_sourcing_sprints_grants.sql` (RLS + per-role policies + grants, mirroring the
+> `saved_queries`/`alerts` app-role pattern from 0008 and the `alerts`/`alert_triggers` worker-role
+> pattern from 0010). Remaining gap in this route-isolation subtask: admin tools and a handful of
+> subject-only `/api/me/**` routes (all separately confirmed to have a verified auth guard by
+> `pnpm security:route-coverage`) — see task 15's own progress notes below.
+>
+> **Update (2026-07-23, continued)**: while extending route coverage, ran a systematic diff of every
+> table in `schema.ts` against every `GRANT` statement across all migrations, cross-referenced against
+> which DB client each table's actual call sites use — the same failure mode that caught the sprints
+> bug above. Found **two more real, previously-undiscovered production bugs of the identical class**:
+> `builder_embeddings` (plan `semantic-search`) and `discovery_state` (plan `proactive-discovery`) are
+> both global non-tenant tables (correctly no RLS) written/read exclusively through `publicDb` (==
+> `env.DATABASE_URL` == the app role in production), but neither ever received a grant for
+> `builderhunt_app` in any migration. Every search/track request's write-through embedding indexing,
+> and the entire proactive-discovery worker, have been silently failing (caught and swallowed by a
+> try/catch, so no visible error to a user or caller) since these features shipped. Fixed with
+> `drizzle/0025_public_tables_app_grants.sql`. Verified directly against the exact `builderhunt_app`
+> role on a disposable DB (`INSERT`/`SELECT` on `builder_embeddings`, `INSERT`/`UPDATE`/`SELECT` on
+> `discovery_state` all succeed) and added 2 permanent regression checks to
+> `scripts/db/verify-api-isolation-local.mjs` (`checkPublicNonTenantTableGrants`) — full re-run:
+> `pnpm test:migrations:local` (26 migrations, idempotent), `drizzle-kit check` clean,
+> `pnpm test:api-isolation:local` → **61/61** checks pass. Also re-verified `pnpm type-check`,
+> `pnpm lint` (0 errors), `pnpm security:boundaries`/`security:route-coverage` (clean), and the full
+> test suite (638/638). This makes 3 for 3: every previously-unexercised app-role write path found so
+> far in this session had a missing grant — worth treating as a standing suspicion for any other table
+> that's only ever been tested against the DB owner role, not just the ones audited here.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
@@ -111,6 +152,10 @@ must include its tests and must not stage unrelated worktree changes.
     2. `user_consents`, `data_export_requests`, `deletion_requests`, `plan_changes`, `plan_requests`, `plans`, `builder_claim_requests`, `builder_profile_views`, and `roadmap_votes` had **no grant at all** for `builderhunt_app` in any migration — consent recording, data export, account deletion requests, plan self-service reads, and roadmap voting were all broken. Fixed with additive `drizzle/0020_account_subject_grants.sql`.
   - Progress (2026-07-22): fixed the `trackedBuilders` gap above — `loadAccountExportSource` now reads `builders` once per organization membership under that org's `withTenantContext`, flattening results. Fixing it surfaced that `organizationMemberships` in the same function, and `listOwnedOrganizations` (the guard in `legal.ts` that blocks deleting an account that still owns an organization), had the identical bug: reading RLS-forced `organization_members`/`organizations` via `accountDb` with no tenant context, silently returning zero rows. Both now read via `authDb`, which already has an unrestricted auth-broker policy on those two tables (better-auth needs it to list switchable orgs) — no chicken-and-egg tenant-context problem, no new RLS policy needed. `listOwnedOrganizations` returning `[]` unconditionally meant a team owner could delete their own account and orphan the organization for every other member; this is now blocked correctly. Isolation script's presence check for `trackedBuilders` restored — 19/19 pass against the real disposable DB with exact roles.
   - Progress (2026-07-22): `scripts/check-route-coverage.mjs` (task 2) confirms every one of the ~34 API routes has a verified auth guard, and `pnpm security:boundaries` confirms every private repository is tenant-scoped (0 legacy imports) — the code-level migration this task calls for is done. What's left is test breadth: the isolation script now also covers builder notes (own/other create+list) — 23/23 checks pass. Building it caught a fixture-fidelity gap, not a product bug: `builder_notes.builder_id` still FKs to the legacy `builders` table (the identity split never repointed it, correctly deferred until cutover), and real rows satisfy that FK only because `trackOrganizationBuilder` always dual-writes both tables under the same id — my synthetic seed hadn't mirrored that invariant. Still open: extending the same real-route-handler pattern to the rest of the ~34-route inventory (search, sprints, enrichment, evidence, claims, plans, etc.) — each addition is mechanical at this point, not blocked on any design question.
+  - Progress (2026-07-23, real disposable-DB run against the exact non-owner roles): extended the isolation script to 13 route groups — search-annotation scoping (`getTrackedBuilderIds`, tested directly since both search routes otherwise only front live external network calls), sprints (list/detail/results — own/other/random-id matrix), builder enrichment + evidence (list/review) + evidence-refresh (all keyed on `builderIdentityId`, not `organizationBuilders.id` — confirmed org A gets 404 against org B's tracked identity), builder claim (create + verify, confirmed a claim token is scoped to its creating user, not just its creating org), plans/me + plan-changes + request-upgrade (subject-scoped, not org-scoped — confirmed each user only ever sees their own history), builder export (CSV never contains the other org's builder), organization team snapshot + member role-change/removal (confirmed org A's owner gets 404 targeting a user who is only a member of org B — `findMembership` correctly scopes by `(targetUserId, organizationId)`), and dashboard stats/recent-builders/recommendations/track. `pnpm test:api-isolation:local` → 59/59 checks pass.
+  - **Real bug found and fixed by this pass**: `sourcing_sprints`/`sprint_results` had zero grants for `builderhunt_app`/`builderhunt_worker` and RLS was never enabled on either table — the entire ai-sourcing-sprints feature (routes and worker alike) has been non-functional against the real least-privilege runtime roles since it shipped in `drizzle/0015_loud_nitro.sql`, undetected because dev/tests only ever ran against the owner role. Fixed with `drizzle/0024_sourcing_sprints_grants.sql`. Caught immediately on the first isolation run after adding sprint coverage (`permission denied for table sourcing_sprints`), not from code review — direct evidence for why this task's remaining test-breadth work still matters even though every route already has a verified auth guard.
+  - Also fixed en route: the isolation script itself left several previously-untouched pooled DB clients (`platformDb`, `authDb`, `workerDb` — newly exercised by the plans/claim/members checks) open at exit, which stalled process termination indefinitely; added an explicit `process.exit()` after `owner.end()` so the script (and the CI step running it) terminates promptly regardless of what a given check transitively imports.
+  - Still open: admin tools (`/api/admin/**`) and a few subject-only `/api/me/**` routes (data-export, delete-account, restrict-processing) not yet covered by a real-route-handler isolation check — all separately confirmed to have a verified auth guard by `pnpm security:route-coverage`, so this is test breadth, not a known gap in guards.
 
 - [x] **Harden HTTP, secrets, logs, dependencies, and AI tenant boundaries**
   - Files: `src/shared/lib/env.ts`, `src/shared/lib/rate-limit.ts`, `src/shared/lib/security/headers.ts`, `src/shared/lib/security/audit.ts`, `src/shared/lib/ai/cache.ts`, `src/shared/lib/ai/budget.ts`, `server.prod.mjs`, `.github/dependabot.yml`

@@ -96,6 +96,14 @@
     "0023_organization_deletion_requests": {
       "sql": "68c29065d9fd6a674abab3b2737e246bc3a6410c6345b747c582f868cf10a93e",
       "snapshot": "04d1516508b973127ddf6c96faa9f5fc0ced7e0eb46adf5b44aa87ab235517ef"
+    },
+    "0024_sourcing_sprints_grants": {
+      "sql": "6c3bc56ead5f749f4959584fc3ab12eb2faaa0182aaff0439565bd7ac89de1ea",
+      "snapshot": "391ac518169dfb8dcabf78212b0dd026e8b88851205d2a711206d4337aefa802"
+    },
+    "0025_public_tables_app_grants": {
+      "sql": "2d873ebae41854fc20599bc83ac74e55fe9e8d33873b2d08e7a68a5cacb185c1",
+      "snapshot": "5749f3ca52dbc65f77221f11741b722451c5c60a728b032bf4fb6cb76487c570"
     }
   }
 }

@@ -4,14 +4,19 @@
 // so RLS is genuinely enforced end-to-end — the same failure mode a bug in
 // `withTenantContext`/RLS policy would actually produce in production.
 //
-// Scope: covers saved-queries, organization-alerts, builder tracking, and
-// builder notes (four representative tenant-private resources),
-// account-export privacy isolation, and alerts-worker cross-organization
-// data isolation. This is NOT the full ~34-route inventory in
-// src/routes/api/** — see plans/security-and-multitenancy/tasks.md task 15
-// for what remains; every route in that inventory does have a verified auth
-// guard per scripts/check-route-coverage.mjs, so the gap here is test
-// breadth, not missing guards.
+// Scope: saved-queries, organization-alerts, builder tracking/notes/claim,
+// sprints (list/detail/results), builder enrichment/evidence, plans/plan-changes,
+// builder export, organization team/members, dashboard stats/recent-builders/
+// recommendations, account-export privacy, and alerts-worker cross-organization
+// isolation. Still not the full ~34-route inventory in src/routes/api/** — see
+// plans/security-and-multitenancy/tasks.md task 15 for what remains (mainly
+// admin tools and a few subject-only `/api/me/**` routes not covered above);
+// every route in that inventory does have a verified auth guard per
+// scripts/check-route-coverage.mjs, so the gap here is test breadth, not
+// missing guards. Routes that only front a live external network call
+// (search, sprint preview) are exercised via the tenant-scoped logic they
+// actually own (e.g. the tracked-annotation map) rather than the full HTTP
+// handler, to keep this fast and deterministic.
 //
 // Required env (set by the caller before running):
 //   DATABASE_URL             -> builderhunt_app role connection
@@ -38,6 +43,11 @@ for (const key of requiredEnv) {
   }
 }
 
+// `env.ts` parses `process.env` once at module load and freezes the result,
+// so this must be set before anything (even transitively) imports it —
+// i.e. before the first dynamic `import()` of a route handler below.
+process.env.ENRICHMENT_ENABLED = 'true'
+
 const owner = postgres(process.env.OWNER_SEED_URL, { max: 1, prepare: false })
 
 const IDS = {
@@ -55,6 +65,14 @@ const IDS = {
   trackedB: 'iso-tracked-b',
   legacyBuilderA: 'iso-legacy-builder-a',
   legacyBuilderB: 'iso-legacy-builder-b',
+  sprintA: 'iso-sprint-a',
+  sprintB: 'iso-sprint-b',
+  sprintResultA: 'iso-sprint-result-a',
+  enrichmentJobA: 'iso-enrichment-job-a',
+  evidenceA: 'aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa',
+  planChangeA: 'iso-plan-change-a',
+  planChangeB: 'iso-plan-change-b',
+  recsQueryA: 'iso-recs-query-a',
 }
 
 async function seed() {
@@ -128,6 +146,48 @@ async function seed() {
       (${IDS.alertB}, ${IDS.orgB}, ${IDS.userB}, 'Alert B', '[]'::jsonb, true,
        ${owner.json({ eventType: 'any_activity', builderId: IDS.legacyBuilderB })}, 'dashboard', now() - interval '1 hour')
   `
+  await owner`
+    insert into sourcing_sprints (id, organization_id, creator_user_id, name, criteria, variants, status, quota, cursor, created_at)
+    values
+      (${IDS.sprintA}, ${IDS.orgA}, ${IDS.userA}, 'Sprint A', '{}'::jsonb, '[]'::jsonb, 'active', 200, '{"variantIndex":0,"page":1}'::jsonb, now()),
+      (${IDS.sprintB}, ${IDS.orgB}, ${IDS.userB}, 'Sprint B', '{}'::jsonb, '[]'::jsonb, 'active', 200, '{"variantIndex":0,"page":1}'::jsonb, now())
+  `
+  await owner`
+    insert into sprint_results (id, organization_id, sprint_id, source, source_id, profile, matched_variant, score, created_at)
+    values (${IDS.sprintResultA}, ${IDS.orgA}, ${IDS.sprintA}, 'github', 'iso-sprint-result-a', '{}'::jsonb, 'v1', 80, now())
+  `
+  // Enrichment/evidence FK to (organization_id, builder_identity_id) on
+  // organization_builders — reuses trackedA/identityA seeded above.
+  await owner`
+    insert into enrichment_jobs (
+      id, organization_id, builder_identity_id, requested_by_user_id, trigger, status,
+      requested_connectors, submitted_urls, created_at, updated_at
+    ) values (
+      ${IDS.enrichmentJobA}, ${IDS.orgA}, ${IDS.identityA}, ${IDS.userA}, 'manual', 'succeeded',
+      '[]'::jsonb, '[]'::jsonb, now(), now()
+    )
+  `
+  await owner`
+    insert into enrichment_evidence (
+      id, organization_id, job_id, builder_identity_id, connector, acquisition_mode, source_url,
+      content_hash, payload, confidence_bps, resolver_version, score_components, match_signals,
+      contradictions, resolution, observed_at, expires_at, created_at
+    ) values (
+      ${IDS.evidenceA}, ${IDS.orgA}, ${IDS.enrichmentJobA}, ${IDS.identityA}, 'github', 'public_api',
+      'https://github.com/iso-a', 'iso-evidence-hash-a', ${owner.json({})}, 9000, 1, ${owner.json({})},
+      '[]'::jsonb, '[]'::jsonb, 'review', now(), now() + interval '30 days', now()
+    )
+  `
+  await owner`
+    insert into plan_changes (id, user_id, from_plan, to_plan, changed_by, reason, created_at)
+    values
+      (${IDS.planChangeA}, ${IDS.userA}, 'free', 'pro', ${IDS.userA}, 'iso test A', now()),
+      (${IDS.planChangeB}, ${IDS.userB}, 'free', 'pro', ${IDS.userB}, 'iso test B', now())
+  `
+  // `recsQueryA` is NOT seeded here — checkRecommendationsScoping inserts it
+  // itself, lazily, right before it runs. Seeding it up front would give org
+  // A two saved_queries rows for the whole run, breaking checkSavedQueries'
+  // "A sees only A's query" (length === 1) assertion, which runs earlier.
 }
 
 // better-auth signs the session_token cookie with HMAC-SHA256(secret, token)
@@ -288,6 +348,316 @@ async function checkBuilderNotes() {
   record('builder notes: A sees A\'s own note', Array.isArray(listOwn) && listOwn.length === 1 && listOwn[0].content === 'A\'s own note', JSON.stringify(listOwn))
 }
 
+// Both search routes only annotate global (public) search results with a
+// per-org `tracked`/`trackedRowId` flag via getTrackedBuilderIds — they don't
+// otherwise touch tenant-private tables. The results themselves come from
+// live external APIs (GitHub, HN, etc.), so exercising the full HTTP routes
+// here would be slow/flaky and net-dependent. This tests the actual scoping
+// logic those routes share directly against the disposable DB instead.
+async function checkSearchTrackedAnnotationScoping() {
+  const { requireTenantPrincipal } = await import('../../src/shared/lib/auth/tenant-principal.ts')
+  const { withTenantContext } = await import('../../src/shared/lib/db/tenant-context.ts')
+  const { getTrackedBuilderIds, trackedKey } = await import('../../src/shared/lib/tracked-builders.ts')
+
+  const principalA = await requireTenantPrincipal(sessionRequest('iso-session-token-a', 'https://iso.test/api/search/builders'))
+  const trackedA = await withTenantContext(principalA, (tx) => getTrackedBuilderIds(tx, principalA.organizationId))
+  record(
+    'search annotation: org A\'s tracked-id map has A\'s identity but not B\'s',
+    trackedA.has(trackedKey('github', 'iso-a')) && !trackedA.has(trackedKey('github', 'iso-b')),
+    JSON.stringify(Array.from(trackedA.keys())),
+  )
+
+  const principalB = await requireTenantPrincipal(sessionRequest('iso-session-token-b', 'https://iso.test/api/search/builders'))
+  const trackedB = await withTenantContext(principalB, (tx) => getTrackedBuilderIds(tx, principalB.organizationId))
+  record(
+    'search annotation: org B\'s tracked-id map has B\'s identity but not A\'s',
+    trackedB.has(trackedKey('github', 'iso-b')) && !trackedB.has(trackedKey('github', 'iso-a')),
+    JSON.stringify(Array.from(trackedB.keys())),
+  )
+}
+
+// `builder_embeddings` and `discovery_state` are global non-tenant tables
+// (no organization_id, no RLS) written/read exclusively through `publicDb`
+// (== `env.DATABASE_URL` == the app role in production) from the
+// semantic-search write-through pipeline and the proactive-discovery worker
+// respectively. Both had zero grants for `builderhunt_app` in any migration
+// until drizzle/0025_public_tables_app_grants.sql — every write from every
+// search/track request, and the entire discovery worker, silently failed
+// and was swallowed by a try/catch. This check exists purely to keep that
+// fixed: not a tenant-isolation property (nothing here is org-scoped), just
+// "the app role can actually read and write its own public tables."
+async function checkPublicNonTenantTableGrants() {
+  const { upsertBuilderEmbeddingStub, findPendingBuilderEmbeddings } = await import('../../src/shared/lib/repositories/public-builder-embeddings.ts')
+  const stubSourceId = 'iso-embedding-smoke'
+  await upsertBuilderEmbeddingStub({
+    source: 'github',
+    sourceId: stubSourceId,
+    document: 'iso smoke-test document',
+    contentHash: 'iso-smoke-hash',
+    profile: { username: stubSourceId, source: 'github', sourceId: stubSourceId },
+  })
+  const pending = await findPendingBuilderEmbeddings(1000)
+  record(
+    'builder_embeddings: app role can insert and read back its own stub row',
+    pending.some((row) => row.id && row.document === 'iso smoke-test document'),
+    JSON.stringify(pending.find((row) => row.document === 'iso smoke-test document') ?? null),
+  )
+
+  const { getDiscoveryState } = await import('../../src/shared/lib/repositories/discovery-state.ts')
+  const { publicDb } = await import('../../src/shared/lib/db/client.ts')
+  const { discoveryState } = await import('../../src/shared/lib/db/schema.ts')
+  const { eq } = await import('drizzle-orm')
+  await publicDb.insert(discoveryState).values({ id: 'default', cursor: 0 }).onConflictDoNothing()
+  await publicDb.update(discoveryState).set({ cursor: 7 }).where(eq(discoveryState.id, 'default'))
+  const state = await getDiscoveryState()
+  record('discovery_state: app role can insert, update, and read the singleton row', state?.cursor === 7, JSON.stringify(state))
+}
+
+async function checkSprints() {
+  const { Route: ListRoute } = await import('../../src/routes/api/sprints/index.ts')
+  const { GET: listGET } = ListRoute.options.server.handlers
+
+  const listA = await (await listGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints') })).json()
+  record('sprints: A sees only A\'s sprint', Array.isArray(listA) && listA.length === 1 && listA[0].id === IDS.sprintA, JSON.stringify(listA.map((s) => s.id)))
+
+  const { Route: DetailRoute } = await import('../../src/routes/api/sprints/$sprintId.ts')
+  const { GET, PATCH, DELETE } = DetailRoute.options.server.handlers
+
+  const getOther = await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x'), params: { sprintId: IDS.sprintB } })
+  record('sprints: A cannot GET B\'s sprint (other id)', getOther.status === 404, `status=${getOther.status}`)
+
+  const getRandom = await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x'), params: { sprintId: 'nonexistent-random-id' } })
+  record('sprints: A cannot GET a random sprint id', getRandom.status === 404, `status=${getRandom.status}`)
+
+  const getOwn = await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x'), params: { sprintId: IDS.sprintA } })
+  record('sprints: A can GET A\'s own sprint', getOwn.status === 200, `status=${getOwn.status}`)
+
+  const patchOther = await PATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x', { method: 'PATCH', body: JSON.stringify({ name: 'hijacked' }) }),
+    params: { sprintId: IDS.sprintB },
+  })
+  record('sprints: A cannot PATCH B\'s sprint (other id)', patchOther.status === 404, `status=${patchOther.status}`)
+
+  const deleteOther = await DELETE({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x', { method: 'DELETE' }),
+    params: { sprintId: IDS.sprintB },
+  })
+  record('sprints: A cannot DELETE B\'s sprint (other id)', deleteOther.status === 404, `status=${deleteOther.status}`)
+
+  const { Route: ResultsRoute } = await import('../../src/routes/api/sprints/$sprintId/results.ts')
+  const { GET: resultsGET } = ResultsRoute.options.server.handlers
+
+  const resultsOther = await resultsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x/results'), params: { sprintId: IDS.sprintB } })
+  record('sprints: A cannot read B\'s sprint results (other id)', resultsOther.status === 404, `status=${resultsOther.status}`)
+
+  const resultsOwn = await (await resultsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/sprints/x/results'), params: { sprintId: IDS.sprintA } })).json()
+  record('sprints: A sees A\'s own sprint result', Array.isArray(resultsOwn.items) && resultsOwn.items.length === 1, JSON.stringify(resultsOwn))
+}
+
+async function checkEnrichmentAndEvidence() {
+  const { Route: EnrichmentRoute } = await import('../../src/routes/api/builders/$builderId/enrichment.ts')
+  const { GET: enrichmentGET } = EnrichmentRoute.options.server.handlers
+
+  const getOther = await enrichmentGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/enrichment'), params: { builderId: IDS.identityB } })
+  record('enrichment: A cannot fetch enrichment for B\'s tracked identity (other id)', getOther.status === 404, `status=${getOther.status}`)
+
+  const getRandom = await enrichmentGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/enrichment'), params: { builderId: 'nonexistent-random-id' } })
+  record('enrichment: A cannot fetch enrichment for a random identity', getRandom.status === 404, `status=${getRandom.status}`)
+
+  const getOwn = await enrichmentGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/enrichment'), params: { builderId: IDS.identityA } })
+  const getOwnBody = await getOwn.json()
+  record('enrichment: A can fetch A\'s own tracked identity (insufficient signal, no AI call)', getOwn.status === 200 && getOwnBody.insufficient === true, JSON.stringify(getOwnBody))
+
+  const { Route: EvidenceListRoute } = await import('../../src/routes/api/builders/$builderId/evidence/index.ts')
+  const { GET: evidenceListGET } = EvidenceListRoute.options.server.handlers
+
+  const evidenceOther = await (await evidenceListGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/builders/x/evidence'), params: { builderId: IDS.identityA } })).json()
+  record('evidence: B\'s org has no evidence rows for A\'s identity', Array.isArray(evidenceOther.evidence) && evidenceOther.evidence.length === 0, JSON.stringify(evidenceOther))
+
+  const evidenceOwn = await (await evidenceListGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/evidence'), params: { builderId: IDS.identityA } })).json()
+  record('evidence: A sees A\'s own evidence', Array.isArray(evidenceOwn.evidence) && evidenceOwn.evidence.length === 1 && evidenceOwn.evidence[0].id === IDS.evidenceA, JSON.stringify(evidenceOwn))
+
+  const { Route: EvidenceReviewRoute } = await import('../../src/routes/api/builders/$builderId/evidence/$evidenceId.ts')
+  const { PATCH: evidencePATCH } = EvidenceReviewRoute.options.server.handlers
+
+  const reviewByB = await evidencePATCH({
+    request: sessionRequest('iso-session-token-b', 'https://iso.test/api/builders/x/evidence/x', { method: 'PATCH', body: JSON.stringify({ resolution: 'accepted' }) }),
+    params: { builderId: IDS.identityA, evidenceId: IDS.evidenceA },
+  })
+  record('evidence: B (org B owner) cannot review A\'s evidence (other org)', reviewByB.status === 404, `status=${reviewByB.status}`)
+
+  const reviewByA = await evidencePATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/evidence/x', { method: 'PATCH', body: JSON.stringify({ resolution: 'accepted' }) }),
+    params: { builderId: IDS.identityA, evidenceId: IDS.evidenceA },
+  })
+  record('evidence: A (org A owner) can review A\'s own evidence', reviewByA.status === 200, `status=${reviewByA.status}`)
+
+  const { Route: RefreshRoute } = await import('../../src/routes/api/builders/$builderId/evidence-refresh.ts')
+  const { POST: refreshPOST } = RefreshRoute.options.server.handlers
+
+  const refreshOther = await refreshPOST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/evidence-refresh', {
+      method: 'POST',
+      body: JSON.stringify({ connectors: ['github'], submittedUrls: [] }),
+    }),
+    params: { builderId: IDS.identityB },
+  })
+  record('evidence-refresh: A cannot enqueue a job for B\'s tracked identity (other id)', refreshOther.status === 404, `status=${refreshOther.status}`)
+}
+
+async function checkBuilderClaim() {
+  const { Route: ClaimRoute } = await import('../../src/routes/api/builders/$builderId/claim.ts')
+  const { POST } = ClaimRoute.options.server.handlers
+
+  const claimResp = await POST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/claim', {
+      method: 'POST',
+      body: JSON.stringify({ email: 'iso-a@test.invalid' }),
+    }),
+    params: { builderId: IDS.identityA },
+  })
+  const claimBody = await claimResp.json()
+  record('claim: A can start a claim using A\'s own session email', claimResp.status === 200 && claimBody.ok === true && typeof claimBody.devLink === 'string', JSON.stringify(claimBody))
+
+  const token = claimBody.devLink ? new URL(claimBody.devLink).searchParams.get('token') : null
+
+  const { Route: VerifyRoute } = await import('../../src/routes/api/builders/claim/verify.ts')
+  const { GET: verifyGET } = VerifyRoute.options.server.handlers
+
+  const verifyByB = await verifyGET({
+    request: sessionRequest('iso-session-token-b', `https://iso.test/api/builders/claim/verify?token=${encodeURIComponent(token ?? '')}`),
+  })
+  const verifyByBLocation = verifyByB.headers.get('Location') ?? ''
+  record('claim: B cannot verify A\'s claim token (wrong subject)', verifyByB.status === 302 && verifyByBLocation.includes('claimError'), `status=${verifyByB.status} location=${verifyByBLocation}`)
+
+  const verifyByA = await verifyGET({
+    request: sessionRequest('iso-session-token-a', `https://iso.test/api/builders/claim/verify?token=${encodeURIComponent(token ?? '')}`),
+  })
+  const verifyByALocation = verifyByA.headers.get('Location') ?? ''
+  record('claim: A can verify A\'s own claim token', verifyByA.status === 302 && verifyByALocation.startsWith('/me?claimed=1'), `status=${verifyByA.status} location=${verifyByALocation}`)
+}
+
+async function checkPlansAndPlanChanges() {
+  const { Route: PlanMeRoute } = await import('../../src/routes/api/plans/me.ts')
+  const { GET: planMeGET } = PlanMeRoute.options.server.handlers
+
+  const planA = await (await planMeGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/plans/me') })).json()
+  record('plans/me: A\'s seatsUsed reflects only org A\'s membership', planA.plan?.seatsUsed === 1, JSON.stringify(planA.plan))
+
+  const { Route: PlanChangesRoute } = await import('../../src/routes/api/me/plan-changes/index.ts')
+  const { GET: planChangesGET } = PlanChangesRoute.options.server.handlers
+
+  const changesA = await (await planChangesGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/plan-changes') })).json()
+  record('plan-changes: A sees only A\'s own plan-change history', Array.isArray(changesA) && changesA.length === 1 && changesA[0].id === IDS.planChangeA, JSON.stringify(changesA))
+
+  const changesB = await (await planChangesGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/plan-changes') })).json()
+  record('plan-changes: B sees only B\'s own plan-change history', Array.isArray(changesB) && changesB.length === 1 && changesB[0].id === IDS.planChangeB, JSON.stringify(changesB))
+
+  const { Route: RequestUpgradeRoute } = await import('../../src/routes/api/plans/request-upgrade.ts')
+  const { POST: requestUpgradePOST } = RequestUpgradeRoute.options.server.handlers
+
+  const upgradeResp = await requestUpgradePOST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/plans/request-upgrade', {
+      method: 'POST',
+      body: JSON.stringify({ requestedPlan: 'pro' }),
+    }),
+  })
+  const upgradeBody = await upgradeResp.json()
+  record('plan request-upgrade: A can request an upgrade', upgradeResp.status === 200 && upgradeBody.ok === true, JSON.stringify(upgradeBody))
+
+  const [requestRow] = await owner`select user_id from plan_requests where id = ${upgradeBody.id}`
+  record('plan request-upgrade: stored request is owned by A, not B', requestRow?.user_id === IDS.userA, JSON.stringify(requestRow))
+}
+
+async function checkExportBuilders() {
+  const { Route } = await import('../../src/routes/api/export/builders.ts')
+  const { GET } = Route.options.server.handlers
+
+  const csvA = await (await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/export/builders') })).text()
+  record('export: A\'s CSV contains A\'s tracked builder', csvA.includes('iso-a'), csvA.slice(0, 200))
+  record('export: A\'s CSV never contains B\'s tracked builder', !csvA.includes('iso-b'), csvA.slice(0, 200))
+}
+
+async function checkOrganizationTeamAndMembers() {
+  const { Route: TeamRoute } = await import('../../src/routes/api/organizations/team.ts')
+  const { GET: teamGET } = TeamRoute.options.server.handlers
+
+  const snapshotA = await (await teamGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/organizations/team') })).json()
+  const memberIdsA = (snapshotA.members ?? []).map((m) => m.userId)
+  record('team: org A snapshot lists only A\'s member, not B\'s', memberIdsA.includes(IDS.userA) && !memberIdsA.includes(IDS.userB), JSON.stringify(memberIdsA))
+
+  const { Route: MembersRoute } = await import('../../src/routes/api/organizations/members/$memberId.ts')
+  const { PATCH: memberPATCH, DELETE: memberDELETE } = MembersRoute.options.server.handlers
+
+  const patchCrossOrg = await memberPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/organizations/members/x', { method: 'PATCH', body: JSON.stringify({ role: 'admin' }) }),
+    params: { memberId: IDS.userB },
+  })
+  record('members: A (org A owner) cannot change role of B (not a member of org A)', patchCrossOrg.status === 404, `status=${patchCrossOrg.status}`)
+
+  const deleteCrossOrg = await memberDELETE({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/organizations/members/x', { method: 'DELETE' }),
+    params: { memberId: IDS.userB },
+  })
+  record('members: A (org A owner) cannot remove B (not a member of org A)', deleteCrossOrg.status === 404, `status=${deleteCrossOrg.status}`)
+}
+
+async function checkDashboardStatsAndRecent() {
+  const { Route: StatsRoute } = await import('../../src/routes/api/dashboard/stats.ts')
+  const { GET: statsGET } = StatsRoute.options.server.handlers
+
+  const statsA = await (await statsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/dashboard/stats') })).json()
+  record('dashboard stats: A gets an org-scoped stats object, not an error', statsA && typeof statsA === 'object' && !('error' in statsA), JSON.stringify(statsA))
+
+  const { Route: RecentRoute } = await import('../../src/routes/api/builders/recent/index.ts')
+  const { GET: recentGET } = RecentRoute.options.server.handlers
+
+  const recentA = await (await recentGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/recent') })).json()
+  record('recent builders: A sees only A\'s tracked builder, not B\'s', Array.isArray(recentA) && recentA.length === 1 && recentA[0].identityId === IDS.identityA, JSON.stringify(recentA))
+
+  const { Route: TrackRoute } = await import('../../src/routes/api/builders/track.ts')
+  const { POST: trackPOST } = TrackRoute.options.server.handlers
+
+  const trackNew = await trackPOST({
+    request: sessionRequest('iso-session-token-b', 'https://iso.test/api/builders/track', {
+      method: 'POST',
+      body: JSON.stringify({
+        source: 'github',
+        sourceId: 'iso-new-tracked',
+        username: 'iso-new-tracked',
+        profileUrl: 'https://github.com/iso-new-tracked',
+      }),
+    }),
+  })
+  const trackNewBody = await trackNew.json()
+  record('track: B can track a new builder into B\'s own org', trackNew.status === 200 && trackNewBody.tracked === true, JSON.stringify(trackNewBody))
+
+  const recentAAfter = await (await recentGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/recent') })).json()
+  record('recent builders: A still sees only A\'s builder after B tracks a new one', Array.isArray(recentAAfter) && recentAAfter.length === 1 && recentAAfter[0].identityId === IDS.identityA, JSON.stringify(recentAAfter))
+}
+
+// Inserts its own keyword-less saved query right before running (not in the
+// global seed()) — org A's original `queryA` has real keywords and is
+// deleted by checkSavedQueries earlier, so by this point org A has zero
+// saved queries; adding one here, lazily, keeps basedOnSearches
+// deterministic without giving checkSavedQueries' earlier "sees only A's
+// query" (length === 1) assertion a second row to trip over. Keyword-less
+// so the route never reaches the live external search pipeline. org B is
+// not called here for the same reason — `queryB` (seeded in seed(), never
+// deleted) has real keywords and would trigger a live network search.
+async function checkRecommendationsScoping() {
+  await owner`
+    insert into saved_queries (id, organization_id, user_id, name, keywords, sources, created_at)
+    values (${IDS.recsQueryA}, ${IDS.orgA}, ${IDS.userA}, 'Recs A (no keywords)', '[]'::jsonb, '[]'::jsonb, now())
+  `
+
+  const { Route } = await import('../../src/routes/api/recommendations/index.ts')
+  const { GET } = Route.options.server.handlers
+
+  const recsA = await (await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/recommendations') })).json()
+  record('recommendations: A\'s basedOnSearches reflects only A\'s own saved queries', recsA.meta?.basedOnSearches === 1, JSON.stringify(recsA.meta))
+}
+
 async function checkAccountExportPrivacy() {
   const { buildExportPayload } = await import('../../src/shared/lib/legal.ts')
   const payloadA = await buildExportPayload(IDS.userA)
@@ -335,6 +705,16 @@ async function main() {
   await checkAlerts()
   await checkBuilderTracking()
   await checkBuilderNotes()
+  await checkSearchTrackedAnnotationScoping()
+  await checkPublicNonTenantTableGrants()
+  await checkSprints()
+  await checkEnrichmentAndEvidence()
+  await checkBuilderClaim()
+  await checkPlansAndPlanChanges()
+  await checkExportBuilders()
+  await checkOrganizationTeamAndMembers()
+  await checkDashboardStatsAndRecent()
+  await checkRecommendationsScoping()
   await checkAccountExportPrivacy()
   await checkWorkerIsolation()
 
@@ -348,3 +728,12 @@ try {
 } finally {
   await owner.end({ timeout: 5 })
 }
+
+// Extending coverage beyond the original 4 routes pulled in route handlers
+// that transitively open their own long-lived pooled clients (platformDb,
+// authDb, workerDb — e.g. via better-auth's own session lookup, or
+// requestPlatformPlanUpgrade) that this script never explicitly closes.
+// Node's event loop won't drain on its own with those sockets still open,
+// so force a prompt exit now that every check + `owner.end()` above has
+// resolved, rather than leaving the process to hang indefinitely.
+process.exit(process.exitCode ?? 0)

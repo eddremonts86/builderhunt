@@ -16,7 +16,7 @@ export default defineConfig(() => ({
       '~': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  server: { port: 3000 },
+  server: { port: process.env.PORT ? Number(process.env.PORT) : 3000 },
   // @resvg/resvg-js ships a native .node binary (used server-side only, to
   // rasterize the OG image to PNG). Vite's dep optimizer tries to parse it
   // as JS and crashes — keep it out of pre-bundling entirely.
