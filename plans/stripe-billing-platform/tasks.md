@@ -1,6 +1,6 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (23/~40 tasks — §0-§6 complete: dependency contracts pinned, launch
+> **Status**: `in_progress` (29/~40 tasks — §0-§7 complete: dependency contracts pinned, launch
 > register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit tables
 > added in an additive migration with RLS/runtime-role grants applied and verified live,
 > backup/restore/rollback safety proven with checksum evidence, tenant-safe billing repositories/DTOs
@@ -15,8 +15,15 @@
 > the way), the pending-Checkout return experience (polls internal state only, never trusts the
 > redirect URL), and owner/recent-auth-gated restricted Customer Portal sessions; "Validate Stripe
 > Products and Prices" now DONE for the test sandbox — see the note below. §6 (webhooks/workers) is
-> now fully built: signed durable receipt, idempotent monotonic event handlers, and the claim/lease/
-> backoff/dead-letter worker with platform-admin-audited single-event replay.)
+> fully built: signed durable receipt, idempotent monotonic event handlers, and the claim/lease/
+> backoff/dead-letter worker with platform-admin-audited single-event replay. §7 (subscription
+> lifecycle) is now ALSO fully built: Stripe-driven entitlement projection (with a new Pro Max tier
+> widened through the legacy entitlement/AI-allowance/seat-limit system), the remaining-11-window
+> annual credit sweep, the full preview/change matrix (immediate upgrades with ceiling-delta credits,
+> scheduled downgrades, a fingerprint-based stale-preview guard), Team-downgrade seat blockers,
+> owner cancellation and a renewal-safe price-migration timing engine, and seven-day dunning/recovery
+> (grant freeze/unfreeze, organization-wide payment-blocked gate). §8 (packs, risk, refunds, disputes)
+> is next.)
 >
 > **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
 > A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
@@ -738,10 +745,69 @@
     `pnpm type-check`/`pnpm lint` (0 errors)/`pnpm security:boundaries`/route-coverage (86 routes, 8
     allowlisted — unchanged, confirming the new route is correctly auth-gated) all clean.
 
-- [ ] **Implement seven-day dunning and recovery**
+- [x] **Implement seven-day dunning and recovery**
   - Files: `src/shared/lib/billing/dunning.ts`, `src/shared/lib/billing/dunning.test.ts`, `src/shared/lib/billing/worker.ts`, `src/shared/lib/repositories/entitlements.ts`
   - Do: Record first failure/grace end, keep access in grace, send deduplicated notices, block/freeze after seven days, preserve packs/data/export, restore only still-valid grants after payment, and suspend non-owner Team access without deleting membership.
   - Verify: boundary-time/Test Clock cases cover first/repeated failure, recovery before/at/after deadline, cancellation, late paid event, and no new premium reservation after block.
+  - Progress (2026-07-23): "Record first failure/grace end" and "deduplicated notices" were already
+    fully covered by task 6.2's `markBillingSubscriptionGraceStart` (set-once guard: a repeated
+    failure during the SAME grace window never resets the clock or re-triggers anything) — this task
+    builds everything AFTER that marker exists. New `dunning.ts`: `shouldBlockForNonPayment(candidate,
+    now)` is pure (true only once grace has run out AND the subscription isn't already blocked —
+    itself the idempotency guarantee, not just a side effect of the caller's own bookkeeping);
+    `freezeIncludedGrantsForNonPayment` freezes every active "included" grant
+    (`subscription_monthly`/`subscription_annual_window`/`subscription_upgrade_delta`) via the
+    already-built `credits.ts.freezeCreditGrant`, deliberately leaving `pack`-sourced grants
+    completely untouched (spec.md: "preserves purchased grants but makes them unusable" — packs stay
+    `active` state-wise, becoming unusable purely as a side effect of the NEW organization-level
+    `paymentBlocked` gate below, not a per-grant mutation); `unfreezeStillValidGrantsOnRecovery`
+    unfreezes still-valid frozen grants but correctly `expireCreditGrant`s (never unfreezes) one whose
+    expiry passed WHILE frozen — "restore only still-valid grants" taken literally.
+    New `worker.ts` sweep (`sweepNonPaymentBlocks`, new `listGracePeriodBillingSubscriptions` query in
+    `repositories/billing-worker.ts`) blocks each subscription whose grace has run out exactly once
+    (new `markBillingSubscriptionPaymentBlocked`, set-once guard mirroring `markBillingSubscriptionGraceStart`'s
+    own). Recovery is wired into the EXISTING `handleSubscriptionUpsert` call site (webhook-handlers.ts)
+    that already clears grace on an active/trialing status update — extended to also
+    `unfreezeStillValidGrantsOnRecovery` when the subscription was blocked, then clear BOTH the grace
+    and block markers via a new `clearBillingSubscriptionPaymentBlock` (replacing the narrower
+    `clearBillingSubscriptionGrace`) — chosen over a separate worker-driven recovery path so recovery
+    is as prompt as the webhook that reports it, matching every other real-time state transition this
+    plan already drives from webhooks rather than the next worker tick.
+    **"Blocks new premium work" required reconciling with task 7.1's own entitlement projection**:
+    `organization_entitlements.status` is driven purely by Stripe's raw subscription status, and real
+    Stripe dunning typically keeps a subscription `active` through automatic retries (spec.md:
+    "Configure Stripe retries inside that window") — so `payment_blocked` is a genuinely SEPARATE
+    signal from `status`, not a special case of it. `entitlements.ts`'s `EntitlementPolicy` gained a
+    `paymentBlocked` field and `getOrganizationEntitlement` now ALSO joins the organization's
+    non-canceled `billing_subscriptions` row for `paymentBlockedAt`, folding it into
+    `paidActionsAllowed` as a hard, independent override (`active && tier !== 'free' && !paymentBlocked`)
+    — every existing consumer of `paidActionsAllowed` (sprints, AI budget, search, saved queries,
+    builder tracking, alerts) is blocked automatically, with no route-level changes needed. Read paths
+    are untouched, satisfying "preserves all data/export access" for free.
+    **Scope decision on "suspend non-owner Team access without deleting membership"**: implemented as
+    the org-wide block above (every viewer, owner included, loses `paidActionsAllowed` equally) plus
+    the literal, verified guarantee that this module never reads or writes
+    `organization_members`/`organization_invitations` at all. A genuinely asymmetric owner-vs-non-owner
+    split isn't implemented — `EntitlementPolicy` has no per-viewer-role dimension anywhere in this
+    codebase today, and introducing one would mean threading the viewer's role through every existing
+    `getOrganizationEntitlement` call site, well beyond this task's own file list. Documented in
+    `dunning.ts`'s own module comment as a deliberate, bounded interpretation.
+    12 new `dunning.test.ts` tests (pure block-decision boundary cases including the exact grace-end
+    instant, freeze/unfreeze disposable-database integration, idempotency of both directions, the
+    expire-instead-of-unfreeze case), 4 new `worker.test.ts` integration tests (blocks once grace runs
+    out and freezes grants, never blocks before the boundary, a duplicate run never re-blocks, no
+    grace in progress never blocks), 1 new `webhook-handlers.test.ts` recovery test (active status
+    update clears the block and unfreezes a still-valid grant), 5 new `entitlements.test.ts` cases
+    (pure payment-blocked denial, default-false, free-tier-blocked-for-tier-not-block, and 3
+    disposable-database integration tests for the new join — not-blocked/blocked/ignores-a-canceled-
+    row's stale block flag). Full suite 840 total minus the same two pre-existing unrelated failures
+    (`catalog.test.ts`'s Price ID, `checkout.test.ts`'s already-confirmed-flaky concurrency test — 838
+    passing); `pnpm type-check`/`pnpm lint` (0 errors)/`pnpm security:boundaries`/route-coverage (86
+    routes, 8 allowlisted — unchanged, no new routes) all clean.
+
+**Section 7 (Subscription lifecycle) is now fully complete** — all 6 tasks (subscription/entitlement
+projection, annual credit windowing, preview/change matrix, seat blockers, cancellation/price
+migration, dunning/recovery) implemented, tested, and committed.
 
 ## 8. Packs, risk, refunds, and disputes
 

@@ -178,6 +178,31 @@ export async function listActiveAnnualBillingSubscriptions(
     ))
 }
 
+export interface GracePeriodBillingSubscriptionRecord {
+  stripeSubscriptionId: string
+  gracePeriodEndsAt: Date | null
+  paymentBlockedAt: Date | null
+}
+
+/** Every subscription currently in a grace period (payment-failure marker set) and not yet blocked — what the daily dunning sweep (plans/stripe-billing-platform/tasks.md §7 "Implement seven-day dunning and recovery") checks against `dunning.ts`'s `shouldBlockForNonPayment`. Already-blocked subscriptions are excluded here (not merely re-checked and no-op'd) so the sweep's own row count reflects real work, not repeats. */
+export async function listGracePeriodBillingSubscriptions(
+  transaction: WorkerTransaction,
+  organizationId: string,
+): Promise<GracePeriodBillingSubscriptionRecord[]> {
+  return transaction
+    .select({
+      stripeSubscriptionId: billingSubscriptions.stripeSubscriptionId,
+      gracePeriodEndsAt: billingSubscriptions.gracePeriodEndsAt,
+      paymentBlockedAt: billingSubscriptions.paymentBlockedAt,
+    })
+    .from(billingSubscriptions)
+    .where(and(
+      eq(billingSubscriptions.organizationId, organizationId),
+      sql`${billingSubscriptions.gracePeriodEndsAt} is not null`,
+      sql`${billingSubscriptions.paymentBlockedAt} is null`,
+    ))
+}
+
 export interface UpdateBillingSubscriptionFromStripeInput {
   stripeStatus: string
   currentPeriodStart: Date | null
@@ -226,6 +251,35 @@ export async function clearBillingSubscriptionGrace(
   await transaction
     .update(billingSubscriptions)
     .set({ gracePeriodEndsAt: null })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
+/** Records the block timestamp exactly once (an already-blocked row is left untouched) — `dunning.ts`'s worker sweep owns deciding WHEN to call this; this repository function only ever records the decision. */
+export async function markBillingSubscriptionPaymentBlocked(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+  paymentBlockedAt: Date,
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({ paymentBlockedAt })
+    .where(and(
+      eq(billingSubscriptions.organizationId, organizationId),
+      eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId),
+      sql`${billingSubscriptions.paymentBlockedAt} is null`,
+    ))
+}
+
+/** Clears both the block and any lingering grace marker on recovery — a recovered subscription is no longer "in grace" either, it's simply current. */
+export async function clearBillingSubscriptionPaymentBlock(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({ paymentBlockedAt: null, gracePeriodEndsAt: null })
     .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
 }
 

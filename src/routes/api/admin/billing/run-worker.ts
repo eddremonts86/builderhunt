@@ -29,6 +29,7 @@ export const Route = createFileRoute('/api/admin/billing/run-worker')({
               deadLetteredEvents: summary.deadLetteredEvents,
               expiredGrants: summary.expiredGrants,
               annualGrantsIssued: summary.annualGrantsIssued,
+              paymentBlocksApplied: summary.paymentBlocksApplied,
             },
           })
           return Response.json({
@@ -40,6 +41,7 @@ export const Route = createFileRoute('/api/admin/billing/run-worker')({
             deadLetteredEvents: summary.deadLetteredEvents,
             expiredGrants: summary.expiredGrants,
             annualGrantsIssued: summary.annualGrantsIssued,
+            paymentBlocksApplied: summary.paymentBlocksApplied,
           })
         } catch (err) {
           const response = platformAdminErrorResponse(err)

@@ -326,3 +326,83 @@ describe('runBillingWorker — annual subscription grant sweep', () => {
     expect(rowsAfterSecond).toHaveLength(2)
   })
 })
+
+describe('runBillingWorker — non-payment block sweep', () => {
+  async function seedGracePeriodSubscription(gracePeriodEndsAt: Date): Promise<{ organizationId: string; stripeSubscriptionId: string; customerId: string }> {
+    const organizationId = uniqueId('org')
+    await db.insert(organizations).values({ id: organizationId, name: organizationId, slug: organizationId, createdAt: new Date() })
+    const customerId = uniqueId('cust')
+    await db.insert(billingCustomers).values({ id: customerId, organizationId, livemode: false, stripeCustomerId: `cus_${customerId}` })
+    const stripeSubscriptionId = `sub_${uniqueId('sub')}`
+    await db.insert(billingSubscriptions).values({
+      id: uniqueId('subrow'), organizationId, customerId, livemode: false,
+      catalogKey: 'pro_monthly', tier: 'pro', interval: 'monthly', catalogVersion: 1,
+      stripeSubscriptionId, stripeStatus: 'active',
+      gracePeriodEndsAt,
+      providerSyncedAt: new Date('2026-01-01T00:00:00Z'),
+    })
+    return { organizationId, stripeSubscriptionId, customerId }
+  }
+
+  it('blocks a subscription once its grace period has run out, freezing included grants', async () => {
+    const { organizationId, stripeSubscriptionId } = await seedGracePeriodSubscription(new Date('2026-01-08T00:00:00Z'))
+    await db.insert(billingCreditGrants).values({
+      id: uniqueId('grant'), organizationId, source: 'subscription_monthly', sourceReference: stripeSubscriptionId,
+      originalUnits: 100, remainingUnits: 100, state: 'active', expiresAt: new Date('2027-01-01T00:00:00Z'),
+    })
+    const retriever = fakeRetriever(new Map())
+
+    const summary = await runBillingWorker({ retriever, db, now: () => new Date('2026-01-09T00:00:00Z') })
+
+    expect(summary.paymentBlocksApplied).toBeGreaterThanOrEqual(1)
+    const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
+    expect(row.paymentBlockedAt).not.toBeNull()
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.sourceReference, stripeSubscriptionId))
+    expect(grants[0].state).toBe('frozen')
+  })
+
+  it('does not block before the grace period has ended', async () => {
+    const { stripeSubscriptionId } = await seedGracePeriodSubscription(new Date('2026-01-08T00:00:00Z'))
+    const retriever = fakeRetriever(new Map())
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-01-05T00:00:00Z') })
+
+    const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
+    expect(row.paymentBlockedAt).toBeNull()
+  })
+
+  it('a duplicate worker run never re-blocks an already-blocked subscription', async () => {
+    const { stripeSubscriptionId } = await seedGracePeriodSubscription(new Date('2026-01-08T00:00:00Z'))
+    const retriever = fakeRetriever(new Map())
+    const now = () => new Date('2026-01-09T00:00:00Z')
+
+    await runBillingWorker({ retriever, db, now })
+    const [firstRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
+    const firstBlockedAt = firstRow.paymentBlockedAt
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-02-01T00:00:00Z') })
+    const [secondRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
+
+    expect(secondRow.paymentBlockedAt?.toISOString()).toBe(firstBlockedAt?.toISOString())
+  })
+
+  it('never blocks a subscription with no grace period in progress', async () => {
+    const organizationId = uniqueId('org')
+    await db.insert(organizations).values({ id: organizationId, name: organizationId, slug: organizationId, createdAt: new Date() })
+    const customerId = uniqueId('cust')
+    await db.insert(billingCustomers).values({ id: customerId, organizationId, livemode: false, stripeCustomerId: `cus_${customerId}` })
+    const stripeSubscriptionId = `sub_${uniqueId('sub')}`
+    await db.insert(billingSubscriptions).values({
+      id: uniqueId('subrow'), organizationId, customerId, livemode: false,
+      catalogKey: 'pro_monthly', tier: 'pro', interval: 'monthly', catalogVersion: 1,
+      stripeSubscriptionId, stripeStatus: 'active',
+      providerSyncedAt: new Date('2026-01-01T00:00:00Z'),
+    })
+    const retriever = fakeRetriever(new Map())
+
+    await runBillingWorker({ retriever, db, now: () => new Date('2026-06-01T00:00:00Z') })
+
+    const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId))
+    expect(row.paymentBlockedAt).toBeNull()
+  })
+})

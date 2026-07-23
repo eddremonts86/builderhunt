@@ -5,10 +5,11 @@
  * HTTP-cron pattern (`requirePlatformAdminPrincipal` + `auditPlatformAdminAction`, matching every
  * other `run-worker.ts` route in this codebase) rather than a new mechanism.
  *
- * Grace-period enforcement (blocking after 7 days — §7 task 6, not yet built), automatic notices,
- * and auto-recharge processing (§8 task 5, not yet built) are explicitly OUT of this worker's scope
- * today: there is no dunning/auto-recharge infrastructure yet for it to drive. Adding those sweeps
- * is a small, additive extension of `runBillingWorker` once those tasks land — not a redesign.
+ * Grace-period blocking after 7 days is now built (§7 task 6, `dunning.ts`) and swept below.
+ * Deduplicated notices and auto-recharge processing (§8 task 5, not yet built) remain OUT of this
+ * worker's scope today — no notification channel or auto-recharge infrastructure exists yet for it
+ * to drive. Adding that sweep is a small, additive extension of `runBillingWorker` once it lands —
+ * not a redesign.
  *
  * ## Why the worker re-fetches from Stripe's Events API, not our own stored payload
  *
@@ -29,10 +30,17 @@ import { and, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import { billingWebhookEvents } from '../db/schema'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { listActiveBillingCreditGrants } from '../repositories/billing'
-import { listActiveAnnualBillingSubscriptions, listWorkerOrganizationIds, withWorkerOrganization } from '../repositories/billing-worker'
+import {
+  listActiveAnnualBillingSubscriptions,
+  listGracePeriodBillingSubscriptions,
+  listWorkerOrganizationIds,
+  markBillingSubscriptionPaymentBlocked,
+  withWorkerOrganization,
+} from '../repositories/billing-worker'
 import { issueAnnualSubscriptionGrants } from './annual-grants'
 import { resolveSubscriptionCatalogEntryByKey } from './catalog'
 import { expireCreditGrant } from './credits'
+import { freezeIncludedGrantsForNonPayment, shouldBlockForNonPayment } from './dunning'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
 export interface EventRetriever {
@@ -81,6 +89,7 @@ export interface WorkerRunSummary {
   retryScheduledEvents: number
   expiredGrants: number
   annualGrantsIssued: number
+  paymentBlocksApplied: number
   eventResults: WebhookEventProcessingResult[]
 }
 
@@ -240,6 +249,31 @@ async function sweepAnnualSubscriptionGrants(db: PostgresJsDatabase | typeof wor
   return issued
 }
 
+/**
+ * Grace periods (§7 task 6, "Implement seven-day dunning and recovery") that have run out — blocks
+ * each one (marks `paymentBlockedAt` and freezes its included grants) exactly once. A subscription
+ * that recovers before this ever runs simply stops appearing in `listGracePeriodBillingSubscriptions`
+ * (its `gracePeriodEndsAt` was already cleared by the webhook handler), so there is nothing to
+ * "un-decide" here — this sweep only ever moves a subscription forward into being blocked, never
+ * the other direction.
+ */
+async function sweepNonPaymentBlocks(db: PostgresJsDatabase | typeof workerDb, now: Date): Promise<number> {
+  const orgIds = await listWorkerOrganizationIds(db)
+  let blocked = 0
+  for (const { id: organizationId } of orgIds) {
+    await withWorkerOrganization(organizationId, async (tx) => {
+      const candidates = await listGracePeriodBillingSubscriptions(tx as WorkerTransaction, organizationId)
+      for (const candidate of candidates) {
+        if (!shouldBlockForNonPayment(candidate, now)) continue
+        await freezeIncludedGrantsForNonPayment(tx as WorkerTransaction, organizationId, candidate.stripeSubscriptionId)
+        await markBillingSubscriptionPaymentBlocked(tx as WorkerTransaction, organizationId, candidate.stripeSubscriptionId, now)
+        blocked += 1
+      }
+    }, db)
+  }
+  return blocked
+}
+
 export async function runBillingWorker(options: RunBillingWorkerOptions): Promise<WorkerRunSummary> {
   const db = options.db ?? workerDb
   const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
@@ -255,6 +289,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
 
   const expiredGrants = await sweepExpiredCreditGrants(db, now)
   const annualGrantsIssued = await sweepAnnualSubscriptionGrants(db, now)
+  const paymentBlocksApplied = await sweepNonPaymentBlocks(db, now)
 
   return {
     claimedEvents: claimed.length,
@@ -264,6 +299,7 @@ export async function runBillingWorker(options: RunBillingWorkerOptions): Promis
     retryScheduledEvents: eventResults.filter((r) => r.result === 'retry_scheduled').length,
     expiredGrants,
     annualGrantsIssued,
+    paymentBlocksApplied,
     eventResults,
   }
 }

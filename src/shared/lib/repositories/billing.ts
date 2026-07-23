@@ -442,6 +442,27 @@ export async function listActiveBillingCreditGrants(
     .orderBy(billingCreditGrants.expiresAt)
 }
 
+/** Same shape as `listActiveBillingCreditGrants` but for an arbitrary state — `dunning.ts` uses this to find `'frozen'` grants on payment recovery, without a second bespoke query for every future state that needs listing. */
+export async function listBillingCreditGrantsByState(
+  transaction: TenantTransaction,
+  organizationId: string,
+  state: string,
+): Promise<BillingCreditGrantRecord[]> {
+  return transaction
+    .select({
+      id: billingCreditGrants.id,
+      organizationId: billingCreditGrants.organizationId,
+      source: billingCreditGrants.source,
+      remainingUnits: billingCreditGrants.remainingUnits,
+      originalUnits: billingCreditGrants.originalUnits,
+      state: billingCreditGrants.state,
+      expiresAt: billingCreditGrants.expiresAt,
+    })
+    .from(billingCreditGrants)
+    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, state)))
+    .orderBy(billingCreditGrants.expiresAt)
+}
+
 export interface CreateBillingCreditGrantInput {
   id: string
   organizationId: string

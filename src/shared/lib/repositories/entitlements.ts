@@ -1,7 +1,7 @@
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import type { PlanStatus, PlanTier } from '../billing-shared'
 import type { TenantTransaction } from '../db/client'
-import { organizationEntitlements } from '../db/schema'
+import { billingSubscriptions, organizationEntitlements } from '../db/schema'
 
 interface EntitlementInput {
   tier: string
@@ -26,6 +26,8 @@ export interface EntitlementPolicy {
   active: boolean
   paidActionsAllowed: boolean
   seatLimit: number
+  /** True once the seven-day payment-grace period has run out (`dunning.ts` / `billing_subscriptions.paymentBlockedAt`) — an org-wide gate independent of `status`, since Stripe's own subscription status often stays `active` throughout automatic retries (spec.md: "Configure Stripe retries inside that window"). Never affects reads — only `paidActionsAllowed`. */
+  paymentBlocked: boolean
 }
 
 /**
@@ -41,7 +43,7 @@ export function resolveLegacyPlanTier(tier: EntitlementTier): PlanTier {
   return tier === 'pro_max' ? 'team' : tier
 }
 
-export function resolveEntitlementPolicy(entitlement: EntitlementInput | null): EntitlementPolicy {
+export function resolveEntitlementPolicy(entitlement: EntitlementInput | null, paymentBlocked = false): EntitlementPolicy {
   if (!entitlement) {
     return {
       tier: 'free',
@@ -49,6 +51,7 @@ export function resolveEntitlementPolicy(entitlement: EntitlementInput | null): 
       active: true,
       paidActionsAllowed: false,
       seatLimit: 1,
+      paymentBlocked,
     }
   }
 
@@ -59,8 +62,9 @@ export function resolveEntitlementPolicy(entitlement: EntitlementInput | null): 
     tier,
     status,
     active,
-    paidActionsAllowed: active && tier !== 'free',
+    paidActionsAllowed: active && tier !== 'free' && !paymentBlocked,
     seatLimit: entitlement.seatLimit,
+    paymentBlocked,
   }
 }
 
@@ -78,7 +82,13 @@ export async function getOrganizationEntitlement(
     .where(eq(organizationEntitlements.organizationId, organizationId))
     .limit(1)
 
-  return resolveEntitlementPolicy(row ?? null)
+  const [subscriptionRow] = await transaction
+    .select({ paymentBlockedAt: billingSubscriptions.paymentBlockedAt })
+    .from(billingSubscriptions)
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), isNull(billingSubscriptions.canceledAt)))
+    .limit(1)
+
+  return resolveEntitlementPolicy(row ?? null, Boolean(subscriptionRow?.paymentBlockedAt))
 }
 
 function asTier(value: string): EntitlementTier {

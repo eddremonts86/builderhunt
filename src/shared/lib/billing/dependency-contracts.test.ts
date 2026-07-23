@@ -98,10 +98,10 @@ describe('billing dependency: seat usage — accepted members plus usable invita
 describe('billing dependency: canonical entitlement interface', () => {
   it("pins EntitlementPolicy's shape and paid-action derivation", () => {
     expect(resolveEntitlementPolicy(null)).toEqual({
-      tier: 'free', status: 'active', active: true, paidActionsAllowed: false, seatLimit: 1,
+      tier: 'free', status: 'active', active: true, paidActionsAllowed: false, seatLimit: 1, paymentBlocked: false,
     })
     expect(resolveEntitlementPolicy({ tier: 'team', status: 'active', seatLimit: 10 })).toEqual({
-      tier: 'team', status: 'active', active: true, paidActionsAllowed: true, seatLimit: 10,
+      tier: 'team', status: 'active', active: true, paidActionsAllowed: true, seatLimit: 10, paymentBlocked: false,
     })
   })
 })

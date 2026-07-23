@@ -32,9 +32,10 @@ import type Stripe from 'stripe'
 import { computeAnniversary } from './annual-grants'
 import { resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
+import { unfreezeStillValidGrantsOnRecovery } from './dunning'
 import { findBillingCustomer } from '../repositories/billing'
 import {
-  clearBillingSubscriptionGrace,
+  clearBillingSubscriptionPaymentBlock,
   findBillingCheckoutAttemptByStripeSessionId,
   findFullBillingSubscriptionByStripeId,
   findOrganizationIdForStripeCheckoutSession,
@@ -225,7 +226,10 @@ async function handleSubscriptionUpsert(
       providerSyncedAt: eventTimestamp,
     })
     if (subscription.status === 'active' || subscription.status === 'trialing') {
-      await clearBillingSubscriptionGrace(tx, organizationId, subscription.id)
+      if (existing.paymentBlockedAt) {
+        await unfreezeStillValidGrantsOnRecovery(tx, organizationId, subscription.id, eventTimestamp)
+      }
+      await clearBillingSubscriptionPaymentBlock(tx, organizationId, subscription.id)
     }
     const existingCatalogEntry = resolveSubscriptionCatalogEntryByKey(existing.catalogKey)
     if (existingCatalogEntry) {

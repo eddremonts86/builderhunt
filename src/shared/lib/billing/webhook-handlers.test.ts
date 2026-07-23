@@ -331,6 +331,35 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
     )
     expect(result.outcome).toBe('deferred')
   })
+
+  it('recovering to active clears a payment block and unfreezes still-valid grants (§7 task 6 dunning recovery)', async () => {
+    const { organizationId } = await seedOrganization()
+    const stripeCustomerId = await seedCustomer(organizationId)
+    const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
+    const subscriptionId = await seedSubscription(organizationId, customerRow.id, { stripeStatus: 'past_due', providerSyncedAt: new Date('2026-01-01T00:00:00Z') })
+    await db.update(billingSubscriptions)
+      .set({ gracePeriodEndsAt: new Date('2026-01-08T00:00:00Z'), paymentBlockedAt: new Date('2026-01-08T00:00:00Z') })
+      .where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
+    const grantId = uniqueId('grant')
+    await db.insert(billingCreditGrants).values({
+      id: grantId, organizationId, source: 'subscription_monthly', sourceReference: subscriptionId,
+      originalUnits: 100, remainingUnits: 100, state: 'frozen', expiresAt: new Date('2027-01-01T00:00:00Z'),
+    })
+
+    const result = await processStripeWebhookEvent(
+      subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
+        subscriptionId, customerId: stripeCustomerId, status: 'active', created: Math.floor(new Date('2026-01-10T00:00:00Z').getTime() / 1000),
+      }),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [subscriptionRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
+    expect(subscriptionRow.paymentBlockedAt).toBeNull()
+    expect(subscriptionRow.gracePeriodEndsAt).toBeNull()
+    const [grantRow] = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.id, grantId))
+    expect(grantRow.state).toBe('active')
+  })
 })
 
 describe('processStripeWebhookEvent — subscription deleted', () => {
