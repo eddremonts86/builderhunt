@@ -21,6 +21,12 @@ describe('organization permissions', () => {
     { action: 'organization:manage-members', member: false, admin: true, owner: true },
     { action: 'organization:transfer', member: false, admin: false, owner: true },
     { action: 'organization:delete', member: false, admin: false, owner: true },
+    { action: 'billing:availability', member: true, admin: true, owner: true },
+    { action: 'billing:read', member: false, admin: true, owner: true },
+    { action: 'billing:mutate', member: false, admin: false, owner: true },
+    { action: 'billing:refund', member: false, admin: false, owner: true },
+    { action: 'billing:portal', member: false, admin: false, owner: true },
+    { action: 'billing:auto-recharge', member: false, admin: false, owner: true },
   ]
 
   for (const row of matrix) {

@@ -20,6 +20,12 @@ export type PermissionAction =
   | 'resource:delete'
   | 'resource:share'
   | 'resource:export'
+  | 'billing:availability'
+  | 'billing:read'
+  | 'billing:mutate'
+  | 'billing:refund'
+  | 'billing:portal'
+  | 'billing:auto-recharge'
 
 export interface ResourceAuthorizationContext {
   creatorUserId?: string | null
@@ -44,6 +50,19 @@ export function can(
       return elevated
     case 'organization:transfer':
     case 'organization:delete':
+      return principal.role === 'owner'
+    // spec.md §Permissions and UX: "Owners can subscribe, preview and confirm
+    // changes, open Portal, buy packs, configure capped auto-recharge, and
+    // submit eligible refund requests. Admins see read-only billing and usage
+    // data. Members see only feature availability and an owner-contact action."
+    case 'billing:availability':
+      return true
+    case 'billing:read':
+      return elevated
+    case 'billing:mutate':
+    case 'billing:refund':
+    case 'billing:portal':
+    case 'billing:auto-recharge':
       return principal.role === 'owner'
     case 'resource:read':
       return (
