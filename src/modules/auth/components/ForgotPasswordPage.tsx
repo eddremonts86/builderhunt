@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft } from 'lucide-react'
 import { Input, Button } from '~/components/ui'
+import { ThemeToggle } from '~/shared/components/ThemeToggle'
 
 export function ForgotPasswordPage() {
   const [email, setEmail] = React.useState('')
@@ -35,9 +36,12 @@ export function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-app flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
-        <Link to="/auth/sign-in" className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-8 transition-colors">
-          <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to sign in
-        </Link>
+        <div className="flex items-center justify-between mb-8">
+          <Link to="/auth/sign-in" className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm transition-colors">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Back to sign in
+          </Link>
+          <ThemeToggle />
+        </div>
 
         <div className="card-glow">
           <div className="p-8">

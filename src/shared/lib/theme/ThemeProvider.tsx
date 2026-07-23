@@ -31,10 +31,24 @@ function readStored<T extends string>(key: string, fallback: T, valid: readonly 
  * correctly no matter which layout is currently mounted. Since the three layouts are mutually
  * exclusive per route, only one instance is ever mounted at a time, and all instances share
  * the same localStorage keys, so the theme/accent choice persists seamlessly across them.
+ *
+ * State starts from the SSR-safe defaults ('dark'/'brand') rather than reading localStorage in
+ * the initializer: the server has no `window`, so an SSR render always produces those defaults,
+ * and reading the real value in the client's lazy initializer would make the client's very
+ * first (hydration) render disagree with the server-rendered attributes — React detects that
+ * as a hydration mismatch and, per its own warning, "won't patch it up" (the mismatched
+ * attributes are left as the server rendered them, e.g. the ThemeToggle's `aria-checked` staying
+ * stuck on the wrong button). Re-reading the stored value in a post-mount effect instead is a
+ * normal client-side re-render, which React reconciles and applies correctly.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<Theme>(() => readStored(THEME_KEY, 'dark', ['dark', 'light']))
-  const [accent, setAccentState] = React.useState<Accent>(() => readStored(ACCENT_KEY, 'brand', ['brand', 'neon']))
+  const [theme, setThemeState] = React.useState<Theme>('dark')
+  const [accent, setAccentState] = React.useState<Accent>('brand')
+
+  React.useEffect(() => {
+    setThemeState(readStored<Theme>(THEME_KEY, 'dark', ['dark', 'light']))
+    setAccentState(readStored<Accent>(ACCENT_KEY, 'brand', ['brand', 'neon']))
+  }, [])
 
   const setTheme = React.useCallback((next: Theme) => {
     setThemeState(next)
