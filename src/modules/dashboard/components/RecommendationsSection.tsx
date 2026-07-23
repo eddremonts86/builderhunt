@@ -129,7 +129,7 @@ export function RecommendationsSection() {
 
       {/* Loading skeleton */}
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="glass-panel animate-pulse h-32 bg-bh-surface/40" />
           ))}
@@ -171,7 +171,7 @@ export function RecommendationsSection() {
 
       {/* Populated */}
       {!loading && visibleRecs.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {visibleRecs.slice(0, 8).map((rec) => (
             <RecommendationCard
               key={rec.builder.id}
