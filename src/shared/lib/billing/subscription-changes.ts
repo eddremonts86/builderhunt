@@ -39,6 +39,7 @@ import {
   applyImmediateSubscriptionChange,
   findFullActiveBillingSubscription,
   markBillingSubscriptionCancelAtPeriodEnd,
+  markBillingSubscriptionCanceledImmediately,
   scheduleBillingSubscriptionChange,
   type FullBillingSubscriptionRecord,
 } from '../repositories/billing'
@@ -406,4 +407,40 @@ export async function cancelSubscriptionAtPeriodEnd(
   await markBillingSubscriptionCancelAtPeriodEnd(transaction, principal.organizationId, subscription.stripeSubscriptionId)
 
   return { cancelAtPeriodEnd: true, effectiveAt }
+}
+
+export interface CancelSubscriptionImmediatelyResult {
+  canceled: true
+  /** Null when the organization had no active subscription to begin with — a no-op, not an error. */
+  canceledAt: string | null
+}
+
+/**
+ * Immediate, non-reversible cancellation — the sole exception to this file's own rule that "every
+ * cancellation path... is deliberately scheduled at the NEXT period end, never immediate"
+ * (`cancelSubscriptionAtPeriodEnd` above). Used ONLY by `organizations/deletion.ts`'s immediate-
+ * deletion path: the organization and all its access are being destroyed in the same action, so
+ * there is no "remaining paid period" left to honor the way a normal cancellation does.
+ *
+ * Takes a plain `organizationId` rather than a `TenantPrincipal` — unlike every other function in
+ * this file — because its two call sites are a real owner-initiated request (tenant-scoped
+ * transaction, a `TenantPrincipal` available) AND the grace-period worker sweep for the SCHEDULED
+ * deletion path (`withWorkerOrganization`-scoped transaction, no principal at all, only an
+ * organizationId). Nothing below actually needs `principal.role`/`userId`, so this avoids
+ * fabricating a fake principal for the worker call site.
+ */
+export async function cancelSubscriptionImmediately(
+  transaction: TenantTransaction,
+  organizationId: string,
+  options: SubscriptionChangeOptions,
+): Promise<CancelSubscriptionImmediatelyResult> {
+  const now = (options.now ?? (() => new Date()))()
+  const livemode = isLiveMode()
+  const subscription = await findFullActiveBillingSubscription(transaction, organizationId, livemode)
+  if (!subscription) return { canceled: true, canceledAt: null }
+
+  await options.provider.cancelSubscription({ subscriptionId: subscription.stripeSubscriptionId, atPeriodEnd: false })
+  await markBillingSubscriptionCanceledImmediately(transaction, organizationId, subscription.stripeSubscriptionId, now)
+
+  return { canceled: true, canceledAt: now.toISOString() }
 }

@@ -22,6 +22,7 @@ vi.mock('../organizations/contracts', async (importOriginal) => {
 
 import {
   cancelSubscriptionAtPeriodEnd,
+  cancelSubscriptionImmediately,
   changeSubscription,
   classifySubscriptionChange,
   computeUpgradeCreditDelta,
@@ -537,5 +538,41 @@ describe('cancelSubscriptionAtPeriodEnd', () => {
     const principal = await freshOrgWithOwner()
     await expect(db.transaction((tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider })))
       .rejects.toMatchObject({ code: 'no_active_subscription' })
+  })
+})
+
+describe('cancelSubscriptionImmediately', () => {
+  let provider: FakeBillingProvider
+  beforeEach(() => { provider = new FakeBillingProvider() })
+
+  it('cancels right now, not at period end, and marks the local row canceled immediately', async () => {
+    const principal = await freshOrgWithOwner()
+    const stripeSubscriptionId = await seedActiveSubscription(principal.organizationId, provider)
+
+    const result = await db.transaction((tx) => cancelSubscriptionImmediately(tx, principal.organizationId, { provider }))
+
+    expect(result.canceled).toBe(true)
+    expect(result.canceledAt).not.toBeNull()
+    const row = await readSubscription(stripeSubscriptionId)
+    expect(row.stripeStatus).toBe('canceled')
+    expect(row.canceledAt).not.toBeNull()
+  })
+
+  it('asks the provider for an immediate cancellation, never at period end', async () => {
+    const principal = await freshOrgWithOwner()
+    await seedActiveSubscription(principal.organizationId, provider)
+    const cancelSpy = vi.spyOn(provider, 'cancelSubscription')
+
+    await db.transaction((tx) => cancelSubscriptionImmediately(tx, principal.organizationId, { provider }))
+
+    expect(cancelSpy).toHaveBeenCalledWith(expect.objectContaining({ atPeriodEnd: false }))
+  })
+
+  it('is a no-op, not an error, when there is no active subscription — nothing to cancel for a free-tier deletion', async () => {
+    const principal = await freshOrgWithOwner()
+
+    const result = await db.transaction((tx) => cancelSubscriptionImmediately(tx, principal.organizationId, { provider }))
+
+    expect(result).toEqual({ canceled: true, canceledAt: null })
   })
 })

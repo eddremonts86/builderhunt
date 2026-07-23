@@ -169,6 +169,21 @@ function TeamSettingsRoute() {
       },
     )
 
+  // Unlike scheduled deletion, this hard-deletes the organization right away — the caller's own
+  // membership is gone by the time this resolves, so it ends the tenant context the same way
+  // `leaveOrganizationContext` does for "leave organization", not a snapshot refresh.
+  const handleRequestImmediateDeletion = (confirmOrganizationName: string) =>
+    runMutation(
+      () => fetch('/api/organizations/deletion/immediate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmOrganizationName }),
+      }),
+      'Failed to delete organization immediately',
+      leaveOrganizationContext,
+    )
+
   const handleInvite = (email: string, role: InvitableRole) =>
     runMutation(
       () => fetch('/api/organizations/invitations', {
@@ -249,6 +264,7 @@ function TeamSettingsRoute() {
       onTransferOwnership={handleTransferOwnership}
       onRequestDeletion={handleRequestDeletion}
       onCancelDeletion={handleCancelDeletion}
+      onRequestImmediateDeletion={handleRequestImmediateDeletion}
     />
   )
 }

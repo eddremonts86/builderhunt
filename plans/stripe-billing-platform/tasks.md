@@ -1510,10 +1510,111 @@ migration, dunning/recovery) implemented, tested, and committed.
     `TeamSettingsPage.test.tsx` (6/6, unaffected); `pnpm security:boundaries` (0 legacy imports) and
     `pnpm security:route-coverage` (97 routes — +1 for the new preview route, 8 allowlisted, valid).
 
-- [ ] **Integrate subscription-safe organization deletion**
+- [x] **Integrate subscription-safe organization deletion**
   - Files: `src/shared/lib/organizations/deletion.ts`, `src/shared/lib/organizations/deletion.test.ts`, `src/modules/dashboard/components/OrganizationDangerZone.tsx`, `src/shared/lib/billing/subscription-changes.ts`
   - Do: Normal deletion immediately prevents renewal, retains paid access, schedules product deletion after period; immediate path warns forfeiture, cancels now, deletes product data, and retains only approved financial records. Canceling deletion never restores renewal automatically.
   - Verify: normal/immediate/cancel/re-subscribe, refund exception, worker race, financial retention, and tenant B isolation tests pass.
+  - Progress: Research first confirmed the pre-existing 30-day-grace deletion flow (`organization-lifecycle.ts`'s
+    `requestOrganizationDeletion`/`cancelOrganizationDeletion`/`processPendingOrganizationDeletions`) did ZERO
+    billing work — the worker's own hard-delete cascade silently destroyed `billing_customers`/
+    `billing_subscriptions`/etc. with no Stripe-side cancellation ever called and no financial record kept. Built
+    the new `organizations/deletion.ts` as the billing-aware layer on top (the pre-existing lifecycle functions
+    are unchanged, still doing the pure request/cancel-request bookkeeping):
+    - `requestNormalDeletion(request, principal, deps)` — calls the existing `requestOrganizationDeletion` first
+      (unchanged 30-day grace + owner/recent-auth), then best-effort calls `cancelSubscriptionAtPeriodEnd`
+      (already existed, §7 task 5) so renewal stops IMMEDIATELY while paid access continues through the current
+      period — swallows `SubscriptionChangeError('no_active_subscription')` as the expected free-tier case, logs
+      (never rethrows) any other billing failure since the deletion REQUEST itself already succeeded.
+    - `requestImmediateDeletion(principal, session, deps)` — the new, more destructive path: owner-only
+      (`can(principal,'organization:delete')`) + recent-auth-gated (same `RECENT_AUTH_MAX_AGE_SECONDS`/
+      `STALE_SESSION_ERROR_MESSAGE` constants as every other recent-auth action), forfeits any remaining paid
+      period (no partial-period credit — deliberately the one exception to this codebase's "every cancellation
+      is scheduled, never immediate" rule, since there's no remaining period to honor once the org itself is
+      being destroyed), deletes product data right now instead of after 30 days, audits
+      `organization.delete.immediate`.
+    - `finalizeOrganizationDeletion(organizationId, deletionType, deps)` — the ONE place either path ever
+      hard-deletes an organization: reads the org name (`account-privacy.ts`'s existing `findOrganizationName`,
+      already auth-broker-allowlisted from §9 task 5), force-cancels any still-active subscription via the new
+      `cancelSubscriptionImmediately` (worker-scoped transaction, `billing-worker.ts`'s existing
+      `withWorkerOrganization`), writes a durable financial-retention snapshot, THEN hard-deletes via a new
+      `hardDeleteOrganization` helper added to `organization-lifecycle.ts` (kept there, not in `deletion.ts`
+      itself, specifically so `deletion.ts` never needs an `authDb` import — confirmed via
+      `pnpm security:boundaries`, which initially flagged a direct `authDb` import in `deletion.ts` before this
+      refactor). Idempotent (no-op if the org is already gone). `processPendingOrganizationDeletions` (the
+      30-day-grace worker sweep) now delegates its hard-delete to this same function instead of its own bare
+      `authDb.delete(organizations)` — the scheduled path gets the exact same financial-retention/force-cancel
+      safety net as the immediate path, satisfying "worker race" safety by construction (idempotent finalize, no
+      new races introduced) and "tenant B isolation" (every call is scoped to exactly one `organizationId`,
+      identical to every other worker sweep in this codebase).
+    - New durable table `organization_deletion_financial_records` (`drizzle/0039_nappy_norrin_radd.sql` +
+      `0040_organization_deletion_financial_records_rls_grants.sql`) — deliberately NOT a foreign key to
+      `organizations` (the row it describes is gone by the time anyone reads it back), no tenant-scoped RLS
+      (there's no live `app.organization_id` to scope by), role-gated only: `builderhunt_worker` INSERT-only
+      (written once, at finalize time), `builderhunt_platform` SELECT-only (compliance/support lookups),
+      `builderhunt_app` has NO access at all. Captures organizationId/name, deletion type, livemode, the Stripe
+      customer id if any, the last subscription's tier/interval, and when it was force-canceled — satisfies
+      "retains only approved financial records" without needing a schema-wide FK/cascade rework of the entire
+      billing subtree.
+    - New `cancelSubscriptionImmediately` in `subscription-changes.ts` — the sole immediate-cancellation
+      function in this codebase (every other cancellation, `cancelSubscriptionAtPeriodEnd`, is deliberately
+      scheduled); takes a plain `organizationId` rather than a `TenantPrincipal` (unlike every sibling function
+      in that file) specifically so it's callable from both a real owner-initiated request AND the grace-period
+      worker sweep, which has no principal at all.
+    - New immediate-delete route `POST /api/organizations/deletion/immediate` — re-validates the typed
+      confirmation name server-side (never trusts the client-side type-to-confirm gate alone), a deliberately
+      separate endpoint from the reversible scheduled `DELETE /api/organizations` rather than a body flag on it
+      (a fundamentally more destructive action deserves its own audit action name and confirmation contract, not
+      a footgun flag on the safe one).
+    - `OrganizationDangerZone.tsx` — the existing type-to-confirm delete flow now also reveals a "Delete
+      immediately instead" link once expanded; clicking it shows an explicit forfeiture warning + a required
+      acknowledgment checkbox, with the destructive confirm button disabled until BOTH the typed name matches
+      AND the checkbox is checked. `TeamSettingsPage.tsx`/`team.tsx` wired straight through — the immediate path
+      reuses `leaveOrganizationContext` (router invalidate + navigate away) since the caller's own membership is
+      gone the moment it resolves, same as "leave organization".
+    - Deliberately did NOT build: an operator-facing "refund exception" UI (refunds.ts already documents that
+      subscription refunds are operator-reviewed only, never automatic — immediate deletion doesn't change
+      that; a forfeited period remains eligible for the existing manual refund-request pathway from §8 task 4,
+      nothing new needed there) and a "re-subscribe" flow (already exists — the ordinary Checkout/plan-change
+      flow, unrelated to deletion).
+    Tests: `subscription-changes.test.ts` — 3 new disposable-DB integration tests for
+    `cancelSubscriptionImmediately` (cancels right now not at period end, asks the provider for
+    `atPeriodEnd:false`, no-op for a free-tier org — 42/42 passing including all pre-existing tests).
+    `organizations/deletion.test.ts` (NEW, 11 tests, mocked — real-DB integration testing was deliberately
+    ruled out here: `withWorkerOrganization`/`hardDeleteOrganization`/`findOrganizationName` are all hardcoded to
+    the real `workerDb`/`authDb` singletons with no test-database injection seam, the SAME precedent
+    `processPendingOrganizationDeletions` itself already set — it had zero test coverage before this change
+    either — so this is verified via mocked unit tests here plus a full live-browser walkthrough below, not a
+    disposable-DB test): `requestNormalDeletion` delegates + best-effort cancels + swallows the free-tier
+    no-op + swallows unexpected billing failures without failing the request; `requestImmediateDeletion` rejects
+    non-owner/missing-session/stale-session before touching anything, succeeds and audits for a fresh-session
+    owner, surfaces `OrganizationDeletionError` as a real catchable instance; `finalizeOrganizationDeletion` is
+    idempotent for an already-gone org, force-cancels + snapshots + hard-deletes for an active subscription, and
+    snapshots-with-nulls for a free-tier org. `deletion/immediate.test.ts` (NEW, 6 route tests — name-match
+    gate, invalid body, 401/403/stale-session propagation). `OrganizationDangerZone.test.tsx` — 5 new tests
+    (immediate-delete option hidden without the handler prop, warning/checkbox reveal-on-click, both-conditions
+    gating, correct callback args, ordinary Schedule-deletion button never triggers the immediate callback — 18/18
+    total, no regressions).
+    Live-verified the complete immediate-deletion flow end-to-end against the running dev server: as the (real)
+    owner of a test organization, opened the delete-confirm flow, clicked "Delete immediately instead" — saw the
+    exact forfeiture warning text, confirm button correctly disabled until BOTH the typed org name matched AND
+    the checkbox was checked, then clicking "Delete immediately" actually deleted the organization. Confirmed via
+    direct DB query: `organizations` row for that org: 0 rows (fully gone). A matching
+    `organization_deletion_financial_records` row persisted with the correct `organization_name`,
+    `deletion_type: 'immediate'`, the org's real `stripe_customer_id` (confirming even a never-subscribed
+    organization already has a `billing_customers` row, exercised correctly), and null subscription fields
+    (correct — this org had no active subscription to cancel). Server console showed the matching
+    `[security-audit] {"action":"organization.delete.immediate",...,"result":"allowed"}` line with the correct
+    actor/organization ids. This also surfaced a genuine PRE-EXISTING gap, unrelated to this task's own logic:
+    landing on `/dashboard` after the delete showed "stats: 403" ("An active organization is required") because
+    the deleted org's `onDelete:'set null'` FK nulls out the session's `activeOrganizationId`, and nothing
+    re-picks a fallback for an EXISTING session (only `session.create.before` in `better-auth.ts` does that, for
+    brand-new sign-ins) — the exact same gap the pre-existing "leave organization" flow already has via the same
+    shared `leaveOrganizationContext` helper. Flagged via `spawn_task` (`task_54e1f0eb`) rather than fixed here,
+    since it's shared with code this task didn't touch and deserves its own scoped fix.
+    `pnpm type-check` (clean) and `pnpm lint` (0 errors) on every touched/new file; `pnpm security:boundaries`
+    (0 legacy imports — including catching and fixing the `deletion.ts`-imports-`authDb`-directly violation
+    during development, via the `hardDeleteOrganization` refactor above) and `pnpm security:route-coverage`
+    (98 routes — +1 for the new immediate-delete route, 8 allowlisted, valid).
 
 - [ ] **Build platform billing operations dashboard**
   - Files: `src/routes/_dashboard/admin/billing.tsx`, `src/modules/admin/billing/BillingOperationsPage.tsx`, `src/modules/admin/billing/BillingOperationsPage.test.tsx`, `src/routes/api/admin/billing/metrics.ts`

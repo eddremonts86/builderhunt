@@ -1263,6 +1263,35 @@ export const billingContacts = pgTable(
 )
 
 /**
+ * Durable compliance snapshot written just before an organization row (and its full cascade —
+ * members, resources, `billing_customers`/`billing_subscriptions`/etc.) is hard-deleted, whether via
+ * the 30-day scheduled path or the owner-initiated immediate path (plans/stripe-billing-platform/
+ * tasks.md §9 "Integrate subscription-safe organization deletion" — "retains only approved financial
+ * records"). Deliberately NOT a foreign key to `organizations`: by the time this row is read back,
+ * the organization it describes no longer exists. No RLS tenant-scoping either, for the same
+ * reason — there is no live `app.organization_id` to scope by; access is role-gated only (worker
+ * writes it, platform reads it), never exposed to the app/tenant role at all.
+ */
+export const organizationDeletionFinancialRecords = pgTable(
+  'organization_deletion_financial_records',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull(),
+    organizationName: text('organization_name').notNull(),
+    deletionType: text('deletion_type').notNull(),
+    livemode: boolean('livemode').notNull(),
+    stripeCustomerId: text('stripe_customer_id'),
+    lastSubscriptionTier: text('last_subscription_tier'),
+    lastSubscriptionInterval: text('last_subscription_interval'),
+    subscriptionCanceledAt: timestamp('subscription_canceled_at', { withTimezone: true }),
+    retainedAt: timestamp('retained_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('organization_deletion_financial_records_deletion_type_check', sql`${table.deletionType} in ('scheduled', 'immediate')`),
+  ],
+)
+
+/**
  * Append-only velocity signal for fraud/high-volume exception controls (plans/stripe-billing-platform/
  * tasks.md §8 "Add fraud and high-volume exception controls"). Every known payment failure is
  * recorded here by its own call site (`packs.ts`'s Checkout decline, `auto-recharge.ts`'s off-session

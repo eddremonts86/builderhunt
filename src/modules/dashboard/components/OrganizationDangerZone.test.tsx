@@ -246,3 +246,70 @@ describe('OrganizationDangerZone — transfer ownership preview/confirm dialog',
     expect(document.querySelector('[data-testid="transfer-ownership-preview"]')).toBeNull()
   })
 })
+
+describe('OrganizationDangerZone — immediate deletion', () => {
+  async function openConfirmDelete(onRequestImmediateDeletion = vi.fn()) {
+    const props = baseProps('owner', 'user-owner')
+    props.onRequestImmediateDeletion = onRequestImmediateDeletion
+    await render(props)
+
+    await act(async () => (container!.querySelector('[data-testid="delete-organization-btn"]') as HTMLButtonElement).click())
+    return onRequestImmediateDeletion
+  }
+
+  it('does not show the immediate-delete option when no handler is provided', async () => {
+    const props = baseProps('owner', 'user-owner')
+    await render(props)
+    await act(async () => (container!.querySelector('[data-testid="delete-organization-btn"]') as HTMLButtonElement).click())
+
+    expect(testIds()).not.toContain('show-immediate-delete-btn')
+  })
+
+  it('reveals a forfeiture warning and checkbox only after "Delete immediately instead" is clicked', async () => {
+    await openConfirmDelete()
+    expect(testIds()).not.toContain('immediate-delete-warning')
+
+    await act(async () => (container!.querySelector('[data-testid="show-immediate-delete-btn"]') as HTMLButtonElement).click())
+
+    expect(testIds()).toContain('immediate-delete-warning')
+    const confirmBtn = container!.querySelector('[data-testid="confirm-immediate-delete-organization-btn"]') as HTMLButtonElement
+    expect(confirmBtn.disabled).toBe(true) // name not typed yet, checkbox not checked
+  })
+
+  it('requires BOTH the typed name match AND the forfeiture checkbox before enabling the confirm button', async () => {
+    await openConfirmDelete()
+    await act(async () => (container!.querySelector('[data-testid="show-immediate-delete-btn"]') as HTMLButtonElement).click())
+
+    const nameInput = container!.querySelector('[data-testid="confirm-organization-name-input"]') as HTMLInputElement
+    const checkbox = container!.querySelector('[data-testid="immediate-delete-forfeiture-checkbox"]') as HTMLInputElement
+    const confirmBtn = () => container!.querySelector('[data-testid="confirm-immediate-delete-organization-btn"]') as HTMLButtonElement
+
+    await act(async () => typeInto(nameInput, 'Acme'))
+    expect(confirmBtn().disabled).toBe(true) // name matches, checkbox still unchecked
+
+    await act(async () => checkbox.click())
+    expect(confirmBtn().disabled).toBe(false)
+  })
+
+  it('calls onRequestImmediateDeletion with the typed name once both conditions are met', async () => {
+    const onRequestImmediateDeletion = await openConfirmDelete()
+    await act(async () => (container!.querySelector('[data-testid="show-immediate-delete-btn"]') as HTMLButtonElement).click())
+
+    const nameInput = container!.querySelector('[data-testid="confirm-organization-name-input"]') as HTMLInputElement
+    await act(async () => typeInto(nameInput, 'Acme'))
+    const checkbox = container!.querySelector('[data-testid="immediate-delete-forfeiture-checkbox"]') as HTMLInputElement
+    await act(async () => checkbox.click())
+    await act(async () => (container!.querySelector('[data-testid="confirm-immediate-delete-organization-btn"]') as HTMLButtonElement).click())
+
+    expect(onRequestImmediateDeletion).toHaveBeenCalledWith('Acme')
+  })
+
+  it('never calls onRequestImmediateDeletion for the ordinary "Schedule deletion" button', async () => {
+    const onRequestImmediateDeletion = await openConfirmDelete()
+    const nameInput = container!.querySelector('[data-testid="confirm-organization-name-input"]') as HTMLInputElement
+    await act(async () => typeInto(nameInput, 'Acme'))
+    await act(async () => (container!.querySelector('[data-testid="confirm-delete-organization-btn"]') as HTMLButtonElement).click())
+
+    expect(onRequestImmediateDeletion).not.toHaveBeenCalled()
+  })
+})

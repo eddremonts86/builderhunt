@@ -4,6 +4,8 @@ import { auth } from '~/shared/lib/auth/better-auth'
 import { generateOrganizationSlug, getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { listMyOrganizations, toOrganizationSummaryDtoList } from '~/shared/lib/organizations/contracts'
+import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
+import { requestNormalDeletion } from '~/shared/lib/organizations/deletion'
 
 const CreateBody = z.object({
   name: z.string().trim().min(2).max(80),
@@ -46,12 +48,14 @@ export const Route = createFileRoute('/api/organizations/')({
 
       // Schedules the caller's own active organization for deletion after a
       // grace period — never a client-chosen one, via `requireTenantPrincipal`.
-      // `requestOrganizationDeletion` itself enforces owner-only + recent-auth.
+      // `requestNormalDeletion` enforces owner-only + recent-auth (via the
+      // underlying `requestOrganizationDeletion`) and additionally stops
+      // subscription renewal right now (plans/stripe-billing-platform/
+      // tasks.md §9 "Integrate subscription-safe organization deletion").
       DELETE: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const lifecycle = await getOrganizationLifecycle()
-          const result = await lifecycle.requestOrganizationDeletion(request, principal.organizationId)
+          const result = await requestNormalDeletion(request, principal, { provider: getBillingProvider() })
           return Response.json({ ok: true, id: result.id, gracePeriodEndsAt: result.gracePeriodEndsAt.toISOString() })
         } catch (error) {
           const response = lifecycleErrorResponse(error)

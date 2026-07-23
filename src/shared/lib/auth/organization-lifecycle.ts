@@ -1206,14 +1206,26 @@ export interface ProcessPendingOrganizationDeletionsResult {
  * cascade removes members/invitations/entitlements/resources with it), then
  * marks the request completed. A failed delete leaves that request untouched
  * for the next run rather than losing track of it.
+ *
+ * The actual hard delete is delegated to `organizations/deletion.ts`'s
+ * `finalizeOrganizationDeletion` (plans/stripe-billing-platform/tasks.md §9
+ * "Integrate subscription-safe organization deletion") — it force-cancels any
+ * still-active subscription and writes a durable financial-retention snapshot
+ * BEFORE the organization row (and its cascade) is removed, so this worker
+ * never again does a bare `authDb.delete(organizations)` itself.
  */
-export async function processPendingOrganizationDeletions(): Promise<ProcessPendingOrganizationDeletionsResult> {
-  const [{ and, eq, lt }, { authDb }, schema] = await Promise.all([
+export async function processPendingOrganizationDeletions(
+  deps: { provider?: import('../billing/provider').BillingProvider } = {},
+): Promise<ProcessPendingOrganizationDeletionsResult> {
+  const [{ and, eq, lt }, { authDb }, schema, { finalizeOrganizationDeletion }, { getBillingProvider }] = await Promise.all([
     import('drizzle-orm'),
     import('../db/auth-db'),
     import('../db/schema'),
+    import('../organizations/deletion'),
+    import('../billing/stripe-provider'),
   ])
-  const { organizations, organizationDeletionRequests } = schema
+  const { organizationDeletionRequests } = schema
+  const provider = deps.provider ?? getBillingProvider()
 
   const due = await authDb
     .select({ id: organizationDeletionRequests.id, organizationId: organizationDeletionRequests.organizationId })
@@ -1224,7 +1236,7 @@ export async function processPendingOrganizationDeletions(): Promise<ProcessPend
   let errors = 0
   for (const dueRequest of due) {
     try {
-      await authDb.delete(organizations).where(eq(organizations.id, dueRequest.organizationId))
+      await finalizeOrganizationDeletion(dueRequest.organizationId, 'scheduled', { provider })
       await authDb
         .update(organizationDeletionRequests)
         .set({ status: 'completed', completedAt: new Date() })
@@ -1236,4 +1248,20 @@ export async function processPendingOrganizationDeletions(): Promise<ProcessPend
     }
   }
   return { processed, errors }
+}
+
+/**
+ * The one place outside this file allowed to trigger an organization hard-delete —
+ * `organizations/deletion.ts`'s `finalizeOrganizationDeletion` calls this instead of importing
+ * `authDb` itself (only files in `check-tenant-boundaries.mjs`'s `authDbAllowlist` may import the
+ * auth-broker client directly; this file is one of the few, `organizations/deletion.ts` is not, by
+ * design — it should have no reason to touch auth-broker tables beyond this one action).
+ */
+export async function hardDeleteOrganization(organizationId: string): Promise<void> {
+  const [{ eq }, { authDb }, { organizations }] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  await authDb.delete(organizations).where(eq(organizations.id, organizationId))
 }

@@ -35,6 +35,8 @@ export interface OrganizationDangerZoneProps {
   onTransferOwnership?: (userId: string) => void | Promise<void>
   onRequestDeletion?: () => void | Promise<void>
   onCancelDeletion?: () => void | Promise<void>
+  /** Distinct from `onRequestDeletion` — forfeits any remaining paid period and deletes product data right now instead of after a 30-day grace period. Takes the typed confirmation name so the route can re-validate it server-side too. */
+  onRequestImmediateDeletion?: (confirmOrganizationName: string) => void | Promise<void>
 }
 
 function noop() {}
@@ -57,11 +59,14 @@ export function OrganizationDangerZone({
   onTransferOwnership,
   onRequestDeletion,
   onCancelDeletion,
+  onRequestImmediateDeletion,
 }: OrganizationDangerZoneProps) {
   const [transferTarget, setTransferTarget] = React.useState('')
   const [transferPreviewOpen, setTransferPreviewOpen] = React.useState(false)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [confirmName, setConfirmName] = React.useState('')
+  const [immediateMode, setImmediateMode] = React.useState(false)
+  const [forfeitureAcknowledged, setForfeitureAcknowledged] = React.useState(false)
 
   const canDelete = isOwnerRole(viewerRole) && !isPersonal
   const transferableMembers = members.filter((m) => canTransferOwnershipTo(viewerRole, viewerUserId, m.userId))
@@ -245,6 +250,8 @@ export function OrganizationDangerZone({
                     onClick={() => {
                       setConfirmDelete(false)
                       setConfirmName('')
+                      setImmediateMode(false)
+                      setForfeitureAcknowledged(false)
                     }}
                     disabled={busy}
                     className="btn-secondary text-sm shrink-0"
@@ -254,6 +261,46 @@ export function OrganizationDangerZone({
                     Cancel
                   </button>
                 </div>
+
+                {onRequestImmediateDeletion && !immediateMode && (
+                  <button
+                    type="button"
+                    onClick={() => setImmediateMode(true)}
+                    disabled={busy}
+                    className="text-xs text-bh-danger underline mt-2"
+                    data-testid="show-immediate-delete-btn"
+                  >
+                    Delete immediately instead
+                  </button>
+                )}
+
+                {onRequestImmediateDeletion && immediateMode && (
+                  <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mt-3" data-testid="immediate-delete-warning">
+                    <p className="text-sm text-bh-danger font-medium mb-2">
+                      This forfeits any remaining paid subscription period — no partial-period credit — and deletes
+                      all product data right now, not after 30 days. This cannot be undone.
+                    </p>
+                    <label className="flex items-start gap-2 text-sm text-bh-text-muted mb-3">
+                      <input
+                        type="checkbox"
+                        checked={forfeitureAcknowledged}
+                        onChange={(e) => setForfeitureAcknowledged(e.target.checked)}
+                        className="mt-0.5"
+                        data-testid="immediate-delete-forfeiture-checkbox"
+                      />
+                      I understand this forfeits the remaining paid period and cannot be undone.
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => (onRequestImmediateDeletion ?? noop)(confirmName)}
+                      disabled={busy || !nameMatches || !forfeitureAcknowledged}
+                      className="btn-danger text-sm"
+                      data-testid="confirm-immediate-delete-organization-btn"
+                    >
+                      Delete immediately
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

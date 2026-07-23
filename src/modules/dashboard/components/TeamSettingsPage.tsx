@@ -38,6 +38,7 @@ export interface TeamSettingsPageProps {
   onTransferOwnership?: (userId: string) => void | Promise<void>
   onRequestDeletion?: () => void | Promise<void>
   onCancelDeletion?: () => void | Promise<void>
+  onRequestImmediateDeletion?: (confirmOrganizationName: string) => void | Promise<void>
 }
 
 const ROLE_LABEL: Record<OrganizationRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member' }
@@ -60,6 +61,7 @@ export function TeamSettingsPage({
   onTransferOwnership,
   onRequestDeletion,
   onCancelDeletion,
+  onRequestImmediateDeletion,
 }: TeamSettingsPageProps) {
   const [inviteEmail, setInviteEmail] = React.useState('')
   const [inviteRole, setInviteRole] = React.useState<InvitableRole>('member')
@@ -320,6 +322,7 @@ export function TeamSettingsPage({
         onTransferOwnership={onTransferOwnership}
         onRequestDeletion={onRequestDeletion}
         onCancelDeletion={onCancelDeletion}
+        onRequestImmediateDeletion={onRequestImmediateDeletion}
       />
     </div>
   )

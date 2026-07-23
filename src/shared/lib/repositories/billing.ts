@@ -240,6 +240,27 @@ export async function markBillingSubscriptionCancelAtPeriodEnd(
     .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
 }
 
+/**
+ * The one immediate-cancellation local write in this codebase — used ONLY by the
+ * organization-deletion path (`organizations/deletion.ts`'s `cancelSubscriptionImmediately`), never
+ * by an owner-initiated plan change (`cancelSubscriptionAtPeriodEnd` above is always scheduled).
+ * Optimistic local mirror of the provider call that just succeeded, same as its at-period-end
+ * counterpart — `webhook-handlers.ts`'s `handleSubscriptionDeleted` would set the same fields from a
+ * real Stripe event, but the organization (and this row, via cascade) is typically gone before that
+ * webhook would ever arrive.
+ */
+export async function markBillingSubscriptionCanceledImmediately(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+  canceledAt: Date,
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({ stripeStatus: 'canceled', canceledAt })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
 export interface CreateBillingSubscriptionInput {
   id: string
   organizationId: string
