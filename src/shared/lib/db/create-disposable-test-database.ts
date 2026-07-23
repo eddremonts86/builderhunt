@@ -12,16 +12,20 @@ import postgres from 'postgres'
  * repo's CI already runs a live Postgres service for the whole test/build
  * sequence).
  *
- * Retries the initial migration on a "tuple concurrently updated" conflict:
- * several early migrations run cluster-wide `ALTER ROLE` statements (Postgres
- * roles are not per-database), so two disposable-database test files
- * migrating at the same time — vitest runs test files in parallel by default
- * — can race on the same role catalog rows. This is a transient DDL
- * conflict, not a real bug, and is safe to retry with backoff. Found this the
- * hard way: `billing.test.ts` and `seller-profile.test.ts` each ran their own
- * independent `migrate()` and passed individually, but failed intermittently
- * only when the full suite ran both in parallel.
+ * Several early migrations run cluster-wide `ALTER ROLE` statements
+ * (Postgres roles are not per-database), so two disposable-database test
+ * files migrating at the same time — vitest runs test files in parallel by
+ * default, and this repo now has several billing test files doing this —
+ * can race on the same role catalog rows ("tuple concurrently updated").
+ * Retrying with backoff alone (an earlier version of this file) got flakier
+ * as more billing test files were added and more of them ran in parallel;
+ * a Postgres session-level advisory lock fully serializes the
+ * migration step across every concurrent caller instead of hoping a retry
+ * wins the race, and scales to any number of parallel test files. The retry
+ * loop is kept as a defense-in-depth backstop, not the primary mechanism.
  */
+const MIGRATION_ADVISORY_LOCK_KEY = 918_273_645_102_938
+
 export async function createDisposableTestDatabase(namePrefix: string) {
   const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:postgres@localhost:5432/builderhunt')
   const databaseName = `builderhunt_security_test_${namePrefix}_${randomUUID().replace(/-/g, '').slice(0, 16)}`
@@ -33,7 +37,13 @@ export async function createDisposableTestDatabase(namePrefix: string) {
 
   const client = postgres(databaseUrl.toString(), { max: 1, prepare: false })
   const db = drizzle(client)
-  await migrateWithRetry(db)
+
+  await admin`select pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`
+  try {
+    await migrateWithRetry(db)
+  } finally {
+    await admin`select pg_advisory_unlock(${MIGRATION_ADVISORY_LOCK_KEY})`
+  }
 
   return {
     db,
