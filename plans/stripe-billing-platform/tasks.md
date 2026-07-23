@@ -1,6 +1,6 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (20/~40 tasks — §0-§5 complete: dependency contracts pinned, launch
+> **Status**: `in_progress` (23/~40 tasks — §0-§6 complete: dependency contracts pinned, launch
 > register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit tables
 > added in an additive migration with RLS/runtime-role grants applied and verified live,
 > backup/restore/rollback safety proven with checksum evidence, tenant-safe billing repositories/DTOs
@@ -14,7 +14,9 @@
 > Checkout endpoint (found/fixed a real open-redirect vulnerability in its own return-URL check along
 > the way), the pending-Checkout return experience (polls internal state only, never trusts the
 > redirect URL), and owner/recent-auth-gated restricted Customer Portal sessions; "Validate Stripe
-> Products and Prices" now DONE for the test sandbox — see the note below.)
+> Products and Prices" now DONE for the test sandbox — see the note below. §6 (webhooks/workers) is
+> now fully built: signed durable receipt, idempotent monotonic event handlers, and the claim/lease/
+> backoff/dead-letter worker with platform-admin-audited single-event replay.)
 >
 > **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
 > A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
@@ -410,10 +412,55 @@
     `catalog.test.ts` failure; `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries`/route-coverage
     all clean.
 
-- [ ] **Build billing worker and event replay**
-  - Files: `src/shared/lib/billing/worker.ts`, `src/shared/lib/billing/worker.test.ts`, `src/routes/api/admin/billing/run-worker.ts`, `src/routes/api/admin/billing/events/$eventId/replay.ts`, `docs/operations/stripe-webhooks.md`
+- [x] **Build billing worker and event replay**
+  - Files: `src/shared/lib/billing/worker.ts`, `src/shared/lib/billing/worker.test.ts`, `src/routes/api/admin/billing/run-worker.ts`, `src/routes/api/admin/billing/run-worker.test.ts`, `src/routes/api/admin/billing/events/$eventId/replay.ts`, `src/routes/api/admin/billing/events/$eventId/replay.test.ts`, `docs/operations/stripe-webhooks.md`
   - Do: Claim/lease pending events, retry with bounded backoff, alert dead letters, process grace/grants/expiry/notices/auto-recharge, and expose platform-admin audited single-event replay. Use restricted worker DB role and existing authenticated HTTP-cron pattern.
   - Verify: concurrent worker, crashed lease, poison event, replay, and unknown event tests pass; runbook demonstrates Stripe resend plus internal replay safely.
+  - Progress (2026-07-23): `worker.ts`'s `runBillingWorker(options)` claims up to `batchSize`
+    (default 25) pending/retryable `billing_webhook_events` rows atomically via
+    `FOR UPDATE SKIP LOCKED` with a `leaseSeconds` (default 300) lease window, re-fetches the FULL
+    event from Stripe via a new `EventRetriever` seam (`createStripeEventRetriever()` calling
+    `stripe.events.retrieve(eventId)` in production; tests inject a fake) rather than trying to
+    reconstruct one from the deliberately-minimized local `payload_encrypted` storage — Stripe
+    retains full event bodies for 30 days, which is the correct place to source a full replay body
+    from, not our own lossy audit copy. Each claimed row resolves to one of four outcomes:
+    `'processed'` (the handler applied the event or safely no-op'd on an unrecognized type),
+    `'deferred'` (a recognized-but-not-yet-actionable family — PaymentIntent/refund/dispute — stays
+    `pending` and is retried on the same schedule, never treated as an error), `'retry_scheduled'`
+    (the handler threw; exponential backoff `min(30 * 2^(attempts-1), 3600)` seconds), or
+    `'dead_lettered'` (exhausted `maxAttempts`, default 8, or Stripe no longer has the event past its
+    30-day retention — `status: 'failed'`, never auto-retried again). `sweepExpiredCreditGrants`
+    loops every organization (via the existing `listWorkerOrganizationIds`/`withWorkerOrganization`
+    cross-org pattern, now duplicated a third time in `repositories/billing-worker.ts` with an added
+    optional `db` override for integration-test injection) and expires any credit grant past its
+    natural expiry. `replayBillingWebhookEvent(eventRowId, options)` is a separate, platform-admin-
+    audited path (`ReplayError` with `code: 'not_found'` for an unknown row) that bypasses the
+    claim/lease mechanism entirely and re-processes a row regardless of its current status —
+    idempotent-safe even on an already-`processed` row, since `processStripeWebhookEvent`'s own
+    idempotency guarantees make a replay a no-op rather than a double effect. Two new admin routes
+    (`POST /api/admin/billing/run-worker`, `POST /api/admin/billing/events/$eventId/replay`) mirror
+    the existing `api/admin/alerts/run-worker.ts` pattern exactly: `requirePlatformAdminPrincipal` +
+    `auditPlatformAdminAction` + `platformAdminErrorResponse`. Deliberately does NOT implement
+    dunning/grace enforcement (§7 task 6), auto-recharge (§8 task 5), or any notices/emails — none of
+    that infrastructure exists yet; `docs/operations/stripe-webhooks.md` documents this explicitly as
+    "what this worker does NOT do yet" so the gap is visible rather than silently assumed-covered.
+    Two real bugs found and fixed while writing the 15 worker tests: (1) `sql\`${id} = any(${ids})\``
+    bound a JS array as a scalar tuple rather than a Postgres array (`op ANY/ALL (array) requires
+    array on right side`) — fixed with drizzle's `inArray()` helper instead of hand-rolled SQL; (2)
+    the claim query's WHERE treated any `status = 'pending'` row as immediately claimable regardless
+    of its own `nextAttemptAt`, so a `'deferred'`-outcome row given a future backoff timestamp (while
+    staying `'pending'`) got reclaimed instantly by the next worker run instead of waiting out its
+    backoff — fixed by requiring pending rows to also satisfy `nextAttemptAt IS NULL OR
+    nextAttemptAt <= now`. 15 new worker tests (basic claim/process, no-reclaim-of-processed,
+    deferred-stays-pending, dead-letter-on-missing-event, concurrent-claims-no-overlap across two
+    parallel `runBillingWorker` calls, crashed-lease reclaim vs. still-leased non-reclaim, poison-
+    event backoff-then-dead-letter, dead-lettered-never-reclaimed, replay of any status including
+    idempotent re-replay and unknown-id `ReplayError`, credit-grant expiry sweep), 7 new admin-route
+    tests (success + non-admin-403 + generic-500 for run-worker; success + non-admin-403 +
+    `ReplayError`-to-404 + generic-500 for replay). Full suite 528 total minus the same pre-existing
+    unrelated `catalog.test.ts` failure (527 passing); `pnpm lint` clean (0 errors, only pre-existing
+    warnings), `pnpm security:boundaries` clean, route-coverage valid (83 routes, 8 allowlisted),
+    `routeTree.gen.ts` regenerated for the two new routes.
 
 ## 7. Subscription lifecycle
 

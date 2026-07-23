@@ -136,6 +136,7 @@ import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/ad
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
+import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
@@ -144,6 +145,7 @@ import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } fro
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
+import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -802,6 +804,12 @@ const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   path: '/api/admin/changelog/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminBillingRunWorkerRoute =
+  ApiAdminBillingRunWorkerRouteImport.update({
+    id: '/api/admin/billing/run-worker',
+    path: '/api/admin/billing/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminBillingConfigurationRoute =
   ApiAdminBillingConfigurationRouteImport.update({
     id: '/api/admin/billing/configuration',
@@ -848,6 +856,12 @@ const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
     id: '/evidence/$evidenceId',
     path: '/evidence/$evidenceId',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
+const ApiAdminBillingEventsEventIdReplayRoute =
+  ApiAdminBillingEventsEventIdReplayRouteImport.update({
+    id: '/api/admin/billing/events/$eventId/replay',
+    path: '/api/admin/billing/events/$eventId/replay',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -939,6 +953,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -984,6 +999,7 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
@@ -1072,6 +1088,7 @@ export interface FileRoutesByTo {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -1117,6 +1134,7 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1210,6 +1228,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
+  '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -1255,6 +1274,7 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1347,6 +1367,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1392,6 +1413,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
+    | '/api/admin/billing/events/$eventId/replay'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1480,6 +1502,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1525,6 +1548,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence'
+    | '/api/admin/billing/events/$eventId/replay'
   id:
     | '__root__'
     | '/_dashboard'
@@ -1617,6 +1641,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/configuration'
+    | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1662,6 +1687,7 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
+    | '/api/admin/billing/events/$eventId/replay'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -1715,6 +1741,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
+  ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -1747,6 +1774,7 @@ export interface RootRouteChildren {
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
+  ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -2640,6 +2668,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/run-worker': {
+      id: '/api/admin/billing/run-worker'
+      path: '/api/admin/billing/run-worker'
+      fullPath: '/api/admin/billing/run-worker'
+      preLoaderRoute: typeof ApiAdminBillingRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/configuration': {
       id: '/api/admin/billing/configuration'
       path: '/api/admin/billing/configuration'
@@ -2695,6 +2730,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/builders/$builderId/evidence/$evidenceId'
       preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
+    '/api/admin/billing/events/$eventId/replay': {
+      id: '/api/admin/billing/events/$eventId/replay'
+      path: '/api/admin/billing/events/$eventId/replay'
+      fullPath: '/api/admin/billing/events/$eventId/replay'
+      preLoaderRoute: typeof ApiAdminBillingEventsEventIdReplayRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -2965,6 +3007,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
+  ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
@@ -2998,6 +3041,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
+  ApiAdminBillingEventsEventIdReplayRoute:
+    ApiAdminBillingEventsEventIdReplayRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
