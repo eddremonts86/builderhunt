@@ -30,7 +30,7 @@ import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type Stripe from 'stripe'
 import { computeAnniversary } from './annual-grants'
-import { resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
+import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
 import { grantCredits } from './credits'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
 import { findBillingCustomer } from '../repositories/billing'
@@ -46,7 +46,7 @@ import {
   updateBillingSubscriptionFromStripe,
   withWorkerOrganization,
 } from '../repositories/billing-worker'
-import { workerDb } from '../db/worker-db'
+import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { billingSubscriptions } from '../db/schema'
 import { resolveSubscriptionTransition } from './subscription-state'
 import { projectSubscriptionEntitlement } from './subscriptions'
@@ -83,9 +83,9 @@ export async function processStripeWebhookEvent(
 
   switch (event.type) {
     case 'checkout.session.completed':
-      return handleCheckoutSessionStatus(event.data.object as Stripe.Checkout.Session, 'complete', db)
+      return handleCheckoutSessionStatus(event.data.object as Stripe.Checkout.Session, 'complete', db, new Date(event.created * 1000))
     case 'checkout.session.expired':
-      return handleCheckoutSessionStatus(event.data.object as Stripe.Checkout.Session, 'expired', db)
+      return handleCheckoutSessionStatus(event.data.object as Stripe.Checkout.Session, 'expired', db, new Date(event.created * 1000))
 
     case 'customer.subscription.created':
     case 'customer.subscription.updated':
@@ -101,7 +101,13 @@ export async function processStripeWebhookEvent(
     case 'payment_intent.succeeded':
     case 'payment_intent.payment_failed':
     case 'payment_intent.requires_action':
-      return { outcome: 'deferred', detail: `${event.type}: packs are not built yet (plans/stripe-billing-platform/tasks.md §8 task 1)` }
+      // Pack purchases (§8 task 1) grant on `checkout.session.completed` instead — every pack
+      // Checkout uses the restricted immediate-settlement payment methods (card/link), so Stripe
+      // only sends that event once payment has actually succeeded, and the Checkout attempt row
+      // already carries the organizationId/catalogKey a PaymentIntent-only event would lack. These
+      // PaymentIntent events remain unreconciled until auto-recharge (§8 task 2) creates
+      // off-session PaymentIntents directly, with no Checkout Session to key off of.
+      return { outcome: 'deferred', detail: `${event.type}: auto-recharge is not built yet (plans/stripe-billing-platform/tasks.md §8 task 2)` }
 
     case 'charge.refunded':
     case 'refund.created':
@@ -124,11 +130,8 @@ async function handleCheckoutSessionStatus(
   session: Stripe.Checkout.Session,
   status: 'complete' | 'expired',
   db: PostgresJsDatabase | typeof workerDb,
+  eventTimestamp: Date,
 ): Promise<WebhookHandlerOutcome> {
-  if (session.mode !== 'subscription') {
-    return { outcome: 'deferred', detail: 'Non-subscription-mode Checkout Sessions (packs) are not built yet' }
-  }
-
   const organizationId = await findOrganizationIdForStripeCheckoutSession(session.id, db)
   if (!organizationId) {
     return { outcome: 'deferred', detail: `No checkout attempt found yet for session ${session.id}` }
@@ -142,8 +145,55 @@ async function handleCheckoutSessionStatus(
     }
 
     await updateBillingCheckoutAttemptStatus(tx, organizationId, session.id, status)
+
+    // Packs (action: 'credits', mode: 'payment') grant credits right here, on completion — there is
+    // no subsequent invoice for a one-shot payment-mode Checkout the way subscriptions have
+    // `invoice.paid`. See this file's top-of-file comment and `handlePackCheckoutCompleted` below.
+    if (attempt.action === 'credits' && session.mode === 'payment' && status === 'complete') {
+      return handlePackCheckoutCompleted(tx, organizationId, attempt, session.id, eventTimestamp)
+    }
+
     return { outcome: 'applied', detail: `Checkout attempt ${attempt.id} marked ${status}` }
   }, db)
+}
+
+/**
+ * Grants the exact catalog units for a completed pack purchase (spec.md: "grant exact units for 12
+ * months only on success webhook"). Idempotent via `grantCredits`' own idempotency key, keyed off
+ * this Checkout Session id — a duplicate `checkout.session.completed` delivery (or one arriving
+ * after the attempt was already marked `complete` by a prior delivery, caught above) never grants
+ * twice. Expiry is computed from the event's own timestamp, not "now" (worker clock), so a delayed
+ * replay still expires exactly 12 months after the actual purchase.
+ */
+async function handlePackCheckoutCompleted(
+  tx: WorkerTransaction,
+  organizationId: string,
+  attempt: { id: string; catalogKey: string },
+  stripeCheckoutSessionId: string,
+  eventTimestamp: Date,
+): Promise<WebhookHandlerOutcome> {
+  const catalogEntry = resolvePackCatalogEntryByKey(attempt.catalogKey)
+  if (!catalogEntry) {
+    return { outcome: 'ignored', detail: `Pack catalog key ${attempt.catalogKey} no longer resolves` }
+  }
+
+  const result = await grantCredits(tx, {
+    grantId: randomUUID(),
+    ledgerEntryId: randomUUID(),
+    organizationId,
+    source: 'pack',
+    sourceReference: catalogEntry.key,
+    stripePaymentReference: stripeCheckoutSessionId,
+    units: catalogEntry.credits,
+    expiresAt: computeAnniversary(eventTimestamp, catalogEntry.expiryMonths),
+    idempotencyKey: `pack-grant:${stripeCheckoutSessionId}`,
+  })
+  return {
+    outcome: 'applied',
+    detail: result.replayed
+      ? `Checkout session ${stripeCheckoutSessionId} already granted pack credits — duplicate delivery, no-op`
+      : `Granted ${catalogEntry.credits} pack credits for checkout attempt ${attempt.id}`,
+  }
 }
 
 async function handleSubscriptionUpsert(

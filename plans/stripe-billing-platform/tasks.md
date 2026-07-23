@@ -811,10 +811,63 @@ migration, dunning/recovery) implemented, tested, and committed.
 
 ## 8. Packs, risk, refunds, and disputes
 
-- [ ] **Build pack Checkout and successful grant**
+- [x] **Build pack Checkout and successful grant**
   - Files: `src/shared/lib/billing/packs.ts`, `src/shared/lib/billing/packs.test.ts`, `src/routes/api/billing/checkout/credits.ts`, `src/routes/api/billing/checkout/credits.test.ts`
   - Do: Owner/active-paid only; use payment-mode immutable Price; reject promos; apply Denmark/readiness/rolling risk limits; grant exact units for 12 months only on success webhook; preserve but disable on subscription lapse.
   - Verify: success/decline/pending/duplicate/refund/lapse/reactivation/expiry and spoofed units/amount tests pass.
+  - Progress (2026-07-23): New `billing/packs.ts` mirrors `checkout.ts`'s subscription-Checkout shape
+    (duplicate-idempotency replay, return-URL allowlist, seller-profile country gate,
+    `checkout_credits` consent action — already defined in `consent.ts`) with pack-specific
+    differences: requires `isActivePaidSubscription` (packs cannot be bought standalone),
+    `allowPromotionCodes: false` always (no client input for it — "packs do not accept promotion
+    codes" is enforced server-side, not merely undocumented), and a new
+    `assertWithinRollingPackChargeLimit` pre-check (max 3 successful pack charges or $1,000 in a
+    trailing 24h window, whichever comes first) — exported so §8 task 2 (auto-recharge) shares the
+    exact same counter rather than a second, possibly-inconsistent one. New
+    `catalog.resolvePackCatalogEntryByKey` (unfiltered, mirrors
+    `resolveSubscriptionCatalogEntryByKey`) lets the risk check and the webhook grant resolve a past
+    grant's original price/units even after a catalog entry retires. New
+    `repositories/billing-ledger.listRecentGrantsBySource` powers the risk-window query.
+    The actual grant happens on `checkout.session.completed` for `mode: 'payment'`, not at Checkout
+    creation time and not on `payment_intent.succeeded` — `webhook-handlers.ts`'s
+    `handleCheckoutSessionStatus` no longer bails out for non-subscription-mode sessions; it now
+    branches on the checkout attempt's own `action` (`'credits'` + `mode: 'payment'` + `'complete'`)
+    into new `handlePackCheckoutCompleted`, which grants `catalogEntry.credits` units expiring at
+    `computeAnniversary(eventTimestamp, catalogEntry.expiryMonths)` (event time, not worker "now", so
+    a delayed replay still expires exactly 12 months after the real purchase), idempotent via
+    `pack-grant:${sessionId}`. Chose `checkout.session.completed` over `payment_intent.succeeded` as
+    the grant trigger because every pack Checkout is restricted to
+    `APPROVED_IMMEDIATE_PAYMENT_METHOD_TYPES` (card/link) — session-completed IS payment-succeeded for
+    those methods — and the checkout-attempt row already carries organizationId/catalogKey, which a
+    bare PaymentIntent event has no way to resolve without inventing a Checkout-Session↔PaymentIntent
+    link this codebase doesn't model. `payment_intent.*` events stay `'deferred'`, re-scoped from
+    "packs are not built yet" to "auto-recharge is not built yet (§8 task 2)" — that future off-session
+    flow creates PaymentIntents directly with no Checkout Session to key off of, so it genuinely needs
+    those events; extended `findBillingCheckoutAttemptByStripeSessionId` to also select
+    `action`/`catalogKey` for this branch.
+    "Preserve but disable on subscription lapse" needed no new code: `dunning.ts`'s own top-of-file
+    comment already documents that pack-sourced grants are never frozen by the dunning worker, becoming
+    unusable purely via the pre-existing organization-wide `paymentBlocked` entitlement gate — verified
+    by reading that code path, not re-implemented.
+    23 new `packs.test.ts` tests (billing-disabled, no-active-subscription including a lapsed
+    `past_due` subscription, payment-mode session with promotions disabled, country/catalog/URL/
+    disclosure rejections, duplicate/concurrent idempotency, provider timeout, both rolling-limit
+    branches — 3-charge count and the $1,000 boundary arithmetic tested directly since 3×$299 never
+    reaches $1,000 with today's catalog, and the outside-the-24h-window case), 4 new
+    `webhook-handlers.test.ts` tests (grants exact units, duplicate delivery grants once, a mismatched
+    `action: 'subscription'` session never grants pack credits, an expired session never grants), 15
+    new `credits.test.ts` route tests (owner/admin/member permission matrix, spoofed-field/disclosure/
+    URL rejections, every `PackCheckoutErrorCode`→HTTP mapping, generic 500 without leaking internals).
+    Live-verified against the running dev server (not just vitest): an authenticated owner session
+    hitting `POST /api/billing/checkout/credits` with a garbage body gets the expected Zod
+    `fieldErrors`, and a full valid body correctly returns 403 `no_active_subscription` for this dev
+    org (which has no Stripe subscription) — proving auth/permission/validation/service wiring all work
+    end-to-end, without polluting real dev data to force the happy path (already covered in isolation
+    by the disposable-DB test suite). Full suite 446 total minus the same one pre-existing, already-
+    documented unrelated failure (`catalog.test.ts`'s Price ID expectation, noted in §7 task 6's own
+    evidence above) — 445 passing; `pnpm type-check` (clean); `pnpm lint` (0 errors, same 57
+    pre-existing warnings); `pnpm security:boundaries` (0 legacy imports tracked); route-coverage (87
+    routes — +1 for the new `/api/billing/checkout/credits` route, 8 allowlisted, unchanged, valid).
 
 - [ ] **Implement capped auto-recharge and SCA recovery**
   - Files: `src/shared/lib/billing/auto-recharge.ts`, `src/shared/lib/billing/auto-recharge.test.ts`, `src/routes/api/billing/auto-recharge.ts`, `src/modules/billing/AutoRechargeSettings.tsx`

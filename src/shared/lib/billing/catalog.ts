@@ -205,6 +205,17 @@ export function resolvePackCatalogKey(key: string, now: Date = new Date()): Pack
 }
 
 /**
+ * Unfiltered counterpart to `resolvePackCatalogKey` — mirrors
+ * `resolveSubscriptionCatalogEntryByKey`'s reasoning: a pack grant already on the ledger (read back
+ * via its `sourceReference`, e.g. by the rolling risk-limit check in `billing/packs.ts`) must keep
+ * resolving its original price even after that pack entry is retired from new purchases. Never call
+ * this with a client-submitted key.
+ */
+export function resolvePackCatalogEntryByKey(key: string): PackCatalogEntry | null {
+  return (PACK_CATALOG as Record<string, PackCatalogEntry>)[key] ?? null
+}
+
+/**
  * Unfiltered counterpart to `resolveSubscriptionCatalogKey` — an EXISTING subscription's own
  * recorded catalog key (e.g. read back from `billing_subscriptions.catalog_key` for an
  * `invoice.paid` credit grant) must keep resolving even after that entry is retired from new

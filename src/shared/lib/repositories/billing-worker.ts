@@ -289,7 +289,12 @@ export async function findBillingCheckoutAttemptByStripeSessionId(
   stripeCheckoutSessionId: string,
 ) {
   const [row] = await transaction
-    .select({ id: billingCheckoutAttempts.id, status: billingCheckoutAttempts.status })
+    .select({
+      id: billingCheckoutAttempts.id,
+      status: billingCheckoutAttempts.status,
+      action: billingCheckoutAttempts.action,
+      catalogKey: billingCheckoutAttempts.catalogKey,
+    })
     .from(billingCheckoutAttempts)
     .where(and(eq(billingCheckoutAttempts.organizationId, organizationId), eq(billingCheckoutAttempts.stripeCheckoutSessionId, stripeCheckoutSessionId)))
     .limit(1)

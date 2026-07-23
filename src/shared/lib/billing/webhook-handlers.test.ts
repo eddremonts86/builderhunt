@@ -3,7 +3,8 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
 import { authUsers, billingCheckoutAttempts, billingCreditGrants, billingCustomers, billingSubscriptions, organizationEntitlements, organizations } from '../db/schema'
-import { SUBSCRIPTION_CATALOG } from './catalog'
+import { computeAnniversary } from './annual-grants'
+import { PACK_CATALOG, SUBSCRIPTION_CATALOG } from './catalog'
 import { processStripeWebhookEvent } from './webhook-handlers'
 
 let db: PostgresJsDatabase
@@ -44,11 +45,16 @@ async function readEntitlement(organizationId: string) {
   return row ?? null
 }
 
-async function seedCheckoutAttempt(organizationId: string, userId: string, stripeCheckoutSessionId: string): Promise<string> {
+async function seedCheckoutAttempt(
+  organizationId: string,
+  userId: string,
+  stripeCheckoutSessionId: string,
+  overrides: Partial<{ action: 'subscription' | 'credits'; catalogKey: string }> = {},
+): Promise<string> {
   const id = uniqueId('attempt')
   await db.insert(billingCheckoutAttempts).values({
-    id, organizationId, actorUserId: userId, livemode: false, action: 'subscription',
-    catalogKey: 'pro_monthly', idempotencyKey: uniqueId('idem'), consentVersions: { terms: 'v1.0', privacy: 'v1.0' },
+    id, organizationId, actorUserId: userId, livemode: false, action: overrides.action ?? 'subscription',
+    catalogKey: overrides.catalogKey ?? 'pro_monthly', idempotencyKey: uniqueId('idem'), consentVersions: { terms: 'v1.0', privacy: 'v1.0' },
     stripeCheckoutSessionId, expiresAt: new Date(Date.now() + 60 * 60 * 1000),
   })
   return id
@@ -71,10 +77,16 @@ async function seedSubscription(
   return stripeSubscriptionId
 }
 
-function checkoutSessionEvent(id: string, sessionId: string, type: 'checkout.session.completed' | 'checkout.session.expired', created = 1780000000) {
+function checkoutSessionEvent(
+  id: string,
+  sessionId: string,
+  type: 'checkout.session.completed' | 'checkout.session.expired',
+  created = 1780000000,
+  mode: 'subscription' | 'payment' = 'subscription',
+) {
   return {
     id, type, created, livemode: false, api_version: '2026-06-24.dahlia',
-    data: { object: { id: sessionId, object: 'checkout.session', mode: 'subscription' } },
+    data: { object: { id: sessionId, object: 'checkout.session', mode } },
   } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
 }
 
@@ -531,6 +543,68 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
 
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
     expect(row.gracePeriodEndsAt).toBeNull()
+  })
+})
+
+describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
+  it('grants exact pack credits on checkout.session.completed for a payment-mode session', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const sessionId = `cs_${uniqueId('session')}`
+    await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'credits', catalogKey: 'starter_300' })
+
+    const result = await processStripeWebhookEvent(
+      checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment'),
+      { db },
+    )
+
+    expect(result.outcome).toBe('applied')
+    const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
+    expect(attempt.status).toBe('complete')
+    const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, 'pack')))
+    expect(grants).toHaveLength(1)
+    expect(grants[0].originalUnits).toBe(PACK_CATALOG.starter_300.credits)
+    expect(grants[0].remainingUnits).toBe(PACK_CATALOG.starter_300.credits)
+    expect(grants[0].stripePaymentReference).toBe(sessionId)
+    const expectedExpiry = computeAnniversary(new Date(1780000000 * 1000), PACK_CATALOG.starter_300.expiryMonths)
+    expect(grants[0].expiresAt.toISOString()).toBe(expectedExpiry.toISOString())
+  })
+
+  it('duplicate delivery of the same pack checkout session grants credits exactly once', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const sessionId = `cs_${uniqueId('session')}`
+    await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'credits', catalogKey: 'scale_1000' })
+    const event = checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment')
+
+    await processStripeWebhookEvent(event, { db })
+    const second = await processStripeWebhookEvent(event, { db })
+
+    expect(second.outcome).toBe('applied')
+    const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, 'pack')))
+    expect(grants).toHaveLength(1)
+  })
+
+  it('a payment-mode session for a subscription checkout attempt (mismatched action) never grants pack credits', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const sessionId = `cs_${uniqueId('session')}`
+    await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'subscription' })
+
+    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment'), { db })
+
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
+    expect(grants).toHaveLength(0)
+  })
+
+  it('an expired pack checkout session never grants credits', async () => {
+    const { organizationId, userId } = await seedOrganization()
+    const sessionId = `cs_${uniqueId('session')}`
+    await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'credits', catalogKey: 'starter_300' })
+
+    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.expired', 1780000000, 'payment'), { db })
+
+    const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
+    expect(attempt.status).toBe('expired')
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
+    expect(grants).toHaveLength(0)
   })
 })
 

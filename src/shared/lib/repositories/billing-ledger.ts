@@ -171,6 +171,20 @@ export async function findCreditGrantByMonthlyWindowKey(
   return row ?? null
 }
 
+/** Every grant of one `source` created since `since`, regardless of state — the shared pack/auto-recharge rolling risk-limit check (spec.md: "at most three successful charges or $1,000 in 24 hours") counts successful purchases, not just currently-active ones, so a since-consumed or since-expired grant still counts against the window it was created in. */
+export async function listRecentGrantsBySource(
+  transaction: TenantTransaction,
+  organizationId: string,
+  source: string,
+  since: Date,
+): Promise<BillingCreditGrantRecord[]> {
+  const rows = await transaction
+    .select()
+    .from(billingCreditGrants)
+    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, source)))
+  return rows.filter((row) => row.createdAt.getTime() >= since.getTime())
+}
+
 /** Grants still marked `active` whose `expiresAt` has already passed — the daily worker's expiry sweep target (a later task builds the actual worker; this is the read it will use). */
 export async function listExpiredButStillActiveGrants(
   transaction: TenantTransaction,
