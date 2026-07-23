@@ -78,12 +78,20 @@ export async function listEnrichmentProvenanceForIdentity(builderIdentityId: str
     from enrichment_evidence
     where builder_identity_id = ${builderIdentityId} and resolution in ('accepted', 'review')
     order by observed_at desc
-  `) as unknown as Array<{ connector: string; observed_at: Date; expires_at: Date }>
+  `) as unknown as Array<{ connector: string; observed_at: string; expires_at: string }>
 
-  return rows.map((row) => ({
-    source: row.connector,
-    observedAt: row.observed_at.toISOString(),
-    expiresAt: row.expires_at.toISOString(),
-    retentionState: row.expires_at.getTime() > Date.now() ? 'active' : 'expired',
-  }))
+  // `drizzle`'s raw `.execute()` returns timestamp columns as strings, not
+  // `Date` (unlike the typed query builder, and unlike the underlying
+  // `postgres` driver used directly) — always convert before calling any
+  // Date method. Confirmed this route 500'd on every real call before this
+  // fix (found while extending scripts/db/verify-api-isolation-local.mjs).
+  return rows.map((row) => {
+    const expiresAt = new Date(row.expires_at)
+    return {
+      source: row.connector,
+      observedAt: new Date(row.observed_at).toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      retentionState: expiresAt.getTime() > Date.now() ? 'active' : 'expired',
+    }
+  })
 }

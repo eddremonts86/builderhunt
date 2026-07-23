@@ -6,17 +6,21 @@
 //
 // Scope: saved-queries, organization-alerts, builder tracking/notes/claim,
 // sprints (list/detail/results), builder enrichment/evidence, plans/plan-changes,
-// builder export, organization team/members, dashboard stats/recent-builders/
-// recommendations, account-export privacy, and alerts-worker cross-organization
-// isolation. Still not the full ~34-route inventory in src/routes/api/** — see
-// plans/security-and-multitenancy/tasks.md task 15 for what remains (mainly
-// admin tools and a few subject-only `/api/me/**` routes not covered above);
-// every route in that inventory does have a verified auth guard per
-// scripts/check-route-coverage.mjs, so the gap here is test breadth, not
-// missing guards. Routes that only front a live external network call
-// (search, sprint preview) are exercised via the tenant-scoped logic they
-// actually own (e.g. the tracked-annotation map) rather than the full HTTP
-// handler, to keep this fast and deterministic.
+// builder export, organization team/members, admin content management
+// (changelog/incidents/roadmap/users/plan-requests), dashboard stats/
+// recent-builders/recommendations, subject-only `/api/me/**` routes
+// (data-export, delete-account, verified builder claims, evidence-provenance,
+// restrict-processing, org-tracked builders), the two grant-only public
+// tables (builder_embeddings, discovery_state), account-export privacy, and
+// alerts-worker cross-organization isolation. Still not the full ~34-route
+// inventory in src/routes/api/** — the admin/*/run-worker endpoints and a
+// couple of read-only public routes (changelog/roadmap public GETs, status,
+// incidents public feed) remain uncovered; every route in the full inventory
+// does have a verified auth guard per scripts/check-route-coverage.mjs, so
+// any remaining gap is test breadth, not missing guards. Routes that only
+// front a live external network call (search, sprint preview) are exercised
+// via the tenant-scoped logic they actually own (e.g. the tracked-annotation
+// map) rather than the full HTTP handler, to keep this fast and deterministic.
 //
 // Required env (set by the caller before running):
 //   DATABASE_URL             -> builderhunt_app role connection
@@ -602,6 +606,132 @@ async function checkOrganizationTeamAndMembers() {
   record('members: A (org A owner) cannot remove B (not a member of org A)', deleteCrossOrg.status === 404, `status=${deleteCrossOrg.status}`)
 }
 
+// Admin routes are platform-scoped (requirePlatformAdminPrincipal), not
+// tenant-scoped — there is no organization boundary to test here. What's
+// worth verifying with real route handlers instead: (1) a non-admin session
+// genuinely gets rejected at runtime, not just per the static auth-guard
+// scan in scripts/check-route-coverage.mjs, and (2) editing/deleting one
+// content row never touches another (CRUD scoping, not tenant isolation).
+async function checkAdminContentManagement() {
+  process.env.ADMIN_USER_IDS = IDS.userA
+
+  const { Route: ChangelogListRoute } = await import('../../src/routes/api/admin/changelog/index.ts')
+  const { GET: changelogGET, POST: changelogPOST } = ChangelogListRoute.options.server.handlers
+  const { Route: ChangelogItemRoute } = await import('../../src/routes/api/admin/changelog/$id.ts')
+  const { PATCH: changelogPATCH, DELETE: changelogDELETE } = ChangelogItemRoute.options.server.handlers
+
+  const nonAdminList = await changelogGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/admin/changelog') })
+  record('admin changelog: non-admin session (B) is rejected at runtime', nonAdminList.status === 403, `status=${nonAdminList.status}`)
+
+  const createOne = await (await changelogPOST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog', {
+      method: 'POST', body: JSON.stringify({ title: 'Iso One', content: 'one', slug: 'iso-one', tags: [] }),
+    }),
+  })).json()
+  const createTwo = await (await changelogPOST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog', {
+      method: 'POST', body: JSON.stringify({ title: 'Iso Two', content: 'two', slug: 'iso-two', tags: [] }),
+    }),
+  })).json()
+
+  await changelogPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog/x', { method: 'PATCH', body: JSON.stringify({ title: 'Iso One Updated' }) }),
+    params: { id: createOne.id },
+  })
+  const afterPatch = await (await changelogGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog') })).json()
+  const patchedOne = afterPatch.find((row) => row.id === createOne.id)
+  const untouchedTwo = afterPatch.find((row) => row.id === createTwo.id)
+  record(
+    'admin changelog: PATCH updates only the target row, not the other',
+    patchedOne?.title === 'Iso One Updated' && untouchedTwo?.title === 'Iso Two',
+    JSON.stringify({ patchedOne, untouchedTwo }),
+  )
+
+  await changelogDELETE({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog/x', { method: 'DELETE' }), params: { id: createOne.id } })
+  const afterDelete = await (await changelogGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/changelog') })).json()
+  record(
+    'admin changelog: DELETE removes only the target row, not the other',
+    !afterDelete.some((row) => row.id === createOne.id) && afterDelete.some((row) => row.id === createTwo.id),
+    JSON.stringify(afterDelete.map((row) => row.id)),
+  )
+
+  const { Route: IncidentsListRoute } = await import('../../src/routes/api/admin/incidents/index.ts')
+  const { GET: incidentsGET, POST: incidentsPOST } = IncidentsListRoute.options.server.handlers
+  const { Route: IncidentItemRoute } = await import('../../src/routes/api/admin/incidents/$id.ts')
+  const { PATCH: incidentPATCH } = IncidentItemRoute.options.server.handlers
+
+  const incidentOne = await (await incidentsPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/incidents', { method: 'POST', body: JSON.stringify({ title: 'Incident One' }) }) })).json()
+  const incidentTwo = await (await incidentsPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/incidents', { method: 'POST', body: JSON.stringify({ title: 'Incident Two' }) }) })).json()
+  await incidentPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/incidents/x', { method: 'PATCH', body: JSON.stringify({ status: 'resolved' }) }),
+    params: { id: incidentOne.id },
+  })
+  const incidentsAfter = await (await incidentsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/incidents') })).json()
+  const resolvedOne = incidentsAfter.find((row) => row.id === incidentOne.id)
+  const untouchedIncidentTwo = incidentsAfter.find((row) => row.id === incidentTwo.id)
+  record(
+    'admin incidents: PATCH updates only the target row, not the other',
+    resolvedOne?.status === 'resolved' && untouchedIncidentTwo?.status !== 'resolved',
+    JSON.stringify({ resolvedOne, untouchedIncidentTwo }),
+  )
+
+  const { Route: RoadmapListRoute } = await import('../../src/routes/api/admin/roadmap/index.ts')
+  const { GET: roadmapGET, POST: roadmapPOST } = RoadmapListRoute.options.server.handlers
+  const { Route: RoadmapItemRoute } = await import('../../src/routes/api/admin/roadmap/$id.ts')
+  const { PATCH: roadmapPATCH, DELETE: roadmapDELETE } = RoadmapItemRoute.options.server.handlers
+
+  const roadmapOne = await (await roadmapPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/roadmap', { method: 'POST', body: JSON.stringify({ title: 'Roadmap One' }) }) })).json()
+  const roadmapTwo = await (await roadmapPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/roadmap', { method: 'POST', body: JSON.stringify({ title: 'Roadmap Two' }) }) })).json()
+  await roadmapPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/roadmap/x', { method: 'PATCH', body: JSON.stringify({ status: 'shipped' }) }),
+    params: { id: roadmapOne.id },
+  })
+  await roadmapDELETE({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/roadmap/x', { method: 'DELETE' }), params: { id: roadmapTwo.id } })
+  const roadmapAfter = await (await roadmapGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/roadmap') })).json()
+  const shippedOne = roadmapAfter.find((row) => row.id === roadmapOne.id)
+  record(
+    'admin roadmap: PATCH and DELETE each affect only their own target row',
+    shippedOne?.status === 'shipped' && !roadmapAfter.some((row) => row.id === roadmapTwo.id),
+    JSON.stringify(roadmapAfter.map((row) => ({ id: row.id, status: row.status }))),
+  )
+
+  const { Route: UsersListRoute } = await import('../../src/routes/api/admin/users/index.ts')
+  const { GET: usersGET } = UsersListRoute.options.server.handlers
+  const { Route: UserItemRoute } = await import('../../src/routes/api/admin/users/$userId.ts')
+  const { PATCH: userPATCH } = UserItemRoute.options.server.handlers
+
+  await userPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users/x', { method: 'PATCH', body: JSON.stringify({ plan: 'pro' }) }),
+    params: { userId: IDS.userA },
+  })
+  const usersAfter = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
+  const planA = usersAfter.users.find((u) => u.userId === IDS.userA)
+  const planB = usersAfter.users.find((u) => u.userId === IDS.userB)
+  record(
+    'admin users: plan change targets only the specified user, not the other',
+    planA?.plan === 'pro' && planB?.plan !== 'pro',
+    JSON.stringify({ planA, planB }),
+  )
+
+  const { Route: PlanRequestsRoute } = await import('../../src/routes/api/admin/plan-requests/index.ts')
+  const { POST: planRequestsResolve } = PlanRequestsRoute.options.server.handlers
+  const [pendingRequest] = await owner`
+    insert into plan_requests (id, user_id, requested_plan, status) values (${IDS.planChangeB + '-req'}, ${IDS.userB}, 'team', 'pending') returning id
+  `
+  const resolveResp = await (await planRequestsResolve({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/plan-requests', {
+      method: 'POST', body: JSON.stringify({ requestId: pendingRequest.id, decision: 'approved' }),
+    }),
+  })).json()
+  const usersAfterResolve = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
+  const resolvedPlanB = usersAfterResolve.users.find((u) => u.userId === IDS.userB)
+  record(
+    'admin plan-requests: approving B\'s request sets B\'s plan, not A\'s',
+    resolveResp.ok === true && resolvedPlanB?.plan === 'team',
+    JSON.stringify({ resolveResp, resolvedPlanB }),
+  )
+}
+
 async function checkDashboardStatsAndRecent() {
   const { Route: StatsRoute } = await import('../../src/routes/api/dashboard/stats.ts')
   const { GET: statsGET } = StatsRoute.options.server.handlers
@@ -656,6 +786,96 @@ async function checkRecommendationsScoping() {
 
   const recsA = await (await GET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/recommendations') })).json()
   record('recommendations: A\'s basedOnSearches reflects only A\'s own saved queries', recsA.meta?.basedOnSearches === 1, JSON.stringify(recsA.meta))
+}
+
+// Subject-only `/api/me/**` routes — scoped by session.user.id, not by
+// organization. Run last, after checkBuilderClaim (A already has a verified
+// claim on identityA by this point) and checkOrganizationTeamAndMembers/etc,
+// since delete-account's mutation is the most invasive of anything in this
+// file and should not affect earlier assertions.
+async function checkMeSubjectRoutes() {
+  const { Route: DataExportListRoute } = await import('../../src/routes/api/me/data-export/index.ts')
+  const { GET: exportListGET, POST: exportPOST } = DataExportListRoute.options.server.handlers
+  const { Route: DataExportItemRoute } = await import('../../src/routes/api/me/data-export/$id.ts')
+  const { GET: exportItemGET } = DataExportItemRoute.options.server.handlers
+
+  const exportCreate = await (await exportPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/data-export', { method: 'POST' }) })).json()
+  record('me/data-export: A can request an export', exportCreate.ok === true && typeof exportCreate.id === 'string', JSON.stringify(exportCreate))
+
+  const listA = await (await exportListGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/data-export') })).json()
+  const listB = await (await exportListGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/data-export') })).json()
+  record('me/data-export: A\'s list has A\'s request, B\'s list is empty', listA.some((r) => r.id === exportCreate.id) && listB.length === 0, JSON.stringify({ listA, listB }))
+
+  const ownGet = await exportItemGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/data-export/x'), params: { id: exportCreate.id } })
+  record('me/data-export: A can read A\'s own export by id', ownGet.status === 200, `status=${ownGet.status}`)
+
+  const crossGet = await exportItemGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/data-export/x'), params: { id: exportCreate.id } })
+  record('me/data-export: B cannot read A\'s export by id (other user)', crossGet.status === 404, `status=${crossGet.status}`)
+
+  const { Route: DeleteAccountRoute } = await import('../../src/routes/api/me/delete-account/index.ts')
+  const { GET: deleteAccountGET, POST: deleteAccountPOST, DELETE: deleteAccountDELETE } = DeleteAccountRoute.options.server.handlers
+
+  const beforeB = await (await deleteAccountGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/delete-account') })).json()
+  record('me/delete-account: B has no pending deletion before A requests one', beforeB.request === null, JSON.stringify(beforeB))
+
+  const requestA = await (await deleteAccountPOST({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/delete-account', { method: 'POST' }) })).json()
+  record('me/delete-account: A can request deletion of A\'s own account', requestA.ok === true, JSON.stringify(requestA))
+
+  const afterB = await (await deleteAccountGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/delete-account') })).json()
+  record('me/delete-account: A\'s deletion request never appears for B', afterB.request === null, JSON.stringify(afterB))
+
+  const cancelA = await (await deleteAccountDELETE({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/delete-account', { method: 'DELETE' }) })).json()
+  record('me/delete-account: A can cancel A\'s own deletion request', cancelA.ok === true, JSON.stringify(cancelA))
+
+  // A already has a verified claim on identityA from checkBuilderClaim.
+  const { Route: MeBuilderListRoute } = await import('../../src/routes/api/me/builder/index.ts')
+  const { GET: meBuilderGET } = MeBuilderListRoute.options.server.handlers
+  const meBuilderA = await (await meBuilderGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/builder') })).json()
+  const meBuilderB = await (await meBuilderGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/builder') })).json()
+  record(
+    'me/builder: A\'s verified-claim list has identityA, B\'s is empty',
+    meBuilderA.some((row) => row.id === IDS.identityA) && meBuilderB.length === 0,
+    JSON.stringify({ meBuilderA, meBuilderB }),
+  )
+
+  const { Route: MeBuilderItemRoute } = await import('../../src/routes/api/me/builder/$builderId.ts')
+  const { PATCH: meBuilderPATCH } = MeBuilderItemRoute.options.server.handlers
+  const patchOwnClaim = await meBuilderPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/builder/x', { method: 'PATCH', body: JSON.stringify({ bio: 'iso claimed bio' }) }),
+    params: { builderId: IDS.identityA },
+  })
+  record('me/builder: A can update A\'s own verified claim', patchOwnClaim.status === 200, `status=${patchOwnClaim.status}`)
+
+  const patchOtherIdentity = await meBuilderPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/builder/x', { method: 'PATCH', body: JSON.stringify({ bio: 'should not land' }) }),
+    params: { builderId: IDS.identityB },
+  })
+  record('me/builder: A cannot update identityB (never claimed by A)', patchOtherIdentity.status === 403, `status=${patchOtherIdentity.status}`)
+
+  const { Route: EvidenceProvenanceRoute } = await import('../../src/routes/api/me/builder/$builderId/evidence-provenance.ts')
+  const { GET: provenanceGET } = EvidenceProvenanceRoute.options.server.handlers
+  const provenanceOwn = await provenanceGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/builder/x/evidence-provenance'), params: { builderId: IDS.identityA } })
+  record('evidence-provenance: A (verified claimant) can read A\'s own provenance', provenanceOwn.status === 200, `status=${provenanceOwn.status}`)
+
+  const provenanceOther = await provenanceGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/builder/x/evidence-provenance'), params: { builderId: IDS.identityA } })
+  record('evidence-provenance: B (not a claimant of identityA) is rejected', provenanceOther.status === 403, `status=${provenanceOther.status}`)
+
+  const { Route: RestrictProcessingRoute } = await import('../../src/routes/api/me/builder/$builderId/restrict-processing.ts')
+  const { POST: restrictPOST } = RestrictProcessingRoute.options.server.handlers
+  const restrictOther = await restrictPOST({
+    request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/builder/x/restrict-processing', { method: 'POST' }),
+    params: { builderId: IDS.identityA },
+  })
+  record('restrict-processing: B (not a claimant of identityA) is rejected', restrictOther.status === 403, `status=${restrictOther.status}`)
+
+  const { Route: MeBuildersRoute } = await import('../../src/routes/api/me/builders/index.ts')
+  const { GET: meBuildersGET } = MeBuildersRoute.options.server.handlers
+  const meBuildersA = await (await meBuildersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/builders') })).json()
+  record(
+    'me/builders: A\'s org-tracked list has A\'s tracked identity, not B\'s',
+    meBuildersA.some((row) => row.identityId === IDS.identityA) && !meBuildersA.some((row) => row.identityId === IDS.identityB),
+    JSON.stringify(meBuildersA.map((row) => row.identityId)),
+  )
 }
 
 async function checkAccountExportPrivacy() {
@@ -717,6 +937,14 @@ async function main() {
   await checkRecommendationsScoping()
   await checkAccountExportPrivacy()
   await checkWorkerIsolation()
+  // Run last: checkAdminContentManagement approves a plan-request for B
+  // (legitimately recording admin A's id in B's own plan-change history) and
+  // checkMeSubjectRoutes requests/cancels a real account deletion — both
+  // would otherwise trip checkAccountExportPrivacy's blunt
+  // never-mentions-the-other-user's-id assertion, which was written
+  // assuming no such legitimate cross-reference exists yet.
+  await checkAdminContentManagement()
+  await checkMeSubjectRoutes()
 
   const failed = results.filter((r) => !r.pass)
   console.log(JSON.stringify({ total: results.length, passed: results.length - failed.length, failed: failed.length, results }, null, 2))

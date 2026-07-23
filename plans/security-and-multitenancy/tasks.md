@@ -64,6 +64,49 @@
 > test suite (638/638). This makes 3 for 3: every previously-unexercised app-role write path found so
 > far in this session had a missing grant — worth treating as a standing suspicion for any other table
 > that's only ever been tested against the DB owner role, not just the ones audited here.
+>
+> **Update (2026-07-23, grant audit extended to worker/platform roles)**: repeated the same
+> schema-vs-grants diff for `builderhunt_worker` and `builderhunt_platform`, this time cross-referencing
+> every candidate against actual call sites (which file imports which table alongside which DB client)
+> instead of raw absence, to separate real bugs from tables those roles are correctly never meant to
+> touch. Worker role: one candidate (`builder_processing_restrictions` in
+> `enrichment-restrictions.ts`) turned out to be a false positive — that file imports `workerDb` but
+> only ever queries the table via `platformDb`, matching the documented platform-only design (0017's
+> own comment). No real bugs. Platform role: found `checkPlatformLimit` in
+> `src/shared/lib/repositories/platform-billing.ts` querying `builders`/`saved_queries` via
+> `platformDb`, which has no grant *and* no RLS policy for `builderhunt_platform` on either table (both
+> have RLS forced) — would silently return zero rows, always resolving a limit check as "under limit."
+> However, `checkLimit` (its re-export) has zero callers anywhere in the codebase — dead code from the
+> pre-organization per-user plan-limit system, superseded by the org-based entitlement pattern used
+> everywhere else. Not an active bug since nothing invokes it, but a landmine if re-wired later; flagged
+> as a separate background task (spawn_task) rather than fixed here, since fixing unreachable code isn't
+> this task's job. With this, the grant audit across all 4 roles is complete: every table any live route
+> or worker actually queries has been cross-checked against its role's grants.
+>
+> **Update (2026-07-23, admin tools + subject-only `/api/me/**` route coverage)**: extended
+> `scripts/db/verify-api-isolation-local.mjs` with `checkAdminContentManagement` (changelog, incidents,
+> roadmap, users, plan-requests — a non-admin session rejected at runtime, and CRUD scoping: editing
+> or deleting one row never touches another) and `checkMeSubjectRoutes` (data-export, delete-account,
+> verified builder claims, evidence-provenance, restrict-processing, org-tracked builders — all scoped
+> by session.user.id/verified-claimant, not organization). Both run last, after
+> `checkAccountExportPrivacy`, since approving a plan-request or requesting account deletion legitimately
+> writes cross-user references (e.g. `changedBy: <admin id>` in the target's own plan-change history)
+> that would otherwise trip that check's blunt never-mentions-the-other-user's-id assertion.
+>
+> **Found a fourth real, previously-undiscovered bug** — different class this time, not a missing
+> grant: `listEnrichmentProvenanceForIdentity` in `src/shared/lib/repositories/enrichment-restrictions.ts`
+> (backs `GET /api/me/builder/$builderId/evidence-provenance`) called `.toISOString()`/`.getTime()` on
+> rows from `workerDb.execute(sql\`...\`)`, assuming Postgres `timestamptz` columns come back as `Date`.
+> Confirmed empirically (see scratch scripts run against a disposable DB) that drizzle-orm's raw
+> `.execute()` returns those columns as strings — unlike its typed `.select()` builder, and unlike the
+> underlying `postgres` driver used directly, which both correctly parse to `Date`. This route has
+> 500'd on every real call since the stealth-scraping/subject-rights feature shipped; nothing had ever
+> exercised it with a real verified claim + real evidence row before. Fixed by wrapping both fields in
+> `new Date(...)` before calling `.toISOString()`/`.getTime()`. Full re-run: `pnpm test:migrations:local`
+> (26 migrations), `drizzle-kit check`, `pnpm test:api-isolation:local` → **83/83** (up from 61/61),
+> `pnpm type-check`/`pnpm lint` (0 errors)/`security:boundaries`/`security:route-coverage` all clean,
+> full test suite 638/638. Four for four now — every previously-unexercised code path this session
+> actually touched had a real, silent bug.
 
 Tasks are ordered as reviewer-sized, independently testable deliverables. Each implementation commit
 must include its tests and must not stage unrelated worktree changes.
