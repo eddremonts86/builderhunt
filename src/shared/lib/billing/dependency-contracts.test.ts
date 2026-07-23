@@ -121,12 +121,35 @@ describe('billing module boundary', () => {
       .map((entry) => join(billingDir, entry.name))
   }
 
-  it('no billing module accepts a bare organizationId as its authority', async () => {
+  /**
+   * Functions that legitimately take a bare `organizationId` as their first parameter — never out of
+   * carelessness, but because there is no `TenantPrincipal` to derive one from in their actual call
+   * path: platform-operator-only functions (a `PlatformAdminPrincipal`-gated route has no
+   * `TenantPrincipal` at all — matches `billing/permissions.ts`'s own documented separation) or a
+   * function that deliberately runs an INDEPENDENT, always-committed transaction rather than reusing
+   * the caller's own about-to-roll-back one (see `risk.ts`'s own module comment for
+   * `recordPaymentFailure`'s exact reasoning). This mirrors `scripts/check-tenant-boundaries.mjs`'s
+   * `roleLiteralCheckAllowlist` — an explicit, reviewed exemption list, not a blanket per-file skip
+   * (so a genuinely tenant-scoped function added to the same file later is still caught). Adding a
+   * name here must be paired with a doc comment at the function itself explaining why.
+   */
+  const BARE_ORGANIZATION_ID_ALLOWLIST = new Set([
+    'recordPaymentFailure', // risk.ts — independent, always-committed transaction (see module comment)
+    'listRiskExceptions', // risk.ts — platform-operator-only (no TenantPrincipal in that call path)
+    'revokeRiskException', // risk.ts — platform-operator-only (no TenantPrincipal in that call path)
+  ])
+
+  it('no billing module accepts a bare organizationId as its authority, unless explicitly allowlisted', async () => {
+    const pattern = /export (?:async )?function (\w+)\(\s*organizationId\s*:\s*string/g
     for (const file of await billingSourceFiles()) {
       const source = await readFile(file, 'utf8')
-      expect(source, `${file} must accept a TenantPrincipal, not a bare organizationId`).not.toMatch(
-        /export (?:async )?function \w+\(\s*organizationId\s*:\s*string/,
-      )
+      for (const match of source.matchAll(pattern)) {
+        const functionName = match[1]
+        expect(
+          BARE_ORGANIZATION_ID_ALLOWLIST.has(functionName),
+          `${file}: ${functionName} must accept a TenantPrincipal, not a bare organizationId (or be added to BARE_ORGANIZATION_ID_ALLOWLIST with a reason)`,
+        ).toBe(true)
+      }
     }
   })
 
