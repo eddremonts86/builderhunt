@@ -6,6 +6,7 @@ import {
   listActiveSubscriptionCatalog,
   PACK_CATALOG,
   resolvePackCatalogKey,
+  resolveSubscriptionCatalogEntryByStripePriceId,
   resolveSubscriptionCatalogKey,
   SUBSCRIPTION_CATALOG,
   TIER_PRESENTATION,
@@ -104,6 +105,22 @@ describe('resolving a client-submitted catalog key', () => {
     const retired = { effectiveAt: '2025-01-01', retiredAt: '2026-01-01' }
     expect(isActive(retired, new Date('2025-06-01'))).toBe(true)
     expect(isActive(retired, new Date('2026-06-01'))).toBe(false)
+  })
+})
+
+describe('resolving a Stripe Price ID back to its catalog entry (webhook direction)', () => {
+  it('resolves a known test-mode Price ID to the matching entry', () => {
+    const entry = resolveSubscriptionCatalogEntryByStripePriceId(SUBSCRIPTION_CATALOG.team_monthly.stripePriceId.test!, false)
+    expect(entry?.key).toBe('team_monthly')
+  })
+
+  it('returns null for an unknown Price ID', () => {
+    expect(resolveSubscriptionCatalogEntryByStripePriceId('price_does_not_exist', false)).toBeNull()
+  })
+
+  it('never matches a test-mode Price ID under a livemode=true lookup, or vice versa', () => {
+    const testPriceId = SUBSCRIPTION_CATALOG.pro_monthly.stripePriceId.test!
+    expect(resolveSubscriptionCatalogEntryByStripePriceId(testPriceId, true)).toBeNull()
   })
 })
 

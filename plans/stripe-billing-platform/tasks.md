@@ -361,10 +361,54 @@
     suite 373/373 minus the same pre-existing unrelated `catalog.test.ts` failure; `pnpm type-check`/
     `pnpm lint`/`pnpm security:boundaries`/route-coverage all clean; `routeTree.gen.ts` regenerated.
 
-- [ ] **Implement idempotent monotonic event handlers**
+- [x] **Implement idempotent monotonic event handlers**
   - Files: `src/shared/lib/billing/webhook-handlers.ts`, `src/shared/lib/billing/webhook-handlers.test.ts`, `src/shared/lib/billing/subscription-state.ts`, `src/shared/lib/billing/subscription-state.test.ts`
   - Do: Handle required Checkout/invoice/subscription/PaymentIntent/refund/dispute families. Retrieve current objects when needed, enforce legal state transitions/provider timestamps, and make unknown events safe no-ops. Link every effect to event/object idempotency.
   - Verify: permutation tests deliver fixtures duplicate/reversed/delayed and produce identical final subscription, entitlement, refund, and ledger state.
+  - Progress (2026-07-23): `subscription-state.ts` is the pure decision core —
+    `resolveSubscriptionTransition(current, incoming)` combines terminal-status locking
+    (`canceled`/`incomplete_expired` can never transition again — a resubscribe is always a new
+    Stripe subscription id, never a status flip back) with monotonic-timestamp ordering
+    (`isMonotonicallyNewer`) into one of five outcomes: `first_seen`/`duplicate`/`newer`/`stale`/
+    `terminal_locked`. `webhook-handlers.ts`'s `processStripeWebhookEvent(event, {db, livemode})`
+    dispatches every required family: `checkout.session.completed/expired` mark a checkout attempt
+    terminal (idempotent — already-terminal is a no-op, never regresses); `customer.subscription.
+    created/updated` resolve the org via a NEW cross-org lookup (`repositories/billing-worker.ts`,
+    see below), create the `billing_subscriptions` row on first sighting (tier/interval/catalogKey
+    resolved from the subscription's Price ID via a new `resolveSubscriptionCatalogEntryByStripePriceId`)
+    or apply the transition subscription-state.ts approved; `customer.subscription.deleted` cancels
+    (through the same transition gate); `invoice.paid` issues the subscription's monthly credit
+    allowance via the already-built `credits.ts.grantCredits`, idempotent by `invoice-grant:<invoiceId>`
+    (a business key, not the delivery-specific event id, so redelivery via a different event id still
+    converges) — the allowance is read from the SUBSCRIPTION's own recorded catalog key via a new
+    unfiltered `resolveSubscriptionCatalogEntryByKey` (never re-derived from the invoice's own
+    line-item shape, and deliberately NOT filtered by `isActive`, since an existing subscriber must
+    keep resolving correctly even after that catalog entry is later retired from new signups);
+    `invoice.payment_failed` records a grace-period marker (set-once, per markBillingSubscriptionGraceStart's
+    own guard) for the not-yet-built dunning worker (§7 task 6) to act on later.
+    New `repositories/billing-worker.ts` solves a structural problem: a webhook event carries only
+    Stripe object ids, never our organizationId, and even `builderhunt_worker`'s RLS policies are
+    still `organization_id = current_setting(...)`-scoped — there is no unscoped cross-tenant read
+    path. Mirrors the SAME loop pattern `sprints-worker.ts`/`alerts-worker.ts` already established
+    (list every org id, then check each one's rows inside a transaction scoped to exactly that org
+    via `set_config`) but — deviating from their hardcoded-`workerDb` precedent — adds an optional
+    `db` override on every exported function, since this code moves real money and deserves real
+    disposable-database integration-test coverage rather than pure-logic-only tests. O(organizations)
+    per lookup; documented as an accepted, revisitable tradeoff at this app's current scale.
+    PaymentIntent/refund/dispute events are deliberately reported as `'deferred'` — a THIRD, distinct
+    outcome from `'ignored'` — since packs (§8 task 1), refund review (§8 task 4), and dispute
+    handling (§8 tasks 2-3) don't exist yet; there is nothing in this app today for those events to
+    reconcile against. "Deferred" tells the future worker (§6 task 3) to leave the row pending and
+    revisit once that infrastructure lands, never that nothing needs to happen — attempting to fully
+    implement all six required families in one task would have meant building most of §7 and §8
+    prematurely inside this one. 17 new subscription-state.ts tests (every transition outcome, plus a
+    reversed-delivery permutation proving the newest event always wins regardless of arrival order),
+    32 new webhook-handlers.ts tests (every event family, duplicate-delivery idempotency, a
+    reversed-order permutation, an out-of-order invoice.paid-before-subscription-created permutation
+    that resolves once the subscription later appears, grace-marker set-once and clear-on-recovery,
+    every deferred/ignored family). Full suite 506/506 minus the same pre-existing unrelated
+    `catalog.test.ts` failure; `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries`/route-coverage
+    all clean.
 
 - [ ] **Build billing worker and event replay**
   - Files: `src/shared/lib/billing/worker.ts`, `src/shared/lib/billing/worker.test.ts`, `src/routes/api/admin/billing/run-worker.ts`, `src/routes/api/admin/billing/events/$eventId/replay.ts`, `docs/operations/stripe-webhooks.md`

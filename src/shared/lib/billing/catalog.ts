@@ -203,3 +203,27 @@ export function resolvePackCatalogKey(key: string, now: Date = new Date()): Pack
   if (!entry || !isActive(entry, now)) return null
   return entry
 }
+
+/**
+ * Unfiltered counterpart to `resolveSubscriptionCatalogKey` — an EXISTING subscription's own
+ * recorded catalog key (e.g. read back from `billing_subscriptions.catalog_key` for an
+ * `invoice.paid` credit grant) must keep resolving even after that entry is retired from new
+ * signups; retirement blocks new Checkout attempts, not recognition of an already-active
+ * subscriber's own plan. Never call this with a client-submitted key.
+ */
+export function resolveSubscriptionCatalogEntryByKey(key: string): SubscriptionCatalogEntry | null {
+  return (SUBSCRIPTION_CATALOG as Record<string, SubscriptionCatalogEntry>)[key] ?? null
+}
+
+/**
+ * The reverse direction of `resolveSubscriptionCatalogKey` — given a Stripe Price ID a webhook
+ * event carries (never a client-submitted value; this is only ever called with an id read back
+ * from Stripe's own object), finds which catalog entry it belongs to. Checks retired entries too
+ * (`isActive` is NOT applied here): an existing subscriber must keep resolving correctly against a
+ * Price that was later retired from new signups — retirement blocks new Checkout attempts, not
+ * recognition of an already-active subscription's own Price.
+ */
+export function resolveSubscriptionCatalogEntryByStripePriceId(priceId: string, livemode: boolean): SubscriptionCatalogEntry | null {
+  const key = livemode ? 'live' : 'test'
+  return Object.values(SUBSCRIPTION_CATALOG).find((entry) => entry.stripePriceId[key] === priceId) ?? null
+}
