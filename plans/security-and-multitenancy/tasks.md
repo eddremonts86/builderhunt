@@ -83,6 +83,17 @@
 > this task's job. With this, the grant audit across all 4 roles is complete: every table any live route
 > or worker actually queries has been cross-checked against its role's grants.
 >
+> **Update (2026-07-23, landmine resolved)**: the flagged task ran. Confirmed via `git log` that
+> `checkPlatformLimit` was a mechanical oversight, not a deliberate design choice — the whole
+> `platform-billing.ts` file was moved from the original app-role `db` connection to `platformDb`
+> uniformly in one commit (`dc2eec1`, "complete secure data access boundaries") without checking
+> per-table reachability under the new role. Re-confirmed zero callers of `checkLimit`/`checkPlatformLimit`
+> and deleted both, plus the unused `builders`/`saved_queries`/`PLAN_LIMITS` imports it left behind.
+> `LimitCheck`/`LimitResource` in `billing-shared.ts` were NOT deleted — `src/routes/_dashboard/settings/
+> billing.tsx` builds those same shapes itself from `/api/plans/me`, a live, unrelated consumer, caught
+> by grepping for usages before deleting rather than trusting the first grep pass. Verified: `pnpm
+> type-check` clean, `pnpm lint` 0 errors, full test suite 638/638.
+>
 > **Update (2026-07-23, admin tools + subject-only `/api/me/**` route coverage)**: extended
 > `scripts/db/verify-api-isolation-local.mjs` with `checkAdminContentManagement` (changelog, incidents,
 > roadmap, users, plan-requests — a non-admin session rejected at runtime, and CRUD scoping: editing
