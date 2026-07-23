@@ -10,7 +10,8 @@ import {
   type OrganizationMemberDto,
   type OrganizationRole,
 } from '~/shared/lib/organizations/contracts'
-import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Dialog, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { TransferOwnershipPreview } from './TransferOwnershipPreview'
 
 /**
  * Extracted from TeamSettingsPage so the recent-auth challenge, the
@@ -58,6 +59,7 @@ export function OrganizationDangerZone({
   onCancelDeletion,
 }: OrganizationDangerZoneProps) {
   const [transferTarget, setTransferTarget] = React.useState('')
+  const [transferPreviewOpen, setTransferPreviewOpen] = React.useState(false)
   const [confirmDelete, setConfirmDelete] = React.useState(false)
   const [confirmName, setConfirmName] = React.useState('')
 
@@ -164,7 +166,7 @@ export function OrganizationDangerZone({
               </div>
               <button
                 type="button"
-                onClick={() => transferTarget && (onTransferOwnership ?? noop)(transferTarget)}
+                onClick={() => transferTarget && setTransferPreviewOpen(true)}
                 disabled={busy || !transferTarget}
                 className="btn-danger-outline text-sm"
                 data-testid="transfer-ownership-btn"
@@ -174,6 +176,24 @@ export function OrganizationDangerZone({
               </button>
             </div>
           </div>
+        )}
+
+        {transferPreviewOpen && (
+          <Dialog
+            open={transferPreviewOpen}
+            onClose={() => setTransferPreviewOpen(false)}
+            title={`Transfer ownership to ${transferableMembers.find((m) => m.userId === transferTarget)?.name ?? 'this member'}`}
+          >
+            <TransferOwnershipPreview
+              targetName={transferableMembers.find((m) => m.userId === transferTarget)?.name ?? 'This member'}
+              confirmDisabled={busy}
+              onConfirm={() => {
+                setTransferPreviewOpen(false)
+                if (transferTarget) (onTransferOwnership ?? noop)(transferTarget)
+              }}
+              onCancel={() => setTransferPreviewOpen(false)}
+            />
+          </Dialog>
         )}
 
         {canDelete && !pendingDeletion && (

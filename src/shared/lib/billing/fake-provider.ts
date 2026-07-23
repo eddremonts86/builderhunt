@@ -43,6 +43,7 @@ import type {
   CreatePortalSessionInput,
   CreateRefundInput,
   CreateSetupIntentInput,
+  PaymentMethodSummary,
   PreviewSubscriptionChangeInput,
   ReconciliationObjectType,
   RefreshableObjectType,
@@ -88,6 +89,12 @@ export class FakeBillingProvider implements BillingProvider {
 
   async getCustomer(customerId: string): Promise<BillingCustomer | null> {
     return this.customers.get(customerId) ?? null
+  }
+
+  /** Deterministic fake — every known customer "has" the same fake Visa on file; a real adapter would read Stripe's actual default payment method. */
+  async getDefaultPaymentMethodSummary(customerId: string): Promise<PaymentMethodSummary | null> {
+    if (!this.customers.has(customerId)) return null
+    return { brand: 'visa', last4: '4242' }
   }
 
   async createCheckoutSession(input: CreateCheckoutSessionInput): Promise<BillingCheckoutSession> {

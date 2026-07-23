@@ -333,3 +333,67 @@ export async function getBillingAvailability(principal: TenantPrincipal): Promis
 
   return { capabilities: { paidActionsAllowed } }
 }
+
+/** Masked-only — see `PaymentMethodSummary`'s own doc comment in `provider.ts`: no PAN, no expiry, no billing address. */
+export interface OwnershipTransferPaymentMethodDto {
+  brand: string
+  last4: string
+}
+
+/**
+ * Read-only preview shown before confirming an ownership transfer (plans/stripe-billing-platform/
+ * tasks.md §9 task 5). Deliberately makes ZERO calls to any provider method that could create a
+ * charge, a Checkout Session, or a PaymentIntent — only `getCustomer`/`getDefaultPaymentMethodSummary`
+ * (both pure reads). "Atomically move billing authority with ownership" needs no write of its own
+ * here: `billing_customers`/`billing_subscriptions` are keyed by `organizationId`, never by a user id
+ * (confirmed by reading `schema.ts` in full) — the Customer/subscription/payment method already
+ * belong to the organization regardless of who its owner is, and every billing permission check
+ * (`billing/permissions.ts`) already derives authority purely from `organization_members.role`, the
+ * exact column `transferOwnership` (`auth/organization-lifecycle.ts`) flips. There is no separate
+ * "billing owner" row to migrate.
+ */
+export interface OwnershipTransferBillingPreviewDto {
+  hasBillingCustomer: boolean
+  paymentMethod: OwnershipTransferPaymentMethodDto | null
+  tier: string
+  billingPeriod: string
+  currentPeriodEnd: string | null
+  nextChargeAmountCents: number | null
+  cancelAtPeriodEnd: boolean
+}
+
+export async function getOwnershipTransferBillingPreview(principal: TenantPrincipal): Promise<OwnershipTransferBillingPreviewDto> {
+  const [{ withTenantContext }, repo, entitlementsRepo, { getBillingProvider }, { resolveSubscriptionCatalogEntryByKey }] = await Promise.all([
+    import('../db/tenant-context'),
+    import('../repositories/billing'),
+    import('../repositories/entitlements'),
+    import('./stripe-provider'),
+    import('./catalog'),
+  ])
+
+  const livemode = isLiveMode()
+  const provider = getBillingProvider()
+
+  const { policy, period, subscription, customer } = await withTenantContext(principal, async (tx) => {
+    const [policy, period, subscription, customer] = await Promise.all([
+      entitlementsRepo.getOrganizationEntitlement(tx, principal.organizationId),
+      entitlementsRepo.getOrganizationEntitlementPeriod(tx, principal.organizationId),
+      repo.findActiveBillingSubscription(tx, principal.organizationId, livemode),
+      repo.findBillingCustomer(tx, principal.organizationId, livemode),
+    ])
+    return { policy, period, subscription, customer }
+  })
+
+  const paymentMethod = customer ? await provider.getDefaultPaymentMethodSummary(customer.stripeCustomerId) : null
+  const catalogEntry = subscription ? resolveSubscriptionCatalogEntryByKey(subscription.catalogKey) : null
+
+  return {
+    hasBillingCustomer: Boolean(customer),
+    paymentMethod,
+    tier: policy.tier,
+    billingPeriod: period.billingPeriod,
+    currentPeriodEnd: (subscription?.currentPeriodEnd ?? period.currentPeriodEnd)?.toISOString() ?? null,
+    nextChargeAmountCents: catalogEntry?.amountCents ?? null,
+    cancelAtPeriodEnd: subscription?.cancelAtPeriodEnd ?? false,
+  }
+}

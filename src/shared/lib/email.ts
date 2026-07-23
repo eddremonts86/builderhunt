@@ -448,6 +448,68 @@ export async function sendBillingPaymentFailedEmail(to: string): Promise<SendRes
   }
 }
 
+/** Sent to the FORMER owner once an ownership transfer commits (plans/stripe-billing-platform/tasks.md §9 task 5) — confirms billing authority moved with ownership, never a request for action. */
+export async function sendOwnershipTransferredFromEmail(to: string, organizationName: string, newOwnerName: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Ownership-transferred (from) email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: `You transferred ownership of ${organizationName}`,
+        html: ownershipTransferredFromEmailHtml(organizationName, newOwnerName),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Sent to the NEW owner once an ownership transfer commits — billing authority (subscription, payment method, Portal access) moved to them along with ownership. */
+export async function sendOwnershipTransferredToEmail(to: string, organizationName: string, previousOwnerName: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Ownership-transferred (to) email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: `You're now the owner of ${organizationName}`,
+        html: ownershipTransferredToEmailHtml(organizationName, previousOwnerName),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 function deletionScheduledEmailHtml(gracePeriodEndDate: string): string {
   return `<!doctype html>
 <html>
@@ -533,6 +595,37 @@ function billingPaymentFailedEmailHtml(): string {
     <p style="margin:1.5rem 0;">
       <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
     </p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function ownershipTransferredFromEmailHtml(organizationName: string, newOwnerName: string): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">You transferred ownership of ${organizationName}</h1>
+    <p><strong>${newOwnerName}</strong> is now the owner of ${organizationName}. Billing authority — the
+      subscription, saved payment method, and Customer Portal access — moved to them along with ownership.
+      Nothing was charged as part of this transfer.</p>
+    <p style="color:#6b7280;font-size:0.85rem;">If you didn't request this, contact us immediately.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function ownershipTransferredToEmailHtml(organizationName: string, previousOwnerName: string): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">You're now the owner of ${organizationName}</h1>
+    <p><strong>${previousOwnerName}</strong> transferred ownership of ${organizationName} to you. Billing
+      authority — the subscription, saved payment method, and Customer Portal access — moved to you along with
+      ownership. Nothing was charged as part of this transfer.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review billing</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.85rem;">If you didn't expect this, contact us immediately.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
 </html>`

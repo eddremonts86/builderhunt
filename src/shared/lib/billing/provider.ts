@@ -176,9 +176,18 @@ export interface CreateRefundInput {
 export type ReconciliationObjectType = 'customers' | 'subscriptions' | 'payment_intents' | 'refunds'
 export type RefreshableObjectType = 'customer' | 'subscription' | 'checkout_session' | 'payment_intent'
 
+/** Never the full payment method — only what's safe to display in a UI (e.g. an ownership-transfer preview): card network and last 4 digits. No PAN, no expiry, no billing address. */
+export interface PaymentMethodSummary {
+  brand: string
+  last4: string
+}
+
 export interface BillingProvider {
   createCustomer(input: CreateCustomerInput): Promise<BillingCustomer>
   getCustomer(customerId: string): Promise<BillingCustomer | null>
+
+  /** Read-only, masked-only summary of the customer's default payment method — never invoked from a mutating flow (spec.md's ownership-transfer preview is the only caller). Returns null if the customer has no default payment method on file yet. */
+  getDefaultPaymentMethodSummary(customerId: string): Promise<PaymentMethodSummary | null>
 
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<BillingCheckoutSession>
   getCheckoutSession(checkoutSessionId: string): Promise<BillingCheckoutSession | null>

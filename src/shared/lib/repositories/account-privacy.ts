@@ -243,6 +243,19 @@ export async function findAccountEmail(userId: string): Promise<string | null> {
   return row?.email ?? null
 }
 
+/** Used where a notification needs both the recipient address and a display name (e.g. ownership-transfer emails) — `findAccountEmail` alone is enough for every other existing caller, so that one is left untouched. */
+export async function findAccountEmailAndName(userId: string): Promise<{ email: string; name: string } | null> {
+  const [row] = await authDb.select({ email: authUsers.email, name: authUsers.name }).from(authUsers)
+    .where(eq(authUsers.id, userId)).limit(1)
+  return row ?? null
+}
+
+export async function findOrganizationName(organizationId: string): Promise<string | null> {
+  const [row] = await authDb.select({ name: organizations.name }).from(organizations)
+    .where(eq(organizations.id, organizationId)).limit(1)
+  return row?.name ?? null
+}
+
 export const insertDeletionRequest = (input: typeof deletionRequests.$inferInsert) => accountDb.insert(deletionRequests).values(input)
 export const updateDeletionRequest = (id: string, input: Partial<typeof deletionRequests.$inferInsert>) => accountDb
   .update(deletionRequests).set(input).where(eq(deletionRequests.id, id))

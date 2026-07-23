@@ -1452,10 +1452,63 @@ migration, dunning/recovery) implemented, tested, and committed.
     imports); route-coverage (95 routes — +2 for `/api/billing/contact` and
     `/api/billing/contact/verify`, 8 allowlisted, valid).
 
-- [ ] **Integrate billing into ownership transfer**
+- [x] **Integrate billing into ownership transfer**
   - Files: `src/modules/dashboard/components/OrganizationDangerZone.tsx`, `src/shared/lib/organizations/ownership.ts`, `src/shared/lib/organizations/ownership.test.ts`, `src/shared/lib/email.ts`
   - Do: Preview masked method, next charge/date, continued-billing warning; preserve Customer/subscription/method; atomically move billing authority with ownership; notify both parties; allow optional method replacement before transfer. Never create a charge from transfer.
   - Verify: company/personal-card warning, stale transfer, concurrent billing mutation, authority revocation, notification, and no-card-detail leakage tests pass.
+  - Progress: No separate `ownership.ts` service was needed — research confirmed "billing authority" has no
+    independent data-model representation in this codebase: `billing_customers`/`billing_subscriptions` are
+    keyed by `organizationId` only, never by user id, and every billing permission already derives purely from
+    `organization_members.role` (`billing/permissions.ts`). So "atomically move billing authority with
+    ownership" requires zero new writes — the existing `transferOwnership` UPDATE of `organization_members.role`
+    already does it. Built instead: (1) `BillingProvider.getDefaultPaymentMethodSummary(customerId)` +
+    `PaymentMethodSummary { brand, last4 }` in `provider.ts`/`fake-provider.ts` — masked-only, no PAN/expiry/
+    billing address, read-only, never called from a mutating flow; (2) `getOwnershipTransferBillingPreview
+    (principal)` in `contracts.ts` — composes `getCustomer`+`getDefaultPaymentMethodSummary` (both pure reads)
+    with entitlement/subscription state into `OwnershipTransferBillingPreviewDto` (hasBillingCustomer, masked
+    paymentMethod, tier, billingPeriod, currentPeriodEnd, nextChargeAmountCents, cancelAtPeriodEnd) — makes zero
+    calls to anything that could create a charge/Checkout Session/PaymentIntent; (3)
+    `GET /api/organizations/transfer-ownership-preview` — same authority as the transfer action
+    (`organization:transfer`, owner-only) but deliberately NOT recent-auth-gated since it mutates nothing;
+    (4) `TransferOwnershipPreview.tsx` — plain-fetch preview/confirm component (matches this module's own
+    manual-fetch convention rather than introducing React Query), rendered inside the existing `Dialog` primitive
+    from `OrganizationDangerZone.tsx`'s Transfer button (previously a direct one-click action, now opens the
+    preview dialog first); shows masked card, plan/billing period, next-charge-amount-and-date OR a
+    cancel-scheduled notice, a "no active subscription" message when `hasBillingCustomer` is false, and a
+    "Manage payment method" link to `/settings/billing` (the existing Customer Portal entry point) as the
+    optional replace-first affordance — confirming closes the dialog and calls the existing
+    `onTransferOwnership` prop unchanged, so `transfer-ownership.ts`'s recent-auth gate and atomic
+    `transferOwnershipRecord` UPDATE are untouched; (5) two new email senders
+    (`sendOwnershipTransferredFromEmail`/`sendOwnershipTransferredToEmail`) + templates in `email.ts`, wired into
+    `transfer-ownership.ts`'s POST handler as a best-effort, fire-and-forget notify (a delivery failure never
+    reverses or fails the already-committed transfer) using two new lookup helpers
+    (`findAccountEmailAndName`/`findOrganizationName`) in `repositories/account-privacy.ts`.
+    Tests: `transfer-ownership-preview.test.ts` (6 — owner-allowed, admin/member-forbidden, 401 propagation,
+    not-recent-auth-gated, 500-on-throw), `transfer-ownership.test.ts` (5 — success + both emails sent with
+    correct args, invalid body 400, 401 propagation, stale-session 401 with zero emails sent, and success even
+    when a notification send itself throws), `TransferOwnershipPreview.test.tsx` (6 — active-subscription
+    render, cancel-scheduled notice suppresses next-charge, no-billing-customer message, error state, confirm/
+    cancel callbacks, and an explicit assertion that the payment-method field renders exactly `"visa •••• 4242"`
+    with nothing else — guards against a future DTO widening leaking a raw PAN into this UI unnoticed), plus 3
+    new `OrganizationDangerZone.test.tsx` cases covering the dialog open/confirm/cancel flow (including driving
+    the real Radix Select in happy-dom to choose a member — no prior test in this codebase had exercised that
+    Select before; it worked without any polyfill).
+    Live-verified the complete flow against the running dev server: created a second real account, added it as
+    a member of a fresh non-personal org via a direct DB insert (seat-limit-1 on the Free plan blocked a normal
+    invite — this was purely a test-environment workaround, not a product gap), then as the owner clicked
+    Transfer → dialog opened showing "Nate New will become the owner..." with masked `visa •••• 4242`,
+    `Plan: free (none)` (confirming a `billing_customers` row already exists even pre-subscription, exercising
+    the `hasBillingCustomer: true` + no-active-tier branch), and the continued-billing warning with a working
+    "Manage payment method" link to `/settings/billing`. Clicking Cancel closed the dialog with zero calls to
+    the transfer endpoint (owner unchanged). Reopening and clicking "Confirm transfer" actually flipped roles —
+    "You are Owner" → "You are Admin" for the caller, the target's row flipped to OWNER, a
+    `[security-audit] organization.ownership-transfer` line was recorded with a `requestId` shown on the danger
+    zone, and both `📧 [DEV] Ownership-transferred (from/to) email would be sent to: ...` lines appeared in the
+    server console addressed to the correct old-owner and new-owner emails respectively.
+    `pnpm type-check` (clean) and `pnpm lint` (0 errors) on every touched file;
+    `pnpm vitest run` for all 4 new/updated test files (30/30 passing) plus the existing
+    `TeamSettingsPage.test.tsx` (6/6, unaffected); `pnpm security:boundaries` (0 legacy imports) and
+    `pnpm security:route-coverage` (97 routes — +1 for the new preview route, 8 allowlisted, valid).
 
 - [ ] **Integrate subscription-safe organization deletion**
   - Files: `src/shared/lib/organizations/deletion.ts`, `src/shared/lib/organizations/deletion.test.ts`, `src/modules/dashboard/components/OrganizationDangerZone.tsx`, `src/shared/lib/billing/subscription-changes.ts`

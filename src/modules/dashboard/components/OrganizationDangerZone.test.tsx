@@ -1,12 +1,33 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRouter, createRootRoute, createMemoryHistory, RouterProvider } from '@tanstack/react-router'
 import type { OrganizationMemberDto, OrganizationRole } from '~/shared/lib/organizations/contracts'
 import { OrganizationDangerZone, type OrganizationDangerZoneProps } from './OrganizationDangerZone'
 
 beforeAll(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+})
+
+function jsonResponse(body: unknown, ok = true): Response {
+  return { ok, json: async () => body } as Response
+}
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(
+      jsonResponse({
+        hasBillingCustomer: false,
+        paymentMethod: null,
+        tier: 'free',
+        billingPeriod: 'monthly',
+        currentPeriodEnd: null,
+        nextChargeAmountCents: null,
+        cancelAtPeriodEnd: false,
+      }),
+    ),
+  )
 })
 
 let container: HTMLDivElement | null = null
@@ -17,6 +38,7 @@ afterEach(() => {
   container?.remove()
   container = null
   root = null
+  vi.unstubAllGlobals()
 })
 
 const MEMBERS: OrganizationMemberDto[] = [
@@ -169,5 +191,58 @@ describe('OrganizationDangerZone — DTO contamination', () => {
     props.members[0].password = 'super-secret-hash'
     await render(props)
     expect(container!.innerHTML).not.toContain('super-secret-hash')
+  })
+})
+
+describe('OrganizationDangerZone — transfer ownership preview/confirm dialog', () => {
+  async function openTransferDialog(onTransferOwnership = vi.fn()) {
+    const props = baseProps('owner', 'user-owner')
+    props.onTransferOwnership = onTransferOwnership
+    await render(props)
+
+    const trigger = container!.querySelector('[data-testid="transfer-target-select"]') as HTMLButtonElement
+    await act(async () => trigger.click())
+
+    // Radix Select renders its listbox into a body-level portal, not inside `container`.
+    const item = Array.from(document.querySelectorAll('[data-slot="select-item"]')).find((el) =>
+      el.textContent?.includes('Ada Admin'),
+    ) as HTMLElement
+    await act(async () => item.click())
+
+    const transferBtn = container!.querySelector('[data-testid="transfer-ownership-btn"]') as HTMLButtonElement
+    await act(async () => transferBtn.click())
+    // The preview's own fetch resolves on a microtask.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    return onTransferOwnership
+  }
+
+  it('opens a preview dialog instead of transferring immediately when Transfer is clicked', async () => {
+    await openTransferDialog()
+
+    expect(document.querySelector('[data-testid="transfer-ownership-preview"]')).not.toBeNull()
+  })
+
+  it('only calls onTransferOwnership after the dialog is confirmed, with the selected member', async () => {
+    const onTransferOwnership = await openTransferDialog()
+    expect(onTransferOwnership).not.toHaveBeenCalled()
+
+    const confirmBtn = document.querySelector('[data-testid="transfer-ownership-confirm"]') as HTMLButtonElement
+    await act(async () => confirmBtn.click())
+
+    expect(onTransferOwnership).toHaveBeenCalledWith('user-admin')
+    expect(document.querySelector('[data-testid="transfer-ownership-preview"]')).toBeNull()
+  })
+
+  it('never calls onTransferOwnership when the dialog is cancelled', async () => {
+    const onTransferOwnership = await openTransferDialog()
+
+    const cancelBtn = document.querySelector('[data-testid="transfer-ownership-preview-cancel"]') as HTMLButtonElement
+    await act(async () => cancelBtn.click())
+
+    expect(onTransferOwnership).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-testid="transfer-ownership-preview"]')).toBeNull()
   })
 })
