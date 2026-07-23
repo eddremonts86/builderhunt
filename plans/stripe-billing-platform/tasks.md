@@ -1,16 +1,20 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (15/~40 tasks — §0-§4 complete: dependency contracts pinned, launch
+> **Status**: `in_progress` (20/~40 tasks — §0-§5 complete: dependency contracts pinned, launch
 > register recorded, Stripe SDK/client/catalog/fake-provider built, all 14 billing/credit tables
 > added in an additive migration with RLS/runtime-role grants applied and verified live,
 > backup/restore/rollback safety proven with checksum evidence, tenant-safe billing repositories/DTOs
 > built, owner/admin/member billing permissions centralized, private seller/country configuration
 > built (route+page+component), a pure fail-closed live-readiness gate implemented and wired to
 > `pnpm billing:check-readiness`, the append-only credit grant/balance ledger and atomic reservation
-> lifecycle implemented with property-tested/concurrency-tested invariants, and the server-only
-> feature billing contracts (`checkEntitlement`/reserve/extend/settle/release/`refundUsage`) exposed
-> behind versioned rate cards; "Validate Stripe Products and Prices" now DONE for the
-> test sandbox — see the note below.)
+> lifecycle implemented with property-tested/concurrency-tested invariants, the server-only feature
+> billing contracts (`checkEntitlement`/reserve/extend/settle/release/`refundUsage`) exposed behind
+> versioned rate cards, and the full Checkout/consent/customer-lifecycle surface built end-to-end:
+> idempotent Stripe Customer provisioning, versioned commercial consent, the owner-only subscription
+> Checkout endpoint (found/fixed a real open-redirect vulnerability in its own return-URL check along
+> the way), the pending-Checkout return experience (polls internal state only, never trusts the
+> redirect URL), and owner/recent-auth-gated restricted Customer Portal sessions; "Validate Stripe
+> Products and Prices" now DONE for the test sandbox — see the note below.)
 >
 > **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
 > A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
@@ -276,10 +280,46 @@
     distinct, more delicate piece of work. The full automated suite above is the verification of
     record for this task.
 
-- [ ] **Create restricted Customer Portal sessions**
+- [x] **Create restricted Customer Portal sessions**
   - Files: `src/shared/lib/billing/portal.ts`, `src/shared/lib/billing/portal.test.ts`, `src/routes/api/billing/portal.ts`, `docs/operations/stripe-customer-portal.md`
   - Do: Owner/recent-auth only, allowlisted return URL, configured Portal limited to payment methods, tax identity, invoices, and receipts; disable product switching and cancellation. Validate Portal configuration in readiness.
   - Verify: owner can open sandbox Portal; admin/member cannot; sandbox Portal cannot change/cancel plan; open redirect tests pass.
+  - Progress (2026-07-23): **Found and fixed a real open-redirect vulnerability while writing this
+    task's own verify criteria.** `checkout.ts`'s and my first draft of `portal.ts`'s return-URL
+    checks both used `url.startsWith(env.APP_URL)` — a lookalike host like
+    `https://app.example.com.evil.com` legitimately *starts with* `https://app.example.com` as a
+    plain string, so that check would have let an attacker redirect a customer's browser to an
+    arbitrary domain after Checkout/Portal. Replaced with `stripe-client.ts`'s new
+    `isAllowedReturnUrl`, which compares the full **parsed origin** (`URL.origin`, exact
+    protocol+host+port match) instead of a string prefix — applied to both `checkout.ts` and
+    `portal.ts`, with regression tests added to `stripe-client.test.ts` (7 exhaustive cases:
+    same-origin, different-origin, lookalike-host, wrong-port, wrong-protocol, unparseable,
+    userinfo-smuggling) and to both `checkout.test.ts` and `portal.test.ts`.
+    `portal.ts`'s `createBillingPortalSession(transaction, principal, {returnUrl}, {provider})`
+    resolves the org's existing Stripe customer (never creates one — Portal access is never how a
+    Customer gets provisioned), validates the return URL, and returns only `{url}` — no plan/price
+    field of any kind, since the Portal is never how BuilderHunt lets an org change what it's
+    subscribed to (that stays entirely in §7's own endpoints). The route
+    (`POST /api/billing/portal`) is owner-only AND recent-auth-gated (`'billing:portal'` was already
+    in `permissions.ts`'s `RECENT_AUTH_REQUIRED_BILLING_ACTIONS`) — the first billing route in this
+    plan to actually exercise that gate; a stale or absent session gets 401 before the Portal
+    service is ever called. Extended `readiness.ts`'s evidence struct with
+    `portalConfigurationRestricted` — a manual attestation (`--confirm-portal-configuration`, wired
+    through `check-live-readiness.ts`) since the actual feature restriction (no plan switching, no
+    cancellation) lives entirely in a Stripe Dashboard Billing Portal Configuration this code cannot
+    introspect; `readiness.test.ts`'s existing generic per-gate test loop covered the new field with
+    no additional test code needed. New `docs/operations/stripe-customer-portal.md` documents the
+    split between what our code controls (owner/recent-auth, return-URL origin, customer
+    resolution) versus what only the manual gate can guarantee (the Configuration itself). 15 new
+    portal tests (service: session creation, DTO-shape-is-url-only, no-customer rejection, open
+    redirect + lookalike-host rejection; route: owner/admin/member matrix, stale/missing session
+    401, spoofed-field/non-URL 400s, every `PortalError` code mapped to its HTTP status) plus 7 new
+    `isAllowedReturnUrl` unit tests and 2 new lookalike-host regression tests added to the existing
+    checkout/portal suites. Full suite 305/305 minus the same pre-existing unrelated
+    `catalog.test.ts` failure; `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries`/route-coverage
+    all clean; `routeTree.gen.ts` regenerated for the new route.
+
+    **This closes out §5 (Checkout, consent, and customer lifecycle) in full.**
 
 ## 6. Webhooks and workers
 

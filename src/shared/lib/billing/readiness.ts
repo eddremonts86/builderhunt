@@ -39,6 +39,8 @@ export interface LiveBillingReadinessEvidence {
   operatorRunbooksConfirmed: boolean
   /** A `billing_reconciliation_runs` row with `result: 'clean'` exists from within the required freshness window (see `scripts/billing/check-live-readiness.ts`'s freshness check). */
   reconciliationEvidenceRecent: boolean
+  /** An operator has confirmed the Stripe Billing Portal configuration in actual use (Stripe Dashboard or a specific Configuration id our code passes) restricts the owner to payment methods, tax identity, invoices, and receipts — no plan switching, no cancellation. This is a Stripe-account-side setting our code cannot introspect, so it is a manual attestation, not something derivable from a database row. */
+  portalConfigurationRestricted: boolean
 }
 
 export function assessLiveBillingReadiness(evidence: LiveBillingReadinessEvidence): {
@@ -57,5 +59,6 @@ export function assessLiveBillingReadiness(evidence: LiveBillingReadinessEvidenc
   if (!evidence.termsPrivacyVersionsConfirmed) missing.push('termsPrivacyVersionsConfirmed')
   if (!evidence.operatorRunbooksConfirmed) missing.push('operatorRunbooksConfirmed')
   if (!evidence.reconciliationEvidenceRecent) missing.push('reconciliationEvidenceRecent')
+  if (!evidence.portalConfigurationRestricted) missing.push('portalConfigurationRestricted')
   return { ready: missing.length === 0, missing }
 }

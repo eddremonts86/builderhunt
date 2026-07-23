@@ -18,19 +18,23 @@ pnpm billing:check-readiness
 ```
 
 Read-only by default: it never calls the real Stripe API unless you pass `--live` (still read-only —
-it only retrieves the connected account's `charges_enabled` flag). Two gates require an explicit
-operator attestation rather than a computed check, because neither can be verified from source or a
+it only retrieves the connected account's `charges_enabled` flag). Three gates require an explicit
+operator attestation rather than a computed check, because none can be verified from source or a
 database row:
 
 ```sh
-pnpm billing:check-readiness --live --confirm-terms-privacy --confirm-runbooks
+pnpm billing:check-readiness --live --confirm-terms-privacy --confirm-runbooks --confirm-portal-configuration
 ```
 
 Only pass `--confirm-terms-privacy` once the current `CURRENT_CONSENT_VERSIONS` (`src/shared/lib/legal.ts`)
-have actually been reviewed for this launch, and `--confirm-runbooks` once the incident,
+have actually been reviewed for this launch, `--confirm-runbooks` once the incident,
 secret-rotation, refund, and backup/restore runbooks referenced in the launch register have a real
-tabletop exercise on record. Passing either flag without that evidence existing defeats the entire
-point of a fail-closed gate — these are attestations, not checkboxes to clear.
+tabletop exercise on record, and `--confirm-portal-configuration` once the Stripe Billing Portal
+configuration actually in use (Stripe Dashboard → Settings → Billing → Customer portal, or a specific
+Configuration id `src/shared/lib/billing/portal.ts` passes) has been checked to restrict the owner to
+payment methods, tax identity, invoices, and receipts only — no plan switching, no cancellation.
+Passing any flag without that evidence existing defeats the entire point of a fail-closed gate —
+these are attestations, not checkboxes to clear.
 
 Exit code is `0` when `ready: true`, `1` otherwise. Output is a JSON object naming exactly which
 gates are unmet (`missing`) — the reason codes are the evidence struct's own field names, never a
@@ -51,6 +55,7 @@ secret value, so this is always safe to paste into an incident channel or a rele
 | `termsPrivacyVersionsConfirmed` | An operator has confirmed the current Terms/Privacy versions were reviewed for this launch. | `--confirm-terms-privacy` |
 | `operatorRunbooksConfirmed` | Incident/secret-rotation/refund/restore runbooks exist and have a tabletop exercise on record. | `--confirm-runbooks` |
 | `reconciliationEvidenceRecent` | A `billing_reconciliation_runs` row with `result: 'clean'` exists within the last 48 hours. | `billing_reconciliation_runs` |
+| `portalConfigurationRestricted` | The Stripe Billing Portal configuration in use restricts the owner to payment methods, tax identity, invoices, and receipts — no plan switching or cancellation. | `--confirm-portal-configuration` |
 
 ## Known gaps, tracked deliberately rather than hidden
 

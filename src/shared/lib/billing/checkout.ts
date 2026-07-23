@@ -11,7 +11,6 @@ import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
-import { env } from '../env'
 import { resolveSubscriptionCatalogKey } from './catalog'
 import { recordCheckoutConsent, type CheckoutDisclosures } from './consent'
 import { ensureBillingCustomer } from './customers'
@@ -24,7 +23,7 @@ import {
   findLatestBillingCheckoutAttempt,
 } from '../repositories/billing'
 import { getCurrentSellerProfile } from './seller-profile'
-import { idempotencyKeyFor, isLiveMode } from './stripe-client'
+import { idempotencyKeyFor, isAllowedReturnUrl, isLiveMode } from './stripe-client'
 
 export type CheckoutErrorCode =
   | 'billing_disabled'
@@ -69,7 +68,7 @@ export interface CreateSubscriptionCheckoutOptions {
 }
 
 function assertAllowedReturnUrl(url: string, field: 'successUrl' | 'cancelUrl'): void {
-  if (!url.startsWith(env.APP_URL)) {
+  if (!isAllowedReturnUrl(url)) {
     throw new CheckoutError(`${field} must be within this app's own origin`, 'invalid_url')
   }
 }

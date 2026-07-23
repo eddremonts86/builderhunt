@@ -122,3 +122,24 @@ export function redactStripeError(error: unknown): RedactedStripeError {
 export function idempotencyKeyFor(...parts: string[]): string {
   return parts.filter(Boolean).join(':')
 }
+
+/**
+ * Guards every Checkout/Portal return URL this app hands to Stripe (`billing/checkout.ts`,
+ * `billing/portal.ts`) — Stripe redirects the customer's browser straight to whatever URL we
+ * supply, so an open redirect here is a real phishing vector. Compares the full parsed origin
+ * (`protocol://host:port`), never a string prefix: a naive `url.startsWith(env.APP_URL)` check
+ * would wrongly accept a lookalike domain like `https://app.test.evil.com` when `env.APP_URL` is
+ * `https://app.test`, since the attacker's host merely starts with our own. `URL.origin` doesn't
+ * have that ambiguity — two origins are equal only when protocol, host, and port all match exactly.
+ */
+export function isAllowedReturnUrl(url: string): boolean {
+  let candidate: URL
+  let appOrigin: URL
+  try {
+    candidate = new URL(url)
+    appOrigin = new URL(env.APP_URL)
+  } catch {
+    return false
+  }
+  return candidate.origin === appOrigin.origin
+}

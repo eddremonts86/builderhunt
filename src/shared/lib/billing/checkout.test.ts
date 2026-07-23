@@ -165,6 +165,15 @@ describe('createSubscriptionCheckout', () => {
         .rejects.toMatchObject({ code: 'invalid_url' })
     })
 
+    it('rejects a lookalike-host successUrl that merely starts with our own origin (e.g. https://app.test.evil.com)', async () => {
+      const principal = await freshOrgWithOwner()
+      const appOrigin = new URL(env.APP_URL)
+      const lookalike = `${appOrigin.protocol}//${appOrigin.host}.evil.com/success`
+
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ successUrl: lookalike }), { provider, sellerProfileDb: db })))
+        .rejects.toMatchObject({ code: 'invalid_url' })
+    })
+
     it('rejects when an active subscription already exists for this organization', async () => {
       const principal = await freshOrgWithOwner()
       const customerId = uniqueId('customer')

@@ -72,6 +72,7 @@ import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/st
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
+import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
@@ -456,6 +457,11 @@ const ApiBuildersTrackRoute = ApiBuildersTrackRouteImport.update({
 const ApiBuildersBuilderIdRoute = ApiBuildersBuilderIdRouteImport.update({
   id: '/api/builders/$builderId',
   path: '/api/builders/$builderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
+  id: '/api/billing/portal',
+  path: '/api/billing/portal',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
@@ -882,6 +888,7 @@ export interface FileRoutesByFullPath {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1013,6 +1020,7 @@ export interface FileRoutesByTo {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1149,6 +1157,7 @@ export interface FileRoutesById {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
@@ -1284,6 +1293,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1415,6 +1425,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1550,6 +1561,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
+    | '/api/billing/portal'
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/changelog/$slug'
@@ -1655,6 +1667,7 @@ export interface RootRouteChildren {
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBillingPortalRoute: typeof ApiBillingPortalRoute
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
@@ -2164,6 +2177,13 @@ declare module '@tanstack/react-router' {
       path: '/api/builders/$builderId'
       fullPath: '/api/builders/$builderId'
       preLoaderRoute: typeof ApiBuildersBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/portal': {
+      id: '/api/billing/portal'
+      path: '/api/billing/portal'
+      fullPath: '/api/billing/portal'
+      preLoaderRoute: typeof ApiBillingPortalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/auth/$': {
@@ -2888,6 +2908,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAiEmbedRoute: ApiAiEmbedRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBillingPortalRoute: ApiBillingPortalRoute,
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,

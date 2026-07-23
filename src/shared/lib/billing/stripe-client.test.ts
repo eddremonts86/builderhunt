@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import Stripe from 'stripe'
+import { env } from '../env'
 import {
   idempotencyKeyFor,
+  isAllowedReturnUrl,
   redactStripeError,
   resolveStripeClientConfig,
   StripeBillingDisabledError,
@@ -65,6 +67,38 @@ describe('redactStripeError', () => {
   it('falls back to a generic message for a non-Stripe error', () => {
     expect(redactStripeError(new Error('boom'))).toEqual({ message: 'boom' })
     expect(redactStripeError('not an error')).toEqual({ message: 'Unknown Stripe error' })
+  })
+})
+
+describe('isAllowedReturnUrl', () => {
+  it('accepts a URL on this app\'s own origin', () => {
+    expect(isAllowedReturnUrl(`${env.APP_URL}/settings/billing`)).toBe(true)
+    expect(isAllowedReturnUrl(env.APP_URL)).toBe(true)
+  })
+
+  it('rejects a completely different origin', () => {
+    expect(isAllowedReturnUrl('https://evil.example.com/steal')).toBe(false)
+  })
+
+  it('rejects a lookalike host that merely starts with our own (open-redirect via prefix match)', () => {
+    const appOrigin = new URL(env.APP_URL)
+    expect(isAllowedReturnUrl(`${appOrigin.protocol}//${appOrigin.host}.evil.com/x`)).toBe(false)
+  })
+
+  it('rejects a same-host URL on the wrong port or protocol', () => {
+    const appOrigin = new URL(env.APP_URL)
+    expect(isAllowedReturnUrl(`${appOrigin.protocol}//${appOrigin.hostname}:9999/x`)).toBe(false)
+    expect(isAllowedReturnUrl(`http://${appOrigin.host}/x`)).toBe(appOrigin.protocol === 'http:')
+  })
+
+  it('rejects an unparseable URL rather than throwing', () => {
+    expect(isAllowedReturnUrl('not a url at all')).toBe(false)
+    expect(isAllowedReturnUrl('')).toBe(false)
+  })
+
+  it('rejects a userinfo-smuggling URL (https://app.test@evil.com) — the origin, not the string, decides', () => {
+    const appOrigin = new URL(env.APP_URL)
+    expect(isAllowedReturnUrl(`${appOrigin.protocol}//${appOrigin.host}@evil.com/x`)).toBe(false)
   })
 })
 

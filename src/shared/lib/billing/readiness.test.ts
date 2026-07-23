@@ -13,6 +13,7 @@ const FULLY_READY: LiveBillingReadinessEvidence = {
   termsPrivacyVersionsConfirmed: true,
   operatorRunbooksConfirmed: true,
   reconciliationEvidenceRecent: true,
+  portalConfigurationRestricted: true,
 }
 
 const GATES = Object.keys(FULLY_READY) as Array<keyof LiveBillingReadinessEvidence>

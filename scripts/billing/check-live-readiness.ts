@@ -11,13 +11,14 @@
  *   pnpm billing:check-readiness --live        # also calls Stripe's real Accounts API for charges_enabled
  *                                              # (requires STRIPE_SECRET_KEY; still entirely read-only)
  *
- * The two manual-attestation gates (Terms/Privacy sign-off, operator runbooks)
- * cannot be verified from source or a database row — they require
- * --confirm-terms-privacy / --confirm-runbooks, an explicit operator assertion
- * that the corresponding "Release gates" checklist items in
+ * The three manual-attestation gates (Terms/Privacy sign-off, operator runbooks,
+ * Stripe Billing Portal configuration) cannot be verified from source or a
+ * database row — they require --confirm-terms-privacy / --confirm-runbooks /
+ * --confirm-portal-configuration, an explicit operator assertion that the
+ * corresponding "Release gates" checklist items in
  * docs/operations/stripe-launch-register.md have real evidence attached.
- * Omitting either flag reports that gate as missing — this script never
- * assumes an unconfirmed attestation.
+ * Omitting any flag reports that gate as missing — this script never assumes
+ * an unconfirmed attestation.
  */
 import Stripe from 'stripe'
 import { desc, eq } from 'drizzle-orm'
@@ -32,6 +33,7 @@ interface Flags {
   live: boolean
   confirmTermsPrivacy: boolean
   confirmRunbooks: boolean
+  confirmPortalConfiguration: boolean
 }
 
 function parseFlags(argv: string[]): Flags {
@@ -39,6 +41,7 @@ function parseFlags(argv: string[]): Flags {
     live: argv.includes('--live'),
     confirmTermsPrivacy: argv.includes('--confirm-terms-privacy'),
     confirmRunbooks: argv.includes('--confirm-runbooks'),
+    confirmPortalConfiguration: argv.includes('--confirm-portal-configuration'),
   }
 }
 
@@ -108,6 +111,7 @@ async function main() {
     termsPrivacyVersionsConfirmed: flags.confirmTermsPrivacy,
     operatorRunbooksConfirmed: flags.confirmRunbooks,
     reconciliationEvidenceRecent: await safeCheck('reconciliation evidence', checkRecentCleanReconciliation),
+    portalConfigurationRestricted: flags.confirmPortalConfiguration,
   }
 
   const result = assessLiveBillingReadiness(evidence)
