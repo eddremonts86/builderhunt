@@ -1,6 +1,6 @@
 import { and, asc, eq } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
-import { billingCreditGrants, billingLedgerEntries } from '../db/schema'
+import { billingCreditAllocations, billingCreditGrants, billingCreditReservations, billingLedgerEntries } from '../db/schema'
 
 /**
  * Raw, tenant-scoped data access for the append-only credit ledger
@@ -71,6 +71,24 @@ export async function listActiveCreditGrantsByEarliestExpiry(
     .from(billingCreditGrants)
     .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
     .orderBy(asc(billingCreditGrants.expiresAt))
+}
+
+/**
+ * Same as `listActiveCreditGrantsByEarliestExpiry` but takes `SELECT ... FOR UPDATE` row locks —
+ * every reservation/extension allocation walk must use this, never the unlocked list, so two
+ * concurrent reservations against the same organization can't both read the same pre-allocation
+ * `remainingUnits` and overspend it.
+ */
+export async function lockActiveCreditGrantsByEarliestExpiry(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<BillingCreditGrantRecord[]> {
+  return transaction
+    .select()
+    .from(billingCreditGrants)
+    .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
+    .orderBy(asc(billingCreditGrants.expiresAt))
+    .for('update')
 }
 
 /** The only mutation path onto a grant row — state and remainingUnits are always changed together, from `credits.ts`, never independently. */
@@ -164,4 +182,189 @@ export async function listExpiredButStillActiveGrants(
     .from(billingCreditGrants)
     .where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.state, 'active')))
   return rows.filter((row) => row.expiresAt.getTime() <= now.getTime())
+}
+
+// ---------------------------------------------------------------------------
+// Reservations and allocations (plans/stripe-billing-platform/tasks.md §4
+// "Implement atomic reservation lifecycle") — business logic and invariants
+// live in `~/shared/lib/billing/reservations.ts`, this file only reads/writes.
+// ---------------------------------------------------------------------------
+
+export interface BillingCreditReservationRecord {
+  id: string
+  organizationId: string
+  operation: string
+  rateCardVersion: number
+  idempotencyKey: string
+  maximumUnits: number
+  settledUnits: number | null
+  state: string
+  heartbeatAt: Date
+  deadlineAt: Date
+  settlementGraceEndsAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface InsertReservationInput {
+  id: string
+  organizationId: string
+  operation: string
+  rateCardVersion: number
+  idempotencyKey: string
+  maximumUnits: number
+  deadlineAt: Date
+}
+
+export async function insertReservation(
+  transaction: TenantTransaction,
+  input: InsertReservationInput,
+): Promise<BillingCreditReservationRecord> {
+  const [row] = await transaction
+    .insert(billingCreditReservations)
+    .values({ ...input, heartbeatAt: new Date() })
+    .returning()
+  return row
+}
+
+export async function findReservationByIdempotencyKey(
+  transaction: TenantTransaction,
+  organizationId: string,
+  idempotencyKey: string,
+): Promise<BillingCreditReservationRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingCreditReservations)
+    .where(and(
+      eq(billingCreditReservations.organizationId, organizationId),
+      eq(billingCreditReservations.idempotencyKey, idempotencyKey),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
+/** Row-locked fetch — every mutation of a reservation (extend/heartbeat/settle/release) must lock it first so two concurrent calls can't both act on a stale read of its state. */
+export async function lockReservation(
+  transaction: TenantTransaction,
+  organizationId: string,
+  reservationId: string,
+): Promise<BillingCreditReservationRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingCreditReservations)
+    .where(and(eq(billingCreditReservations.organizationId, organizationId), eq(billingCreditReservations.id, reservationId)))
+    .for('update')
+    .limit(1)
+  return row ?? null
+}
+
+export interface UpdateReservationInput {
+  maximumUnits?: number
+  settledUnits?: number | null
+  state?: string
+  heartbeatAt?: Date
+  deadlineAt?: Date
+  settlementGraceEndsAt?: Date | null
+}
+
+export async function updateReservation(
+  transaction: TenantTransaction,
+  organizationId: string,
+  reservationId: string,
+  update: UpdateReservationInput,
+): Promise<BillingCreditReservationRecord> {
+  const [row] = await transaction
+    .update(billingCreditReservations)
+    .set({ ...update, updatedAt: new Date() })
+    .where(and(eq(billingCreditReservations.organizationId, organizationId), eq(billingCreditReservations.id, reservationId)))
+    .returning()
+  return row
+}
+
+export interface BillingCreditAllocationRecord {
+  id: string
+  organizationId: string
+  reservationId: string
+  grantId: string
+  allocatedUnits: number
+  consumedUnits: number
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface InsertAllocationInput {
+  id: string
+  organizationId: string
+  reservationId: string
+  grantId: string
+  allocatedUnits: number
+}
+
+export async function insertAllocation(
+  transaction: TenantTransaction,
+  input: InsertAllocationInput,
+): Promise<BillingCreditAllocationRecord> {
+  const [row] = await transaction.insert(billingCreditAllocations).values(input).returning()
+  return row
+}
+
+/** A reservation can only have one allocation row per grant (`billing_credit_allocations_reservation_grant_unique`) — `extendReservation` widening an existing allocation must go through this, never a second `insertAllocation` for the same (reservationId, grantId) pair. */
+export async function findAllocationForReservationAndGrant(
+  transaction: TenantTransaction,
+  organizationId: string,
+  reservationId: string,
+  grantId: string,
+): Promise<BillingCreditAllocationRecord | null> {
+  const [row] = await transaction
+    .select()
+    .from(billingCreditAllocations)
+    .where(and(
+      eq(billingCreditAllocations.organizationId, organizationId),
+      eq(billingCreditAllocations.reservationId, reservationId),
+      eq(billingCreditAllocations.grantId, grantId),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
+export async function updateAllocationAllocated(
+  transaction: TenantTransaction,
+  organizationId: string,
+  allocationId: string,
+  allocatedUnits: number,
+): Promise<BillingCreditAllocationRecord> {
+  const [row] = await transaction
+    .update(billingCreditAllocations)
+    .set({ allocatedUnits, updatedAt: new Date() })
+    .where(and(eq(billingCreditAllocations.organizationId, organizationId), eq(billingCreditAllocations.id, allocationId)))
+    .returning()
+  return row
+}
+
+export async function listAllocationsForReservation(
+  transaction: TenantTransaction,
+  organizationId: string,
+  reservationId: string,
+): Promise<BillingCreditAllocationRecord[]> {
+  return transaction
+    .select()
+    .from(billingCreditAllocations)
+    .where(and(
+      eq(billingCreditAllocations.organizationId, organizationId),
+      eq(billingCreditAllocations.reservationId, reservationId),
+    ))
+}
+
+export async function updateAllocationConsumed(
+  transaction: TenantTransaction,
+  organizationId: string,
+  allocationId: string,
+  consumedUnits: number,
+): Promise<BillingCreditAllocationRecord> {
+  const [row] = await transaction
+    .update(billingCreditAllocations)
+    .set({ consumedUnits, updatedAt: new Date() })
+    .where(and(eq(billingCreditAllocations.organizationId, organizationId), eq(billingCreditAllocations.id, allocationId)))
+    .returning()
+  return row
 }
