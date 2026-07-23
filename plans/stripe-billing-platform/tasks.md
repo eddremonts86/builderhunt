@@ -1,6 +1,7 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `pending`
+> **Status**: `in_progress` (1/~40 tasks — dependency contracts pinned; everything else requires a real
+> Stripe sandbox account and business/legal decisions not available in this session)
 > **Depends on**: [`security-and-multitenancy`](../security-and-multitenancy/tasks.md),
 > [`team-accounts`](../team-accounts/tasks.md)
 > **Blocks**: [`calendar-scheduling-interview-intelligence`](../calendar-scheduling-interview-intelligence/tasks.md)
@@ -11,10 +12,13 @@
 
 ## 0. Lock dependencies and commercial configuration
 
-- [ ] **Verify organization billing dependency contracts**
+- [x] **Verify organization billing dependency contracts**
   - Files: `src/shared/lib/auth/tenant-principal.ts`, `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/repositories/entitlements.ts`, `src/shared/lib/organizations/contracts.ts`, `src/shared/lib/billing/dependency-contracts.test.ts`
   - Do: Pin active-organization resolution, `owner | admin | member`, owner-only billing mutation, admin read, platform-admin separation, accepted-member plus usable-invitation seat count, and canonical entitlement interfaces. Add a boundary test forbidding billing modules from accepting organization IDs as authority or importing Better Auth/DB rows into DTOs.
   - Verify: `pnpm vitest run src/shared/lib/billing/dependency-contracts.test.ts && pnpm security:boundaries` passes after security/team dependencies are complete.
+  - Progress (2026-07-23): security-and-multitenancy (17/19, rest correctly blocked on production observation) and team-accounts (9/9) are both substantially complete, so this task's dependency contracts were pinnable now rather than deferred. Created `src/shared/lib/billing/` (new module, first file) with `dependency-contracts.test.ts` — 10 tests pinning: `resolveTenantPrincipal`'s `{userId, organizationId, role, requestId}` derivation (rejects no-session/no-active-org); `can()`'s owner-only (`organization:transfer`/`delete`) vs. any-role-read (`organization:read`) vs. elevated-mutate (`organization:update`) pattern, which billing subscription mutation/read will reuse; `resolvePlatformAdminPrincipal`'s structural separation from organization role (no `organizationId`/`role` field, distinct allow-list); `toSeatUsageDto`'s `{used, limit}` shape; and `resolveEntitlementPolicy`'s tier/status/paid-actions derivation. Also added a forward-looking boundary check (`billing module boundary` describe block) that scans every non-test file under `src/shared/lib/billing/` for a bare `organizationId: string` first parameter (should be a `TenantPrincipal`) or a direct `better-auth`/`db/schema`/`db/index` import — trivially passes today (no real billing module exists yet) but starts enforcing the moment phase 1 adds one. Deliberately thin: each contract already has its own exhaustive unit test elsewhere (`tenant-principal.test.ts`, `permissions.test.ts`, `entitlements.test.ts`) — this file only pins the surface those tests already prove, framed in terms of what billing will actually consume.
+  - Verified: `pnpm vitest run src/shared/lib/billing/dependency-contracts.test.ts` → 10/10, `pnpm security:boundaries` clean, `pnpm type-check`/`pnpm lint` (0 errors) clean, full test suite 648/648 (up from 638, +10 new).
+  - Not started: everything past this task requires either a real Stripe sandbox account/API keys (which this session has no access to) or business/legal decisions (Denmark-only allowlist, tax classification, KYC evidence, catalog pricing sign-off) that aren't mine to make — see task 2 ("Record the launch decision register") and the `plan.md` Phase 0 gate.
 
 - [ ] **Record the launch decision register without personal identifiers**
   - Files: `docs/operations/stripe-launch-register.md`, `plans/_meta/app-reality.md`, `.env.example`
