@@ -1,10 +1,10 @@
 # Tasks: Stripe Billing Platform
 
-> **Status**: `in_progress` (8/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
+> **Status**: `in_progress` (9/~40 tasks — dependency contracts pinned, launch register recorded, Stripe
 > SDK/client/catalog/fake-provider built, all 14 billing/credit tables added in an additive migration
 > with RLS/runtime-role grants applied and verified live, backup/restore/rollback safety proven with
-> checksum evidence; "Validate Stripe Products and Prices" now DONE for the test sandbox — see the
-> note below.)
+> checksum evidence, tenant-safe billing repositories/DTOs built; "Validate Stripe Products and Prices"
+> now DONE for the test sandbox — see the note below.)
 >
 > **Stripe configuration status (2026-07-23)** — read this before assuming nothing is set up:
 > A real Stripe **test** account exists (Denmark, individual). The full catalog is provisioned and
@@ -99,10 +99,11 @@
 
 ## 3. Repositories, permissions, configuration, and readiness
 
-- [ ] **Build tenant-safe billing repositories and DTOs**
+- [x] **Build tenant-safe billing repositories and DTOs**
   - Files: `src/shared/lib/repositories/billing.ts`, `src/shared/lib/repositories/billing.test.ts`, `src/shared/lib/billing/contracts.ts`, `src/shared/lib/billing/contracts.test.ts`
   - Do: Implement transaction-injected repositories for organization customer/subscription/attempt/terms/grant/reservation/refund summary. Return explicit DTOs only; enforce composite organization references and forbid raw Stripe payload/card/bank/PII serialization.
   - Verify: repository tests cover A/B isolation, missing rows, duplicate keys, and malicious extra fields; boundary check rejects global `db` import.
+  - Progress (2026-07-23): `repositories/billing.ts` implements find/create functions for all 7 record types (customer, subscription, checkout attempt, terms acceptance, credit grant, credit reservation, refund) following `entitlements.ts`/`organization-alerts.ts`'s exact convention — `TenantTransaction` first param, explicit interfaces, defense-in-depth `organizationId` re-filtering even though RLS already forces it. `billing/contracts.ts` mirrors `organizations/contracts.ts`: every export takes a `TenantPrincipal` (never a bare `organizationId: string` — verified by `dependency-contracts.test.ts`'s boundary regex, 10/10 still pass), DTOs never carry raw Stripe IDs/idempotency keys/actor or organization ids (`hasStripeCustomer: boolean` instead of the real `stripeCustomerId`, etc.), and `getBillingSummary(principal)` composes all 7 repository reads through `withTenantContext` in one call, mirroring `getOrganizationBillingSnapshot`'s shape. Every other `repositories/*.test.ts` file in this codebase is a static boundary/import scan, never a live-database test (confirmed by reading all of them) — deliberately broke that precedent for `billing.test.ts` specifically: financial-data correctness (A/B isolation, missing rows, duplicate-key rejection, cross-tenant composite-FK rejection) is worth proving against a real Postgres rather than trusting a scan, and it's safe to do unconditionally since `DATABASE_MIGRATION_URL` is already a hard app-wide requirement and this repo's own CI (`.github/workflows/quality.yml`) already runs the full `pnpm test`/`pnpm build` sequence against a live migrated Postgres service — the test only adds one more disposable, self-created-and-dropped database on that same already-required server (auto-creates `builderhunt_security_test_repo_billing_<random>`, runs the real migrator, seeds two organizations, drops the database in `afterAll`). 8/8 pass: A/B isolation (customer + subscription), missing rows (customer + subscription), organization-preserving composite-FK rejection (a subscription referencing another org's customerId), and duplicate-idempotency-key rejection (checkout attempt + credit reservation). `contracts.test.ts` covers the "malicious extra fields" requirement directly — every `toXDto` mapper is fed a raw row with simulated extra fields (`cardLast4`, `bankAccountNumber`, a `rawStripePayload` blob) and asserted to strip them all, 10/10 pass. Verified: `pnpm type-check` clean, `pnpm lint` 0 errors, `pnpm security:boundaries` clean, `pnpm build` succeeds, full suite 760/761 (same pre-existing unrelated `catalog.test.ts` failure from the concurrent Stripe-provisioning session).
 
 - [ ] **Centralize owner/admin/member billing permissions**
   - Files: `src/shared/lib/billing/permissions.ts`, `src/shared/lib/billing/permissions.test.ts`, `src/shared/lib/authorization/permissions.ts`
