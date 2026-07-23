@@ -1,0 +1,50 @@
+# ── Docker build context ignore ──────────────────────────────────────────────
+# Without this file the `COPY . .` in the build stage copies the HOST node_modules
+# (macOS/arm64 native binaries for esbuild, sharp, @resvg, tailwind oxide, …) on
+# top of the freshly-installed linux node_modules — producing an image whose
+# native bindings are the wrong architecture ("container doesn't work as it
+# should"). Ignoring node_modules (and the other noise below) keeps the build
+# reproducible and small.
+
+# Dependencies (reinstalled inside the image with --frozen-lockfile)
+node_modules
+**/node_modules
+
+# Build / test output
+dist
+build
+coverage
+test-results
+playwright-report
+blob-report
+.vite
+
+# Secrets & local env (never bake into an image — injected by Coolify at runtime)
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# VCS & tooling
+.git
+.gitignore
+.github
+.husky
+.vscode
+.idea
+
+# OS / editor noise
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Docs & planning (not needed to build the app)
+docs
+plans
+*.md
+!README.md
+
+# Backups / scratch
+package.json.bak
+*.tgz

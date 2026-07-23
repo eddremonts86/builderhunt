@@ -116,6 +116,14 @@
     "0028_billing_rls_grants": {
       "sql": "52c9c3d32958e5f14134d2eade9b1ac41f650ade6e0e249219dfd660b83011a2",
       "snapshot": "3d2966504306dcc6d145b8855ef7f6db88561462ba3e0049acb38848a0ef8675"
+    },
+    "0029_organization_entitlements_pro_max_tier": {
+      "sql": "9d6473c4764ca96f27eedd833b40fb8abb6f5317dee8c2ac2c3abcca743d8c9d",
+      "snapshot": "c2d802b26a0fd68a10b9724b2d2f97f7e35719f530339c6d0752d250f7479078"
+    },
+    "0030_billing_credit_grants_upgrade_delta_source": {
+      "sql": "99b72dbaba97b19a2c156d9c39c67c985861a2f1f607940db6356c9f50a79eb4",
+      "snapshot": "92c44eb7de08c34aa31214fa698a7bac4f0d4f1e198dc85d4fb5f13f9a97b468"
     }
   }
 }

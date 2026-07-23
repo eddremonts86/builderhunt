@@ -10,7 +10,10 @@ RUN corepack enable
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
-RUN pnpm install
+# --frozen-lockfile makes the image reproducible: it installs exactly what the
+# committed lockfile pins and fails loudly if package.json and the lockfile have
+# drifted (run `pnpm deploy:preflight` locally to catch that before pushing).
+RUN pnpm install --frozen-lockfile
 
 FROM base AS build
 WORKDIR /app
@@ -37,5 +40,11 @@ COPY tsconfig.json ./tsconfig.json
 COPY scripts ./scripts
 
 EXPOSE 3000
+
+# Let Coolify/Docker know when the app is actually serving. The endpoint is
+# intentionally shallow (no DB touch) — DB liveness is the db resource's own
+# healthcheck. start-period covers the TanStack Start server boot + dist load.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server.prod.mjs"]
