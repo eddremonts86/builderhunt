@@ -93,6 +93,7 @@ import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashbo
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
+import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
 import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
@@ -130,6 +131,7 @@ import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/ad
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
+import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
@@ -560,6 +562,11 @@ const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
   path: '/admin/changelog',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardAdminBillingRoute = DashboardAdminBillingRouteImport.update({
+  id: '/admin/billing',
+  path: '/admin/billing',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const ApiOrganizationsInvitationsIndexRoute =
   ApiOrganizationsInvitationsIndexRouteImport.update({
     id: '/api/organizations/invitations/',
@@ -761,6 +768,12 @@ const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   path: '/api/admin/changelog/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminBillingConfigurationRoute =
+  ApiAdminBillingConfigurationRouteImport.update({
+    id: '/api/admin/billing/configuration',
+    path: '/api/admin/billing/configuration',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   id: '/api/admin/alerts/run-worker',
   path: '/api/admin/alerts/run-worker',
@@ -819,6 +832,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -881,6 +895,7 @@ export interface FileRoutesByFullPath {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -945,6 +960,7 @@ export interface FileRoutesByTo {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -1007,6 +1023,7 @@ export interface FileRoutesByTo {
   '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -1075,6 +1092,7 @@ export interface FileRoutesById {
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/_landing/': typeof LandingIndexRoute
+  '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -1137,6 +1155,7 @@ export interface FileRoutesById {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -1204,6 +1223,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/admin/billing'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -1266,6 +1286,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1330,6 +1351,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/admin/billing'
     | '/admin/changelog'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -1392,6 +1414,7 @@ export interface FileRouteTypes {
     | '/api/sprints'
     | '/api/status'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1459,6 +1482,7 @@ export interface FileRouteTypes {
     | '/onboarding/success'
     | '/onboarding/welcome'
     | '/_landing/'
+    | '/_dashboard/admin/billing'
     | '/_dashboard/admin/changelog'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
@@ -1521,6 +1545,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/configuration'
     | '/api/admin/changelog/$id'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
@@ -1613,6 +1638,7 @@ export interface RootRouteChildren {
   ApiSprintsIndexRoute: typeof ApiSprintsIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
+  ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
@@ -2235,6 +2261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminChangelogRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/billing': {
+      id: '/_dashboard/admin/billing'
+      path: '/admin/billing'
+      fullPath: '/admin/billing'
+      preLoaderRoute: typeof DashboardAdminBillingRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/api/organizations/invitations/': {
       id: '/api/organizations/invitations/'
       path: '/api/organizations/invitations'
@@ -2494,6 +2527,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/configuration': {
+      id: '/api/admin/billing/configuration'
+      path: '/api/admin/billing/configuration'
+      fullPath: '/api/admin/billing/configuration'
+      preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/alerts/run-worker': {
       id: '/api/admin/alerts/run-worker'
       path: '/api/admin/alerts/run-worker'
@@ -2541,6 +2581,7 @@ declare module '@tanstack/react-router' {
 
 interface DashboardRouteRouteChildren {
   DashboardAlertsRoute: typeof DashboardAlertsRoute
+  DashboardAdminBillingRoute: typeof DashboardAdminBillingRoute
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
@@ -2562,6 +2603,7 @@ interface DashboardRouteRouteChildren {
 
 const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAlertsRoute: DashboardAlertsRoute,
+  DashboardAdminBillingRoute: DashboardAdminBillingRoute,
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
@@ -2784,6 +2826,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSprintsIndexRoute: ApiSprintsIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
+  ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,

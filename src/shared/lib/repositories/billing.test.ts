@@ -1,8 +1,6 @@
-import { randomUUID } from 'node:crypto'
-import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { migrate } from 'drizzle-orm/postgres-js/migrator'
-import postgres from 'postgres'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
 import { authUsers, organizations } from '../db/schema'
 import {
   createBillingCheckoutAttempt,
@@ -34,22 +32,13 @@ import {
  * auto-created-and-dropped) database on that same already-required server.
  */
 
-const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:postgres@localhost:5432/builderhunt')
-const testDatabaseName = `builderhunt_security_test_repo_billing_${randomUUID().replace(/-/g, '').slice(0, 16)}`
-const testDatabaseUrl = new URL(adminUrl.toString())
-testDatabaseUrl.pathname = `/${testDatabaseName}`
-
-let admin: ReturnType<typeof postgres>
-let testClient: ReturnType<typeof postgres>
 let db: PostgresJsDatabase
+let drop: () => Promise<void>
 
 beforeAll(async () => {
-  admin = postgres(adminUrl.toString(), { max: 1, prepare: false })
-  await admin.unsafe(`CREATE DATABASE ${testDatabaseName}`)
-
-  testClient = postgres(testDatabaseUrl.toString(), { max: 1, prepare: false })
-  db = drizzle(testClient)
-  await migrate(db, { migrationsFolder: './drizzle' })
+  const disposable = await createDisposableTestDatabase('repo_billing')
+  db = disposable.db
+  drop = disposable.drop
 
   await db.insert(organizations).values([
     { id: 'repo-billing-org-a', name: 'A', slug: 'repo-billing-org-a', createdAt: new Date() },
@@ -62,9 +51,7 @@ beforeAll(async () => {
 }, 60_000)
 
 afterAll(async () => {
-  await testClient?.end({ timeout: 5 })
-  await admin.unsafe(`DROP DATABASE IF EXISTS ${testDatabaseName}`)
-  await admin.end({ timeout: 5 })
+  await drop()
 })
 
 describe('billing repository — tenant isolation and integrity', () => {
