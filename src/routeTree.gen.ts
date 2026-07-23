@@ -76,6 +76,7 @@ import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/
 import { Route as ApiBillingSummaryRouteImport } from './routes/api/billing/summary'
 import { Route as ApiBillingRefundsRouteImport } from './routes/api/billing/refunds'
 import { Route as ApiBillingPortalRouteImport } from './routes/api/billing/portal'
+import { Route as ApiBillingDisputesRouteImport } from './routes/api/billing/disputes'
 import { Route as ApiBillingContactRouteImport } from './routes/api/billing/contact'
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
@@ -494,6 +495,11 @@ const ApiBillingRefundsRoute = ApiBillingRefundsRouteImport.update({
 const ApiBillingPortalRoute = ApiBillingPortalRouteImport.update({
   id: '/api/billing/portal',
   path: '/api/billing/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiBillingDisputesRoute = ApiBillingDisputesRouteImport.update({
+  id: '/api/billing/disputes',
+  path: '/api/billing/disputes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiBillingContactRoute = ApiBillingContactRouteImport.update({
@@ -1001,6 +1007,7 @@ export interface FileRoutesByFullPath {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
+  '/api/billing/disputes': typeof ApiBillingDisputesRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1150,6 +1157,7 @@ export interface FileRoutesByTo {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
+  '/api/billing/disputes': typeof ApiBillingDisputesRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1304,6 +1312,7 @@ export interface FileRoutesById {
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
+  '/api/billing/disputes': typeof ApiBillingDisputesRoute
   '/api/billing/portal': typeof ApiBillingPortalRoute
   '/api/billing/refunds': typeof ApiBillingRefundsRoute
   '/api/billing/summary': typeof ApiBillingSummaryRoute
@@ -1457,6 +1466,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
+    | '/api/billing/disputes'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1606,6 +1616,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
+    | '/api/billing/disputes'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1759,6 +1770,7 @@ export interface FileRouteTypes {
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
+    | '/api/billing/disputes'
     | '/api/billing/portal'
     | '/api/billing/refunds'
     | '/api/billing/summary'
@@ -1880,6 +1892,7 @@ export interface RootRouteChildren {
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
   ApiBillingContactRoute: typeof ApiBillingContactRouteWithChildren
+  ApiBillingDisputesRoute: typeof ApiBillingDisputesRoute
   ApiBillingPortalRoute: typeof ApiBillingPortalRoute
   ApiBillingRefundsRoute: typeof ApiBillingRefundsRoute
   ApiBillingSummaryRoute: typeof ApiBillingSummaryRoute
@@ -2430,6 +2443,13 @@ declare module '@tanstack/react-router' {
       path: '/api/billing/portal'
       fullPath: '/api/billing/portal'
       preLoaderRoute: typeof ApiBillingPortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/billing/disputes': {
+      id: '/api/billing/disputes'
+      path: '/api/billing/disputes'
+      fullPath: '/api/billing/disputes'
+      preLoaderRoute: typeof ApiBillingDisputesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/billing/contact': {
@@ -3269,6 +3289,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
   ApiBillingContactRoute: ApiBillingContactRouteWithChildren,
+  ApiBillingDisputesRoute: ApiBillingDisputesRoute,
   ApiBillingPortalRoute: ApiBillingPortalRoute,
   ApiBillingRefundsRoute: ApiBillingRefundsRoute,
   ApiBillingSummaryRoute: ApiBillingSummaryRoute,

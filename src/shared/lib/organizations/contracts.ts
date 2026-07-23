@@ -229,12 +229,16 @@ export function isOwnerRole(role: OrganizationRole): boolean {
 }
 
 /**
- * Everything `OrganizationBillingCard` needs for one render. `paidActionsAllowed`
- * mirrors `resolveEntitlementPolicy` (active/trialing status on a non-free
- * tier) — false here is what "Team lapse" (an admin flips status to
- * `past_due`/`canceled`, or a trial ends) looks like from the client's side;
- * there's no separate suspension flag or expiry cron to build, membership
- * rows are never touched, only paid-feature access.
+ * Legacy entitlement snapshot — superseded by the canonical `OrganizationBillingSummaryDto`
+ * (`~/shared/lib/billing/contracts.ts`, `GET /api/billing/summary`) that
+ * `BillingSettingsPage.tsx`/`modules/billing/*` now render from
+ * (plans/stripe-billing-platform/tasks.md §9 tasks 1-2). Kept for `/api/organizations/billing`,
+ * which has no other UI consumer left; not deleted outright in this pass to avoid scope creep into a
+ * separate route-retirement cleanup. `paidActionsAllowed` mirrors `resolveEntitlementPolicy` (active/
+ * trialing status on a non-free tier) — false here is what "Team lapse" (an admin flips status to
+ * `past_due`/`canceled`, or a trial ends) looks like from the client's side; there's no separate
+ * suspension flag or expiry cron to build, membership rows are never touched, only paid-feature
+ * access.
  */
 export interface OrganizationEntitlementDto {
   organizationName: string

@@ -1220,10 +1220,93 @@ migration, dunning/recovery) implemented, tested, and committed.
     no exemption for that case. Confirmed via `git stash`/re-run that this predates and is unrelated to
     this task's own diff. Flagged as a separate follow-up rather than scope-creeping into an unrelated fix.
 
-- [ ] **Build complete organization billing settings**
+- [x] **Build complete organization billing settings**
   - Files: `src/routes/_dashboard/settings/billing.tsx`, `src/modules/billing/BillingSettingsPage.tsx`, `src/modules/billing/BillingSettingsPage.test.tsx`, `src/modules/billing/PlanChangePreview.tsx`, `src/modules/billing/CreditBalance.tsx`
   - Do: Replace manual copy with plan/change/cancel, grace/recovery, invoices/Portal, balance by source/expiry, usage, pack purchase, auto-recharge, verified billing email, 30/7/1 warnings, pending/refund/dispute states, and owner/admin/member controls. Preserve data-access messaging.
   - Verify: role/state snapshots, keyboard/screen-reader/mobile tests, forged client controls, and E2E Checkout-return paths pass.
+  - Progress (2026-07-24): **Discovered `PlanChangePreview.tsx` + its test already existed and were complete**,
+    built earlier in this same plan (§7 tasks 3/4's "preview and change matrix" / "seat blockers" work)
+    but never mounted anywhere — confirmed via `grep` that no route/module imported it before this task.
+    Did NOT rewrite it; instead built the surrounding page that lets an owner pick a target catalog
+    key and mounts it with `newCatalogKey`/`onChanged`/`onCancel`, exactly the contract it already
+    exposed. Same research pass confirmed `/api/billing/subscription/preview`, `/change`, and `/cancel`
+    all already existed and were fully unwired to any UI — this task's real job was almost entirely
+    "connect already-built backend to a new frontend," not building new backend logic, except for one
+    genuinely new route (below).
+    **New `GET /api/billing/disputes`** (tenant-scoped, `billing:read`, reuses `disputes.ts`'s existing
+    `listOrganizationDisputes`) — the canonical summary DTO never carried dispute data and the only
+    existing dispute route was platform-admin/cross-org, so an owner/admin had no way to see their own
+    organization's chargebacks; this closes that gap cleanly rather than overloading `/api/billing/
+    summary` with a query that's usually empty.
+    Extended `BillingCreditGrantSummaryDto` (`contracts.ts`, from §9 task 1) with `id` — needed
+    structurally so the UI can target one exact grant for a refund request; deliberately did NOT add
+    `originalUnits` back (a prior, deliberate minimization from task 1) since the refund route already
+    re-validates "fully unused" server-side, so the button is offered for every `pack`-sourced grant and
+    the server's own answer is shown inline on ineligibility, rather than duplicating that business rule
+    client-side. Updated the one existing pure-mapping test that asserted the old (narrower) shape.
+    New `modules/billing/CreditBalance.tsx`: balance-by-source (labeled `SOURCE_LABELS`) and expiry,
+    a pack-purchase mini-flow (`listActivePackCatalog()` client-safe import → `/api/billing/checkout/
+    credits`, same disclosure/idempotency-key contract §9 task 3's pricing-page `SubscribeCta`
+    established), a per-grant "Request refund" button (owner-only) calling `/api/billing/refunds`, and
+    a recent-refunds list with state badges (pending/succeeded/failed/repair_needed — the "pending ...
+    states" half of this task's Do line).
+    New `modules/billing/BillingSettingsPage.tsx` (the actual orchestrator; `settings/billing/index.tsx`
+    is now a thin header + mount, matching every other settings page's shape): fetches the canonical
+    `GET /api/billing/summary` as its ONLY data source (replacing the old page's two separate legacy
+    fetches to `/api/organizations/billing` and `/api/plans/me`). Branches on whether the response has
+    a `tier` field to distinguish the owner/admin shape from the member-only `BillingAvailabilityDto`
+    (spec.md: "Members see only feature availability and an owner-contact action" — a member's branch
+    never even fetches `/api/billing/disputes`, gated by the same check). Within the elevated branch,
+    every mutation control (Portal, cancel, change-plan picker, pack purchase, refund request,
+    auto-recharge) is gated on `capabilities.canOpenPortal === true` (owner-only booleans from §9 task
+    1's DTO — admin sees the identical read-only data with zero mutation affordances, never a disabled
+    button implying a broken feature).
+    **"30/7/1 warnings"** implemented as time-based banners derived from the summary's own `grace`/
+    `scheduledChange`/`cancelAtPeriodEnd`/`currentPeriodEnd` fields (no new backend state): a danger
+    banner once `grace.paymentBlockedAt` is set; an escalating grace-period countdown banner (plain
+    warning while >1 day remains until `gracePeriodEndsAt`, danger at ≤1 day) while payment has failed
+    but access isn't blocked yet; an info banner for a pending `scheduledChange`; a warning banner for
+    `cancelAtPeriodEnd`; and a low-key renewal-approaching notice within 30 days of `currentPeriodEnd`
+    (mirrors spec.md's "price increases receive at least 30 days' notice" cadence, generalized to any
+    upcoming renewal). "Preserve data-access messaging": the member view's copy and the cancel/grace
+    banners all explicitly state access continues through the current paid period — never implies data
+    loss, matching `dunning.ts`'s own invariant.
+    **Reused `OrganizationDangerZone.tsx`'s exact stale-session banner pattern** (same
+    `STALE_SESSION_ERROR_MESSAGE` constant billing throws) for the Portal button's 401 case — confirmed
+    live (below) that a real recent-auth 401 renders the identical "Sign in again to continue" banner/
+    link this codebase already established elsewhere, rather than a bespoke error style.
+    **Deleted `modules/dashboard/components/OrganizationBillingCard.tsx`** and its test — the only
+    consumer of the legacy `/api/organizations/billing` route/`OrganizationEntitlementDto`, now
+    genuinely dead code once `BillingSettingsPage` replaced it; updated the one stale doc-comment
+    reference in `organizations/contracts.ts`. Deliberately did NOT delete the legacy route/DTO
+    themselves in this pass (a separate, larger cleanup — `SeatDowngradeBlockerDto`/`isOwnerRole`/
+    `OrganizationRole` in the same file are still genuinely used elsewhere) — flagged as a follow-up
+    task instead of scope-creeping a route removal into this already-large page rewrite.
+    10 new `BillingSettingsPage.test.tsx` tests (member availability-only view for both paid/free,
+    full owner view with all mutation controls present, full admin view with zero mutation controls,
+    payment-blocked danger banner, grace-period warning banner, scheduled-change banner, cancel-
+    scheduled banner suppressing the cancel button, credit-balance + disputes rendering from real data,
+    and the summary-fetch error state) — `PlanChangePreview.tsx` itself is not re-tested here since its
+    own pre-existing `PlanChangePreview.test.tsx` already covers its internals in isolation.
+    Live-verified against the running dev server end to end: the full owner view renders correctly
+    (real "Renews on 15/8/2026", "Team plan · 2 of 10 seats used · Active", Manage-payment/Cancel
+    buttons, a real 6-option "Change plan" picker, credit balance with a real pack selector, auto-
+    recharge, billing contact, usage bars — all in the dark-glass theme); clicking a "Change plan"
+    option correctly mounted the pre-existing `PlanChangePreview` and issued a REAL `POST /api/billing/
+    subscription/preview`, which correctly returned `no_active_subscription` (this dev org's Team
+    status is a manually-granted legacy entitlement with no real Stripe subscription row — the exact
+    same reason §9 task 3's pricing-page checkout attempt succeeded rather than hitting
+    `subscription_exists`) and displayed that real error inline; the Cancel-subscription confirm flow
+    issued a real `POST /api/billing/subscription/cancel`, hit the identical real
+    `no_active_subscription` error, and displayed it; the Portal button issued a real
+    `POST /api/billing/portal`, got a real 401, and rendered the exact stale-session banner/reauth-link
+    described above; no console errors on a fresh tab (one transient Vite HMR warning about the just-
+    deleted `OrganizationBillingCard.tsx` cleared immediately on a fresh tab, confirmed harmless).
+    `pnpm type-check` (clean); `pnpm lint` (0 errors in every file touched); targeted vitest
+    (`BillingSettingsPage.test.tsx` 10/10, `contracts.test.ts` 16/16, `PlanChangePreview.test.tsx`
+    and `CheckoutReturn.test.tsx` both still green — confirming the `contracts.ts` DTO change broke
+    nothing pre-existing, `billing.test.ts` repository-layer 8/8); `pnpm security:boundaries` (0 legacy
+    imports); route-coverage (96 routes — +1 for `/api/billing/disputes`, 8 allowlisted, valid).
 
 - [x] **Update pricing for the approved catalog**
   - Files: `src/routes/_landing/pricing.tsx`, `src/routes/_landing/pricing.test.tsx`, `src/shared/lib/billing-shared.ts`, `test/test-pricing-and-billing.mjs`

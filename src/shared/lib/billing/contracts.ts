@@ -42,6 +42,8 @@ export interface BillingTermsAcceptanceSummaryDto {
 }
 
 export interface BillingCreditGrantSummaryDto {
+  /** Needed structurally so an owner can target this exact grant for a refund request (`POST /api/billing/refunds`) — the route itself re-validates eligibility server-side, so no other grant field needs to leave this DTO for that purpose. */
+  id: string
   source: string
   remainingUnits: number
   expiresAt: string
@@ -177,9 +179,9 @@ export function toBillingTermsAcceptanceSummaryDto(
 }
 
 export function toBillingCreditGrantSummaryDto(
-  grant: { source: string; remainingUnits: number; expiresAt: Date },
+  grant: { id: string; source: string; remainingUnits: number; expiresAt: Date },
 ): BillingCreditGrantSummaryDto {
-  return { source: grant.source, remainingUnits: grant.remainingUnits, expiresAt: grant.expiresAt.toISOString() }
+  return { id: grant.id, source: grant.source, remainingUnits: grant.remainingUnits, expiresAt: grant.expiresAt.toISOString() }
 }
 
 export function toBillingCreditReservationSummaryDto(

@@ -129,7 +129,7 @@ describe('billing contracts — DTO mapping', () => {
       originalUnits: 140,
       expiresAt: new Date('2026-08-01T00:00:00Z'),
     } as never)
-    expect(dto).toEqual({ source: 'subscription_monthly', remainingUnits: 90, expiresAt: '2026-08-01T00:00:00.000Z' })
+    expect(dto).toEqual({ id: 'grant-1', source: 'subscription_monthly', remainingUnits: 90, expiresAt: '2026-08-01T00:00:00.000Z' })
     expect(dto).not.toHaveProperty('stripePaymentReference')
     expect(dto).not.toHaveProperty('originalUnits')
   })
