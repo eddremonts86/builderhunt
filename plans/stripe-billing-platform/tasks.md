@@ -175,10 +175,27 @@
     `catalog.test.ts` failure from a concurrent session's Stripe Price ID provisioning work).
     `pnpm type-check`/`pnpm lint`/`pnpm security:boundaries` clean.
 
-- [ ] **Implement versioned commercial consent**
+- [x] **Implement versioned commercial consent**
   - Files: `src/shared/lib/billing/consent.ts`, `src/shared/lib/billing/consent.test.ts`, `src/shared/lib/legal.ts`, `src/shared/lib/legal.test.ts`
   - Do: Resolve current Terms/Privacy/commercial versions, validate Checkout disclosures, store owner/org/action/time/provider evidence, require reacceptance on material version changes, and model separate auto-recharge consent.
   - Verify: stale/missing/wrong-org consent blocks Checkout; material/non-material version tests match policy; no raw request payload is stored.
+  - Progress (2026-07-23): `legal.ts` gains `parseDocumentVersion`/`isMaterialVersionChange` — a
+    generic `v<major>.<minor>` comparator (major bump = material = forces reacceptance; minor bump
+    or unchanged = not; either side unparseable fails closed as material) reused by billing consent
+    on top of the account-level tos/privacy/cookies versioning already there. `billing/consent.ts`
+    adds `recordCheckoutConsent` (validates all 7 required Checkout disclosures — renewal, amount,
+    interval, cancellation/refund policy, credit expiry/non-transferability, tax, total — are
+    acknowledged, then stores only the typed `billing_terms_acceptances` evidence columns, never the
+    disclosures object itself), `recordAutoRechargeConsent` (a structurally separate action with its
+    own off-session-charge acknowledgment, per spec.md's "separate versioned off-session consent"),
+    and `requireCurrentCommercialConsent` (blocks Checkout when no consent is on file, when the org's
+    latest acceptance predates a material Terms/Privacy version bump, or — proven directly — when
+    only a *different* organization has consented). 16 new legal.ts tests +
+    17 new consent.ts tests (disposable-DB integration, covering every required-disclosure key
+    individually, auto-recharge modeled separately from checkout consent, stale vs. non-material
+    version scenarios, and wrong-org isolation), all passing; full suite 234/234 minus the same
+    pre-existing unrelated `catalog.test.ts` failure. `pnpm type-check`/`pnpm lint`/
+    `pnpm security:boundaries` clean.
 
 - [ ] **Build subscription Checkout endpoint**
   - Files: `src/shared/lib/billing/checkout.ts`, `src/shared/lib/billing/checkout.test.ts`, `src/routes/api/billing/checkout/subscription.ts`, `src/routes/api/billing/checkout/subscription.test.ts`

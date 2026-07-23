@@ -36,6 +36,8 @@ import {
   GRACE_PERIOD_MS,
   EXPORT_TTL_MS,
   buildExportPayload,
+  isMaterialVersionChange,
+  parseDocumentVersion,
   performHardDelete,
   processPendingDeletions,
   requestDeletion,
@@ -62,6 +64,46 @@ describe('legal constants', () => {
   it('ConsentDocument union covers tos/privacy/cookies', () => {
     const docs: ConsentDocument[] = ['tos', 'privacy', 'cookies']
     expect(docs).toHaveLength(3)
+  })
+})
+
+describe('parseDocumentVersion', () => {
+  it('parses major/minor from a v<major>.<minor> string', () => {
+    expect(parseDocumentVersion('v1.0')).toEqual({ major: 1, minor: 0 })
+    expect(parseDocumentVersion('v2.13')).toEqual({ major: 2, minor: 13 })
+  })
+
+  it('returns null for anything that does not match the shape', () => {
+    expect(parseDocumentVersion('1.0')).toBeNull()
+    expect(parseDocumentVersion('v1')).toBeNull()
+    expect(parseDocumentVersion('v1.0.0')).toBeNull()
+    expect(parseDocumentVersion('')).toBeNull()
+  })
+})
+
+describe('isMaterialVersionChange', () => {
+  it('is not material when the version is unchanged', () => {
+    expect(isMaterialVersionChange('v1.0', 'v1.0')).toBe(false)
+  })
+
+  it('is not material on a minor bump', () => {
+    expect(isMaterialVersionChange('v1.0', 'v1.1')).toBe(false)
+    expect(isMaterialVersionChange('v1.5', 'v1.2')).toBe(false)
+  })
+
+  it('is material on a major bump', () => {
+    expect(isMaterialVersionChange('v1.9', 'v2.0')).toBe(true)
+    expect(isMaterialVersionChange('v1.0', 'v3.0')).toBe(true)
+  })
+
+  it('fails closed (treats as material) when the versions differ and either is unparseable', () => {
+    expect(isMaterialVersionChange('garbage', 'v1.0')).toBe(true)
+    expect(isMaterialVersionChange('v1.0', 'garbage')).toBe(true)
+    expect(isMaterialVersionChange('garbage-a', 'garbage-b')).toBe(true)
+  })
+
+  it('an identical unparseable version on both sides is still "unchanged", not material', () => {
+    expect(isMaterialVersionChange('garbage', 'garbage')).toBe(false)
   })
 })
 

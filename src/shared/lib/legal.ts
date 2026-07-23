@@ -24,6 +24,33 @@ const CURRENT_VERSIONS = {
 export type ConsentDocument = keyof typeof CURRENT_VERSIONS
 export const CURRENT_CONSENT_VERSIONS = CURRENT_VERSIONS
 
+export interface ParsedDocumentVersion {
+  major: number
+  minor: number
+}
+
+/** Versions are `v<major>.<minor>` (e.g. `v1.0`, `v1.1`, `v2.0`). Returns null for anything else. */
+export function parseDocumentVersion(version: string): ParsedDocumentVersion | null {
+  const match = /^v(\d+)\.(\d+)$/.exec(version)
+  if (!match) return null
+  return { major: Number(match[1]), minor: Number(match[2]) }
+}
+
+/**
+ * A major bump (`v1.x` -> `v2.0`) is a material change to a legal document — plans/stripe-billing-platform/
+ * spec.md: "Material changes require fresh acceptance." A minor bump (`v1.0` -> `v1.1`, e.g. a typo or
+ * clarification) is not: an existing acceptance of an earlier minor version stays valid. An unparseable
+ * version on either side is always treated as material — fail closed, never silently skip reacceptance
+ * because a version string didn't match the expected shape.
+ */
+export function isMaterialVersionChange(previousVersion: string, currentVersion: string): boolean {
+  if (previousVersion === currentVersion) return false
+  const previous = parseDocumentVersion(previousVersion)
+  const current = parseDocumentVersion(currentVersion)
+  if (!previous || !current) return true
+  return previous.major !== current.major
+}
+
 export async function getConsentStatus(userId: string | null) {
   if (!userId) {
     return {
