@@ -82,6 +82,10 @@ export interface UserPlan {
   notes: string | null
 }
 
+// Still consumed by src/routes/_dashboard/settings/billing.tsx, which builds
+// these shapes itself from /api/plans/me's org-based entitlement response —
+// not by checkPlatformLimit (deleted: dead code with a latent bug, see
+// plans/security-and-multitenancy/tasks.md task 15).
 export type LimitResource = 'savedSearches' | 'savedBuilders' | 'rssSubscriptions'
 
 export interface LimitCheck {

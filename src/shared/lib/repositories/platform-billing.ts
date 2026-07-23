@@ -1,8 +1,8 @@
 import { and, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
-import { PLAN_LIMITS, PLAN_SEAT_LIMITS, type LimitCheck, type LimitResource, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
+import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
-import { authUsers, builders, planChanges, planRequests, plans, savedQueries } from '../db/schema'
+import { authUsers, planChanges, planRequests, plans } from '../db/schema'
 
 export async function getPlatformUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {
   if (!userId) return null
@@ -78,16 +78,6 @@ export async function resolvePlatformPlanRequest(id: string, status: 'approved' 
 export async function findPlatformPlanRequest(id: string) {
   const [row] = await platformDb.select().from(planRequests).where(eq(planRequests.id, id)).limit(1)
   return row ?? null
-}
-
-export async function checkPlatformLimit(userId: string, resource: LimitResource): Promise<LimitCheck> {
-  const plan = (await getPlatformUserPlan(userId))?.plan ?? 'free'
-  const limit = PLAN_LIMITS[plan][resource]
-  const table = resource === 'savedBuilders' ? builders : savedQueries
-  const userColumn = resource === 'savedBuilders' ? builders.userId : savedQueries.userId
-  const [row] = await platformDb.select({ value: count() }).from(table).where(eq(userColumn, userId))
-  const current = Number(row?.value ?? 0)
-  return { allowed: current < limit, current, limit, plan, resource }
 }
 
 export async function listPlatformUsersWithPlans() {

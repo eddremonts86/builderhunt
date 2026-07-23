@@ -1,5 +1,4 @@
 export {
-  checkPlatformLimit as checkLimit,
   findPlatformPlanRequest as findPlanRequest,
   getPlatformUserPlan as getUserPlan,
   listPlatformPlanRequests as listPlanRequestsWithUsers,
@@ -12,8 +11,6 @@ export {
 export {
   PLAN_LIMITS,
   PLAN_PRICING,
-  type LimitCheck,
-  type LimitResource,
   type PlanStatus,
   type PlanTier,
   type UserPlan,
