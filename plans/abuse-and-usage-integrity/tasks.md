@@ -333,11 +333,39 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     confirmed via `psql` query, then deleted the synthetic test row and the scratch script to leave
     the dev DB and repo clean.
 
-- [ ] **Risk scoring**
+- [x] **Risk scoring**
   - Files: `src/shared/lib/abuse/risk.ts` (+ test), `src/shared/lib/repositories/account-risk.ts`
   - Do: combine signals into a decayed `account_risk` score + candidate stage; corroboration rules
     (no single weak signal escalates past `warn`).
   - Verify: unit tests for scoring, decay, and corroboration gates.
+  - Progress: New `risk.ts`. `computeDecayedRiskScore(signals, now, halfLifeHours=72)` sums each
+    signal's severity weight (low=1/medium=3/high=7) decayed exponentially by age
+    (`weight * 0.5^(ageHours/halfLife)`) — a signal's contribution halves every 72h rather than
+    being dropped at a hard cutoff. `computeCandidateRiskStage` maps the score to a `RiskStage`
+    (`observe`/`warned`/`stepup`/`throttled`/`blocked` — exactly `account_risk.stage`'s check
+    constraint) via fixed thresholds (4/12/25/40), then applies the spec.md-mandated corroboration
+    gate verbatim: *"a single weak signal ... never escalates past `warn`; escalation requires
+    corroborating signals"* — implemented as `distinctSignalTypes < MIN_CORROBORATING_SIGNAL_TYPES
+    (2)` caps the candidate stage at `warned` regardless of how high the raw score is, even from
+    20 repeated high-severity signals of the SAME type (explicit test: score >40 by itself, but
+    stays `warned` because `distinctSignalTypes === 1`). "Candidate" stage deliberately, since
+    deciding whether/how to actually act on it is the enforcement ladder's job
+    (`resolveEnforcement()`, Phase 5, not built yet). `recomputeAccountRisk(transaction, userId,
+    deps?)` composes `listAbuseSignalsForUser` (read, plain `workerDb` default — `abuse_signals`
+    has no RLS/tenant context to inherit) with `upsertAccountRisk` (write, via the caller's
+    RLS-scoped `WorkerTransaction` — `account_risk.stage`/`.riskScore` are written through
+    `withWorkerUser`'s `app.user_id` scoping same as every other account-risk write); no change
+    needed to `repositories/account-risk.ts` itself, `getAccountRisk`/`upsertAccountRisk` were
+    already sufficient. `risk.test.ts`: 12 pure-function tests (zero signals, severity ordering,
+    exact decay at 1 and 2 half-lives, custom half-life, summing not averaging, scoring
+    thresholds, the corroboration gate at 1/exactly-2/3+ distinct types, and confirming
+    corroboration never artificially demotes a genuinely-low score) + 2 real-disposable-DB
+    integration tests for `recomputeAccountRisk` (real `abuse_signals` rows in → real scored
+    `account_risk` upsert out, matching `stored` via `getAccountRisk`; a user with zero signals
+    lands at `observe`/score 0/`reason: null`). Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint`
+    clean, `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/account-risk.test.ts
+    src/shared/lib/repositories/abuse-signals.test.ts src/shared/lib/auth/tenant-principal.test.ts`
+    → 99/99 green, `pnpm security:boundaries` → 0 legacy imports.
 
 ## Phase 3 — Multi-accounting defenses (B)
 
