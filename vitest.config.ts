@@ -2,8 +2,12 @@ import { defineConfig } from 'vitest/config'
 import { resolve } from 'path'
 import { config } from 'dotenv'
 
-// Load .env so env-validating modules don't crash on import
+// Load .env so env-validating modules don't crash on import, then layer .env.local on top
+// with the same override priority Vite itself uses — keeps the test suite on the same
+// test-mode-safe Stripe credentials as `pnpm dev` rather than silently falling back to
+// whatever real/live values happen to be sitting in .env.
 config({ path: '.env' })
+config({ path: '.env.local', override: true })
 
 // Provide test defaults for required env vars (real values, but isolated)
 process.env.NODE_ENV = process.env.NODE_ENV ?? 'test'

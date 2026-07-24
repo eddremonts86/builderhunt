@@ -52,20 +52,42 @@
 | Incident/kill-switch owner | Edd Remonts | confirmed 2026-07-24 | has Stripe Dashboard + deploy access |
 | Secret rotation owner | Edd Remonts | confirmed 2026-07-24 | same |
 | Stripe Billing Portal configuration | Restricted (`bpc_1Twg3NFbQx9fJlcGpkbiTqgy`, live mode): payment methods + tax ID + invoice history enabled; plan switching and cancellation disabled | confirmed 2026-07-24 | verified directly against the Stripe live API; matches `real-provider.ts`'s `ensureRestrictedPortalConfiguration()` |
-| Production webhook endpoint | `builderhunt-production`, live mode, `https://builderhunt.eduardoinerarte.dk/api/webhooks/stripe`, the 18 event types the code handles | confirmed 2026-07-24 | Stripe Dashboard → Workbench → Webhooks |
+| Production webhook endpoint | Two destinations exist, same URL/18 events: `builderhunt-production` (live mode, currently receiving nothing — production runs the test key) and `builderhunt-production-testmode` (test mode, currently active — verified with a real 200 response after a manual resend) | confirmed 2026-07-24 | Stripe Dashboard → Workbench → Webhooks |
 | `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` | Set locally; **not yet present in the production Coolify environment** | _pending_ | see "Production environment gap" below — must be pushed before `STRIPE_BILLING_ENABLED=true` |
 
-### Production environment gap (found 2026-07-24)
+### Production environment gap (found 2026-07-24) — resolved, then deliberately reversed to test mode
 
-The production Coolify app currently has **none** of the Stripe-related env vars configured —
-`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_API_VERSION`, `STRIPE_BILLING_ENABLED`,
-`VITE_STRIPE_PUBLISHABLE_KEY`, `ADMIN_USER_IDS`, `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` (verified via the
-Coolify API's `/applications/{uuid}/envs` endpoint — only non-billing vars are present). This was
-harmless while the flag has never been `true`, but it means the webhook endpoint just registered in
-Stripe (above) cannot yet be verified in production, and flipping `STRIPE_BILLING_ENABLED=true` today
-would crash the app (env.ts fails closed on the missing required vars). These must be pushed to
-Coolify production (and ideally preview) before `billingFlagEnabledInLiveMode` is attempted — this
-is a real, outward-facing infrastructure change and needs explicit sign-off before doing it.
+The production Coolify app initially had **none** of the Stripe-related env vars configured, then
+was briefly configured with LIVE credentials (`STRIPE_BILLING_ENABLED=false`, so harmless). Per an
+explicit product decision the same day: **production now intentionally runs on Stripe TEST-mode
+credentials with `STRIPE_BILLING_ENABLED=true`**, so trusted friends/testers can use the real
+deployed app and exercise the entire real Checkout/webhook/entitlement pipeline with Stripe's test
+cards — zero real money at risk — before the actual public/live launch. Concretely:
+
+- Local dev now has `.env.local` (gitignored, Vite/vitest-prioritized over `.env`) holding the same
+  test-mode `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET`/`VITE_STRIPE_PUBLISHABLE_KEY` as production,
+  plus `STRIPE_BILLING_ENABLED=true` — `RealBillingProvider` runs everywhere in dev/CI now, never the
+  fake provider, without any live-money risk. `vitest.config.ts` layers `.env.local` over `.env` with
+  `override: true` so the test suite picks the same safe defaults as `pnpm dev`.
+- `.env` still holds the real `sk_live_...`/live webhook secret, `STRIPE_BILLING_ENABLED=false` — this
+  is the "break glass for the actual launch" file, untouched by day-to-day dev work.
+- A SECOND webhook destination (`builderhunt-production-testmode`, test mode, same 18 events) was
+  created in Stripe pointing at the same production URL — the earlier LIVE-mode destination
+  (`builderhunt-production`) stays configured but currently receives nothing, since production is on
+  the test key.
+- Verified end to end for real: after the redeploy, a genuinely failed test-mode webhook delivery
+  (`invalid_signature`, from events fired before the redeploy picked up the new secret) was manually
+  resent from the Stripe Dashboard and returned a real `200 {"received":true,...}` from production.
+- The Coolify `envs` API requires `POST` to create a key and `PATCH` to update an existing one
+  (`POST` on an existing key 409s) — worth remembering for future env pushes.
+- The preview-scope duplication behavior from the earlier live-key push (see below) was NOT repeated
+  here deliberately — test-mode secrets carry no real-money risk, so they were left in both scopes.
+
+**Still true and unchanged**: flipping to the REAL live launch requires swapping these four vars back
+to the values already sitting in `.env` (`sk_live_...`, the live webhook secret, the live publishable
+key) plus everything else the `billingFlagEnabledInLiveMode` gate and the Denmark canary require —
+this test-mode soft-launch state is not itself the live launch, just a safe rehearsal of the full
+pipeline.
 
 ## Technical pins
 

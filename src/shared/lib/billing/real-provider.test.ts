@@ -178,7 +178,7 @@ describe.skipIf(!shouldRun)('RealBillingProvider (real Stripe test-mode network 
     expect(refundFirst.amount).toBe(500)
     const refundSecond = await provider.createRefund({ paymentIntentId: first.id, idempotencyKey: refundKey })
     expect(refundSecond.id).toBe(refundFirst.id)
-  })
+  }, 20_000)
 
   it('rejects an off-session charge with a BillingProviderError when the customer has no default payment method on file', async () => {
     // Stripe's decline-simulation PaymentMethod tokens (`pm_card_chargeDeclined`,
