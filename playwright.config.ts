@@ -1,6 +1,16 @@
 import { defineConfig, devices } from 'playwright/test'
+import { randomBytes } from 'node:crypto'
 
-// E2E runs against a real dev server + real local Postgres — not a mock.
+// E2E runs against a real dev server + real local Postgres + real local
+// Redis — never mocks. The Wave 1 Task 1 isolation harness owns one
+// disposable PostgreSQL database and one Redis namespace per Playwright
+// worker, so this config has to:
+//   1. Set E2E_MODE=true for the vite dev server (gating test-only seams
+//      in the app code, e.g. `src/shared/lib/rate-limit.ts` fail-closed).
+//   2. Set REDIS_URL so the worker process can connect to the local
+//      Redis instance (the in-memory fallback is forbidden in E2E mode).
+//   3. Pick a per-run REDIS prefix so repeated invocations cannot collide.
+//
 // CI provisions its own disposable Postgres (see .github/workflows/quality.yml)
 // and seeds env vars before this config's webServer starts the app. In CI,
 // prefer the job's own APP_URL (already set for the rest of the quality job)
@@ -14,12 +24,30 @@ const baseURL =
     : `http://localhost:${process.env.E2E_PORT ?? '3100'}`
 const PORT = new URL(baseURL).port || '80'
 
+// Pre-compute a single REDIS_URL pointing at the local Redis container.
+// The container is expected to be running on the standard 6379 port (the
+// repo's docker-compose.yml's `redis` service publishes it).
+const redisURL = process.env.REDIS_URL ?? `redis://localhost:${process.env.REDIS_PORT ?? '6379'}`
+// Wave 1 Task 1 — single global prefix for this run is the baseline;
+// per-worker prefixes are derived inside `e2e/harness/cache.ts` and
+// written into the test process's process.env.E2E_REDIS_PREFIX by the
+// test's own beforeAll hook.
+const e2eRunId = process.env.E2E_RUN_ID ?? `run-${randomBytes(4).toString('hex')}`
+
+// Parallelism: the Wave 1 Task 1 isolation spec MUST run with --workers=2
+// to prove isolation. Configured here as the default so a bare `pnpm
+// exec playwright test e2e/harness/isolation.spec.ts` exercises the
+// concurrency path the spec requires. Other suites can override via
+// --workers=1 when they need serialized state — e.g. the existing
+// team-accounts spec, which still shares fixtures.
+const defaultWorkers = Number(process.env.E2E_WORKERS ?? '2')
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false, // team-accounts specs share one local DB — no cross-test isolation between orgs otherwise
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: defaultWorkers,
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   timeout: 30_000,
   use: {
@@ -46,6 +74,15 @@ export default defineConfig({
     // actually binds to — override both here so they always match this
     // config's own baseURL, or every request (starting with sign-up) 404s/
     // connection-refuses against whatever port `.env` happens to say.
-    env: { APP_URL: baseURL, VITE_APP_URL: baseURL },
+    env: {
+      APP_URL: baseURL,
+      VITE_APP_URL: baseURL,
+      // Wave 1 Task 1 — E2E seams. E2E_MODE gates the fail-closed path in
+      // `src/shared/lib/rate-limit.ts` and is the marker the harness reads
+      // via `e2eEnv()` to refuse to run in production mode.
+      E2E_MODE: 'true',
+      REDIS_URL: redisURL,
+      E2E_RUN_ID: e2eRunId,
+    },
   },
 })

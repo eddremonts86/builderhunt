@@ -18,3 +18,10 @@ dist
 test-results/
 playwright-report/
 blob-report/
+
+# Wave 1 Task 1 — E2E isolation artifacts that should never be committed.
+# `e2e/harness/.e2e-run-id` is written by the harness when a run starts so
+# teardown can find the last run's per-worker prefixes/database names; we
+# keep it out of the repo to avoid masking real leaks.
+e2e/harness/.e2e-run-id
+e2e/harness/.e2e-leftovers.log

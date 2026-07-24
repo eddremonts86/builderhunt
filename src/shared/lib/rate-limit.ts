@@ -20,7 +20,24 @@ interface Bucket {
 
 const memoryBuckets = new Map<string, Bucket>()
 
+// Wave 1 Task 1 — E2E fail-closed.
+//
+// In E2E mode (E2E_MODE=true) the application MUST use a real, scoped
+// Redis instance — the process-global in-memory fallback would silently
+// collapse every worker's buckets into one shared map and break tenant
+// isolation. The harness's `e2e/harness/cache.ts` owns a per-worker
+// `E2E_REDIS_PREFIX`; rate-limit keys live under that prefix in E2E
+// mode so cleanup can drop only the worker's namespace.
+//
+// This is gated on E2E_MODE rather than the mere presence of REDIS_URL
+// so dev mode (no REDIS_URL, in-memory fallback) keeps working.
+function isE2E(): boolean {
+  return process.env.E2E_MODE === 'true'
+}
+
 function getKey(scope: string, id: string): string {
+  const prefix = process.env.E2E_REDIS_PREFIX
+  if (prefix) return `${prefix}:rl:${scope}:${id}`
   return `rl:${scope}:${id}`
 }
 
@@ -38,12 +55,11 @@ export async function rateLimit(
   try {
     const redis = await getRedis()
     if (redis) {
-      const redisKey = `rl:${scope}:${id}`
-      const count = await redis.incr(redisKey)
+      const count = await redis.incr(key)
       if (count === 1) {
-        await redis.expire(redisKey, windowSeconds)
+        await redis.expire(key, windowSeconds)
       }
-      const ttl = await redis.ttl(redisKey)
+      const ttl = await redis.ttl(key)
       const resetMs = ttl > 0 ? ttl * 1000 : windowMs
       return {
         allowed: count <= limit,
@@ -53,10 +69,20 @@ export async function rateLimit(
       }
     }
   } catch {
-    // Fall through to in-memory
+    // Fall through to in-memory (production) or fail closed (E2E).
   }
 
-  // In-memory fallback
+  // E2E fail-closed: if Redis is unreachable in E2E mode, refuse the
+  // request rather than silently falling back to the in-memory bucket.
+  // Returning `{ allowed: false }` matches the spec: "the in-memory
+  // rate-limit fallback must fail closed in E2E mode" — i.e. when no
+  // shared state is available, deny the request rather than allow it
+  // against a different worker's bucket.
+  if (isE2E()) {
+    return { allowed: false, remaining: 0, resetMs: windowMs, limit }
+  }
+
+  // In-memory fallback (production / dev only)
   const bucket = memoryBuckets.get(key)
   if (!bucket || bucket.resetAt < now) {
     memoryBuckets.set(key, { count: 1, resetAt: now + windowMs })

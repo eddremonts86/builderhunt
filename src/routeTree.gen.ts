@@ -58,11 +58,11 @@ import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/seman
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
+import { Route as ApiOrganizationsTransferOwnershipPreviewRouteImport } from './routes/api/organizations/transfer-ownership-preview'
 import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
 import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
 import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOrganizationsDeletionRouteImport } from './routes/api/organizations/deletion'
-import { Route as ApiOrganizationsBillingRouteImport } from './routes/api/organizations/billing'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -124,6 +124,7 @@ import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/spri
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
+import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
@@ -151,8 +152,11 @@ import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/chan
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
 import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
+import { Route as ApiAdminBillingReconcileRouteImport } from './routes/api/admin/billing/reconcile'
+import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/billing/metrics'
 import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
+import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
@@ -405,6 +409,12 @@ const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   path: '/api/plans/me',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOrganizationsTransferOwnershipPreviewRoute =
+  ApiOrganizationsTransferOwnershipPreviewRouteImport.update({
+    id: '/api/organizations/transfer-ownership-preview',
+    path: '/api/organizations/transfer-ownership-preview',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrganizationsTransferOwnershipRoute =
   ApiOrganizationsTransferOwnershipRouteImport.update({
     id: '/api/organizations/transfer-ownership',
@@ -427,11 +437,6 @@ const ApiOrganizationsDeletionRoute =
     path: '/api/organizations/deletion',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiOrganizationsBillingRoute = ApiOrganizationsBillingRouteImport.update({
-  id: '/api/organizations/billing',
-  path: '/api/organizations/billing',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
   id: '/api/onboarding/status',
   path: '/api/onboarding/status',
@@ -749,6 +754,12 @@ const ApiOrganizationsInvitationsInvitationIdRoute =
     path: '/api/organizations/invitations/$invitationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOrganizationsDeletionImmediateRoute =
+  ApiOrganizationsDeletionImmediateRouteImport.update({
+    id: '/immediate',
+    path: '/immediate',
+    getParentRoute: () => ApiOrganizationsDeletionRoute,
+  } as any)
 const ApiMeDataExportIdRoute = ApiMeDataExportIdRouteImport.update({
   id: '/api/me/data-export/$id',
   path: '/api/me/data-export/$id',
@@ -900,6 +911,17 @@ const ApiAdminBillingRefundsRoute = ApiAdminBillingRefundsRouteImport.update({
   path: '/api/admin/billing/refunds',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminBillingReconcileRoute =
+  ApiAdminBillingReconcileRouteImport.update({
+    id: '/api/admin/billing/reconcile',
+    path: '/api/admin/billing/reconcile',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminBillingMetricsRoute = ApiAdminBillingMetricsRouteImport.update({
+  id: '/api/admin/billing/metrics',
+  path: '/api/admin/billing/metrics',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminBillingDisputesRoute = ApiAdminBillingDisputesRouteImport.update({
   id: '/api/admin/billing/disputes',
   path: '/api/admin/billing/disputes',
@@ -909,6 +931,12 @@ const ApiAdminBillingConfigurationRoute =
   ApiAdminBillingConfigurationRouteImport.update({
     id: '/api/admin/billing/configuration',
     path: '/api/admin/billing/configuration',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminBillingAccountingExportRoute =
+  ApiAdminBillingAccountingExportRouteImport.update({
+    id: '/api/admin/billing/accounting-export',
+    path: '/api/admin/billing/accounting-export',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
@@ -1021,11 +1049,11 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
-  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
-  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRoute
+  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
+  '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -1054,8 +1082,11 @@ export interface FileRoutesByFullPath {
   '/api/status/': typeof ApiStatusIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
+  '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
+  '/api/admin/billing/reconcile': typeof ApiAdminBillingReconcileRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1083,6 +1114,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
@@ -1171,11 +1203,11 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
-  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
-  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRoute
+  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
+  '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -1204,8 +1236,11 @@ export interface FileRoutesByTo {
   '/api/status': typeof ApiStatusIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
+  '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
+  '/api/admin/billing/reconcile': typeof ApiAdminBillingReconcileRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1233,6 +1268,7 @@ export interface FileRoutesByTo {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
@@ -1326,11 +1362,11 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
-  '/api/organizations/billing': typeof ApiOrganizationsBillingRoute
-  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRoute
+  '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
+  '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -1359,8 +1395,11 @@ export interface FileRoutesById {
   '/api/status/': typeof ApiStatusIndexRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
+  '/api/admin/billing/metrics': typeof ApiAdminBillingMetricsRoute
+  '/api/admin/billing/reconcile': typeof ApiAdminBillingReconcileRoute
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
@@ -1388,6 +1427,7 @@ export interface FileRoutesById {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
+  '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
@@ -1480,11 +1520,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
-    | '/api/organizations/billing'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
+    | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1513,8 +1553,11 @@ export interface FileRouteTypes {
     | '/api/status/'
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
+    | '/api/admin/billing/metrics'
+    | '/api/admin/billing/reconcile'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1542,6 +1585,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
@@ -1630,11 +1674,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
-    | '/api/organizations/billing'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
+    | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1663,8 +1707,11 @@ export interface FileRouteTypes {
     | '/api/status'
     | '/settings/billing/return'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
+    | '/api/admin/billing/metrics'
+    | '/api/admin/billing/reconcile'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1692,6 +1739,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
@@ -1784,11 +1832,11 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
-    | '/api/organizations/billing'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
     | '/api/organizations/transfer-ownership'
+    | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/search/builders'
@@ -1817,8 +1865,11 @@ export interface FileRouteTypes {
     | '/api/status/'
     | '/_dashboard/settings/billing/return'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
+    | '/api/admin/billing/metrics'
+    | '/api/admin/billing/reconcile'
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
@@ -1846,6 +1897,7 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
+    | '/api/organizations/deletion/immediate'
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
@@ -1906,11 +1958,11 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
-  ApiOrganizationsBillingRoute: typeof ApiOrganizationsBillingRoute
-  ApiOrganizationsDeletionRoute: typeof ApiOrganizationsDeletionRoute
+  ApiOrganizationsDeletionRoute: typeof ApiOrganizationsDeletionRouteWithChildren
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
   ApiOrganizationsTransferOwnershipRoute: typeof ApiOrganizationsTransferOwnershipRoute
+  ApiOrganizationsTransferOwnershipPreviewRoute: typeof ApiOrganizationsTransferOwnershipPreviewRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
@@ -1930,8 +1982,11 @@ export interface RootRouteChildren {
   ApiSprintsIndexRoute: typeof ApiSprintsIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
+  ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
   ApiAdminBillingDisputesRoute: typeof ApiAdminBillingDisputesRoute
+  ApiAdminBillingMetricsRoute: typeof ApiAdminBillingMetricsRoute
+  ApiAdminBillingReconcileRoute: typeof ApiAdminBillingReconcileRoute
   ApiAdminBillingRefundsRoute: typeof ApiAdminBillingRefundsRoute
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
@@ -2319,6 +2374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPlansMeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/transfer-ownership-preview': {
+      id: '/api/organizations/transfer-ownership-preview'
+      path: '/api/organizations/transfer-ownership-preview'
+      fullPath: '/api/organizations/transfer-ownership-preview'
+      preLoaderRoute: typeof ApiOrganizationsTransferOwnershipPreviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/transfer-ownership': {
       id: '/api/organizations/transfer-ownership'
       path: '/api/organizations/transfer-ownership'
@@ -2345,13 +2407,6 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/deletion'
       fullPath: '/api/organizations/deletion'
       preLoaderRoute: typeof ApiOrganizationsDeletionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/organizations/billing': {
-      id: '/api/organizations/billing'
-      path: '/api/organizations/billing'
-      fullPath: '/api/organizations/billing'
-      preLoaderRoute: typeof ApiOrganizationsBillingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/onboarding/status': {
@@ -2781,6 +2836,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/organizations/deletion/immediate': {
+      id: '/api/organizations/deletion/immediate'
+      path: '/immediate'
+      fullPath: '/api/organizations/deletion/immediate'
+      preLoaderRoute: typeof ApiOrganizationsDeletionImmediateRouteImport
+      parentRoute: typeof ApiOrganizationsDeletionRoute
+    }
     '/api/me/data-export/$id': {
       id: '/api/me/data-export/$id'
       path: '/api/me/data-export/$id'
@@ -2970,6 +3032,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBillingRefundsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/reconcile': {
+      id: '/api/admin/billing/reconcile'
+      path: '/api/admin/billing/reconcile'
+      fullPath: '/api/admin/billing/reconcile'
+      preLoaderRoute: typeof ApiAdminBillingReconcileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/metrics': {
+      id: '/api/admin/billing/metrics'
+      path: '/api/admin/billing/metrics'
+      fullPath: '/api/admin/billing/metrics'
+      preLoaderRoute: typeof ApiAdminBillingMetricsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/disputes': {
       id: '/api/admin/billing/disputes'
       path: '/api/admin/billing/disputes'
@@ -2982,6 +3058,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/billing/configuration'
       fullPath: '/api/admin/billing/configuration'
       preLoaderRoute: typeof ApiAdminBillingConfigurationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/billing/accounting-export': {
+      id: '/api/admin/billing/accounting-export'
+      path: '/api/admin/billing/accounting-export'
+      fullPath: '/api/admin/billing/accounting-export'
+      preLoaderRoute: typeof ApiAdminBillingAccountingExportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/alerts/run-worker': {
@@ -3229,6 +3312,21 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
 const ApiBuildersBuilderIdRouteWithChildren =
   ApiBuildersBuilderIdRoute._addFileChildren(ApiBuildersBuilderIdRouteChildren)
 
+interface ApiOrganizationsDeletionRouteChildren {
+  ApiOrganizationsDeletionImmediateRoute: typeof ApiOrganizationsDeletionImmediateRoute
+}
+
+const ApiOrganizationsDeletionRouteChildren: ApiOrganizationsDeletionRouteChildren =
+  {
+    ApiOrganizationsDeletionImmediateRoute:
+      ApiOrganizationsDeletionImmediateRoute,
+  }
+
+const ApiOrganizationsDeletionRouteWithChildren =
+  ApiOrganizationsDeletionRoute._addFileChildren(
+    ApiOrganizationsDeletionRouteChildren,
+  )
+
 interface ApiSprintsSprintIdRouteChildren {
   ApiSprintsSprintIdResultsRoute: typeof ApiSprintsSprintIdResultsRoute
 }
@@ -3303,12 +3401,13 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
-  ApiOrganizationsBillingRoute: ApiOrganizationsBillingRoute,
-  ApiOrganizationsDeletionRoute: ApiOrganizationsDeletionRoute,
+  ApiOrganizationsDeletionRoute: ApiOrganizationsDeletionRouteWithChildren,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,
   ApiOrganizationsTransferOwnershipRoute:
     ApiOrganizationsTransferOwnershipRoute,
+  ApiOrganizationsTransferOwnershipPreviewRoute:
+    ApiOrganizationsTransferOwnershipPreviewRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
@@ -3328,8 +3427,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSprintsIndexRoute: ApiSprintsIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
+  ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
   ApiAdminBillingDisputesRoute: ApiAdminBillingDisputesRoute,
+  ApiAdminBillingMetricsRoute: ApiAdminBillingMetricsRoute,
+  ApiAdminBillingReconcileRoute: ApiAdminBillingReconcileRoute,
   ApiAdminBillingRefundsRoute: ApiAdminBillingRefundsRoute,
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
