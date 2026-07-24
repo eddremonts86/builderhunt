@@ -16,7 +16,7 @@
  * without either a new "platform sees everything" policy or this per-organization loop — the loop was
  * chosen as the smaller, zero-schema-change option for a beta-scale organization count.
  */
-import { and, eq, lt } from 'drizzle-orm'
+import { and, desc, eq, lt } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { platformDb } from '../db/client'
 import { billingCreditReservations, billingReconciliationRuns, billingWebhookEvents } from '../db/schema'
@@ -86,7 +86,7 @@ async function getLastReconciliationRun(db: PostgresJsDatabase | typeof platform
   const [row] = await db
     .select({ windowEnd: billingReconciliationRuns.windowEnd, result: billingReconciliationRuns.result })
     .from(billingReconciliationRuns)
-    .orderBy(billingReconciliationRuns.createdAt)
+    .orderBy(desc(billingReconciliationRuns.createdAt))
     .limit(1)
   return row ? { windowEnd: row.windowEnd.toISOString(), result: row.result } : null
 }

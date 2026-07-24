@@ -129,6 +129,20 @@ describe('getBillingOperationsMetrics — real-DB-backed pieces (webhooks, confi
     expect(metrics.reconciliation.lastRun).toMatchObject({ result: 'clean' })
   })
 
+  it('surfaces the MOST RECENT run by createdAt, not an arbitrary or oldest one, when several exist', async () => {
+    // Explicit far-future createdAt values so this assertion is never accidentally satisfied by
+    // wall-clock-timestamped rows other tests in this same disposable database may have inserted.
+    await db.insert(billingReconciliationRuns).values([
+      { id: uniqueId('recon'), windowStart: new Date('2031-01-01T00:00:00Z'), windowEnd: new Date('2031-01-02T00:00:00Z'), countsChecked: {}, result: 'clean', createdAt: new Date('2031-01-02T00:00:00Z') },
+      { id: uniqueId('recon'), windowStart: new Date('2031-02-01T00:00:00Z'), windowEnd: new Date('2031-02-02T00:00:00Z'), countsChecked: {}, result: 'mismatches_found', createdAt: new Date('2031-02-02T00:00:00Z') },
+      { id: uniqueId('recon'), windowStart: new Date('2031-01-15T00:00:00Z'), windowEnd: new Date('2031-01-16T00:00:00Z'), countsChecked: {}, result: 'repairs_applied', createdAt: new Date('2031-01-16T00:00:00Z') },
+    ])
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.reconciliation.lastRun).toMatchObject({ result: 'mismatches_found', windowEnd: '2031-02-02T00:00:00.000Z' })
+  })
+
   it('reports cost/margin as explicitly unavailable — never a fabricated number', async () => {
     const metrics = await getBillingOperationsMetrics({ platform: db })
     expect(metrics.costMargin).toEqual({ available: false })
