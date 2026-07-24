@@ -40,6 +40,11 @@ an explicitly reviewed view or command is listed.
 | plans | account-subject (legacy entitlement) | currently `user_id`; target organization entitlement | none | compatibility window |
 | plan_changes | system-operational (legacy) | affected user + admin actor | none | financial/audit schedule |
 | plan_requests | account-subject (legacy) | `user_id`; target organization | none | support/audit schedule |
+| user_devices | account-subject | `user_id` | none | rolling device-recognition window |
+| account_risk | account-subject | `user_id` | none; stage never app-writable | until account closure |
+| seat_usage_daily | tenant-private | `organization_id` (+ `user_id` seat) | none | rolling daily-quota window |
+| session_signals | system-operational | correlation only (`session_id_hash`, no FK) | none | bounded investigation window |
+| abuse_signals | system-operational | correlation only (`user_id`/`organization_id`, no FK) | none | append-only; bounded investigation window |
 
 The source currently contains 32 tables after the additive organization, entitlement, and builder-normalization migrations.
 `builders`, queries, alerts, notes, onboarding, and legacy plan surfaces

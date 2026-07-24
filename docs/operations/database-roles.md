@@ -56,3 +56,31 @@ Before credential cutover, run the exact-role tests against a disposable databas
 `current_user`, `rolsuper = false`, `rolbypassrls = false`, missing-context denial, tenant A/B rows,
 cross-tenant insert/update denial, pool reuse, and auth-broker product denial. Never test RLS as the
 owner and treat that as evidence.
+
+## Abuse-and-usage-integrity tables (abuse-and-usage-integrity)
+
+The 5 tables added for account/session/seat risk signals (`drizzle/0043_abuse_usage_integrity_tables.sql`,
+RLS/grants in `drizzle/0044_abuse_usage_integrity_rls_grants.sql`) split access by who is trusted to
+write the signal, not just by tenant:
+
+- `user_devices` (account-subject, `user_id`) and `seat_usage_daily` (tenant-private,
+  `organization_id`): `builderhunt_app` gets SELECT + INSERT + UPDATE — both are synchronous,
+  request-path writes (a first-party device-cookie upsert, an own-org usage-counter increment),
+  the same "owner-initiated request" category as `billing_checkout_attempts`.
+  `builderhunt_worker` additionally gets SELECT + INSERT + UPDATE on `seat_usage_daily` for
+  background rollups/enforcement checks, scoped by the same `organization_id` policy.
+- `account_risk` (account-subject, `user_id`): `builderhunt_app` gets **no grant at all** — an
+  account's risk score/enforcement stage is written exclusively by `builderhunt_worker`
+  (background scoring) and read/overridden by `builderhunt_platform` (admin action), so a
+  compromised or buggy app-role query can never fabricate a signal or downgrade its own risk stage.
+  Both worker and platform stay `user_id`-scoped even for cross-user background sweeps — the same
+  per-subject-batch discipline `sprints/worker.ts` applies per-organization.
+- `session_signals`/`abuse_signals` (system-operational, no owning subject, no RLS possible):
+  `builderhunt_app` gets nothing; `builderhunt_worker` gets SELECT + INSERT (signal ingestion);
+  `builderhunt_platform` gets SELECT (investigation/dashboards). `abuse_signals` never receives an
+  UPDATE grant for any role — it is append-only, matching `billing_ledger_entries`.
+
+`scripts/db/verify-rls-local.mjs` proves the live-role behavior for all 5 tables: account-subject
+and tenant-private isolation, cross-subject/cross-tenant insert/update denial, the app role's total
+lack of access to `account_risk`/`session_signals`/`abuse_signals`, and worker/platform read-write
+against the system-operational tables.

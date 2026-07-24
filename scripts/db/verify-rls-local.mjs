@@ -163,6 +163,132 @@ try {
   }
   if (!platformBillingDenied) throw new Error('Platform role accessed tenant billing customer data')
 
+  // user_devices — account-subject (app.user_id), app role is the only one granted access.
+  const devicesMissing = await app`select id from user_devices`
+  if (devicesMissing.length !== 0) throw new Error('Missing user context exposed user_devices')
+  const scopedDevices = (userId) => app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', ${userId}, true)`
+    return transaction`select id from user_devices order by id`
+  })
+  const [devicesA, devicesB] = await Promise.all([scopedDevices('user-a'), scopedDevices('user-b')])
+  assertIds(devicesA, ['device-a'], 'user_devices user-a isolation')
+  assertIds(devicesB, ['device-b'], 'user_devices user-b isolation')
+
+  let crossSubjectDeviceInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.user_id', 'user-a', true)`
+      await transaction`
+        insert into user_devices (id, user_id, device_hash, ua_family, trust_state)
+        values ('device-cross', 'user-b', 'hash-cross', 'chrome', 'new')
+      `
+    })
+  } catch (error) {
+    crossSubjectDeviceInsertDenied = error?.code === '42501'
+  }
+  if (!crossSubjectDeviceInsertDenied) throw new Error('Cross-subject user_devices insert was not denied')
+
+  // account_risk — account-subject, but app has NO grant at all: risk stage/score is written
+  // exclusively by trusted worker/platform paths, never the browser-facing role.
+  let appAccountRiskDenied = false
+  try {
+    await app`select user_id from account_risk`
+  } catch (error) {
+    appAccountRiskDenied = error?.code === '42501'
+  }
+  if (!appAccountRiskDenied) throw new Error('App role accessed account_risk')
+
+  const riskMissing = await worker`select user_id from account_risk`
+  if (riskMissing.length !== 0) throw new Error('Missing user context exposed account_risk')
+  const scopedRisk = (userId) => worker.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', ${userId}, true)`
+    return transaction`select user_id from account_risk order by user_id`
+  })
+  const [riskA, riskB] = await Promise.all([scopedRisk('user-a'), scopedRisk('user-b')])
+  if (riskA.length !== 1 || riskA[0].user_id !== 'user-a') throw new Error('account_risk worker user-a isolation failed')
+  if (riskB.length !== 1 || riskB[0].user_id !== 'user-b') throw new Error('account_risk worker user-b isolation failed')
+
+  let workerCrossSubjectRiskDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.user_id', 'user-a', true)`
+      await transaction`update account_risk set stage = 'blocked' where user_id = 'user-b'`
+    })
+    const [unchanged] = await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.user_id', 'user-b', true)`
+      return transaction`select stage from account_risk where user_id = 'user-b'`
+    })
+    workerCrossSubjectRiskDenied = unchanged?.stage === 'observe'
+  } catch {
+    workerCrossSubjectRiskDenied = true
+  }
+  if (!workerCrossSubjectRiskDenied) throw new Error('Worker cross-subject account_risk update was not denied')
+
+  const platformRiskMissing = await platform`select user_id from account_risk`
+  if (platformRiskMissing.length !== 0) throw new Error('Platform role read account_risk rows with missing context')
+  const platformRiskA = await platform.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select user_id from account_risk order by user_id`
+  })
+  if (platformRiskA.length !== 1 || platformRiskA[0].user_id !== 'user-a') {
+    throw new Error('Platform account_risk user-a scoped read failed')
+  }
+
+  // seat_usage_daily — tenant-private (app.organization_id), same shape as other tenant tables.
+  const seatUsageMissing = await app`select id from seat_usage_daily`
+  if (seatUsageMissing.length !== 0) throw new Error('Missing context exposed seat_usage_daily')
+  const scopedSeatUsage = (organizationId) => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    return transaction`select id from seat_usage_daily order by id`
+  })
+  const [seatUsageA, seatUsageB] = await Promise.all([scopedSeatUsage('org-a'), scopedSeatUsage('org-b')])
+  assertIds(seatUsageA, ['usage-a'], 'seat_usage_daily org-a isolation')
+  assertIds(seatUsageB, ['usage-b'], 'seat_usage_daily org-b isolation')
+
+  let crossTenantSeatUsageInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into seat_usage_daily (id, organization_id, user_id, day, action, count, credit_units)
+        values ('usage-cross', 'org-b', 'user-a', '2026-01-01', 'searches', 1, 0)
+      `
+    })
+  } catch (error) {
+    crossTenantSeatUsageInsertDenied = error?.code === '42501'
+  }
+  if (!crossTenantSeatUsageInsertDenied) throw new Error('Cross-tenant seat_usage_daily insert was not denied')
+
+  // session_signals / abuse_signals — system-operational, no RLS; app gets no grant at all.
+  let appSessionSignalsDenied = false
+  try {
+    await app`select id from session_signals`
+  } catch (error) {
+    appSessionSignalsDenied = error?.code === '42501'
+  }
+  if (!appSessionSignalsDenied) throw new Error('App role accessed session_signals')
+
+  let appAbuseSignalsDenied = false
+  try {
+    await app`select id from abuse_signals`
+  } catch (error) {
+    appAbuseSignalsDenied = error?.code === '42501'
+  }
+  if (!appAbuseSignalsDenied) throw new Error('App role accessed abuse_signals')
+
+  await worker`
+    insert into abuse_signals (id, type, severity, user_id, organization_id)
+    values ('signal-worker', 'seat_overuse', 'low', 'user-a', 'org-a')
+  `
+  const workerAbuseSignals = await worker`select id from abuse_signals order by id`
+  if (workerAbuseSignals.length !== 1 || workerAbuseSignals[0].id !== 'signal-worker') {
+    throw new Error('Worker abuse_signals read/write failed')
+  }
+  const platformAbuseSignals = await platform`select id from abuse_signals order by id`
+  if (platformAbuseSignals.length !== 1 || platformAbuseSignals[0].id !== 'signal-worker') {
+    throw new Error('Platform abuse_signals read failed')
+  }
+
   const organizations = await auth`select id from organizations order by id`
   const organizationIds = organizations.map((row) => row.id)
   if (!organizationIds.includes('org-a') || !organizationIds.includes('org-b')) {
@@ -266,6 +392,20 @@ try {
     workerBillingTenantIsolation: workerBillingA.map((row) => row.id),
     workerBillingCrossTenantUpdate: 'denied',
     platformBillingAccess: 'denied',
+    userDevicesA: devicesA.map((row) => row.id),
+    userDevicesB: devicesB.map((row) => row.id),
+    crossSubjectDeviceInsert: 'denied',
+    appAccountRiskAccess: 'denied',
+    accountRiskWorkerIsolation: [riskA[0].user_id, riskB[0].user_id],
+    workerCrossSubjectRiskUpdate: 'denied',
+    platformAccountRiskScoped: platformRiskA.map((row) => row.user_id),
+    seatUsageDailyA: seatUsageA.map((row) => row.id),
+    seatUsageDailyB: seatUsageB.map((row) => row.id),
+    crossTenantSeatUsageInsert: 'denied',
+    appSessionSignalsAccess: 'denied',
+    appAbuseSignalsAccess: 'denied',
+    workerAbuseSignals: workerAbuseSignals.map((row) => row.id),
+    platformAbuseSignals: platformAbuseSignals.map((row) => row.id),
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end()])

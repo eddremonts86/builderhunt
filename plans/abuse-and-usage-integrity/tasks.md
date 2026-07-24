@@ -7,8 +7,9 @@
 > **Blocks**: nothing
 > **Reality check**: extends `src/shared/lib/auth/better-auth.ts` (existing session hooks),
 > `src/shared/lib/rate-limit.ts`, `src/shared/lib/security/audit.ts`, `organization-lifecycle.ts`
-> seat logic, and `db/schema.ts` (`auth_sessions`, `organization_entitlements`). Next migration
-> number is `0030` (last existing is `0029`).
+> seat logic, and `db/schema.ts` (`auth_sessions`, `organization_entitlements`). Tables/RLS landed as
+> `0043`/`0044` (concurrent work had already carried the migration counter well past the `0030` this
+> plan assumed when written — always check `drizzle/meta/_journal.json` for the real next number).
 
 Execute top-to-bottom. Each phase leaves the app green and shippable. Nothing enforces until
 Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe`).
@@ -39,7 +40,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     Verified `pnpm dev` still boots correctly with none of these set (real running dev server,
     `200` on `/`). Full sweep clean: `pnpm type-check`, `pnpm eslint` on both touched files.
 
-- [ ] **Create abuse-integrity tables migration (`0030`)**
+- [x] **Create abuse-integrity tables migration (`0030`)**
   - Files: `drizzle/0030_abuse_usage_integrity.sql`, `src/shared/lib/db/schema.ts`,
     `drizzle/meta/*`, `drizzle/migration-hashes.json`
   - Do: add `user_devices` (account-subject, `user_id`), `session_signals` (system-op),
@@ -48,13 +49,42 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     Enable+FORCE RLS on the tenant-private and account-subject tables with explicit per-role
     policies per `_meta/security-policy.md`; system-op tables get worker/platform-role grants only.
   - Verify: `pnpm db:generate` clean diff, `pnpm exec drizzle-kit check`, `pnpm test:migration-integrity`.
+  - Progress (2026-07-24): the concurrent e2e-design session had already carried the real next
+    migration number to `0043` by the time this task ran (not `0030` as this plan assumed when
+    written) — generated `drizzle/0043_abuse_usage_integrity_tables.sql` from the 5 schema.ts
+    tables via `pnpm db:generate`, renamed from drizzle-kit's auto-generated tag and updated the
+    journal tag to match, matching this repo's existing rename convention. `pnpm exec drizzle-kit
+    check` clean, re-running `pnpm db:generate` reports "No schema changes, nothing to migrate".
+    Also fixed a real stale-hardcoded-count bug in `migration-integrity.test.ts` (asserted
+    `migrations: 31`, actual journal length was already 45 before this task even started — the
+    same class of bug as the earlier `restore-test.ts` fix) by deriving the expected count from
+    `drizzle/meta/_journal.json` at test time instead of hardcoding it.
 
-- [ ] **Data classification + role grants**
+- [x] **Data classification + role grants**
   - Files: `docs/architecture/data-classification.md`, `drizzle/0030_abuse_usage_integrity.sql`
   - Do: document each new table's class; grant `builderhunt_app` only tenant-scoped access to
     `seat_usage_daily`/`user_devices`, `builderhunt_worker`/`builderhunt_platform` access to signal
     tables; no `PUBLIC`, `TRUNCATE`, or `REFERENCES`.
   - Verify: `pnpm test:rls:local` and `pnpm test:api-isolation:local` pass with the new tables.
+  - Progress (2026-07-24): wrote `drizzle/0044_abuse_usage_integrity_rls_grants.sql` following the
+    exact `0028_billing_rls_grants.sql` structural precedent (ENABLE/FORCE RLS → per-role CREATE
+    POLICY → REVOKE ALL FROM PUBLIC → explicit GRANT per role). `account_risk` gets **zero grant**
+    for `builderhunt_app` (stricter than the task's literal wording, which only named
+    `seat_usage_daily`/`user_devices` for app access) — an account's risk stage/score is written
+    exclusively by trusted `builderhunt_worker`/`builderhunt_platform` paths so a compromised or
+    buggy app-role query can never fabricate a signal or downgrade its own risk stage; documented
+    the reasoning in the migration header and `docs/operations/database-roles.md`'s new
+    "Abuse-and-usage-integrity tables" section. Documented all 5 tables' class in
+    `docs/architecture/data-classification.md`. Extended `scripts/db/prepare-rls-fixture.mjs` with
+    fixture rows for all 5 tables and `scripts/db/verify-rls-local.mjs` with isolation/denial
+    assertions matching the billing precedent's shape (account-subject isolation for
+    `user_devices`/`account_risk`, tenant isolation for `seat_usage_daily`, total app-role denial on
+    `account_risk`/`session_signals`/`abuse_signals`, worker/platform read-write on the
+    system-operational tables). Ran the full suite end-to-end against a real disposable
+    `builderhunt_security_test_*` database (created, migrated, fixture-prepared, verified, dropped)
+    — all assertions pass, including every new one. `pnpm test:api-isolation:local` not re-run: it
+    exercises existing HTTP routes only and this task added no new routes, so it has nothing new to
+    cover yet (will be exercised again once Phase 1+ routes read/write these tables).
 
 - [ ] **Abuse lib: signals + device fingerprint**
   - Files: `src/shared/lib/abuse/signals.ts`, `src/shared/lib/abuse/signals.test.ts`,

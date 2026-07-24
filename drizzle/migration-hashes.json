@@ -124,6 +124,62 @@
     "0030_billing_credit_grants_upgrade_delta_source": {
       "sql": "99b72dbaba97b19a2c156d9c39c67c985861a2f1f607940db6356c9f50a79eb4",
       "snapshot": "92c44eb7de08c34aa31214fa698a7bac4f0d4f1e198dc85d4fb5f13f9a97b468"
+    },
+    "0031_long_eternity": {
+      "sql": "1f0e1a4033f45734be194015df61cd53eaebb44b5f778dfa142a7cfacf745582",
+      "snapshot": "7a0f24b8c934b78fd436dca0c04cf26a289d385dc3468a39de724e47549751d8"
+    },
+    "0032_chief_captain_stacy": {
+      "sql": "e17feedcf68de5238f17647206e650308d9424d7b37a93b7ebdcfc187f326db0",
+      "snapshot": "3160e6520a94ee374a74292802b80cc85e740b573986577f961eeec9c66e8ffe"
+    },
+    "0033_billing_risk_rls_grants": {
+      "sql": "9c485a39695da20f5315306b698a41ab42f5226a8a7648678fe0122f2b87ffb1",
+      "snapshot": "dd1ddb39a1ebea7322deadd60df5266407f1da814efd7bf149720e830bee35b0"
+    },
+    "0034_tan_jean_grey": {
+      "sql": "d6d248b4ee9c56c924faa1a586bf2b914a350fd27b5e0d87b2e5e8f4ddbfddb7",
+      "snapshot": "1ca60e8a6fc4e30615d528c042257282d0dcc9647eeb399376ec784bfcfa8424"
+    },
+    "0035_bitter_frog_thor": {
+      "sql": "d2ce82c5020d778fa552a0f2f3379080f33950bb96cf4fc9ee1b97396cd11626",
+      "snapshot": "a07331648887132f3d56baa7d0786239994929d7200d42b4b3acaba570c0a417"
+    },
+    "0036_billing_disputes_rls_grants": {
+      "sql": "ad33431f5b9f0cd21d24842d839bbfc65f3201a02dc4cce15e28d2b5b735c1bd",
+      "snapshot": "6ca65bd418d6c55878c0a08662c1a01c8a76c9b043a34568ce1ad7aca2060a45"
+    },
+    "0037_premium_aqueduct": {
+      "sql": "0e0c44fe915e793378811174866bbf7960a6bbec0a2be0f0d80ce38748875fe5",
+      "snapshot": "56411e7acc6350d6029423471eb59a8c0414fea005deb430df427e6caae1f19e"
+    },
+    "0038_billing_contacts_rls_grants": {
+      "sql": "4c454e567e8d67526143b9e0be3b93bc2bcdb9de9a47172bc9f3d66598e3aaed",
+      "snapshot": "4d1f9ffa68638ee6406d6f084a09509ac92a38a720742a7857ea438a830eb51f"
+    },
+    "0039_nappy_norrin_radd": {
+      "sql": "8e018d57c715137cea057bf4ff60f9a39058456cd824f84d73330cddcf8c27e0",
+      "snapshot": "cbe1633c49878bf37282cc123d8b5debb5a6568e7ce17d5583a7a657274775c9"
+    },
+    "0040_organization_deletion_financial_records_rls_grants": {
+      "sql": "446cf43e42fd8d612c83075680ef409e1ff7b8b9fb6beda301502f7690d1ed91",
+      "snapshot": "58d6f07110ca872d0b324a4677d6cee80caa809b8e5b29a83870194cb342544f"
+    },
+    "0041_billing_notification_log": {
+      "sql": "e148b6df3a1cb7917b9392a78623c2220714b62174c2d81bf9ab758815fb69f5",
+      "snapshot": "bbbde8cd493e0f99d1e6a63d9e6dea3b6a5e67afe2b1dbd0c3ed4729040f3848"
+    },
+    "0042_billing_notification_log_rls_grants": {
+      "sql": "882a81feecb0ae625ccf04b730009e18ab3a2d384f9737a87878d302ce570f7e",
+      "snapshot": "512904e4f2ea28a9ad582b741e2ac3a8781566af0413ea6e3a9f0958cb9e7b30"
+    },
+    "0043_abuse_usage_integrity_tables": {
+      "sql": "6877e53da412311666b312b37f0015314e59e3ec2a44b13cd565b6e10f13bd32",
+      "snapshot": "9bc33f23f0b7cde41121a54648ce6bdc47a6be2be10a9b99085032c60bc936b7"
+    },
+    "0044_abuse_usage_integrity_rls_grants": {
+      "sql": "46e8e02502a0fd980d62636a34c055771ebede37dcf2c1dfc6cc81dbf3a2cf1c",
+      "snapshot": "0bd39e1776e9821242f8fbc71e0a8ef2a4006cd1b8ded75be1b202b9d73ef6d5"
     }
   }
 }

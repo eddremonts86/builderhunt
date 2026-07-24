@@ -1430,3 +1430,143 @@ export const billingTermsAcceptances = pgTable(
     check('billing_terms_acceptances_action_check', sql`${table.commercialAction} in ('checkout_subscription', 'checkout_credits', 'auto_recharge')`),
   ],
 )
+
+// ---------------------------------------------------------------------------
+// Abuse and Usage Integrity (Plan: abuse-and-usage-integrity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Account-subject (`user_id`): one row per (user, device fingerprint hash). The fingerprint is a
+ * salted hash of a first-party device cookie + UA client-hint family — never a raw fingerprint or
+ * any PII — computed by `src/shared/lib/abuse/device.ts`. RLS filters on `app.user_id`, the same
+ * session variable `tenant-context.ts`'s `withTenantContext` already sets on every request
+ * alongside `app.organization_id` (see `0011_builder_claim_policies.sql` for the original
+ * `subject_user_id` precedent this reuses).
+ */
+export const userDevices = pgTable(
+  'user_devices',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    deviceHash: text('device_hash').notNull(),
+    uaFamily: text('ua_family'),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastIpAsn: text('last_ip_asn'),
+    lastCountry: text('last_country'),
+    trustState: text('trust_state').notNull().default('new'),
+  },
+  (table) => [
+    uniqueIndex('user_devices_user_id_device_hash_unique').on(table.userId, table.deviceHash),
+    index('user_devices_user_id_last_seen_idx').on(table.userId, table.lastSeenAt),
+    check('user_devices_trust_state_check', sql`${table.trustState} in ('new', 'trusted', 'flagged')`),
+  ],
+)
+
+/**
+ * System operational: no `organization_id`/`user_id` column, no RLS possible or needed — access is
+ * controlled entirely by GRANT to `builderhunt_worker`/`builderhunt_platform`. Correlates to a
+ * session only via a salted session-id hash (OWASP logging guidance: never store the raw session
+ * token anywhere outside the session store itself), and to a device via `deviceId` — both are
+ * one-way lookups an operator can join on, never a way to reconstruct the original token.
+ */
+export const sessionSignals = pgTable(
+  'session_signals',
+  {
+    id: text('id').primaryKey(),
+    sessionIdHash: text('session_id_hash').notNull(),
+    deviceId: text('device_id').references(() => userDevices.id, { onDelete: 'set null' }),
+    ipAsn: text('ip_asn'),
+    country: text('country'),
+    newDevice: boolean('new_device').notNull().default(false),
+    concurrentDistinctIp: boolean('concurrent_distinct_ip').notNull().default(false),
+    impossibleTravel: boolean('impossible_travel').notNull().default(false),
+    midSessionUaChange: boolean('mid_session_ua_change').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('session_signals_session_id_hash_idx').on(table.sessionIdHash),
+    index('session_signals_created_at_idx').on(table.createdAt),
+  ],
+)
+
+/**
+ * System operational, append-only — never updated or deleted (matches `billing_ledger_entries`'
+ * append-only convention: no `updatedAt` column at all). `userId`/`organizationId` are correlation
+ * columns only, deliberately with NO foreign key — an abuse signal must outlive the account or
+ * organization it names (compliance/investigation trail), the same reasoning
+ * `deletion_requests.user_id` already documents for the same reason.
+ */
+export const abuseSignals = pgTable(
+  'abuse_signals',
+  {
+    id: text('id').primaryKey(),
+    type: text('type').notNull(),
+    severity: text('severity').notNull(),
+    details: jsonb('details').$type<Record<string, unknown>>(),
+    userId: text('user_id'),
+    organizationId: text('organization_id'),
+    requestId: text('request_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('abuse_signals_user_id_created_idx').on(table.userId, table.createdAt),
+    index('abuse_signals_organization_id_created_idx').on(table.organizationId, table.createdAt),
+    index('abuse_signals_type_created_idx').on(table.type, table.createdAt),
+    check(
+      'abuse_signals_type_check',
+      sql`${table.type} in (
+        'concurrent_sessions', 'impossible_travel', 'ua_change', 'seat_overuse',
+        'signup_velocity', 'linked_account', 'export_burst', 'cross_tenant_denied',
+        'credit_farming', 'pool_drain', 'refund_farming', 'margin_drift', 'reserve_leak'
+      )`,
+    ),
+    check('abuse_signals_severity_check', sql`${table.severity} in ('low', 'medium', 'high')`),
+  ],
+)
+
+/**
+ * Account-subject (`user_id`): one row per user, rolling risk score + current enforcement stage.
+ * RLS filters on `app.user_id`, same as `user_devices` above.
+ */
+export const accountRisk = pgTable(
+  'account_risk',
+  {
+    userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
+    riskScore: integer('risk_score').notNull().default(0),
+    stage: text('stage').notNull().default('observe'),
+    reason: text('reason'),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('account_risk_stage_check', sql`${table.stage} in ('observe', 'warned', 'stepup', 'throttled', 'blocked')`),
+    check('account_risk_score_check', sql`${table.riskScore} >= 0`),
+  ],
+)
+
+/**
+ * Tenant-private (`organization_id`): per-(organization, seat/user, UTC day) counters for the
+ * scarce core actions that were never metered at all before this plan (unlike AI credits, which
+ * `billing_credit_grants`/`billing_ledger_entries` already govern). Enforces a per-seat ceiling so
+ * sharing one seat hits a wall quickly — the unique index below is the enforcement primitive every
+ * increment upserts against.
+ */
+export const seatUsageDaily = pgTable(
+  'seat_usage_daily',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    day: text('day').notNull(), // UTC calendar day, 'YYYY-MM-DD' — a plain date column would silently apply the DB session's timezone
+    action: text('action').notNull(),
+    count: integer('count').notNull().default(0),
+    // Each seat's share of the pooled monthly credit budget (G2 — pool_drain via seat sharing).
+    creditUnits: integer('credit_units').notNull().default(0),
+  },
+  (table) => [
+    uniqueIndex('seat_usage_daily_org_user_day_action_unique').on(table.organizationId, table.userId, table.day, table.action),
+    index('seat_usage_daily_organization_id_day_idx').on(table.organizationId, table.day),
+    check('seat_usage_daily_action_check', sql`${table.action} in ('searches', 'reveals', 'exports', 'messages')`),
+    check('seat_usage_daily_count_check', sql`${table.count} >= 0`),
+  ],
+)
