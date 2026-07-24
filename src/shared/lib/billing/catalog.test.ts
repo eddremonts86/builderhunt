@@ -37,13 +37,13 @@ describe('subscription catalog — exact amounts from spec.md', () => {
     expect(SUBSCRIPTION_CATALOG.team_annual).toMatchObject({ tier: 'team', amountCents: 191000, monthlyCredits: 2100, seatLimit: 10 })
   })
 
-  it('every entry is USD, tax-exclusive, version 1, with a provisioned test Price ID and no live Price ID yet', () => {
+  it('every entry is USD, tax-exclusive, version 1, with provisioned test and live Price IDs', () => {
     for (const entry of Object.values(SUBSCRIPTION_CATALOG)) {
       expect(entry.currency).toBe('usd')
       expect(entry.taxBehavior).toBe('exclusive')
       expect(entry.version).toBe(1)
       expect(entry.stripePriceId.test).toMatch(/^price_\w+$/)
-      expect(entry.stripePriceId.live).toBeNull()
+      expect(entry.stripePriceId.live).toMatch(/^price_\w+$/)
     }
   })
 })
