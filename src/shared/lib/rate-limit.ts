@@ -98,7 +98,10 @@ export async function rateLimit(
 }
 
 /**
- * Extract a stable client ID from a request — IP first, fallback to UA hash.
+ * Extract a stable client ID from a request — IP first, fallback to UA hash. Only appropriate for
+ * requests with no resolved identity yet (anonymous traffic) — an authenticated request rotating
+ * its IP would get a fresh bucket every time, defeating the cap. Use `getAuthedRateLimitId` once a
+ * principal is available.
  */
 export function getRateLimitId(request: Request): string {
   const fwd = request.headers.get('x-forwarded-for')
@@ -110,4 +113,26 @@ export function getRateLimitId(request: Request): string {
   let h = 0
   for (let i = 0; i < ua.length; i++) h = (h * 31 + ua.charCodeAt(i)) | 0
   return `ua:${h}`
+}
+
+export interface AuthedRateLimitIdentity {
+  userId: string
+  organizationId?: string | null
+  /** Optional extra scoping (e.g. a session/device hash) for callers that want a finer bucket
+   * than "this user in this org" — omitted, the key is stable across that user's every session
+   * and device, which is what "IP rotation cannot reset an authed bucket" requires. */
+  sessionHash?: string | null
+}
+
+/**
+ * Composes a stable per-identity rate-limit key from `userId` (+ `organizationId`, + an optional
+ * session/device hash) — the network-agnostic replacement for `getRateLimitId` on authenticated
+ * endpoints. Rotating IPs, user agents, or devices never changes this key, so an attacker cannot
+ * reset their bucket by simply changing network egress; the cap follows the identity, not the
+ * connection. Matches the `${organizationId}:${userId}` composite key already used ad hoc across
+ * several routes (`sprints/index.ts`, `evidence-refresh.ts`, `recommendations/index.ts`,
+ * `ai/complete.ts`) — formalized here as one tested, reusable function.
+ */
+export function getAuthedRateLimitId(identity: AuthedRateLimitIdentity): string {
+  return [identity.userId, identity.organizationId ?? '-', identity.sessionHash ?? '-'].join(':')
 }

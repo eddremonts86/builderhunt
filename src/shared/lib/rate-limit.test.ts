@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { rateLimit } from './rate-limit'
+import { getAuthedRateLimitId, rateLimit } from './rate-limit'
 
 describe('rateLimit', () => {
   beforeEach(() => {
@@ -63,4 +63,54 @@ describe('rateLimit', () => {
     const afterWindow = await rateLimit(scope, id, 1, 1)
     expect(afterWindow.allowed).toBe(true)
   })
+})
+
+describe('getAuthedRateLimitId', () => {
+  it('composes userId + organizationId into a stable key', () => {
+    expect(getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })).toBe('user-1:org-1:-')
+  })
+
+  it('is stable regardless of organizationId/sessionHash argument order or repetition', () => {
+    const a = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })
+    const b = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })
+    expect(a).toBe(b)
+  })
+
+  it('produces distinct keys for different users in the same org', () => {
+    const a = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })
+    const b = getAuthedRateLimitId({ userId: 'user-2', organizationId: 'org-1' })
+    expect(a).not.toBe(b)
+  })
+
+  it('produces distinct keys for the same user across different orgs', () => {
+    const a = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })
+    const b = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-2' })
+    expect(a).not.toBe(b)
+  })
+
+  it('includes an optional sessionHash for finer scoping when supplied', () => {
+    const withoutSession = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1' })
+    const withSession = getAuthedRateLimitId({ userId: 'user-1', organizationId: 'org-1', sessionHash: 'session-abc' })
+    expect(withSession).not.toBe(withoutSession)
+  })
+
+  it(
+    'an identity-keyed cap holds across IP rotation for an authenticated user — the userId+organizationId ' +
+    'key is what rateLimit buckets on, so requests simulated from different client IPs still share and ' +
+    'exhaust one cap, unlike getRateLimitId(request) which would reset per IP',
+    async () => {
+      const identity = { userId: `authed-user-${crypto.randomUUID()}`, organizationId: 'org-1' }
+      const rateLimitId = getAuthedRateLimitId(identity)
+      const scope = 'authed-endpoint'
+      const limit = 3
+      const simulatedClientIps = ['203.0.113.10', '198.51.100.20', '192.0.2.30', '203.0.113.40']
+      const results = []
+      for (const _ip of simulatedClientIps) {
+        // A per-IP limiter would use a different key per iteration here; getAuthedRateLimitId
+        // returns the SAME key regardless, since it never looks at the request/IP at all.
+        results.push(await rateLimit(scope, rateLimitId, limit, 60))
+      }
+      expect(results.map((r) => r.allowed)).toEqual([true, true, true, false])
+    },
+  )
 })

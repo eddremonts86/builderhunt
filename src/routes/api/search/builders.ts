@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import { upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
-import { rateLimit, getRateLimitId } from '~/shared/lib/rate-limit'
+import { rateLimit, getRateLimitId, getAuthedRateLimitId } from '~/shared/lib/rate-limit'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getTrackedBuilderIds, trackedKey } from '~/shared/lib/tracked-builders'
@@ -15,7 +15,20 @@ export const Route = createFileRoute('/api/search/builders')({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const rl = await rateLimit('search-builders', getRateLimitId(request), 60, 60)
+          // Resolve the principal up front (best-effort — search also serves anonymous
+          // visitors) so the rate limit below can key on identity, not IP, for signed-in users:
+          // an authenticated user rotating IPs must not get a fresh bucket every time.
+          let principal: Awaited<ReturnType<typeof requireTenantPrincipal>> | null = null
+          try {
+            principal = await requireTenantPrincipal(request)
+          } catch {
+            principal = null
+          }
+
+          const rateLimitId = principal
+            ? getAuthedRateLimitId({ userId: principal.userId, organizationId: principal.organizationId })
+            : getRateLimitId(request)
+          const rl = await rateLimit('search-builders', rateLimitId, 60, 60)
           if (!rl.allowed) {
             return Response.json(
               { error: 'Too many search requests. Please slow down.' },
@@ -45,24 +58,25 @@ export const Route = createFileRoute('/api/search/builders')({
           })
 
           let trackedIds = new Map<string, string>()
-          try {
-            const principal = await requireTenantPrincipal(request)
-            trackedIds = await withTenantContext(principal, async (tx) => {
-              // Meter (abuse-and-usage-integrity Phase 4 "core actions per seat") — count only,
-              // observe-only, never blocks; anonymous/no-active-org search (caught below) simply
-              // isn't metered, since there's no seat to attribute it to.
-              await meterSeatActionAndEmit(tx, {
-                organizationId: principal.organizationId,
-                userId: principal.userId,
-                action: 'searches',
-                cap: env.SEAT_DAILY_SEARCHES,
-                requestId: principal.requestId,
+          if (principal) {
+            try {
+              trackedIds = await withTenantContext(principal, async (tx) => {
+                // Meter (abuse-and-usage-integrity Phase 4 "core actions per seat") — count only,
+                // observe-only, never blocks.
+                await meterSeatActionAndEmit(tx, {
+                  organizationId: principal!.organizationId,
+                  userId: principal!.userId,
+                  action: 'searches',
+                  cap: env.SEAT_DAILY_SEARCHES,
+                  requestId: principal!.requestId,
+                })
+                return getTrackedBuilderIds(tx, principal!.organizationId)
               })
-              return getTrackedBuilderIds(tx, principal.organizationId)
-            })
-          } catch (err) {
-            // Best-effort for anonymous search and sessions without an active organization.
-            console.error('getTrackedBuilderIds error:', err)
+            } catch (err) {
+              // Best-effort — a resolved principal with no active organization still shouldn't
+              // break search.
+              console.error('getTrackedBuilderIds error:', err)
+            }
           }
           const annotated = results.map((b) => {
             const trackedRowId = trackedIds.get(trackedKey(b.source, b.sourceId))

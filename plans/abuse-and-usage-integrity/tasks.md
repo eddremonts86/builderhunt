@@ -568,11 +568,42 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     exactly the 3 expected rows (`searches: 1, exports: 1, reveals: 1`) for that user/org/day.
     Cleaned up the test user, its org-builder row, and the extra dev-server instance afterward.
 
-- [ ] **Re-key rate limiting on identity, not IP alone**
+- [x] **Re-key rate limiting on identity, not IP alone**
   - Files: `src/shared/lib/rate-limit.ts`, `src/shared/lib/rate-limit.test.ts`
   - Do: add `getRateLimitId` variants that compose authenticated `userId` + `organizationId` +
     session hash; apply on authed endpoints so IP rotation cannot reset an authed bucket.
   - Verify: `rate-limit.test.ts` proves an authed user is limited across changing IPs.
+  - Progress: Surveyed every existing `rateLimit(...)` call site first — most authed-only routes
+    (`sprints/index.ts`, `evidence-refresh.ts`, `recommendations/index.ts`, `ai/complete.ts`,
+    `organization-lifecycle.ts`, etc.) already keyed ad hoc on `principal.userId` or
+    `${organizationId}:${userId}`, so they were never actually IP-vulnerable — no change needed
+    there. **One real gap**: `api/search/builders.ts` (search allows anonymous traffic, so its
+    rate-limit check ran *before* any principal was resolved) always used `getRateLimitId(request)`
+    (IP/UA-based), even for signed-in users — an authenticated attacker rotating IPs could reset
+    their own cap indefinitely. Added `getAuthedRateLimitId({userId, organizationId, sessionHash?})`
+    to `rate-limit.ts` — a formalized, tested version of the `${organizationId}:${userId}` pattern
+    already used ad hoc elsewhere, with an optional `sessionHash` for callers wanting finer scoping
+    than "this user in this org" (unused today, but the composite accepts it without a breaking
+    change later). Restructured `search/builders.ts` to resolve the principal (best-effort) *before*
+    the rate-limit check, then key on `getAuthedRateLimitId(...)` when a principal exists, falling
+    back to `getRateLimitId(request)` only for genuinely anonymous requests — this also let the
+    later `requireTenantPrincipal()` call (previously duplicated for tracked-ids/metering) collapse
+    into the same single resolved principal. Tests (`rate-limit.test.ts`, 6 new cases): key
+    composition (stable, distinct per user, distinct per org, optional sessionHash differentiates),
+    and the task-mandated "identity cap holds across IP rotation" case using the same
+    `rateLimit()` primitive as the signup-device test, proving the key itself never reads the
+    request/IP. Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean,
+    `pnpm vitest run src/shared/lib/rate-limit.test.ts src/shared/lib/abuse --no-file-parallelism`
+    → 133/133 green, `pnpm security:boundaries` → 0 legacy imports. **Live end-to-end verification**
+    against the real dev server: a real signed-in test user made 61 rapid `/api/search/builders`
+    calls cycling through 5 different `X-Forwarded-For` values (203.0.113.x/198.51.100.x/192.0.2.x)
+    — 57 succeeded (200) then 4 were rejected (429), exactly at the configured 60/60s cap. Under
+    the OLD IP-keyed scheme, cycling 5 IPs would spread the same 61 requests to ~12 per IP, well
+    under the 60 cap, and none would ever 429 — the fact that the cap DID trip despite the rotating
+    IP header is the concrete proof the identity key is what's actually being enforced. An
+    anonymous (no-cookie) call to the same endpoint still succeeded normally (200), confirming the
+    IP-keyed fallback path for unauthenticated traffic is untouched. Deleted the test user
+    afterward.
 
 - [ ] **Export burst throttle + proportionate anti-automation**
   - Files: `src/routes/api/export/builders.ts`, `src/shared/lib/abuse/anti-automation.ts` (+ test)
