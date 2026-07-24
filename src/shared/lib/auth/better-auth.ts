@@ -1,6 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { organization } from 'better-auth/plugins'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
+import { and, eq, gt } from 'drizzle-orm'
 import { authDb } from '~/shared/lib/db/auth-db'
 import {
   authUsers,
@@ -13,8 +14,28 @@ import {
 } from '~/shared/lib/db/schema'
 import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
+import { handleSessionAfter, handleSessionBefore, type SessionCookieAdapter, type SessionDeviceResult } from '~/shared/lib/abuse/session-hooks'
 import { organizationOptions } from './organization-options'
 import { ensurePersonalOrganization, pickDefaultActiveOrganizationId } from './personal-organization'
+
+function cookieAdapterFor(context: { getCookie?: (name: string) => string | null; setCookie?: (name: string, value: string, options?: Record<string, unknown>) => unknown } | null | undefined): SessionCookieAdapter {
+  return {
+    get: (name) => context?.getCookie?.(name) ?? null,
+    set: (name, value, options) => {
+      context?.setCookie?.(name, value, options)
+    },
+  }
+}
+
+// `session.create.before` resolves the device (needs cookie access, which
+// only works reliably from `before` — see `session-hooks.ts`'s comment on
+// `handleSessionBefore`) before the session row exists; `after` needs that
+// same result once `session.id` exists to write `session_signals`. `context`
+// is the same object instance for both hooks within one request (better-auth
+// stores it via AsyncLocalStorage per-request), so it doubles as the
+// correlation key — a WeakMap so entries are garbage-collected with the
+// request context object, never a growing global.
+const pendingSessionDevices = new WeakMap<object, SessionDeviceResult>()
 
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
@@ -65,7 +86,19 @@ export const auth = betterAuth({
     // sign-in) path.
     session: {
       create: {
-        before: async (session) => {
+        before: async (session, context) => {
+          // Device recognition (abuse-and-usage-integrity plan, Phase 1
+          // "Register device + count concurrency on session create") — must
+          // run here, not in `after`: cookie writes from `after` never reach
+          // the response (verified empirically, see session-hooks.ts).
+          if (context) {
+            const device = await handleSessionBefore(
+              { userId: session.userId, userAgent: (session.userAgent as string | null | undefined) ?? null },
+              cookieAdapterFor(context),
+            )
+            pendingSessionDevices.set(context, device)
+          }
+
           if (session.activeOrganizationId) return
           let organizationId = await pickDefaultActiveOrganizationId(session.userId)
           if (!organizationId) {
@@ -74,6 +107,20 @@ export const auth = betterAuth({
           }
           if (!organizationId) return
           return { data: { activeOrganizationId: organizationId } }
+        },
+        // Concurrent-session signal — needs `session.id`, which only exists
+        // once the row is created. Observe-mode only: never blocks a sign-in.
+        after: async (session, context) => {
+          const device = context ? pendingSessionDevices.get(context) : undefined
+          if (!device) return
+          const liveSessions = await authDb.select({ id: authSessions.id }).from(authSessions)
+            .where(and(eq(authSessions.userId, session.userId), gt(authSessions.expiresAt, new Date())))
+          await handleSessionAfter({
+            id: session.id,
+            userId: session.userId,
+            activeOrganizationId: (session.activeOrganizationId as string | null | undefined) ?? null,
+            liveSessionCount: liveSessions.length,
+          }, device)
         },
       },
     },

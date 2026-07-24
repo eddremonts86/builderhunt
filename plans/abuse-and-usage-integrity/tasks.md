@@ -133,13 +133,35 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 1 — Concurrent-session control + active-sessions UX (A1)
 
-- [ ] **Register device + count concurrency on session create**
+- [x] **Register device + count concurrency on session create**
   - Files: `src/shared/lib/auth/better-auth.ts`, `src/shared/lib/abuse/session-guard.ts` (+ test)
   - Do: add `databaseHooks.session.create.after` to upsert `user_devices`, write a `session_signals`
     row, count the user's live sessions, and `emitAbuseSignal('concurrent_sessions', …)` when over
     the tier cap. Observe-mode: record only.
   - Verify: `session-guard.test.ts` (pure count/threshold logic); manual Playwright: two logins →
     signal row appears, no block in observe mode.
+  - Progress (2026-07-24): `session-guard.ts` — pure `resolveSessionCap(tier, config)`/
+    `evaluateSessionConcurrency(...)` (`pro_max` shares `pro`'s cap, unknown tiers fall back to
+    `free`, the conservative default for concurrency). Split the actual wiring across BOTH
+    `session.create.before` and `.after` in `better-auth.ts` (task text said `.after` only, but
+    empirically — verified with `curl -i` against the real running dev server — a `context.setCookie`
+    call made from `.after` never reaches the response's `Set-Cookie` header, because `.after` fires
+    inside better-auth's `queueAfterTransactionHook`, while the identical call from `.before` does
+    reach it). So `.before` now does the cookie read/issue + `user_devices` upsert (needs no session
+    id yet); `.after` does the `session_signals` write + live-session count + concurrency check +
+    `emitAbuseSignal`, since only `.after` has the real `session.id`. The two hooks correlate via a
+    `WeakMap<context, SessionDeviceResult>` keyed on better-auth's per-request context object
+    (garbage-collected with it, never a growing global) — `src/shared/lib/abuse/session-hooks.ts`
+    holds the actual logic (`handleSessionBefore`/`handleSessionAfter`), `better-auth.ts` only wires
+    it. `lastIpAsn`/`ipAsn` intentionally left unset (no ASN-lookup capability exists yet — separate
+    later task). Live-verified end-to-end against the real local dev DB (migrations 0043/0044
+    applied there for the first time this task): fresh sign-in → `bh_did` cookie appears in the
+    response, `user_devices` row created (`trust_state='new'`); replaying the same `bh_did` cookie on
+    a second sign-in → same `device_id` reused, `session_signals.new_device=false`, no duplicate
+    `user_devices` row; this admin account's real accumulated session count already exceeds the
+    free-tier cap of 2, so every one of these real logins correctly emitted a genuine
+    `abuse_signals` row with `type='concurrent_sessions'`. `pnpm tsc --noEmit`, `pnpm eslint`,
+    `pnpm vitest run src/shared/lib/abuse` (29/29), `pnpm security:boundaries` all clean.
 
 - [ ] **Tier-derived concurrency cap with one-in-one-out (enforce path, gated)**
   - Files: `src/shared/lib/abuse/session-guard.ts`, `src/shared/lib/auth/better-auth.ts`
