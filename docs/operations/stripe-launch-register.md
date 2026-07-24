@@ -49,8 +49,8 @@
 | Support/refund contact | `support@builderhunt.dev` (seller profile) / `hello@builderhunt.dev` (pricing page FAQ) | confirmed, but see note | `billing_seller_profiles` v2 + `pricing.tsx` FAQ — two different addresses are in use; confirm whether that's intentional (e.g. general vs. billing-specific) or should be consolidated to one monitored inbox |
 | Statement descriptor | `BUILDERHUNT` | confirmed | `billing_seller_profiles` v2 |
 | Financial record retention | _not decided_ | _pending_ | Danish bookkeeping law requires invoice/accounting records for 5 years; confirm exact schedule before relying on any backup-rotation policy that could delete within that window |
-| Incident/kill-switch owner | _pending_ | _pending_ | who has Stripe Dashboard + deploy access to flip `STRIPE_BILLING_ENABLED=false` in an outage — needs a named person, not left blank |
-| Secret rotation owner | _pending_ | _pending_ | who rotates `STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` on schedule or compromise — needs a named person, not left blank |
+| Incident/kill-switch owner | Edd Remonts | confirmed 2026-07-24 | has Stripe Dashboard + deploy access |
+| Secret rotation owner | Edd Remonts | confirmed 2026-07-24 | same |
 | Stripe Billing Portal configuration | Restricted (`bpc_1Twg3NFbQx9fJlcGpkbiTqgy`, live mode): payment methods + tax ID + invoice history enabled; plan switching and cancellation disabled | confirmed 2026-07-24 | verified directly against the Stripe live API; matches `real-provider.ts`'s `ensureRestrictedPortalConfiguration()` |
 | Production webhook endpoint | `builderhunt-production`, live mode, `https://builderhunt.eduardoinerarte.dk/api/webhooks/stripe`, the 18 event types the code handles | confirmed 2026-07-24 | Stripe Dashboard → Workbench → Webhooks |
 | `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` | Set locally; **not yet present in the production Coolify environment** | _pending_ | see "Production environment gap" below — must be pushed before `STRIPE_BILLING_ENABLED=true` |

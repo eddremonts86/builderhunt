@@ -49,6 +49,4 @@ convenience:
 
 ## Owner
 
-**Not yet designated** — `stripe-launch-register.md`'s "Secret rotation owner" row. Name a real
-person/role and update this doc before treating any tabletop exercise involving this runbook as
-complete.
+**Edd Remonts** (confirmed 2026-07-24 — `stripe-launch-register.md`'s "Secret rotation owner" row).

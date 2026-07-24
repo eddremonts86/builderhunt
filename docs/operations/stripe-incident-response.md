@@ -26,8 +26,8 @@ Stripe's own retry/dunning timers, and will not un-verify already-received webho
 is off) until the flag comes back on and the worker (`api/admin/billing/run-worker.ts`) resumes
 draining the inbox.
 
-**Owner**: _not yet designated_ — `stripe-launch-register.md`'s "Incident/kill-switch owner" row.
-Do not flip this in production until an owner is named and can actually execute the redeploy.
+**Owner**: Edd Remonts (confirmed 2026-07-24 — `stripe-launch-register.md`'s "Incident/kill-switch
+owner" row).
 
 ## Webhook recovery after an outage
 
@@ -124,5 +124,4 @@ evidence for.
   - **Scenario 1 (outage) and scenario 4 (wrong tax country)** were walked through on paper only —
     no real production outage or live tax charge exists yet to exercise end-to-end; re-run these two
     once real live traffic exists.
-  - Owners for the kill switch and secret rotation are still `_not yet designated_` — naming a real
-    person/role remains open before this runbook is complete.
+  - Owners for the kill switch and secret rotation are both Edd Remonts (confirmed 2026-07-24).
