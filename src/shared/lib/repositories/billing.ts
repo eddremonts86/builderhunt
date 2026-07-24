@@ -261,6 +261,33 @@ export async function markBillingSubscriptionCanceledImmediately(
     .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
 }
 
+/**
+ * The one repair reconciliation.ts (plans/stripe-billing-platform/tasks.md §10 "Implement daily
+ * financial reconciliation") is ever allowed to apply automatically: re-syncing the three fields
+ * that mirror provider-authoritative subscription state (`webhook-handlers.ts`'s
+ * `handleSubscriptionUpsert` would set these same fields from a real webhook event — this is the
+ * same sync, just triggered by a listing comparison instead of an event). Every OTHER mismatch class
+ * (missing/extra/duplicate) is report-only; this exists specifically because it is pure, idempotent,
+ * side-effect-free field replacement with no financial action of its own (no charge, no grant, no
+ * cancellation trigger) — it never risks manufacturing a false "repaired" success.
+ */
+export async function syncBillingSubscriptionMirrorFromProvider(
+  transaction: TenantTransaction,
+  organizationId: string,
+  stripeSubscriptionId: string,
+  authoritative: { stripeStatus: string; cancelAtPeriodEnd: boolean; currentPeriodEnd: Date },
+): Promise<void> {
+  await transaction
+    .update(billingSubscriptions)
+    .set({
+      stripeStatus: authoritative.stripeStatus,
+      cancelAtPeriodEnd: authoritative.cancelAtPeriodEnd,
+      currentPeriodEnd: authoritative.currentPeriodEnd,
+      providerSyncedAt: new Date(),
+    })
+    .where(and(eq(billingSubscriptions.organizationId, organizationId), eq(billingSubscriptions.stripeSubscriptionId, stripeSubscriptionId)))
+}
+
 export interface CreateBillingSubscriptionInput {
   id: string
   organizationId: string
