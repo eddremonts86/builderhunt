@@ -605,11 +605,51 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     IP-keyed fallback path for unauthenticated traffic is untouched. Deleted the test user
     afterward.
 
-- [ ] **Export burst throttle + proportionate anti-automation**
+- [x] **Export burst throttle + proportionate anti-automation**
   - Files: `src/routes/api/export/builders.ts`, `src/shared/lib/abuse/anti-automation.ts` (+ test)
   - Do: cap exports/day per seat, add an `export_burst` signal, and add lightweight automation
     heuristics (missing/implausible headers, non-interactive cadence) that raise signals, not blocks.
   - Verify: unit tests; export beyond the daily cap emits a signal (and 429 only under `enforce`).
+  - Progress: Split into two independent, non-redundant concerns rather than overloading one
+    signal type. (1) **The daily cap** was already tracked via Task 1's `meterSeatActionAndEmit`
+    (`SEAT_DAILY_EXPORTS`, `seat_overuse` signal) — this task adds the missing piece: **real
+    enforcement**. `export/builders.ts` now calls the already-exported pure `detectSeatOveruse`
+    against the post-increment count and, only when `ABUSE_ENFORCEMENT_MODE === 'enforce'` AND the
+    seat is over its cap, returns `429` before doing any CSV work — the metering/signal call itself
+    still never blocks (matches Task 1's contract exactly; only this NEW explicit check blocks, and
+    only under `enforce`). (2) **New `abuse/anti-automation.ts`** for the "lightweight automation
+    heuristics" half, deliberately independent of the day cap: `detectMissingOrImplausibleHeaders`
+    (no User-Agent, no Accept header, or a known non-browser client signature — curl/wget/
+    python-requests/PostmanRuntime/okhttp/axios/node-fetch/Scrapy; a narrow, well-known-library
+    list, not "anything unusual," to avoid false-positiving on legitimate but uncommon browsers)
+    and `detectNonInteractiveCadence` (sub-500ms gap since the same identity's last export — a
+    human cannot sustain that clicking a button) + a module-scoped in-memory `recordExportRequestCadence`
+    wrapper (same "lightweight, resets on restart" precedent as `rate-limit.ts`'s in-memory
+    fallback bucket). `checkExportBurstAndEmit` emits the dedicated `export_burst` signal (not
+    `seat_overuse`) whenever either heuristic fires — per the task's explicit wording, this half
+    **never blocks on its own**, regardless of enforcement mode; it only ever raises a signal.
+    Both checks run on every export request, independently of each other. Tests
+    (`anti-automation.test.ts`, 21 cases): header detection table (missing UA/Accept, each listed
+    client signature, two plausible-browser negatives), cadence detection (first-ever call never
+    flags, under/at/over the threshold, custom threshold), the stateful `recordExportRequestCadence`
+    wrapper (first call per key never flags, rapid second call flags, distant second call doesn't,
+    distinct keys tracked independently), and `checkExportBurstAndEmit` (silent when neither
+    heuristic fires, emits on headers alone, emits on cadence alone). Full sweep: `pnpm tsc --noEmit`
+    clean, `pnpm eslint` clean, `pnpm vitest run src/shared/lib/abuse --no-file-parallelism` →
+    144/144 green, `pnpm security:boundaries` → 0 legacy imports. **Live end-to-end verification**
+    against the real dev server: temporarily set `SEAT_DAILY_EXPORTS=2` and
+    `ABUSE_ENFORCEMENT_MODE=enforce` (standard restart-required override this plan has needed every
+    time), signed up a real user, made curl-based export requests (curl's own UA trips
+    `detectMissingOrImplausibleHeaders` for free) — the 1st and 2nd succeeded (200), the 3rd was
+    rejected with `429 {"error":"Daily export limit reached for this seat. Try again tomorrow."}`;
+    a direct query of `abuse_signals` showed real `export_burst` rows on every attempt
+    (`suspiciousHeaders: true`, `nonInteractiveCadence` correctly varying true/false by actual
+    timing) and real `seat_overuse` rows once the cap was crossed (`count: 3, cap: 2` and
+    `count: 4, cap: 2` — the blocked attempt's own increment still landed, matching "emits a signal"
+    regardless of the block). Reverted both env vars, restarted, and confirmed the exact same
+    3-request sequence now returns `200/200/200` under the default `observe` mode + real
+    `SEAT_DAILY_EXPORTS` — full backward compatibility for every deployment that hasn't opted into
+    `enforce`. Deleted every test user created during verification afterward.
 
 ## Phase 4B — Credit / premium-feature abuse (G)
 

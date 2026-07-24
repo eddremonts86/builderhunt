@@ -2,7 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { listOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
-import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { detectSeatOveruse, meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { checkExportBurstAndEmit, detectMissingOrImplausibleHeaders, recordExportRequestCadence } from '~/shared/lib/abuse/anti-automation'
 import { env } from '~/shared/lib/env'
 
 export const Route = createFileRoute('/api/export/builders')({
@@ -12,18 +13,43 @@ export const Route = createFileRoute('/api/export/builders')({
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const builders = await withTenantContext(principal, async (tx) => {
-            // Meter (abuse-and-usage-integrity Phase 4) — one 'exports' unit per export event
-            // (matches SEAT_DAILY_EXPORTS' per-event framing, not per-row); observe-only.
-            await meterSeatActionAndEmit(tx, {
+
+          // Automation heuristics (Phase 4 "Export burst throttle + proportionate
+          // anti-automation") — independent of the day cap below, never blocks on its own.
+          const suspiciousHeaders = detectMissingOrImplausibleHeaders({
+            userAgent: request.headers.get('user-agent'),
+            accept: request.headers.get('accept'),
+          })
+          const nonInteractiveCadence = recordExportRequestCadence(`${principal.organizationId}:${principal.userId}`)
+          await checkExportBurstAndEmit(
+            { suspiciousHeaders, nonInteractiveCadence },
+            { userId: principal.userId, organizationId: principal.organizationId, requestId: principal.requestId },
+          )
+
+          const { builders, overDailyCap } = await withTenantContext(principal, async (tx) => {
+            // Meter (Phase 4 "core actions per seat") — one 'exports' unit per export event
+            // (matches SEAT_DAILY_EXPORTS' per-event framing, not per-row); the increment+signal
+            // itself is always observe-only (meterSeatActionAndEmit never blocks).
+            const usage = await meterSeatActionAndEmit(tx, {
               organizationId: principal.organizationId,
               userId: principal.userId,
               action: 'exports',
               cap: env.SEAT_DAILY_EXPORTS,
               requestId: principal.requestId,
             })
-            return listOrganizationBuilders(tx, principal.organizationId)
+            return {
+              builders: await listOrganizationBuilders(tx, principal.organizationId),
+              overDailyCap: detectSeatOveruse({ count: usage.count, cap: env.SEAT_DAILY_EXPORTS }),
+            }
           })
+
+          // Real enforcement (as opposed to the metering above, which only ever counts/signals):
+          // only blocks once this exact seat has gone over its daily export cap, and only when an
+          // operator has deliberately moved ABUSE_ENFORCEMENT_MODE past its `observe` default.
+          if (overDailyCap && env.ABUSE_ENFORCEMENT_MODE === 'enforce') {
+            return Response.json({ error: 'Daily export limit reached for this seat. Try again tomorrow.' }, { status: 429 })
+          }
+
           const header = ['username', 'source', 'score', 'language', 'country', 'topics', 'profileUrl']
           const rows = builders.map((builder) => [
             builder.username,
