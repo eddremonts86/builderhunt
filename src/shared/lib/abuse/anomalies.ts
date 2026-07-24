@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto'
+import type { TenantTransaction } from '../db/client'
+import { incrementSeatUsage, type SeatUsageRecord } from '../repositories/seat-usage'
 import { emitAbuseSignal, type EmitAbuseSignalDeps } from './signals'
 
 /**
@@ -232,4 +235,43 @@ export async function checkSeatOveruseAndEmit(
     }, deps)
   }
   return flagged
+}
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
+export interface MeterSeatActionInput {
+  organizationId: string
+  userId: string
+  action: 'searches' | 'reveals' | 'exports' | 'messages'
+  cap: number
+  requestId: string
+}
+
+/**
+ * Increments today's (org, user, action) `seat_usage_daily` counter and checks it against `cap`
+ * via `checkSeatOveruseAndEmit` — the single entry point every metered request path (search,
+ * export, profile-reveal) calls, so the increment-then-check sequence is never duplicated or
+ * drifted across call sites. Phase 4 "Meter scarce core actions per seat" is observe-only: this
+ * counts and signals, it never blocks the action itself (no enforcement gate exists yet).
+ */
+export async function meterSeatActionAndEmit(
+  transaction: TenantTransaction,
+  input: MeterSeatActionInput,
+  deps?: EmitAbuseSignalDeps,
+): Promise<SeatUsageRecord> {
+  const record = await incrementSeatUsage(transaction, {
+    id: randomUUID(),
+    organizationId: input.organizationId,
+    userId: input.userId,
+    day: todayUtc(),
+    action: input.action,
+  })
+  await checkSeatOveruseAndEmit(
+    { count: record.count, cap: input.cap, action: input.action },
+    { userId: input.userId, organizationId: input.organizationId, requestId: input.requestId },
+    deps,
+  )
+  return record
 }

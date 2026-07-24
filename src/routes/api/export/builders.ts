@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { listOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
+import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { env } from '~/shared/lib/env'
 
 export const Route = createFileRoute('/api/export/builders')({
   component: () => null,
@@ -10,9 +12,18 @@ export const Route = createFileRoute('/api/export/builders')({
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const builders = await withTenantContext(principal, (tx) =>
-            listOrganizationBuilders(tx, principal.organizationId),
-          )
+          const builders = await withTenantContext(principal, async (tx) => {
+            // Meter (abuse-and-usage-integrity Phase 4) — one 'exports' unit per export event
+            // (matches SEAT_DAILY_EXPORTS' per-event framing, not per-row); observe-only.
+            await meterSeatActionAndEmit(tx, {
+              organizationId: principal.organizationId,
+              userId: principal.userId,
+              action: 'exports',
+              cap: env.SEAT_DAILY_EXPORTS,
+              requestId: principal.requestId,
+            })
+            return listOrganizationBuilders(tx, principal.organizationId)
+          })
           const header = ['username', 'source', 'score', 'language', 'country', 'topics', 'profileUrl']
           const rows = builders.map((builder) => [
             builder.username,

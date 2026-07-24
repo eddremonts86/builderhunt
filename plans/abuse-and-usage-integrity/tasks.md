@@ -514,13 +514,59 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 4 — Core-value metering + rate-limit hardening (C)
 
-- [ ] **Meter scarce core actions per seat**
+- [x] **Meter scarce core actions per seat**
   - Files: `src/lib/search.ts`, `src/routes/api/export/builders.ts`,
     profile-reveal + outreach send paths, `src/shared/lib/repositories/seat-usage.ts`
   - Do: increment `seat_usage_daily` per (org,user,day,action); read per-tier ceilings from env.
     Observe: count only. Converge monetary actions with the Stripe `billing/credits` reserve/settle
     contract; keep non-monetary read actions on this counter.
   - Verify: unit tests for counter increments + ceiling math; search/export still work in observe.
+  - Progress: Researched via Explore sub-agent to find the exact 4 integration points before
+    writing anything. Findings that shaped scope: (1) `src/lib/search.ts`'s `searchBuilders` is a
+    plain function with no tenant context — metering had to go in its caller,
+    `api/search/builders.ts`, where a best-effort `TenantPrincipal` is already resolved (anonymous
+    search stays un-metered, correctly — there's no seat to attribute it to). (2) The
+    `seat_usage_daily.action` check constraint is `'searches'|'reveals'|'exports'|'messages'` — one
+    row per action-*event*, not per result-row, confirmed by the existing `SEAT_DAILY_EXPORTS`
+    naming (per-seat daily event cap, not a row-count cap) — export increments once per download
+    click, not once per CSV row. (3) "Profile-reveal" has no code literally named "reveal"; the
+    real analog is `api/builders/$builderId.ts`'s `GET` handler's tenant branch (returns an org's
+    private/enriched builder metadata — language/country/topics — to a recruiter who tracked that
+    builder). (4) **"Outreach send" doesn't exist as a server-side action** — grepped
+    `outreach`/`send` across the whole tree; `OutreachCopilot.tsx`'s `handleCopy` explicitly does
+    `navigator.clipboard.writeText` only, with a code comment stating *"Nothing is sent
+    automatically — review and copy the draft yourself"*. There is no send endpoint to meter.
+    Documented this gap rather than fabricating a metering hook for a feature that doesn't exist;
+    `'messages'` stays a defined-but-currently-unused action until a real send path is built.
+    **`abuse/anomalies.ts`**: added `meterSeatActionAndEmit(transaction, {organizationId, userId,
+    action, cap, requestId}, deps?)` — the single entry point every metered route calls, composing
+    the existing `incrementSeatUsage` repo call with the existing `checkSeatOveruseAndEmit` (so the
+    increment-then-check sequence is never duplicated/drifted across the 3 call sites). Observe-only
+    by construction: it counts and signals, never blocks (no enforcement gate exists yet — that's a
+    later phase). **Wired into 3 real request paths**, each inside the route's existing
+    `withTenantContext` block so the meter write shares the same transaction as the read/write it's
+    metering: `api/search/builders.ts` (`action: 'searches'`, cap `SEAT_DAILY_SEARCHES`),
+    `api/export/builders.ts` (`action: 'exports'`, cap `SEAT_DAILY_EXPORTS`),
+    `api/builders/$builderId.ts`'s tenant-reveal branch (`action: 'reveals'`, cap
+    `SEAT_DAILY_REVEALS`). Per-tier ceilings: the existing `SEAT_DAILY_*` env vars are flat
+    per-action caps, not actually tier-differentiated (unlike e.g.
+    `SESSION_MAX_CONCURRENT_FREE/_PRO/_TEAM_PER_SEAT`) — used them as-is rather than inventing a
+    tier-lookup system with no existing wiring to an org's subscription tier; noting this honestly
+    rather than silently overclaiming tier-awareness the current env contract doesn't have.
+    **Tests** (`anomalies.test.ts`, real disposable-DB integration, not mocked — since this
+    composes a real repo write): increments the real `seat_usage_daily` row and stays silent under
+    cap; emits `seat_overuse` only once accumulated real usage exceeds the cap (3 calls, cap 2 →
+    exactly 1 emission, on the 3rd call); tracks distinct actions independently for the same
+    org/user/day. Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean on all 5 changed files,
+    `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/seat-usage.test.ts
+    --no-file-parallelism` → 128/128 green, `pnpm security:boundaries` → 0 legacy imports.
+    **Live end-to-end verification against the real dev server + Postgres**: signed up a real test
+    user, called `/api/search/builders`, `/api/export/builders`, and (after inserting a real
+    `organization_builders` row so the tenant-reveal branch had something to find)
+    `/api/builders/$builderId` — all three still returned their normal 200 responses (confirming
+    "search/export still work in observe" holds), and a direct query of `seat_usage_daily` showed
+    exactly the 3 expected rows (`searches: 1, exports: 1, reveals: 1`) for that user/org/day.
+    Cleaned up the test user, its org-builder row, and the extra dev-server instance afterward.
 
 - [ ] **Re-key rate limiting on identity, not IP alone**
   - Files: `src/shared/lib/rate-limit.ts`, `src/shared/lib/rate-limit.test.ts`

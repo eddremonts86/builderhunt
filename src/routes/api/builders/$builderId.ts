@@ -9,6 +9,8 @@ import {
   updateOrganizationBuilder,
 } from '~/shared/lib/repositories/organization-builders'
 import { findPublishedBuilderProfile, findVerifiedBuilderClaim } from '~/shared/lib/repositories/public-builders'
+import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { env } from '~/shared/lib/env'
 
 const PatchBody = z.object({
   topics: z.array(z.string().min(1).max(40)).max(20).optional(),
@@ -41,6 +43,16 @@ export const Route = createFileRoute('/api/builders/$builderId')({
               findOrganizationBuilderByEitherId(tx, principal!.organizationId, params.builderId),
             )
             if (tenantBuilder) {
+              // Meter (abuse-and-usage-integrity Phase 4) — this is the "reveal" of an org's
+              // private/enriched builder metadata (language/country/topics below) to the
+              // recruiter; observe-only, doesn't gate the response.
+              await withTenantContext(principal, (tx) => meterSeatActionAndEmit(tx, {
+                organizationId: principal!.organizationId,
+                userId: principal!.userId,
+                action: 'reveals',
+                cap: env.SEAT_DAILY_REVEALS,
+                requestId: principal!.requestId,
+              }))
               const privateMetadata = tenantBuilder.privateMetadata as { topics?: string[]; country?: string; language?: string }
               const claim = await findVerifiedBuilderClaim(tenantBuilder.identityId)
               return Response.json({

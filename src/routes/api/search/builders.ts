@@ -6,6 +6,8 @@ import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { getTrackedBuilderIds, trackedKey } from '~/shared/lib/tracked-builders'
 import { log } from '~/shared/lib/log'
+import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { env } from '~/shared/lib/env'
 
 export const Route = createFileRoute('/api/search/builders')({
   component: () => null,
@@ -45,9 +47,19 @@ export const Route = createFileRoute('/api/search/builders')({
           let trackedIds = new Map<string, string>()
           try {
             const principal = await requireTenantPrincipal(request)
-            trackedIds = await withTenantContext(principal, (tx) =>
-              getTrackedBuilderIds(tx, principal.organizationId),
-            )
+            trackedIds = await withTenantContext(principal, async (tx) => {
+              // Meter (abuse-and-usage-integrity Phase 4 "core actions per seat") — count only,
+              // observe-only, never blocks; anonymous/no-active-org search (caught below) simply
+              // isn't metered, since there's no seat to attribute it to.
+              await meterSeatActionAndEmit(tx, {
+                organizationId: principal.organizationId,
+                userId: principal.userId,
+                action: 'searches',
+                cap: env.SEAT_DAILY_SEARCHES,
+                requestId: principal.requestId,
+              })
+              return getTrackedBuilderIds(tx, principal.organizationId)
+            })
           } catch (err) {
             // Best-effort for anonymous search and sessions without an active organization.
             console.error('getTrackedBuilderIds error:', err)

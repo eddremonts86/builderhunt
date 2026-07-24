@@ -1,4 +1,8 @@
-import { describe, expect, it, vi } from 'vitest'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
+import { authUsers, organizations } from '../db/schema'
+import { getSeatUsage } from '../repositories/seat-usage'
 import {
   checkConcurrentDistinctIpAndEmit,
   checkCrossTenantDenialAndEmit,
@@ -11,6 +15,7 @@ import {
   detectMidSessionUaChange,
   detectSeatOveruse,
   isAllowlistedAsn,
+  meterSeatActionAndEmit,
 } from './anomalies'
 
 const NYC = { lat: 40.7128, lng: -74.006 }
@@ -225,5 +230,89 @@ describe('check*AndEmit wrappers', () => {
     )
     expect(flagged).toBe(true)
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ type: 'cross_tenant_denied', severity: 'medium', userId: 'user-1', organizationId: 'org-1' }))
+  })
+})
+
+describe('meterSeatActionAndEmit', () => {
+  let db: PostgresJsDatabase
+  let drop: () => Promise<void>
+
+  beforeAll(async () => {
+    const disposable = await createDisposableTestDatabase('abuse_meter_seat')
+    db = disposable.db
+    drop = disposable.drop
+    await db.insert(organizations).values([
+      { id: 'meter-org-a', name: 'A', slug: 'meter-org-a', createdAt: new Date() },
+    ])
+    await db.insert(authUsers).values([
+      { id: 'meter-user-a', name: 'A', email: 'meter-a@test.invalid', emailVerified: true, createdAt: new Date(), updatedAt: new Date() },
+    ])
+  }, 60_000)
+
+  afterAll(async () => {
+    await drop()
+  })
+
+  it('increments the real seat_usage_daily counter and does not emit while under the cap', async () => {
+    const insert = vi.fn()
+    const record = await db.transaction((tx) => meterSeatActionAndEmit(tx, {
+      organizationId: 'meter-org-a',
+      userId: 'meter-user-a',
+      action: 'searches',
+      cap: 5,
+      requestId: 'req-meter-1',
+    }, { insert, sink: { write: vi.fn() } }))
+
+    expect(record.count).toBe(1)
+    expect(insert).not.toHaveBeenCalled()
+
+    const today = new Date().toISOString().slice(0, 10)
+    const stored = await db.transaction((tx) => getSeatUsage(tx, 'meter-org-a', 'meter-user-a', today, 'searches'))
+    expect(stored?.count).toBe(1)
+  })
+
+  it('emits seat_overuse once accumulated real usage exceeds the cap', async () => {
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    for (let i = 1; i <= 3; i++) {
+      await db.transaction((tx) => meterSeatActionAndEmit(tx, {
+        organizationId: 'meter-org-a',
+        userId: 'meter-user-a',
+        action: 'exports',
+        cap: 2,
+        requestId: `req-meter-${i}`,
+      }, deps))
+    }
+
+    expect(insert).toHaveBeenCalledTimes(1) // only the 3rd call (count=3 > cap=2) flags
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'seat_overuse',
+      details: expect.objectContaining({ action: 'exports', count: 3, cap: 2 }),
+    }))
+  })
+
+  it('tracks distinct actions for the same org/user/day independently', async () => {
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    await db.transaction((tx) => meterSeatActionAndEmit(tx, {
+      organizationId: 'meter-org-a',
+      userId: 'meter-user-a',
+      action: 'reveals',
+      cap: 100,
+      requestId: 'req-meter-reveals',
+    }, deps))
+    await db.transaction((tx) => meterSeatActionAndEmit(tx, {
+      organizationId: 'meter-org-a',
+      userId: 'meter-user-a',
+      action: 'messages',
+      cap: 100,
+      requestId: 'req-meter-messages',
+    }, deps))
+
+    const today = new Date().toISOString().slice(0, 10)
+    const reveals = await db.transaction((tx) => getSeatUsage(tx, 'meter-org-a', 'meter-user-a', today, 'reveals'))
+    const messages = await db.transaction((tx) => getSeatUsage(tx, 'meter-org-a', 'meter-user-a', today, 'messages'))
+    expect(reveals?.count).toBe(1)
+    expect(messages?.count).toBe(1)
   })
 })
