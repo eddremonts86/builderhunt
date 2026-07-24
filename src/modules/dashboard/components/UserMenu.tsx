@@ -70,10 +70,17 @@ interface UserMenuProps {
 export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuProps) {
   const [open, setOpen] = React.useState(false)
   const [coords, setCoords] = React.useState({ top: 0, right: 0 })
+  const [mounted, setMounted] = React.useState(false)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
   const { accent, setAccent } = useTheme()
   const reduceMotion = useReducedMotion()
+
+  // `document.body` (below) doesn't exist during SSR — same mounted-gate
+  // pattern as `TosModal.tsx`'s portal.
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const reposition = React.useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect()
@@ -125,7 +132,7 @@ export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuP
         <CircleUser className="w-4 h-4" aria-hidden="true" />
       </button>
 
-      {createPortal(
+      {mounted && createPortal(
         <AnimatePresence mode="wait">
           {open && (
             <motion.div
