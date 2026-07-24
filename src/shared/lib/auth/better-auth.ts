@@ -108,19 +108,30 @@ export const auth = betterAuth({
           if (!organizationId) return
           return { data: { activeOrganizationId: organizationId } }
         },
-        // Concurrent-session signal — needs `session.id`, which only exists
-        // once the row is created. Observe-mode only: never blocks a sign-in.
+        // Concurrent-session signal + (under ABUSE_ENFORCEMENT_MODE=enforce)
+        // one-in-one-out revocation — needs `session.id`, which only exists
+        // once the row is created. `handleSessionAfter` only decides policy;
+        // this file performs the actual `auth_sessions` delete (auth-db
+        // allowlist) so the abuse module never touches auth tables directly.
         after: async (session, context) => {
           const device = context ? pendingSessionDevices.get(context) : undefined
           if (!device) return
-          const liveSessions = await authDb.select({ id: authSessions.id }).from(authSessions)
+          const liveSessions = await authDb.select({
+            id: authSessions.id,
+            token: authSessions.token,
+            createdAt: authSessions.createdAt,
+          }).from(authSessions)
             .where(and(eq(authSessions.userId, session.userId), gt(authSessions.expiresAt, new Date())))
-          await handleSessionAfter({
+          const otherLiveSessions = liveSessions.filter((row) => row.id !== session.id)
+          const { revokedSessionId } = await handleSessionAfter({
             id: session.id,
             userId: session.userId,
             activeOrganizationId: (session.activeOrganizationId as string | null | undefined) ?? null,
             liveSessionCount: liveSessions.length,
-          }, device)
+          }, device, otherLiveSessions)
+          if (revokedSessionId) {
+            await authDb.delete(authSessions).where(eq(authSessions.id, revokedSessionId))
+          }
         },
       },
     },

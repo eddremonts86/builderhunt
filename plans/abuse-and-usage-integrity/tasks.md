@@ -163,12 +163,33 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `abuse_signals` row with `type='concurrent_sessions'`. `pnpm tsc --noEmit`, `pnpm eslint`,
     `pnpm vitest run src/shared/lib/abuse` (29/29), `pnpm security:boundaries` all clean.
 
-- [ ] **Tier-derived concurrency cap with one-in-one-out (enforce path, gated)**
+- [x] **Tier-derived concurrency cap with one-in-one-out (enforce path, gated)**
   - Files: `src/shared/lib/abuse/session-guard.ts`, `src/shared/lib/auth/better-auth.ts`
   - Do: when `ABUSE_ENFORCEMENT_MODE=enforce`, revoke the oldest session via Better Auth
     `revokeSession` before allowing the new one (cap = tier value; Team = per-seat). Emit audit.
   - Verify: unit test the revoke-oldest selection; integration test that a 3rd Pro session revokes
     the 1st only under `enforce`.
+  - Progress (2026-07-24): `session-guard.ts` adds `selectSessionToRevoke()` (pure, picks the single
+    oldest of a candidate list, stable tie-break) — 4 new unit tests. Traced better-auth's own
+    `revokeSession` endpoint (`api/routes/session.mjs`) to confirm it's a thin wrapper that just calls
+    `internalAdapter.deleteSession(token)`, which (no secondary storage configured here) is a plain
+    `DELETE FROM auth_sessions WHERE token = ...` — so `better-auth.ts` (already on the auth-db
+    allowlist) deletes the row directly instead of re-entering the full HTTP endpoint/context
+    machinery from inside its own `session.create.after` hook, avoiding a recursive-reentry risk.
+    `session-hooks.ts`'s `handleSessionAfter` only decides *policy* (should we revoke, which
+    session) via an injectable `enforcementMode` param (defaults to the real env var, overridable in
+    tests) — it never touches `auth_sessions` itself, keeping the auth-db-allowlist boundary intact.
+    Severity bumps to `high` (from `medium`) and `details.enforced`/`revokedSessionId` are set on the
+    signal when a real revocation happens. Live-verified end-to-end against the real local dev DB
+    (temporarily set `ABUSE_ENFORCEMENT_MODE=enforce` in `.env.local`, restarted the dev server,
+    reverted after — Vite does not hot-reload `process.env`, confirmed a full server restart was
+    required both ways): captured the oldest of this account's 35 real live sessions, logged in
+    again via `curl`, confirmed that exact session row was deleted, total count stayed at 35 (not
+    36), and `abuse_signals` recorded `severity:"high", enforced:true, revokedSessionId:"<that id>"`.
+    Restarted again after reverting `.env.local` and confirmed a 4th login left all 36 sessions
+    intact with `enforced:false` — both branches proven against production-shaped data, not mocks.
+    `pnpm tsc --noEmit`, `pnpm eslint`, `pnpm vitest run src/shared/lib/abuse` (33/33),
+    `pnpm security:boundaries` all clean.
 
 - [ ] **Idle + absolute session timeouts**
   - Files: `src/shared/lib/auth/better-auth.ts`

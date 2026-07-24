@@ -7,7 +7,12 @@ import { env } from '../env'
 import { upsertUserDevice } from '../repositories/user-devices'
 import { computeDeviceHash, detectUaFamily, issueDeviceCookieValue, DEVICE_COOKIE_NAME } from './device'
 import { emitAbuseSignal, hashSessionId } from './signals'
-import { evaluateSessionConcurrency, type SessionConcurrencyConfig } from './session-guard'
+import {
+  evaluateSessionConcurrency,
+  selectSessionToRevoke,
+  type RevocationCandidateSession,
+  type SessionConcurrencyConfig,
+} from './session-guard'
 
 /** Abstracts better-auth's endpoint `context.getCookie`/`context.setCookie` for testability. */
 export interface SessionCookieAdapter {
@@ -100,15 +105,35 @@ export interface SessionAfterInput {
   liveSessionCount: number
 }
 
+export interface SessionAfterResult {
+  /**
+   * Non-null only under `ABUSE_ENFORCEMENT_MODE=enforce` when over cap and an
+   * older session exists to revoke. `better-auth.ts` owns the actual
+   * `auth_sessions` delete (auth-db allowlist) — this module only decides
+   * policy (should we revoke, which one), never mutates the row itself.
+   */
+  revokedSessionId: string | null
+}
+
 /**
  * Runs from `databaseHooks.session.create.after`, once the session row (and
  * therefore `session.id`) exists. Writes the `session_signals` row and — when
  * the user's live session count is over their tier's concurrency cap — emits
- * a `concurrent_sessions` abuse signal. Observe-mode only: nothing here
- * blocks the sign-in; `ABUSE_ENFORCEMENT_MODE` gates enforcement in a later
- * phase. `device` is whatever `handleSessionBefore` resolved for this same request.
+ * a `concurrent_sessions` abuse signal. Under `observe`/`warn` this only
+ * records; under `enforce` it additionally selects the single oldest of the
+ * user's *other* live sessions for one-in-one-out revocation (never the
+ * session just created) and reports that choice back to the caller — it does
+ * not block the sign-in itself, and does not revoke anything when there is no
+ * older session to pick (e.g. a race already resolved the over-cap count).
+ * `device` is whatever `handleSessionBefore` resolved for this same request.
  */
-export async function handleSessionAfter(session: SessionAfterInput, device: SessionDeviceResult): Promise<void> {
+export async function handleSessionAfter(
+  session: SessionAfterInput,
+  device: SessionDeviceResult,
+  otherLiveSessions: RevocationCandidateSession[],
+  /** Defaults to the real env var; injectable so tests can exercise the `enforce` branch without mutating global env. */
+  enforcementMode: string = env.ABUSE_ENFORCEMENT_MODE,
+): Promise<SessionAfterResult> {
   const secret = resolveSecret()
 
   await workerDb.insert(sessionSignals).values({
@@ -125,14 +150,26 @@ export async function handleSessionAfter(session: SessionAfterInput, device: Ses
     config: resolveSessionConcurrencyConfig(),
   })
 
-  if (overCap) {
-    await emitAbuseSignal({
-      type: 'concurrent_sessions',
-      severity: 'medium',
-      userId: session.userId,
-      organizationId: session.activeOrganizationId ?? undefined,
-      requestId: randomUUID(),
-      details: { liveSessionCount: session.liveSessionCount, cap, tier },
-    })
-  }
+  if (!overCap) return { revokedSessionId: null }
+
+  const revocationTarget = enforcementMode === 'enforce'
+    ? selectSessionToRevoke(otherLiveSessions)
+    : null
+
+  await emitAbuseSignal({
+    type: 'concurrent_sessions',
+    severity: revocationTarget ? 'high' : 'medium',
+    userId: session.userId,
+    organizationId: session.activeOrganizationId ?? undefined,
+    requestId: randomUUID(),
+    details: {
+      liveSessionCount: session.liveSessionCount,
+      cap,
+      tier,
+      enforced: Boolean(revocationTarget),
+      revokedSessionId: revocationTarget?.id ?? null,
+    },
+  })
+
+  return { revokedSessionId: revocationTarget?.id ?? null }
 }

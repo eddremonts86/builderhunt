@@ -41,3 +41,20 @@ export function evaluateSessionConcurrency(input: SessionConcurrencyInput): Sess
   const cap = resolveSessionCap(input.tier, input.config)
   return { cap, overCap: input.liveSessionCount > cap }
 }
+
+export interface RevocationCandidateSession {
+  id: string
+  token: string
+  createdAt: Date
+}
+
+/**
+ * One-in-one-out: picks the single oldest of the *other* live sessions to revoke when a new
+ * session pushes the user over their tier cap. Never targets the just-created session itself —
+ * callers must exclude it from `sessions` before calling this. Returns `null` for an empty list
+ * (nothing to revoke, e.g. the over-cap count came from a race that already resolved).
+ */
+export function selectSessionToRevoke(sessions: RevocationCandidateSession[]): RevocationCandidateSession | null {
+  if (sessions.length === 0) return null
+  return sessions.reduce((oldest, session) => (session.createdAt < oldest.createdAt ? session : oldest))
+}
