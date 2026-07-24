@@ -1,0 +1,30 @@
+import { createFileRoute } from '@tanstack/react-router'
+import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { getBillingOperationsMetrics } from '~/shared/lib/billing/operations-metrics'
+
+/**
+ * Read-only aggregate metrics for the platform billing operations dashboard
+ * (plans/stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
+ * Platform-admin only; returns nothing beyond aggregate counts (no per-organization detail, no raw
+ * webhook payloads, no secrets — every field comes straight from `getBillingOperationsMetrics`,
+ * which never reads anything encrypted/secret itself).
+ */
+export const Route = createFileRoute('/api/admin/billing/metrics')({
+  component: () => null,
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        try {
+          await requirePlatformAdminPrincipal(request)
+          const metrics = await getBillingOperationsMetrics()
+          return Response.json(metrics)
+        } catch (err) {
+          const response = platformAdminErrorResponse(err)
+          if (response) return response
+          console.error('admin billing metrics error:', err)
+          return Response.json({ error: 'Failed to load billing metrics' }, { status: 500 })
+        }
+      },
+    },
+  },
+})

@@ -4,7 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CircleUser, Users, CreditCard, Shield, Activity, Cog, Inbox, AlertTriangle,
-  BookOpen, Map, LogOut, Sparkles, RotateCcw, ShieldAlert,
+  BookOpen, Map, LogOut, Sparkles, RotateCcw, ShieldAlert, Gauge,
 } from 'lucide-react'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
@@ -27,6 +27,7 @@ const ADMIN_LINKS = [
   { to: '/admin/roadmap', icon: Map, label: 'Roadmap' },
   { to: '/admin/refunds', icon: RotateCcw, label: 'Refunds' },
   { to: '/admin/disputes', icon: ShieldAlert, label: 'Disputes' },
+  { to: '/admin/billing', icon: Gauge, label: 'Billing ops' },
 ] as const
 
 function MenuLink({ to, icon: Icon, label, active, onNavigate }: {

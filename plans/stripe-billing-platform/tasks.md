@@ -1616,10 +1616,71 @@ migration, dunning/recovery) implemented, tested, and committed.
     during development, via the `hardDeleteOrganization` refactor above) and `pnpm security:route-coverage`
     (98 routes — +1 for the new immediate-delete route, 8 allowlisted, valid).
 
-- [ ] **Build platform billing operations dashboard**
+- [x] **Build platform billing operations dashboard**
   - Files: `src/routes/_dashboard/admin/billing.tsx`, `src/modules/admin/billing/BillingOperationsPage.tsx`, `src/modules/admin/billing/BillingOperationsPage.test.tsx`, `src/routes/api/admin/billing/metrics.ts`
   - Do: Show readiness, configuration version, webhook backlog/dead letters/replay, grace, refunds, disputes, risk exceptions, reconciliation, credit invariants, cost/margin, and runbook links. Platform-admin only; raw payload and secrets never render.
   - Verify: operator/non-operator role tests, redaction fixtures, accessibility/mobile, and stale metrics states pass.
+  - Progress: Research first surfaced that a genuinely cross-organization "how many X across every org"
+    query has NO existing path in this codebase: every platform-role RLS policy on the organization-scoped
+    billing tables (`billing_refunds`/`billing_disputes`/`billing_risk_exceptions`/`billing_subscriptions`) is
+    still `USING (organization_id = current_setting('app.organization_id'))` — even `risk.ts`'s
+    `listRiskExceptions`, which defaults to `platformDb`, still requires an `organizationId` argument for
+    exactly this reason. Rather than add a new "platform sees everything" RLS policy (a real schema change,
+    reviewed and deliberate everywhere else in this plan), built the new `billing/operations-metrics.ts`
+    composer around the SAME O(organizations) cross-org sweep pattern `billing-worker.ts` already establishes
+    and documents as "acceptable at this app's current scale": `listWorkerOrganizationIds` + a
+    `withWorkerOrganization`-scoped read per organization, reusing the EXISTING per-organization repository
+    functions (`listGracePeriodBillingSubscriptions`, `listBillingRefunds`, `listOrganizationDisputes`,
+    `listRiskExceptions`) — zero new business logic, only composition and counting. Two pieces genuinely didn't
+    exist as reusable functions and needed small, new, honestly-scoped additions: webhook backlog (a
+    `group by status` count over `billing_webhook_events`, which has no organization column and no RLS at all —
+    a direct `platformDb` query, no loop needed) and "credit invariants" (defined as: `billing_credit_reservations`
+    rows still `state = 'reserved'` past their own `deadlineAt` — i.e. should have been swept to `expired` by the
+    reservation worker but weren't; a genuine, meaningful, and cheap invariant, not a fabricated one).
+    Readiness and reconciliation were deliberately scoped down from full duplication:
+    `scripts/billing/check-live-readiness.ts`'s full 12-field evidence gate calls the real Stripe API
+    (`accounts.retrieve()`) and includes several pure operator attestations (Terms/Privacy versions confirmed,
+    runbooks tabletop-tested, Portal configuration restricted) that have no database representation at all —
+    duplicating that logic into a page-load-triggered web route would mean hitting Stripe's API on every
+    dashboard refresh for evidence this same script already gates release readiness on. The dashboard instead
+    shows `isLiveMode()` (live vs. test) plus the current seller-configuration version, and reconciliation reads
+    the (currently always-empty) `billing_reconciliation_runs` table directly and reports "not yet available"
+    honestly when no run exists yet — that table was already created in the original 0027 migration for §10
+    task 1, which hasn't been built yet. Cost/margin (§10, also unstarted) is reported the same way:
+    `{ available: false }`, never a fabricated number.
+    Also discovered mid-task: `/_dashboard/admin/billing.tsx` (the existing Seller Configuration page from §3)
+    had NO nav-menu entry at all — reachable only by typing the URL directly. Combined the new
+    `BillingOperationsPage` (metrics, above) with the pre-existing `SellerConfiguration` (unchanged) on that same
+    route — both are platform-admin-only billing surfaces that belong together — and added the missing
+    "Billing ops" entry to `UserMenu.tsx`'s admin section, fixing that orphaned-page gap as part of the same
+    edit rather than leaving the new dashboard equally unreachable.
+    Tests: `operations-metrics.test.ts` (NEW, 9 tests) — a hybrid of real-disposable-DB coverage for the
+    platformDb-backed pieces (webhook backlog counts by status against real seeded rows, no-configuration-yet
+    reports null not a fabricated version, reads a real seller-profile version once one exists, reconciliation
+    reports null until a real row exists then surfaces it, cost/margin always explicitly unavailable) and mocked
+    coverage for the cross-org aggregation math (sums grace/refund/dispute/risk-exception/stale-reservation
+    counts correctly across multiple organizations; a revoked or already-expired risk exception is never counted
+    as active; reflects `isLiveMode()`). `metrics.test.ts` (NEW, 4 route tests — admin-only returns the metrics,
+    non-admin/signed-out rejected before any computation runs, a thrown error never leaks its raw message, e.g. an
+    internal hostname/IP, to the client). `BillingOperationsPage.test.tsx` (NEW, 7 tests — every metric section
+    renders correctly once loaded; loading and error states render distinctly, never a crash; "not set"
+    configuration is visually distinct from a real version and never shows a fabricated one; reconciliation and
+    cost/margin both show their explicit "not yet available" copy; a redaction-fixture assertion scanning the
+    full rendered HTML for `sk_(live|test)_`/`whsec_`/`payloadEncrypted`/`stripeEventId` patterns — the
+    "raw payload and secrets never render" requirement, checked mechanically rather than by inspection; the
+    refresh button re-fetches).
+    Live-verified the complete dashboard against the running dev server as the real platform-admin account
+    (`edd_admin@local.com`, the sole id in `ADMIN_USER_IDS`): navigated to `/admin/billing` and confirmed every
+    section renders with REAL live aggregate data — "101 organizations scanned" (every test organization created
+    across this session's earlier live-verification work), Test mode, seller configuration v1 (BUILDERHUNT),
+    0 webhook backlog, 0 organizations in grace, 0 pending refunds, 0 open disputes, 0 active risk exceptions,
+    0 stale credit reservations, both "not yet available" sections for reconciliation/cost-margin, all 6 runbook
+    references, and the pre-existing Seller Configuration form/history rendering unchanged below it. Confirmed the
+    new "Billing ops" nav entry appears in `UserMenu.tsx`'s admin section and points to the right route.
+    `pnpm type-check` (clean) and `pnpm lint` (0 errors — one pre-existing, accepted `react-hooks/set-state-in-effect`
+    warning matching the identical data-loading pattern already used by `SellerConfiguration.tsx`, not a new
+    issue); `pnpm security:boundaries` (0 legacy imports) and `pnpm security:route-coverage` (99 routes — +1 for
+    the new metrics route, 8 allowlisted, valid).
 
 ## 10. Reconciliation, migration, and release
 
