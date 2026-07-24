@@ -17,11 +17,13 @@
  *   STRIPE_SECRET_KEY=sk_test_... pnpm stripe:provision            # create-or-validate (test)
  *   STRIPE_SECRET_KEY=sk_test_... pnpm stripe:provision --validate # read-only, never create
  *   STRIPE_SECRET_KEY=sk_test_... pnpm stripe:provision --write    # provision + patch catalog.ts
- *   STRIPE_SECRET_KEY=sk_test_... pnpm stripe:provision --dry-run  # print the plan, call nothing
+ *   STRIPE_SECRET_KEY=sk_test_... pnpm stripe:provision --dry-run  # read-only lookups only, never mutates
  *
  * The test/live column patched by --write is chosen automatically from the key
  * prefix (sk_test_ -> "test", sk_live_ -> "live"). A live key is refused unless
- * you also pass --allow-live, so you can never accidentally mutate production.
+ * you also pass --allow-live, so you can never accidentally mutate production —
+ * this refusal does NOT apply to --dry-run, which never mutates regardless of
+ * which key is configured.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -33,6 +35,14 @@ import {
   type SubscriptionCatalogEntry,
   type PackCatalogEntry,
 } from '../../src/shared/lib/billing/catalog.ts'
+import {
+  CatalogMismatchError,
+  diffPackPrice,
+  diffSubscriptionPrice,
+  intervalOf,
+  packMetadataOf,
+  subscriptionMetadataOf,
+} from '../../src/shared/lib/billing/catalog-validation.ts'
 
 // Pin to the exact version the installed SDK (stripe@22.3.2) ships, so the
 // webhook endpoint, fixtures, and this provisioner all agree. This is also the
@@ -55,12 +65,14 @@ interface Flags {
   mode: Mode
   write: boolean
   allowLive: boolean
+  /** Set in `main()` once the secret key is known — never derived in `parseFlags`, which only sees argv. */
+  live: boolean
 }
 
 function parseFlags(argv: string[]): Flags {
   const has = (f: string) => argv.includes(f)
   const mode: Mode = has('--validate') ? 'validate' : has('--dry-run') ? 'dry-run' : 'provision'
-  return { mode, write: has('--write'), allowLive: has('--allow-live') }
+  return { mode, write: has('--write'), allowLive: has('--allow-live'), live: false }
 }
 
 // Deterministic product IDs → idempotent retrieve-or-create (Stripe accepts a
@@ -80,17 +92,6 @@ const PRODUCT_NAMES = {
 
 function packProductId(key: string): string {
   return `bh_pack_${key}`
-}
-
-function intervalOf(entry: SubscriptionCatalogEntry): 'month' | 'year' {
-  return entry.interval === 'annual' ? 'year' : 'month'
-}
-
-class MismatchError extends Error {
-  constructor(public key: string, public diffs: string[]) {
-    super(`Existing Stripe object for "${key}" does not match catalog — refusing to mutate:\n  - ${diffs.join('\n  - ')}`)
-    this.name = 'MismatchError'
-  }
 }
 
 async function ensureProduct(
@@ -132,32 +133,6 @@ async function findPriceByLookupKey(stripe: Stripe, key: string): Promise<Stripe
   return res.data[0] ?? null
 }
 
-function validateSubscriptionPrice(entry: SubscriptionCatalogEntry, price: Stripe.Price, productId: string): string[] {
-  const diffs: string[] = []
-  if (price.unit_amount !== entry.amountCents) diffs.push(`unit_amount ${price.unit_amount} ≠ ${entry.amountCents}`)
-  if (price.currency !== 'usd') diffs.push(`currency ${price.currency} ≠ usd`)
-  if (price.tax_behavior !== 'exclusive') diffs.push(`tax_behavior ${price.tax_behavior} ≠ exclusive`)
-  if (price.type !== 'recurring') diffs.push(`type ${price.type} ≠ recurring`)
-  if (price.recurring?.interval !== intervalOf(entry)) diffs.push(`interval ${price.recurring?.interval} ≠ ${intervalOf(entry)}`)
-  if ((price.recurring?.interval_count ?? 1) !== 1) diffs.push(`interval_count ${price.recurring?.interval_count} ≠ 1`)
-  const prodId = typeof price.product === 'string' ? price.product : price.product?.id
-  if (prodId !== productId) diffs.push(`product ${prodId} ≠ ${productId}`)
-  if (!price.active) diffs.push('price is archived/inactive')
-  return diffs
-}
-
-function validatePackPrice(entry: PackCatalogEntry, price: Stripe.Price, productId: string): string[] {
-  const diffs: string[] = []
-  if (price.unit_amount !== entry.amountCents) diffs.push(`unit_amount ${price.unit_amount} ≠ ${entry.amountCents}`)
-  if (price.currency !== 'usd') diffs.push(`currency ${price.currency} ≠ usd`)
-  if (price.tax_behavior !== 'exclusive') diffs.push(`tax_behavior ${price.tax_behavior} ≠ exclusive`)
-  if (price.type !== 'one_time') diffs.push(`type ${price.type} ≠ one_time`)
-  const prodId = typeof price.product === 'string' ? price.product : price.product?.id
-  if (prodId !== productId) diffs.push(`product ${prodId} ≠ ${productId}`)
-  if (!price.active) diffs.push('price is archived/inactive')
-  return diffs
-}
-
 async function ensureSubscriptionPrice(
   stripe: Stripe,
   entry: SubscriptionCatalogEntry,
@@ -168,34 +143,26 @@ async function ensureSubscriptionPrice(
 
   const existing = await findPriceByLookupKey(stripe, entry.key)
   if (existing) {
-    const diffs = validateSubscriptionPrice(entry, existing, productId)
-    if (diffs.length) throw new MismatchError(entry.key, diffs)
+    const diffs = diffSubscriptionPrice(entry, existing, productId, { expectedLivemode: flags.live })
+    if (diffs.length) throw new CatalogMismatchError(entry.key, diffs)
     console.log(`  ok   ${entry.key.padEnd(16)} → ${existing.id} (validated, unchanged)`)
     return existing.id
   }
-  if (flags.mode === 'validate') throw new MismatchError(entry.key, ['no Price exists with this lookup_key (validate mode will not create it)'])
+  if (flags.mode === 'validate') throw new CatalogMismatchError(entry.key, ['no Price exists with this lookup_key (validate mode will not create it)'])
   if (flags.mode === 'dry-run') {
     console.log(`  [dry-run] would CREATE price ${entry.key} = $${(entry.amountCents / 100).toFixed(2)}/${intervalOf(entry)}`)
     return `price_DRYRUN_${entry.key}`
   }
   const created = await stripe.prices.create(
     {
-      currency: 'usd',
+      currency: entry.currency,
       unit_amount: entry.amountCents,
-      tax_behavior: 'exclusive',
+      tax_behavior: entry.taxBehavior,
       lookup_key: entry.key,
       transfer_lookup_key: true,
       product: productId,
       recurring: { interval: intervalOf(entry), interval_count: 1 },
-      metadata: {
-        catalog_key: entry.key,
-        catalog_version: String(entry.version),
-        tier: entry.tier,
-        interval: entry.interval,
-        monthly_credits: String(entry.monthlyCredits),
-        seat_limit: String(entry.seatLimit),
-        kind: 'subscription',
-      },
+      metadata: subscriptionMetadataOf(entry),
     },
     { idempotencyKey: `provision:price:${entry.key}:v${entry.version}` },
   )
@@ -209,31 +176,25 @@ async function ensurePackPrice(stripe: Stripe, entry: PackCatalogEntry, flags: F
 
   const existing = await findPriceByLookupKey(stripe, entry.key)
   if (existing) {
-    const diffs = validatePackPrice(entry, existing, productId)
-    if (diffs.length) throw new MismatchError(entry.key, diffs)
+    const diffs = diffPackPrice(entry, existing, productId, { expectedLivemode: flags.live })
+    if (diffs.length) throw new CatalogMismatchError(entry.key, diffs)
     console.log(`  ok   ${entry.key.padEnd(16)} → ${existing.id} (validated, unchanged)`)
     return existing.id
   }
-  if (flags.mode === 'validate') throw new MismatchError(entry.key, ['no Price exists with this lookup_key (validate mode will not create it)'])
+  if (flags.mode === 'validate') throw new CatalogMismatchError(entry.key, ['no Price exists with this lookup_key (validate mode will not create it)'])
   if (flags.mode === 'dry-run') {
     console.log(`  [dry-run] would CREATE pack price ${entry.key} = $${(entry.amountCents / 100).toFixed(2)} one-time`)
     return `price_DRYRUN_${entry.key}`
   }
   const created = await stripe.prices.create(
     {
-      currency: 'usd',
+      currency: entry.currency,
       unit_amount: entry.amountCents,
-      tax_behavior: 'exclusive',
+      tax_behavior: entry.taxBehavior,
       lookup_key: entry.key,
       transfer_lookup_key: true,
       product: productId,
-      metadata: {
-        catalog_key: entry.key,
-        catalog_version: String(entry.version),
-        credits: String(entry.credits),
-        expiry_months: String(entry.expiryMonths),
-        kind: 'pack',
-      },
+      metadata: packMetadataOf(entry),
     },
     { idempotencyKey: `provision:pack:${entry.key}:v${entry.version}` },
   )
@@ -276,10 +237,14 @@ async function main(): Promise<void> {
     process.exit(1)
   }
   const live = secretKey?.startsWith('sk_live_') ?? false
-  if (live && !flags.allowLive) {
+  // dry-run "prints the plan, calls nothing" — it must never refuse to run just because whichever
+  // key happens to be sitting in the environment is live; the live-key gate only matters once a
+  // real network call (validate/provision) is about to happen.
+  if (live && !flags.allowLive && flags.mode !== 'dry-run') {
     console.error('Refusing to run against a LIVE key without --allow-live. Provision test mode first.')
     process.exit(1)
   }
+  flags.live = live
   const column: 'test' | 'live' = live ? 'live' : 'test'
 
   console.log(`Mode: ${flags.mode} | Stripe env: ${flags.mode === 'dry-run' ? 'n/a' : column} | API version: ${API_VERSION}\n`)
@@ -293,7 +258,7 @@ async function main(): Promise<void> {
     console.log('\nCredit packs:')
     for (const entry of Object.values(PACK_CATALOG)) ids[entry.key] = await ensurePackPrice(stripe, entry, flags)
   } catch (err) {
-    if (err instanceof MismatchError) {
+    if (err instanceof CatalogMismatchError) {
       console.error(`\n✖ ${err.message}`)
       console.error('\nNothing was mutated. Reconcile the divergence (archive & recreate, or fix the catalog) and re-run.')
       process.exit(2)
