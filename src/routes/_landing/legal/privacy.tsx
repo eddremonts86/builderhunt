@@ -44,8 +44,9 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
           <li><strong>Resend</strong> — sends transactional email only (account verification, password reset, organization invitations, smart-alert digests, and account deletion/data-export notices). Falls back to a server-side console log with no third-party call when unconfigured.</li>
           <li><strong>MiniMax M3</strong> — a server-side AI model used to generate persisted, shared artifacts (e.g. profile enrichment summaries, code fingerprints) and to power background AI features. We only send public profile data and your own submitted inputs (e.g. a job description) — never your account email, password, private notes, or other users&apos; data.</li>
           <li><strong>Embedding provider (configured via a server-only vector API)</strong> — converts already-public builder profile text into numeric vectors that power semantic search. No account data is embedded.</li>
+          <li><strong>Stripe</strong> — our payment processor. Billing is not yet enabled for customer accounts: today, Stripe is used only for our own product-catalog setup and to verify the authenticity of Stripe&apos;s webhook messages — no customer payment method, card, or subscription data is sent to or received from Stripe yet. Once billing is enabled, this section will be updated before any customer payment, card, or subscription data is processed.</li>
         </ul>
-        <p className="mt-2">We do not use Sentry, PostHog, or Stripe — no error-tracking, analytics, or payment processor currently has access to your data.</p>
+        <p className="mt-2">We do not use Sentry or PostHog — no error-tracking or analytics provider currently has access to your data.</p>
       </>
     ),
   },
@@ -108,7 +109,7 @@ function PrivacyPage() {
             <Shield className="w-7 h-7 text-bh-accent" aria-hidden="true" />
             Privacy Policy
           </h1>
-          <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-21</p>
+          <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-24</p>
         </header>
         <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
           {SECTIONS.map((s) => (

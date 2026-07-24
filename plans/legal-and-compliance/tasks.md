@@ -172,7 +172,7 @@
     active integration (Postgres, Redis, the 8 public source APIs, Resend, MiniMax M3,
     embeddings) has an entry.
 
-- [ ] **Re-audit the privacy-policy processor list for Stripe (this task's own "we don't use it" claim is now stale)**
+- [x] **Re-audit the privacy-policy processor list for Stripe (this task's own "we don't use it" claim is now stale)**
   - Files: `src/routes/_landing/legal/privacy.tsx`
   - Do: The audit above correctly said "we do not use Stripe" at the time — `package.json` had no
     `stripe` dependency then. That is no longer true: `plans/stripe-billing-platform` has since
@@ -189,10 +189,21 @@
     at that point — payment method data, customer records, subscription state).
   - Verify: same as the audit above — every processor claim maps to a real import/env var/API call
     found via grep, re-run `pnpm type-check && pnpm lint && pnpm test && pnpm build`.
-  - **Flagged, not executed**: modifying live, public-facing legal copy is outside what should be
-    changed autonomously — this task was added to `legal-and-compliance/tasks.md` (properly tracked,
-    not silently done) during `stripe-billing-platform` §10 "Complete operational and privacy
-    runbooks" specifically so a human reviews and makes the actual edit.
+  - Progress (2026-07-24): Executed with the operator's explicit go-ahead in chat (this was
+    previously left unedited specifically because modifying public legal copy needs a human
+    decision, not a silent autonomous edit). Added a `Stripe` bullet to Section 3 (Subprocessors):
+    names it as the payment processor, states billing is not yet enabled for customer accounts,
+    and scopes today's actual usage precisely (our own catalog provisioning + verifying Stripe's
+    webhook signatures) — explicit that no customer payment method/card/subscription data is sent
+    to or received from Stripe yet, and that this section will be updated again before any of that
+    starts (i.e. once `STRIPE_BILLING_ENABLED` is set to `true` in production — still `false`
+    today, unaffected by `stripe-billing-platform`'s `RealBillingProvider` existing in code since
+    that adapter is only reachable once the flag flips). Narrowed the "we do not use X" line to
+    Sentry/PostHog only. Bumped "Last updated" to 2026-07-24; kept `version: v1.0` per the same
+    precedent as the prior processor-list correction (factual gap fix, not a change in how data is
+    actually handled). Verified: `pnpm type-check` and `pnpm eslint` on the touched file clean;
+    live-rendered at `/legal/privacy` in the dev server (dark mode) and confirmed the new bullet
+    reads correctly.
 
 - [x] **Complete the DMCA registration decision and disclosure**
   - Files: `src/routes/_landing/legal/imprint.tsx`
