@@ -22,7 +22,7 @@
         "w5-auth",
         "w6-onboarding"
       ],
-      "status": "dispatched (w4-public:3140, w5-auth:3150, w6-onboarding:3160)",
+      "status": "accepted+verified: public 55/55, auth 16/16+1fixme, onboarding/dashboard 19/19",
       "depends_on": "B"
     }
   },
@@ -43,6 +43,23 @@
     "task_df65786b DONE in-session: createE2EWorkerDatabase and prepare-rls-fixture.mjs no longer mutate shared cluster role passwords. Both now create per-run dedicated login roles (members of the base roles; RLS policies verified to apply via inheritance). CI keeps legacy ALTER behavior (gated on CI env; quality.yml depends on it). Cluster passwords restored to .env values. Verified: probe-before/after + full verify-rls-local via dedicated roles + isolation/fixtures 22/22.",
     "w3-fakes accepted with 9 documented drift notes (vitest-vs-playwright spec placement, E2E-only FakeBillingProvider subclass, unconditional fake under E2E_MODE to preserve no-Stripe-egress, etc.).",
     "Orchestrator added shared seam for Stage C: GET/DELETE /api/e2e/outbox (E2E_MODE-gated, 404 otherwise) + route-coverage allowlist entry. check-route-coverage: 101 routes valid.",
-    "webServer cold-start can exceed the 60s timeout right after route-tree changes; one retry resolves it (documented to minions)."
-  ]
+    "webServer cold-start can exceed the 60s timeout right after route-tree changes; one retry resolves it (documented to minions).",
+    "w5-auth self-reports ok: 16 passed + 1 test.fixme (real product bug: OrganizationInvitationPage bounces freshly signed-in invitee due to stale useSession atom \u2014 chip task_7ee8af98). Second product gap: _dashboard beforeLoad drops ?redirect= on sign-in bounce (chip task_0f55f433). Mechanical verification DEFERRED until w4/w6 finish: concurrent Playwright runs share test-results/ and wipe each other's artifacts.",
+    "w6-onboarding self-reports ok: 19 tests green twice with 2 workers. Product bug: /api/onboarding/complete field mismatch (builderId vs patch.addBuilderId) means onboarding_selected_builders never written via API \u2014 chip task_3250c5de. Coverage gaps recorded: no completed-user redirect on /onboarding/*, client-only save counter, no /api/search/builders fake (specs seed the app's own Redis search cache). Verification deferred until w4-public lands."
+  ],
+  "gate": {
+    "e2e_full_suite": "two consecutive identical clean runs: 189 passed + 1 skipped (2 workers)",
+    "lint": "0 errors (77 pre-existing warnings) after orchestrator fixed require() in harness env.ts",
+    "type_check": "clean",
+    "unit": "172 files / 1723 tests green after orchestrator raised vitest hookTimeout to 120s (advisory-lock queue on disposable-DB files)",
+    "build": "green"
+  },
+  "product_bugs_found": [
+    "stale useSession bounce on OrganizationInvitationPage (chip task_7ee8af98, test.fixme in auth spec)",
+    "_dashboard beforeLoad drops ?redirect= (chip task_0f55f433)",
+    "/api/onboarding/complete builderId vs addBuilderId mismatch (chip task_3250c5de; fix already applied in working tree by another session)",
+    "billing customer creation race on stripe_customer_id unique (chip task_07a6c3d1, intermittent)",
+    "hydration mismatches: signed-in _landing header session race; /explore JSON-LD+og:image origin mismatch; /builders/:id SSR meta reads legacy builders table (documented in w4 specs)"
+  ],
+  "status": "run 1 COMPLETE \u2014 Wave 1 (tasks 1-4) + Wave 2 (tasks 6-8) delivered and gate-verified. Next runs: Wave 3 (tasks 9-13), Wave 4 (14-17), Wave 5 (18-21), Wave 6 (22-24)."
 }

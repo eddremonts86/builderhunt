@@ -17,18 +17,23 @@
  * only interception is the deliberate 500 in the error-state test, where
  * no product path can produce a deterministic failure.
  *
- * Coverage gaps recorded (no src/** changes allowed):
+ * Coverage gaps recorded:
  *   - There is no "completed users are redirected away from /onboarding/*"
  *     behavior in the product — completed users can revisit every step
  *     (asserted below as the actual behavior).
- *   - POST /api/onboarding/complete accepts `builderId` but
- *     `advanceOnboarding` reads `patch.addBuilderId`
- *     (src/shared/lib/onboarding.ts), so `onboarding_selected_builders`
- *     rows are never written through the API and `status.firstBuilderIds`
- *     stays empty. The real tracking (POST /api/builders/track) works, so
- *     the flow itself is unaffected; asserted via organization_builders.
+ *
+ * Regression coverage: POST /api/onboarding/complete and
+ * `advanceOnboarding` (src/shared/lib/onboarding.ts) are aligned on the
+ * `builderId` field, so each onboarding save writes an
+ * `onboarding_selected_builders` row and `status.firstBuilderIds` is
+ * populated — asserted in the full-journey test below.
  */
-import { test, expect, type Browser, type BrowserContext, type Page } from 'playwright/test'
+import { test, expect as baseExpect, type Browser, type BrowserContext, type Page } from 'playwright/test'
+
+// Two vite dev servers compile routes on demand while both workers run —
+// data-dependent assertions can legitimately take longer than the 5s
+// default under that contention. Still bounded, never a fixed delay.
+const expect = baseExpect.configure({ timeout: 15_000 })
 import postgres, { type Sql } from 'postgres'
 import { config as loadEnv } from 'dotenv'
 
@@ -70,6 +75,12 @@ const minted: Principal[] = []
 const seededCacheKeys: string[] = []
 
 test.describe.configure({ mode: 'serial' })
+
+// Cold on-demand vite compiles of a route tree can exceed the 30s default
+// while the sibling worker's server is booting; every test stays bounded.
+test.beforeEach(() => {
+  test.setTimeout(120_000)
+})
 
 test.beforeAll(async () => {
   // Disposable DB + migrations + vite dev server boot — far beyond 30s.
@@ -392,6 +403,16 @@ test('full onboarding journey: welcome → starter query → three saves → suc
     expect(queries.some((q) => q.name === starterQuery)).toBe(true)
     expect(await trackedBuilderCount(journey.organizationId!)).toBe(3)
 
+    // Regression: the route's `builderId` field reaches advanceOnboarding
+    // (they were mismatched once — builderId vs addBuilderId — leaving
+    // firstBuilderIds empty forever), so the three onboarding saves are
+    // recorded in onboarding_selected_builders and surface in the status.
+    expect(status.firstBuilderIds).toHaveLength(3)
+    const seededIds = new Set(builders.map((b) => b.id))
+    for (const ref of status.firstBuilderIds) {
+      expect(seededIds.has(ref), `firstBuilderIds entry ${ref} must be a seeded builder`).toBe(true)
+    }
+
     // Success → dashboard, where the onboarding banner no longer renders
     // for a completed user (its own status fetch resolves first).
     const bannerStatusSeen = page.waitForResponse((r) => r.url().includes('/api/onboarding/status'))
@@ -459,6 +480,9 @@ test('typed query, refresh restoration, and duplicate submissions collapsing to 
     await firstSaveAgain.click()
     await expect(firstSaveAgain).toHaveText(/Saved/)
     expect(await trackedBuilderCount(principal.organizationId!)).toBe(1)
+    // The duplicate also collapses in onboarding_selected_builders (unique
+    // on user + builderRef), so the status still reports one selection.
+    expect((await onboardingStatus(principal)).firstBuilderIds).toHaveLength(1)
 
     assertStrictClean(sp)
   } finally {

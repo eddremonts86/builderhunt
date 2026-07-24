@@ -106,6 +106,13 @@ test.beforeAll(async () => {
   }
 })
 
+// Two parallel per-worker vite dev servers (plus the global one) compile
+// on demand — a first visit to a not-yet-transformed route can exceed the
+// default 30s test budget on a cold run. No fixed delays: just budget.
+test.beforeEach(async () => {
+  test.setTimeout(60_000)
+})
+
 test.afterAll(async () => {
   const h = harness
   if (!h) return

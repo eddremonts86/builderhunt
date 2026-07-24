@@ -34,7 +34,9 @@ export function SignInPage() {
     try {
       const result = await signInEmail({ email, password })
       if (result.data?.user) {
-        navigate({ to: safeRedirect })
+        // `href` (not `to`): the redirect may carry a query string
+        // (e.g. "/settings/team?tab=x") and `to` treats "?" as pathname.
+        navigate({ href: safeRedirect })
       } else {
         setError(result.error?.message ?? 'Sign in failed. Check your credentials and try again.')
       }

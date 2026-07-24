@@ -4,10 +4,12 @@ import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 import { TenantQueryProvider } from '~/shared/components/TenantQueryProvider'
 
 export const Route = createFileRoute('/_dashboard')({
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const user = await getAppAuthSession()
     if (!user.userId) {
-      throw redirect({ to: '/auth/sign-in' })
+      // Preserve the deep link (path + search) so sign-in can return the
+      // user here — SignInPage only honors same-origin "/" paths.
+      throw redirect({ to: '/auth/sign-in', search: { redirect: location.href } })
     }
     return { user }
   },

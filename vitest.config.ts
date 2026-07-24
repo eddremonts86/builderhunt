@@ -21,6 +21,13 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'test/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.vinxi', '.output'],
+    // ~30 test files provision a real disposable Postgres database in
+    // beforeAll, and a cluster-wide advisory lock serializes their
+    // migrations (see src/shared/lib/db/create-disposable-test-database.ts).
+    // With the default 10s hook timeout, whichever files land at the back
+    // of that queue fail spuriously on a loaded machine — the hooks are
+    // waiting on the lock, not hanging.
+    hookTimeout: 120_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json'],

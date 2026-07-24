@@ -19,7 +19,12 @@
  * the loading-gate and forced-500 tests, where no product path can
  * produce those states deterministically.
  */
-import { test, expect, type Browser, type BrowserContext, type Page } from 'playwright/test'
+import { test, expect as baseExpect, type Browser, type BrowserContext, type Page } from 'playwright/test'
+
+// Two vite dev servers compile routes on demand while both workers run —
+// data-dependent assertions can legitimately take longer than the 5s
+// default under that contention. Still bounded, never a fixed delay.
+const expect = baseExpect.configure({ timeout: 15_000 })
 import postgres, { type Sql } from 'postgres'
 import { config as loadEnv } from 'dotenv'
 
@@ -72,6 +77,12 @@ const minted: Principal[] = []
 const seededCacheKeys: string[] = []
 
 test.describe.configure({ mode: 'serial' })
+
+// Cold on-demand vite compiles of a route tree can exceed the 30s default
+// while the sibling worker's server is booting; every test stays bounded.
+test.beforeEach(() => {
+  test.setTimeout(120_000)
+})
 
 test.beforeAll(async () => {
   // Disposable DB + migrations + vite dev server boot — far beyond 30s.

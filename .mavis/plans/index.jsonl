@@ -1,0 +1,1 @@
+{"id": "e2e-suite-run1-2026-07-24", "goal": "Wave 1 harness completion + Wave 2 foundational browser E2E suites", "workers": 6, "retries": 0, "result": "success", "e2e_tests_delivered": "189 passing (from 31 baseline)", "product_bugs_found": 5, "duration": "single session 2026-07-24"}

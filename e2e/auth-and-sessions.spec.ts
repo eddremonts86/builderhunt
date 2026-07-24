@@ -43,7 +43,6 @@ import {
   newApiContext,
   sessionFromStorageState,
   signIn,
-  type E2ECredentials,
 } from './harness/auth'
 import {
   dismissOverlays,
@@ -206,10 +205,25 @@ function allowIncidentsProbe(guard: StrictBrowserGuard, mounts = 1): void {
   for (let i = 0; i < mounts; i++) guard.allowExpectedFailure(/Failed to load resource/)
 }
 
-async function uiSignIn(page: Page, credentials: Pick<E2ECredentials, 'email' | 'password'>): Promise<void> {
+/**
+ * DashboardPage settles three data fetches after mount and logs
+ * "Dashboard load error" if one dies mid-flight — which is exactly what a
+ * reload or sign-out issued while they are still pending looks like
+ * (navigation aborts the fetch). The stats section only renders once
+ * loading finished, so waiting for it means no dashboard fetch is left to
+ * abort. Call before triggering any further navigation from /dashboard.
+ */
+async function waitForDashboardSettled(page: Page): Promise<void> {
+  await page.locator('#stats-heading').waitFor({ state: 'attached' })
+}
+
+/** Accepts a Principal directly (whose fields are nullable) — authenticated fixtures always carry credentials. */
+async function uiSignIn(page: Page, credentials: { email: string | null; password: string | null }): Promise<void> {
+  expect(credentials.email).toBeTruthy()
+  expect(credentials.password).toBeTruthy()
   await gotoHydrated(page, url('/auth/sign-in'))
-  await page.locator('#email').fill(credentials.email)
-  await page.locator('#password').fill(credentials.password)
+  await page.locator('#email').fill(credentials.email!)
+  await page.locator('#password').fill(credentials.password!)
   await page.getByRole('button', { name: 'Sign in' }).click()
 }
 
@@ -363,6 +377,9 @@ test('sign-in via the UI lands on the dashboard and the session survives a reloa
   const before = await pageSession(page)
   expect(before?.userId).toBe(harness.verified.userId)
 
+  // Never reload with dashboard fetches still in flight — the abort would
+  // surface as an app console.error and trip the strict guard.
+  await waitForDashboardSettled(page)
   await page.reload()
   await waitForHydration(page)
   await dismissOverlays(page)
@@ -410,13 +427,16 @@ test('sign-out ends the session for that browser context only — cookie jars ne
     expect(sessionA?.email).toBe(harness.owner.email)
     expect(sessionB?.email).toBe(harness.verified.email)
 
-    // Sign out A through the real menu.
+    // Sign out A through the real menu — after A's dashboard fetches
+    // settled, so the sign-out cannot abort one mid-flight.
+    await waitForDashboardSettled(pageA)
     await pageA.getByRole('button', { name: 'Account menu' }).click()
     await pageA.getByRole('menuitem', { name: 'Sign out' }).click()
     await pageA.waitForURL(/\/auth\/sign-in/)
     expect(await pageSession(pageA)).toBeNull()
 
     // B's session is untouched — including across a full document reload.
+    await waitForDashboardSettled(pageB)
     await pageB.reload()
     await waitForHydration(pageB)
     await dismissOverlays(pageB)
@@ -518,6 +538,34 @@ test('sign-in rejects open redirects and falls back to the dashboard', async ({ 
       await context.close()
     }
   }
+})
+
+test('a signed-out dashboard deep link round-trips through sign-in back to the original page', async ({ page }) => {
+  const guard = expectStrictBrowser(page)
+  // One dashboard-layout mount at /settings/team after the sign-in returns.
+  allowIncidentsProbe(guard, 1)
+
+  // Signed out → the _dashboard guard bounces to sign-in carrying the FULL
+  // original location (path + search) as ?redirect=, not a bare /auth/sign-in.
+  const deepLink = '/settings/team?from=e2e-deep-link'
+  await page.goto(url(deepLink))
+  await page.waitForURL(/\/auth\/sign-in/)
+  await waitForHydration(page)
+  expect(new URL(page.url()).searchParams.get('redirect')).toBe(deepLink)
+
+  await page.locator('#email').fill(harness.owner.email!)
+  await page.locator('#password').fill(harness.owner.password!)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+
+  // Sign-in returns to the original deep link — query string included.
+  await page.waitForURL(/\/settings\/team/)
+  await dismissOverlays(page)
+  const landed = new URL(page.url())
+  expect(landed.pathname).toBe('/settings/team')
+  expect(landed.searchParams.get('from')).toBe('e2e-deep-link')
+
+  guard.assertClean()
+  guard.dispose()
 })
 
 // ---------------------------------------------------------------------------
@@ -713,13 +761,12 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
     // contract holds end to end.
     await page.waitForURL(new RegExp(`/team/invite/${invitationId}`))
 
-    // KNOWN BUG (see the fixme test below): the invitation page then reads a
-    // stale signed-out useSession value and bounces the freshly signed-in
-    // invitee back to /auth/sign-in. The session itself is real — prove it,
-    // then recover the way a real user does: load the invitation link again
-    // in the now-signed-in browser (fresh document, fresh session fetch).
+    // The invitation page must render for the freshly signed-in invitee
+    // WITHOUT a recovery reload: better-auth's client atom briefly reports
+    // a stale signed-out value right after the client-side return, and the
+    // page's guard is required to confirm against the server before
+    // deciding to bounce (regression: stale-useSession redirect bug).
     expect((await pageSession(page))?.email).toBe(harness.verified.email)
-    await gotoHydrated(page, url(`/team/invite/${invitationId}`))
     await dismissOverlays(page)
     await expect(page.getByTestId('invitation-page')).toBeVisible()
     await page.getByTestId('invitation-accept-btn').click()
@@ -740,26 +787,3 @@ test('a signed-out invitation link round-trips through sign-in back to the origi
   }
 })
 
-/**
- * Real product bug, reproduced deterministically against a real per-worker
- * server (three consecutive runs; failure snapshot shows a fresh, empty
- * sign-in form): after the signed-out invitation → sign-in round trip, the
- * router client-side-navigates back to /team/invite/:id, but
- * `OrganizationInvitationPage` (src/modules/auth/components/
- * OrganizationInvitationPage.tsx) guards on better-auth's `useSession`,
- * whose atom still holds the pre-sign-in value at mount (`isPending: false`,
- * `data: null` — the post-sign-in refetch is still in flight). Its redirect
- * effect therefore bounces the freshly signed-in invitee straight back to
- * /auth/sign-in with an empty form. `GET /api/auth/get-session` from the
- * same page returns the signed-in user at that exact moment (asserted in
- * the round-trip test above), so this is purely a stale-client-state guard,
- * not an auth failure. The page needs to wait for a fresh session resolution
- * (or refetch) before deciding the visitor is signed out.
- */
-test.fixme('the sign-in return renders the invitation without needing a second full page load', async () => {
-  // Covered end to end by the round-trip test above EXCEPT the final leg:
-  // asserting `invitation-page` is visible immediately after the sign-in
-  // return (no recovery reload) fails today. Un-fixme once the stale
-  // useSession guard is fixed, then fold this assertion back into the
-  // round-trip test and drop its recovery `gotoHydrated`.
-})

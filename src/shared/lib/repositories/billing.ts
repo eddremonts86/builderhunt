@@ -64,10 +64,17 @@ export async function createBillingCustomer(
 }
 
 /**
- * Same insert, but tolerates losing a race to a concurrent caller inserting the same
- * `(organizationId, livemode)` pair (drizzle/0027's `billing_customers_org_livemode_unique`) —
+ * Same insert, but tolerates losing a race to a concurrent caller inserting the same customer —
  * returns `null` instead of throwing so the caller can re-`findBillingCustomer` and return the
  * row the winner created (`billing/customers.ts`'s `ensureBillingCustomer`).
+ *
+ * The `ON CONFLICT` is deliberately targetless: a concurrent loser conflicts on TWO unique
+ * indexes at once — `billing_customers_org_livemode_unique` AND
+ * `billing_customers_stripe_customer_id_unique` (both callers hold the same `stripeCustomerId`,
+ * because the provider idempotency key is derived from the same `(organizationId, livemode)`
+ * pair) — and Postgres may detect either one first. An arbiter limited to `(organizationId,
+ * livemode)` turns the stripe-id detection order into a raised duplicate-key error instead of
+ * `DO NOTHING`.
  */
 export async function createBillingCustomerIfAbsent(
   transaction: TenantTransaction,
@@ -76,7 +83,7 @@ export async function createBillingCustomerIfAbsent(
   const [row] = await transaction
     .insert(billingCustomers)
     .values(input)
-    .onConflictDoNothing({ target: [billingCustomers.organizationId, billingCustomers.livemode] })
+    .onConflictDoNothing()
     .returning()
   return row ?? null
 }

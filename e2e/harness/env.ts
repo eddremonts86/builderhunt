@@ -17,6 +17,7 @@
  * If any of those seams can be reached without `E2E_MODE=true`, this
  * codebase has an isolation bug — fail loud, not silent.
  */
+import { readFileSync } from 'node:fs'
 import { z } from 'zod'
 
 const e2eEnvSchema = z.object({
@@ -65,8 +66,7 @@ const E2E_ENV_FILE = `${process.cwd()}/e2e/harness/.e2e-run-id`
 
 function loadFromFile(): void {
   try {
-    const fs = require('node:fs') as typeof import('node:fs')
-    const raw = fs.readFileSync(E2E_ENV_FILE, 'utf8')
+    const raw = readFileSync(E2E_ENV_FILE, 'utf8')
     const parsed = JSON.parse(raw) as Record<string, string | undefined>
     for (const [key, value] of Object.entries(parsed)) {
       if (value !== undefined && process.env[key] === undefined) {

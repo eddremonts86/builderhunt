@@ -5,18 +5,47 @@ import { useSession } from '~/shared/lib/auth/client'
 type AcceptState = 'idle' | 'pending' | 'accepted' | 'error'
 
 export function OrganizationInvitationPage({ invitationId }: { invitationId: string }) {
-  const { data: session, isPending: sessionPending } = useSession()
+  const { data: session, isPending: sessionPending, refetch: refetchSession } = useSession()
   const navigate = useNavigate()
   const [state, setState] = React.useState<AcceptState>('idle')
   const [error, setError] = React.useState<string | null>(null)
+  const [redirecting, setRedirecting] = React.useState(false)
 
   // Signed-out visitors go to sign-in and come straight back here to finish
   // accepting — `?redirect=` is sign-in's existing "return to" contract
   // (src/routes/auth/sign-in.tsx), so no new mechanism is needed.
+  //
+  // The client session atom can briefly hold a stale signed-out value
+  // (`isPending: false`, `data: null`) right after the client-side return
+  // from sign-in, while its own refetch is still in flight — so a bare
+  // `!session?.user` check would bounce the freshly signed-in invitee
+  // straight back to the sign-in form. Confirm against the server before
+  // treating the visitor as signed out; when the server says signed in,
+  // refresh the atom and stay.
   React.useEffect(() => {
     if (sessionPending || session?.user) return
-    navigate({ to: '/auth/sign-in', search: { redirect: `/team/invite/${invitationId}` } })
-  }, [sessionPending, session, invitationId, navigate])
+    let cancelled = false
+    void (async () => {
+      let serverUser: unknown
+      try {
+        const res = await fetch('/api/auth/get-session', { credentials: 'include' })
+        const body = res.ok ? ((await res.json().catch(() => null)) as { user?: unknown } | null) : null
+        serverUser = body?.user ?? null
+      } catch {
+        serverUser = null
+      }
+      if (cancelled) return
+      if (serverUser) {
+        refetchSession()
+        return
+      }
+      setRedirecting(true)
+      navigate({ to: '/auth/sign-in', search: { redirect: `/team/invite/${invitationId}` } })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [sessionPending, session, invitationId, navigate, refetchSession])
 
   async function handleAccept() {
     setState('pending')
@@ -47,7 +76,7 @@ export function OrganizationInvitationPage({ invitationId }: { invitationId: str
   if (sessionPending || !session?.user) {
     return (
       <div className="p-8 max-w-md mx-auto text-center text-sm text-bh-text-muted" data-testid="invitation-loading">
-        {sessionPending ? 'Loading…' : 'Redirecting to sign in…'}
+        {redirecting ? 'Redirecting to sign in…' : 'Loading…'}
       </div>
     )
   }

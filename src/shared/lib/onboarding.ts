@@ -108,7 +108,7 @@ export async function advanceOnboarding(
   transaction: TenantTransaction,
   organizationId: string,
   userId: string,
-  patch: { step?: number; firstQueryId?: string; addBuilderId?: string; completed?: boolean },
+  patch: { step?: number; firstQueryId?: string; builderId?: string; completed?: boolean },
 ): Promise<OnboardingStatus> {
   await ensureOnboardingRow(transaction, organizationId, userId)
 
@@ -126,10 +126,10 @@ export async function advanceOnboarding(
     .set(update)
     .where(and(eq(onboardingProgress.userId, userId), eq(onboardingProgress.organizationId, organizationId)))
 
-  if (patch.addBuilderId) {
+  if (patch.builderId) {
     await transaction
       .insert(onboardingSelectedBuilders)
-      .values({ id: randomId(), organizationId, userId, builderRef: patch.addBuilderId })
+      .values({ id: randomId(), organizationId, userId, builderRef: patch.builderId })
       .onConflictDoNothing()
   }
 
