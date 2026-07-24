@@ -12,6 +12,11 @@ interface MembershipScope {
 export interface TenantPrincipalDependencies {
   getSession(request: Request): Promise<SessionScope | null>
   findMembership(userId: string, organizationId: string): Promise<MembershipScope | null>
+  // Fired only for the genuine cross-tenant case (a session claims membership in an org it does
+  // not belong to) — never for the "no active organization selected" case, which isn't a tenant
+  // boundary breach. Awaited before throwing, but purely observational: it can never change
+  // whether the request is rejected (abuse/anomalies.ts's cross-tenant-denial clustering).
+  onMembershipDenied?(context: { userId: string; organizationId: string; requestId: string }): Promise<void> | void
 }
 
 export class TenantAuthorizationError extends Error {
@@ -38,6 +43,11 @@ export async function resolveTenantPrincipal(
 
   const membership = await dependencies.findMembership(session.userId, session.activeOrganizationId)
   if (!membership || !organizationRoles.has(membership.role as OrganizationRole)) {
+    await dependencies.onMembershipDenied?.({
+      userId: session.userId,
+      organizationId: session.activeOrganizationId,
+      requestId: requestIdFrom(request),
+    })
     throw new TenantAuthorizationError('Active organization membership is invalid', 403)
   }
 
@@ -50,11 +60,16 @@ export async function resolveTenantPrincipal(
 }
 
 export async function requireTenantPrincipal(request: Request): Promise<TenantPrincipal> {
-  const [{ and, eq }, { auth }, { authDb }, { organizationMembers }] = await Promise.all([
+  const [{ and, eq }, { auth }, { authDb }, { organizationMembers }, { env }, { rateLimit }, { emitSecurityAudit }, { consoleSecurityAuditSink }, { checkCrossTenantDenialAndEmit }] = await Promise.all([
     import('drizzle-orm'),
     import('./better-auth'),
     import('../db/auth-db'),
     import('../db/schema'),
+    import('../env'),
+    import('../rate-limit'),
+    import('../security/audit'),
+    import('../security/audit-sink'),
+    import('../abuse/anomalies'),
   ])
 
   return resolveTenantPrincipal(request, {
@@ -76,6 +91,31 @@ export async function requireTenantPrincipal(request: Request): Promise<TenantPr
         ))
         .limit(1)
       return membership ?? null
+    },
+    onMembershipDenied: async ({ userId, organizationId, requestId }) => {
+      await emitSecurityAudit({
+        organizationId,
+        actorUserId: userId,
+        action: 'tenant.membership_check',
+        targetType: 'organization',
+        targetId: organizationId,
+        result: 'denied',
+        requestId,
+      }, consoleSecurityAuditSink)
+      await checkCrossTenantDenialAndEmit(
+        { userId, organizationId, requestId },
+        {
+          gate: async (gateUserId) => {
+            const result = await rateLimit(
+              'cross-tenant-denied',
+              gateUserId,
+              env.ABUSE_CROSS_TENANT_DENIAL_THRESHOLD,
+              env.ABUSE_CROSS_TENANT_DENIAL_WINDOW_MINUTES * 60,
+            )
+            return { allowed: result.allowed }
+          },
+        },
+      )
     },
   })
 }

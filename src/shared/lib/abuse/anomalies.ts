@@ -174,6 +174,46 @@ export async function checkConcurrentDistinctIpAndEmit(
   return flagged
 }
 
+/**
+ * A pluggable "has this user exceeded N occurrences of X within the configured window?" gate —
+ * production wiring backs this with the existing Redis/in-memory `rateLimit()` counter (already
+ * battle-tested for exactly this shape of question) rather than a new counting mechanism.
+ */
+export interface CrossTenantDenialGate {
+  gate(userId: string): Promise<{ allowed: boolean }>
+}
+
+/** True once the gate reports the cluster threshold has been exceeded for this user. */
+export function detectDenialCluster(gateResult: { allowed: boolean }): boolean {
+  return !gateResult.allowed
+}
+
+/**
+ * Emits `cross_tenant_denied` when a user's tenant-membership-denied attempts cluster within the
+ * configured window (per `ABUSE_CROSS_TENANT_DENIAL_THRESHOLD`/`_WINDOW_MINUTES`). Detection only —
+ * this never influences the underlying authorization decision, which stays owned entirely by
+ * `resolveTenantPrincipal` (security-and-multitenancy).
+ */
+export async function checkCrossTenantDenialAndEmit(
+  context: AnomalyEmitContext,
+  gate: CrossTenantDenialGate,
+  deps?: EmitAbuseSignalDeps,
+): Promise<boolean> {
+  const gateResult = await gate.gate(context.userId)
+  const flagged = detectDenialCluster(gateResult)
+  if (flagged) {
+    await emitAbuseSignal({
+      type: 'cross_tenant_denied',
+      severity: 'medium',
+      userId: context.userId,
+      organizationId: context.organizationId ?? undefined,
+      requestId: context.requestId,
+      details: {},
+    }, deps)
+  }
+  return flagged
+}
+
 /** Emits `seat_overuse` if today's usage for a metered action exceeds its per-seat daily cap. */
 export async function checkSeatOveruseAndEmit(
   input: SeatOveruseInput & { action: string },

@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   checkConcurrentDistinctIpAndEmit,
+  checkCrossTenantDenialAndEmit,
   checkImpossibleTravelAndEmit,
   checkMidSessionUaChangeAndEmit,
   checkSeatOveruseAndEmit,
   detectConcurrentDistinctIp,
+  detectDenialCluster,
   detectImpossibleTravel,
   detectMidSessionUaChange,
   detectSeatOveruse,
@@ -131,6 +133,15 @@ describe('isAllowlistedAsn', () => {
   })
 })
 
+describe('detectDenialCluster', () => {
+  it.each([
+    [{ allowed: true }, false],
+    [{ allowed: false }, true],
+  ])('detectDenialCluster(%o) -> %s', (gateResult, expected) => {
+    expect(detectDenialCluster(gateResult)).toBe(expected)
+  })
+})
+
 describe('check*AndEmit wrappers', () => {
   it('checkImpossibleTravelAndEmit suppresses emission for an allowlisted ASN (VPN provider) even when travel is impossible', async () => {
     const sink = { write: vi.fn() }
@@ -189,5 +200,30 @@ describe('check*AndEmit wrappers', () => {
     )
     expect(flagged).toBe(true)
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ type: 'seat_overuse', details: expect.objectContaining({ action: 'searches' }) }))
+  })
+
+  it('checkCrossTenantDenialAndEmit does not emit while the denial-cluster gate still allows (below threshold)', async () => {
+    const insert = vi.fn()
+    const gate = { gate: vi.fn().mockResolvedValue({ allowed: true }) }
+    const flagged = await checkCrossTenantDenialAndEmit(
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      gate,
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(gate.gate).toHaveBeenCalledWith('user-1')
+    expect(flagged).toBe(false)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('checkCrossTenantDenialAndEmit emits cross_tenant_denied once the gate reports the cluster threshold exceeded', async () => {
+    const insert = vi.fn()
+    const gate = { gate: vi.fn().mockResolvedValue({ allowed: false }) }
+    const flagged = await checkCrossTenantDenialAndEmit(
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      gate,
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(flagged).toBe(true)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ type: 'cross_tenant_denied', severity: 'medium', userId: 'user-1', organizationId: 'org-1' }))
   })
 })

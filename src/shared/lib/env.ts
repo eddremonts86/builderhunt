@@ -100,6 +100,11 @@ const zodEnv = z.object({
   // Comma-separated ASNs (e.g. known corporate/VPN egress ranges) to suppress IP-churn signals for —
   // per the OWASP NAT/proxy caveat, shared-IP alone must never be treated as suspicious on its own.
   ABUSE_ALLOWLIST_ASNS: z.string().default(''),
+  // How many tenant-membership-denied attempts a single user may rack up within the window before
+  // it's treated as a cluster (probing for another tenant's data) rather than isolated noise (an
+  // expired invite link, a stale bookmark) — emits `cross_tenant_denied`, detection only.
+  ABUSE_CROSS_TENANT_DENIAL_THRESHOLD: z.coerce.number().int().positive().default(5),
+  ABUSE_CROSS_TENANT_DENIAL_WINDOW_MINUTES: z.coerce.number().int().positive().default(10),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
