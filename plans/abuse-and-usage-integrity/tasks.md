@@ -86,7 +86,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     exercises existing HTTP routes only and this task added no new routes, so it has nothing new to
     cover yet (will be exercised again once Phase 1+ routes read/write these tables).
 
-- [ ] **Abuse lib: signals + device fingerprint**
+- [x] **Abuse lib: signals + device fingerprint**
   - Files: `src/shared/lib/abuse/signals.ts`, `src/shared/lib/abuse/signals.test.ts`,
     `src/shared/lib/abuse/device.ts`, `src/shared/lib/abuse/device.test.ts`
   - Do: `AbuseSignalType`/`AbuseSignal` types + `emitAbuseSignal()` layered over `emitSecurityAudit`
@@ -94,13 +94,42 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     first-party `bh_did` cookie issue/read + `computeDeviceHash(cookie, uaFamily, salt)` (coarse UA
     family only; no raw fingerprint).
   - Verify: unit tests for redaction, stable hashing, and UA-family bucketing; `pnpm test`.
+  - Progress (2026-07-24): `emitAbuseSignal()` writes both a security-audit log line (via the
+    existing `emitSecurityAudit`, `details` already redacted by its own `redactLogValue` call — no
+    new redaction code needed) and a durable `abuse_signals` row via `repositories/abuse-signals.ts`
+    (task below). Uses `result: 'allowed'` on the audit event since Phases 0-4 are observe-only —
+    the flagged action always proceeds, this call only records that it happened; Phase 5's
+    enforcement decision is a separate concern. `hashSessionId(sessionId, salt)` exported from
+    `signals.ts` for Phase 1's `session-guard.ts` to use — same caller-supplies-the-secret HMAC
+    convention as `security/feed-capability.ts`'s `sign()`, so it stays a pure, easily testable
+    function instead of reading `env` directly. `device.ts`: `DEVICE_COOKIE_NAME`/
+    `issueDeviceCookieValue()`/`detectUaFamily()` (coarse family bucketing — Edge/Chrome-iOS/
+    Firefox-iOS checked before generic Chrome/Firefox/Safari, since all of them also match on
+    `Safari/` or `Chrome/` substrings) /`computeDeviceHash()`. 20 tests
+    (`device.test.ts` + `signals.test.ts`), including one asserting the raw cookie/session value
+    never appears in its own hash. `pnpm test`, `pnpm tsc --noEmit`, `pnpm eslint` all clean.
 
-- [ ] **Repositories for the new tables**
+- [x] **Repositories for the new tables**
   - Files: `src/shared/lib/repositories/abuse-signals.ts`, `.../user-devices.ts`,
     `.../account-risk.ts`, `.../seat-usage.ts` (+ sibling `*.test.ts`)
   - Do: tenant-scoped writes via `withTenantContext` for `seat_usage_daily`; account/worker-scoped
     writes for the rest through the correct role client. DTO allowlists only.
   - Verify: `pnpm test`; boundary check `pnpm security:boundaries` (no global `db` import).
+  - Progress (2026-07-24): `user-devices.ts` and `seat-usage.ts` take a `TenantTransaction` directly
+    (no new plumbing — `withTenantContext` already sets `app.user_id` alongside
+    `app.organization_id` on every call). `account-risk.ts` adds `withWorkerUser(userId, operation,
+    db?)`, the per-subject analogue of `repositories/billing-worker.ts`'s `withWorkerOrganization`:
+    a background risk-scoring sweep processes one user's row per transaction via
+    `set_config('app.user_id', ...)`, matching that file's per-tenant-batch precedent exactly.
+    `abuse-signals.ts` takes a plain `PostgresJsDatabase | typeof workerDb` with no context to set
+    (system-operational, no RLS). `seat-usage.ts`'s `incrementSeatUsage` upserts additively
+    (`count = count + $n`) rather than overwriting, so repeated calls accumulate instead of
+    clobbering. 16 real-disposable-database integration tests (A/B isolation, missing-row, upsert-
+    vs-insert, additive increment across distinct actions) following the exact
+    `repositories/billing.test.ts` precedent (superuser connection — RLS enforcement itself is
+    proven separately by `verify-rls-local.mjs`, not duplicated here). `pnpm test`,
+    `pnpm security:boundaries` ("0 legacy imports tracked"), `pnpm tsc --noEmit`, `pnpm eslint` all
+    clean.
 
 ## Phase 1 — Concurrent-session control + active-sessions UX (A1)
 
