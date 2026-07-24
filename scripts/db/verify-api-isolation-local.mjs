@@ -952,6 +952,161 @@ async function checkWorkerIsolation() {
   record('worker: run completed without throwing for either tenant', Array.isArray(result.errors), `errors=${JSON.stringify(result.errors)}`)
 }
 
+// abuse-and-usage-integrity Phase 4B task 1, "Verify built credit-ledger invariants under the real
+// runtime role (G3/G5/G9/G10)". Unlike reservations.test.ts/credits.test.ts (which only ever run
+// against the disposable-DB OWNER connection — docs/operations/database-roles.md explicitly warns
+// "never test RLS as the owner and treat that as evidence"), this exercises the real restricted
+// builderhunt_worker role, with RLS/grants actually enforced. builderhunt_app has ZERO INSERT/UPDATE
+// grant on any of the four credit-ledger tables (drizzle/0028_billing_rls_grants.sql) — only the
+// worker role can ever mutate this state — so "as builderhunt_app" in the task's own wording is read
+// as "as the real restricted runtime role that actually owns this write path," i.e. builderhunt_worker.
+// No route exists yet calling reserveCredits/settleReservation/grantCredits (feature-authorization.ts
+// is written but not wired to any endpoint), so unlike every other check in this file there is no
+// route handler to import — this calls the library functions directly through withWorkerOrganization,
+// the same real drizzle transaction + RLS context every actual writer of this state will use.
+async function checkCreditLedgerInvariantsUnderWorkerRole() {
+  // Two dedicated orgs, not one — the reservation-race balance assertion (below) needs an
+  // unambiguous, single-grant pool; sharing an org with the monthly-window-grant race would let a
+  // SECOND grant land in the same pool between the two checks and inflate the available balance,
+  // which is exactly what happened the first time this was written against a real Postgres (two
+  // 60-unit reservations both "succeeded" against what looked like a 100-unit balance — not a
+  // product bug: an earlier 50-unit window grant in the same org had legitimately raised the real
+  // pool to 150, and the allocator correctly spent exactly 120 of it, leaving 30 — the assertion
+  // was wrong, not the allocator).
+  const orgId = 'iso-credit-org-a'
+  const reserveOrgId = 'iso-credit-org-reserve'
+  await owner`
+    insert into organizations (id, name, slug, metadata, created_at)
+    values
+      (${orgId}, 'Credit Ledger Org', 'iso-credit-org-a', '{}', now()),
+      (${reserveOrgId}, 'Credit Ledger Reserve Org', 'iso-credit-org-reserve', '{}', now())
+    on conflict (id) do nothing
+  `
+
+  const { withWorkerOrganization } = await import('../../src/shared/lib/repositories/billing-worker.ts')
+  const { grantCredits } = await import('../../src/shared/lib/billing/credits.ts')
+  const { reserveCredits, settleReservation } = await import('../../src/shared/lib/billing/reservations.ts')
+
+  const farFuture = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
+
+  // --- G9: negative grant units rejected before any row is written ---
+  let negativeGrantRejected = false
+  try {
+    await withWorkerOrganization(orgId, (tx) => grantCredits(tx, {
+      grantId: crypto.randomUUID(), ledgerEntryId: crypto.randomUUID(), organizationId: orgId,
+      source: 'operator_trial', units: -5, expiresAt: farFuture, idempotencyKey: crypto.randomUUID(),
+    }))
+  } catch (error) {
+    negativeGrantRejected = error?.code === 'invalid_units'
+  }
+  record('credit ledger (worker role, G9): negative grant units rejected', negativeGrantRejected, String(negativeGrantRejected))
+
+  // Seed a real 100-unit grant, as the worker role, to reserve against below.
+  const seededGrant = await withWorkerOrganization(orgId, (tx) => grantCredits(tx, {
+    grantId: crypto.randomUUID(), ledgerEntryId: crypto.randomUUID(), organizationId: orgId,
+    source: 'operator_trial', units: 100, expiresAt: farFuture, idempotencyKey: crypto.randomUUID(),
+  }))
+  record(
+    'credit ledger (worker role): seed grant created with 100 remaining units',
+    seededGrant.grant.remainingUnits === 100,
+    JSON.stringify(seededGrant.grant),
+  )
+
+  // --- G5: monthly-window grant uniqueness holds under REAL concurrency (existing coverage is
+  // sequential-only — credits.test.ts:79-91) ---
+  const windowKey = `iso-worker-sub-x:window-1`
+  const windowRace = await Promise.allSettled([
+    withWorkerOrganization(orgId, (tx) => grantCredits(tx, {
+      grantId: crypto.randomUUID(), ledgerEntryId: crypto.randomUUID(), organizationId: orgId,
+      source: 'subscription_annual_window', monthlyWindowKey: windowKey, units: 50,
+      expiresAt: farFuture, idempotencyKey: crypto.randomUUID(),
+    })),
+    withWorkerOrganization(orgId, (tx) => grantCredits(tx, {
+      grantId: crypto.randomUUID(), ledgerEntryId: crypto.randomUUID(), organizationId: orgId,
+      source: 'subscription_annual_window', monthlyWindowKey: windowKey, units: 50,
+      expiresAt: farFuture, idempotencyKey: crypto.randomUUID(),
+    })),
+  ])
+  const windowOutcomes = windowRace.map((r) => r.status)
+  record(
+    'credit ledger (worker role, G5): concurrent same-window grants — exactly one persists',
+    windowOutcomes.filter((s) => s === 'fulfilled').length === 1,
+    JSON.stringify(windowOutcomes),
+  )
+  const windowRows = await owner`select id from billing_credit_grants where monthly_window_key = ${windowKey}`
+  record('credit ledger (worker role, G5): only one grant row exists for the contested window', windowRows.length === 1, JSON.stringify(windowRows.map((r) => r.id)))
+
+  // Dedicated grant, dedicated org — nothing else can ever be allocated from this pool.
+  await withWorkerOrganization(reserveOrgId, (tx) => grantCredits(tx, {
+    grantId: crypto.randomUUID(), ledgerEntryId: crypto.randomUUID(), organizationId: reserveOrgId,
+    source: 'operator_trial', units: 100, expiresAt: farFuture, idempotencyKey: crypto.randomUUID(),
+  }))
+
+  // --- G3/G9: concurrent reserveCredits against a shared real balance never overspends ---
+  const reserveRace = await Promise.allSettled([
+    withWorkerOrganization(reserveOrgId, (tx) => reserveCredits(tx, {
+      reservationId: crypto.randomUUID(), organizationId: reserveOrgId, operation: 'iso_check',
+      rateCardVersion: 1, idempotencyKey: crypto.randomUUID(), maximumUnits: 60, maxDurationSeconds: 300,
+    })),
+    withWorkerOrganization(reserveOrgId, (tx) => reserveCredits(tx, {
+      reservationId: crypto.randomUUID(), organizationId: reserveOrgId, operation: 'iso_check',
+      rateCardVersion: 1, idempotencyKey: crypto.randomUUID(), maximumUnits: 60, maxDurationSeconds: 300,
+    })),
+  ])
+  const reserveOutcomes = reserveRace.map((r) => r.status)
+  record(
+    'credit ledger (worker role, G3/G9): concurrent 60+60 reservations against a 100-unit balance — exactly one succeeds',
+    reserveOutcomes.filter((s) => s === 'fulfilled').length === 1,
+    JSON.stringify(reserveOutcomes),
+  )
+  const balanceRows = await owner`select coalesce(sum(remaining_units), 0)::int as total from billing_credit_grants where organization_id = ${reserveOrgId}`
+  record(
+    'credit ledger (worker role, G3/G9): remaining balance never went negative or was double-spent (100 - 60 = 40)',
+    balanceRows[0]?.total === 40,
+    JSON.stringify(balanceRows[0]),
+  )
+
+  const successfulReservation = reserveRace.find((r) => r.status === 'fulfilled')?.value?.reservation
+
+  // --- G3: settleReservation refuses actualUnits beyond what was reserved (over-settlement) ---
+  let overSettlementRejected = false
+  if (successfulReservation) {
+    try {
+      await withWorkerOrganization(reserveOrgId, (tx) => settleReservation(tx, {
+        organizationId: reserveOrgId, reservationId: successfulReservation.id,
+        actualUnits: successfulReservation.maximumUnits + 1,
+        idempotencyKey: crypto.randomUUID(), settlementGraceSeconds: 60,
+      }))
+    } catch (error) {
+      overSettlementRejected = error?.code === 'over_settlement'
+    }
+  }
+  record(
+    'credit ledger (worker role, G3): settleReservation refuses actualUnits > maximumUnits',
+    overSettlementRejected,
+    String(overSettlementRejected),
+  )
+
+  // --- G10: a replayed settlement idempotency key returns the cached result, never double-consumes ---
+  let replayConsistent = false
+  if (successfulReservation) {
+    const settleKey = crypto.randomUUID()
+    const settleInput = {
+      organizationId: reserveOrgId, reservationId: successfulReservation.id,
+      actualUnits: Math.floor(successfulReservation.maximumUnits / 2),
+      idempotencyKey: settleKey, settlementGraceSeconds: 60,
+    }
+    const first = await withWorkerOrganization(reserveOrgId, (tx) => settleReservation(tx, settleInput))
+    const second = await withWorkerOrganization(reserveOrgId, (tx) => settleReservation(tx, settleInput))
+    replayConsistent = second.replayed === true && second.reservation.settledUnits === first.reservation.settledUnits
+  }
+  record(
+    'credit ledger (worker role, G10): replayed settlement idempotency key returns the cached result (no double-consume)',
+    replayConsistent,
+    String(replayConsistent),
+  )
+}
+
 async function main() {
   await seed()
   await checkSavedQueries()
@@ -970,6 +1125,7 @@ async function main() {
   await checkRecommendationsScoping()
   await checkAccountExportPrivacy()
   await checkWorkerIsolation()
+  await checkCreditLedgerInvariantsUnderWorkerRole()
   // Run last: checkAdminContentManagement approves a plan-request for B
   // (legitimately recording admin A's id in B's own plan-change history) and
   // checkMeSubjectRoutes requests/cancels a real account deletion — both

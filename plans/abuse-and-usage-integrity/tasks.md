@@ -653,7 +653,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 4B — Credit / premium-feature abuse (G)
 
-- [ ] **Verify built credit-ledger invariants under the real runtime role (G3/G5/G9/G10)**
+- [x] **Verify built credit-ledger invariants under the real runtime role (G3/G5/G9/G10)**
   - Files: `scripts/db/verify-api-isolation-local.mjs`, `src/shared/lib/billing/reservations.test.ts`,
     `src/shared/lib/repositories/billing-ledger.ts`
   - Do: add adversarial checks as `builderhunt_app` — concurrent `reserveCredits` never overspends;
@@ -662,6 +662,72 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     settle more than reserved and `actualUnits` is server-derived (not client-widened).
   - Verify: `pnpm test` (new reservation/ledger cases) + `pnpm test:api-isolation:local` green;
     document each verified invariant.
+  - Progress: **Researched first** (Explore sub-agent, full read of `reservations.ts`/
+    `reservations.test.ts`/`billing-ledger.ts`/`verify-api-isolation-local.mjs`) before writing
+    anything, to find the REAL gap rather than duplicate existing coverage. Finding: `reserveCredits`/
+    `settleReservation`/`grantCredits`/etc. already had thorough business-logic tests (including the
+    exact `Promise.all` concurrent-overspend race, the over-settlement rejection, and idempotency
+    replay with ledger-state assertions, not just a `replayed` flag) — but **every one of them only
+    ever ran against the disposable-DB migration-OWNER connection**, never `builderhunt_worker` (the
+    only role that can actually write these tables — `builderhunt_app` has zero INSERT/UPDATE grant
+    on any of the four credit-ledger tables per `drizzle/0028_billing_rls_grants.sql`, so the task's
+    own "as `builderhunt_app`" is read as "as the real restricted role," i.e. `builderhunt_worker`).
+    `docs/operations/database-roles.md` itself says *"never test RLS as the owner and treat that as
+    evidence"* — this task's entire job was closing exactly that gap, not inventing new business
+    logic. No route calls `reserveCredits`/`settleReservation` yet (`feature-authorization.ts` isn't
+    wired to any endpoint), so unlike every other check in `verify-api-isolation-local.mjs` there's no
+    route handler to import — new `checkCreditLedgerInvariantsUnderWorkerRole()` calls the library
+    functions directly through `withWorkerOrganization` (the real drizzle transaction + RLS context
+    every actual writer will use), asserting: G9 negative-units rejection, a real 100-unit grant
+    creation, G5 monthly-window uniqueness under genuine `Promise.allSettled` concurrency (not just
+    sequential, per `credits.test.ts:79-91`), G3/G9 concurrent-reservation overspend prevention, G3
+    over-settlement rejection, and G10 settlement-replay cache consistency.
+    **Ran for real** — not just written, actually executed against a real Postgres with real RLS
+    enforced. Running `prepare-rls-fixture.mjs`/`test:api-isolation:local` locally would normally risk
+    mutating the shared dev cluster's role passwords (this plan's standing caution from Phase 3), so
+    spun up a throwaway, fully isolated `pgvector/pgvector:pg16` Docker container (matching CI's exact
+    recipe from `.github/workflows/quality.yml`) instead — zero risk to the concurrent session sharing
+    the persistent local Postgres. Discovered along the way that `prepare-rls-fixture.mjs` already
+    guards against mutating real global role passwords outside `CI=true`/an explicit opt-in env var
+    (creates `_rls_ci`-suffixed roles instead) — this was likely already true when the earlier Phase 3
+    caution was written and simply hadn't been rediscovered; worth remembering this makes
+    `test:rls:local` itself safer to run locally than previously assumed, IF pointed at a database
+    matching the `builderhunt_security_test_*` naming guard (still never the persistent dev database).
+    **A real bug surfaced by the first run — in the new test, not the product**: the concurrent
+    reserveCredits race initially reported BOTH 60-unit reservations succeeding against what looked
+    like a 100-unit balance. Direct inspection of the actual rows showed why: the reservation-race
+    check shared an organization with the just-completed monthly-window-grant race, which had legitimately
+    added a second 50-unit grant to the same pool (100 + 50 = 150 available — both 60-unit reservations,
+    totalling 120, correctly fit, and the allocator correctly left exactly 30 total remaining across
+    both grants). The allocator was correct; the test's assumption of an isolated 100-unit pool was
+    not. Fixed by giving the reservation-race its own dedicated organization with its own dedicated
+    grant — reran clean afterward. Documenting this because it's exactly the kind of race-condition
+    reasoning error this task exists to catch in the *product* — catching it in the *test* first is
+    the harness working as intended.
+    **Result: all 8 new checks + all 86 pre-existing checks passed (94/94, exit 0)** against the real
+    `builderhunt_worker`/`builderhunt_app` roles with RLS/grants genuinely enforced — G3, G5, G9, and
+    G10 all independently confirmed to hold under the actual restricted runtime role, not just the
+    disposable-DB owner. Also generated the missing `drizzle/meta/0045_snapshot.json` (the
+    `0045_user_devices_worker_read_grant.sql` migration from Phase 3 was hand-authored without
+    `drizzle-kit generate`, matching precedent for RLS-only migrations, but its snapshot file was
+    never created) — `pnpm exec drizzle-kit check`/`verify-migration-integrity.mjs` both failed
+    until this was added; fixed by copying `0044_snapshot.json`'s schema shape forward with a new
+    `id`/`prevId` chain (no actual schema difference, since 0045 only adds RLS policy + GRANT
+    statements, which drizzle-kit's snapshot format doesn't track) and regenerating
+    `migration-hashes.json`. Both integrity checks pass again.
+    **Strengthened `reservations.test.ts`** (the task's own file list) with the two secondary gaps
+    the research surfaced: the existing `reserveCredits` replay test now also asserts the grant's
+    `remainingUnits` reflects exactly one allocation (170, not double-decremented), not just the
+    `replayed` flag; and a new test in the concurrency `describe` block races two settle calls with
+    **different** idempotency keys (no replay short-circuit possible) against the same 80-unit
+    reservation, proving the `state !== 'reserved'` guard — not just the idempotency lookup — holds
+    under genuine concurrency (exactly one of two racing 80-unit settles succeeds, the other sees
+    "no longer reserved," total remaining is 20 as expected, never a double-consume).
+    Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean, `pnpm vitest run
+    src/shared/lib/billing/reservations.test.ts src/shared/lib/billing/credits.test.ts
+    --no-file-parallelism` → 35/35 green, `pnpm exec drizzle-kit check` clean,
+    `node scripts/db/verify-migration-integrity.mjs` valid, `pnpm security:boundaries` → 0 legacy
+    imports. Removed the throwaway Docker container afterward.
 
 - [ ] **Per-seat credit sub-budget + `pool_drain` signal (G2)**
   - Files: `src/shared/lib/billing/reservations.ts`, `src/shared/lib/repositories/seat-usage.ts`,

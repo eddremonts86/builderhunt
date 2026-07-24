@@ -83,7 +83,7 @@ describe('reserveCredits', () => {
 
   it('replays the original reservation for a duplicate idempotency key instead of reserving twice', async () => {
     const orgId = await freshOrg()
-    await seedGrant(orgId, 200, FAR_FUTURE())
+    const grantId = await seedGrant(orgId, 200, FAR_FUTURE())
     const idempotencyKey = uniqueId('idem')
     const input = {
       reservationId: uniqueId('reservation'), organizationId: orgId, operation: 'ai_task',
@@ -93,6 +93,10 @@ describe('reserveCredits', () => {
     const second = await db.transaction((tx) => reserveCredits(tx, { ...input, reservationId: uniqueId('reservation') }))
     expect(second.replayed).toBe(true)
     expect(second.reservation.id).toBe(first.reservation.id)
+    // Not just the `replayed` flag — confirm the grant was only ever decremented once (200 - 30 =
+    // 170), i.e. the replay genuinely skipped a second allocation rather than merely reporting one.
+    const grant = await db.transaction((tx) => findCreditGrant(tx, orgId, grantId))
+    expect(grant?.remainingUnits).toBe(170)
   })
 
   it('splits allocation across multiple grants, earliest expiry first', async () => {
@@ -382,5 +386,42 @@ describe('concurrent reservations cannot overspend a shared balance', () => {
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, orgId))
     const totalRemaining = grants.reduce((sum, grant) => sum + grant.remainingUnits, 0)
     expect(totalRemaining).toBe(40)
+  })
+
+  it('two DIFFERENT idempotency-keyed settle calls racing the same reservation cannot jointly over-consume it', async () => {
+    // The existing replay tests above only ever race the SAME idempotency key sequentially (a
+    // crash/retry). This races two DISTINCT keys concurrently — no replay short-circuit is
+    // possible, so the `state !== 'reserved'` guard (whichever settle commits first flips the
+    // reservation to `settled`) is what has to hold under genuine concurrency, not just the
+    // idempotency lookup.
+    const orgId = await freshOrg()
+    await db.transaction((tx) => grantCredits(tx, {
+      grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId: orgId, source: 'promotional',
+      units: 100, expiresAt: FAR_FUTURE(), idempotencyKey: uniqueId('idem'),
+    }))
+    const { reservation } = await db.transaction((tx) => reserveCredits(tx, {
+      reservationId: uniqueId('reservation'), organizationId: orgId, operation: 'ai_task', rateCardVersion: 1,
+      idempotencyKey: uniqueId('idem'), maximumUnits: 80, maxDurationSeconds: 300,
+    }))
+
+    const attemptSettle = (actualUnits: number) => db.transaction((tx) => settleReservation(tx, {
+      organizationId: orgId, reservationId: reservation.id, actualUnits,
+      idempotencyKey: uniqueId('idem'), settlementGraceSeconds: 60,
+    })).catch((error: unknown) => error)
+
+    const [first, second] = await Promise.all([attemptSettle(80), attemptSettle(80)])
+    const results = [first, second]
+    const succeeded = results.filter((result) => !(result instanceof Error))
+    const failed = results.filter((result) => result instanceof ReservationError)
+
+    // Exactly one settle wins the race; the other must see "no longer reserved" — never both
+    // consuming 80 units each (160 total) against an 80-unit reservation.
+    expect(succeeded).toHaveLength(1)
+    expect(failed).toHaveLength(1)
+
+    const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, orgId))
+    const totalRemaining = grants.reduce((sum, grant) => sum + grant.remainingUnits, 0)
+    // 100 granted, 80 reserved+consumed by the single winning settle, 20 never reserved at all.
+    expect(totalRemaining).toBe(20)
   })
 })

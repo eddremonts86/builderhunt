@@ -180,6 +180,10 @@
     "0044_abuse_usage_integrity_rls_grants": {
       "sql": "46e8e02502a0fd980d62636a34c055771ebede37dcf2c1dfc6cc81dbf3a2cf1c",
       "snapshot": "0bd39e1776e9821242f8fbc71e0a8ef2a4006cd1b8ded75be1b202b9d73ef6d5"
+    },
+    "0045_user_devices_worker_read_grant": {
+      "sql": "e9a8b2bce370662c4e0855fb49d368d77bb4bac6981d5f788403aeed6f10a173",
+      "snapshot": "7f70fbb9d14b4bf652da8e621241c439b17ca13ae52e06aab1c29efc8b314dc9"
     }
   }
 }
