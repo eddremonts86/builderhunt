@@ -161,3 +161,39 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
     expect(parsed.STRIPE_WEBHOOK_SECRET_PREVIOUS).toBe('whsec_previous123')
   })
 })
+
+describe('abuse-and-usage-integrity environment (plan: abuse-and-usage-integrity)', () => {
+  it('defaults to observe-only with every threshold set, when nothing is configured', () => {
+    const parsed = parseEnvironment(productionEnvironment)
+    expect(parsed.ABUSE_ENFORCEMENT_MODE).toBe('observe')
+    expect(parsed.SIGNUP_REQUIRE_VERIFIED_EMAIL).toBe('false')
+    expect(parsed.SIGNUP_BLOCK_DISPOSABLE_EMAILS).toBe('false')
+    expect(parsed.ABUSE_ALLOWLIST_ASNS).toBe('')
+    expect(parsed).toMatchObject({
+      SESSION_MAX_CONCURRENT_FREE: 2,
+      SESSION_MAX_CONCURRENT_PRO: 3,
+      SESSION_MAX_CONCURRENT_TEAM_PER_SEAT: 2,
+      SESSION_IDLE_TIMEOUT_MINUTES: 10080,
+      SESSION_ABSOLUTE_TIMEOUT_HOURS: 720,
+      SEAT_DAILY_SEARCHES: 200,
+      SEAT_DAILY_REVEALS: 100,
+      SEAT_DAILY_EXPORTS: 20,
+      SEAT_DAILY_MESSAGES: 100,
+    })
+  })
+
+  it('rejects an enforcement mode outside the fixed enum, never permissively coercing', () => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ABUSE_ENFORCEMENT_MODE: 'block' })).toThrow()
+  })
+
+  it('coerces numeric thresholds from string env values, and rejects a non-numeric override', () => {
+    const parsed = parseEnvironment({ ...productionEnvironment, SESSION_MAX_CONCURRENT_FREE: '5' })
+    expect(parsed.SESSION_MAX_CONCURRENT_FREE).toBe(5)
+    expect(() => parseEnvironment({ ...productionEnvironment, SESSION_MAX_CONCURRENT_FREE: 'unlimited' })).toThrow()
+  })
+
+  it('accepts warn/enforce explicitly, never assuming observe silently means the same thing', () => {
+    expect(parseEnvironment({ ...productionEnvironment, ABUSE_ENFORCEMENT_MODE: 'warn' }).ABUSE_ENFORCEMENT_MODE).toBe('warn')
+    expect(parseEnvironment({ ...productionEnvironment, ABUSE_ENFORCEMENT_MODE: 'enforce' }).ABUSE_ENFORCEMENT_MODE).toBe('enforce')
+  })
+})

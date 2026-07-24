@@ -77,6 +77,29 @@ const zodEnv = z.object({
   // AES-256-GCM key (64 hex chars = 32 bytes) for the minimized webhook payload retained in
   // `billing_webhook_events.payload_encrypted` (spec.md §Operations: "encrypted where retained").
   WEBHOOK_PAYLOAD_ENCRYPTION_KEY: z.string().optional(),
+  // Plan: abuse-and-usage-integrity. All optional, fail-open to the safe default so unset config
+  // never changes existing behavior — `observe` only emits signals, nothing is ever blocked or
+  // throttled until an operator deliberately moves this past `observe` (see Phase 5's
+  // `resolveEnforcement()`, not built yet as of this gate).
+  ABUSE_ENFORCEMENT_MODE: z.enum(['observe', 'warn', 'enforce']).default('observe'),
+  // Concurrent-session caps, one per tier — defaults sized to comfortably allow a single person
+  // signed in on a laptop + phone at once, not to police normal multi-device use.
+  SESSION_MAX_CONCURRENT_FREE: z.coerce.number().int().positive().default(2),
+  SESSION_MAX_CONCURRENT_PRO: z.coerce.number().int().positive().default(3),
+  SESSION_MAX_CONCURRENT_TEAM_PER_SEAT: z.coerce.number().int().positive().default(2),
+  SESSION_IDLE_TIMEOUT_MINUTES: z.coerce.number().int().positive().default(10080), // 7 days
+  SESSION_ABSOLUTE_TIMEOUT_HOURS: z.coerce.number().int().positive().default(720), // 30 days
+  // Per-seat, per-UTC-day ceilings on the core actions that were never metered at all before this
+  // plan (unlike AI credits, which the existing ledger already governs).
+  SEAT_DAILY_SEARCHES: z.coerce.number().int().positive().default(200),
+  SEAT_DAILY_REVEALS: z.coerce.number().int().positive().default(100),
+  SEAT_DAILY_EXPORTS: z.coerce.number().int().positive().default(20),
+  SEAT_DAILY_MESSAGES: z.coerce.number().int().positive().default(100),
+  SIGNUP_REQUIRE_VERIFIED_EMAIL: z.enum(['true', 'false']).default('false'),
+  SIGNUP_BLOCK_DISPOSABLE_EMAILS: z.enum(['true', 'false']).default('false'),
+  // Comma-separated ASNs (e.g. known corporate/VPN egress ranges) to suppress IP-churn signals for —
+  // per the OWASP NAT/proxy caveat, shared-IP alone must never be treated as suspicious on its own.
+  ABUSE_ALLOWLIST_ASNS: z.string().default(''),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

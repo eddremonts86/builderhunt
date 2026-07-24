@@ -15,7 +15,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 0 — Foundations, flags, telemetry (observe-only)
 
-- [ ] **Add abuse env gate and thresholds**
+- [x] **Add abuse env gate and thresholds**
   - Files: `src/shared/lib/env.ts`
   - Do: add optional `ABUSE_ENFORCEMENT_MODE` (`observe`|`warn`|`enforce`, default `observe`),
     `SESSION_MAX_CONCURRENT_FREE`/`_PRO`/`_TEAM_PER_SEAT`, `SESSION_IDLE_TIMEOUT_MINUTES`,
@@ -24,6 +24,20 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     optional with safe defaults so an unset config keeps current behavior.
   - Verify: `pnpm dev` boots with none set; add an `env.test.ts` case asserting defaults resolve to
     `observe` and enforcement is off.
+  - Progress (2026-07-24): all 12 vars added to `zodEnv` in `env.ts`, matching the plan's spec.md
+    guidance exactly (`SESSION_MAX_CONCURRENT_*` sized to "allow laptop+phone"). Defaults:
+    `ABUSE_ENFORCEMENT_MODE=observe`, concurrency caps 2/3/2 (free/pro/team-per-seat), idle timeout
+    7 days, absolute timeout 30 days, seat-daily ceilings 200/100/20/100
+    (searches/reveals/exports/messages), both signup booleans `false`, ASN allowlist empty. The
+    plan's own credit-related vars (`CREDIT_SEAT_DAILY_UNITS` etc.) belong to Phase 4B tasks, not
+    this one — deliberately not added here. Documented every var in `.env.example` with its default
+    and rationale. Rather than create a fresh `env.test.ts` (this codebase's existing convention is
+    `env.security.test.ts` for all `env.ts` validation coverage — confirmed by reading it first),
+    added a new `describe` block there: defaults-resolve-correctly, enum rejects an invalid value
+    (no permissive coercion), numeric coercion from string env values (and rejects a non-numeric
+    override), and explicit warn/enforce acceptance. 37/37 tests pass (`env.security.test.ts`).
+    Verified `pnpm dev` still boots correctly with none of these set (real running dev server,
+    `200` on `/`). Full sweep clean: `pnpm type-check`, `pnpm eslint` on both touched files.
 
 - [ ] **Create abuse-integrity tables migration (`0030`)**
   - Files: `drizzle/0030_abuse_usage_integrity.sql`, `src/shared/lib/db/schema.ts`,
