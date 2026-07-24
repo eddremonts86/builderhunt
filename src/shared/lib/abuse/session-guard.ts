@@ -58,3 +58,26 @@ export function selectSessionToRevoke(sessions: RevocationCandidateSession[]): R
   if (sessions.length === 0) return null
   return sessions.reduce((oldest, session) => (session.createdAt < oldest.createdAt ? session : oldest))
 }
+
+export interface SessionTimeoutConfig {
+  expiresIn: number
+  updateAge: number
+}
+
+/**
+ * Maps the two abuse-and-usage-integrity env vars onto better-auth's native
+ * session model: `expiresIn` (seconds) is the outer bound a session can go
+ * without being refreshed before it dies outright — driven by
+ * `SESSION_ABSOLUTE_TIMEOUT_HOURS`; `updateAge` (seconds) is how much of that
+ * window must remain before an active request bumps `expiresAt` forward by
+ * `expiresIn` again — driven by `SESSION_IDLE_TIMEOUT_MINUTES`, whose default
+ * (7 days) reproduces better-auth's own built-in `updateAge` default. This is
+ * a sliding window, not a hard "even a daily user gets logged out on day N"
+ * cap — see `better-auth.ts`'s comment where this is wired in.
+ */
+export function resolveSessionTimeoutConfig(absoluteTimeoutHours: number, idleTimeoutMinutes: number): SessionTimeoutConfig {
+  return {
+    expiresIn: absoluteTimeoutHours * 60 * 60,
+    updateAge: idleTimeoutMinutes * 60,
+  }
+}

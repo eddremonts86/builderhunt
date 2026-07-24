@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { evaluateSessionConcurrency, resolveSessionCap, selectSessionToRevoke } from './session-guard'
+import {
+  evaluateSessionConcurrency,
+  resolveSessionCap,
+  resolveSessionTimeoutConfig,
+  selectSessionToRevoke,
+} from './session-guard'
 
 const CONFIG = { free: 2, pro: 3, teamPerSeat: 2 }
 
@@ -71,5 +76,22 @@ describe('selectSessionToRevoke', () => {
     const first = { id: 's1', token: 't1', createdAt: tiedAt }
     const second = { id: 's2', token: 't2', createdAt: tiedAt }
     expect(selectSessionToRevoke([first, second])).toEqual(first)
+  })
+})
+
+describe('resolveSessionTimeoutConfig', () => {
+  it('converts the default 30-day absolute / 7-day idle env values to seconds', () => {
+    const result = resolveSessionTimeoutConfig(720, 10080)
+    expect(result).toEqual({ expiresIn: 30 * 24 * 60 * 60, updateAge: 7 * 24 * 60 * 60 })
+  })
+
+  it('converts arbitrary hour/minute values independently', () => {
+    const result = resolveSessionTimeoutConfig(1, 30)
+    expect(result).toEqual({ expiresIn: 3600, updateAge: 1800 })
+  })
+
+  it('produces a 7-day updateAge matching better-auth\'s own built-in default when the idle env is at its default', () => {
+    const result = resolveSessionTimeoutConfig(720, 10080)
+    expect(result.updateAge).toBe(60 * 60 * 24 * 7)
   })
 })

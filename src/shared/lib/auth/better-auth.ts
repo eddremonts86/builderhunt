@@ -15,6 +15,7 @@ import {
 import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/shared/lib/email'
 import { env } from '~/shared/lib/env'
 import { handleSessionAfter, handleSessionBefore, type SessionCookieAdapter, type SessionDeviceResult } from '~/shared/lib/abuse/session-hooks'
+import { resolveSessionTimeoutConfig } from '~/shared/lib/abuse/session-guard'
 import { organizationOptions } from './organization-options'
 import { ensurePersonalOrganization, pickDefaultActiveOrganizationId } from './personal-organization'
 
@@ -56,6 +57,20 @@ export const auth = betterAuth({
       await sendResetPasswordEmail(user.email, url)
     },
   },
+  // abuse-and-usage-integrity plan, Phase 1 "Idle + absolute session timeouts".
+  // better-auth's own model: `expiresIn` is the max lifetime a session can go
+  // without being refreshed before it dies outright; `updateAge` is how much
+  // of that window must remain before an active request bumps `expiresAt`
+  // forward by `expiresIn` again. Mapped so `SESSION_IDLE_TIMEOUT_MINUTES`
+  // (default 7 days) drives `updateAge` — matching better-auth's own 7-day
+  // default when the env var is left at its default — and
+  // `SESSION_ABSOLUTE_TIMEOUT_HOURS` (default 30 days) drives `expiresIn`,
+  // the outer bound. This is a sliding window, not a hard "even a daily user
+  // gets logged out on day 30" cap — a continuously active session keeps
+  // refreshing indefinitely, same as any `expiresIn`/`updateAge` session
+  // config. Both env vars are validated numbers with safe defaults
+  // (`env.ts`), so this is always well-defined.
+  session: resolveSessionTimeoutConfig(env.SESSION_ABSOLUTE_TIMEOUT_HOURS, env.SESSION_IDLE_TIMEOUT_MINUTES),
   databaseHooks: {
     user: {
       create: {

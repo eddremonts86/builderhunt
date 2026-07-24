@@ -191,11 +191,25 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `pnpm tsc --noEmit`, `pnpm eslint`, `pnpm vitest run src/shared/lib/abuse` (33/33),
     `pnpm security:boundaries` all clean.
 
-- [ ] **Idle + absolute session timeouts**
+- [x] **Idle + absolute session timeouts**
   - Files: `src/shared/lib/auth/better-auth.ts`
   - Do: set `session.expiresIn`/`updateAge` from `SESSION_ABSOLUTE_TIMEOUT_HOURS`/idle env; keep
     current 7-day default when unset.
   - Verify: config unit test; manual check that idle past the window forces re-auth.
+  - Progress (2026-07-24): added `resolveSessionTimeoutConfig(absoluteHours, idleMinutes)` to
+    `session-guard.ts` (pure, 3 new unit tests) mapping `SESSION_ABSOLUTE_TIMEOUT_HOURS` →
+    better-auth's `expiresIn` (the outer bound before a session dies outright if never refreshed)
+    and `SESSION_IDLE_TIMEOUT_MINUTES` → `updateAge` (how much of that window must remain before an
+    active request bumps `expiresAt` forward again) — traced better-auth's refresh logic
+    (`api/routes/session.mjs`) to confirm this is a sliding window, not a hard "even a daily user
+    gets logged out on day 30" cap; documented that nuance directly in `better-auth.ts` so it isn't
+    overclaimed. The idle default (7 days) reproduces better-auth's own built-in `updateAge` default
+    exactly, satisfying "keep current 7-day default when unset." Live-verified: restarted the dev
+    server (env/config changes need a full restart, not picked up by HMR — same as task 2's
+    finding), logged in via `curl`, and confirmed the new session's real `expires_at - created_at`
+    in Postgres is exactly 30 days (was 7 by better-auth's un-configured default before this change).
+    `pnpm tsc --noEmit`, `pnpm eslint`, `pnpm vitest run src/shared/lib/abuse` (36/36),
+    `pnpm security:boundaries` all clean.
 
 - [ ] **`/settings/security` — active sessions + logbook**
   - Files: `src/routes/_dashboard/settings/security.tsx`,
