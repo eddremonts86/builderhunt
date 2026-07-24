@@ -46,7 +46,7 @@
 
 | Decision | Value | Owner | Evidence |
 | --- | --- | --- | --- |
-| Support/refund contact | `support@builderhunt.dev` (seller profile) / `hello@builderhunt.dev` (pricing page FAQ) | confirmed, but see note | `billing_seller_profiles` v2 + `pricing.tsx` FAQ — two different addresses are in use; confirm whether that's intentional (e.g. general vs. billing-specific) or should be consolidated to one monitored inbox |
+| Support/refund contact | `hello@builderhunt.dev` — consolidated from two different addresses in use | confirmed 2026-07-24 | `billing_seller_profiles` v3 (`supportEmail`) now matches `pricing.tsx`, `roadmap.tsx`, and `legal/imprint.tsx`, which already used this address site-wide |
 | Statement descriptor | `BUILDERHUNT` | confirmed | `billing_seller_profiles` v2 |
 | Financial record retention | _not decided_ | _pending_ | Danish bookkeeping law requires invoice/accounting records for 5 years; confirm exact schedule before relying on any backup-rotation policy that could delete within that window |
 | Incident/kill-switch owner | Edd Remonts | confirmed 2026-07-24 | has Stripe Dashboard + deploy access |
@@ -88,10 +88,17 @@ is a real, outward-facing infrastructure change and needs explicit sign-off befo
       `fast-check`-based property tests in `credits.test.ts`/`reservations.test.ts`.
 - [x] Tenant A/B isolation and platform/organization role matrix pass under real RLS roles —
       `billing-tenant-isolation.test.ts`, verified against a real disposable Postgres.
-- [ ] **Monthly and annual Test Clock lifecycles pass — NOT YET DONE.** No `testClock`/`test_clock`
-      usage exists anywhere in this codebase (verified via grep). This is a genuine, still-open gap,
-      not documentation drift — real subscription renewal/upgrade/downgrade/grace/cancellation timing
-      has only ever been unit-tested with fake clocks, never against Stripe's real Test Clock API.
+- [x] Test Clock lifecycle certified 2026-07-24 — `test-clock-lifecycle.test.ts`, run for real against
+      Stripe's `test_helpers.test_clocks` API (never mocked): creation → real renewal (2nd paid
+      invoice) → upgrade (real proration on the upcoming invoice) → downgrade → cancellation, plus a
+      dedicated Jan-31-start subscription proving Stripe's real month-end anniversary rule (renews
+      Feb 28 in a non-leap year, not Mar 3 or any drifted date), plus a dedicated case proving a real
+      declined renewal (via `pm_card_authenticationRequired`, since this account disables raw-card
+      Tokens API access) puts the subscription into `past_due` — the actual assumption the seven-day
+      dunning code relies on. Discovered along the way that this project's original catalog-provision
+      test sandbox no longer exists / was reset (its Price IDs 404'd against every currently-known
+      test key) — re-provisioned via `pnpm stripe:provision --write` against the current sandbox,
+      `catalog.ts`'s `test` column now points at real, live Price IDs again.
 - [x] Refund, dispute, and auto-recharge cap scenarios pass — `refunds.test.ts`, `disputes.test.ts`,
       auto-recharge tests from §8 tasks 2 and 4.
 - [x] Daily reconciliation detects and repairs an injected mismatch — `reconciliation.test.ts` injects
