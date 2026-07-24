@@ -1,7 +1,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { can, toInvitationSummaryDto, toOrganizationSummaryDto } from './contracts'
+import { can, canManageTeamSettings, toInvitationSummaryDto, toOrganizationSummaryDto } from './contracts'
 
 describe('organization contracts', () => {
   it('maps an organization record + role into a summary DTO with no extra fields', () => {
@@ -33,6 +33,12 @@ describe('organization contracts', () => {
 
   it('re-exports can() from the authorization module', () => {
     expect(typeof can).toBe('function')
+  })
+
+  it('canManageTeamSettings allows owner/admin only, never a plain member', () => {
+    expect(canManageTeamSettings('owner')).toBe(true)
+    expect(canManageTeamSettings('admin')).toBe(true)
+    expect(canManageTeamSettings('member')).toBe(false)
   })
 })
 

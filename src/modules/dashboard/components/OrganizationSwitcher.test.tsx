@@ -14,20 +14,31 @@ const organizations = [
   { id: 'org-b', name: 'Personal workspace', slug: 'personal-org-b', role: 'owner' as const, isPersonal: true },
 ]
 
+const memberOrganizations = [
+  { id: 'org-a', name: 'Acme', slug: 'acme', role: 'member' as const, isPersonal: false },
+]
+
+type OrganizationFixture = typeof organizations[number] | typeof memberOrganizations[number]
+
 let container: HTMLDivElement | null = null
 let root: Root | null = null
 let fetchMock: ReturnType<typeof vi.fn>
+let switchShouldFail = false
+let organizationsResponse: OrganizationFixture[] = organizations
 
 beforeEach(() => {
+  switchShouldFail = false
+  organizationsResponse = organizations
   fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     if (url.endsWith('/api/organizations') && (init?.method ?? 'GET') === 'GET') {
-      return new Response(JSON.stringify(organizations), { status: 200 })
+      return new Response(JSON.stringify(organizationsResponse), { status: 200 })
     }
     if (url.endsWith('/api/organizations') && init?.method === 'POST') {
       return new Response(JSON.stringify({ id: 'org-new', name: 'New Team', slug: 'new-team-abc123' }), { status: 200 })
     }
     if (url.endsWith('/api/organizations/switch')) {
+      if (switchShouldFail) return new Response(JSON.stringify({ error: 'Membership no longer active' }), { status: 403 })
       return new Response(JSON.stringify({ ok: true }), { status: 200 })
     }
     return new Response('not found', { status: 404 })
@@ -136,5 +147,77 @@ describe('OrganizationSwitcher', () => {
     const switchCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/organizations/switch'))
     expect(switchCall).toBeDefined()
     expect(JSON.parse((switchCall![1] as RequestInit).body as string)).toEqual({ organizationId: 'org-new' })
+  })
+
+  it('renders nothing when the caller belongs to zero organizations', async () => {
+    organizationsResponse = []
+    await mount('org-a')
+    expect(container!.querySelector('button[aria-label="Switch organization"]')).toBeNull()
+  })
+
+  it('surfaces a real switch failure without changing the active organization', async () => {
+    switchShouldFail = true
+    await mount('org-a')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    act(() => trigger.click())
+
+    const items = document.querySelectorAll('[role="menuitemradio"]')
+    const otherItem = Array.from(items).find((el) => el.textContent?.includes('Personal workspace')) as HTMLButtonElement
+    await act(async () => {
+      otherItem.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Membership no longer active')
+    // The panel is still open (never closed on failure) and the trigger still shows the ORIGINAL
+    // active org — a failed switch must never look like it silently succeeded.
+    expect(trigger.textContent).toContain('Acme')
+  })
+
+  it('falls back to a neutral label when the active organization is no longer in the caller\'s membership list (e.g. just removed)', async () => {
+    // Simulates the active org having been removed from under the user between session-read and
+    // this fetch — a real, if rare, race (membership revoked mid-session).
+    await mount('org-removed')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    expect(trigger).not.toBeNull()
+    expect(trigger.textContent).toContain('Select organization')
+  })
+
+  it('closes the open panel on Escape (keyboard operation)', async () => {
+    await mount('org-a')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    act(() => trigger.click())
+    expect(document.querySelector('[role="menu"]')).not.toBeNull()
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+  })
+
+  it('shows a "manage" link only for owner/admin organizations, never for a plain member', async () => {
+    organizationsResponse = memberOrganizations
+    await mount('org-a')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    act(() => trigger.click())
+
+    expect(document.querySelector('button[aria-label="Manage Acme"]')).toBeNull()
+  })
+
+  it('switching to manage a non-active organization switches into it first, then navigates to team settings', async () => {
+    await mount('org-a')
+    const trigger = container!.querySelector('button[aria-label="Switch organization"]') as HTMLButtonElement
+    act(() => trigger.click())
+
+    const manageButton = document.querySelector('button[aria-label="Manage Personal workspace"]') as HTMLButtonElement
+    expect(manageButton).not.toBeNull()
+    await act(async () => {
+      manageButton.click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const switchCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/api/organizations/switch'))
+    expect(switchCall).toBeDefined()
+    expect(JSON.parse((switchCall![1] as RequestInit).body as string)).toEqual({ organizationId: 'org-b' })
   })
 })

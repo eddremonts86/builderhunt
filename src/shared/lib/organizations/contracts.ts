@@ -224,3 +224,8 @@ export function isOwnerRole(role: OrganizationRole): boolean {
   return role === 'owner'
 }
 
+/** Whether a "manage this team" affordance (e.g. a shortcut into `/settings/team`) should be shown for a given membership role — a plain member never gets one, since every mutating control on that page is already hidden from them. */
+export function canManageTeamSettings(role: OrganizationRole): boolean {
+  return role === 'owner' || role === 'admin'
+}
+

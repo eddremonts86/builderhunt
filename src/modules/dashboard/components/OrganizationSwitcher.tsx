@@ -2,18 +2,19 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { Building2, Check, ChevronDown, Plus } from 'lucide-react'
+import { Building2, Check, ChevronDown, Plus, Settings } from 'lucide-react'
 import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 import { Input } from '~/components/ui'
+import { canManageTeamSettings, type OrganizationRole } from '~/shared/lib/organizations/contracts'
 
 interface OrganizationSummary {
   id: string
   name: string
   slug: string
-  role: 'owner' | 'admin' | 'member'
+  role: OrganizationRole
   isPersonal: boolean
 }
 
@@ -78,9 +79,10 @@ export function OrganizationSwitcher() {
     }
   }, [open, reposition])
 
-  async function handleSwitch(organizationId: string) {
+  async function handleSwitch(organizationId: string, destination: string = '/dashboard') {
     if (organizationId === activeOrganizationId) {
       setOpen(false)
+      if (destination !== '/dashboard') navigate({ to: destination })
       return
     }
     setSwitchingTo(organizationId)
@@ -102,12 +104,21 @@ export function OrganizationSwitcher() {
       // before anything renders under the new organization.
       await router.invalidate()
       setOpen(false)
-      navigate({ to: '/dashboard' })
+      navigate({ to: destination })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to switch organization')
     } finally {
       setSwitchingTo(null)
     }
+  }
+
+  /** "Manage" is entitlement-gated (owner/admin only, matching contracts.ts's own role matrix) — a
+   * plain member never sees it, since `/settings/team` itself hides every mutating control from
+   * them anyway. Switches into the target organization first (if it isn't already active) so the
+   * settings page never renders under the wrong tenant context. */
+  function handleManage(event: React.MouseEvent, organizationId: string) {
+    event.stopPropagation()
+    void handleSwitch(organizationId, '/settings/team')
   }
 
   async function handleCreate(event: React.FormEvent) {
@@ -172,30 +183,44 @@ export function OrganizationSwitcher() {
           {error && <p className="px-3 py-1.5 text-xs text-bh-danger" role="alert">{error}</p>}
           {organizations.map((org) => {
             const isActive = org.id === activeOrganizationId
+            const canManage = canManageTeamSettings(org.role)
             return (
-              <button
-                key={org.id}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isActive}
-                disabled={switchingTo !== null}
-                onClick={() => handleSwitch(org.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-left transition-colors duration-150 disabled:opacity-50 ${
-                  isActive
-                    ? 'text-bh-accent bg-bh-accent-soft font-semibold'
-                    : 'text-bh-text-muted hover:text-bh-text hover:bg-bh-bg-alt'
-                }`}
-              >
-                <span className="flex-1 truncate">
-                  {org.name}
-                  <span className="block text-[11px] font-normal text-bh-text-dim">
-                    {org.isPersonal ? 'Personal' : org.role}
+              <div key={org.id} className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={isActive}
+                  disabled={switchingTo !== null}
+                  onClick={() => handleSwitch(org.id)}
+                  className={`flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-left transition-colors duration-150 disabled:opacity-50 ${
+                    isActive
+                      ? 'text-bh-accent bg-bh-accent-soft font-semibold'
+                      : 'text-bh-text-muted hover:text-bh-text hover:bg-bh-bg-alt'
+                  }`}
+                >
+                  <span className="flex-1 truncate">
+                    {org.name}
+                    <span className="block text-[11px] font-normal text-bh-text-dim">
+                      {org.isPersonal ? 'Personal' : org.role}
+                    </span>
                   </span>
-                </span>
-                {switchingTo === org.id
-                  ? <span className="spinner" aria-hidden="true" />
-                  : isActive && <Check className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-              </button>
+                  {switchingTo === org.id
+                    ? <span className="spinner" aria-hidden="true" />
+                    : isActive && <Check className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    disabled={switchingTo !== null}
+                    onClick={(event) => handleManage(event, org.id)}
+                    aria-label={`Manage ${org.name}`}
+                    title="Manage team"
+                    className="shrink-0 p-2 rounded-xl text-bh-text-dim hover:text-bh-text hover:bg-bh-bg-alt transition-colors duration-150 disabled:opacity-50"
+                  >
+                    <Settings className="w-3.5 h-3.5" aria-hidden="true" />
+                  </button>
+                )}
+              </div>
             )
           })}
 
