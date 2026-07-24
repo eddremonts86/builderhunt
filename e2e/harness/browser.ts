@@ -1,0 +1,261 @@
+/**
+ * Wave 1 Task 3 — strict browser behavior harness.
+ *
+ * Replaces fixed hydration delays (`networkidle` + `waitForTimeout`) with a
+ * semantic signal, and gives specs collectors that fail loud on browser
+ * misbehavior instead of silently swallowing it.
+ *
+ * Hydration: `src/shared/components/HydrationSignal.tsx` (mounted in
+ * `src/routes/-root-components.tsx`) sets `data-hydrated="true"` on `<html>`
+ * from a `useEffect`, which React flushes only after the hydration commit.
+ * Waiting for that attribute waits for React to actually be live — the exact
+ * condition the old 400ms buffer was guessing at.
+ */
+import { expect, type Browser, type BrowserContext, type Download, type Page } from 'playwright/test'
+
+/** Keep in sync with HYDRATED_ATTRIBUTE in src/shared/components/HydrationSignal.tsx. */
+const HYDRATED_SELECTOR = 'html[data-hydrated="true"]'
+
+/**
+ * Waits for the HydrationSignal marker — no fixed delays. Safe to call
+ * after `page.goto`/`page.reload` (both resolve only once the new
+ * document is committed, so the attribute check runs against the fresh
+ * document, never a stale one).
+ */
+export async function waitForHydration(page: Page): Promise<void> {
+  await page.locator(HYDRATED_SELECTOR).waitFor({ state: 'attached' })
+}
+
+/** Navigate and wait for React hydration to complete. */
+export async function gotoHydrated(page: Page, url: string): Promise<void> {
+  await page.goto(url)
+  await waitForHydration(page)
+}
+
+/**
+ * Dismisses the first-visit ToS modal and cookie banner if either is
+ * showing — both are one-time-per-session UI unrelated to what most specs
+ * check, and both otherwise intercept pointer events on everything behind
+ * them.
+ *
+ * The ToS modal (`src/shared/components/TosModal.tsx`) decides whether to
+ * render only after the document's own `GET /api/consent` settles — a
+ * modal that is not visible *yet* may still be coming. Resource Timing
+ * records that fetch, so wait for it semantically (never a fixed delay),
+ * let React commit whatever the response triggered, then act on the
+ * final overlay state. The cookie banner decides synchronously from
+ * localStorage in a mount effect, which has already flushed by the time
+ * the hydration marker is set — its current visibility is already final.
+ */
+export async function dismissOverlays(page: Page): Promise<void> {
+  // Ask the same endpoint the modal itself consults. If this session
+  // needs ToS acceptance, the modal WILL render on any document that
+  // loaded while signed in (the only situation this harness supports —
+  // call dismissOverlays after a full-page navigation, not after a
+  // client-side one), so let the click auto-wait for it. A plain
+  // isVisible() probe here would race the modal's own consent fetch.
+  type ConsentStatus = { userId: string | null; needsAcceptance: string[] }
+  const status = await page
+    .evaluate(async () => {
+      const response = await fetch('/api/consent', { credentials: 'include' })
+      return (await response.json()) as ConsentStatus
+    })
+    .catch((): ConsentStatus | null => null)
+  if (status?.userId && status.needsAcceptance.includes('tos')) {
+    await page.getByTestId('tos-modal-accept').click()
+  }
+  const cookies = page.getByTestId('cookie-banner-essential')
+  if (await cookies.isVisible().catch(() => false)) await cookies.click()
+}
+
+export interface StrictBrowserGuard {
+  /** Violations recorded so far, in arrival order. */
+  readonly violations: string[]
+  /**
+   * One-shot opt-out: the next single violation matching `matcher` is
+   * consumed instead of recorded. Register once per expected occurrence.
+   */
+  allowExpectedFailure(matcher: RegExp | string): void
+  /** Fails the test if any unexpected violation was recorded. */
+  assertClean(): void
+  /** Detach all listeners (e.g. before intentionally noisy teardown). */
+  dispose(): void
+}
+
+/**
+ * Installs strict collectors on `page` that treat the following as
+ * violations:
+ *   - any `console.error` emitted by the page
+ *   - any uncaught page error (`pageerror`)
+ *   - any failed same-origin request (network-level failure; deliberate
+ *     `net::ERR_ABORTED` cancellations from client-side navigation are
+ *     exempt — aborting in-flight requests on navigation is normal
+ *     browser behavior, not app misbehavior)
+ *   - any third-party egress: a request whose origin differs from the
+ *     app's own origin (recorded when the request is *attempted* — it
+ *     does not need to succeed to count)
+ *
+ * Call `assertClean()` at the end of the test (or wherever strictness
+ * should be enforced); use `allowExpectedFailure` for a known,
+ * intentional error line.
+ */
+export function expectStrictBrowser(page: Page): StrictBrowserGuard {
+  const violations: string[] = []
+  const allowedOnce: (RegExp | string)[] = []
+
+  function matches(matcher: RegExp | string, text: string): boolean {
+    return typeof matcher === 'string' ? text.includes(matcher) : matcher.test(text)
+  }
+
+  function record(violation: string): void {
+    const index = allowedOnce.findIndex((matcher) => matches(matcher, violation))
+    if (index !== -1) {
+      allowedOnce.splice(index, 1) // consume — one-shot
+      return
+    }
+    violations.push(violation)
+  }
+
+  // The app origin is established by the first top-level navigation, NOT
+  // read from `page.url()` at event time: the initial navigation request
+  // fires while the page is still `about:blank` (origin "null"), which
+  // would misclassify the app's own first request as egress.
+  let knownOrigin: string | null = null
+
+  function appOrigin(): string | null {
+    try {
+      const origin = new URL(page.url()).origin
+      if (origin !== 'null') return origin
+    } catch {
+      // fall through to the origin captured from the first navigation
+    }
+    return knownOrigin
+  }
+
+  function isSameOrigin(url: string): boolean {
+    const origin = appOrigin()
+    if (!origin) return false
+    try {
+      return new URL(url).origin === origin
+    } catch {
+      return false
+    }
+  }
+
+  const onConsole = (msg: { type(): string; text(): string }): void => {
+    if (msg.type() === 'error') record(`console.error: ${msg.text()}`)
+  }
+  const onPageError = (error: Error): void => {
+    record(`pageerror: ${error.message}`)
+  }
+  const onRequestFailed = (request: { url(): string; failure(): { errorText: string } | null }): void => {
+    const failure = request.failure()?.errorText ?? 'unknown failure'
+    if (failure.includes('ERR_ABORTED')) return
+    if (isSameOrigin(request.url())) {
+      record(`request failed (same-origin): ${request.url()} — ${failure}`)
+    }
+  }
+  const onRequest = (request: {
+    url(): string
+    isNavigationRequest(): boolean
+    frame(): unknown
+  }): void => {
+    const url = request.url()
+    // Non-network schemes carry no egress.
+    if (!/^https?:/i.test(url)) return
+    const requestOrigin = new URL(url).origin
+    if (request.isNavigationRequest() && request.frame() === page.mainFrame()) {
+      if (knownOrigin === null) {
+        knownOrigin = requestOrigin // first navigation defines the app origin
+        return
+      }
+      if (requestOrigin === knownOrigin) return
+      // A top-level navigation *away* from the app origin is still egress.
+    }
+    const origin = appOrigin()
+    if (origin && requestOrigin !== origin) {
+      record(`third-party egress: ${url}`)
+    }
+  }
+
+  page.on('console', onConsole)
+  page.on('pageerror', onPageError)
+  page.on('requestfailed', onRequestFailed)
+  page.on('request', onRequest)
+
+  return {
+    violations,
+    allowExpectedFailure(matcher: RegExp | string): void {
+      allowedOnce.push(matcher)
+    },
+    assertClean(): void {
+      expect(violations, 'strict browser collectors recorded unexpected violations').toEqual([])
+    },
+    dispose(): void {
+      page.off('console', onConsole)
+      page.off('pageerror', onPageError)
+      page.off('requestfailed', onRequestFailed)
+      page.off('request', onRequest)
+    },
+  }
+}
+
+export interface TwoContexts {
+  contextA: BrowserContext
+  contextB: BrowserContext
+  pageA: Page
+  pageB: Page
+  /** Closes both contexts (and their pages). */
+  close(): Promise<void>
+}
+
+/**
+ * Two fully isolated browser contexts (separate cookie jars and storage) —
+ * the standard stand-in for two tenants/users in one spec.
+ */
+export async function twoContexts(browser: Browser): Promise<TwoContexts> {
+  const contextA = await browser.newContext()
+  const contextB = await browser.newContext()
+  const pageA = await contextA.newPage()
+  const pageB = await contextB.newPage()
+  return {
+    contextA,
+    contextB,
+    pageA,
+    pageB,
+    async close() {
+      await contextA.close()
+      await contextB.close()
+    },
+  }
+}
+
+/**
+ * Runs `trigger` (a click or keyboard action expected to start a download)
+ * and resolves with the resulting Download. No fixed delays — the listener
+ * is armed before the trigger runs, so the race is safe.
+ */
+export async function waitForDownload(page: Page, trigger: () => Promise<void>): Promise<Download> {
+  const [download] = await Promise.all([page.waitForEvent('download'), trigger()])
+  return download
+}
+
+/**
+ * Like `waitForDownload`, but also saves the file to `saveAs` (or a
+ * Playwright-managed temp path when omitted) and returns the absolute
+ * path on disk, failing if the download errored.
+ */
+export async function downloadToFile(
+  page: Page,
+  trigger: () => Promise<void>,
+  saveAs?: string,
+): Promise<string> {
+  const download = await waitForDownload(page, trigger)
+  const failure = await download.failure()
+  if (failure) throw new Error(`download of ${download.suggestedFilename()} failed: ${failure}`)
+  if (saveAs) {
+    await download.saveAs(saveAs)
+    return saveAs
+  }
+  return download.path()
+}

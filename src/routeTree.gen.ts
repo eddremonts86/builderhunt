@@ -69,6 +69,7 @@ import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboardi
 import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
+import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
@@ -465,6 +466,11 @@ const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
 const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
   id: '/api/export/builders',
   path: '/api/export/builders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiE2eOutboxRoute = ApiE2eOutboxRouteImport.update({
+  id: '/api/e2e/outbox',
+  path: '/api/e2e/outbox',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
@@ -1043,6 +1049,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -1197,6 +1204,7 @@ export interface FileRoutesByTo {
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -1356,6 +1364,7 @@ export interface FileRoutesById {
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -1514,6 +1523,7 @@ export interface FileRouteTypes {
     | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/og/explore'
@@ -1668,6 +1678,7 @@ export interface FileRouteTypes {
     | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/og/explore'
@@ -1826,6 +1837,7 @@ export interface FileRouteTypes {
     | '/api/builders/track'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/og/explore'
@@ -1952,6 +1964,7 @@ export interface RootRouteChildren {
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
+  ApiE2eOutboxRoute: typeof ApiE2eOutboxRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
   ApiOgExploreRoute: typeof ApiOgExploreRoute
@@ -2449,6 +2462,13 @@ declare module '@tanstack/react-router' {
       path: '/api/export/builders'
       fullPath: '/api/export/builders'
       preLoaderRoute: typeof ApiExportBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/e2e/outbox': {
+      id: '/api/e2e/outbox'
+      path: '/api/e2e/outbox'
+      fullPath: '/api/e2e/outbox'
+      preLoaderRoute: typeof ApiE2eOutboxRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dashboard/stats': {
@@ -3395,6 +3415,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
+  ApiE2eOutboxRoute: ApiE2eOutboxRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
   ApiOgExploreRoute: ApiOgExploreRoute,

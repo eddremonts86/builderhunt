@@ -1,0 +1,48 @@
+{
+  "plan": "e2e-suite-run1-2026-07-24.json",
+  "stages": {
+    "A": {
+      "workers": [
+        "w1-fixtures",
+        "w2-browser"
+      ],
+      "status": "accepted+verified: isolation 7/7, fixtures 15/15, browser+team-accounts+signup 21/21, HydrationSignal unit 4/4, type-check clean",
+      "dispatched_at": "2026-07-24 (session local)"
+    },
+    "B": {
+      "workers": [
+        "w3-fakes"
+      ],
+      "status": "accepted+verified: outbox 10/10, fakes.spec 5/5, harness regression 32/32, email+billing unit suites 672 passed, type-check clean",
+      "depends_on": "A"
+    },
+    "C": {
+      "workers": [
+        "w4-public",
+        "w5-auth",
+        "w6-onboarding"
+      ],
+      "status": "dispatched (w4-public:3140, w5-auth:3150, w6-onboarding:3160)",
+      "depends_on": "B"
+    }
+  },
+  "pre_flight": {
+    "isolation_spec": "7/7 green after fixing role-URL collapse assertion in e2e/harness/isolation.spec.ts",
+    "playwright_config": "runner-process now mirrors E2E_MODE/REDIS_URL/E2E_RUN_ID so bare pnpm test:e2e works",
+    "type_check_baseline": "clean",
+    "containers": "builderhunt-db (pgvector:pg16) and builderhunt-redis healthy"
+  },
+  "retries": {},
+  "notes": [
+    "w1-fixtures accepted: 15/15 green, type-check clean, isolation 7/7 intact.",
+    "w1 plan_issue confirmed and fixed by orchestrator: workerDatabaseUrls now carries the 'builderhunt_e2e' role password that createE2EWorkerDatabase provisions (e2e/harness/database.ts).",
+    "CAUTION: createE2EWorkerDatabase resets builderhunt_app/auth/worker/platform passwords CLUSTER-WIDE to 'builderhunt_e2e' \u2014 this silently breaks any dev server on the shared local Postgres that still uses .env passwords for those roles.",
+    "fixtures.spec regressed to 1-failed (sign-up 500) during concurrent w2 execution; bisect proved orchestrator's database.ts edit is NOT the cause. Working tree also gained out-of-scope env.ts/.env.example changes tagged 'abuse-and-usage-integrity' (external session or sweep). Re-verify Stage A after w2 lands.",
+    "w2-browser accepted: hydration signal + strict browser harness landed; team-accounts migrated off all fixed delays; real races fixed (seedTeamEntitlement vs org creation, consent-modal probe).",
+    "Root cause of the earlier sign-up 500 confirmed by w2: a concurrent session runs scripts/db/prepare-rls-fixture.mjs which mutates cluster-global role passwords mid-run. Follow-up chip spawned (task_df65786b).",
+    "task_df65786b DONE in-session: createE2EWorkerDatabase and prepare-rls-fixture.mjs no longer mutate shared cluster role passwords. Both now create per-run dedicated login roles (members of the base roles; RLS policies verified to apply via inheritance). CI keeps legacy ALTER behavior (gated on CI env; quality.yml depends on it). Cluster passwords restored to .env values. Verified: probe-before/after + full verify-rls-local via dedicated roles + isolation/fixtures 22/22.",
+    "w3-fakes accepted with 9 documented drift notes (vitest-vs-playwright spec placement, E2E-only FakeBillingProvider subclass, unconditional fake under E2E_MODE to preserve no-Stripe-egress, etc.).",
+    "Orchestrator added shared seam for Stage C: GET/DELETE /api/e2e/outbox (E2E_MODE-gated, 404 otherwise) + route-coverage allowlist entry. check-route-coverage: 101 routes valid.",
+    "webServer cold-start can exceed the 60s timeout right after route-tree changes; one retry resolves it (documented to minions)."
+  ]
+}

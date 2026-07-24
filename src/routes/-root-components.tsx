@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { HeadContent, Scripts } from '@tanstack/react-router'
 import { CookieBanner } from '~/shared/components/CookieBanner'
+import { HydrationSignal } from '~/shared/components/HydrationSignal'
 import { TosModal } from '~/shared/components/TosModal'
 
 export function RootDocument({ children }: { children: React.ReactNode }) {
@@ -14,6 +15,7 @@ export function RootDocument({ children }: { children: React.ReactNode }) {
         {children}
         <CookieBanner />
         <TosModal />
+        <HydrationSignal />
         <Scripts />
       </body>
     </html>

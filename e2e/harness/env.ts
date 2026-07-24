@@ -33,6 +33,17 @@ const e2eEnvSchema = z.object({
   DATABASE_PLATFORM_URL: z.string().min(1).optional(),
   E2E_RUN_ID: z.string().min(1).optional(),
   E2E_FIXED_TIME: z.string().optional(),
+  // Wave 1 Task 4 — external-service fake seams
+  // (docs/superpowers/plans/2026-07-23-wave1-task4-external-fakes.md).
+  // All optional; every consumer of these vars is additionally gated on
+  // E2E_MODE=true, so they are inert in any other mode.
+  E2E_BILLING_SCENARIO: z.enum(['success', 'sca_required', 'decline', 'timeout', 'delayed', 'out_of_order']).optional(),
+  E2E_STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  E2E_STRIPE_WEBHOOK_SECRET_PREVIOUS: z.string().min(1).optional(),
+  E2E_EMBEDDINGS_SCENARIO: z.enum(['success', 'empty', 'malformed', 'hostile', 'timeout', 'rate_limited', 'fallback']).optional(),
+  E2E_ENRICHMENT_SCENARIO: z.enum(['success', 'empty', 'malformed', 'hostile', 'timeout', 'rate_limited', 'fallback']).optional(),
+  E2E_AI_TASK_SCENARIO: z.enum(['success', 'disabled', 'budget_exceeded', 'unsupported']).optional(),
+  E2E_OUTBOX_MODE: z.enum(['memory']).default('memory'),
   // Playwright sets TEST_PARALLEL_INDEX to the worker index (0-based) for
   // every test file and worker process. We surface it for the harness
   // but never require it: unit-style E2E tests that don't run under

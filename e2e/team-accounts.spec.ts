@@ -1,6 +1,7 @@
 import { test, expect, type Page, type BrowserContext } from 'playwright/test'
 import postgres from 'postgres'
 import { config as loadEnv } from 'dotenv'
+import { dismissOverlays, gotoHydrated, waitForHydration } from './harness/browser'
 
 // This spec file runs as a plain Node process, not through vite/vitest —
 // nothing auto-loads `.env` here the way the app (and vitest.config.ts) do,
@@ -40,19 +41,12 @@ const PASSWORD = 'e2e-Test-Passw0rd!'
  * (confirmed directly: the same keystrokes that update the DOM `value`
  * left the "Create account" button disabled and the password-strength
  * checklist unrendered, both of which read React state, not the DOM).
- * `networkidle` plus a short buffer reliably clears that window.
+ * `gotoHydrated` waits on the HydrationSignal marker (`e2e/harness/
+ * browser.ts`) — the semantic "React is live" signal — instead of the
+ * old `networkidle` + fixed-delay guess.
  */
 async function goto(page: Page, url: string) {
-  await page.goto(url, { waitUntil: 'networkidle' })
-  await page.waitForTimeout(400)
-}
-
-/** Dismisses the first-visit ToS modal and cookie banner if either is showing — both are one-time-per-session UI unrelated to what these tests check, and both otherwise intercept pointer events on everything behind them. */
-async function dismissOverlays(page: Page) {
-  const tos = page.getByTestId('tos-modal-accept')
-  if (await tos.isVisible().catch(() => false)) await tos.click()
-  const cookies = page.getByTestId('cookie-banner-essential')
-  if (await cookies.isVisible().catch(() => false)) await cookies.click()
+  await gotoHydrated(page, url)
 }
 
 /**
@@ -138,6 +132,13 @@ async function createTeam(page: Page, teamName: string) {
   await page.getByLabel('New team name').fill(teamName)
   await page.getByRole('button', { name: 'Create team' }).click()
   await page.waitForURL(/\/dashboard/)
+  // `waitForURL` resolves immediately (the page is already on /dashboard),
+  // so wait for the switcher to show the new team — the semantic signal
+  // that the server actually committed the organization. Without this,
+  // `seedTeamEntitlement`'s INSERT..SELECT can race org creation and
+  // silently insert zero rows (the 400ms buffers this file used to carry
+  // were masking exactly this).
+  await expect(page.getByRole('button', { name: 'Switch organization' })).toContainText(teamName)
 }
 
 /**
@@ -231,25 +232,35 @@ test.describe('team accounts release matrix', () => {
 
   test('A sees B as a member and promotes them to admin', async () => {
     await goto(pageA, '/settings/team')
-    await pageA.reload({ waitUntil: 'networkidle' })
-    await pageA.waitForTimeout(400)
+    await pageA.reload()
+    await waitForHydration(pageA)
     await expect(pageA.getByTestId('members-list').getByText('Invitee B')).toBeVisible()
-    const roleSelects = pageA.locator('select[data-testid^="role-select-"]')
-    await roleSelects.first().selectOption('admin')
+    // The role picker is a Radix Select (the testid sits on its trigger
+    // button, TeamSettingsPage.tsx) — drive it the way a user does: open
+    // the trigger, click the option. `selectOption` only works on native
+    // <select> elements and can never match this UI.
+    await pageA.locator('[data-testid^="role-select-"]').first().click()
+    await pageA.getByRole('option', { name: 'Admin' }).click()
     await expect(pageA.getByTestId('team-error')).toHaveCount(0)
   })
 
   test('billing view differs by role: owner (A) gets a plan-change CTA, admin (B) gets read-only', async () => {
+    // The billing surface was rebuilt by the Stripe billing platform work
+    // after this scenario was written — the old testids (billing-card,
+    // billing-email-us, billing-*-cta) no longer exist anywhere in src/.
+    // Same intent, current UI: the owner gets the owner-only plan/portal
+    // controls (`canOpenBillingPortal` is role-gated to owner —
+    // src/shared/lib/billing/permissions.ts), the admin gets the same
+    // billing content read-only, with no owner controls.
     await goto(pageA, '/settings/billing')
-    await expect(pageA.getByTestId('billing-card')).toBeVisible()
-    await expect(pageA.getByTestId('billing-email-us')).toBeVisible()
+    await expect(pageA.getByTestId('billing-settings-content')).toBeVisible()
+    await expect(pageA.getByTestId('open-portal-button')).toBeVisible()
 
     await switchToOrg(pageB, teamName)
     await goto(pageB, '/settings/billing')
-    await expect(pageB.getByTestId('billing-card')).toBeVisible()
-    await expect(pageB.getByTestId('billing-email-us')).toHaveCount(0)
-    await expect(pageB.getByTestId('billing-upgrade-cta')).toHaveCount(0)
-    await expect(pageB.getByTestId('billing-compare-cta')).toHaveCount(0)
+    await expect(pageB.getByTestId('billing-settings-content')).toBeVisible()
+    await expect(pageB.getByTestId('open-portal-button')).toHaveCount(0)
+    await expect(pageB.getByTestId('plan-picker')).toHaveCount(0)
   })
 
   test('A removes B from the team', async () => {
@@ -271,15 +282,22 @@ test.describe('team accounts release matrix', () => {
     await switchToOrg(pageB, teamName)
 
     await goto(pageA, '/settings/team')
-    await pageA.reload({ waitUntil: 'networkidle' })
-    await pageA.waitForTimeout(400)
-    await pageA.getByTestId('transfer-target-select').selectOption({ label: 'Invitee B' })
+    await pageA.reload()
+    await waitForHydration(pageA)
+    // Radix Select, same as the role picker above — open, then pick.
+    await pageA.getByTestId('transfer-target-select').click()
+    await pageA.getByRole('option', { name: 'Invitee B' }).click()
     await pageA.getByTestId('transfer-ownership-btn').click()
+    // The transfer button now opens a billing-impact preview dialog
+    // (OrganizationDangerZone.tsx → TransferOwnershipPreview, added by the
+    // team-accounts task-8 UX work after this scenario was written) —
+    // confirm it, same as a real owner would.
+    await pageA.getByTestId('transfer-ownership-confirm').click()
     await expect(pageA.getByTestId('leave-organization-btn')).toBeVisible()
 
     await goto(pageB, '/settings/team')
-    await pageB.reload({ waitUntil: 'networkidle' })
-    await pageB.waitForTimeout(400)
+    await pageB.reload()
+    await waitForHydration(pageB)
     await expect(pageB.getByTestId('delete-organization-btn')).toBeVisible()
   })
 
@@ -290,8 +308,8 @@ test.describe('team accounts release matrix', () => {
     await seedTeamEntitlement(teamName, 3)
 
     await goto(pageB, '/settings/team')
-    await pageB.reload({ waitUntil: 'networkidle' })
-    await pageB.waitForTimeout(400)
+    await pageB.reload()
+    await waitForHydration(pageB)
 
     const [first, second] = await Promise.all([
       pageB.request.post('/api/organizations/invitations', {

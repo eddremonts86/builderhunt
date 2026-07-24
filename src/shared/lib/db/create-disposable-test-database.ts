@@ -76,6 +76,35 @@ export async function createDisposableTestDatabase(namePrefix: string) {
  * spec runs two workers concurrently, so the same `ALTER ROLE` race
  * that motivated the lock for vitest applies here too.
  */
+/**
+ * The four cluster-global application roles the E2E harness needs to
+ * impersonate. Postgres roles are cluster-wide, so the harness NEVER
+ * mutates these shared roles (that would break every concurrent session
+ * on the same local instance — dev servers, RLS runs, other E2E runs).
+ * Instead each worker database gets four dedicated login roles that are
+ * members of the base roles (privileges and RLS policies apply to
+ * members via inheritance) and are dropped with the database.
+ */
+export const E2E_BASE_ROLES = [
+  'builderhunt_app',
+  'builderhunt_auth',
+  'builderhunt_worker',
+  'builderhunt_platform',
+] as const
+
+export const E2E_ROLE_PASSWORD = 'builderhunt_e2e'
+
+/**
+ * Deterministic per-database role name for a base role, derivable from the
+ * database name alone so `e2e/harness/database.ts` can reconstruct the
+ * connection URLs without threading extra state.
+ * `builderhunt_security_test_e2e_w0_<16hex>` → `builderhunt_app_e2e_w0_<16hex>`.
+ */
+export function e2eWorkerRoleName(baseRole: string, databaseName: string): string {
+  const suffix = databaseName.replace(/^builderhunt_security_test_/, '')
+  return `${baseRole}_${suffix}`
+}
+
 export async function createE2EWorkerDatabase(workerIndex: number) {
   const adminUrl = new URL(process.env.DATABASE_MIGRATION_URL ?? 'postgresql://postgres:***@localhost:5432/builderhunt')
   const databaseName = `builderhunt_security_test_e2e_w${workerIndex}_${randomUUID().replace(/-/g, '').slice(0, 16)}`
@@ -94,12 +123,19 @@ export async function createE2EWorkerDatabase(workerIndex: number) {
 
   try {
     await migrateWithRetry(db)
-    // Roles are cluster-wide, while CONNECT is database-specific. Give the
-    // E2E roles deterministic test-only credentials and explicitly grant
-    // access to this worker database after migrations create the roles.
-    for (const role of ['builderhunt_app', 'builderhunt_auth', 'builderhunt_worker', 'builderhunt_platform']) {
-      await admin.unsafe(`ALTER ROLE ${role} PASSWORD 'builderhunt_e2e'`)
-      await admin.unsafe(`GRANT CONNECT ON DATABASE ${databaseName} TO ${role}`)
+    // Roles are cluster-wide, while CONNECT is database-specific. Never
+    // mutate the shared base roles' passwords — that races every other
+    // session on the same local cluster. Create per-database login roles
+    // that are members of the base roles instead: table privileges and
+    // RLS policies (`TO builderhunt_app` etc.) apply to inheriting
+    // members, and the roles die with the database in `drop()`.
+    for (const baseRole of E2E_BASE_ROLES) {
+      const dedicated = e2eWorkerRoleName(baseRole, databaseName)
+      await admin.unsafe(`DROP ROLE IF EXISTS ${dedicated}`)
+      await admin.unsafe(
+        `CREATE ROLE ${dedicated} LOGIN INHERIT PASSWORD '${E2E_ROLE_PASSWORD}' IN ROLE ${baseRole}`,
+      )
+      await admin.unsafe(`GRANT CONNECT ON DATABASE ${databaseName} TO ${dedicated}`)
     }
   } catch (error) {
     await client.end({ timeout: 5 }).catch(() => {})
@@ -114,6 +150,9 @@ export async function createE2EWorkerDatabase(workerIndex: number) {
     async drop(): Promise<void> {
       await client.end({ timeout: 5 })
       await admin.unsafe(`DROP DATABASE IF EXISTS ${databaseName}`)
+      for (const baseRole of E2E_BASE_ROLES) {
+        await admin.unsafe(`DROP ROLE IF EXISTS ${e2eWorkerRoleName(baseRole, databaseName)}`)
+      }
       await admin.end({ timeout: 5 })
     },
   }

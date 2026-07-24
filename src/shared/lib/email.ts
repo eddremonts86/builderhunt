@@ -1,4 +1,5 @@
 import { env } from '~/shared/lib/env'
+import { recordOutbox } from '~/shared/lib/email/outbox'
 
 /**
  * Email helper. Uses Resend in production (when RESEND_API_KEY is set);
@@ -15,11 +16,51 @@ export interface SendResult {
   error?: string
 }
 
+/**
+ * Wave 1 Task 4 — E2E outbox seam
+ * (docs/superpowers/plans/2026-07-23-wave1-task4-external-fakes.md).
+ *
+ * When `E2E_MODE === 'true'` every sender below short-circuits into this
+ * dispatcher BEFORE its dev-mode/Resend branches, so E2E captures emails
+ * even without `RESEND_API_KEY` and never performs Resend egress. Outside
+ * E2E mode the dispatcher is unreachable (it throws), and every sender's
+ * existing code path is byte-identical to its pre-seam behavior.
+ */
+export interface DispatchEmailInput {
+  to: string
+  subject: string
+  html: string
+  /** Passed through untouched so E2E UI flows that surface dev links keep working. */
+  devLink?: string
+  /** Optional scenario tag stored on the outbox entry. */
+  scenario?: string
+}
+
+function isE2EOutboxActive(): boolean {
+  return typeof process !== 'undefined' && process.env.E2E_MODE === 'true'
+}
+
+export async function dispatchEmail(input: DispatchEmailInput): Promise<SendResult> {
+  if (!isE2EOutboxActive()) {
+    throw new Error('dispatchEmail is E2E-only (E2E_MODE=true required) — production senders use their own Resend paths')
+  }
+  const sequence = recordOutbox({ to: input.to, subject: input.subject, html: input.html, scenario: input.scenario })
+  return { ok: true, id: `outbox:${sequence}`, devLink: input.devLink }
+}
+
 export async function sendOrganizationInvitationEmail(
   to: string,
   organizationName: string,
   link: string,
 ): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({
+      to,
+      subject: `Invitation to join ${organizationName} on BuilderHunt`,
+      html: organizationInvitationEmailHtml(organizationName, link),
+      devLink: link,
+    })
+  }
   if (!env.RESEND_API_KEY) {
     // Do not log invitation URLs or recipient addresses: both are credentials/PII.
     return { ok: true, devLink: link }
@@ -48,6 +89,9 @@ export async function sendOrganizationInvitationEmail(
 }
 
 export async function sendClaimEmail(to: string, link: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Verify your BuilderHunt profile', html: claimEmailHtml(link), devLink: link })
+  }
   if (!env.RESEND_API_KEY) {
     // Dev mode — log and return the link so the UI can show it
     console.log('\n📧 [DEV] Claim email would be sent to:', to)
@@ -87,6 +131,9 @@ export async function sendClaimEmail(to: string, link: string): Promise<SendResu
  * password — the user needs this to set a real one).
  */
 export async function sendResetPasswordEmail(to: string, link: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Reset your BuilderHunt password', html: resetPasswordEmailHtml(link), devLink: link })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Password reset email would be sent to:', to)
     console.log('   Link:', link, '\n')
@@ -133,6 +180,13 @@ export interface AlertDigestItem {
  * sendResetPasswordEmail) when RESEND_API_KEY isn't configured.
  */
 export async function sendAlertDigestEmail(to: string, items: AlertDigestItem[]): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({
+      to,
+      subject: items.length === 1 ? 'BuilderHunt: 1 new alert match' : `BuilderHunt: ${items.length} new alert matches`,
+      html: alertDigestEmailHtml(items),
+    })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Alert digest email would be sent to:', to)
     for (const item of items) {
@@ -252,6 +306,9 @@ function organizationInvitationEmailHtml(organizationName: string, link: string)
  */
 export async function sendDeletionScheduledEmail(to: string, gracePeriodEndsAt: Date): Promise<SendResult> {
   const formattedDate = gracePeriodEndsAt.toISOString().slice(0, 10)
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Your BuilderHunt account deletion is scheduled', html: deletionScheduledEmailHtml(formattedDate) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Deletion-scheduled email would be sent to:', to, '— grace ends', formattedDate, '\n')
     return { ok: true, devLink: undefined }
@@ -288,6 +345,9 @@ export async function sendDeletionScheduledEmail(to: string, gracePeriodEndsAt: 
  * auth_users row (and its email) is gone once the delete transaction commits.
  */
 export async function sendDeletionCompletedEmail(to: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Your BuilderHunt account has been deleted', html: deletionCompletedEmailHtml() })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Deletion-completed email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -319,6 +379,9 @@ export async function sendDeletionCompletedEmail(to: string): Promise<SendResult
 
 /** Data export ready — sent once the synchronous export payload is stored. */
 export async function sendExportReadyEmail(to: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Your BuilderHunt data export is ready', html: exportReadyEmailHtml() })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Export-ready email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -350,6 +413,9 @@ export async function sendExportReadyEmail(to: string): Promise<SendResult> {
 
 /** Verify a newly-set billing contact email (plans/stripe-billing-platform/tasks.md §9 task 4). */
 export async function sendBillingContactVerificationEmail(to: string, link: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Confirm your BuilderHunt billing contact email', html: billingContactVerificationEmailHtml(link), devLink: link })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Billing contact verification email would be sent to:', to)
     console.log('   Link:', link, '\n')
@@ -388,6 +454,9 @@ export interface BillingReceiptDetails {
 
 /** A successful subscription/pack payment — receipt only, never sent for a $0 or manually-granted change. */
 export async function sendBillingReceiptEmail(to: string, details: BillingReceiptDetails): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Your BuilderHunt receipt', html: billingReceiptEmailHtml(details) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Billing receipt email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -419,6 +488,9 @@ export async function sendBillingReceiptEmail(to: string, details: BillingReceip
 
 /** A failed subscription payment attempt — this and its grace-period consequences (see dunning.ts) are critical enough that this sender is always ALSO called for the organization owner, even when a separate billing contact exists (plans/stripe-billing-platform/tasks.md §9 task 4: "critical messages also reach owner"). */
 export async function sendBillingPaymentFailedEmail(to: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Action needed: your BuilderHunt payment failed', html: billingPaymentFailedEmailHtml() })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Billing payment-failed email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -450,6 +522,9 @@ export async function sendBillingPaymentFailedEmail(to: string): Promise<SendRes
 
 /** Sent to the FORMER owner once an ownership transfer commits (plans/stripe-billing-platform/tasks.md §9 task 5) — confirms billing authority moved with ownership, never a request for action. */
 export async function sendOwnershipTransferredFromEmail(to: string, organizationName: string, newOwnerName: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: `You transferred ownership of ${organizationName}`, html: ownershipTransferredFromEmailHtml(organizationName, newOwnerName) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Ownership-transferred (from) email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -481,6 +556,9 @@ export async function sendOwnershipTransferredFromEmail(to: string, organization
 
 /** Sent to the NEW owner once an ownership transfer commits — billing authority (subscription, payment method, Portal access) moved to them along with ownership. */
 export async function sendOwnershipTransferredToEmail(to: string, organizationName: string, previousOwnerName: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: `You're now the owner of ${organizationName}`, html: ownershipTransferredToEmailHtml(organizationName, previousOwnerName) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Ownership-transferred (to) email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -633,6 +711,13 @@ function ownershipTransferredToEmailHtml(organizationName: string, previousOwner
 
 /** Credit expiry notice at 30/7/1 days (plans/stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and alerts") — `notifications.ts` calls this at most once per grant per bucket (deduplicated via `billing_notification_log`). */
 export async function sendCreditExpiryNoticeEmail(to: string, details: { remainingUnits: number; daysUntilExpiry: number }): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({
+      to,
+      subject: `${details.remainingUnits} BuilderHunt credits expire in ${details.daysUntilExpiry} day${details.daysUntilExpiry === 1 ? '' : 's'}`,
+      html: creditExpiryNoticeEmailHtml(details),
+    })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Credit expiry notice email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -664,6 +749,9 @@ export async function sendCreditExpiryNoticeEmail(to: string, details: { remaini
 
 /** A reminder that a subscription is about to renew (billed) — sent once, 7 days ahead. */
 export async function sendSubscriptionRenewalReminderEmail(to: string, details: { tier: string; currentPeriodEnd: Date }): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Your BuilderHunt subscription renews soon', html: subscriptionRenewalReminderEmailHtml(details) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Subscription renewal reminder email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -695,6 +783,9 @@ export async function sendSubscriptionRenewalReminderEmail(to: string, details: 
 
 /** A subscription has been payment-blocked (grace period exhausted without recovery) — distinct from `sendBillingPaymentFailedEmail` (the FIRST failure, which starts grace); this is the harder "access is at risk now" message. */
 export async function sendActionRequiredEmail(to: string): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'Action required: your BuilderHunt subscription is on hold', html: actionRequiredEmailHtml() })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Action-required (payment-blocked) email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -726,6 +817,13 @@ export async function sendActionRequiredEmail(to: string): Promise<SendResult> {
 
 /** A refund request has been decided (succeeded or failed) — one email per refund, never per retry. */
 export async function sendRefundDecisionEmail(to: string, details: { amountCents: number; state: string }): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({
+      to,
+      subject: details.state === 'succeeded' ? 'Your BuilderHunt refund was processed' : 'Your BuilderHunt refund could not be processed',
+      html: refundDecisionEmailHtml(details),
+    })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Refund decision email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -757,6 +855,9 @@ export async function sendRefundDecisionEmail(to: string, details: { amountCents
 
 /** A chargeback was opened against a payment — one email per dispute (plans/stripe-billing-platform/tasks.md §8 task 5, §10). */
 export async function sendDisputeNotificationEmail(to: string, details: { amountCents: number; evidenceDueBy: Date | null }): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject: 'A dispute was opened on a BuilderHunt payment', html: disputeNotificationEmailHtml(details) })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Dispute notification email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }
@@ -788,6 +889,13 @@ export async function sendDisputeNotificationEmail(to: string, details: { amount
 
 /** Platform-operator alert for a non-clean daily reconciliation run — sent once per run id, to the current seller profile's support email (there is no separate operator-alert recipient list yet). */
 export async function sendReconciliationAlertEmail(to: string, details: { result: string; mismatchCount: number; windowEnd: string }): Promise<SendResult> {
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({
+      to,
+      subject: `Billing reconciliation: ${details.result} (${details.mismatchCount} mismatch${details.mismatchCount === 1 ? '' : 'es'})`,
+      html: reconciliationAlertEmailHtml(details),
+    })
+  }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Reconciliation alert email would be sent to:', to, '\n')
     return { ok: true, devLink: undefined }

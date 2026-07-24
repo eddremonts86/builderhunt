@@ -34,6 +34,14 @@ const redisURL = process.env.REDIS_URL ?? `redis://localhost:${process.env.REDIS
 // test's own beforeAll hook.
 const e2eRunId = process.env.E2E_RUN_ID ?? `run-${randomBytes(4).toString('hex')}`
 
+// The harness (`e2e/harness/env.ts`) runs inside the *test-runner* process,
+// which does not inherit `webServer.env` below. This config file is loaded
+// by that same runner process, so mirroring the E2E seam vars here makes a
+// bare `pnpm test:e2e` work without exporting anything in the shell.
+process.env.E2E_MODE ??= 'true'
+process.env.REDIS_URL ??= redisURL
+process.env.E2E_RUN_ID ??= e2eRunId
+
 // Parallelism: the Wave 1 Task 1 isolation spec MUST run with --workers=2
 // to prove isolation. Configured here as the default so a bare `pnpm
 // exec playwright test e2e/harness/isolation.spec.ts` exercises the

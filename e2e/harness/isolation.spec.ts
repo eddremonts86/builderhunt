@@ -83,10 +83,13 @@ test('worker database exposes role URLs targeting the same database', async () =
   expect(urls.DATABASE_AUTH_URL).toContain(`/${handle.databaseName}`)
   expect(urls.DATABASE_WORKER_URL).toContain(`/${handle.databaseName}`)
   expect(urls.DATABASE_PLATFORM_URL).toContain(`/${handle.databaseName}`)
-  // The runtime and migration URLs always differ (one is the application
-  // role, the other the superuser migration role). The role URLs may
-  // collapse in local dev — we only assert the database path is correct.
-  expect(urls.DATABASE_URL).not.toBe(urls.DATABASE_MIGRATION_URL)
+  // The runtime and migration URLs differ whenever the environment wires
+  // distinct role credentials (CI does; local dev may collapse both onto
+  // the superuser). Only assert separation when the source env separates.
+  const env = e2eEnv()
+  if (env.DATABASE_URL !== env.DATABASE_MIGRATION_URL) {
+    expect(urls.DATABASE_URL).not.toBe(urls.DATABASE_MIGRATION_URL)
+  }
 })
 
 test('worker can open a connection, insert a row, and read it back', async () => {

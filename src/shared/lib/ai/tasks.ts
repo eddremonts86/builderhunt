@@ -391,6 +391,9 @@ export const AI_TASKS: Record<AITaskId, AITaskDefinition<any, any>> = {
 }
 
 export function getTask(id: string): AITaskDefinition<any, any> | null {
+  // Wave 1 Task 4 — E2E scenario seam: `unsupported` simulates a task id the
+  // registry does not know. Unreachable outside E2E_MODE=true.
+  if (e2eAITaskScenario() === 'unsupported') return null
   return AI_TASKS[id] ?? null
 }
 
@@ -400,9 +403,32 @@ interface AIEnvFlags {
 }
 
 export function isTaskDisabled(id: string, env: AIEnvFlags): boolean {
+  // Wave 1 Task 4 — E2E scenario seam: `disabled` simulates the kill switch
+  // without touching the real AI_DISABLED flags. Unreachable outside E2E.
+  if (e2eAITaskScenario() === 'disabled') return true
   if (env.AI_DISABLED === 'true') return true
   const disabledList = env.AI_DISABLED_TASKS.split(',').map((entry) => entry.trim()).filter(Boolean)
   return disabledList.includes(id)
+}
+
+export type E2EAITaskScenario = 'success' | 'disabled' | 'budget_exceeded' | 'unsupported'
+
+/**
+ * Wave 1 Task 4 — E2E AI-task scenario
+ * (docs/superpowers/plans/2026-07-23-wave1-task4-external-fakes.md).
+ *
+ * Reads `E2E_AI_TASK_SCENARIO` under `E2E_MODE=true` only; returns `null`
+ * everywhere else (including the browser, where `process` does not exist —
+ * this module is imported client-side too, so the seam must be inert there).
+ * `budget_exceeded` is surfaced for the budget-enforcing callers/tests; the
+ * registry itself only acts on `disabled` and `unsupported`.
+ */
+export function e2eAITaskScenario(): E2EAITaskScenario | null {
+  if (typeof process === 'undefined' || process.env.E2E_MODE !== 'true') return null
+  const raw = process.env.E2E_AI_TASK_SCENARIO
+  if (!raw || raw === 'success') return raw ? 'success' : null
+  if (raw === 'disabled' || raw === 'budget_exceeded' || raw === 'unsupported') return raw
+  throw new Error(`Unknown E2E_AI_TASK_SCENARIO "${raw}" — expected one of: success, disabled, budget_exceeded, unsupported`)
 }
 
 const UNTRUSTED_OPEN = '<untrusted>'

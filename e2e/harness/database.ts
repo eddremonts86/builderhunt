@@ -22,7 +22,12 @@
  */
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import { createE2EWorkerDatabase } from '../../src/shared/lib/db/create-disposable-test-database'
+import {
+  createE2EWorkerDatabase,
+  E2E_BASE_ROLES,
+  E2E_ROLE_PASSWORD,
+  e2eWorkerRoleName,
+} from '../../src/shared/lib/db/create-disposable-test-database'
 import { e2eEnv } from './env'
 
 export interface WorkerDatabase {
@@ -60,9 +65,19 @@ export function workerDatabaseUrls(databaseName: string): {
 } {
   const env = e2eEnv()
   const adminUrl = new URL(env.DATABASE_MIGRATION_URL)
+  // `createE2EWorkerDatabase` never touches the shared cluster roles.
+  // It creates per-database dedicated login roles (members of the base
+  // roles) with a deterministic test password, so any URL that names a
+  // base role is rewritten to that database's dedicated role. URLs using
+  // other users (e.g. the local `postgres` superuser) pass through.
   const templateFor = (source: string | undefined, fallback: string): string => {
     const u = new URL(source ?? fallback)
     u.pathname = `/${databaseName}`
+    const username = decodeURIComponent(u.username)
+    if ((E2E_BASE_ROLES as readonly string[]).includes(username)) {
+      u.username = e2eWorkerRoleName(username, databaseName)
+      u.password = E2E_ROLE_PASSWORD
+    }
     return u.toString()
   }
   return {

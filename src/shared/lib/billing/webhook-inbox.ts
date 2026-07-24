@@ -53,8 +53,27 @@ export interface StripeWebhookReceipt {
   duplicate: boolean
 }
 
-/** Matches Stripe's own default tolerance — see https://docs.stripe.com/webhooks#verify-official-libraries. */
-const SIGNATURE_TOLERANCE_SECONDS = 5 * 60
+/** Matches Stripe's own default tolerance — see https://docs.stripe.com/webhooks#verify-official-libraries. Exported so the E2E harness (`e2e/harness/fakes/webhook.ts`) can sign at exactly the edge of the window instead of duplicating the literal. */
+export const SIGNATURE_TOLERANCE_SECONDS = 5 * 60
+
+/**
+ * Wave 1 Task 4 — E2E-only signing-secret channel
+ * (docs/superpowers/plans/2026-07-23-wave1-task4-external-fakes.md).
+ *
+ * The harness reads the secrets it should sign test fixtures with from
+ * `E2E_STRIPE_WEBHOOK_SECRET` / `E2E_STRIPE_WEBHOOK_SECRET_PREVIOUS`
+ * (current first, previous second — the same rotation-order contract as
+ * `currentSigningSecrets`). Guarded by `E2E_MODE`; unreachable in
+ * production. The receipt path itself is unchanged — this is a typed
+ * read-only accessor, never an override of `verifySignature`.
+ */
+export function __e2eSigningSecrets(): string[] {
+  if (process.env.E2E_MODE !== 'true') {
+    throw new Error('__e2eSigningSecrets is E2E-only (E2E_MODE=true required)')
+  }
+  return [process.env.E2E_STRIPE_WEBHOOK_SECRET, process.env.E2E_STRIPE_WEBHOOK_SECRET_PREVIOUS]
+    .filter((secret): secret is string => Boolean(secret))
+}
 
 function currentSigningSecrets(): string[] {
   return [env.STRIPE_WEBHOOK_SECRET, env.STRIPE_WEBHOOK_SECRET_PREVIOUS].filter((secret): secret is string => Boolean(secret))
