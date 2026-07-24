@@ -1,7 +1,11 @@
 # BuilderHunt implementation roadmap
 
-This directory is the implementation backlog for BuilderHunt. It contains 47 plan
-records plus the shared planning policy in [`_meta/`](./_meta/). Each plan is a trio:
+This directory is the implementation backlog for BuilderHunt. It contains 53 plan
+records plus the shared planning policy in [`_meta/`](./_meta/). (Note: this count and the
+categorized index below have drifted out of sync with the plan directories that actually exist —
+several newer plans, e.g. `calendar-scheduling-interview-intelligence`, `exhaustive-local-e2e-design`,
+and `solutions-intelligence`, are on disk but not yet listed in the sections below. Reconciling that
+is a separate cleanup, out of scope here.) Each plan is a trio:
 `spec.md` defines the outcome, `plan.md` defines the delivery sequence, and `tasks.md`
 is the executable checklist.
 
@@ -258,6 +262,9 @@ flowchart LR
 - [`audit-performance-qa`](./audit-performance-qa/spec.md)
 - [`audit-trust`](./audit-trust/spec.md)
 - [`audit-visual-system`](./audit-visual-system/spec.md)
+- [`responsive-mobile-design`](./responsive-mobile-design/spec.md) — overlaps
+  `audit-visual-system`'s unchecked "dashboard shell" task; see that plan's spec.md for the
+  relationship
 
 ## Global completion gate
 
