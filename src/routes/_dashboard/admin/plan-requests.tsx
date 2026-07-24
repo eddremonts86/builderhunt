@@ -55,13 +55,19 @@ function AdminPlanRequestsPage() {
 
   const resolve = async (id: string, decision: 'approved' | 'declined') => {
     setBusy(id)
+    setError(null)
     try {
-      await fetch('/api/admin/plan-requests', {
+      const res = await fetch('/api/admin/plan-requests', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requestId: id, decision, reason: 'admin resolved from /admin/plan-requests' }),
       })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setError(body.error ?? `Failed: ${res.status}`)
+        return
+      }
       await load()
     } catch (e) {
       setError(String(e))

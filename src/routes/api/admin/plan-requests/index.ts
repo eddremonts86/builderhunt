@@ -4,6 +4,7 @@ import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAd
 import { SeatLimitExceededError } from '~/shared/lib/auth/organization-lifecycle'
 import {
   findPlanRequest,
+  LegacyPlanMutationDisabledError,
   listPlanRequestsWithUsers,
   resolvePlanRequest,
   setUserPlan,
@@ -60,6 +61,12 @@ export const Route = createFileRoute('/api/admin/plan-requests/')({
           if (err instanceof SeatLimitExceededError) {
             return Response.json(
               { error: 'This user has more members in their personal workspace than the requested plan allows' },
+              { status: 409 },
+            )
+          }
+          if (err instanceof LegacyPlanMutationDisabledError) {
+            return Response.json(
+              { error: 'Self-service plan requests are retired now that Stripe billing is canonical — direct the user to Checkout, or use the operator grant tool on /admin/users for a manual exception.', migrationGuidance: true },
               { status: 409 },
             )
           }

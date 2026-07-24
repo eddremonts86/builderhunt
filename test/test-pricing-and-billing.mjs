@@ -134,6 +134,13 @@ async function run() {
 
   // ====================================================================
   // /api/plans/request-upgrade as user
+  //
+  // Asserts the legacy self-service path still works — this script only runs against a dev
+  // environment with STRIPE_BILLING_ENABLED=false (this repo's own default). Once that flag flips to
+  // 'true' (plans/stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after
+  // canonical cutover"), this same request instead returns 409 with `migrationGuidance: true` and a
+  // `checkoutUrl` — see `platform-billing.test.ts`'s `shouldBlockLegacyPlanMutations` and
+  // `request-upgrade.test.ts`/`admin/plan-requests/index.test.ts` for that behavior's real coverage.
   // ====================================================================
   console.log('\n🛒 User requests upgrade to team')
   const requestRes = await page.evaluate(async () => {

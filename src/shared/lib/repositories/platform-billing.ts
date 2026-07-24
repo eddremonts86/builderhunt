@@ -1,9 +1,37 @@
 import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
 import { randomId } from '~/lib/utils'
+import { env } from '../env'
 import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
 import { authUsers, planChanges, planRequests, plans } from '../db/schema'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
+
+/**
+ * Thrown by the self-service plan-request path once the canonical Stripe billing system is live
+ * (plans/stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after canonical
+ * cutover"). `STRIPE_BILLING_ENABLED` is the same flag that gates the real Stripe adapter itself
+ * (`stripe-client.ts`) — reused here rather than inventing a second flag, since "the canonical
+ * system is live" is exactly the condition this class exists to react to. Deliberately does NOT gate
+ * `setPlatformUserPlan` (the operator grant path) or any read (`getPlatformUserPlan`,
+ * `listPlatformUsersWithPlans`, `listPlatformPlanRequests`, `findPlatformPlanRequest`) — spec.md's
+ * "preserve an audited operator grant path separate from paid Stripe state" and "keep historical
+ * reads" both require those to keep working unconditionally.
+ */
+export class LegacyPlanMutationDisabledError extends Error {
+  constructor() {
+    super('Self-service plan requests are no longer accepted — subscribe through Checkout instead.')
+    this.name = 'LegacyPlanMutationDisabledError'
+  }
+}
+
+/** Pure decision, exported for direct unit testing — `env` is a frozen singleton read at import time and is never mocked in this codebase's tests (see `stripe-provider.test.ts`'s own note on this), so the actual gate logic is kept testable independent of reading it. */
+export function shouldBlockLegacyPlanMutations(billingEnabledFlag: string): boolean {
+  return billingEnabledFlag === 'true'
+}
+
+function assertLegacyPlanMutationsEnabled(): void {
+  if (shouldBlockLegacyPlanMutations(env.STRIPE_BILLING_ENABLED)) throw new LegacyPlanMutationDisabledError()
+}
 
 export async function getPlatformUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {
   if (!userId) return null
@@ -64,6 +92,7 @@ export async function setPlatformUserPlan(
 }
 
 export async function requestPlatformPlanUpgrade(userId: string, requestedPlan: 'pro' | 'team', message?: string) {
+  assertLegacyPlanMutationsEnabled()
   const [existing] = await platformDb.select({ id: planRequests.id }).from(planRequests)
     .where(and(eq(planRequests.userId, userId), eq(planRequests.status, 'pending'))).limit(1)
   if (existing) return { id: existing.id, alreadyPending: true }
@@ -73,6 +102,7 @@ export async function requestPlatformPlanUpgrade(userId: string, requestedPlan: 
 }
 
 export async function resolvePlatformPlanRequest(id: string, status: 'approved' | 'declined') {
+  assertLegacyPlanMutationsEnabled()
   await platformDb.update(planRequests).set({ status }).where(eq(planRequests.id, id))
 }
 

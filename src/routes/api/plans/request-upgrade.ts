@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auth } from '~/shared/lib/auth/better-auth'
-import { requestPlanUpgrade } from '~/shared/lib/billing'
+import { LegacyPlanMutationDisabledError, requestPlanUpgrade } from '~/shared/lib/billing'
 
 const Body = z.object({
   requestedPlan: z.enum(['pro', 'team']),
@@ -27,6 +27,9 @@ export const Route = createFileRoute('/api/plans/request-upgrade')({
           )
           return Response.json({ ok: true, ...result })
         } catch (err) {
+          if (err instanceof LegacyPlanMutationDisabledError) {
+            return Response.json({ error: err.message, migrationGuidance: true, checkoutUrl: '/settings/billing' }, { status: 409 })
+          }
           console.error('plan request error:', err)
           return Response.json({ error: 'Failed' }, { status: 500 })
         }
