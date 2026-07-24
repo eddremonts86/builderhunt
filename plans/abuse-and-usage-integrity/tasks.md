@@ -247,12 +247,40 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 2 — Session anomaly detection (A2, A3, E-detection)
 
-- [ ] **Anomaly computations → signals**
+- [x] **Anomaly computations → signals**
   - Files: `src/shared/lib/abuse/anomalies.ts` (+ test)
   - Do: pure functions for impossible-travel (distance/time between two IP geos), mid-session
     UA-family change, concurrent-distinct-IP, and per-seat over-use; suppress IP-only churn for
     `ABUSE_ALLOWLIST_ASNS`. Emit the corresponding `abuse_signals`.
   - Verify: table-driven unit tests incl. NAT/allowlist suppression and VPN edge cases.
+  - Progress: Wrote `anomalies.ts` as pure `detect*` functions (haversine-based
+    `detectImpossibleTravel` against a `maxPlausibleSpeedKmh` bound, default 1000km/h —
+    faster than commercial cruise speed with headroom so layovers don't false-positive;
+    `detectMidSessionUaChange` no-ops on null/undefined/`'unknown'` family on either side;
+    `detectConcurrentDistinctIp` counts distinct non-null identifiers; `detectSeatOveruse`
+    is a plain `count > cap`; `isAllowlistedAsn` parses `ABUSE_ALLOWLIST_ASNS`-shaped CSV).
+    No IP→geo/ASN resolution lives here — that's out of scope, deferred to the later
+    "Device/ASN sign-up velocity + linked-account clustering" task; these functions take
+    already-resolved coordinates/identifiers, matching the same pure-function+DI split as
+    `session-guard.ts`/`session-hooks.ts` from Phase 0/1. Four `check*AndEmit` wrappers
+    (`checkImpossibleTravelAndEmit`, `checkMidSessionUaChangeAndEmit`,
+    `checkConcurrentDistinctIpAndEmit`, `checkSeatOveruseAndEmit`) call `emitAbuseSignal`
+    from Phase 0's `signals.ts` only when flagged, each taking an optional
+    `deps?: EmitAbuseSignalDeps` for test injectability (Phase 0's own convention).
+    `anomalies.test.ts`: 30 table-driven cases across all 5 pure functions (same-location,
+    genuinely-impossible NYC→London in 1h, realistic 8h flight not flagged, a short local
+    NAT-style hop over a plausible 5-minute gap not flagged, simultaneous-login zero-elapsed
+    edge case flagged, custom-speed-bound override, UA-family null/unknown/change matrix,
+    NAT/shared-egress single-IP not flagged vs. genuinely distinct IPs flagged, seat at-cap
+    vs over-cap, ASN allowlist matching/non-matching/whitespace/empty-CSV) plus 5
+    wrapper-level cases proving the VPN/NAT suppression path end-to-end: an allowlisted ASN
+    suppresses emission even when the underlying travel is impossible (`insert` never
+    called), a non-allowlisted ASN under the same impossible-travel input does emit, and the
+    concurrent-IP wrapper filters allowlisted identifiers out before checking distinctness.
+    Verified `pnpm tsc --noEmit` and `pnpm exec eslint` clean on both files, full
+    `pnpm vitest run src/shared/lib/abuse` green (66/66, up from 16), and
+    `pnpm security:boundaries` still passes (0 legacy imports tracked) — this task added no
+    new DB/request-path wiring, so the boundary ratchet is unaffected as expected.
 
 - [ ] **Surface denied cross-tenant attempts as signals**
   - Files: `src/shared/lib/security/audit.ts` sink wiring, `src/shared/lib/abuse/anomalies.ts`
