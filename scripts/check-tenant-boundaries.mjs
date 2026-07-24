@@ -17,6 +17,10 @@ const authDbAllowlist = new Set([
   // FK-safe two-transaction delete order this depends on.
   'src/shared/lib/repositories/account-privacy.ts',
   'src/shared/lib/repositories/alerts-worker.ts',
+  // Narrow, read-only worker access to auth_sessions.ip_address for linked-account clustering
+  // (abuse/linked-accounts.ts, plans/abuse-and-usage-integrity/tasks.md Phase 3) — same exception
+  // shape as the two files above, not a general auth-db opening.
+  'src/shared/lib/repositories/auth-sessions-worker.ts',
 ])
 // Global-public data/health surfaces are explicitly allowed to read the
 // unscoped runtime db directly (static or dynamic import) — they never

@@ -105,6 +105,9 @@ const zodEnv = z.object({
   // expired invite link, a stale bookmark) — emits `cross_tenant_denied`, detection only.
   ABUSE_CROSS_TENANT_DENIAL_THRESHOLD: z.coerce.number().int().positive().default(5),
   ABUSE_CROSS_TENANT_DENIAL_WINDOW_MINUTES: z.coerce.number().int().positive().default(10),
+  // Sign-ups from the same first-party device cookie, per day — survives IP rotation (unlike
+  // better-auth's own built-in per-IP sign-up limiter), catching multi-accounting from one browser.
+  SIGNUP_DEVICE_DAILY_LIMIT: z.coerce.number().int().positive().default(3),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

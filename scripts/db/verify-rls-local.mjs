@@ -163,7 +163,10 @@ try {
   }
   if (!platformBillingDenied) throw new Error('Platform role accessed tenant billing customer data')
 
-  // user_devices — account-subject (app.user_id), app role is the only one granted access.
+  // user_devices — account-subject (app.user_id). App role is scoped read/write for its own
+  // user_id (request-path device-cookie upsert); worker role got an unscoped, SELECT-only grant in
+  // 0045 for cross-user linked-account clustering (there's no single user_id to scope a clustering
+  // read by) — never INSERT/UPDATE, those stay exclusively with app.
   const devicesMissing = await app`select id from user_devices`
   if (devicesMissing.length !== 0) throw new Error('Missing user context exposed user_devices')
   const scopedDevices = (userId) => app.begin(async (transaction) => {
@@ -187,6 +190,20 @@ try {
     crossSubjectDeviceInsertDenied = error?.code === '42501'
   }
   if (!crossSubjectDeviceInsertDenied) throw new Error('Cross-subject user_devices insert was not denied')
+
+  const workerDevicesAll = await worker`select id from user_devices order by id`
+  assertIds(workerDevicesAll, ['device-a', 'device-b'], 'user_devices worker cross-user read')
+
+  let workerDeviceInsertDenied = false
+  try {
+    await worker`
+      insert into user_devices (id, user_id, device_hash, ua_family, trust_state)
+      values ('device-worker-insert', 'user-a', 'hash-worker', 'chrome', 'new')
+    `
+  } catch (error) {
+    workerDeviceInsertDenied = error?.code === '42501'
+  }
+  if (!workerDeviceInsertDenied) throw new Error('Worker role was able to insert into user_devices')
 
   // account_risk — account-subject, but app has NO grant at all: risk stage/score is written
   // exclusively by trusted worker/platform paths, never the browser-facing role.

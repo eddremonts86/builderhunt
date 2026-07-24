@@ -316,6 +316,13 @@
 			"when": 1784895092181,
 			"tag": "0044_abuse_usage_integrity_rls_grants",
 			"breakpoints": true
+		},
+		{
+			"idx": 45,
+			"version": "7",
+			"when": 1784895093181,
+			"tag": "0045_user_devices_worker_read_grant",
+			"breakpoints": true
 		}
 	]
 }

@@ -17,6 +17,8 @@ import { env } from '~/shared/lib/env'
 import { handleSessionAfter, handleSessionBefore, type SessionCookieAdapter, type SessionDeviceResult } from '~/shared/lib/abuse/session-hooks'
 import { resolveSessionTimeoutConfig } from '~/shared/lib/abuse/session-guard'
 import { checkSignupEmailGate, DisposableEmailRejectedError } from '~/shared/lib/abuse/email-hygiene'
+import { computeDeviceHash, detectUaFamily, DEVICE_COOKIE_NAME, issueDeviceCookieValue } from '~/shared/lib/abuse/device'
+import { rateLimit } from '~/shared/lib/rate-limit'
 import { organizationOptions } from './organization-options'
 import { ensurePersonalOrganization, pickDefaultActiveOrganizationId } from './personal-organization'
 
@@ -38,6 +40,17 @@ function cookieAdapterFor(context: { getCookie?: (name: string) => string | null
 // correlation key — a WeakMap so entries are garbage-collected with the
 // request context object, never a growing global.
 const pendingSessionDevices = new WeakMap<object, SessionDeviceResult>()
+
+// A brand-new sign-up runs `user.create.before` (device-hash rate limit) BEFORE
+// `session.create.before` (device recognition/upsert) within the same request — but
+// `context.getCookie` only ever reads the ORIGINAL incoming request's Cookie header, never a
+// value set earlier in the same request by `context.setCookie`. Without this, both hooks would
+// independently issue a fresh `bh_did` value on a brand-new signup, and the response would carry
+// two conflicting `Set-Cookie: bh_did=...` headers (the browser silently keeps only the last one)
+// — the two hooks would disagree about the device's identity for this one request. Recording the
+// value here (keyed by the same per-request `context` object as `pendingSessionDevices`) lets
+// `session.create.before` reuse exactly what `user.create.before` already issued.
+const pendingSignupDeviceCookie = new WeakMap<object, string>()
 
 export const auth = betterAuth({
   database: drizzleAdapter(authDb, {
@@ -81,7 +94,7 @@ export const auth = betterAuth({
         // rethrows it verbatim to the client — the transaction never commits, so no user row is
         // created. Same "before can block, after cannot" split as `session.create` (see the
         // cookie-write comment above `pendingSessionDevices`).
-        before: async (user) => {
+        before: async (user, context) => {
           try {
             checkSignupEmailGate({ email: user.email, blockDisposable: env.SIGNUP_BLOCK_DISPOSABLE_EMAILS === 'true' })
           } catch (error) {
@@ -89,6 +102,39 @@ export const auth = betterAuth({
               throw new APIError('BAD_REQUEST', { message: error.message, code: 'DISPOSABLE_EMAIL_NOT_ALLOWED' })
             }
             throw error
+          }
+
+          // Device-keyed sign-up velocity (Phase 3 "Device/ASN sign-up velocity + linked-account
+          // clustering") — survives IP rotation, unlike better-auth's own built-in per-IP sign-up
+          // limiter (`rateLimit` config below, `/sign-up/email: 10/day`). No `user.userAgent`
+          // field exists (unlike `session.userAgent`, which better-auth populates itself), so the
+          // UA comes straight off the request headers on `context`. Cookie read/issue here mirrors
+          // `handleSessionBefore`'s pattern exactly, since this fires before that hook and needs
+          // the same first-party device cookie for a consistent fingerprint at signup time.
+          if (context) {
+            const cookies = cookieAdapterFor(context)
+            let deviceCookieValue = cookies.get(DEVICE_COOKIE_NAME)
+            if (!deviceCookieValue) {
+              deviceCookieValue = issueDeviceCookieValue()
+              cookies.set(DEVICE_COOKIE_NAME, deviceCookieValue, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'lax',
+                path: '/',
+                maxAge: 60 * 60 * 24 * 365,
+              })
+              pendingSignupDeviceCookie.set(context, deviceCookieValue)
+            }
+            const headers = context.headers ?? context.request?.headers
+            const uaFamily = detectUaFamily(headers?.get('user-agent') ?? null)
+            const deviceHash = computeDeviceHash(deviceCookieValue, uaFamily, env.BETTER_AUTH_SECRET ?? 'dev-secret-change-in-production')
+            const gate = await rateLimit('signup-device', deviceHash, env.SIGNUP_DEVICE_DAILY_LIMIT, 60 * 60 * 24)
+            if (!gate.allowed) {
+              throw new APIError('TOO_MANY_REQUESTS', {
+                message: 'Too many accounts created from this device recently. Please try again later.',
+                code: 'SIGNUP_DEVICE_RATE_LIMITED',
+              })
+            }
           }
         },
         after: async (user) => {
@@ -124,9 +170,16 @@ export const auth = betterAuth({
           // run here, not in `after`: cookie writes from `after` never reach
           // the response (verified empirically, see session-hooks.ts).
           if (context) {
+            const cookies = cookieAdapterFor(context)
+            // If `user.create.before` already issued a device cookie earlier in this exact
+            // request (brand-new sign-up), reuse it — `context.getCookie` only reads the
+            // original incoming request, so without this override this hook would issue a
+            // SECOND, different `bh_did` value, leaving two conflicting `Set-Cookie` headers
+            // (browsers keep only the last one) and disagreeing device identities.
+            const alreadyIssued = pendingSignupDeviceCookie.get(context)
             const device = await handleSessionBefore(
               { userId: session.userId, userAgent: (session.userAgent as string | null | undefined) ?? null },
-              cookieAdapterFor(context),
+              alreadyIssued ? { get: (name) => (name === DEVICE_COOKIE_NAME ? alreadyIssued : cookies.get(name)), set: cookies.set } : cookies,
             )
             pendingSessionDevices.set(context, device)
           }

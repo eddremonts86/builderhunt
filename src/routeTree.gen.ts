@@ -161,6 +161,7 @@ import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
@@ -963,6 +964,11 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminAbuseClustersRoute = ApiAdminAbuseClustersRouteImport.update({
+  id: '/api/admin/abuse/clusters',
+  path: '/api/admin/abuse/clusters',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardSettingsBillingReturnRoute =
   DashboardSettingsBillingReturnRouteImport.update({
     id: '/return',
@@ -1102,6 +1108,7 @@ export interface FileRoutesByFullPath {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
+  '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
@@ -1259,6 +1266,7 @@ export interface FileRoutesByTo {
   '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
+  '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
@@ -1421,6 +1429,7 @@ export interface FileRoutesById {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
+  '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
@@ -1582,6 +1591,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/settings/billing/return'
+    | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
@@ -1739,6 +1749,7 @@ export interface FileRouteTypes {
     | '/api/sprints'
     | '/api/status'
     | '/settings/billing/return'
+    | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
@@ -1900,6 +1911,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/_dashboard/settings/billing/return'
+    | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
@@ -2019,6 +2031,7 @@ export interface RootRouteChildren {
   ApiRoadmapIndexRoute: typeof ApiRoadmapIndexRoute
   ApiSprintsIndexRoute: typeof ApiSprintsIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
+  ApiAdminAbuseClustersRoute: typeof ApiAdminAbuseClustersRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
@@ -3134,6 +3147,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/abuse/clusters': {
+      id: '/api/admin/abuse/clusters'
+      path: '/api/admin/abuse/clusters'
+      fullPath: '/api/admin/abuse/clusters'
+      preLoaderRoute: typeof ApiAdminAbuseClustersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_dashboard/settings/billing/return': {
       id: '/_dashboard/settings/billing/return'
       path: '/return'
@@ -3489,6 +3509,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRoadmapIndexRoute: ApiRoadmapIndexRoute,
   ApiSprintsIndexRoute: ApiSprintsIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
+  ApiAdminAbuseClustersRoute: ApiAdminAbuseClustersRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,

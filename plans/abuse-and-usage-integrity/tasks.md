@@ -417,12 +417,100 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     created during verification (`psql DELETE FROM auth_users WHERE email IN (...)`) to leave the
     dev database clean.
 
-- [ ] **Device/ASN sign-up velocity + linked-account clustering**
+- [x] **Device/ASN sign-up velocity + linked-account clustering**
   - Files: `src/shared/lib/rate-limit.ts`, `src/shared/lib/abuse/linked-accounts.ts` (+ test),
     `src/routes/api/admin/abuse/clusters.ts`
   - Do: extend sign-up limiting to key on device hash + ASN (not IP alone); build a read model that
     clusters accounts sharing device/IP/ASN for admin review.
   - Verify: unit test cluster grouping; rate-limit test that device+ASN caps hold under IP rotation.
+  - Progress: **ASN scope decision** — checked with the user before building: this codebase has
+    zero IP→ASN resolution capability (no geo-IP dependency installed), so real ASN clustering
+    would mean picking and adding a new external dependency/vendor. User chose device+IP only,
+    ASN explicitly deferred (same honest-deferral pattern as `anomalies.ts`/`session-hooks.ts`).
+    **Two security-boundary questions also confirmed with the user before proceeding**: (1)
+    reading `auth_sessions.ip_address` needs a new narrow auth-db-allowlisted repository file —
+    approved; (2) cross-user device clustering needs `builderhunt_worker` to read `user_devices`
+    across ALL users, but it had zero grant on that table at all (only `builderhunt_app`,
+    scoped to its own `app.user_id`) — approved a new migration granting it unscoped SELECT.
+    **New migration `0045_user_devices_worker_read_grant.sql`**: `CREATE POLICY
+    user_devices_worker_select ... USING (true)` + `GRANT SELECT` for `builderhunt_worker` —
+    SELECT only, INSERT/UPDATE/DELETE stay exclusively with `builderhunt_app`, unlike
+    `account_risk`'s worker policy (stays `user_id`-scoped) there's no single subject to scope a
+    clustering read by. Applied via `drizzle-kit migrate`; confirmed the policy live with `\d+
+    user_devices`. Did **not** run the full `test:rls:local` fixture rehearsal against this shared
+    dev cluster — `prepare-rls-fixture.mjs` mutates cluster-wide role passwords
+    (`ALTER ROLE ... PASSWORD`), which would have broken a concurrent session's dev server using
+    the same local Postgres; instead verified directly with the real `builderhunt_worker`/`builderhunt_app`
+    credentials from `.env` (no mutation): worker sees all 35 device rows unscoped, app sees 0
+    with no `app.user_id` context set — matches the policy's intent exactly. Extended
+    `verify-rls-local.mjs`'s existing `user_devices` block with the worker-cross-user-read +
+    worker-insert-denied assertions for whenever that fixture *is* run (CI, or an isolated
+    environment).
+    **New `repositories/auth-sessions-worker.ts`** (added to `check-tenant-boundaries.mjs`'s
+    `authDbAllowlist`, same narrow-exception shape as `account-privacy.ts`/`alerts-worker.ts`):
+    `listRecentSessionIps(sinceDate, limit)` — bounded, read-only `auth_sessions.ip_address`.
+    **Extended `repositories/user-devices.ts`** with `listRecentDeviceHashesAcrossUsers` (worker-only,
+    bounded by `lastSeenAt`/`limit`).
+    **New `abuse/linked-accounts.ts`**: `clusterLinkedAccounts` — union-find over
+    `(userId, deviceHash?, ipAddress?)` associations; two accounts land in one cluster if they
+    share ANY device hash or IP, transitively (A~B via device, B~C via IP → one cluster of 3).
+    Singleton "clusters" (nothing shared with anyone) are dropped. `findLinkedAccountClusters`
+    composes the two read models into the flat clustering input. Detection/admin-review only —
+    never influences authorization.
+    **New `api/admin/abuse/clusters.ts`**: `GET`, `requirePlatformAdminPrincipal`-gated, optional
+    `?windowDays=` (default 30), returns `{windowDays, clusters}`.
+    **Device-hash-keyed sign-up rate limiting**: extended `better-auth.ts`'s existing
+    `user.create.before` hook (already used for the disposable-email gate) to also read/issue the
+    `bh_did` cookie and call `rateLimit('signup-device', deviceHash, SIGNUP_DEVICE_DAILY_LIMIT,
+    24h)` (new env var, default 3/day) — survives IP rotation, unlike better-auth's own built-in
+    per-IP sign-up limiter. Researched via Explore sub-agent that `context.headers`/
+    `context.request?.headers` (not `user.userAgent`, which doesn't exist) is how to read the
+    incoming UA from a `user.create.before` hook in better-auth 1.6.23.
+    **Bug found and fixed during live verification**: a brand-new sign-up's `user.create.before`
+    (rate-limit check) and `session.create.before` (existing device-recognition upsert from Phase 1)
+    each independently issued their OWN fresh `bh_did` value when no cookie existed yet — since
+    `context.getCookie` only reads the ORIGINAL incoming request, never a value set earlier in the
+    same request by another hook's `context.setCookie`. This produced two conflicting
+    `Set-Cookie: bh_did=...` headers in one response (a real browser keeps only the last one) — the
+    two hooks disagreed about the device's identity for that exact request. Fixed with a
+    `pendingSignupDeviceCookie` `WeakMap<object, string>` (same per-request `context`-object
+    correlation pattern as the existing `pendingSessionDevices` map): `user.create.before` records
+    what it issued, `session.create.before` checks the map first and reuses that value instead of
+    issuing a second one. Confirmed fixed live: a fresh sign-up now sets exactly one `bh_did`
+    cookie, and `user_devices` gets exactly one consistent device row.
+    **Tests**: `linked-accounts.test.ts` (11 cases — empty input, lone account not clustered,
+    disjoint accounts not clustered, device-only cluster, IP-only cluster, 3-way transitive
+    clustering across different identifier types, two independent clusters not merged, null/undefined
+    identifiers ignored, a shared identifier reported only when 2+ *final-cluster* members actually
+    share it, size-descending sort, and the `findLinkedAccountClusters` composition wiring).
+    New `rate-limit.test.ts` (4 cases, this function had no tests before): basic cap/deny, distinct
+    ids tracked independently, window reset, and the task-mandated "device-hash cap holds across
+    IP rotation" case (same `id`, four different *simulated* client IPs — the point being `rateLimit`
+    never takes IP as input at all, so keying on device hash instead of IP is inherently immune to
+    IP rotation).
+    **Full local sweep**: `pnpm tsc --noEmit` clean, `pnpm eslint` clean on all 9 changed/new
+    source files, `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/user-devices.test.ts
+    src/shared/lib/rate-limit.test.ts src/shared/lib/auth/tenant-principal.test.ts
+    src/routes/api/admin/abuse --no-file-parallelism` → 134/134 green (ran with reduced
+    parallelism after hitting real Postgres connection-limit contention — 203/200 connections,
+    traced to an orphaned dev-server process from an earlier `preview_stop` in this same session
+    that hadn't released its connections; killed it, connections dropped to 93, unrelated to this
+    task's code), `pnpm security:boundaries` → 0 legacy imports (confirms the new
+    `auth-sessions-worker.ts` allowlist entry didn't open anything unintended).
+    **Live end-to-end verification against the real dev server + Postgres** (not just unit tests):
+    (1) sign-up device cap — 4 sign-ups sharing one persisted `bh_did` cookie (via a curl cookie
+    jar, with an `Origin` header to satisfy better-auth's pre-existing CSRF origin-check, which
+    only triggers once a Cookie header is present — unrelated to this task) succeeded, the 4th
+    hitting the cap failed with `429 {"code":"SIGNUP_DEVICE_RATE_LIMITED"}`, exactly matching the
+    default limit of 3; (2) the cookie-sync fix — confirmed a fresh sign-up now emits exactly one
+    `Set-Cookie: bh_did=...` and one consistent `user_devices` row; (3) clustering — created two
+    real users sharing one device cookie, ran `findLinkedAccountClusters` against the real dev DB,
+    got back a real cluster containing both (plus every other locally-tested account, since all
+    local dev traffic shares `127.0.0.1` — expected, and itself a live demonstration of the
+    OWASP NAT caveat this whole plan is built around: IP alone over-clusters on shared egress,
+    which is exactly why `risk.ts`'s corroboration gate requires 2+ *distinct* signal types before
+    escalating, not just one indiscriminate one). Deleted every test user/cookie/scratch script
+    created during verification afterward.
 
 ## Phase 4 — Core-value metering + rate-limit hardening (C)
 

@@ -1,6 +1,8 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, gte } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantTransaction } from '../db/client'
 import { userDevices } from '../db/schema'
+import { workerDb } from '../db/worker-db'
 
 /**
  * Account-subject (`user_id`) — `builderhunt_app` has SELECT + INSERT + UPDATE
@@ -41,6 +43,20 @@ export async function listUserDevicesForUser(
   userId: string,
 ): Promise<UserDeviceRecord[]> {
   return transaction.select().from(userDevices).where(eq(userDevices.userId, userId))
+}
+
+/**
+ * Cross-user, worker-only (`drizzle/0045_user_devices_worker_read_grant.sql` — SELECT-only,
+ * unscoped by `app.user_id`, since a clustering read has no single subject to scope by). Used by
+ * `abuse/linked-accounts.ts`'s clustering read model; never exposed to `builderhunt_app`. Bounded
+ * by `sinceDate` and `limit` — never an unbounded full-table scan.
+ */
+export async function listRecentDeviceHashesAcrossUsers(
+  sinceDate: Date,
+  limit = 5000,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<UserDeviceRecord[]> {
+  return db.select().from(userDevices).where(gte(userDevices.lastSeenAt, sinceDate)).limit(limit)
 }
 
 export interface UpsertUserDeviceInput {
