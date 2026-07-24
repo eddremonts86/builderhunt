@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
-  CircleUser, Users, CreditCard, Shield, Activity, Cog, Inbox, AlertTriangle,
+  CircleUser, Users, CreditCard, Shield, ShieldCheck, Activity, Cog, Inbox, AlertTriangle,
   BookOpen, Map, LogOut, Sparkles, RotateCcw, ShieldAlert, Gauge,
 } from 'lucide-react'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
@@ -15,6 +15,7 @@ const WORKSPACE_LINKS = [
   { to: '/settings/team', icon: Users, label: 'Team' },
   { to: '/settings/billing', icon: CreditCard, label: 'Billing' },
   { to: '/settings/privacy', icon: Shield, label: 'Privacy' },
+  { to: '/settings/security', icon: ShieldCheck, label: 'Security' },
   { to: '/status', icon: Activity, label: 'Status' },
 ] as const
 

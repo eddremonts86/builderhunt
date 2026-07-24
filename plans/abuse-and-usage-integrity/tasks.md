@@ -211,7 +211,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `pnpm tsc --noEmit`, `pnpm eslint`, `pnpm vitest run src/shared/lib/abuse` (36/36),
     `pnpm security:boundaries` all clean.
 
-- [ ] **`/settings/security` — active sessions + logbook**
+- [x] **`/settings/security` — active sessions + logbook**
   - Files: `src/routes/_dashboard/settings/security.tsx`,
     `src/modules/dashboard/components/ActiveSessionsPanel.tsx` (+ test),
     `src/routes/api/me/sessions/index.ts`
@@ -219,6 +219,31 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `listSessions`; per-row "Sign out" (`revokeSession`) and "Sign out everywhere else"
     (`revokeOtherSessions`); show recent activity from `session_signals` (redacted).
   - Verify: component test; Playwright: revoke a second session and confirm it is logged out.
+  - Progress (2026-07-24): `/api/me/sessions` GET enriches better-auth's `listSessions` with
+    `user_devices`/`session_signals` — `session_signals` has zero `builderhunt_app` grant (system-
+    operational, see `0044_abuse_usage_integrity_rls_grants.sql`), so this reads it via `workerDb`
+    directly filtered to exactly this user's own `sessionIdHash` values, the same "worker-role read
+    for a user's own display data" pattern `abuse-signals.ts`'s `listAbuseSignalsForUser` already
+    established; `user_devices` IS granted to `builderhunt_app`, read via the normal
+    `withTenantContext`. Added `listUserDevicesForUser` to the repo (+ 2 new A/B isolation tests).
+    "Coarse location" omitted (always `null`) — no ASN/geo-lookup capability exists yet, a separate
+    later task; showing a fabricated value would be worse than showing nothing. Revoke actions
+    (`ActiveSessionsPanel.tsx`) call better-auth's own `authClient.revokeSession`/
+    `revokeOtherSessions` directly — no custom revoke route needed. Component test discovered a real
+    gotcha worth documenting: better-auth's client captures its own `fetch` reference at
+    client-creation time, so stubbing `global.fetch` alone lets `revokeSession` calls escape to a
+    real network request (confirmed: they hit the actual local dev server and got a real 401) —
+    fixed by `vi.mock`-ing the `~/shared/lib/auth/client` module boundary instead, only the plain
+    `fetch('/api/me/sessions')` call goes through the stubbed global. 8 component tests. Added
+    "Security" to `UserMenu.tsx`'s workspace links so the page is actually reachable. No Playwright
+    spec (per this project's standing direction against new e2e test files) — live-verified instead
+    against the real local dev DB and a real signed-in browser session: the list rendered this
+    account's actual 38 live sessions with correct device-family enrichment for sessions created
+    after this plan's device-tracking landed, "Unknown device" for older pre-existing sessions (no
+    signal data for them, as expected), current-device badge correct; clicked a real "Sign out"
+    button and confirmed via direct Postgres query that `auth_sessions` dropped from 38 to 37 rows
+    and the list re-rendered without that session. `pnpm tsc --noEmit`, `pnpm eslint`, `pnpm vitest
+    run` (60/60 across the touched files), `pnpm security:boundaries` all clean.
 
 ## Phase 2 — Session anomaly detection (A2, A3, E-detection)
 

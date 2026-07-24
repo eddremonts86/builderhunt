@@ -93,6 +93,7 @@ import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/chan
 import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
 import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
 import { Route as DashboardSettingsTeamRouteImport } from './routes/_dashboard/settings/team'
+import { Route as DashboardSettingsSecurityRouteImport } from './routes/_dashboard/settings/security'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
@@ -105,6 +106,7 @@ import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
+import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
@@ -588,6 +590,12 @@ const DashboardSettingsTeamRoute = DashboardSettingsTeamRouteImport.update({
   path: '/settings/team',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardSettingsSecurityRoute =
+  DashboardSettingsSecurityRouteImport.update({
+    id: '/settings/security',
+    path: '/settings/security',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardSettingsPrivacyRoute =
   DashboardSettingsPrivacyRouteImport.update({
     id: '/settings/privacy',
@@ -652,6 +660,11 @@ const ApiOrganizationsInvitationsIndexRoute =
     path: '/api/organizations/invitations/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
+  id: '/api/me/sessions/',
+  path: '/api/me/sessions/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMePlanChangesIndexRoute = ApiMePlanChangesIndexRouteImport.update({
   id: '/api/me/plan-changes/',
   path: '/api/me/plan-changes/',
@@ -1026,6 +1039,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
@@ -1142,6 +1156,7 @@ export interface FileRoutesByFullPath {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1181,6 +1196,7 @@ export interface FileRoutesByTo {
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
@@ -1297,6 +1313,7 @@ export interface FileRoutesByTo {
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
+  '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1341,6 +1358,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
+  '/_dashboard/settings/security': typeof DashboardSettingsSecurityRoute
   '/_dashboard/settings/team': typeof DashboardSettingsTeamRoute
   '/_dashboard/sprints/new': typeof DashboardSprintsNewRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
@@ -1457,6 +1475,7 @@ export interface FileRoutesById {
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
+  '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1500,6 +1519,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/settings/billing'
     | '/settings/privacy'
+    | '/settings/security'
     | '/settings/team'
     | '/sprints/new'
     | '/blog/$slug'
@@ -1616,6 +1636,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/me/sessions/'
     | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -1655,6 +1676,7 @@ export interface FileRouteTypes {
     | '/admin/roadmap'
     | '/admin/users'
     | '/settings/privacy'
+    | '/settings/security'
     | '/settings/team'
     | '/sprints/new'
     | '/blog/$slug'
@@ -1771,6 +1793,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export'
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
+    | '/api/me/sessions'
     | '/api/organizations/invitations'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -1814,6 +1837,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/users'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
+    | '/_dashboard/settings/security'
     | '/_dashboard/settings/team'
     | '/_dashboard/sprints/new'
     | '/_landing/blog/$slug'
@@ -1930,6 +1954,7 @@ export interface FileRouteTypes {
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
+    | '/api/me/sessions/'
     | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -2038,6 +2063,7 @@ export interface RootRouteChildren {
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
+  ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
@@ -2632,6 +2658,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsTeamRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/settings/security': {
+      id: '/_dashboard/settings/security'
+      path: '/settings/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof DashboardSettingsSecurityRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/settings/privacy': {
       id: '/_dashboard/settings/privacy'
       path: '/settings/privacy'
@@ -2714,6 +2747,13 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/invitations'
       fullPath: '/api/organizations/invitations/'
       preLoaderRoute: typeof ApiOrganizationsInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/sessions/': {
+      id: '/api/me/sessions/'
+      path: '/api/me/sessions'
+      fullPath: '/api/me/sessions/'
+      preLoaderRoute: typeof ApiMeSessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/me/plan-changes/': {
@@ -3175,6 +3215,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
+  DashboardSettingsSecurityRoute: typeof DashboardSettingsSecurityRoute
   DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
@@ -3199,6 +3240,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
+  DashboardSettingsSecurityRoute: DashboardSettingsSecurityRoute,
   DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
@@ -3492,6 +3534,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
+  ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,

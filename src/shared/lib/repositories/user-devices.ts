@@ -35,6 +35,14 @@ export async function findUserDevice(
   return row ?? null
 }
 
+/** Used by `/settings/security`'s active-sessions view — a user's own device count is small. */
+export async function listUserDevicesForUser(
+  transaction: TenantTransaction,
+  userId: string,
+): Promise<UserDeviceRecord[]> {
+  return transaction.select().from(userDevices).where(eq(userDevices.userId, userId))
+}
+
 export interface UpsertUserDeviceInput {
   id: string
   userId: string
