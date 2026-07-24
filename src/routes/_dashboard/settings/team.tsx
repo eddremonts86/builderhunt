@@ -5,7 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { TeamSettingsPage } from '~/modules/dashboard/components/TeamSettingsPage'
-import type { InvitableRole, TeamSnapshotDto } from '~/shared/lib/organizations/contracts'
+import type { InvitableRole, OrganizationSummaryDto, TeamSnapshotDto } from '~/shared/lib/organizations/contracts'
 
 export const Route = createFileRoute('/_dashboard/settings/team')({
   beforeLoad: async () => {
@@ -25,6 +25,36 @@ async function fetchTeamSnapshot(): Promise<TeamSnapshotDto> {
 async function parseErrorMessage(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => ({}))
   return typeof body.error === 'string' ? body.error : fallback
+}
+
+/**
+ * `authSessions.activeOrganizationId` has `onDelete: 'set null'` (schema.ts) — the FK sets the
+ * EXISTING session's active org to null the moment the org/membership row is gone (leaving or
+ * deleting an organization), and nothing auto-picks a replacement for an already-live session
+ * (`pickDefaultActiveOrganizationId` only runs at sign-in/sign-up, in `session.create.before`).
+ * Left alone, the next request lands on a dashboard with `activeOrganizationId: null` and every
+ * org-scoped route (e.g. `/api/dashboard/stats`) 403s. Called before navigating away after leaving/
+ * deleting the caller's own active organization — explicitly switches the session onto the user's
+ * own personal workspace (every user has exactly one, `isPersonal: true`), mirroring
+ * `OrganizationSwitcher`'s own switch flow. Best-effort: any failure here just leaves the user on a
+ * dashboard with no active organization, same as if this function didn't exist — never throws.
+ */
+export async function switchToPersonalWorkspace(): Promise<void> {
+  try {
+    const res = await fetch('/api/organizations', { credentials: 'include' })
+    if (!res.ok) return
+    const organizations: OrganizationSummaryDto[] = await res.json()
+    const personal = organizations.find((organization) => organization.isPersonal)
+    if (!personal) return
+    await fetch('/api/organizations/switch', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ organizationId: personal.id }),
+    })
+  } catch {
+    // Best-effort — see doc comment above.
+  }
 }
 
 function TeamSettingsRoute() {
@@ -59,11 +89,14 @@ function TeamSettingsRoute() {
   }
 
   // Leaving or deleting the organization ends the caller's own membership in
-  // it — mirrors OrganizationSwitcher's switch flow: `router.invalidate()`
-  // re-reads the now-null `activeOrganizationId` from the session, which
-  // flows into `TenantQueryProvider`'s effect and clears every cached query,
-  // then navigate away from a settings page for an org that's gone.
+  // it — first move the session onto a workspace that's still valid
+  // (see `switchToPersonalWorkspace`'s doc comment for why this is
+  // necessary), then `router.invalidate()` re-reads the now-valid
+  // `activeOrganizationId` from the session, which flows into
+  // `TenantQueryProvider`'s effect and clears every cached query, and only
+  // then do we navigate away from a settings page for an org that's gone.
   async function leaveOrganizationContext() {
+    await switchToPersonalWorkspace()
     await router.invalidate()
     navigate({ to: '/dashboard' })
   }
