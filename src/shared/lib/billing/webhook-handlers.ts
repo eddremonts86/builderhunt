@@ -34,6 +34,7 @@ import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, res
 import { grantCredits } from './credits'
 import { recordDisputeFundsReinstated, recordDisputeOpened, resolveDispute, updateDisputeStripeStatus } from './disputes'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
+import { endOverlappingManualAuthority } from './legacy-migration'
 import { billingNotificationRecipients } from './notifications'
 import { applyCreditRevocationForRefund } from './refunds'
 import { sendBillingPaymentFailedEmail, sendBillingReceiptEmail } from '../email'
@@ -467,6 +468,11 @@ async function handleSubscriptionUpsert(
         currentPeriodEnd: toDate(item.current_period_end),
         seatLimit: catalogEntry.seatLimit,
       })
+      // Voluntary Checkout cutover (§10 "Migrate manual entitlements without charging"): this is the
+      // FIRST Stripe subscription this organization has ever had — end any overlapping manual
+      // authority (legacy trialEndsAt/notes, any still-active legacy_manual credit grant) atomically
+      // in the same transaction.
+      await endOverlappingManualAuthority(tx, organizationId)
       return { outcome: 'applied', detail: `Created subscription record for ${subscription.id} (${isNewSubscriptionRecord ? 'first sighting' : 'resolved via customer'})` }
     }
 

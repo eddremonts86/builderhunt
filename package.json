@@ -23,6 +23,7 @@
     "db:backfill:organizations": "tsx --env-file=.env scripts/db/backfills/organizations.ts",
     "db:backfill:resources": "tsx --env-file=.env scripts/db/backfills/resources.ts",
     "db:backfill:builders": "tsx --env-file=.env scripts/db/backfills/builders.ts",
+    "db:backfill:stripe-billing-legacy": "tsx --env-file=.env scripts/db/backfills/stripe-billing-legacy.ts",
     "test:rls:local": "node scripts/db/verify-rls-local.mjs",
     "test:api-isolation:local": "tsx scripts/db/verify-api-isolation-local.mjs",
     "test:migrations:local": "node scripts/db/verify-migrations-local.mjs",
