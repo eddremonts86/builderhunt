@@ -6,7 +6,9 @@
 > [`stripe-billing-platform`](../stripe-billing-platform/spec.md)
 > **Blocks**: nothing
 > **Reality check**: no calendar/scheduling/interview/storage implementation exists. The Stripe and
-> credit platform is separately planned but also unimplemented. This
+> credit platform (`stripe-billing-platform`) is now built and owns Stripe/ledger/checkout —
+> this plan only registers rate cards and calls its reserve/settle contracts, never a second
+> payment or ledger implementation. This
 > plan must extend current tenant, AI, email, rate-limit, worker, entitlement, privacy, and dashboard
 > patterns rather than creating parallel foundations. The worktree currently contains unrelated
 > legal/security changes; implementation must preserve them and generate migrations from the then

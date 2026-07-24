@@ -11,10 +11,12 @@
 > private object storage, live audio capture, transcription, or
 > interview pages. Reusable foundations exist in `src/shared/lib/auth/tenant-principal.ts`,
 > `src/shared/lib/db/tenant-context.ts`, `src/shared/lib/ai/`, `src/shared/lib/rate-limit.ts`,
-> `src/shared/lib/email.ts`, and the HTTP-worker routes under `src/routes/api/admin/`. The current
-> [`stripe-billing-platform`](../stripe-billing-platform/spec.md) now owns the still-unimplemented
-> Stripe and credit platform. This program defines interview rate cards and consumes its generic
-> authorization contracts; it must not create a second payment or ledger implementation.
+> `src/shared/lib/email.ts`, and the HTTP-worker routes under `src/routes/api/admin/`. The
+> [`stripe-billing-platform`](../stripe-billing-platform/spec.md) plan is now built (real Stripe
+> adapter framework, credit ledger, reservations, checkout, dunning, refunds, disputes,
+> reconciliation) and owns the Stripe and credit platform. This program defines interview rate
+> cards and consumes its generic authorization contracts; it must not create a second payment or
+> ledger implementation.
 
 ## Source design
 
