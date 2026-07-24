@@ -1,4 +1,4 @@
-import { betterAuth } from 'better-auth'
+import { APIError, betterAuth } from 'better-auth'
 import { organization } from 'better-auth/plugins'
 import { drizzleAdapter } from '@better-auth/drizzle-adapter'
 import { and, eq, gt } from 'drizzle-orm'
@@ -16,6 +16,7 @@ import { sendOrganizationInvitationEmail, sendResetPasswordEmail } from '~/share
 import { env } from '~/shared/lib/env'
 import { handleSessionAfter, handleSessionBefore, type SessionCookieAdapter, type SessionDeviceResult } from '~/shared/lib/abuse/session-hooks'
 import { resolveSessionTimeoutConfig } from '~/shared/lib/abuse/session-guard'
+import { checkSignupEmailGate, DisposableEmailRejectedError } from '~/shared/lib/abuse/email-hygiene'
 import { organizationOptions } from './organization-options'
 import { ensurePersonalOrganization, pickDefaultActiveOrganizationId } from './personal-organization'
 
@@ -74,6 +75,22 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
+        // `before` is the only user.create hook stage that can abort creation: throwing here
+        // propagates through better-auth's un-caught hook loop (dist/db/with-hooks.mjs) into the
+        // sign-up route's try/catch (dist/api/routes/sign-up.mjs), which recognizes `APIError` and
+        // rethrows it verbatim to the client — the transaction never commits, so no user row is
+        // created. Same "before can block, after cannot" split as `session.create` (see the
+        // cookie-write comment above `pendingSessionDevices`).
+        before: async (user) => {
+          try {
+            checkSignupEmailGate({ email: user.email, blockDisposable: env.SIGNUP_BLOCK_DISPOSABLE_EMAILS === 'true' })
+          } catch (error) {
+            if (error instanceof DisposableEmailRejectedError) {
+              throw new APIError('BAD_REQUEST', { message: error.message, code: 'DISPOSABLE_EMAIL_NOT_ALLOWED' })
+            }
+            throw error
+          }
+        },
         after: async (user) => {
           await ensurePersonalOrganization(user.id)
         },

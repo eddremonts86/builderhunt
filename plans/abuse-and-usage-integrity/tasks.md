@@ -375,11 +375,47 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     email before quota/paid actions (not before basic login, to avoid lockout).
   - Verify: integration test that an unverified account is blocked from a gated action only.
 
-- [ ] **Disposable / plus-address email blocking**
+- [x] **Disposable / plus-address email blocking**
   - Files: `src/shared/lib/abuse/email-hygiene.ts` (+ test), `src/shared/lib/auth/better-auth.ts`
   - Do: normalize plus-addresses for duplicate detection and reject known disposable domains at
     sign-up when `SIGNUP_BLOCK_DISPOSABLE_EMAILS`.
   - Verify: unit tests for normalization + a sampled disposable-domain list; sign-up rejection test.
+  - Progress: Skipped the preceding "Email verification gate" task in this pass — its file list
+    includes `src/shared/lib/email.ts`, reserved for a concurrent session this whole plan run has
+    been avoiding; will need a maintainer/second pass to pick up. New `email-hygiene.ts`:
+    `normalizeEmailForDuplicateDetection` (lowercase + strip `+tag` local-part suffix, dots left
+    alone since dot-folding is Gmail-specific and would be wrong for every other provider) and a
+    sampled ~40-domain `DISPOSABLE_EMAIL_DOMAINS` set (mailinator/guerrillamail/10minutemail/etc. —
+    a deterrent against the common case, never claimed exhaustive) behind `isDisposableEmailDomain`.
+    Researched (1 Explore sub-agent reading actual better-auth 1.6.23 source,
+    `dist/db/with-hooks.mjs`/`dist/api/routes/sign-up.mjs`) to confirm the correct rejection seam:
+    `databaseHooks.user.create.before` throwing an `APIError` propagates verbatim to the sign-up
+    endpoint's caller and aborts the transaction (no user row created) — `.after` (already used for
+    `ensurePersonalOrganization`) cannot abort, same "before can block, after cannot" split already
+    established for `session.create` in Phase 1. Wired `checkSignupEmailGate` (throws
+    `DisposableEmailRejectedError`, kept separate from the `APIError` translation so the pure gate
+    stays framework-agnostic and unit-testable) into a new `create.before` in `better-auth.ts`,
+    gated on `env.SIGNUP_BLOCK_DISPOSABLE_EMAILS`. `email-hygiene.test.ts`: 21 tests — normalization
+    table (case/whitespace/plus-strip/multi-plus/dots-preserved/malformed-input), disposable-domain
+    table (case-insensitive match, custom list override, malformed input never matches), and the
+    gate itself (silent for normal emails regardless of flag, silent for disposable emails when the
+    flag is off, throws when both apply). Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint`
+    clean, `pnpm vitest run src/shared/lib/abuse/email-hygiene.test.ts src/shared/lib/auth` → 101/101
+    green, `pnpm security:boundaries` → 0 legacy imports. **Live-verified against the real dev
+    server** (not just unit tests): browser-based sign-up became unreliable mid-session (a
+    concurrent session's edits to `__root.tsx`/`globals.css`/`ThemeProvider.tsx` triggered repeated
+    HMR full-remounts that wiped the sign-up form's local state between fill and submit), so
+    verified via direct `curl -X POST /api/auth/sign-up/email` against the same running server
+    instead — same code path, no UI involved. With `SIGNUP_BLOCK_DISPOSABLE_EMAILS=true` (temporary
+    `.env.local` override + the standard dev-server restart this plan has needed every time, since
+    Vite doesn't hot-reload `process.env`): a `mailinator.com` address got `400 BAD_REQUEST
+    {"message":"Disposable email addresses are not allowed.","code":"DISPOSABLE_EMAIL_NOT_ALLOWED"}`
+    and no user row was created; a normal `example.com` address in the same run still succeeded
+    (`200`, session cookie issued) — confirming the gate doesn't collaterally block legitimate
+    sign-ups. Reverted the env override, restarted the server, confirmed the same `mailinator.com`
+    address now succeeds again (flag back to its `false` default), and deleted every test user
+    created during verification (`psql DELETE FROM auth_users WHERE email IN (...)`) to leave the
+    dev database clean.
 
 - [ ] **Device/ASN sign-up velocity + linked-account clustering**
   - Files: `src/shared/lib/rate-limit.ts`, `src/shared/lib/abuse/linked-accounts.ts` (+ test),
