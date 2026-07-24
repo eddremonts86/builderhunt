@@ -172,6 +172,28 @@
     active integration (Postgres, Redis, the 8 public source APIs, Resend, MiniMax M3,
     embeddings) has an entry.
 
+- [ ] **Re-audit the privacy-policy processor list for Stripe (this task's own "we don't use it" claim is now stale)**
+  - Files: `src/routes/_landing/legal/privacy.tsx`
+  - Do: The audit above correctly said "we do not use Stripe" at the time — `package.json` had no
+    `stripe` dependency then. That is no longer true: `plans/stripe-billing-platform` has since
+    installed `stripe@22.3.2` (pinned, `stripe-launch-register.md`) and makes real calls to the
+    Stripe API today (catalog Product/Price provisioning via `scripts/billing/provision-stripe-catalog.ts`,
+    webhook signature verification) — Stripe is a real processor now, even though
+    `STRIPE_BILLING_ENABLED=false` still gates actual customer/payment data from flowing through it
+    in production (confirmed: `billing/stripe-provider.ts`'s `getBillingProvider()` has never had a
+    real Stripe-calling `BillingProvider` behind it — only `FakeBillingProvider` — so no end-user
+    payment/customer data has ever actually reached Stripe through this app; only the seller's own
+    catalog-provisioning calls have). Update Section 3 (Subprocessors) to name Stripe with an
+    accurate purpose description, and update it again once a real adapter exists and
+    `STRIPE_BILLING_ENABLED` is ever set to `true` in production (a second, larger disclosure change
+    at that point — payment method data, customer records, subscription state).
+  - Verify: same as the audit above — every processor claim maps to a real import/env var/API call
+    found via grep, re-run `pnpm type-check && pnpm lint && pnpm test && pnpm build`.
+  - **Flagged, not executed**: modifying live, public-facing legal copy is outside what should be
+    changed autonomously — this task was added to `legal-and-compliance/tasks.md` (properly tracked,
+    not silently done) during `stripe-billing-platform` §10 "Complete operational and privacy
+    runbooks" specifically so a human reviews and makes the actual edit.
+
 - [x] **Complete the DMCA registration decision and disclosure**
   - Files: `src/routes/_landing/legal/imprint.tsx`
   - Do: Operator confirmed (2026-07-21) no DMCA agent registration exists and they were not
