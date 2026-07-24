@@ -84,3 +84,32 @@ jobs:
         run: pnpm test:e2e -- e2e/team-accounts.spec.ts
       - run: pnpm security:dependencies
       - run: pnpm build
+
+  # Optional, additive certification of the real Stripe-backed BillingProvider
+  # (src/shared/lib/billing/real-provider.ts) against Stripe's actual test-mode API — never a
+  # replacement for the `quality` job above, which never talks to Stripe (FakeBillingProvider only).
+  # Runs only when a real Stripe test-mode secret key is configured as a repo/org secret; skipped
+  # entirely (not failed) otherwise, so forks and contributors without Stripe credentials are never
+  # blocked. `continue-on-error: true` because it depends on a live third-party API — network
+  # flakiness or a Stripe-side issue must never block a merge; see
+  # docs/operations/stripe-sandbox-certification.md for what this does and doesn't certify.
+  stripe-sandbox-certification:
+    name: Stripe sandbox certification (optional, real test-mode API)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY != '' }}
+    continue-on-error: true
+    env:
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+      STRIPE_API_VERSION: '2026-06-24.dahlia'
+      RUN_STRIPE_INTEGRATION_TESTS: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run src/shared/lib/billing/real-provider.test.ts

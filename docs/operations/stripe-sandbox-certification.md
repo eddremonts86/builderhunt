@@ -74,20 +74,34 @@ this is a genuine interface-vs-real-API mismatch, not a functional gap in the ad
 plus its own subscription-lifecycle tests seeded through a real `stripe.subscriptions.create` call
 instead of through `changeSubscription` on a fabricated id.
 
+## CI wiring
+
+`.github/workflows/quality.yml` has a second, independent job — `stripe-sandbox-certification` —
+that runs `real-provider.test.ts` against the real Stripe test-mode API. It is genuinely additive,
+never a replacement for the `quality` job (which never talks to Stripe): gated on a
+`STRIPE_SANDBOX_SECRET_KEY` repo/org secret being configured (`if: secrets.STRIPE_SANDBOX_SECRET_KEY
+!= ''`), so it's silently skipped — not failed — on forks or for contributors without Stripe
+credentials, and `continue-on-error: true` since a live third-party API's network flakiness or an
+outage on Stripe's side must never block a merge. Set the `STRIPE_SANDBOX_SECRET_KEY` secret (a
+real `sk_test_...` key, never `sk_live_...`) in the repo's Actions secrets to turn this job on.
+
 ## Not yet certified
 
 The following are still open, deliberately not attempted in this pass:
 
 - **`e2e/stripe-billing.spec.ts`, `test/security/stripe-billing-isolation.test.ts`,
-  `test/fixtures/stripe/`, `.github/workflows/quality.yml`** (this task's originally-scoped files)
-  — a real browser-driven Checkout redirect flow, Stripe Test Clock month-end/leap-year annual
-  grant simulation, signed webhook duplicate/reordering fixtures replayed against the real adapter,
-  and CI wiring. This repo currently has a separate, actively in-progress local-e2e effort
-  (`plans/exhaustive-local-e2e-design/`, `e2e/harness/`, `scripts/e2e/` — all present as untracked
-  work at the time of writing) that owns the Playwright/e2e/CI surface; building a competing e2e
-  spec and CI wiring here risks directly conflicting with that work rather than complementing it.
-  Whoever owns that effort should extend it to cover the real-adapter Checkout/webhook flow once
-  the harness itself has landed, rather than this task duplicating it.
+  `test/fixtures/stripe/`** (this task's remaining originally-scoped files) — a real browser-driven
+  Checkout redirect flow through Stripe's own hosted payment page, and signed webhook
+  duplicate/reordering fixtures replayed against the real adapter. This repo currently has a
+  separate, actively in-progress local-e2e effort (`plans/exhaustive-local-e2e-design/`,
+  `e2e/harness/`, `scripts/e2e/` — all present as untracked work at the time of writing) that owns
+  the Playwright/e2e surface, and that plan's own scope explicitly defers "optional sandbox contract
+  checks against the real Stripe test account" as a "additive CI job, not a replacement" for its
+  fake-provider coverage — which is exactly what the `stripe-sandbox-certification` CI job above
+  now provides at the API level. A literal browser-driven Checkout redirect flow (automating
+  Stripe's own hosted payment UI) is a materially larger, more fragile undertaking than the API-level
+  certification already in place, and was judged not to be the best use of effort here; building it
+  is left to whoever extends the local-e2e harness once it lands, per that plan's own note.
 - **Test Clock lifecycle** (month boundaries, leap-year annual grant anniversaries, trial-to-active
   transitions over simulated time) — `real-provider.test.ts` verifies real-time behavior only; no
   test in this codebase yet drives a Stripe Test Clock forward to exercise these transitions against
@@ -99,8 +113,10 @@ The following are still open, deliberately not attempted in this pass:
 
 ## Bottom line
 
-The real adapter exists, is wired behind `STRIPE_BILLING_ENABLED`, and every one of its 15 methods
-has been exercised against Stripe's actual test-mode API with passing assertions — this is real
-verification, not another layer built on the fake provider. What remains is the browser/e2e/CI
-surface, which intentionally defers to the repo's separate, already-in-progress e2e effort rather
-than duplicating it.
+The real adapter exists, is wired behind `STRIPE_BILLING_ENABLED`, every one of its 15 methods has
+been exercised against Stripe's actual test-mode API with passing assertions, and that certification
+now runs in CI on every push/PR when `STRIPE_SANDBOX_SECRET_KEY` is configured — this is real
+verification, not another layer built on the fake provider. What remains is the browser Checkout
+e2e flow, Test Clock lifecycle simulation, and real-adapter-specific RLS re-verification, which
+intentionally defer to the repo's separate, already-in-progress e2e effort rather than duplicating
+it.
