@@ -9,6 +9,7 @@ if (!sourceUrl || !targetUrl) throw new Error('RESTORE_TEST_SOURCE_URL and RESTO
 assertRestoreTestTargets(sourceUrl, targetUrl)
 
 const sourceChecksum = await seedAndChecksumBillingFixture(sourceUrl)
+const sourceMigrationCount = await countMigrations(sourceUrl)
 
 await restore(sourceUrl, targetUrl)
 
@@ -37,7 +38,9 @@ try {
       ])})
       and (not c.relrowsecurity or not c.relforcerowsecurity)
   `
-  if (migrations?.count !== 29) throw new Error(`Restored migration count mismatch: ${migrations?.count ?? 0}`)
+  if (migrations?.count !== sourceMigrationCount) {
+    throw new Error(`Restored migration count mismatch: source had ${sourceMigrationCount}, target has ${migrations?.count ?? 0}`)
+  }
   if (rls?.missing !== 0) throw new Error(`Restored RLS manifest has ${rls?.missing ?? 0} missing policies`)
 
   const targetChecksum = await checksumBillingFixture(target)
@@ -109,6 +112,23 @@ async function seedAndChecksumBillingFixture(url: string) {
       on conflict (id) do nothing
     `
     return await checksumBillingFixture(client)
+  } finally {
+    await client.end({ timeout: 5 })
+  }
+}
+
+/**
+ * Compares the restored count against the SOURCE database's own migration count (queried before
+ * the dump) rather than a hardcoded number — a hardcoded expected count silently drifts every time
+ * a new migration lands (it did: this check once read `29`, but the real count had grown to 43
+ * without anyone updating it here, which would have made this rehearsal falsely fail on an
+ * otherwise-correct restore).
+ */
+async function countMigrations(url: string): Promise<number> {
+  const client = postgres(url, { max: 1, prepare: false })
+  try {
+    const [row] = await client<{ count: number }[]>`select count(*)::int as count from drizzle.__drizzle_migrations`
+    return row?.count ?? 0
   } finally {
     await client.end({ timeout: 5 })
   }

@@ -29,6 +29,8 @@ export interface LiveBillingReadinessEvidence {
   catalogLivePriceIdsComplete: boolean
   /** `STRIPE_WEBHOOK_SECRET` and `STRIPE_API_VERSION` are both configured (env.ts already fails closed on malformed values in every environment; this confirms they're present at all). */
   webhookAndApiVersionConfigured: boolean
+  /** `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` is configured as 64 hex characters — without it, `encryptWebhookPayload()` throws on every real webhook receipt (`webhook-inbox.ts`'s `minimizeForStorage` call), so this is not optional hygiene, it's a hard prerequisite for the webhook endpoint to work at all. */
+  webhookPayloadEncryptionKeyConfigured: boolean
   /** The seller profile has at least one recorded tax registration — a proxy for "tax/product code decided," since no separate product-tax-code store exists yet (see readiness.test.ts / stripe-live-readiness.md for the known gap). */
   taxConfigurationRecorded: boolean
   /** The seller profile's production customer-country allowlist includes Denmark, matching spec.md's Denmark-only initial launch. */
@@ -54,6 +56,7 @@ export function assessLiveBillingReadiness(evidence: LiveBillingReadinessEvidenc
   if (!evidence.supportContactConfigured) missing.push('supportContactConfigured')
   if (!evidence.catalogLivePriceIdsComplete) missing.push('catalogLivePriceIdsComplete')
   if (!evidence.webhookAndApiVersionConfigured) missing.push('webhookAndApiVersionConfigured')
+  if (!evidence.webhookPayloadEncryptionKeyConfigured) missing.push('webhookPayloadEncryptionKeyConfigured')
   if (!evidence.taxConfigurationRecorded) missing.push('taxConfigurationRecorded')
   if (!evidence.denmarkAllowlisted) missing.push('denmarkAllowlisted')
   if (!evidence.termsPrivacyVersionsConfirmed) missing.push('termsPrivacyVersionsConfirmed')

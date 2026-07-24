@@ -8,6 +8,7 @@ const FULLY_READY: LiveBillingReadinessEvidence = {
   supportContactConfigured: true,
   catalogLivePriceIdsComplete: true,
   webhookAndApiVersionConfigured: true,
+  webhookPayloadEncryptionKeyConfigured: true,
   taxConfigurationRecorded: true,
   denmarkAllowlisted: true,
   termsPrivacyVersionsConfirmed: true,

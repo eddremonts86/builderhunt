@@ -106,6 +106,7 @@ async function main() {
     supportContactConfigured: Boolean(seller?.statementDescriptor && seller?.supportEmail),
     catalogLivePriceIdsComplete: checkCatalogLivePriceIds(),
     webhookAndApiVersionConfigured: Boolean(process.env.STRIPE_WEBHOOK_SECRET && process.env.STRIPE_API_VERSION),
+    webhookPayloadEncryptionKeyConfigured: /^[0-9a-f]{64}$/i.test(process.env.WEBHOOK_PAYLOAD_ENCRYPTION_KEY ?? ''),
     taxConfigurationRecorded: Boolean(seller && seller.taxRegistrations.length > 0),
     denmarkAllowlisted: Boolean(seller?.countryAllowlist.includes('DK')),
     termsPrivacyVersionsConfirmed: flags.confirmTermsPrivacy,

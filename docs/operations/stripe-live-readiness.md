@@ -50,6 +50,7 @@ secret value, so this is always safe to paste into an incident channel or a rele
 | `supportContactConfigured` | The current seller profile's statement descriptor and support email are both set. | `getCurrentSellerProfile()` |
 | `catalogLivePriceIdsComplete` | Every currently-active catalog entry has a real, non-null live Stripe Price ID. | `src/shared/lib/billing/catalog.ts` |
 | `webhookAndApiVersionConfigured` | `STRIPE_WEBHOOK_SECRET` and `STRIPE_API_VERSION` are both set. | `process.env` |
+| `webhookPayloadEncryptionKeyConfigured` | `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` is set to 64 hex characters — without it, every real webhook receipt throws before it can even be stored. | `process.env` |
 | `taxConfigurationRecorded` | At least one tax registration is on file. | `getCurrentSellerProfile()` |
 | `denmarkAllowlisted` | The production customer-country allowlist includes Denmark. | `getCurrentSellerProfile()` |
 | `termsPrivacyVersionsConfirmed` | An operator has confirmed the current Terms/Privacy versions were reviewed for this launch. | `--confirm-terms-privacy` |
