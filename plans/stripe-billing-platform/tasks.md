@@ -1282,6 +1282,17 @@ migration, dunning/recovery) implemented, tested, and committed.
     themselves in this pass (a separate, larger cleanup — `SeatDowngradeBlockerDto`/`isOwnerRole`/
     `OrganizationRole` in the same file are still genuinely used elsewhere) — flagged as a follow-up
     task instead of scope-creeping a route removal into this already-large page rewrite.
+    **Follow-up completed**: re-grepped the whole tree and confirmed zero remaining consumers of
+    `src/routes/api/organizations/billing.ts`, `OrganizationEntitlementDto`, `toOrganizationEntitlementDto`,
+    and `getOrganizationBillingSnapshot` (routes, modules, and tests) — deleted the route file and the
+    three exports/their now-exclusively-theirs imports (`PlanStatus`, `EntitlementTier`,
+    `OrganizationEntitlementRecord`) from `organizations/contracts.ts`, leaving `SeatDowngradeBlockerDto`/
+    `isOwnerRole`/`OrganizationRole`/`getSeatUsage`/`listMyOrganizations` untouched since `getTeamSnapshot`
+    and other exports in the same file still use them. `getOrganizationBillingDetail`
+    (`auth/organization-lifecycle.ts`) is now unused too as a side effect but was left alone — out of the
+    scope actually requested. `pnpm type-check`, `pnpm eslint` on the touched file, `security:boundaries`,
+    `security:route-coverage` (101→100 routes) all clean; `organizations/`+`dependency-contracts.test.ts`
+    (25 tests) pass unchanged.
     10 new `BillingSettingsPage.test.tsx` tests (member availability-only view for both paid/free,
     full owner view with all mutation controls present, full admin view with zero mutation controls,
     payment-blocked danger banner, grace-period warning banner, scheduled-change banner, cancel-
