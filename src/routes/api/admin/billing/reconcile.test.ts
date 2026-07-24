@@ -19,17 +19,17 @@ vi.mock('~/shared/lib/billing/reconciliation', async (importOriginal) => {
 const { Route } = await import('./reconcile')
 const { PlatformAdminAuthorizationError } = await import('~/shared/lib/auth/platform-admin')
 
-function postRequest(body: unknown): Request {
+function postRequest(body: unknown, headers: Record<string, string> = {}): Request {
   return new Request('https://app.test/api/admin/billing/reconcile', {
     method: 'POST',
     body: JSON.stringify(body),
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...headers },
   })
 }
 
-async function callPost(body: unknown = {}): Promise<Response> {
+async function callPost(body: unknown = {}, headers: Record<string, string> = {}): Promise<Response> {
   const handler = (Route as unknown as { options: { server: { handlers: { POST: (args: { request: Request }) => Promise<Response> } } } }).options.server.handlers.POST
-  return handler({ request: postRequest(body) })
+  return handler({ request: postRequest(body, headers) })
 }
 
 const SAMPLE_SUMMARY = {
@@ -90,5 +90,26 @@ describe('POST /api/admin/billing/reconcile', () => {
 
     expect(response.status).toBe(500)
     expect(JSON.stringify(body)).not.toContain('10.0.4.9')
+  })
+
+  // Regression: billing_reconciliation_runs.actor_user_id has a real FK to auth_users.
+  // tryCronPrincipal's synthetic { userId: 'cron' } isn't a row there — passing it straight
+  // through as actorUserId 500'd with a foreign-key violation the first time this path was ever
+  // actually exercised (it's never called by anything with a browser session). Never regress to
+  // forwarding the sentinel userId as-is.
+  it('passes actorUserId null (never the "cron" sentinel) when authenticated via CRON_SECRET', async () => {
+    const previous = process.env.CRON_SECRET
+    process.env.CRON_SECRET = 'test-cron-secret'
+    try {
+      mocks.runReconciliation.mockResolvedValue(SAMPLE_SUMMARY)
+
+      const response = await callPost({}, { authorization: 'Bearer test-cron-secret' })
+
+      expect(response.status).toBe(200)
+      expect(mocks.requirePlatformAdminPrincipal).not.toHaveBeenCalled()
+      expect(mocks.runReconciliation).toHaveBeenCalledWith(expect.objectContaining({ actorUserId: null }))
+    } finally {
+      process.env.CRON_SECRET = previous
+    }
   })
 })

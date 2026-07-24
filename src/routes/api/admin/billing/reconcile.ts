@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
-import { tryCronPrincipal } from '~/shared/lib/auth/cron'
+import { CRON_PRINCIPAL_USER_ID, tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
 import { runReconciliation, type ReconciliationCursor } from '~/shared/lib/billing/reconciliation'
 
@@ -24,7 +24,11 @@ export const Route = createFileRoute('/api/admin/billing/reconcile')({
             ? { objectType: body.resumeFrom.objectType }
             : null
 
-          const summary = await runReconciliation({ provider: getBillingProvider(), actorUserId: principal.userId, resumeFrom })
+          // `billing_reconciliation_runs.actor_user_id` has a real FK to auth_users — the
+          // synthetic cron principal's userId isn't a row there, so a cron-triggered run is
+          // recorded as unattended (null) rather than violating that constraint.
+          const actorUserId = principal.userId === CRON_PRINCIPAL_USER_ID ? null : principal.userId
+          const summary = await runReconciliation({ provider: getBillingProvider(), actorUserId, resumeFrom })
 
           await auditPlatformAdminAction(principal, {
             action: 'admin.billing.reconcile',

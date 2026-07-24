@@ -38,10 +38,15 @@ function secretsMatch(a: string, b: string): boolean {
   return timingSafeEqual(left, right)
 }
 
+/** The synthetic `userId` a cron-authenticated principal carries — never a real `auth_users.id`
+ * row, so any DB column with a NOT-nullable FK to `auth_users` must not receive this value
+ * directly; compare against this constant and substitute `null` (or a nullable-FK column) instead. */
+export const CRON_PRINCIPAL_USER_ID = 'cron'
+
 export function tryCronPrincipal(request: Request): PlatformAdminPrincipal | null {
   const secret = process.env.CRON_SECRET
   if (!secret) return null
   const token = presentedToken(request)
   if (!token) return null
-  return secretsMatch(token, secret) ? { userId: 'cron', requestId: requestIdFrom(request) } : null
+  return secretsMatch(token, secret) ? { userId: CRON_PRINCIPAL_USER_ID, requestId: requestIdFrom(request) } : null
 }
