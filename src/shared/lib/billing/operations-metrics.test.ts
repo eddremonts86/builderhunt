@@ -2,13 +2,14 @@ import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, billingReconciliationRuns, billingSellerProfiles, billingWebhookEvents } from '../db/schema'
+import { authUsers, billingAutoRechargeRules, billingCheckoutAttempts, billingLedgerEntries, billingReconciliationRuns, billingSellerProfiles, billingSubscriptions, billingWebhookEvents } from '../db/schema'
 
 const mocks = vi.hoisted(() => ({
   listWorkerOrganizationIds: vi.fn(),
   withWorkerOrganization: vi.fn(),
   listGracePeriodBillingSubscriptions: vi.fn(),
   listBillingRefunds: vi.fn(),
+  listActiveBillingCreditGrants: vi.fn(),
   listOrganizationDisputes: vi.fn(),
   listRiskExceptions: vi.fn(),
   isLiveMode: vi.fn(),
@@ -26,7 +27,7 @@ vi.mock('../repositories/billing-worker', async (importOriginal) => {
 
 vi.mock('../repositories/billing', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../repositories/billing')>()
-  return { ...actual, listBillingRefunds: mocks.listBillingRefunds }
+  return { ...actual, listBillingRefunds: mocks.listBillingRefunds, listActiveBillingCreditGrants: mocks.listActiveBillingCreditGrants }
 })
 
 vi.mock('./disputes', async (importOriginal) => {
@@ -44,7 +45,27 @@ vi.mock('./stripe-client', async (importOriginal) => {
   return { ...actual, isLiveMode: mocks.isLiveMode }
 })
 
-const { getBillingOperationsMetrics } = await import('./operations-metrics')
+const { evaluateBillingAlerts, getBillingOperationsMetrics } = await import('./operations-metrics')
+
+const CLEAN_METRICS_BASE = {
+  liveMode: false,
+  configuration: null,
+  webhooks: { pending: 0, processing: 0, failed: 0, ignored: 0, processed: 0 },
+  grace: { organizationsInGrace: 0 },
+  refunds: { pendingRequests: 0 },
+  disputes: { open: 0 },
+  riskExceptions: { active: 0 },
+  creditInvariants: { staleReservations: 0 },
+  reconciliation: { lastRun: null as { windowEnd: string; result: string } | null },
+  costMargin: { available: false as const },
+  checkout: { open: 0, complete: 0, expired: 0, canceled: 0 },
+  recovery: { inGrace: 0, blocked: 0 },
+  webhookAge: { oldestPendingMinutes: null as number | null },
+  ledgerInvariant: { violations: 0 },
+  autoRecharge: { active: 0, pausedNeedsAuth: 0, pausedFailed: 0 },
+  countryGate: { rejectionsSinceStart: 0 },
+  organizationsScanned: 0,
+}
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -64,9 +85,16 @@ afterAll(async () => {
   await drop()
 })
 
-/** Matches `operations-metrics.ts`'s own `transaction.select({id}).from(...).where(...)` shape for the stale-reservations count — every test not specifically asserting on that count gets an empty result by default. */
+/** A thenable that also exposes `.limit()` — matches BOTH shapes `operations-metrics.ts` uses on a raw `transaction.select({...}).from(...).where(...)` result: awaited directly (stale reservations, auto-recharge rules) or chained with `.limit(1)` (the payment-blocked check). */
+function whereResult(rows: unknown[]) {
+  const promise = Promise.resolve(rows) as Promise<unknown[]> & { limit: (n: number) => Promise<unknown[]> }
+  promise.limit = (n: number) => Promise.resolve(rows.slice(0, n))
+  return promise
+}
+
+/** Matches `operations-metrics.ts`'s own `transaction.select({id}).from(...).where(...)` shape — every test not specifically asserting on one of these raw queries gets an empty result by default. */
 function fakeWorkerTransaction() {
-  return { select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }) }
+  return { select: () => ({ from: () => ({ where: () => whereResult([]) }) }) }
 }
 
 beforeEach(() => {
@@ -76,6 +104,7 @@ beforeEach(() => {
   mocks.withWorkerOrganization.mockImplementation((_orgId: string, fn: (tx: unknown) => unknown) => fn(fakeWorkerTransaction()))
   mocks.listGracePeriodBillingSubscriptions.mockResolvedValue([])
   mocks.listBillingRefunds.mockResolvedValue([])
+  mocks.listActiveBillingCreditGrants.mockResolvedValue([])
   mocks.listOrganizationDisputes.mockResolvedValue([])
   mocks.listRiskExceptions.mockResolvedValue([])
 })
@@ -167,7 +196,7 @@ describe('getBillingOperationsMetrics — cross-organization aggregation', () =>
       organizationId === 'org-a' ? [{ id: 'x1', organizationId, revokedAt: null, expiresAt: null } as never] : [],
     )
     mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) => {
-      const tx = { select: () => ({ from: () => ({ where: () => Promise.resolve(organizationId === 'org-b' ? [{ id: 'res-1' }] : []) }) }) }
+      const tx = { select: () => ({ from: () => ({ where: () => whereResult(organizationId === 'org-b' ? [{ id: 'res-1' }] : []) }) }) }
       return fn(tx)
     })
 
@@ -197,5 +226,135 @@ describe('getBillingOperationsMetrics — cross-organization aggregation', () =>
     mocks.isLiveMode.mockReturnValue(true)
     const metrics = await getBillingOperationsMetrics({ platform: db })
     expect(metrics.liveMode).toBe(true)
+  })
+})
+
+/** A `.select().from(table).where(...)` fake that returns different rows depending on WHICH table object was queried (compared by reference) — the new §10 metrics (checkout/auto-recharge/blocked/ledger) all issue distinct raw queries inside the same per-organization transaction, so the single generic `fakeWorkerTransaction()` above (same result for every table) can't distinguish them. */
+function tableAwareFakeTransaction(rowsByTable: Map<unknown, unknown[]>) {
+  return {
+    select: () => ({
+      from: (table: unknown) => ({ where: () => whereResult(rowsByTable.get(table) ?? []) }),
+    }),
+  }
+}
+
+describe('getBillingOperationsMetrics — §10 checkout/recovery/auto-recharge/ledger metrics', () => {
+  it('counts checkout attempts by status across every organization scanned', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue([{ id: 'org-a' }, { id: 'org-b' }])
+    mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) =>
+      fn(tableAwareFakeTransaction(new Map([
+        [billingCheckoutAttempts, organizationId === 'org-a' ? [{ status: 'complete' }, { status: 'expired' }] : [{ status: 'complete' }]],
+      ]))),
+    )
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.checkout).toEqual({ open: 0, complete: 2, expired: 1, canceled: 0 })
+  })
+
+  it('counts auto-recharge rule states across every organization scanned', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue([{ id: 'org-a' }, { id: 'org-b' }])
+    mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) =>
+      fn(tableAwareFakeTransaction(new Map([
+        [billingAutoRechargeRules, organizationId === 'org-a' ? [{ state: 'paused_failed' }] : [{ state: 'active' }]],
+      ]))),
+    )
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.autoRecharge).toEqual({ active: 1, pausedNeedsAuth: 0, pausedFailed: 1 })
+  })
+
+  it('counts an organization with a payment-blocked subscription as "blocked" in the recovery snapshot', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue([{ id: 'org-a' }, { id: 'org-b' }])
+    mocks.withWorkerOrganization.mockImplementation(async (organizationId: string, fn: (tx: unknown) => unknown) =>
+      fn(tableAwareFakeTransaction(new Map([
+        [billingSubscriptions, organizationId === 'org-a' ? [{ id: 'sub-1' }] : []],
+      ]))),
+    )
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.recovery.blocked).toBe(1)
+  })
+
+  it('detects a ledger invariant violation when the recomputed balance disagrees with remainingUnits', async () => {
+    mocks.listWorkerOrganizationIds.mockResolvedValue([{ id: 'org-a' }])
+    mocks.listActiveBillingCreditGrants.mockResolvedValue([{ id: 'grant-1', organizationId: 'org-a', remainingUnits: 100, originalUnits: 100, source: 'pack', state: 'active', expiresAt: new Date() }])
+    mocks.withWorkerOrganization.mockImplementation(async (_organizationId: string, fn: (tx: unknown) => unknown) =>
+      // computed 40 !== remainingUnits 100
+      fn(tableAwareFakeTransaction(new Map([[billingLedgerEntries, [{ unitsDelta: 40 }]]]))),
+    )
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.ledgerInvariant.violations).toBe(1)
+  })
+
+  it('reports country-gate rejections from the in-process counter, not fabricated', async () => {
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+    expect(metrics.countryGate.rejectionsSinceStart).toBe(0)
+  })
+})
+
+describe('getBillingOperationsMetrics — webhook age (real DB)', () => {
+  it('computes the age in minutes of the oldest still-pending webhook event', async () => {
+    // Clean slate: earlier tests in this file seeded their own (recent) pending rows, which would
+    // otherwise win the MIN(receivedAt) comparison against this test's deliberately old row.
+    await db.delete(billingWebhookEvents)
+    const receivedAt = new Date(Date.now() - 90 * 60 * 1000) // 90 minutes ago
+    await db.insert(billingWebhookEvents).values({
+      id: uniqueId('evt'), livemode: false, stripeEventId: uniqueId('stripe'), apiVersion: '2024-01-01',
+      objectType: 'checkout.session', eventType: 'checkout.session.completed', status: 'pending', payloadEncrypted: 'x', receivedAt,
+    })
+
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+
+    expect(metrics.webhookAge.oldestPendingMinutes).toBeGreaterThanOrEqual(89)
+    expect(metrics.webhookAge.oldestPendingMinutes).toBeLessThanOrEqual(91)
+  })
+
+  it('reports null age when there is no pending webhook event', async () => {
+    await db.delete(billingWebhookEvents)
+    const metrics = await getBillingOperationsMetrics({ platform: db })
+    expect(metrics.webhookAge.oldestPendingMinutes).toBeNull()
+  })
+})
+
+describe('evaluateBillingAlerts', () => {
+  it('returns no alerts for a fully clean metrics snapshot', () => {
+    expect(evaluateBillingAlerts(CLEAN_METRICS_BASE)).toEqual([])
+  })
+
+  it('flags an oldest-pending-webhook age over the 120-minute SLO', () => {
+    const alerts = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, webhookAge: { oldestPendingMinutes: 121 } })
+    expect(alerts.some((a) => a.includes('121 minutes'))).toBe(true)
+  })
+
+  it('does not flag a webhook age exactly at the 120-minute SLO', () => {
+    const alerts = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, webhookAge: { oldestPendingMinutes: 120 } })
+    expect(alerts).toEqual([])
+  })
+
+  it('flags permanently failed webhook events', () => {
+    const alerts = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, webhooks: { ...CLEAN_METRICS_BASE.webhooks, failed: 3 } })
+    expect(alerts.some((a) => a.includes('3 webhook event'))).toBe(true)
+  })
+
+  it('flags a ledger invariant violation', () => {
+    const alerts = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, ledgerInvariant: { violations: 1 } })
+    expect(alerts.some((a) => a.includes('ledger invariant'))).toBe(true)
+  })
+
+  it('flags organizations with auto-recharge paused due to failure', () => {
+    const alerts = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, autoRecharge: { active: 0, pausedNeedsAuth: 0, pausedFailed: 2 } })
+    expect(alerts.some((a) => a.includes('auto-recharge paused'))).toBe(true)
+  })
+
+  it('flags a non-clean reconciliation run and never flags a clean one', () => {
+    const dirty = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, reconciliation: { lastRun: { windowEnd: '2026-01-01T00:00:00.000Z', result: 'mismatches_found' } } })
+    const clean = evaluateBillingAlerts({ ...CLEAN_METRICS_BASE, reconciliation: { lastRun: { windowEnd: '2026-01-01T00:00:00.000Z', result: 'clean' } } })
+    expect(dirty.some((a) => a.includes('not clean'))).toBe(true)
+    expect(clean).toEqual([])
   })
 })

@@ -1357,6 +1357,34 @@ export const billingReconciliationRuns = pgTable(
   ],
 )
 
+/**
+ * Deduplication ledger for financial notifications (plans/stripe-billing-platform/tasks.md §10 "Add
+ * financial notifications, metrics, and alerts") — the general "have we already sent notification X
+ * for entity Y in policy window W" answer every message type in that task needs. `organizationId` has
+ * no FK (mirrors `organization_deletion_financial_records`): the `'platform'` sentinel value is used
+ * for cross-organization notification types (e.g. a reconciliation-mismatch alert isn't about a single
+ * tenant), which a real FK to `organizations.id` could never satisfy. The unique index is the actual
+ * dedup mechanism — `notifications.ts`'s `recordNotificationIfDue` does an `ON CONFLICT DO NOTHING
+ * RETURNING`, and only sends the real notification if a row was actually inserted.
+ */
+export const billingNotificationLog = pgTable(
+  'billing_notification_log',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull(),
+    notificationType: text('notification_type').notNull(),
+    windowKey: text('window_key').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('billing_notification_log_org_type_window_unique').on(table.organizationId, table.notificationType, table.windowKey),
+    check(
+      'billing_notification_log_type_check',
+      sql`${table.notificationType} in ('credit_expiry_30', 'credit_expiry_7', 'credit_expiry_1', 'subscription_renewal', 'grace_period', 'action_required', 'refund_decision', 'dispute_opened', 'reconciliation_mismatch')`,
+    ),
+  ],
+)
+
 /** Platform-private: versioned seller configuration, no CPR/card/bank data (spec.md §Seller, country, currency, and tax configuration). */
 export const billingSellerProfiles = pgTable(
   'billing_seller_profiles',

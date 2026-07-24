@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import { evaluateBillingAlerts, getBillingOperationsMetrics } from '~/shared/lib/billing/operations-metrics'
 import { metrics } from '~/shared/lib/metrics'
 import { getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
@@ -22,6 +23,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
 
           const accountMetrics = await getPlatformAccountMetrics(oneDayAgo, oneWeekAgo)
           const discovery = await getDiscoveryState().catch(() => null)
+          const billingMetrics = await getBillingOperationsMetrics()
 
           return Response.json({
             inProcess,
@@ -37,6 +39,10 @@ export const Route = createFileRoute('/api/admin/metrics/')({
               lastRunAt: discovery.lastRunAt,
               stats: discovery.stats,
             },
+            // plans/stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and
+            // alerts" — checkout/recovery/webhook-age/ledger-invariant/auto-recharge/cost-margin/
+            // country-gate metrics, plus the critical SLO alerts computed from them.
+            billing: { ...billingMetrics, alerts: evaluateBillingAlerts(billingMetrics) },
             server: {
               nodeVersion: process.version,
               platform: process.platform,

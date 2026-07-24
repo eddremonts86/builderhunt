@@ -630,3 +630,277 @@ function ownershipTransferredToEmailHtml(organizationName: string, previousOwner
   </body>
 </html>`
 }
+
+/** Credit expiry notice at 30/7/1 days (plans/stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and alerts") — `notifications.ts` calls this at most once per grant per bucket (deduplicated via `billing_notification_log`). */
+export async function sendCreditExpiryNoticeEmail(to: string, details: { remainingUnits: number; daysUntilExpiry: number }): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Credit expiry notice email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: `${details.remainingUnits} BuilderHunt credits expire in ${details.daysUntilExpiry} day${details.daysUntilExpiry === 1 ? '' : 's'}`,
+        html: creditExpiryNoticeEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** A reminder that a subscription is about to renew (billed) — sent once, 7 days ahead. */
+export async function sendSubscriptionRenewalReminderEmail(to: string, details: { tier: string; currentPeriodEnd: Date }): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Subscription renewal reminder email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Your BuilderHunt subscription renews soon',
+        html: subscriptionRenewalReminderEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** A subscription has been payment-blocked (grace period exhausted without recovery) — distinct from `sendBillingPaymentFailedEmail` (the FIRST failure, which starts grace); this is the harder "access is at risk now" message. */
+export async function sendActionRequiredEmail(to: string): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Action-required (payment-blocked) email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'Action required: your BuilderHunt subscription is on hold',
+        html: actionRequiredEmailHtml(),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** A refund request has been decided (succeeded or failed) — one email per refund, never per retry. */
+export async function sendRefundDecisionEmail(to: string, details: { amountCents: number; state: string }): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Refund decision email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: details.state === 'succeeded' ? 'Your BuilderHunt refund was processed' : 'Your BuilderHunt refund could not be processed',
+        html: refundDecisionEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** A chargeback was opened against a payment — one email per dispute (plans/stripe-billing-platform/tasks.md §8 task 5, §10). */
+export async function sendDisputeNotificationEmail(to: string, details: { amountCents: number; evidenceDueBy: Date | null }): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Dispute notification email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: 'A dispute was opened on a BuilderHunt payment',
+        html: disputeNotificationEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Platform-operator alert for a non-clean daily reconciliation run — sent once per run id, to the current seller profile's support email (there is no separate operator-alert recipient list yet). */
+export async function sendReconciliationAlertEmail(to: string, details: { result: string; mismatchCount: number; windowEnd: string }): Promise<SendResult> {
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Reconciliation alert email would be sent to:', to, '\n')
+    return { ok: true, devLink: undefined }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject: `Billing reconciliation: ${details.result} (${details.mismatchCount} mismatch${details.mismatchCount === 1 ? '' : 'es'})`,
+        html: reconciliationAlertEmailHtml(details),
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function creditExpiryNoticeEmailHtml(details: { remainingUnits: number; daysUntilExpiry: number }): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">${details.remainingUnits} credits expiring soon</h1>
+    <p>You have <strong>${details.remainingUnits} BuilderHunt credits</strong> that expire in
+      <strong>${details.daysUntilExpiry} day${details.daysUntilExpiry === 1 ? '' : 's'}</strong>. Unused credits are
+      not refunded or extended once they expire.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Use your credits</a>
+    </p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function subscriptionRenewalReminderEmailHtml(details: { tier: string; currentPeriodEnd: Date }): string {
+  const date = details.currentPeriodEnd.toISOString().slice(0, 10)
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your ${details.tier} plan renews on ${date}</h1>
+    <p>Your BuilderHunt subscription will renew automatically on <strong>${date}</strong> using your saved payment
+      method. No action is needed unless you want to make a change.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review your plan</a>
+    </p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function actionRequiredEmailHtml(): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your subscription is on hold</h1>
+    <p>We still haven't been able to charge your saved payment method after your grace period ended. Your
+      BuilderHunt subscription access is now paused. Update your payment method to restore it.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
+    </p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function refundDecisionEmailHtml(details: { amountCents: number; state: string }): string {
+  const amount = `$${(details.amountCents / 100).toFixed(2)}`
+  const body = details.state === 'succeeded'
+    ? `Your refund of <strong>${amount}</strong> has been processed and should appear on your original payment method within a few business days.`
+    : `We were unable to process your refund of <strong>${amount}</strong>. Our team has been notified and will follow up.`
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">${details.state === 'succeeded' ? 'Refund processed' : 'Refund failed'}</h1>
+    <p>${body}</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function disputeNotificationEmailHtml(details: { amountCents: number; evidenceDueBy: Date | null }): string {
+  const amount = `$${(details.amountCents / 100).toFixed(2)}`
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">A dispute was opened</h1>
+    <p>A chargeback of <strong>${amount}</strong> was opened against a BuilderHunt payment. The related credits
+      have been frozen pending the outcome.${details.evidenceDueBy ? ` Evidence is due by <strong>${details.evidenceDueBy.toISOString().slice(0, 10)}</strong>.` : ''}</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function reconciliationAlertEmailHtml(details: { result: string; mismatchCount: number; windowEnd: string }): string {
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Reconciliation: ${details.result}</h1>
+    <p>The daily billing reconciliation run completed at <strong>${details.windowEnd}</strong> with
+      <strong>${details.mismatchCount}</strong> mismatch${details.mismatchCount === 1 ? '' : 'es'}. Review
+      <code>billing_reconciliation_runs</code> and the operations dashboard for detail.</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}

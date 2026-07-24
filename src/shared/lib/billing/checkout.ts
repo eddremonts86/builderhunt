@@ -12,6 +12,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { resolveSubscriptionCatalogKey } from './catalog'
+import { metrics } from '../metrics'
 import { recordCheckoutConsent, type CheckoutDisclosures } from './consent'
 import { ensureBillingCustomer } from './customers'
 import { BillingProviderError, type BillingProvider } from './provider'
@@ -111,6 +112,7 @@ export async function createSubscriptionCheckout(
     throw new CheckoutError('Billing is not configured yet', 'billing_disabled')
   }
   if (!sellerProfile.countryAllowlist.includes(input.country)) {
+    metrics.increment('checkoutCountryGateRejections')
     throw new CheckoutError(`Checkout is not available for country: ${input.country}`, 'country_not_allowed')
   }
 

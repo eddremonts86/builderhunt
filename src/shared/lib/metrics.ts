@@ -8,6 +8,8 @@ interface Counters {
   apiErrors: number
   signups: number
   signins: number
+  /** Checkout attempts rejected for `country_not_allowed` (`billing/checkout.ts`, `billing/packs.ts`) — the only trace of a country-gate rejection, since it happens before any `billing_checkout_attempts` row is ever written. */
+  checkoutCountryGateRejections: number
 }
 
 const counters: Counters = {
@@ -17,6 +19,7 @@ const counters: Counters = {
   apiErrors: 0,
   signups: 0,
   signins: 0,
+  checkoutCountryGateRejections: 0,
 }
 
 const startTime = Date.now()
@@ -39,5 +42,6 @@ export const metrics = {
     counters.apiErrors = 0
     counters.signups = 0
     counters.signins = 0
+    counters.checkoutCountryGateRejections = 0
   },
 }

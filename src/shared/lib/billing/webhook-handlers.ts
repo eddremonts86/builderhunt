@@ -31,17 +31,16 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type Stripe from 'stripe'
 import { computeAnniversary } from './annual-grants'
 import { resolvePackCatalogEntryByKey, resolveSubscriptionCatalogEntryByKey, resolveSubscriptionCatalogEntryByStripePriceId } from './catalog'
-import { getVerifiedBillingContact } from './billing-contact'
 import { grantCredits } from './credits'
 import { recordDisputeFundsReinstated, recordDisputeOpened, resolveDispute, updateDisputeStripeStatus } from './disputes'
 import { unfreezeStillValidGrantsOnRecovery } from './dunning'
+import { billingNotificationRecipients } from './notifications'
 import { applyCreditRevocationForRefund } from './refunds'
 import { sendBillingPaymentFailedEmail, sendBillingReceiptEmail } from '../email'
 import {
   findAutoRechargeRule,
   findBillingCustomer,
   findBillingRefundByStripeRefundId,
-  findOrganizationOwnerEmail,
   resolveAutoRechargeTrigger,
   updateBillingRefundState,
 } from '../repositories/billing'
@@ -653,16 +652,4 @@ async function sendInvoiceReceipt(tx: WorkerTransaction, organizationId: string,
 async function sendPaymentFailedNotice(tx: WorkerTransaction, organizationId: string): Promise<void> {
   const recipients = await billingNotificationRecipients(tx, organizationId)
   await Promise.all(recipients.map((to) => sendBillingPaymentFailedEmail(to)))
-}
-
-/** The owner's account email, plus the verified billing contact's if one exists and differs — deduped so a contact that happens to match the owner's own address never receives two identical emails. */
-async function billingNotificationRecipients(tx: WorkerTransaction, organizationId: string): Promise<string[]> {
-  const [ownerEmail, contact] = await Promise.all([
-    findOrganizationOwnerEmail(tx, organizationId),
-    getVerifiedBillingContact(tx, organizationId),
-  ])
-  const recipients = new Set<string>()
-  if (ownerEmail) recipients.add(ownerEmail)
-  if (contact) recipients.add(contact.email)
-  return Array.from(recipients)
 }
