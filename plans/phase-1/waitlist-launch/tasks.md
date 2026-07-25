@@ -1,6 +1,11 @@
 # Tasks: Launch Checklist
 
-> **Status**: `pending`
+> **Status**: `non-actionable for an autonomous coding session` — every task here is a manual
+> go-to-market action (posting to Show HN/Reddit/X/LinkedIn/Indie Hackers as the founder,
+> submitting to Google Search Console/Bing Webmaster Tools under the founder's own account,
+> monitoring prod analytics day-to-day). None of it is code. Reviewed 2026-07-25 and left
+> as-is — this plan is the founder's own launch runbook to execute, not an implementation
+> task queue.
 > **Depends on**: [`production-infrastructure`](../production-infrastructure/spec.md), [`legal-and-compliance`](../legal-and-compliance/spec.md), [`public-landing-pages`](../public-landing-pages/spec.md), [`content-marketing`](../content-marketing/spec.md), [`status-and-trust`](../status-and-trust/spec.md), [`pricing-and-billing`](../pricing-and-billing/spec.md)
 > **Blocks**: nothing
 > **Reality check**: No waitlist is built or planned. These are execution/verification tasks
