@@ -38,7 +38,10 @@ async function loadPosts(): Promise<BlogPost[]> {
   } catch {
     return []
   }
-  const mdFiles = files.filter((f) => f.endsWith('.md'))
+  // `_`-prefixed files are authoring scaffolding (`_TEMPLATE.md`), not posts.
+  // Without this filter the template would be published at its own slug and
+  // listed on /blog and the Atom feed.
+  const mdFiles = files.filter((f) => f.endsWith('.md') && !f.startsWith('_'))
 
   const posts = await Promise.all(
     mdFiles.map(async (file) => {

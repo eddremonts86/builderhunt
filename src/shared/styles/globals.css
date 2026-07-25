@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
 /* Self-hosted fonts (previously Google Fonts — removed to stop a CSP
    style-src violation and to avoid leaking visitor IPs to Google). Variable
