@@ -1,13 +1,12 @@
 # Feature: IndieHackers Integration
 
-> **Status**: `blocked`
+> **Status**: `closed — skipped`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: No `src/lib/sources/indiehackers.ts` exists; `indiehackers` is not in
-> `SourceName` (`src/lib/sources/types.ts`). IndieHackers has **no official API of any
-> kind**; the site is a JS-rendered SPA whose data would have to be scraped, which the
-> existing connector pattern (plain server-side `fetch` inside a live search) cannot do.
-> A decision is required before any implementation (see "Blocking decision").
+> **Reality check**: Closed 2026-07-25 — product owner chose option (a), skip permanently
+> (see "Blocking decision" below). No `src/lib/sources/indiehackers.ts` exists and none
+> will be written. Founder-signal coverage moves to `producthunt-integration` and,
+> optionally, a user-tagging mini-plan.
 
 ## Problem
 
@@ -36,7 +35,7 @@ Index IndieHackers members as `RawBuilder` person records searchable by keyword.
 Pretending otherwise would produce a permanently-empty source pill. This plan is therefore
 `blocked`, not `pending`.
 
-## Blocking decision (owner: product)
+## Blocking decision (owner: product) — DECIDED 2026-07-25: (a), skip permanently
 
 Choose one:
 

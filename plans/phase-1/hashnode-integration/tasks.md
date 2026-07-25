@@ -58,6 +58,10 @@
     disabled (already zero-impact since it degrades to `[]`, per the existing design), pay
     for Hashnode's new offering if it's worth it, or de-prioritize/remove this integration
     entirely. Flagging rather than guessing which the user would want.
+  - **Decision 2026-07-25**: paused. Leave the connector pointed at the dead
+    `api.hashnode.com` endpoint (zero-impact, degrades to `[]`) rather than paying for the
+    new offering or removing the integration outright. Revisit if Hashnode's pricing
+    changes or the free tier reopens — no further action needed now.
 
 - [x] **Fix `hn-` id prefix collision with the Hacker News source**
   - Files: `src/lib/sources/hashnode.ts`

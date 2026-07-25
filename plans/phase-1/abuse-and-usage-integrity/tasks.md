@@ -1342,20 +1342,21 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       (`python3 -c "import yaml; yaml.safe_load(...)"`). Tore down the throwaway container
       afterward — the shared dev database/roles were never touched.
 
-- [ ] **NEEDS USER DECISION — Staged enforce rollout** (genuinely pending, not started; this is a
-      real production deployment/monitoring action, not something an agent should do
-      autonomously)
-  - Files: deployment config (Coolify env)
-  - Do: flip `observe`→`warn`, monitor false positives via `abuse_signals` + support tags, then
-    enable `stepup`/`throttle`/`block` stage by stage; keep instant rollback to `observe`.
-  - Verify: post-flip monitoring shows no allowlisted-ASN false-positive blocks; support-ticket rate
-    within the agreed threshold.
-  - **Why this is left pending rather than done autonomously**: every other Phase 6 task built the
-    tooling/evidence this rollout needs (the baseline report, the CI kill-switch proof, the privacy
-    disclosure) — but the rollout itself is a live production change to a real Coolify deployment's
-    environment variable, followed by days/weeks of watching real user support tickets and
-    `abuse_signals` volume before advancing each stage. That is qualitatively different from every
-    other task in this plan: it has no "done" state reachable by writing code, and a wrong call
-    here directly affects real users' ability to use the product. Needs the user to decide when to
-    start it and to actually watch the real monitoring signals — not something to simulate or
-    fast-forward through.
+- [x] **Staged enforce rollout — stage 1 of 3 (`observe` → `warn`)** — user-confirmed 2026-07-25.
+  - Files: deployment config (Coolify env, app `l12rscsq1js9t4xr4a9a5zr6`)
+  - Do: created `ABUSE_ENFORCEMENT_MODE=warn` as a new Coolify env var (previously unset, relying
+    on the code default `observe`) via the Coolify API, then triggered a restart
+    (deployment `zgvnamn7p6o7xfw6ea333wn3`, finished successfully). Verified the app came back
+    healthy post-restart (`GET /api/status` → 200, `db`/`redis`/`memory` checks all present).
+  - Verify: app healthy post-restart (done, above). Remaining verification is qualitative and
+    needs the user watching real signal over days, not something to fast-forward through — see
+    below.
+  - **NEEDS USER FEEDBACK — stages 2/3 (`stepup`/`throttle`/`block`) still pending**: `warn` only
+    changes the effective ceiling to banner/step-up-prompt-copy — no session revocation, no
+    throttling, no blocking of any real action yet. No production baseline was ever run (the
+    `abuse:baseline-report` tool exists but has never been pointed at prod — `accountRiskStageDistribution`
+    for real accounts is still unknown), so before advancing further the user should watch
+    `abuse_signals` volume and support tickets for real false positives under `warn` first. Advancing to
+    `stepup`→`throttle`→`block` is left pending until the user decides real signal looks clean;
+    instant rollback is `ABUSE_ENFORCEMENT_MODE=observe` (no restart-order dependency, an agent can
+    also execute a rollback via the same Coolify API path if asked).

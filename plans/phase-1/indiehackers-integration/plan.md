@@ -1,11 +1,11 @@
 # Plan: IndieHackers Integration
 
-> **Status**: `blocked`
+> **Status**: `closed — skipped`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Blocked on data access: IndieHackers has no official API and its SPA
-> cannot be read by the plain-`fetch` connector pattern used by every source in
-> `src/lib/sources/`. No code should be written until the decision in `spec.md` is made.
+> **Reality check**: Closed 2026-07-25 — product owner chose option (a) from the decision
+> matrix below. No code will be written for this source; see `spec.md` for the closure
+> note and replacements.
 
 ## Why there are no implementation phases
 
