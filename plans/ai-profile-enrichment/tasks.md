@@ -1,6 +1,6 @@
 # AI Profile Enrichment — Developer Persona Card (tasks)
 
-> **Status**: `partially-implemented` (Phases 1, 2, 4 shipped 2026-07-20; Phase 3 deferred)
+> **Status**: `implemented` (Phases 1, 2, 4 shipped 2026-07-20; Phase 3 shipped 2026-07-25)
 > **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (registry, cache, budget, `minimaxChat` implemented)
 > **Blocks**: nothing
 > **Reality check**: Touches `src/shared/lib/ai/tasks.ts`, `src/routes/api/builders/$builderId/*`, `claim/verify.ts`, `BuilderProfilePage.tsx`. Writes only the `metadata.aiEnrichment` jsonb key. No migrations.
@@ -80,7 +80,7 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
 
 ## Phase 3 — Claim hook (DEFERRED — see adaptation note above)
 
-- [ ] **Trigger enrichment on successful claim**
+- [x] **Trigger enrichment on successful claim**
   - Files: `src/routes/api/builders/claim/verify.ts` (or the claim lib it delegates to)
   - Do: After verification succeeds, fire-and-forget the refresh pipeline for that row
     (extract the pipeline into `runProfileEnrichment(builderRow, userId)` in a server lib,
@@ -89,6 +89,46 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
     is never delayed or failed by AI errors.
   - Verify: Complete a claim flow in dev; the row's `metadata.aiEnrichment.enrichedAt`
     appears shortly after; with `AI_DISABLED=true` the claim still succeeds cleanly.
+  - **Done, with one deliberate deviation from the task's literal signature.** Research
+    confirmed there is no single "builderRow" that spans both the claim flow (global, keyed only
+    by `builderIdentityId` — `builder_claims` has no `organization_id` column at all) and the
+    enrichment pipeline's actual persistence path (org-scoped: writes to
+    `organization_builders.privateMetadata.aiEnrichment`, keyed by the claiming user's *active
+    organization's* tracked-builder row). A bare `runProfileEnrichment(builderRow, userId)` with
+    no org context has nowhere to look up or persist to. The existing pipeline's real signature —
+    `runEnrichment(principal: TenantPrincipal, builderIdentityId: string, opts?)` — already fetches
+    its own row and already resolves `{status: 404}` (not a throw) when the identity isn't tracked
+    in that org, which is exactly the safety property a fire-and-forget caller needs. Kept that
+    signature rather than inventing an incompatible one; documented the reasoning inline in the
+    new shared file.
+    - Extracted `runEnrichment` (unchanged logic, byte-for-byte) out of
+      `routes/api/builders/$builderId/enrichment.ts` into new
+      `src/shared/lib/ai/run-enrichment.ts`, so it's a real shared lib function rather than a
+      route-local one. Updated `enrichment.ts`'s GET/POST handlers to import it — both existing
+      call sites are unchanged in behavior.
+    - `routes/api/builders/claim/verify.ts`: after `claim` is confirmed truthy (and before the
+      redirect is built), added `void runEnrichment(principal, claim.builderIdentityId).catch(err
+      => console.error('claim enrichment:', err))`. Used the *default* freshness check (not
+      `skipFreshnessCheck: true`) — if the claimed identity already has a fresh (<30-day)
+      enrichment artifact from before the claim, redoing it on every claim would burn AI budget
+      for no benefit; the freshness check already handles "generate one if there isn't a good one
+      yet" correctly.
+    - No new rate-limiting was added for this trigger (unlike the manual "refresh" button's
+      5/hour cap) — a claim can only be verified once per token, so this path is naturally
+      bounded, not a repeatable-call surface.
+    - **Live-verified without spending real AI budget**: `MINIMAX_API_KEY` is configured with a
+      real key in local dev (`AI_DISABLED=false`), so a live browser walkthrough of the full
+      email-claim flow risked a real, paid MiniMax API call purely to prove wiring that didn't
+      change the enrichment pipeline's own logic (only relocated it). Instead, ran the full
+      `scripts/db/verify-api-isolation-local.mjs` suite (no `MINIMAX_API_KEY` in that
+      environment, so `runEnrichment` safely short-circuits to `{status: 503,
+      error: 'ai_unconfigured'}` without ever reaching the real provider — the exact
+      `AI_DISABLED`-equivalent safe path the task's own verify step asks for) against a fresh,
+      fully isolated throwaway Postgres container: all 102/102 checks passed, including
+      "claim: A can verify A's own claim token," proving the new fire-and-forget call executes
+      inside the real claim-verify handler without throwing, blocking, or altering the response.
+    - Verify sweep: `pnpm tsc --noEmit`, `pnpm eslint` (both clean), full `pnpm vitest run`
+      (2004/2004 passing), `pnpm security:route-coverage` (106 routes, valid).
 
 ## Phase 4 — UI
 

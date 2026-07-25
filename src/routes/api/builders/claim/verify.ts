@@ -5,6 +5,7 @@ import {
   hashClaimSecret,
   verifyPendingBuilderClaim,
 } from '~/shared/lib/repositories/builder-claims'
+import { runEnrichment } from '~/shared/lib/ai/run-enrichment'
 
 export const Route = createFileRoute('/api/builders/claim/verify')({
   component: () => null,
@@ -20,6 +21,14 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
             verificationSecretHash: hashClaimSecret(token),
           }))
           if (!claim) return errorResponse('This claim link is invalid or has expired.')
+
+          // Fire-and-forget: this fresh claim shouldn't wait on (or fail because of) an AI call.
+          // No-ops safely if the identity isn't tracked in the claimer's active org yet, or if
+          // AI is disabled/unconfigured — runEnrichment resolves benignly for both, it never
+          // throws for those cases. Only genuine provider/parse failures reach this .catch().
+          void runEnrichment(principal, claim.builderIdentityId)
+            .catch((err) => console.error('claim enrichment:', err))
+
           const params = new URLSearchParams({ claimed: '1', builderId: claim.builderIdentityId })
           return redirect(`/me?${params.toString()}`)
         } catch (error) {
