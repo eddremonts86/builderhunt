@@ -98,6 +98,28 @@ export function clusterLinkedAccounts(inputs: AccountIdentifierInput[]): Account
   return clusters.sort((a, b) => b.userIds.length - a.userIds.length)
 }
 
+/**
+ * Bridges a user-keyed `AccountCluster` (this file clusters by shared device/IP, not by
+ * organization) to the set of organizations its members belong to — the input the G1 promo/trial
+ * grant cap (`abuse/credit-abuse.ts`) needs to count grants across a whole identity cluster. Takes
+ * the user→organization lookup as a plain `Map` rather than querying it here: resolving every
+ * cluster member's organizations is itself a cross-user read with its own RLS shape, left to
+ * whatever future promo/trial-issuing feature wires this in for real (see `credit-abuse.ts`'s G1
+ * header comment for why this whole feature is unwired today).
+ */
+export function organizationIdsForCluster(
+  cluster: Pick<AccountCluster, 'userIds'>,
+  organizationIdsByUser: Map<string, string[]>,
+): string[] {
+  const organizationIds = new Set<string>()
+  for (const userId of cluster.userIds) {
+    for (const organizationId of organizationIdsByUser.get(userId) ?? []) {
+      organizationIds.add(organizationId)
+    }
+  }
+  return [...organizationIds].sort()
+}
+
 export interface FindLinkedAccountClustersDeps {
   listDeviceHashes?: typeof listRecentDeviceHashesAcrossUsers
   listSessionIps?: typeof listRecentSessionIps

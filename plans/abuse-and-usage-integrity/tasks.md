@@ -960,11 +960,50 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     beyond what the unit tests already prove; `checkMarginDriftAndEmit`'s emit path is structurally
     identical to the other `check*AndEmit` functions already live-verified this session.
 
-- [ ] **Promo/trial grant caps per identity cluster (G1)**
+- [x] **Promo/trial grant caps per identity cluster (G1)**
   - Files: `src/shared/lib/abuse/linked-accounts.ts`, promo/trial grant path in `billing/*`
   - Do: before minting a promo or manual-trial grant, cap total grants per device/payment/identity
     cluster at `PROMO_GRANT_MAX_PER_CLUSTER`; emit `credit_farming` when the cap is hit.
   - Verify: unit test that a second clustered account cannot claim the same promo beyond the cap.
+  - Progress: **explicitly NOT wired to production**, same reasoning and same user-approved pattern
+    as G7 — surfaced before building, per the standing check-in agreement. Repo-wide search
+    confirmed no promo/trial-grant-minting route exists at all today: `grantCredits({source:
+    'promotional', ...})` is only ever called internally by `feature-authorization.ts`'s
+    `refundUsage` fallback (crediting a refund back when the original grant has expired — not a
+    signup bonus), and `source: 'operator_trial'` is never used anywhere. Additionally, even the
+    READ side has no live path: counting promo/trial grants across every organization in a
+    linked-account cluster would need a genuinely new cross-organization RLS grant on
+    `billing_credit_grants` (confirmed every existing `builderhunt_worker` policy on that table is
+    scoped to a single `app.organization_id` via `set_config`, never `USING (true)`) — a real
+    migration, out of proportion for a feature with no live caller. Built the pure detection/signal
+    logic only: `detectPromoGrantClusterCapExceeded`/`checkPromoGrantClusterCapAndEmit` (same
+    `detect*`/`check*AndEmit` convention, emits the existing `credit_farming` signal type — no new
+    migration needed) in `abuse/credit-abuse.ts`, plus `organizationIdsForCluster` in
+    `abuse/linked-accounts.ts` — a small pure bridge from a user-keyed `AccountCluster` (Phase 3's
+    clustering is by shared device/IP, not by organization) to the deduped set of organization ids
+    its members belong to, taking the user→organization lookup as a plain injected `Map` rather than
+    querying it (that query is the part that needs the new RLS grant, left for whoever wires this in
+    for real). New `PROMO_GRANT_MAX_PER_CLUSTER` env var (default 3). 8 new unit tests (3 for the
+    detect function's boundary cases, 2 for the emit gating, 3 for `organizationIdsForCluster`'s
+    dedup/sort/missing-lookup behavior) — all pass, no regressions across the full `src/shared/lib/abuse`
+    suite (183 tests). `pnpm tsc --noEmit`/`pnpm eslint` clean. No live-database verification for
+    this task specifically, for the same reason as G7: nothing writes a real `credit_farming` row
+    from this path in production yet, by design — the emit path itself
+    (`checkPromoGrantClusterCapAndEmit`) is structurally identical to every other `check*AndEmit`
+    function already live-verified this session (G2/G6/G4).
+
+    **This closes out Phase 4B's core credit/premium-feature abuse work (G1, G2, G4, G6, G7, G8) —
+    all 7 tasks in this phase are now complete.** Three of them (G1, G7, and effectively half of G8's
+    real production impact via the `semantic-search.ts` fix) surfaced genuine architecture gaps
+    during implementation rather than being simple feature-adds: no production route yet calls the
+    dollar-based credit ledger (`reserveCredits`) at all, and no production route mints a promo/trial
+    grant. Every abuse-detection primitive built this phase (per-seat sub-budget, first-payer cap,
+    refund-farming cap, margin monitor, promo-cluster cap) is fully implemented, unit-tested, and
+    ready to activate the moment a real feature calls into the credit ledger for real spend — but
+    none of them observe anything in production today beyond what was already wired in G2's
+    `reserveCredits`/`refundUsage` entry points themselves (which G4/G6 also hook into, since those
+    genuinely are called — by this session's own verification scripts and future callers, just not
+    yet by any shipped feature). Phase 5 (enforcement ladder + admin console) is next.
 
 ## Phase 5 — Enforcement ladder + admin console (A–G response)
 

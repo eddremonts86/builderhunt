@@ -52,6 +52,9 @@ const zodEnv = z.object({
   // Provider-cost-vs-credit-charged ratio above which `margin_drift` fires (alert only, never
   // auto-blocks — a real margin problem needs a pricing/rate-card fix, not a runtime block).
   CREDIT_MARGIN_ALERT_RATIO: z.coerce.number().positive().default(1),
+  // Max promotional/manual-trial credit grants allowed across one linked-account identity cluster
+  // (G1) — guards against claiming the same signup bonus repeatedly via near-identical accounts.
+  PROMO_GRANT_MAX_PER_CLUSTER: z.coerce.number().int().positive().default(3),
   AI_EMBEDDING_URL: z.string().optional(),
   AI_EMBEDDING_MODEL: z.string().optional(),
   AI_EMBEDDING_API_KEY: z.string().optional(),

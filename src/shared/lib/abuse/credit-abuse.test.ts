@@ -2,10 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   checkFirstPayerSpendVelocityAndEmit,
   checkPoolDrainAndEmit,
+  checkPromoGrantClusterCapAndEmit,
   checkRefundFarmingAndEmit,
   computeSeatShare,
   detectFirstPayerCapExceeded,
   detectPoolDrain,
+  detectPromoGrantClusterCapExceeded,
   detectRefundCapExceeded,
   detectRefundFarming,
   isWithinFirstPayerWindow,
@@ -194,6 +196,54 @@ describe('checkRefundFarmingAndEmit', () => {
       userId: 'user-1',
       organizationId: 'org-1',
       details: expect.objectContaining({ refundedUnits: 60, settledUnits: 100, ratio: 0.6, ratioThreshold: 0.5, windowHours: 720 }),
+    }))
+  })
+})
+
+describe('detectPromoGrantClusterCapExceeded', () => {
+  it('does not flag while minting one more grant stays at or under the cap', () => {
+    expect(detectPromoGrantClusterCapExceeded({ existingGrantsInCluster: 2, cap: 3 })).toBe(false)
+  })
+
+  it('flags once minting one more grant would exceed the cap', () => {
+    expect(detectPromoGrantClusterCapExceeded({ existingGrantsInCluster: 3, cap: 3 })).toBe(true)
+  })
+
+  it('never allows a cluster with zero prior grants to exceed a cap of 0 or fewer (defensive — cap should always be positive)', () => {
+    expect(detectPromoGrantClusterCapExceeded({ existingGrantsInCluster: 0, cap: 0 })).toBe(true)
+  })
+})
+
+describe('checkPromoGrantClusterCapAndEmit', () => {
+  it('does not emit while the cluster stays under the cap', async () => {
+    const insert = vi.fn()
+    const flagged = await checkPromoGrantClusterCapAndEmit(
+      { existingGrantsInCluster: 1, cap: 3, clusterOrganizationIds: ['org-1', 'org-2'] },
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(flagged).toBe(false)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('emits credit_farming once the cluster would exceed its promo grant cap', async () => {
+    const insert = vi.fn()
+    const flagged = await checkPromoGrantClusterCapAndEmit(
+      { existingGrantsInCluster: 3, cap: 3, clusterOrganizationIds: ['org-1', 'org-2', 'org-3'] },
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(flagged).toBe(true)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'credit_farming',
+      severity: 'high',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      details: expect.objectContaining({
+        existingGrantsInCluster: 3,
+        cap: 3,
+        clusterOrganizationIds: ['org-1', 'org-2', 'org-3'],
+      }),
     }))
   })
 })

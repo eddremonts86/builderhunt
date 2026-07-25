@@ -191,3 +191,54 @@ export async function checkRefundFarmingAndEmit(
   }
   return flagged
 }
+
+/**
+ * Promo/trial grant caps per identity cluster (Phase 4B "G1"). NOT WIRED TO PRODUCTION — same
+ * reasoning as `margin.ts`: no production route mints a promotional or manual-trial grant today
+ * (`grantCredits({source: 'promotional', ...})` is only ever called internally by
+ * `feature-authorization.ts`'s `refundUsage` fallback, and `'operator_trial'` is never used at
+ * all), and counting grants across every organization in a linked-account cluster (Phase 3's
+ * `linked-accounts.ts`) would need its own new cross-organization RLS grant — out of proportion for
+ * a feature with no live caller yet. Pure detection/signal logic only, ready for a future
+ * promo/trial-issuing feature to call before minting, using whatever real grant-count query it
+ * builds alongside its own RLS grant.
+ */
+
+export interface PromoGrantClusterCapInput {
+  /** Promotional/manual-trial grants already minted across every organization in this identity cluster, BEFORE the grant being considered. */
+  existingGrantsInCluster: number
+  cap: number
+}
+
+/** True when minting one more promo/trial grant would push this cluster's total over its cap. */
+export function detectPromoGrantClusterCapExceeded(input: PromoGrantClusterCapInput): boolean {
+  return input.existingGrantsInCluster + 1 > input.cap
+}
+
+export interface CheckPromoGrantClusterCapInput extends PromoGrantClusterCapInput {
+  clusterOrganizationIds: string[]
+}
+
+/** Emits `credit_farming` if minting would cross the per-cluster cap. Detection only — call sites decide separately (via `ABUSE_ENFORCEMENT_MODE`) whether to actually refuse the grant. */
+export async function checkPromoGrantClusterCapAndEmit(
+  input: CheckPromoGrantClusterCapInput,
+  context: AnomalyEmitContext,
+  deps?: EmitAbuseSignalDeps,
+): Promise<boolean> {
+  const flagged = detectPromoGrantClusterCapExceeded(input)
+  if (flagged) {
+    await emitAbuseSignal({
+      type: 'credit_farming',
+      severity: 'high',
+      userId: context.userId,
+      organizationId: context.organizationId ?? undefined,
+      requestId: context.requestId,
+      details: {
+        existingGrantsInCluster: input.existingGrantsInCluster,
+        cap: input.cap,
+        clusterOrganizationIds: input.clusterOrganizationIds,
+      },
+    }, deps)
+  }
+  return flagged
+}

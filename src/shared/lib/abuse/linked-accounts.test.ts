@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { clusterLinkedAccounts, findLinkedAccountClusters, type AccountIdentifierInput } from './linked-accounts'
+import { clusterLinkedAccounts, findLinkedAccountClusters, organizationIdsForCluster, type AccountIdentifierInput } from './linked-accounts'
 
 describe('clusterLinkedAccounts', () => {
   it('returns no clusters for an empty input', () => {
@@ -117,5 +117,28 @@ describe('findLinkedAccountClusters', () => {
     expect(clusters).toEqual([
       { userIds: ['user-1', 'user-2'], sharedDeviceHashes: ['shared-device'], sharedIpAddresses: [] },
     ])
+  })
+})
+
+describe('organizationIdsForCluster', () => {
+  it('returns an empty list when no cluster member maps to an organization', () => {
+    const result = organizationIdsForCluster({ userIds: ['user-1', 'user-2'] }, new Map())
+    expect(result).toEqual([])
+  })
+
+  it('dedupes and sorts organization ids across every cluster member', () => {
+    const lookup = new Map([
+      ['user-1', ['org-b', 'org-a']],
+      ['user-2', ['org-a']],
+      ['user-3', ['org-c']],
+    ])
+    const result = organizationIdsForCluster({ userIds: ['user-1', 'user-2', 'user-3'] }, lookup)
+    expect(result).toEqual(['org-a', 'org-b', 'org-c'])
+  })
+
+  it('ignores a cluster member absent from the lookup map', () => {
+    const lookup = new Map([['user-1', ['org-a']]])
+    const result = organizationIdsForCluster({ userIds: ['user-1', 'user-unknown'] }, lookup)
+    expect(result).toEqual(['org-a'])
   })
 })
