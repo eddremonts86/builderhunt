@@ -38,7 +38,7 @@ import {
   type SynergyInput,
   type TeamMemberRow,
 } from '~/shared/lib/synergy'
-import { generateFingerprint } from '~/shared/lib/code-style'
+import { fingerprintFromV2, generateFingerprint } from '~/shared/lib/code-style'
 
 function toMetrics(fp: ReturnType<typeof generateFingerprint>): CodeStyleMetrics {
   return {
@@ -93,7 +93,7 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
             ? (candidatePrivateMetadata.topics as string[])
             : []
           const fingerprint = storedFingerprint.success
-            ? storedFingerprint.data.metrics
+            ? toMetrics(fingerprintFromV2(storedFingerprint.data))
             : toMetrics(generateFingerprint({
                 language: candidate.language,
                 topics: candidateTopics,

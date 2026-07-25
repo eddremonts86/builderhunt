@@ -16,7 +16,13 @@
  * dependency" the spec describes.
  */
 import { z } from 'zod'
-import { generateFingerprint, type CodeStyleFingerprint, type Paradigm } from './code-style'
+import {
+  codeStyleFingerprintV2Schema as storedFingerprintSchema,
+  fingerprintFromV2,
+  generateFingerprint,
+  type CodeStyleFingerprint,
+  type Paradigm,
+} from './code-style'
 
 export const codeStyleMetricsSchema = z.object({
   paradigm: z.enum(['functional', 'oop', 'pragmatic']),
@@ -28,12 +34,18 @@ export const codeStyleMetricsSchema = z.object({
 })
 export type CodeStyleMetrics = z.infer<typeof codeStyleMetricsSchema>
 
-export const codeStyleFingerprintV2Schema = z.object({
-  version: z.literal(2),
-  metrics: codeStyleMetricsSchema,
-  generatedAt: z.string(),
-})
-export type CodeStyleFingerprintV2 = z.infer<typeof codeStyleFingerprintV2Schema>
+// The v2 envelope now has a real writer (`code-fingerprinting`'s
+// `fingerprint-v2` task), and that plan owns the metadata key — so the
+// canonical schema lives in `code-style.ts` next to v1 and is re-exported
+// here for the callers that already import it from this module. The former
+// local placeholder used a nested `{ version, metrics, generatedAt }` shape
+// that nothing ever wrote; matching real stored data is what makes team
+// synergy actually pick up AI fingerprints instead of silently falling back
+// to the v1 heuristic on every parse.
+export {
+  codeStyleFingerprintV2Schema,
+  type CodeStyleFingerprintV2,
+} from './code-style'
 
 const SENIORITY_VALUES = ['junior', 'mid', 'senior', 'lead'] as const
 type Seniority = (typeof SENIORITY_VALUES)[number]
@@ -86,10 +98,10 @@ export function buildTeamAggregate(rows: TeamMemberRow[]): TeamAggregate {
   const size = capped.length
 
   const fingerprints = capped.map((row) => {
-    const stored = codeStyleFingerprintV2Schema.safeParse(
+    const stored = storedFingerprintSchema.safeParse(
       (row.privateMetadata as Record<string, unknown> | undefined)?.codeStyleFingerprint,
     )
-    if (stored.success) return { metrics: stored.data.metrics, source: 'ai' as const }
+    if (stored.success) return { metrics: toMetrics(fingerprintFromV2(stored.data)), source: 'ai' as const }
     return {
       metrics: toMetrics(generateFingerprint({
         language: row.language,

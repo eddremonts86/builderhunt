@@ -26,17 +26,24 @@ describe('buildTeamAggregate', () => {
   })
 
   it('handles a mixed v1/v2 team — v2 fingerprint used when schema-valid, v1 heuristic otherwise', () => {
+    // The real envelope `code-fingerprinting`'s task writes to
+    // `builders.metadata.codeStyleFingerprint` — flat metrics plus provenance.
+    // This fixture previously used a nested `{ version, metrics, generatedAt }`
+    // placeholder that no writer ever produced.
     const v2Fingerprint = {
       version: 2,
-      metrics: {
-        paradigm: 'oop',
-        modularityScore: 95,
-        testIntensity: 95,
-        documentationRatio: 95,
-        complexityControl: 95,
-        namingConsistency: 95,
-      },
-      generatedAt: new Date().toISOString(),
+      paradigm: 'oop',
+      modularityScore: 95,
+      testIntensity: 95,
+      documentationRatio: 95,
+      complexityControl: 95,
+      namingConsistency: 95,
+      evidence: ['Consistent constructor injection across services'],
+      language: 'Java',
+      analyzedRepos: ['acme-api'],
+      analyzedFiles: 6,
+      analyzedAt: new Date().toISOString(),
+      model: 'minimax-test',
     }
     expect(codeStyleFingerprintV2Schema.safeParse(v2Fingerprint).success).toBe(true)
 

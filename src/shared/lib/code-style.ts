@@ -1,6 +1,12 @@
-// Code-style fingerprint generation. Pure function — no LLM, no network.
-// v1: heuristic from builder metadata. v2: would call an LLM with
-// real repo samples.
+// Code-style fingerprint generation. Pure — no LLM, no network, no I/O
+// imports, so both server code and client components can import it.
+//
+// v1: heuristic from builder metadata (frozen; `generateFingerprint` below).
+// v2: AI-analyzed from real repo samples — produced by the `fingerprint-v2`
+// task and persisted at `builders.metadata.codeStyleFingerprint`. The v2
+// schema lives here rather than next to the task because the profile card
+// (a client component) has to validate stored envelopes too.
+import { z } from 'zod'
 
 export type Paradigm = 'functional' | 'oop' | 'pragmatic'
 
@@ -104,4 +110,54 @@ export function similarity(a: CodeStyleFingerprint, b: CodeStyleFingerprint): nu
   const langBonus = a.language && a.language === b.language ? 5 : 0
 
   return Math.max(0, Math.min(100, metricSim - paradigmPenalty + langBonus))
+}
+
+// ---------------------------------------------------------------------------
+// v2 — AI-analyzed fingerprint (plan: code-fingerprinting)
+// ---------------------------------------------------------------------------
+
+/** What the model returns. Metric names match `CodeStyleFingerprint` exactly so
+ *  `similarity()` and `CodeStyleCard` keep working across v1 and v2. */
+export const codeStyleFingerprintModelSchema = z.object({
+  paradigm: z.enum(['functional', 'oop', 'pragmatic']),
+  modularityScore: z.number().int().min(0).max(100),
+  testIntensity: z.number().int().min(0).max(100),
+  documentationRatio: z.number().int().min(0).max(100),
+  complexityControl: z.number().int().min(0).max(100),
+  namingConsistency: z.number().int().min(0).max(100),
+  evidence: z.array(z.string().min(3).max(160)).min(1).max(6),
+})
+export type CodeStyleFingerprintModel = z.infer<typeof codeStyleFingerprintModelSchema>
+
+/**
+ * The stored envelope at `builders.metadata.codeStyleFingerprint`.
+ *
+ * `code-fingerprinting` owns this key. An earlier placeholder in `synergy.ts`
+ * used a nested `{ version, metrics, generatedAt }` shape while this plan was
+ * unshipped; that shape never had a writer, and keeping both would have meant
+ * every synergy `safeParse` silently failing against real data and falling
+ * back to the v1 heuristic forever. This flat shape is now the only one.
+ */
+export const codeStyleFingerprintV2Schema = codeStyleFingerprintModelSchema.extend({
+  language: z.string().nullable(),
+  analyzedRepos: z.array(z.string()),
+  analyzedFiles: z.number().int(),
+  analyzedAt: z.string().datetime(),
+  model: z.string(),
+  version: z.literal(2),
+})
+export type CodeStyleFingerprintV2 = z.infer<typeof codeStyleFingerprintV2Schema>
+
+/** Adapts a stored v2 envelope to the shape `similarity()` compares. */
+export function fingerprintFromV2(v2: CodeStyleFingerprintV2): CodeStyleFingerprint {
+  return {
+    paradigm: v2.paradigm,
+    modularityScore: v2.modularityScore,
+    testIntensity: v2.testIntensity,
+    documentationRatio: v2.documentationRatio,
+    complexityControl: v2.complexityControl,
+    namingConsistency: v2.namingConsistency,
+    language: v2.language,
+    generatedAt: Date.parse(v2.analyzedAt) || 0,
+  }
 }
