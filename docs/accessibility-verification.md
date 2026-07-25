@@ -30,6 +30,34 @@ note) is announced without an unexpected focus jump.
 
 ## Entries
 
+### 2026-07-25 (2) — Final quality-gate smoke run
+
+- **Commit**: work-in-progress on branch `ui-modernization-and-audits` (uncommitted at time of
+  writing).
+- **Tester**: Claude (agent session), automated tooling only.
+- **What was run**: `pnpm lint && pnpm type-check && pnpm test && pnpm build` — all green
+  (`lint`: 0 errors, 106 pre-existing warnings unrelated to accessibility; `type-check`: clean;
+  `test`: 2006/2006 passing; `build`: succeeds).
+- **`pnpm test:a11y`**: could not complete in this sandboxed session — every route timed out
+  waiting for `html[data-hydrated="true"]` inside the script's own `chromium.launch()` instance,
+  with no other error surfaced. This is **not a real hydration regression**: independently
+  confirmed hydration works correctly against the exact same running dev server by checking
+  `document.documentElement.getAttribute('data-hydrated')` in a real interactive browser session
+  — it returned `"true"`. The failure is isolated to `test-accessibility.mjs`'s own headless
+  Chromium launch in this particular sandbox (retried twice, identical uniform failure both
+  times — a real, reproducible environment constraint here, not flakiness). Whoever runs this
+  gate outside this sandbox should get real pass/fail results; do not trust this entry as
+  evidence the axe-core checks themselves pass or fail.
+- **Staging/production smoke**: **not done** — this task's own text acknowledges a real
+  staging/production deployment is required and is out of scope for a local session. No staging
+  environment exists separate from the single production deployment
+  (`https://builderhunt.eduardoinerarte.dk`); flagging rather than fabricating a smoke pass
+  against it.
+- **Still open**: everything listed as open in the 2026-07-25 (1) and 2026-07-24 entries below
+  (VoiceOver/manual AT pass, 200% zoom, `test:a11y`'s actual pass/fail result).
+- **Owner**: unassigned — needs a human with a normal (non-sandboxed) machine to re-run
+  `pnpm test:a11y` and do the VoiceOver pass.
+
 ### 2026-07-25 — Accent-contrast design decision resolved
 
 - **Commit**: work-in-progress on branch `ui-modernization-and-audits` (uncommitted at time of
