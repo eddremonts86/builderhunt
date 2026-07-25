@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import type { ScoredBuilder } from '~/lib/search'
+import { findPublicRadarBySlug, getPublicRadarQuery } from '~/shared/lib/repositories/public-radars'
 
 // Render the OG image as SVG, then rasterize to PNG via @resvg/resvg-js.
 // Twitter/Facebook/LinkedIn/Slack link previews don't render `og:image`
@@ -93,12 +94,32 @@ export const Route = createFileRoute('/api/og/explore')({
     handlers: {
       GET: async ({ request }) => {
         const url = new URL(request.url)
-        const q = url.searchParams.get('q') ?? ''
+        const radarSlug = url.searchParams.get('radar') ?? ''
+        let q = url.searchParams.get('q') ?? ''
+        let keywords: string[] = []
+        let sources: string[] | undefined
+        let language: string | undefined
+
+        if (radarSlug) {
+          const radar = await findPublicRadarBySlug(radarSlug)
+          const resolved = radar ? await getPublicRadarQuery(radar.organizationId, radar.savedQueryId) : null
+          if (resolved) {
+            q = resolved.query.name
+            keywords = resolved.query.keywords
+            sources = resolved.query.sources ?? undefined
+            language = resolved.query.language ?? undefined
+          }
+        } else {
+          keywords = q.split(/\s+/).filter(Boolean)
+        }
+
         let builders: ScoredBuilder[] = []
-        if (q.trim().length >= 2) {
+        if (keywords.length > 0) {
           try {
             builders = await searchBuilders({
-              keywords: q.split(/\s+/).filter(Boolean),
+              keywords,
+              sources,
+              language,
               perPage: 20,
               page: 1,
             })

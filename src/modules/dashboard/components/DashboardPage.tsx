@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp, fadeInUpVariants, staggerContainer } from '~/shared/lib/motion/tokens'
@@ -29,6 +29,7 @@ interface SavedQuery {
   createdAt: string
   country?: string
   language?: string
+  radarSlug?: string | null
 }
 
 interface RecentBuilder {
@@ -474,6 +475,8 @@ function SavedSearchRow({
   const [exportMsg, setExportMsg] = React.useState<{ ok: boolean; text: string } | null>(null)
   const [confirming, setConfirming] = React.useState(false)
   const [deleting, setDeleting] = React.useState(false)
+  const [radarSlug, setRadarSlug] = React.useState<string | null>(query.radarSlug ?? null)
+  const [sharing, setSharing] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -534,6 +537,53 @@ function SavedSearchRow({
       setTimeout(() => setExportMsg(null), 4000)
     } catch {
       setExportMsg({ ok: false, text: 'Copy failed — RSS URL: ' + rssUrl })
+      setTimeout(() => setExportMsg(null), 6000)
+    }
+  }
+
+  const toggleShare = async () => {
+    setMenuOpen(false)
+    setSharing(true)
+    try {
+      if (radarSlug) {
+        const res = await fetch(`/api/queries/${query.id}/share`, { method: 'DELETE', credentials: 'include' })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error ?? `HTTP ${res.status}`)
+        }
+        setRadarSlug(null)
+        setExportMsg({ ok: true, text: 'Radar unshared — the public link no longer works' })
+      } else {
+        const res = await fetch(`/api/queries/${query.id}/share`, { method: 'POST', credentials: 'include' })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          throw new Error(err.error ?? `HTTP ${res.status}`)
+        }
+        const data = await res.json() as { slug: string; url: string }
+        setRadarSlug(data.slug)
+        const fullUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}${data.url}`
+        await navigator.clipboard.writeText(fullUrl).catch(() => {})
+        setExportMsg({ ok: true, text: 'Shared! Public link copied to clipboard' })
+      }
+      setTimeout(() => setExportMsg(null), 5000)
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Share failed' })
+      setTimeout(() => setExportMsg(null), 5000)
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const copyRadarLink = async () => {
+    setMenuOpen(false)
+    if (!radarSlug) return
+    const fullUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/r/${radarSlug}`
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      setExportMsg({ ok: true, text: 'Public radar link copied to clipboard' })
+      setTimeout(() => setExportMsg(null), 4000)
+    } catch {
+      setExportMsg({ ok: false, text: 'Copy failed — link: ' + fullUrl })
       setTimeout(() => setExportMsg(null), 6000)
     }
   }
@@ -668,6 +718,32 @@ function SavedSearchRow({
                     Open in Inoreader
                   </a>
                 </li>
+                <li role="none">
+                  <div className="my-1 border-t border-bh-border" />
+                </li>
+                <li role="none">
+                  <button
+                    role="menuitem"
+                    onClick={toggleShare}
+                    disabled={sharing}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 disabled:opacity-60"
+                  >
+                    <Radio className={`w-3.5 h-3.5 ${radarSlug ? 'text-bh-success' : 'text-bh-text-dim'}`} aria-hidden="true" />
+                    {radarSlug ? 'Unshare public radar' : 'Share publicly'}
+                  </button>
+                </li>
+                {radarSlug && (
+                  <li role="none">
+                    <button
+                      role="menuitem"
+                      onClick={copyRadarLink}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                    >
+                      <Link2 className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
+                      Copy public link
+                    </button>
+                  </li>
+                )}
               </ul>
             )}
           </div>

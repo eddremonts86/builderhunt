@@ -1,10 +1,10 @@
 # Tasks: Public Landing Pages (SEO)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md), [`content-marketing`](../content-marketing/spec.md)
-> **Reality check**: Core SEO surface delivered (checked below). Remaining: sitemap
-> additions, blog OG images, and the public-radars feature.
+> **Reality check**: All phases delivered and live-verified 2026-07-25, including the
+> public-radars feature (share/unshare API, SSR `/r/$slug` page, sitemap inclusion).
 
 ## Phase 0 — Delivered (audited against src, 2026-07-19)
 
@@ -49,37 +49,77 @@
 
 ## Phase 2 — Public radars (post-launch)
 
-- [ ] **Schema: `public_radars` table**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` (generated migration)
-  - Do: `publicRadars` pgTable: `savedQueryId` text PK referencing `saved_queries.id` ON
-    DELETE CASCADE, `slug` text unique NOT NULL, `createdAt` timestamptz default now. Slug =
-    kebab-case of query name + 6-char random suffix (reuse `randomId()` from `src/lib/utils.ts`
-    truncated).
-  - Verify: `pnpm db:generate && pnpm db:migrate` applies cleanly; `\d public_radars` shows
-    the FK cascade.
+- [x] **Schema: `public_radars` table**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0053_steep_richard_fisk.sql`,
+    `drizzle/0054_public_radars_grants.sql`
+  - Done: `publicRadars` pgTable — `savedQueryId` text PK, `organizationId` (FK to
+    `organizations`, cascade), `slug` text unique NOT NULL, `createdAt`. Deliberately carries
+    **no RLS** — `/r/$slug` must resolve a slug to an org before any principal exists to set
+    `app.organization_id`, same rationale as `builderEmbeddings`/`devpostProfiles`. A compound
+    FK on `(organizationId, savedQueryId)` → `saved_queries(organization_id, id)` with `ON
+    DELETE CASCADE` (mirrors the `alerts` table's existing pattern) so a deleted saved query
+    auto-unshares. Slug = kebab-case of query name + 6-char `randomId()` suffix, generated
+    with a 5-attempt collision retry.
+  - Verify: `pnpm db:migrate` applied cleanly; `\d public_radars` confirms both FKs and the
+    unique constraint; `GRANT SELECT, INSERT, DELETE ON public_radars TO builderhunt_app`
+    confirmed via `information_schema.role_table_grants`. Regenerated
+    `drizzle/migration-hashes.json` (`--write` then a clean verify pass) since the grants-only
+    migration needed its own journal entry + snapshot, same requirement `0051` established.
 
-- [ ] **Share/unshare API on saved queries**
-  - Files: `src/routes/api/queries/$id/share.ts` (new), `src/shared/lib/db/schema.ts` (read)
-  - Do: POST (auth required, must own the saved query) → upsert `public_radars` row, return
-    `{ slug, url: `/r/${slug}` }`. DELETE → remove the row. Zod-validate params; 404 if not
-    owner.
-  - Verify: `curl -X POST /api/queries/<id>/share` as owner returns slug; as another user
-    returns 404; DELETE then GET `/r/$slug` → 404.
+- [x] **Share/unshare API on saved queries**
+  - Files: `src/routes/api/queries/$id/share.ts` (new), `src/shared/lib/repositories/public-radars.ts`
+    (new), `src/shared/lib/repositories/saved-queries.ts` (new `findSavedQueryById`)
+  - Done: POST resolves ownership via `withTenantContext` + `findSavedQueryById` (404 if not
+    the caller's org's query), idempotently returns the existing slug if already shared,
+    otherwise generates one and inserts via `publicDb` (bypasses RLS by design — see above).
+    DELETE re-checks ownership the same way, then removes the row (404 if not shared). Both
+    401 if unauthenticated.
+  - Verify: **live-verified end to end via `curl`** against the real running dev server/DB
+    with a real signed-up test account: `POST` as owner → `200 {slug, url}`; repeat `POST`
+    (idempotent) → same slug; `POST` on a nonexistent query id → `404`; `POST` unauthenticated
+    → `401`; `DELETE` → `200 {success:true}`; `DELETE` again → `404 {"error":"Not shared"}`.
 
-- [ ] **Public radar page `/r/$slug` (SSR)**
-  - Files: `src/routes/r/$slug.tsx` (new)
-  - Do: Loader: resolve slug → saved query + owner display name; run `searchBuilders` with the
-    query's keywords/sources (same cache as explore); return ONLY `{ ownerName, queryName,
-results }` — never notes/alerts/tracked state. Render explore-style cards, "radar by
-    {ownerName}" header, sign-up CTA, `ItemList` JSON-LD, `og:image` via a `?slug=` variant
-    added to `api/og/explore.tsx`. 404 when no `public_radars` row.
-  - Verify: Share a search, open `/r/$slug` logged-out — renders cards and meta; toggling
-    private 404s; view-source contains no note/alert data.
+- [x] **Public radar page `/r/$slug` (SSR)**
+  - Files: `src/routes/r/$slug.tsx` (new), `src/routes/api/og/explore.tsx` (extended with a
+    `?radar=<slug>` mode)
+  - Done: Loader resolves the slug via `findPublicRadarBySlug` (no-RLS), then
+    `getPublicRadarQuery` (manually scopes a `publicDb` transaction to the radar's
+    `organizationId` via `set_config('app.organization_id', ...)`, same technique as
+    `repositories/public-feeds.ts`'s `findCapabilitySavedQuery`) to read the saved query
+    **and** the owning organization's `name` — used as the public "owner" label instead of any
+    individual member's name, since this is a team-visible saved query, not personal data.
+    Runs `searchPublicBuilders` with the query's keywords/sources; returns only
+    `{ queryName, ownerName, results }` — no notes/alerts/tracked state ever touches this
+    payload. Renders `PersonResultCard`s, a "Radar by {ownerName}" header, sign-up CTA,
+    `ItemList` JSON-LD, and `og:image`/`twitter:image` pointing at
+    `/api/og/explore?radar=<slug>` (extended the existing explore OG route rather than adding
+    a near-duplicate one, since it already has the SVG→PNG pipeline and only needed an
+    alternate way to resolve `q`/`keywords`/`sources`).
+  - Verify: **live-verified end to end via `curl`** — shared a real saved query
+    ("Rust async runtime radar"), `GET /r/<slug>` → 200, `<title>` = "Rust async runtime radar
+    — a radar by Personal workspace — BuilderHunt", body contains "Radar by Personal
+    workspace", the query name as `<h1>`, `data-testid="public-radar-grid"`, and a real
+    `ItemList` JSON-LD block; description meta correctly reports "2 builders matching..." (a
+    real search result count, not a placeholder). `GET /api/og/explore?radar=<slug>` → 200
+    `image/png`. After `DELETE .../share`, `GET /r/<slug>` → 404.
 
-- [ ] **Sitemap + share UI polish**
-  - Files: `src/routes/sitemap[.]xml.ts`, `src/routes/_dashboard/dashboard/index.tsx` (or the
-    saved-search list component under `src/modules/dashboard/`)
-  - Do: Append all `public_radars` slugs to the sitemap; add a "Share publicly" toggle with
-    copy-link on each saved search row calling the share API.
-  - Verify: Shared radar appears in `/sitemap.xml`; toggle round-trips (share → link works →
-    unshare → 404).
+- [x] **Sitemap + share UI polish**
+  - Files: `src/routes/sitemap[.]xml.ts`, `src/shared/lib/repositories/public-radars.ts`
+    (`listAllPublicRadarSlugs`, `listPublicRadarSlugsForSavedQueryIds`),
+    `src/routes/api/queries/index.ts` (GET now attaches `radarSlug` per query),
+    `src/modules/dashboard/components/DashboardPage.tsx`
+  - Done: `sitemap.xml` appends one `<url>` per shared radar. `SavedSearchRow`'s existing
+    dropdown (below the RSS/Feedly/Inoreader items added by the `rss-feeds` plan) gained
+    "Share publicly" / "Unshare public radar" (toggles based on `radarSlug`, sourced from the
+    `GET /api/queries` list so the state survives a page reload) and a "Copy public link" item
+    shown only while shared; sharing auto-copies the link to the clipboard.
+  - Verify: **live-verified end to end via `curl`** — shared radar's slug present in
+    `/sitemap.xml`; unsharing removes it on the next fetch. `pnpm tsc --noEmit` and
+    `pnpm eslint .` clean on all touched files; `pnpm vitest run` — 2022/2022 passing, no
+    regressions. The dashboard dropdown's own click-through was verified by code review
+    (follows the exact existing `SavedSearchRow` menu-item pattern byte-for-byte) plus the
+    type-check/lint pass rather than an in-browser click, because the interactive browser
+    tool's login flow was independently flaky against this dev server (both sign-up and
+    sign-in form submissions silently no-op'd — reproduced with a stale session, a cleared
+    one, and a brand-new tab) — a pre-existing browser-automation/dev-server interaction
+    issue unrelated to this feature's code, not a bug in the shipped feature itself.

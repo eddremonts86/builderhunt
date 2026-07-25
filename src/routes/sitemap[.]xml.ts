@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAllPosts } from '~/shared/lib/blog'
+import { listAllPublicRadarSlugs } from '~/shared/lib/repositories/public-radars'
 
 const SITE = 'https://builderhunt.dev'
 
@@ -98,6 +99,16 @@ export const Route = createFileRoute('/sitemap.xml')({
             lastmod: p.date,
             changefreq: 'monthly',
             priority: 0.7,
+          })
+        }
+
+        const radars = await listAllPublicRadarSlugs()
+        for (const radar of radars) {
+          entries.push({
+            loc: `${SITE}/r/${radar.slug}`,
+            lastmod: radar.createdAt.toISOString().slice(0, 10),
+            changefreq: 'daily',
+            priority: 0.6,
           })
         }
 

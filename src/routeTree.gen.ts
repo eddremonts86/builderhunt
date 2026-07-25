@@ -16,6 +16,7 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
+import { Route as RSlugRouteImport } from './routes/r/$slug'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
@@ -128,6 +129,7 @@ import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_das
 import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
+import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
@@ -209,6 +211,11 @@ const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => LandingRouteRoute,
+} as any)
+const RSlugRoute = RSlugRouteImport.update({
+  id: '/r/$slug',
+  path: '/r/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
   id: '/welcome',
@@ -783,6 +790,11 @@ const ApiSprintsSprintIdResultsRoute =
     path: '/results',
     getParentRoute: () => ApiSprintsSprintIdRoute,
   } as any)
+const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
+  id: '/api/queries/$id/share',
+  path: '/api/queries/$id/share',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOrganizationsMembersMemberIdRoute =
   ApiOrganizationsMembersMemberIdRouteImport.update({
     id: '/api/organizations/members/$memberId',
@@ -1078,6 +1090,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/r/$slug': typeof RSlugRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -1195,6 +1208,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/settings/billing/': typeof DashboardSettingsBillingIndexRoute
@@ -1244,6 +1258,7 @@ export interface FileRoutesByTo {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/r/$slug': typeof RSlugRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -1360,6 +1375,7 @@ export interface FileRoutesByTo {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/settings/billing': typeof DashboardSettingsBillingIndexRoute
@@ -1412,6 +1428,7 @@ export interface FileRoutesById {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/r/$slug': typeof RSlugRoute
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
@@ -1530,6 +1547,7 @@ export interface FileRoutesById {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/_dashboard/settings/billing/': typeof DashboardSettingsBillingIndexRoute
@@ -1582,6 +1600,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/r/$slug'
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
@@ -1699,6 +1718,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
     | '/settings/billing/'
@@ -1748,6 +1768,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/r/$slug'
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
@@ -1864,6 +1885,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
     | '/settings/billing'
@@ -1915,6 +1937,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/r/$slug'
     | '/_landing/'
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/billing'
@@ -2033,6 +2056,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
     | '/_dashboard/settings/billing/'
@@ -2072,6 +2096,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
+  RSlugRoute: typeof RSlugRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
@@ -2152,6 +2177,7 @@ export interface RootRouteChildren {
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
+  ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
@@ -2222,6 +2248,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof LandingIndexRouteImport
       parentRoute: typeof LandingRouteRoute
+    }
+    '/r/$slug': {
+      id: '/r/$slug'
+      path: '/r/$slug'
+      fullPath: '/r/$slug'
+      preLoaderRoute: typeof RSlugRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/onboarding/welcome': {
       id: '/onboarding/welcome'
@@ -3007,6 +3040,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
       parentRoute: typeof ApiSprintsSprintIdRoute
     }
+    '/api/queries/$id/share': {
+      id: '/api/queries/$id/share'
+      path: '/api/queries/$id/share'
+      fullPath: '/api/queries/$id/share'
+      preLoaderRoute: typeof ApiQueriesIdShareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/members/$memberId': {
       id: '/api/organizations/members/$memberId'
       path: '/api/organizations/members/$memberId'
@@ -3606,6 +3646,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
+  RSlugRoute: RSlugRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,
@@ -3689,6 +3730,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
+  ApiQueriesIdShareRoute: ApiQueriesIdShareRoute,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,

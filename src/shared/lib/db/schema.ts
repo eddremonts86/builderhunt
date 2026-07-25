@@ -284,6 +284,30 @@ export const savedQueries = pgTable(
   }),
 )
 
+// Plan: public-landing-pages Phase 2 ("public radars"). Deliberately no RLS —
+// the whole point of this table is unauthenticated lookup by `slug` from
+// `/r/$slug` before any principal exists to set `app.organization_id`, same
+// "global, non-tenant" rationale as `builderEmbeddings`/`devpostProfiles`
+// above. Writes only ever happen after an application-layer ownership check
+// against the RLS-protected `savedQueries` table (see
+// src/routes/api/queries/$id/share.ts), not via a Postgres policy on this
+// table itself. `organizationId` + the compound FK exist so the public page
+// can resolve the owning org and re-read `savedQueries` inside a manually
+// scoped tenant transaction (same technique as
+// `repositories/public-feeds.ts`'s `findCapabilitySavedQuery`).
+export const publicRadars = pgTable('public_radars', {
+  savedQueryId: text('saved_query_id').primaryKey(),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  slug: text('slug').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  organizationQueryFk: foreignKey({
+    columns: [table.organizationId, table.savedQueryId],
+    foreignColumns: [savedQueries.organizationId, savedQueries.id],
+    name: 'public_radars_organization_query_fk',
+  }).onDelete('cascade'),
+}))
+
 export const alerts = pgTable('alerts', {
   id: text('id').primaryKey(),
   organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),

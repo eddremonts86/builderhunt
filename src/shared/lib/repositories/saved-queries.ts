@@ -13,6 +13,13 @@ export interface CreateSavedQueryInput {
   country: string | null
 }
 
+export async function findSavedQueryById(transaction: TenantTransaction, organizationId: string, id: string) {
+  const [query] = await transaction.select().from(savedQueries)
+    .where(and(eq(savedQueries.organizationId, organizationId), eq(savedQueries.id, id)))
+    .limit(1)
+  return query ?? null
+}
+
 export function listSavedQueries(transaction: TenantTransaction, organizationId: string) {
   return transaction.select().from(savedQueries)
     .where(eq(savedQueries.organizationId, organizationId))

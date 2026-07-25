@@ -17,6 +17,7 @@ import {
   listLegacySavedQueries,
   listSavedQueries,
 } from '~/shared/lib/repositories/saved-queries'
+import { listPublicRadarSlugsForSavedQueryIds } from '~/shared/lib/repositories/public-radars'
 
 export const Route = createFileRoute('/api/queries/')({
   component: () => null,
@@ -33,6 +34,7 @@ export const Route = createFileRoute('/api/queries/')({
             canonical: () => listSavedQueries(tx, principal.organizationId),
             recordMismatch: recordMigrationMismatch,
           }))
+          const radarSlugs = await listPublicRadarSlugsForSavedQueryIds(queries.map((query) => query.id))
           return Response.json(queries.map((query) => ({
             ...query,
             feedToken: createFeedCapability(
@@ -40,6 +42,7 @@ export const Route = createFileRoute('/api/queries/')({
               query.id,
               env.BETTER_AUTH_SECRET as string,
             ),
+            radarSlug: radarSlugs.get(query.id) ?? null,
           })))
         } catch (error) {
           const authorizationResponse = tenantAuthorizationResponse(error)

@@ -212,6 +212,14 @@
     "0052_mushy_veda": {
       "sql": "cb2bcde522a2121c3db1245cc234325228ef8531f2c6c960e0f3136bf2c5f994",
       "snapshot": "d336060d5ef1820af83aee93e6f1723a45e27bb4f212f3466092f36ffa85eec4"
+    },
+    "0053_steep_richard_fisk": {
+      "sql": "c0f9843cab0c114a78fde985cfcb85bbe7b3cda80325a5124d08ad5e83c08f03",
+      "snapshot": "68559981f0fcdd6c8d91d406e2ed4ec5dd156e9a150bede2ae1b57cb7f83a38b"
+    },
+    "0054_public_radars_grants": {
+      "sql": "d9d001073174062f27ad34c31911e6c5a9533b35be92451f8e1bce08aa434f53",
+      "snapshot": "21f6b4e62a635dd1eb6c9f15321a2a35386d8cd88e15e74132d54ffbdf98b73b"
     }
   }
 }
