@@ -1,6 +1,8 @@
 // Project Hygiene computation. Pure function — no DB, no network.
-// In v1 we compute from existing builder metadata; in v2 we'd fetch
-// real GitHub issues/PRs/files data per repo.
+// In v1 we compute from existing builder metadata; Phase 2
+// (~/lib/github/repo-signals.ts) fetches real GitHub issues/PRs/files data
+// per repo for GitHub builders.
+import { z } from 'zod'
 
 export interface ProjectHygiene {
   globalScore: number // 0-100
@@ -88,11 +90,32 @@ export function computeHygiene(repos: RepoSignals[]): ProjectHygiene {
 }
 
 /**
+ * Small stable string hash (djb2 variant) so the same (username, repoName)
+ * pair always produces the same estimated signals — `Math.random()` made
+ * every render/reload show different fake numbers for the same builder,
+ * which reads as broken rather than "estimated."
+ */
+function stableHash(input: string): number {
+  let hash = 5381
+  for (let i = 0; i < input.length; i++) {
+    hash = (hash * 33) ^ input.charCodeAt(i)
+  }
+  return Math.abs(hash)
+}
+
+/** Deterministic pseudo-random int in `[min, max)`, seeded by `seed`. */
+function seededRange(seed: string, min: number, max: number): number {
+  const h = stableHash(seed)
+  return min + (h % Math.max(1, max - min))
+}
+
+/**
  * Generate plausible repo signals from a builder's existing metadata
  * (followers, topics, language). Heuristic — used for v1 until we wire
  * real GitHub API per-repo scans.
  */
 export function estimateRepoSignalsFromBuilder(builder: {
+  username?: string
   followersCount?: number
   topics?: string[]
   language?: string | null
@@ -140,19 +163,22 @@ export function estimateRepoSignalsFromBuilder(builder: {
     'awesome-utils',
   ].filter(Boolean).slice(0, numRepos)
 
+  const seedBase = `${builder.username ?? 'anonymous'}:${builder.language ?? ''}:${followers}`
+
   return repoNames.map((name, i) => {
     const stars = Math.max(10, followers - i * 200)
     const isPopular = stars > 500
+    const seed = `${seedBase}:${name}`
     return {
       name,
       stars,
-      openIssues: isPopular ? Math.floor(Math.random() * 50) + 5 : Math.floor(Math.random() * 5),
-      closedIssues: isPopular ? Math.floor(Math.random() * 200) + 50 : Math.floor(Math.random() * 20),
+      openIssues: isPopular ? seededRange(seed + ':open', 5, 55) : seededRange(seed + ':open', 0, 5),
+      closedIssues: isPopular ? seededRange(seed + ':closed', 50, 250) : seededRange(seed + ':closed', 0, 20),
       hasReadme: true,
       hasContributing: isPopular || i === 0,
       hasLicense: true,
       hasWorkflows: isPopular,
-      averageCloseDays: isPopular ? Math.floor(Math.random() * 30) + 5 : Math.floor(Math.random() * 10),
+      averageCloseDays: isPopular ? seededRange(seed + ':days', 5, 35) : seededRange(seed + ':days', 0, 10),
       pushedAt: Date.now() - i * 7 * 24 * 60 * 60 * 1000,
     }
   })
@@ -164,3 +190,41 @@ export function hygieneGrade(score: number): { label: string; color: string } {
   if (score >= 50) return { label: 'Average', color: 'text-bh-warning' }
   return { label: 'Needs work', color: 'text-bh-danger' }
 }
+
+// ---------------------------------------------------------------------------
+// Persisted envelope (plan: project-hygiene, Phase 3) — what actually gets
+// written to `organization_builders.privateMetadata.projectHygiene`. `version`
+// is a literal so a future incompatible shape change can be detected on read
+// rather than silently misinterpreted.
+// ---------------------------------------------------------------------------
+
+export const repoSignalsSchema = z.object({
+  name: z.string(),
+  stars: z.number(),
+  openIssues: z.number(),
+  closedIssues: z.number(),
+  hasReadme: z.boolean(),
+  hasContributing: z.boolean(),
+  hasLicense: z.boolean(),
+  hasWorkflows: z.boolean(),
+  averageCloseDays: z.number(),
+  pushedAt: z.number(),
+})
+
+export const projectHygieneSchema = z.object({
+  globalScore: z.number(),
+  issueCloseRate: z.number(),
+  averageResolutionDays: z.number(),
+  hasCICD: z.boolean(),
+  documentationScore: z.number(),
+  lastAnalyzedAt: z.number(),
+})
+
+export const projectHygieneEnvelopeSchema = z.object({
+  hygiene: projectHygieneSchema,
+  signals: z.array(repoSignalsSchema).max(5),
+  computedAt: z.string(), // ISO date
+  version: z.literal(1),
+})
+
+export type ProjectHygieneEnvelope = z.infer<typeof projectHygieneEnvelopeSchema>

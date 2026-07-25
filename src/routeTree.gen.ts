@@ -135,6 +135,7 @@ import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-expo
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
+import { Route as ApiBuildersBuilderIdHygieneRouteImport } from './routes/api/builders/$builderId/hygiene'
 import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
@@ -821,6 +822,12 @@ const ApiBuildersBuilderIdNotesRoute =
     path: '/notes',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersBuilderIdHygieneRoute =
+  ApiBuildersBuilderIdHygieneRouteImport.update({
+    id: '/hygiene',
+    path: '/hygiene',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdEvidenceRefreshRoute =
   ApiBuildersBuilderIdEvidenceRefreshRouteImport.update({
     id: '/evidence-refresh',
@@ -1172,6 +1179,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
@@ -1335,6 +1343,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
@@ -1503,6 +1512,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
@@ -1670,6 +1680,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -1833,6 +1844,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -2000,6 +2012,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
@@ -3030,6 +3043,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdNotesRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/$builderId/hygiene': {
+      id: '/api/builders/$builderId/hygiene'
+      path: '/hygiene'
+      fullPath: '/api/builders/$builderId/hygiene'
+      preLoaderRoute: typeof ApiBuildersBuilderIdHygieneRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/evidence-refresh': {
       id: '/api/builders/$builderId/evidence-refresh'
       path: '/evidence-refresh'
@@ -3476,6 +3496,7 @@ interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
   ApiBuildersBuilderIdEvidenceRefreshRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  ApiBuildersBuilderIdHygieneRoute: typeof ApiBuildersBuilderIdHygieneRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   ApiBuildersBuilderIdEvidenceIndexRoute: typeof ApiBuildersBuilderIdEvidenceIndexRoute
@@ -3486,6 +3507,7 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdEnrichmentRoute: ApiBuildersBuilderIdEnrichmentRoute,
   ApiBuildersBuilderIdEvidenceRefreshRoute:
     ApiBuildersBuilderIdEvidenceRefreshRoute,
+  ApiBuildersBuilderIdHygieneRoute: ApiBuildersBuilderIdHygieneRoute,
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute:
     ApiBuildersBuilderIdEvidenceEvidenceIdRoute,

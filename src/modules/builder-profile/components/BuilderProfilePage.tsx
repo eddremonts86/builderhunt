@@ -244,7 +244,10 @@ export function BuilderProfilePage() {
         {/* Left Column: Hygiene & Code Style */}
         <div className="space-y-6">
           <HygieneCard
+            builderId={builder.id}
+            source={builder.source}
             builder={{
+              username: builder.username,
               followersCount: builder.followersCount,
               topics: builder.topics,
               language: builder.language,

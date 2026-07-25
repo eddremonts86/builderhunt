@@ -205,6 +205,27 @@ export async function setOrganizationBuilderEnrichment(
   return enrichment
 }
 
+/**
+ * Same shape as `setOrganizationBuilderEnrichment`, for the project-hygiene
+ * plan's `projectHygiene` envelope (real-GitHub-signals gauge on the profile
+ * page). Kept as a separate function/key rather than generalizing the two —
+ * they're independent features with independent freshness windows.
+ */
+export async function setOrganizationBuilderHygiene(
+  transaction: TenantTransaction,
+  organizationId: string,
+  builderIdentityId: string,
+  projectHygiene: Record<string, unknown>,
+) {
+  const existing = await findOrganizationBuilderByIdentity(transaction, organizationId, builderIdentityId)
+  if (!existing) return null
+  const privateMetadata = { ...existing.privateMetadata, projectHygiene }
+  await transaction.update(organizationBuilders)
+    .set({ privateMetadata, updatedAt: new Date() })
+    .where(and(eq(organizationBuilders.organizationId, organizationId), eq(organizationBuilders.id, existing.id)))
+  return projectHygiene
+}
+
 export async function trackOrganizationBuilder(
   transaction: TenantTransaction,
   input: TrackOrganizationBuilderInput,

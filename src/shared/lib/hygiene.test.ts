@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHygiene, estimateRepoSignalsFromBuilder, hygieneGrade, type RepoSignals } from './hygiene'
+import { computeHygiene, estimateRepoSignalsFromBuilder, hygieneGrade, projectHygieneEnvelopeSchema, type RepoSignals } from './hygiene'
 
 const EXCELLENT: RepoSignals[] = [
   {
@@ -140,6 +140,19 @@ describe('estimateRepoSignalsFromBuilder', () => {
     }
   })
 
+  it('returns identical signals for the same builder across calls (deterministic, no Math.random)', () => {
+    const builder = { username: 'octocat', followersCount: 3000, topics: ['rust', 'wasm'], language: 'Rust' }
+    const first = estimateRepoSignalsFromBuilder(builder)
+    const second = estimateRepoSignalsFromBuilder(builder)
+    expect(second.map((r) => ({ ...r, pushedAt: 0 }))).toEqual(first.map((r) => ({ ...r, pushedAt: 0 })))
+  })
+
+  it('different builders (or missing username) get different-shaped estimates deterministically too', () => {
+    const a = estimateRepoSignalsFromBuilder({ username: 'alice', followersCount: 100, topics: ['go'] })
+    const b = estimateRepoSignalsFromBuilder({ username: 'alice', followersCount: 100, topics: ['go'] })
+    expect(a).toEqual(b)
+  })
+
   it('uses real repos from metadata when present', () => {
     const repos = estimateRepoSignalsFromBuilder({
       followersCount: 100,
@@ -164,5 +177,38 @@ describe('estimateRepoSignalsFromBuilder', () => {
     expect(repos).toHaveLength(1)
     expect(repos[0].name).toBe('real-repo')
     expect(repos[0].stars).toBe(9999)
+  })
+})
+
+describe('projectHygieneEnvelopeSchema', () => {
+  it('round-trips a real computeHygiene result', () => {
+    const repos: RepoSignals[] = [{
+      name: 'a', stars: 10, openIssues: 1, closedIssues: 9,
+      hasReadme: true, hasContributing: true, hasLicense: true, hasWorkflows: true,
+      averageCloseDays: 3, pushedAt: Date.now(),
+    }]
+    const envelope = {
+      hygiene: computeHygiene(repos),
+      signals: repos,
+      computedAt: new Date().toISOString(),
+      version: 1 as const,
+    }
+    const parsed = projectHygieneEnvelopeSchema.parse(envelope)
+    expect(parsed).toEqual(envelope)
+  })
+
+  it('rejects more than 5 signals', () => {
+    const repo: RepoSignals = {
+      name: 'a', stars: 1, openIssues: 0, closedIssues: 0,
+      hasReadme: false, hasContributing: false, hasLicense: false, hasWorkflows: false,
+      averageCloseDays: 0, pushedAt: 0,
+    }
+    const envelope = {
+      hygiene: computeHygiene([repo]),
+      signals: Array(6).fill(repo),
+      computedAt: new Date().toISOString(),
+      version: 1 as const,
+    }
+    expect(() => projectHygieneEnvelopeSchema.parse(envelope)).toThrow()
   })
 })
