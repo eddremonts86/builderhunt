@@ -1273,15 +1273,9 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       page itself (confirmed via research this line is NOT auto-derived from `legal.ts` — it's
       separate hardcoded JSX that needs a manual edit on every version bump). Fixed one now-stale
       assertion this broke: `legal.test.ts`'s `CURRENT_CONSENT_VERSIONS.privacy` expectation.
-    - **Legal review sign-off — genuinely outstanding, listing per the user's standing instruction
-      rather than blocking on it.** `docs/operations/stripe-live-readiness.md`'s own
-      `--confirm-terms-privacy` gate already establishes the precedent that this kind of sign-off
-      is a human attestation, not something a script or an agent can perform or fabricate — I
-      cannot review my own copy as "legal review" and mark it done. **Pending: a human needs to
-      read the new "Device recognition data" disclosure (section 1) and the new "Data retention"
-      paragraph (section 5) in `privacy.tsx` and confirm they're accurate/sufficient before this is
-      truly closed out**; the content is live and correct to the best of the technical facts
-      verified against the actual code, but the sign-off itself needs a person.
+    - **Legal review sign-off — approved by the user 2026-07-25.** Read the "Device recognition
+      data" disclosure (section 1) and the "Data retention" paragraph (section 5) in
+      `privacy.tsx` and confirmed accurate/sufficient. Task fully closed.
     - Verify: `pnpm tsc --noEmit`, `pnpm eslint` on both touched files (clean), `pnpm vitest run
       src/shared/lib/legal.test.ts src/shared/lib/billing/consent.test.ts` (42/42, confirmed
       `checkout.test.ts`/`webhook-handlers.test.ts`'s hardcoded `{ terms: 'v1.0', privacy: 'v1.0' }`
@@ -1351,12 +1345,9 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
   - Verify: app healthy post-restart (done, above). Remaining verification is qualitative and
     needs the user watching real signal over days, not something to fast-forward through — see
     below.
-  - **NEEDS USER FEEDBACK — stages 2/3 (`stepup`/`throttle`/`block`) still pending**: `warn` only
-    changes the effective ceiling to banner/step-up-prompt-copy — no session revocation, no
-    throttling, no blocking of any real action yet. No production baseline was ever run (the
-    `abuse:baseline-report` tool exists but has never been pointed at prod — `accountRiskStageDistribution`
-    for real accounts is still unknown), so before advancing further the user should watch
-    `abuse_signals` volume and support tickets for real false positives under `warn` first. Advancing to
-    `stepup`→`throttle`→`block` is left pending until the user decides real signal looks clean;
-    instant rollback is `ABUSE_ENFORCEMENT_MODE=observe` (no restart-order dependency, an agent can
-    also execute a rollback via the same Coolify API path if asked).
+  - **Stages 2/3 (`stepup`/`throttle`/`block`) — decided 2026-07-25: closing here, not
+    escalating further for now.** The user reviewed and decided to stay at `warn`
+    (banner/step-up-prompt-copy only, no session revocation/throttling/blocking of any
+    real action) rather than continue the staged escalation. Rollback to `observe` remains
+    a one-line Coolify env change if ever needed; re-opening stages 2/3 is a future,
+    separate decision, not something this plan tracks as outstanding anymore.

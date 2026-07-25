@@ -78,16 +78,22 @@
       meaningfully increases image size/build time — documented inline in the Dockerfile
       and in `docs/operations/deploy-runbook.md`.
 
-- [ ] **NEEDS USER DECISION — turn `DEVPOST_ENABLED=true` on in production** (deliberately
-  left pending, not done autonomously)
-  - Files: Coolify env config for the `builderhunt` app
-  - Do: set `DEVPOST_ENABLED=true`, redeploy, add the crontab entry documented in
-    `docs/operations/deploy-runbook.md` ("Devpost worker" section).
-  - **Why this is left pending rather than done autonomously**: turning this on starts
-    real, recurring outbound scraping traffic from the production VPS against a
-    third-party site with no published rate limit and real IP-ban risk — the same class
-    of "real production action with real external-facing consequences" as the abuse
-    enforcement rollout (see `plans/phase-1/abuse-and-usage-integrity/tasks.md`), not
-    something to flip without the user watching what happens. The code ships dark
-    (`DEVPOST_ENABLED=false` everywhere) so this is a deliberate, reversible activation
-    step whenever the user wants it.
+- [x] **Turn `DEVPOST_ENABLED=true` on — decided 2026-07-25: dev only, not production.**
+  - Files: local `.env` (dev), Coolify env config for the `builderhunt` app (prod, untouched)
+  - Do: user explicitly declined production activation for now ("no lo actives en
+    producción") but asked for it active in local dev immediately, alongside every other
+    scraper feature-flag ("junto con todos los scrapers"). Set `DEVPOST_ENABLED=true` and
+    `ENRICHMENT_ENABLED=true` (the only other kill-switched scraper — public-profile
+    enrichment, plan `stealth-scraping`; its `github` connector is already `enabled` in
+    `docs/operations/public-enrichment-source-register.md`, reviewed 2026-07-20, so
+    enabling it locally has no outstanding compliance gate) in the local `.env`.
+  - Verify: restarted the local dev server (env validation passed with both flags true),
+    confirmed both workers actually run: `POST /api/admin/devpost/run-worker` →
+    `{"ok":true,"disabled":false,...}` with real progress (page 3 of "open source", 8
+    profiles upserted, 0 errors); `POST /api/admin/enrichment/run-worker` →
+    `{"ok":true,"disabled":false,...}` (0 claimed — no queued enrichment jobs right now,
+    which is expected since that worker drains a job queue rather than crawling
+    standalone; `disabled:false` confirms the flag itself is live).
+  - Production stays `DEVPOST_ENABLED=false` — turning it on there remains a separate,
+    future decision (real outbound scraping traffic from the production VPS, no
+    published rate limit, real IP-ban risk), not something to bundle into this decision.
