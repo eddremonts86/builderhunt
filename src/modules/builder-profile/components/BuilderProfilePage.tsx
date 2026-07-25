@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, Sparkles, Users, Lock,
 import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
+import { TeamFitCard } from '~/modules/builder-profile/components/TeamFitCard'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
 import { Button, Input, LinkButton, Textarea } from '~/components/ui'
@@ -49,6 +50,7 @@ export function BuilderProfilePage() {
   const [claimEmail, setClaimEmail] = React.useState('')
   const [claimSending, setClaimSending] = React.useState(false)
   const [claimMsg, setClaimMsg] = React.useState<{ ok: boolean; text: string; devLink?: string } | null>(null)
+  const [trackedBuildersCount, setTrackedBuildersCount] = React.useState(0)
 
   React.useEffect(() => {
     if (!builderId) return
@@ -56,10 +58,12 @@ export function BuilderProfilePage() {
       fetch(`/api/builders/${builderId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : null),
       fetch(`/api/builders/${builderId}/notes`, { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
       fetch('/api/auth/get-session', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([b, n, session]) => {
+      fetch('/api/dashboard/stats', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
+    ]).then(([b, n, session, stats]) => {
       setBuilder(b)
       setNotes(Array.isArray(n) ? n : [])
       setMeId(session?.user?.id ?? null)
+      setTrackedBuildersCount(typeof stats?.totalBuilders === 'number' ? stats.totalBuilders : 0)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [builderId])
@@ -282,6 +286,8 @@ export function BuilderProfilePage() {
               source: builder.source,
             }}
           />
+
+          <TeamFitCard builderId={builder.id} trackedBuildersCount={trackedBuildersCount} />
 
           {/* Action bar — varies based on auth + claim state */}
           <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm p-6">

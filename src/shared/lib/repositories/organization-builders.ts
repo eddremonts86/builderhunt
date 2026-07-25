@@ -87,6 +87,27 @@ export function listRecentOrganizationBuilders(
     .limit(limit)
 }
 
+/**
+ * Plan: team-synergy. "The team" = the recruiter's own org's tracked
+ * builders, most-recently-tracked first (not `listOrganizationBuilders`'
+ * `lastSeenAt` ordering, which reflects the builder's own activity, not when
+ * the org tracked them). Callers should fetch one extra row beyond their
+ * intended cap and filter out the candidate being analyzed themselves, since
+ * a tracked candidate must never inflate their own team aggregate.
+ */
+export function listOrganizationBuildersForTeamAggregate(
+  transaction: TenantTransaction,
+  organizationId: string,
+  limit: number,
+) {
+  return transaction.select(privateBuilderFields)
+    .from(organizationBuilders)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+    .where(eq(organizationBuilders.organizationId, organizationId))
+    .orderBy(desc(organizationBuilders.createdAt))
+    .limit(limit)
+}
+
 export async function countOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
   const [row] = await transaction.select({ value: count() })
     .from(organizationBuilders)

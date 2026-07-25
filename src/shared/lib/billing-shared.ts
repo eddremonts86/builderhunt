@@ -66,6 +66,7 @@ export const PLAN_PRICING: Record<PlanTier, { monthly: number; annual: number; l
       'Shared saved searches',
       'Shared builder lists',
       'Work-sample analysis',
+      'Team fit analysis',
       'Activity feed',
       'AI sourcing sprints (up to 10)',
       'Priority support',
