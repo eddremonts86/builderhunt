@@ -1175,10 +1175,23 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       `pnpm vitest run` (40/40 across the touched files), `pnpm security:route-coverage` (105 routes,
       valid).
 
-- [ ] **Pricing/FAQ fair-use copy**
+- [x] **Pricing/FAQ fair-use copy**
   - Files: `src/routes/_landing/pricing.tsx`
   - Do: state the seat/fair-use and per-seat concurrency policy so enforcement is expected.
   - Verify: content test / visual check.
+  - **Done.** Added a new "Is there a fair-use policy?" entry to the inline `FAQ` array (this page
+    has its own self-contained FAQ, separate from the homepage's `FAQSection.tsx` — nothing shared
+    to touch). Deliberately used qualitative language ("a laptop and phone at once," "sized
+    generously for real research work, not automated scraping") rather than hard-coding the current
+    numeric thresholds (`SESSION_MAX_CONCURRENT_*`, `SEAT_DAILY_*` in `env.ts`) — those are tunable
+    ops knobs pending Phase 6's baseline-calibration task, not a committed public contract, and
+    `env.ts`'s own comment on session limits says they're "sized to comfortably allow a single
+    person... not to police normal multi-device use." Matched the existing FAQ's voice (direct,
+    reassuring, "Yes." opener, no legalese) and `spec.md`'s framing goal ("fairness, not
+    accusation") by naming the in-app warning/step-up UX (Phase 5 tasks 1-2) before any restriction.
+    Verify: `pnpm tsc --noEmit`, `pnpm eslint` (both clean), `pnpm vitest run
+    src/routes/_landing/pricing.test.tsx` (7/7 passing, unaffected), and a visual check in the real
+    dev browser confirming the new accordion entry renders with the rest of the FAQ list.
 
 ## Phase 6 — Baseline, calibrate, gate
 

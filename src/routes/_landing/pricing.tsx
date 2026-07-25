@@ -57,6 +57,10 @@ const FAQ: Array<{ q: string; a: string }> = [
     q: 'What is a "team seat"?',
     a: 'One team seat = one person on your team. Team owners can invite members by email. Members get shared saved searches, shared builder lists, and an activity feed.',
   },
+  {
+    q: 'Is there a fair-use policy?',
+    a: 'Yes. Every plan is priced for one person per seat, signed in from their own normal set of devices — a laptop and phone at once is completely fine. Each seat also has its own daily limits on things like searches, exports, and profile reveals, sized generously for real research work, not automated scraping. We\'d rather warn you than surprise you: if an account looks unusual, you\'ll see an in-app notice (and, rarely, a quick re-login prompt) well before anything is restricted.',
+  },
 ]
 
 const TIERS: CatalogTier[] = ['free', 'pro', 'pro_max', 'team']
