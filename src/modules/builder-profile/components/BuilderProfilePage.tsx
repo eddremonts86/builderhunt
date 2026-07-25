@@ -261,10 +261,13 @@ export function BuilderProfilePage() {
           />
           <CodeStyleCard
             builder={{
+              id: builder.id,
+              source: builder.source,
               language: builder.language,
               topics: builder.topics,
               followersCount: builder.followersCount,
               metadata: builder.metadata as Record<string, unknown> | undefined,
+              codeStyleFingerprint: (builder as { codeStyleFingerprint?: unknown }).codeStyleFingerprint,
             }}
           />
         </div>

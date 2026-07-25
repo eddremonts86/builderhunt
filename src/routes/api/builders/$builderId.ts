@@ -53,7 +53,10 @@ export const Route = createFileRoute('/api/builders/$builderId')({
                 cap: env.SEAT_DAILY_REVEALS,
                 requestId: principal!.requestId,
               }))
-              const privateMetadata = tenantBuilder.privateMetadata as { topics?: string[]; country?: string; language?: string }
+              const privateMetadata = tenantBuilder.privateMetadata as {
+                topics?: string[]; country?: string; language?: string
+                codeStyleFingerprint?: unknown
+              }
               const claim = await findVerifiedBuilderClaim(tenantBuilder.identityId)
               return Response.json({
                 id: tenantBuilder.identityId,
@@ -67,6 +70,11 @@ export const Route = createFileRoute('/api/builders/$builderId')({
                 language: privateMetadata.language ?? tenantBuilder.language,
                 country: privateMetadata.country ?? tenantBuilder.country,
                 topics: privateMetadata.topics ?? [],
+                // Only on the tracked-builder branch: the v2 code-style
+                // fingerprint is the org's own derived artifact, so it is not
+                // part of the public profile payload below. Sent raw and
+                // validated client-side by `codeStyleFingerprintV2Schema`.
+                codeStyleFingerprint: privateMetadata.codeStyleFingerprint ?? null,
                 isClaimed: Boolean(claim),
                 isVerified: Boolean(claim),
                 claimedByUserId: claim?.subjectUserId ?? null,
