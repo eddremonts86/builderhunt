@@ -4,7 +4,7 @@ import { ChevronDown } from 'lucide-react'
 const FAQ_ITEMS = [
   {
     q: 'What is BuilderHunt, in one sentence?',
-    a: 'A radar for open-source builders: it aggregates public activity from GitHub, Reddit, Hacker News and DEV.to, scores it for recency, and lets you save searches, get alerts, and track the people behind the work.',
+    a: 'A radar for open-source builders: it aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and a dozen other developer sources, scores it for recency, and lets you save searches, get alerts, and track the people behind the work.',
   },
   {
     q: 'Is it really free?',
@@ -12,7 +12,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'Do I need API tokens for the sources?',
-    a: 'No. Everything works out of the box. Adding a GitHub personal access token (optional, free) lifts the rate limit so you can run larger or more frequent searches.',
+    a: "No. Every source works out of the box with no setup on your end — there's nothing for you to configure or supply.",
   },
   {
     q: 'How is the activity score calculated?',

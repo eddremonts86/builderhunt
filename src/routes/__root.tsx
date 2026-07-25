@@ -119,14 +119,17 @@ export const Route = createRootRoute({
               availability: 'https://schema.org/InStock',
             },
             featureList: [
-              'Multi-source builder discovery (GitHub, Reddit, Hacker News, DEV.to)',
+              'Multi-source builder discovery (GitHub, GitLab, Codeberg, SourceHut, Hacker News, Reddit, DEV.to, Hashnode, Stack Overflow, npm, Hugging Face, Lobsters, Devpost, Product Hunt, Bluesky)',
               'Recency-weighted activity scoring',
               'Saved keyword searches',
               'Email alerts on new builder activity',
               'Private notes per builder',
               'CSV / JSON exports',
             ],
-            aggregateRating: { '@type': 'AggregateRating', ratingValue: '4.8', ratingCount: '124' },
+            // Deliberately no review-rating field here — BuilderHunt has no
+            // review corpus to report, and an unsourced number is exactly
+            // the kind of runtime-unbacked structured-data claim this app
+            // must not publish. See src/modules/landing/components/trust-claims.test.ts.
           },
           {
             '@context': 'https://schema.org',

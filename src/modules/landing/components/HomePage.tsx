@@ -1,8 +1,8 @@
 import * as React from 'react'
-import { LinkButton, Input, Button } from '~/components/ui'
+import { LinkButton } from '~/components/ui'
 import {
   Sparkles, Target, ArrowRight, Check, Search,
-  Bell, FileText, Download, Zap, Shield, Star
+  Bell, FileText, Download, Zap, Shield
 } from 'lucide-react'
 import { useSession } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
@@ -118,11 +118,6 @@ export function HomePage() {
                   </picture>
                 </div>
 
-                {/* One real, live signal — not decorative chips duplicating what's already on screen. */}
-                <div className="hidden md:flex absolute -left-6 top-10 items-center gap-2 px-3 py-2 rounded-full bg-bh-surface border border-bh-border shadow-lg animate-fade-in" style={{ animationDelay: '500ms' }}>
-                  <GithubIcon className="w-4 h-4 text-bh-github" title="GitHub" />
-                  <span className="text-xs font-medium">+128 stars / 7d</span>
-                </div>
               </div>
             </div>
           </div>
@@ -137,19 +132,16 @@ export function HomePage() {
             <div className="marquee-container">
               <div className="marquee-content">
                 {[
-                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
-                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
-                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
-                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
+                  { name: 'GitHub', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
+                  { name: 'Reddit', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
+                  { name: 'Hacker News', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
+                  { name: 'DEV.to', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
+                  { name: '+ 11 more sources', desc: 'GitLab, Codeberg, Stack Overflow, npm and others', Icon: Sparkles, color: 'text-bh-text-muted' },
                 ].map((s, idx) => (
                   <div key={`${s.name}-1-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
                     <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
                     <div>
-                      <div className="font-bold text-bh-text flex items-center gap-1.5">
-                        {s.name}
-                        <span className="w-1 h-1 rounded-full bg-bh-accent" />
-                        <span className="text-xs font-semibold text-bh-accent">{s.count}</span>
-                      </div>
+                      <div className="font-bold text-bh-text">{s.name}</div>
                       <div className="text-xs text-bh-text-muted">{s.desc}</div>
                     </div>
                   </div>
@@ -157,19 +149,16 @@ export function HomePage() {
               </div>
               <div className="marquee-content" aria-hidden="true">
                 {[
-                  { name: 'GitHub', count: '420M+ profiles', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
-                  { name: 'Reddit', count: '100K+ dev communities', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
-                  { name: 'Hacker News', count: 'Real-time signal', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
-                  { name: 'DEV.to', count: '1M+ articles', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
+                  { name: 'GitHub', desc: 'Stars, commits & PRs', Icon: GithubIcon, color: 'text-bh-github' },
+                  { name: 'Reddit', desc: 'Karma & comments', Icon: RedditIcon, color: 'text-bh-reddit' },
+                  { name: 'Hacker News', desc: 'Upvotes & top-stories', Icon: HackerNewsIcon, color: 'text-bh-hn' },
+                  { name: 'DEV.to', desc: 'Articles & reactions', Icon: DevToIcon, color: 'text-bh-devto' },
+                  { name: '+ 11 more sources', desc: 'GitLab, Codeberg, Stack Overflow, npm and others', Icon: Sparkles, color: 'text-bh-text-muted' },
                 ].map((s, idx) => (
                   <div key={`${s.name}-2-${idx}`} className="flex items-center gap-4 bg-bh-surface border border-bh-border/50 rounded-2xl px-6 py-4 shadow-sm min-w-[280px] hover:border-bh-accent/40 transition-colors">
                     <s.Icon className={`w-8 h-8 ${s.color}`} title={s.name} />
                     <div>
-                      <div className="font-bold text-bh-text flex items-center gap-1.5">
-                        {s.name}
-                        <span className="w-1 h-1 rounded-full bg-bh-accent" />
-                        <span className="text-xs font-semibold text-bh-accent">{s.count}</span>
-                      </div>
+                      <div className="font-bold text-bh-text">{s.name}</div>
                       <div className="text-xs text-bh-text-muted">{s.desc}</div>
                     </div>
                   </div>
@@ -541,11 +530,10 @@ export function HomePage() {
                 <GithubIcon className="w-3.5 h-3.5" title="GitHub" /> Sources
               </span>
               <h2 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
-                Signal from the four places builders actually are.
+                Signal from the places builders actually are.
               </h2>
               <p className="text-lg text-bh-text-muted">
-                All sources work without API tokens. Add a GitHub token (optional) to lift rate limits
-                on heavier searches.
+                Every source works out of the box — no setup, no API keys required from you.
               </p>
             </div>
 
@@ -564,25 +552,6 @@ export function HomePage() {
                 </article>
               ))}
             </div>
-          </div>
-        </section>
-
-        {/* ───────────────────── TESTIMONIAL ────────────────────── */}
-        <section className="section border-t border-bh-border bg-bh-bg-alt/30">
-          <div className="container-narrow text-center">
-            <div className="flex justify-center gap-1 mb-6" role="img" aria-label="5 out of 5 stars">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="w-5 h-5 fill-bh-warning text-bh-warning" aria-hidden="true" />
-              ))}
-            </div>
-            <blockquote className="text-2xl md:text-3xl font-medium leading-snug mb-6">
-              "I spent two hours a week curating a list of contributors for our OSS project.
-              BuilderHunt does it in the background and pings me when someone new is worth a look.
-              It paid for itself in the first week."
-            </blockquote>
-            <footer className="text-bh-text-muted text-sm">
-              — <cite>Beta user</cite> · open-source maintainer, Rust tooling
-            </footer>
           </div>
         </section>
 
@@ -626,20 +595,6 @@ export function HomePage() {
                 </>
               )}
             </div>
-            <div className="max-w-md mx-auto mt-8 p-1 bg-bh-surface border border-bh-border/80 rounded-xl flex shadow-sm focus-within:ring-2 focus-within:ring-bh-accent/40 focus-within:border-bh-accent transition-all">
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                className="!bg-transparent !border-0 !shadow-none !rounded-none !px-3 !py-2 text-sm text-bh-text flex-grow placeholder:text-bh-text-dim"
-                aria-label="Newsletter email input"
-              />
-              <Button type="submit" size="sm" className="px-4 rounded-lg font-bold">
-                Join Alerts
-              </Button>
-            </div>
-            <p className="text-xs text-bh-text-dim mt-3">
-              We send launch updates and feature summaries. No spam, unsubscribe anytime.
-            </p>
           </div>
         </section>
     </>
