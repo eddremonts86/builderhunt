@@ -1,9 +1,12 @@
 # Smart Alerts (tasks)
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (Phase 3's worker/email.ts integration sub-task skipped — see note)
 > **Depends on**: nothing (Phase 3 depends on [`ai-expansion`](../ai-expansion/spec.md))
 > **Blocks**: nothing hard — see spec.md header
-> **Reality check**: Phase 0 is shipped code; only Phases 1–3 below are open work.
+> **Reality check**: Phases 0–2 shipped and live-verified. Phase 3's task registration
+> shipped; its worker/`email.ts` integration is explicitly skipped this session (`email.ts`
+> is a reserved file for this session's scope) — registering the task alone is safe and
+> inert (nothing calls it yet), so this doesn't block calling the plan done.
 
 ## Phase 0 — Delivered (checked, with pointers)
 
@@ -22,61 +25,81 @@
 
 ## Phase 1 — Frequency honoring + editing
 
-- [ ] **Add `last_checked_at` to alerts**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` (generated)
-  - Do: Add `lastCheckedAt: timestamp('last_checked_at')` (nullable) to `alerts`; run
-    `pnpm db:generate` and `pnpm db:migrate`.
-  - Verify: `\d alerts` shows the column; existing rows have NULL.
-- [ ] **Frequency window logic in the worker**
-  - Files: `src/shared/lib/alerts.ts`, `src/shared/lib/alerts.test.ts`, `src/lib/alerts/worker.ts`
-  - Do: Export pure `isDueForCheck(frequency: 'hourly' | 'daily' | 'weekly', lastCheckedAt: Date | null, now: Date): boolean`
-    (null → true; windows: hourly always at a ≥ 1 h cron, daily 20 h, weekly 6.5 d).
-    Worker: `continue` when not due; otherwise evaluate and then
-    `UPDATE alerts SET last_checked_at = now()` regardless of match outcome.
-  - Verify: `pnpm test alerts` — new cases: null, inside window, outside window, weekly.
-- [ ] **PATCH /api/alerts/$id**
-  - Files: `src/routes/api/alerts/$id.ts` (new)
-  - Do: Authed, owner-scoped (`and(eq(alerts.id), eq(alerts.userId, session.user.id))`).
-    Body zod: partial of `{ enabled: z.boolean(), name: z.string().min(1).max(100), frequency: z.enum(['hourly','daily','weekly']), deliveryChannel: z.enum(['email','dashboard']), triggerConditions: <same object as CreateBody> }`.
-    404 when not found/not owner; returns the updated row.
-  - Verify: `curl -X PATCH /api/alerts/<id> -d '{"enabled":false}'` → row disabled; other
-    user's alert → 404.
-- [ ] **Frequency select + pause/edit in the UI**
+- [x] **Add `last_checked_at` to alerts**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0055_fuzzy_ben_urich.sql`
+  - Did: Added `lastCheckedAt: timestamp('last_checked_at')` (nullable) to `alerts`.
+  - Verified: migration applied locally; column present, existing rows NULL.
+- [x] **Frequency window logic in the worker**
+  - Files: `src/shared/lib/alerts.ts` (`isDueForCheck`, `FREQUENCY_WINDOW_MS`),
+    `src/shared/lib/alerts.test.ts`, `src/lib/alerts/worker.ts`,
+    `src/shared/lib/repositories/alerts-worker.ts` (`markWorkerAlertChecked`)
+  - Did: `isDueForCheck('hourly'|'daily'|'weekly', lastCheckedAt, now)` — null → true;
+    windows: hourly 55 min, daily 20 h, weekly 6.5 d (each slightly under nominal to absorb
+    cron jitter). Worker `continue`s past not-due alerts; a `finally` block marks every
+    evaluated alert checked regardless of match outcome.
+  - **Bug found + fixed during live verification**: the worker's `builderhunt_worker` DB
+    role only had a column-scoped `UPDATE (last_triggered_at)` grant on `alerts`
+    (0010_worker_alert_policies.sql) — the new `last_checked_at` column had no grant, so
+    every `markWorkerAlertChecked` write failed with `permission denied for table alerts`
+    (RLS policy allowed the row, the column-grant didn't). Fixed with
+    `drizzle/0056_alerts_last_checked_grant.sql` (`GRANT UPDATE (last_checked_at) ...`).
+  - Verified: `pnpm vitest run alerts.test.ts` (8 new cases: null/inside/outside window ×
+    hourly/daily/weekly + boundary); live `POST /api/admin/alerts/run-worker` (Bearer
+    `CRON_SECRET`) — first call evaluated both real alerts and set `last_checked_at`;
+    immediate second call returned `alertsEvaluated: 0` (correctly skipped, not due yet).
+- [x] **PATCH /api/alerts/$id**
+  - Files: `src/routes/api/alerts/$id.ts` (new), `src/shared/lib/repositories/organization-alerts.ts`
+    (`updateOrganizationAlert`)
+  - Did: Authed via `requireTenantPrincipal` + `withTenantContext`, organization-scoped
+    (matches this codebase's tenant convention, not a raw `session.user.id` check — same
+    pattern as the existing DELETE handler in `api/alerts/index.ts`). Body zod: partial of
+    `{ enabled, name, frequency, deliveryChannel, triggerConditions }`. 404 when not
+    found/not this org's alert.
+  - Verified live in browser: toggled "Php alert" enabled→false (UI showed "Paused"),
+    PATCH'd `frequency` hourly→weekly via the per-row select, confirmed via
+    `read_network_requests` response body (`"frequency":"hourly"` then back to `"weekly"`).
+- [x] **Frequency select + pause/edit in the UI**
   - Files: `src/routes/_dashboard/alerts.tsx`
-  - Do: Add a frequency `<select>` (hourly/daily/weekly, default daily) to the create form
-    body; per-alert row: pause/resume toggle and name/frequency inline edit calling PATCH.
-  - Verify: UI check — create a weekly alert, pause it, confirm `GET /api/alerts` reflects
-    both; paused alert skipped by a manual `POST /api/admin/alerts/run-worker`.
+  - Did: Frequency select was already present on the create form; added a per-alert-row
+    pause/resume `Button` (`toggleAlertEnabled`, PATCH `{enabled}`) and a per-row frequency
+    `Select` (`updateAlertFrequency`, PATCH `{frequency}`).
+  - Verified: live browser click-through (pause → "Paused" badge appears; frequency select
+    → PATCH fires, response confirms new value; resumed + restored to original state after).
 
 ## Phase 2 — Unread badge
 
-- [ ] **Unread count endpoint**
+- [x] **Unread count endpoint**
   - Files: `src/routes/api/alerts/triggers/unread-count.ts` (new)
-  - Do: Authed GET returning `{ count }` via `unreadTriggerCount(userId)`
-    (`src/shared/lib/alerts.ts`).
-  - Verify: curl with a session cookie returns the same count as unread rows in `/alerts`.
-- [ ] **Nav badge**
-  - Files: `src/routes/_dashboard/route.tsx`
-  - Do: Fetch unread count on mount/route change; render a small count pill on the Alerts
-    nav link when > 0.
-  - Verify: UI check — trigger via `POST /api/alerts/test-trigger`, badge appears; mark
-    read in `/alerts`, badge clears on next navigation.
+  - Did: Authed GET returning `{ count }` via `unreadOrganizationTriggerCount`.
+  - Verified: live in browser via `read_network_requests` — matches the "N unread" count
+    already shown in the inbox header.
+- [x] **Nav badge**
+  - Files: `src/modules/dashboard/ui/shell/DashboardLayout.tsx` (not `_dashboard/route.tsx`
+    — the topbar nav pills live in `DashboardLayout`, per this session's earlier
+    dashboard-redesign work; `route.tsx` only mounts the shell)
+  - Did: Fetch unread count on mount + route change (`location.pathname` dep); render a
+    small accent-colored count pill on the Alerts `NavPill` (desktop) and the mobile
+    hamburger-sheet row, "9+" past 9.
+  - Verified: live in browser — badge rendered on `/alerts` while triggers were unread.
 
 ## Phase 3 — Optional AI digest summary (after ai-expansion)
 
-- [ ] **Register `alert-digest-summary` task**
+- [x] **Register `alert-digest-summary` task**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
-  - Do: `server-only`; input `{ items: [...] }` (≤ 20, names via `wrapUntrusted`); output
-    `z.object({ summary: z.string().min(10).max(300) })`; `cacheTtlSeconds: null`;
-    allowances `{ free: 0, pro: 2, team: 2 }`; `maxOutputTokens: 128`.
-  - Verify: `pnpm test tasks` registry-integrity cases pass with the new task.
-- [ ] **Worker integration (best-effort)**
+  - Did: `server-only`; input `{ items: [{alertName, username, source, eventType}] }`
+    (1–20, wrapped via `wrapUntrusted`); output `{ summary: string (10-300 chars) }`;
+    `cacheTtlSeconds: null`; allowances `{ free: 0, pro: 2, team: 2 }`;
+    `maxOutputTokens: 128`.
+  - Verified: `pnpm vitest run tasks.test.ts` — dedicated registry test + the generic
+    registry-integrity checks all pass.
+- [ ] **Worker integration (best-effort)** — **skipped this session**
   - Files: `src/lib/alerts/worker.ts`, `src/shared/lib/email.ts`
-  - Do: Before each digest send: budget-check the recipient, call `minimaxChat` through the
-    task, pass `summary?` into `sendAlertDigestEmail`/`alertDigestEmailHtml` (renders an
-    intro paragraph when present). Wrap in try/catch — failures log and send plain.
-  - Verify: With `MINIMAX_API_KEY` set, run-worker produces a digest with a summary line;
-    with `AI_DISABLED_TASKS=alert-digest-summary`, digest sends without it and no error.
+  - Why skipped: `src/shared/lib/email.ts` is a reserved file for this session (standing
+    instruction). The task is registered and safe to leave unregistered-from-the-worker
+    indefinitely — nothing calls it, so there's no half-finished behavior in prod. A future
+    session with `email.ts` in scope can wire it per the original plan (budget-check the
+    recipient, call the task, pass `summary?` into `sendAlertDigestEmail`, try/catch to a
+    plain digest on any failure).
 
 ## Future (not scheduled)
 

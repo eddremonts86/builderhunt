@@ -203,6 +203,22 @@ describe('AI task registry', () => {
     }).success).toBe(false)
   })
 
+  it('registers alert-digest-summary as server-only, no-cache, Pro/Team-gated', () => {
+    const task = getTask('alert-digest-summary')
+    expect(task).not.toBeNull()
+    expect(task?.tier).toBe('server-only')
+    expect(task?.cacheTtlSeconds).toBeNull()
+    expect(task?.allowances).toEqual({ free: 0, pro: 2, team: 2 })
+
+    const validInput = { items: [{ alertName: 'Rust builders', username: 'alice', source: 'github', eventType: 'new_repo' }] }
+    expect(task?.inputSchema.safeParse(validInput).success).toBe(true)
+    expect(task?.inputSchema.safeParse({ items: [] }).success).toBe(false)
+    expect(task?.inputSchema.safeParse({ items: Array(21).fill(validInput.items[0]) }).success).toBe(false)
+
+    expect(task?.outputSchema.safeParse({ summary: 'Three new builders matched your Rust alert.' }).success).toBe(true)
+    expect(task?.outputSchema.safeParse({ summary: 'short' }).success).toBe(false)
+  })
+
   it('every registered task has a non-empty system prompt, full allowances, and positive maxOutputTokens', () => {
     for (const task of Object.values(AI_TASKS)) {
       expect(task.system.trim().length).toBeGreaterThan(0)

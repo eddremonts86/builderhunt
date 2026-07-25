@@ -31,8 +31,8 @@ const NAV = [
 const MOBILE_NAV_ITEMS = NAV.filter((n) => n.to !== '/dashboard')
 
 function NavPill({
-  to, icon: Icon, label, active,
-}: { to: string; icon: React.ComponentType<{ className?: string }>; label: string; active: boolean }) {
+  to, icon: Icon, label, active, badge,
+}: { to: string; icon: React.ComponentType<{ className?: string }>; label: string; active: boolean; badge?: number }) {
   return (
     <Link
       to={to}
@@ -44,6 +44,14 @@ function NavPill({
     >
       <Icon className="w-4 h-4 shrink-0" aria-hidden="true" />
       {label}
+      {Boolean(badge) && (
+        <span
+          className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-bh-accent px-1 text-[0.625rem] font-bold text-white"
+          data-testid="alerts-nav-badge"
+        >
+          {badge && badge > 9 ? '9+' : badge}
+        </span>
+      )}
     </Link>
   )
 }
@@ -56,7 +64,7 @@ function NavPill({
  * themselves stay always-visible (never enter this sheet) — they're already
  * compact icon/avatar-first triggers on desktop. */
 function MobileNavSheet({ items, activePath }: {
-  items: ReadonlyArray<{ to: string; icon: React.ComponentType<{ className?: string }>; label: string; end: boolean }>
+  items: ReadonlyArray<{ to: string; icon: React.ComponentType<{ className?: string }>; label: string; end: boolean; badge?: number }>
   activePath: string
 }) {
   const [open, setOpen] = React.useState(false)
@@ -143,6 +151,11 @@ function MobileNavSheet({ items, activePath }: {
                   >
                     <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
                     {item.label}
+                    {Boolean(item.badge) && (
+                      <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-bh-accent px-1 text-[0.625rem] font-bold text-white">
+                        {item.badge && item.badge > 9 ? '9+' : item.badge}
+                      </span>
+                    )}
                   </Link>
                 )
               })}
@@ -161,6 +174,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const reduceMotion = useReducedMotion()
   const [signingOut, setSigningOut] = React.useState(false)
   const [isAdmin, setIsAdmin] = React.useState(false)
+  const [unreadAlertsCount, setUnreadAlertsCount] = React.useState(0)
   const pillRowRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -168,6 +182,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       .then((r) => setIsAdmin(r.ok))
       .catch(() => setIsAdmin(false))
   }, [])
+
+  React.useEffect(() => {
+    fetch('/api/alerts/triggers/unread-count', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : { count: 0 }))
+      .then((data) => setUnreadAlertsCount(data.count ?? 0))
+      .catch(() => setUnreadAlertsCount(0))
+  }, [location.pathname])
 
   const indicator = useSlidingIndicator(pillRowRef, [location.pathname])
 
@@ -212,6 +233,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               icon={n.icon}
               label={n.label}
               active={n.end ? location.pathname === n.to : location.pathname.startsWith(n.to)}
+              badge={n.to === '/alerts' ? unreadAlertsCount : undefined}
             />
           ))}
         </div>
@@ -230,7 +252,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
           >
             <LayoutDashboard className="w-4 h-4" aria-hidden="true" />
           </Link>
-          <MobileNavSheet items={MOBILE_NAV_ITEMS} activePath={location.pathname} />
+          <MobileNavSheet
+            items={MOBILE_NAV_ITEMS.map((item) => ({
+              ...item,
+              badge: item.to === '/alerts' ? unreadAlertsCount : undefined,
+            }))}
+            activePath={location.pathname}
+          />
         </div>
 
         <div className="flex items-center gap-2 shrink-0">

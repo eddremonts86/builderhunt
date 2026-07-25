@@ -1,6 +1,6 @@
 import { searchBuilders } from '~/lib/search'
 import { randomId } from '~/lib/utils'
-import { evaluateMatch, type TriggerConditions } from '~/shared/lib/alerts'
+import { evaluateMatch, isDueForCheck, type AlertFrequency, type TriggerConditions } from '~/shared/lib/alerts'
 import { sendAlertDigestEmail, type AlertDigestItem } from '~/shared/lib/email'
 import { log } from '~/shared/lib/log'
 import {
@@ -9,6 +9,7 @@ import {
   listEnabledWorkerAlerts,
   listWorkerOrganizationIds,
   listWorkerSeenSourceIds,
+  markWorkerAlertChecked,
   recordWorkerTrigger,
   withWorkerOrganization,
 } from '~/shared/lib/repositories/alerts-worker'
@@ -37,6 +38,8 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
       listEnabledWorkerAlerts(tx, organizationId),
     )
     for (const alert of activeAlerts) {
+      const frequency = (alert.frequency ?? 'daily') as AlertFrequency
+      if (!isDueForCheck(frequency, alert.lastCheckedAt, new Date())) continue
       result.alertsEvaluated++
       try {
         const conditions = alert.triggerConditions as TriggerConditions
@@ -141,6 +144,8 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
       } catch (error) {
         result.errors.push(`alert ${alert.id} failed: ${error instanceof Error ? error.message : String(error)}`)
         log.error('alerts_worker_alert_failed', { organizationId, alertId: alert.id, error })
+      } finally {
+        await withWorkerOrganization(organizationId, (tx) => markWorkerAlertChecked(tx, organizationId, alert.id))
       }
     }
   }

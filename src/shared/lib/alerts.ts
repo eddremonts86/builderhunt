@@ -71,3 +71,24 @@ export function evaluateMatch(
 export const listTriggersForOrganization = listOrganizationTriggers
 export const markTriggerRead = markOrganizationTriggerRead
 export const unreadTriggerCount = unreadOrganizationTriggerCount
+
+export type AlertFrequency = 'hourly' | 'daily' | 'weekly'
+
+// Slightly under the nominal window so an alert due right at the boundary
+// isn't skipped for a full extra cycle by cron jitter or a slow worker run
+// (e.g. a "daily" alert checked at 23:55 yesterday should still run today).
+const FREQUENCY_WINDOW_MS: Record<AlertFrequency, number> = {
+  hourly: 55 * 60 * 1000, // 55 min
+  daily: 20 * 60 * 60 * 1000, // 20 h
+  weekly: 6.5 * 24 * 60 * 60 * 1000, // 6.5 days
+}
+
+/**
+ * Plan: smart-alerts Phase 1. Pure — whether the worker should re-evaluate
+ * this alert on this pass. Never checked yet (`lastCheckedAt === null`) is
+ * always due, so a freshly created alert doesn't wait out its first window.
+ */
+export function isDueForCheck(frequency: AlertFrequency, lastCheckedAt: Date | null, now: Date): boolean {
+  if (lastCheckedAt === null) return true
+  return now.getTime() - lastCheckedAt.getTime() >= FREQUENCY_WINDOW_MS[frequency]
+}

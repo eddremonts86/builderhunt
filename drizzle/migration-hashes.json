@@ -220,6 +220,14 @@
     "0054_public_radars_grants": {
       "sql": "d9d001073174062f27ad34c31911e6c5a9533b35be92451f8e1bce08aa434f53",
       "snapshot": "21f6b4e62a635dd1eb6c9f15321a2a35386d8cd88e15e74132d54ffbdf98b73b"
+    },
+    "0055_fuzzy_ben_urich": {
+      "sql": "49a3955aee73445dd4880ca61bbda2b7414e8f50c2112bb8b68773e49beac204",
+      "snapshot": "bd2958d670a8dbb619ad8d5d0da827b21147bb9d1395c9433b3b04c87c484163"
+    },
+    "0056_alerts_last_checked_grant": {
+      "sql": "4eed08ff2ef2a28204b242cfea719cd85e4b55ab68c5bacb087013c13353f638",
+      "snapshot": "b2ffc84505aeb76bd3412eceb25ffb551528361c668fe383c6bd4bab95ddbf3b"
     }
   }
 }

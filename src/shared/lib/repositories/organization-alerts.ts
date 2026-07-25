@@ -52,6 +52,27 @@ export async function findOrganizationAlert(
   return row ?? null
 }
 
+export interface UpdateOrganizationAlertInput {
+  enabled?: boolean
+  name?: string
+  frequency?: string
+  deliveryChannel?: string
+  triggerConditions?: typeof alerts.$inferInsert.triggerConditions
+}
+
+export async function updateOrganizationAlert(
+  transaction: TenantTransaction,
+  organizationId: string,
+  id: string,
+  input: UpdateOrganizationAlertInput,
+) {
+  const [row] = await transaction.update(alerts)
+    .set(input)
+    .where(and(eq(alerts.organizationId, organizationId), eq(alerts.id, id)))
+    .returning()
+  return row ?? null
+}
+
 export async function deleteOrganizationAlert(
   transaction: TenantTransaction,
   organizationId: string,

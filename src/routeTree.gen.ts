@@ -84,6 +84,7 @@ import { Route as ApiBillingContactRouteImport } from './routes/api/billing/cont
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
+import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
 import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
 import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
@@ -150,6 +151,7 @@ import { Route as ApiBillingContactVerifyRouteImport } from './routes/api/billin
 import { Route as ApiBillingCheckoutSubscriptionRouteImport } from './routes/api/billing/checkout/subscription'
 import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billing/checkout/status'
 import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
+import { Route as ApiAlertsTriggersUnreadCountRouteImport } from './routes/api/alerts/triggers/unread-count'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
@@ -556,6 +558,11 @@ const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
   path: '/api/alerts/test-trigger',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAlertsIdRoute = ApiAlertsIdRouteImport.update({
+  id: '/api/alerts/$id',
+  path: '/api/alerts/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAiEmbedRoute = ApiAiEmbedRouteImport.update({
   id: '/api/ai/embed',
   path: '/api/ai/embed',
@@ -912,6 +919,12 @@ const ApiBillingCheckoutCreditsRoute =
     path: '/api/billing/checkout/credits',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAlertsTriggersUnreadCountRoute =
+  ApiAlertsTriggersUnreadCountRouteImport.update({
+    id: '/api/alerts/triggers/unread-count',
+    path: '/api/alerts/triggers/unread-count',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
   id: '/api/alerts/triggers/$id',
   path: '/api/alerts/triggers/$id',
@@ -1122,6 +1135,7 @@ export interface FileRoutesByFullPath {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
@@ -1196,6 +1210,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
@@ -1290,6 +1305,7 @@ export interface FileRoutesByTo {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
@@ -1364,6 +1380,7 @@ export interface FileRoutesByTo {
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
@@ -1463,6 +1480,7 @@ export interface FileRoutesById {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
@@ -1537,6 +1555,7 @@ export interface FileRoutesById {
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
+  '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
   '/api/billing/checkout/status': typeof ApiBillingCheckoutStatusRoute
   '/api/billing/checkout/subscription': typeof ApiBillingCheckoutSubscriptionRoute
@@ -1635,6 +1654,7 @@ export interface FileRouteTypes {
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
+    | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
@@ -1709,6 +1729,7 @@ export interface FileRouteTypes {
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
@@ -1803,6 +1824,7 @@ export interface FileRouteTypes {
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
+    | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
@@ -1877,6 +1899,7 @@ export interface FileRouteTypes {
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
@@ -1975,6 +1998,7 @@ export interface FileRouteTypes {
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
+    | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
@@ -2049,6 +2073,7 @@ export interface FileRouteTypes {
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
+    | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
     | '/api/billing/checkout/status'
     | '/api/billing/checkout/subscription'
@@ -2113,6 +2138,7 @@ export interface RootRouteChildren {
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
+  ApiAlertsIdRoute: typeof ApiAlertsIdRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
@@ -2178,6 +2204,7 @@ export interface RootRouteChildren {
   ApiAdminStatusSnapshotRoute: typeof ApiAdminStatusSnapshotRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
+  ApiAlertsTriggersUnreadCountRoute: typeof ApiAlertsTriggersUnreadCountRoute
   ApiBillingCheckoutCreditsRoute: typeof ApiBillingCheckoutCreditsRoute
   ApiBillingCheckoutStatusRoute: typeof ApiBillingCheckoutStatusRoute
   ApiBillingCheckoutSubscriptionRoute: typeof ApiBillingCheckoutSubscriptionRoute
@@ -2738,6 +2765,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAlertsTestTriggerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/alerts/$id': {
+      id: '/api/alerts/$id'
+      path: '/api/alerts/$id'
+      fullPath: '/api/alerts/$id'
+      preLoaderRoute: typeof ApiAlertsIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ai/embed': {
       id: '/api/ai/embed'
       path: '/api/ai/embed'
@@ -3198,6 +3232,13 @@ declare module '@tanstack/react-router' {
       path: '/api/billing/checkout/credits'
       fullPath: '/api/billing/checkout/credits'
       preLoaderRoute: typeof ApiBillingCheckoutCreditsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/alerts/triggers/unread-count': {
+      id: '/api/alerts/triggers/unread-count'
+      path: '/api/alerts/triggers/unread-count'
+      fullPath: '/api/alerts/triggers/unread-count'
+      preLoaderRoute: typeof ApiAlertsTriggersUnreadCountRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/alerts/triggers/$id': {
@@ -3672,6 +3713,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,
+  ApiAlertsIdRoute: ApiAlertsIdRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
@@ -3739,6 +3781,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminStatusSnapshotRoute: ApiAdminStatusSnapshotRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
+  ApiAlertsTriggersUnreadCountRoute: ApiAlertsTriggersUnreadCountRoute,
   ApiBillingCheckoutCreditsRoute: ApiBillingCheckoutCreditsRoute,
   ApiBillingCheckoutStatusRoute: ApiBillingCheckoutStatusRoute,
   ApiBillingCheckoutSubscriptionRoute: ApiBillingCheckoutSubscriptionRoute,

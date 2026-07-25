@@ -53,6 +53,15 @@ export async function listWorkerSeenSourceIds(
     .filter((value): value is string => typeof value === 'string'))
 }
 
+export async function markWorkerAlertChecked(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  alertId: string,
+) {
+  await transaction.update(alerts).set({ lastCheckedAt: new Date() })
+    .where(and(eq(alerts.organizationId, organizationId), eq(alerts.id, alertId)))
+}
+
 export async function recordWorkerTrigger(
   transaction: WorkerTransaction,
   input: {

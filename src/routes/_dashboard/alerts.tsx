@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Bell, Check, Sparkles, ExternalLink, Clock, Plus, Trash2, X } from 'lucide-react'
+import { Bell, Check, Sparkles, ExternalLink, Clock, Pause, Play, Plus, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
@@ -172,6 +172,32 @@ function AlertsInboxPage() {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
+    })
+    await load()
+  }
+
+  const [togglingId, setTogglingId] = React.useState<string | null>(null)
+  const toggleAlertEnabled = async (id: string, enabled: boolean) => {
+    setTogglingId(id)
+    try {
+      await fetch(`/api/alerts/${id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled: !enabled }),
+      })
+      await load()
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
+  const updateAlertFrequency = async (id: string, nextFrequency: 'hourly' | 'daily' | 'weekly') => {
+    await fetch(`/api/alerts/${id}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ frequency: nextFrequency }),
     })
     await load()
   }
@@ -349,6 +375,36 @@ function AlertsInboxPage() {
                           {a.deliveryChannel === 'email' ? 'Email + dashboard' : 'Dashboard only'}
                         </p>
                       </div>
+                      <Select
+                        value={a.frequency ?? 'daily'}
+                        onValueChange={(v) => updateAlertFrequency(a.id, v as 'hourly' | 'daily' | 'weekly')}
+                      >
+                        <SelectTrigger
+                          className="w-32 shrink-0 text-xs"
+                          aria-label="Digest frequency"
+                          data-testid={`alert-frequency-edit-${a.id}`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FREQUENCY_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        onClick={() => toggleAlertEnabled(a.id, a.enabled)}
+                        disabled={togglingId === a.id}
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        aria-label={a.enabled ? 'Pause alert' : 'Resume alert'}
+                        title={a.enabled ? 'Pause alert' : 'Resume alert'}
+                        data-testid={`alert-toggle-${a.id}`}
+                      >
+                        {a.enabled ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      </Button>
                       <Button
                         type="button"
                         onClick={() => deleteAlert(a.id)}

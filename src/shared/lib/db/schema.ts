@@ -318,6 +318,10 @@ export const alerts = pgTable('alerts', {
   frequency: text('frequency').default('daily'), // hourly | daily | weekly
   enabled: boolean('enabled').default(true),
   lastTriggeredAt: timestamp('last_triggered_at'),
+  // Plan: smart-alerts Phase 1 — when the worker last evaluated this alert
+  // (set on every worker pass regardless of match outcome), so `isDueForCheck`
+  // can honor `frequency` instead of re-evaluating every alert every run.
+  lastCheckedAt: timestamp('last_checked_at'),
   createdAt: timestamp('created_at').defaultNow(),
   // Plan: smart-alerts
   triggerConditions: jsonb('trigger_conditions')
