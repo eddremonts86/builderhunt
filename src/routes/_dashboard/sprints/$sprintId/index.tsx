@@ -175,10 +175,11 @@ function SprintDossierPage() {
                 placeholder="Filter keywords (comma separated)"
                 className="flex-1 min-w-[160px] text-sm"
               />
-              {/* Fixed-width wrappers, not width classes on Input/SelectTrigger directly:
-                  .input-field is unlayered CSS in globals.css, which always beats a plain
-                  Tailwind utility of equal specificity — a bare `w-32`/`w-40` on the
-                  control itself is silently ignored and it re-claims the full row instead. */}
+              {/* Fixed-width wrappers. Were required when `.input-field` was unlayered
+                  CSS whose `width: 100%` beat a plain Tailwind width utility; that root
+                  cause is fixed (it now sits in the `components` layer — see
+                  globals.css), so `w-32`/`w-40` on the controls themselves would work
+                  too. Left alone since they render identically. */}
               <div className="w-32 shrink-0">
                 <Input
                   value={minFollowersInput}

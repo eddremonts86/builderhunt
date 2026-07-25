@@ -135,11 +135,13 @@ export function TeamSettingsPage({
                 </div>
 
                 {canChangeThisRole ? (
-                  // Fixed-width wrapper, not a width class on SelectTrigger directly:
-                  // .input-field (globals.css) is unlayered CSS, which always beats a
-                  // plain (non-!important) Tailwind utility of equal specificity
-                  // regardless of source order — a `w-28` on the trigger itself is
-                  // silently ignored and it re-claims 100% of the flex row instead.
+                  // Fixed-width wrapper. This used to be *required* because
+                  // `.input-field` was unlayered CSS whose `width: 100%` beat a plain
+                  // Tailwind width utility on the trigger; that root cause is fixed
+                  // (it now lives in the `components` layer — see globals.css), so a
+                  // `w-28` directly on SelectTrigger would work too. Kept as-is
+                  // because it renders identically and this is not the place to
+                  // churn the team-settings layout.
                   <div className="w-28 shrink-0">
                     <Select
                       value={member.role as InvitableRole}

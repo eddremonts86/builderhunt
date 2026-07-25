@@ -529,21 +529,30 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 /* =============================================================================
    Inputs
    ============================================================================= */
-.input-field {
-  /* A step lighter than the page/panel background it sits on (not --color-bh-bg
-     itself) — otherwise a dark input on a dark glass panel has no visible edge
-     and reads as a flat cutout instead of a control. */
-  background: var(--color-bh-surface);
-  border: 1px solid var(--color-bh-border-strong);
-  border-radius: 8px;
-  padding: 0.625rem 0.875rem;
-  color: var(--color-bh-text);
-  font-size: 0.875rem;
-  width: 100%;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  font-family: inherit;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+/* Scoped into the `components` layer for the same reason `.card` above is:
+   `width: 100%` is the right default for a form field, but call sites that
+   need a compact inline control (e.g. the per-row frequency Select in
+   `_dashboard/alerts.tsx`, `input-field ... w-32`) must be able to override
+   it with a plain Tailwind width utility. Unlayered, this rule beat `w-32`
+   and stretched that Select to the full row, collapsing the sibling
+   `flex-1 min-w-0` name column to 0px. */
+@layer components {
+  .input-field {
+    /* A step lighter than the page/panel background it sits on (not --color-bh-bg
+       itself) — otherwise a dark input on a dark glass panel has no visible edge
+       and reads as a flat cutout instead of a control. */
+    background: var(--color-bh-surface);
+    border: 1px solid var(--color-bh-border-strong);
+    border-radius: 8px;
+    padding: 0.625rem 0.875rem;
+    color: var(--color-bh-text);
+    font-size: 0.875rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+  }
 }
 .input-field:focus {
   border-color: var(--color-bh-accent);

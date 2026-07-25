@@ -90,12 +90,20 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
 
         const keywords = (conditions.keywords?.length ? conditions.keywords : alert.keywords) ?? []
         if (keywords.length === 0) continue
-        const [candidates, alreadySeen] = await Promise.all([
+        const [searchResults, alreadySeen] = await Promise.all([
           searchBuilders({ keywords, perPage: 20 }),
           withWorkerOrganization(organizationId, (tx) =>
             listWorkerSeenSourceIds(tx, organizationId, alert.id),
           ),
         ])
+        // `searchBuilders` returns both people and repositories; an alert is
+        // about *builders*, so drop the repo rows — otherwise the inbox fills
+        // up with project names ("symfony", "bagisto") that a recruiter can
+        // neither track nor contact. Every other consumer of this function
+        // already filters the same way (sprints/discovery workers,
+        // SearchPage, public radars, explore) — this worker was the one
+        // place that didn't.
+        const candidates = searchResults.filter((builder) => builder.kind === 'person')
         let createdForAlert = 0
         for (const candidate of candidates) {
           if (createdForAlert >= MAX_NEW_TRIGGERS_PER_ALERT) break

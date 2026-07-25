@@ -152,9 +152,11 @@ export function OrganizationDangerZone({
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-bh-text-muted">Transfer ownership to another member.</p>
             <div className="flex items-center gap-2 shrink-0">
-              {/* Fixed-width wrapper, not a width class on SelectTrigger: .input-field
-                  is unlayered CSS in globals.css, which always beats a plain Tailwind
-                  utility of equal specificity — a bare `w-48` on the trigger is ignored. */}
+              {/* Fixed-width wrapper. Was required when `.input-field` was unlayered
+                  CSS whose `width: 100%` beat a plain Tailwind width utility; that root
+                  cause is fixed (it now sits in the `components` layer — see
+                  globals.css), so `w-48` on the trigger itself would work too. Left
+                  alone since it renders identically. */}
               <div className="w-48 shrink-0">
                 <Select
                   value={transferTarget}
