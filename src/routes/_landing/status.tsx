@@ -24,6 +24,7 @@ interface StatusResponse {
     db: { name: string; ok: boolean; message?: string }
     redis: { name: string; ok: boolean; message?: string }
   }
+  uptime30d: number | null
   timestamp: string
 }
 
@@ -102,6 +103,7 @@ function StatusPage() {
             <p className="text-xs text-bh-text-muted">
               {lastUpdated ? `Updated ${new Date(lastUpdated).toLocaleTimeString()}` : 'Loading…'}
               {status && ` · v${status.version} · up ${Math.round(status.uptime / 60)}m`}
+              {status?.uptime30d != null && ` · 30-day uptime: ${status.uptime30d.toFixed(2)}%`}
             </p>
           </div>
         </div>

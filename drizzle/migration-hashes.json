@@ -188,6 +188,14 @@
     "0046_abuse_signals_credit_spend_velocity": {
       "sql": "88d6776a0a9a36d0a22fd71bbd41a6de439216299b42b39a04bace2888278fee",
       "snapshot": "d2e76fe98799a26ba1401fa3e781d2f9a7154056d513e0a9d6384158ec7b8432"
+    },
+    "0047_parched_bloodaxe": {
+      "sql": "13a534450f3b043fa0fa0978c9d0ea5a19f4c9813085ee4ca0d46f245b34e63d",
+      "snapshot": "2bd6426885607b3141eeb3fcb2a39005d52bb98b57ba8764efd8f735f5b874f3"
+    },
+    "0048_status_checks_grants": {
+      "sql": "cc16801c493bf0ab985c7785fd56f4041568453568324b5ba95da6aac8f57675",
+      "snapshot": "c4a06676d8e40b3bb0b7cee5f7755bbdfc4578ef94fd73d8d00c4ae374b964de"
     }
   }
 }

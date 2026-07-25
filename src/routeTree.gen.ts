@@ -147,6 +147,7 @@ import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billi
 import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
+import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
@@ -888,6 +889,11 @@ const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
   path: '/api/admin/users/$userId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminStatusSnapshotRoute = ApiAdminStatusSnapshotRouteImport.update({
+  id: '/api/admin/status/snapshot',
+  path: '/api/admin/status/snapshot',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminSprintsRunWorkerRoute =
   ApiAdminSprintsRunWorkerRouteImport.update({
     id: '/api/admin/sprints/run-worker',
@@ -1145,6 +1151,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
+  '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -1306,6 +1313,7 @@ export interface FileRoutesByTo {
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
+  '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -1472,6 +1480,7 @@ export interface FileRoutesById {
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
+  '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -1637,6 +1646,7 @@ export interface FileRouteTypes {
     | '/api/admin/legal/run-worker'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
+    | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/credits'
@@ -1798,6 +1808,7 @@ export interface FileRouteTypes {
     | '/api/admin/legal/run-worker'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
+    | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/credits'
@@ -1963,6 +1974,7 @@ export interface FileRouteTypes {
     | '/api/admin/legal/run-worker'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
+    | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
     | '/api/alerts/triggers/$id'
     | '/api/billing/checkout/credits'
@@ -2085,6 +2097,7 @@ export interface RootRouteChildren {
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
+  ApiAdminStatusSnapshotRoute: typeof ApiAdminStatusSnapshotRoute
   ApiAdminUsersUserIdRoute: typeof ApiAdminUsersUserIdRoute
   ApiAlertsTriggersIdRoute: typeof ApiAlertsTriggersIdRoute
   ApiBillingCheckoutCreditsRoute: typeof ApiBillingCheckoutCreditsRoute
@@ -3087,6 +3100,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminUsersUserIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/status/snapshot': {
+      id: '/api/admin/status/snapshot'
+      path: '/api/admin/status/snapshot'
+      fullPath: '/api/admin/status/snapshot'
+      preLoaderRoute: typeof ApiAdminStatusSnapshotRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/sprints/run-worker': {
       id: '/api/admin/sprints/run-worker'
       path: '/api/admin/sprints/run-worker'
@@ -3588,6 +3608,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
+  ApiAdminStatusSnapshotRoute: ApiAdminStatusSnapshotRoute,
   ApiAdminUsersUserIdRoute: ApiAdminUsersUserIdRoute,
   ApiAlertsTriggersIdRoute: ApiAlertsTriggersIdRoute,
   ApiBillingCheckoutCreditsRoute: ApiBillingCheckoutCreditsRoute,

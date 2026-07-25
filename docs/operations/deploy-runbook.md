@@ -131,6 +131,16 @@ what keeps them working.
 | `POST /api/admin/billing/run-worker` | Stripe webhook event replay | `STRIPE_*` |
 | `POST /api/admin/legal/run-worker` | legal/retention sweeps | — |
 | `POST /api/admin/sprints/run-worker` | sourcing sprints | — |
+| `POST /api/admin/status/snapshot` | uptime-history snapshot for `/status`'s 30-day figure — run every 5 minutes, matching `computeUptime`'s default interval (`src/shared/lib/status.ts`); prunes rows older than 90 days each run | — |
+
+`POST /api/admin/status/snapshot` also accepts `CRON_SECRET` via `Authorization: Bearer <token>` or
+`x-cron-secret: <token>` as an unattended alternative to a platform-admin session (same
+`tryCronPrincipal` fallback every other `run-worker` endpoint above already supports) — the
+intended way an actual VPS crontab authenticates, e.g.:
+
+```
+*/5 * * * * curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/status/snapshot
+```
 
 For a scraper to actually produce data in prod it needs: (a) `builderhunt_worker` able to log
 in (orchestrator step 5/6), (b) its feature env set (`ENRICHMENT_ENABLED=true`,

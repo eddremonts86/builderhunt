@@ -2,6 +2,89 @@
  * Status page aggregator. Pure functions, testable.
  */
 
+export interface CheckResult {
+  name: string
+  ok: boolean
+  message?: string
+}
+
+/**
+ * The three checks the public `/api/status` route and the cron-triggered snapshot worker both
+ * run — extracted here (status-and-trust plan, Phase 1) so the snapshot worker doesn't duplicate
+ * `/api/status`'s inline check logic. `checkDb`/`checkRedis`/`checkMemory` return the same
+ * `{name, ok, message?}` shape `/api/status` has always returned per-check; `runStatusChecks()`
+ * runs all three concurrently and is what both callers should use.
+ */
+async function checkDb(): Promise<CheckResult> {
+  try {
+    const { db } = await import('~/shared/lib/db/index')
+    const { sql } = await import('drizzle-orm')
+    await db.execute(sql`SELECT 1`)
+    return { name: 'db', ok: true }
+  } catch (err) {
+    console.error('status db check failed:', err)
+    return { name: 'db', ok: false, message: 'unavailable' }
+  }
+}
+
+async function checkMemory(): Promise<CheckResult> {
+  const mem = process.memoryUsage()
+  const rssMB = mem.rss / 1024 / 1024
+  // Flag if RSS > 1GB
+  return {
+    name: 'memory',
+    ok: rssMB < 1024,
+    message: rssMB < 1024 ? `${rssMB.toFixed(0)}MB rss` : `${rssMB.toFixed(0)}MB rss — high`,
+  }
+}
+
+async function checkRedis(): Promise<CheckResult> {
+  // Try Redis if configured; if not configured, return ok (degraded mode).
+  // Use a fully-dynamic import so Vite doesn't try to resolve 'ioredis'
+  // at build time when the package isn't installed.
+  const url = process.env.REDIS_URL
+  if (!url) return { name: 'redis', ok: true, message: 'not configured' }
+  try {
+    const RedisMod = await import(/* @vite-ignore */ 'ioredis')
+    const Redis = RedisMod.default ?? RedisMod
+    const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 })
+    await client.connect()
+    await client.ping()
+    await client.quit()
+    return { name: 'redis', ok: true }
+  } catch (err) {
+    console.error('status redis check failed:', err)
+    return { name: 'redis', ok: false, message: 'unavailable' }
+  }
+}
+
+export async function runStatusChecks(): Promise<CheckResult[]> {
+  return Promise.all([checkDb(), checkRedis(), checkMemory()])
+}
+
+/**
+ * Expected-samples uptime over a trailing window, from periodic snapshot rows. Missing samples
+ * (gaps where the cron didn't run, or hadn't started yet) count as down, not as "no data" — the
+ * absence of a snapshot is itself evidence the service might not have been observed/healthy.
+ * Returns null when there's under a day of history, since a percentage from a handful of samples
+ * is misleading (the status page hides the uptime figure entirely in that case).
+ */
+export function computeUptime(
+  checks: Array<{ checkedAt: Date; ok: boolean }>,
+  days: number,
+  intervalMinutes = 5,
+): number | null {
+  const oneDayMs = 24 * 60 * 60 * 1000
+  if (checks.length === 0) return null
+  const oldest = checks.reduce((min, c) => (c.checkedAt < min ? c.checkedAt : min), checks[0].checkedAt)
+  const spanMs = Date.now() - oldest.getTime()
+  if (spanMs < oneDayMs) return null
+
+  const expectedSamples = Math.round((days * 24 * 60) / intervalMinutes)
+  const okSamples = checks.filter((c) => c.ok).length
+  return Math.min(100, (okSamples / expectedSamples) * 100)
+}
+
 export type ComponentStatus = 'operational' | 'degraded' | 'outage'
 
 export interface ComponentCheck {

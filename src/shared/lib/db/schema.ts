@@ -484,6 +484,25 @@ export const roadmapVotes = pgTable(
   }),
 )
 
+/**
+ * System-operational, no owning subject — a periodic uptime snapshot, not tenant/user data.
+ * `builderhunt_worker` inserts (and prunes rows older than 90 days) from the cron-triggered
+ * snapshot endpoint; `builderhunt_app`/`builderhunt_readonly` get read-only access for the public
+ * `/api/status` uptime computation, same public-read pattern as `incidents`/`changelog`.
+ */
+export const statusChecks = pgTable(
+  'status_checks',
+  {
+    id: text('id').primaryKey(),
+    checkedAt: timestamp('checked_at', { withTimezone: true }).notNull().defaultNow(),
+    ok: boolean('ok').notNull(),
+    components: jsonb('components').$type<Array<{ name: string; ok: boolean; message?: string }>>().notNull(),
+  },
+  (table) => [
+    index('status_checks_checked_at_idx').on(table.checkedAt),
+  ],
+)
+
 // ---------------------------------------------------------------------------
 // Legal & Compliance (Plan: legal-and-compliance)
 // ---------------------------------------------------------------------------

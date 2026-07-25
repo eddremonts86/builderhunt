@@ -1,71 +1,31 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { gte } from 'drizzle-orm'
+import { db as publicDb } from '~/shared/lib/db/index'
+import { statusChecks } from '~/shared/lib/db/schema'
+import { computeUptime, runStatusChecks } from '~/shared/lib/status'
 
-interface CheckResult {
-  name: string
-  ok: boolean
-  message?: string
-}
-
-async function checkDb(): Promise<CheckResult> {
-  try {
-    const { db } = await import('~/shared/lib/db/index')
-    const { sql } = await import('drizzle-orm')
-    await db.execute(sql`SELECT 1`)
-    return { name: 'db', ok: true }
-  } catch (err) {
-    console.error('status db check failed:', err)
-    return { name: 'db', ok: false, message: 'unavailable' }
-  }
-}
-
-async function checkMemory(): Promise<CheckResult> {
-  const mem = process.memoryUsage()
-  const rssMB = mem.rss / 1024 / 1024
-  // Flag if RSS > 1GB
-  return {
-    name: 'memory',
-    ok: rssMB < 1024,
-    message: rssMB < 1024 ? `${rssMB.toFixed(0)}MB rss` : `${rssMB.toFixed(0)}MB rss — high`,
-  }
-}
-
-async function checkRedis(): Promise<CheckResult> {
-  // Try Redis if configured; if not configured, return ok (degraded mode).
-  // Use a fully-dynamic import so Vite doesn't try to resolve 'ioredis'
-  // at build time when the package isn't installed.
-  const url = process.env.REDIS_URL
-  if (!url) return { name: 'redis', ok: true, message: 'not configured' }
-  try {
-    const RedisMod = await import(/* @vite-ignore */ 'ioredis')
-    const Redis = RedisMod.default ?? RedisMod
-    const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 })
-    await client.connect()
-    await client.ping()
-    await client.quit()
-    return { name: 'redis', ok: true }
-  } catch (err) {
-    console.error('status redis check failed:', err)
-    return { name: 'redis', ok: false, message: 'unavailable' }
-  }
-}
+const UPTIME_WINDOW_DAYS = 30
 
 export const Route = createFileRoute('/api/status/')({
   component: () => null,
   server: {
     handlers: {
       GET: async () => {
-        const [db, redis, memory] = await Promise.all([
-          checkDb(),
-          checkRedis(),
-          checkMemory(),
+        const [[db, redis, memory], uptimeRows] = await Promise.all([
+          runStatusChecks(),
+          publicDb.select({ checkedAt: statusChecks.checkedAt, ok: statusChecks.ok }).from(statusChecks)
+            .where(gte(statusChecks.checkedAt, new Date(Date.now() - UPTIME_WINDOW_DAYS * 24 * 60 * 60 * 1000)))
+            .catch(() => []),
         ])
         const allOk = [db, redis, memory].every((c) => c.ok)
+        const uptime30d = computeUptime(uptimeRows, UPTIME_WINDOW_DAYS)
         return Response.json(
           {
             status: allOk ? 'ok' : 'degraded',
             version: '1.0.0',
             uptime: process.uptime(),
             checks: { db, redis, memory },
+            uptime30d,
             timestamp: new Date().toISOString(),
           },
           { status: allOk ? 200 : 503 },

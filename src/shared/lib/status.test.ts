@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aggregateStatus, formatDuration, computeDuration } from './status'
+import { aggregateStatus, formatDuration, computeDuration, computeUptime } from './status'
 
 describe('aggregateStatus', () => {
   it('returns operational when all components are operational', () => {
@@ -59,5 +59,51 @@ describe('computeDuration', () => {
     const start = '2026-01-01T10:00:00.000Z'
     const end = '2026-01-01T11:30:00.000Z'
     expect(computeDuration(start, end)).toBe(90)
+  })
+})
+
+describe('computeUptime', () => {
+  function checksSpanningDays(days: number, intervalMinutes: number, downCount = 0): Array<{ checkedAt: Date; ok: boolean }> {
+    const totalSamples = Math.round((days * 24 * 60) / intervalMinutes)
+    const now = Date.now()
+    return Array.from({ length: totalSamples }, (_, i) => ({
+      checkedAt: new Date(now - i * intervalMinutes * 60 * 1000),
+      ok: i >= downCount, // the most recent `downCount` samples are down
+    }))
+  }
+
+  it('returns null when there is no data at all', () => {
+    expect(computeUptime([], 30)).toBeNull()
+  })
+
+  it('returns null when under a day of history exists, even with 100% ok samples', () => {
+    const checks = checksSpanningDays(0.5, 5)
+    expect(computeUptime(checks, 30)).toBeNull()
+  })
+
+  it('returns 100 when every expected sample over the window is ok', () => {
+    const checks = checksSpanningDays(30, 5)
+    expect(computeUptime(checks, 30)).toBe(100)
+  })
+
+  it('is proportional to a one-hour gap of down samples', () => {
+    // 30 days at 5-minute intervals = 8640 expected samples; 12 down samples = 1 hour.
+    const checks = checksSpanningDays(30, 5, 12)
+    const uptime = computeUptime(checks, 30)!
+    expect(uptime).toBeCloseTo(((8640 - 12) / 8640) * 100, 5)
+  })
+
+  it('treats missing samples (gaps) as down, not as absent data', () => {
+    // Only half the expected samples exist (cron only ran for the back half of the window) — all present ones ok.
+    const checks = checksSpanningDays(30, 5).slice(0, 4320)
+    const uptime = computeUptime(checks, 30)!
+    expect(uptime).toBeCloseTo(50, 0)
+  })
+
+  it('never exceeds 100 even if more ok samples exist than theoretically expected', () => {
+    const checks = checksSpanningDays(30, 5)
+    // Duplicate every sample (e.g. the cron ran twice in one interval) — should still cap at 100.
+    const doubled = [...checks, ...checks]
+    expect(computeUptime(doubled, 30)).toBe(100)
   })
 })
