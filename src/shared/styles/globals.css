@@ -367,6 +367,19 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
     box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
   }
 }
+
+/* For a row that owns its own `.card` container but embeds a component that
+   brings one too — e.g. the alerts inbox wrapping `PersonResultCard` so the
+   person and the Track/read actions live in a single item. Without this the
+   inner card paints a second border and background inside the outer one, and
+   the item reads as a broken box with the actions dangling outside it. */
+.flatten-nested-card .card {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
 .card-hover:hover {
   border-color: var(--color-bh-border-strong);
   transform: translateY(-2px);

@@ -1,6 +1,6 @@
 import { searchBuilders } from '~/lib/search'
 import { randomId } from '~/lib/utils'
-import { evaluateMatch, isDueForCheck, type AlertFrequency, type TriggerConditions } from '~/shared/lib/alerts'
+import { evaluateMatch, isDueForCheck, type AlertFrequency, type AlertMatchPayload, type TriggerConditions } from '~/shared/lib/alerts'
 import { sendAlertDigestEmail, type AlertDigestItem } from '~/shared/lib/email'
 import { log } from '~/shared/lib/log'
 import {
@@ -70,11 +70,22 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
             eventType: conditions.eventType,
             payload: {
               name: builder.displayName ?? builder.username,
-              description: `${builder.source} · new activity from ${builder.username}`,
+              description: `New activity from ${builder.username}`,
               sourceId: builder.sourceId,
               source: builder.source,
               username: builder.username,
-            },
+              // This branch used to omit `profileUrl` entirely, which left the
+              // inbox unable to render the person at all (see
+              // `readAlertMatchPayload`, which requires it).
+              profileUrl: builder.profileUrl,
+              displayName: builder.displayName ?? null,
+              avatarUrl: builder.avatarUrl ?? null,
+              bio: builder.bio ?? null,
+              followersCount: builder.followersCount ?? undefined,
+              language: builder.language ?? null,
+              country: builder.country ?? null,
+              topics: builder.topics ?? [],
+            } satisfies AlertMatchPayload,
           }))
           result.triggersCreated++
           if (wantsEmail) pushDigest(digestsByUser, alert.userId, {
@@ -121,21 +132,37 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
               payload: { sourceId: candidate.sourceId },
             },
           )) continue
+          const matchPayload: AlertMatchPayload = {
+            name: candidate.displayName ?? candidate.username,
+            description: candidate.bio ?? '',
+            source: candidate.source,
+            sourceId: candidate.sourceId,
+            username: candidate.username,
+            profileUrl: candidate.profileUrl,
+            displayName: candidate.displayName ?? null,
+            avatarUrl: candidate.avatarUrl ?? null,
+            bio: candidate.bio ?? null,
+            followersCount: candidate.followersCount ?? undefined,
+            language: candidate.language ?? null,
+            country: candidate.country ?? null,
+            topics: candidate.topics ?? [],
+            score: candidate.score,
+          }
           await withWorkerOrganization(organizationId, (tx) => recordWorkerTrigger(tx, {
             id: randomId(),
             organizationId,
             alertId: alert.id,
             userId: alert.userId,
             builderId: null,
-            eventType: conditions.eventType,
-            payload: {
-              name: candidate.displayName ?? candidate.username,
-              description: `${candidate.source} · ${candidate.profileUrl}`,
-              sourceId: candidate.sourceId,
-              source: candidate.source,
-              username: candidate.username,
-              profileUrl: candidate.profileUrl,
-            },
+            // Deliberately `keyword_match`, NOT `conditions.eventType`. This
+            // branch runs a keyword search and reports who it found — it does
+            // not detect repo/product events at all (real event detection is
+            // still unbuilt; see smart-alerts' "Future" section). Echoing the
+            // alert's condition back made the inbox label a person row "New
+            // repository" for an event nobody observed. Recording what
+            // actually happened keeps the inbox honest.
+            eventType: 'keyword_match',
+            payload: { ...matchPayload },
           }))
           alreadySeen.add(candidate.sourceId)
           result.triggersCreated++

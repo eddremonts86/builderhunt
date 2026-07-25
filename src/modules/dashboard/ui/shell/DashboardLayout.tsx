@@ -275,9 +275,12 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 
       {/* Main — one canonical content width for every dashboard page, so
           settings/sprints/search/admin all occupy the same horizontal
-          space instead of each page picking its own max-w-*. */}
+          space instead of each page picking its own max-w-*.
+          1200px deliberately matches `.container` (globals.css), the landing
+          side's width — signed-in and signed-out surfaces used to disagree by
+          176px, which read as the app "jumping narrower" after login. */}
       <main className="pt-24 pb-8 px-4 lg:px-8">
-        <div className="max-w-5xl mx-auto w-full">
+        <div className="max-w-[1200px] mx-auto w-full">
           {children}
         </div>
       </main>

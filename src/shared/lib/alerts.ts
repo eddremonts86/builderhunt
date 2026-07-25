@@ -22,6 +22,11 @@ export interface TriggerConditions {
 
 export type { AlertTriggerRecord }
 
+// The match-payload contract lives in `alerts-shared.ts` — this module pulls
+// in `node:crypto` and the tenant DB repositories, so the inbox UI cannot
+// import from here. Re-exported for server-side callers' convenience.
+export { readAlertMatchPayload, type AlertMatchPayload } from './alerts-shared'
+
 export async function recordTrigger(
   transaction: TenantTransaction,
   input: {
