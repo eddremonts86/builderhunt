@@ -129,8 +129,14 @@ function e2eEmbedTexts(texts: string[], scenario: string): number[][] {
   }
 }
 
-/** FNV-1a-seeded, stable across processes; values in [-1, 1). */
-function deterministicE2EVector(text: string, dim: number): number[] {
+/**
+ * FNV-1a-seeded, stable across processes; values in [-1, 1). Exported so the
+ * E2E harness (e2e/*.spec.ts) can compute the exact vector the app server
+ * will embed a given query string into under `E2E_EMBEDDINGS_SCENARIO=success`,
+ * and seed `builder_embeddings` rows with a known, deliberate relationship to
+ * it — no HTTP, no duplicated hash logic to drift out of sync with this one.
+ */
+export function deterministicE2EVector(text: string, dim: number): number[] {
   let hash = 2166136261
   for (let index = 0; index < text.length; index += 1) {
     hash ^= text.charCodeAt(index)
