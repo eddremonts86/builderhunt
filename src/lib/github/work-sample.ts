@@ -3,26 +3,20 @@ import { createHash } from 'node:crypto'
 
 /**
  * Plan: work-sample. URL parsing + content fetching for the "analyze a
- * public GitHub URL" feature — the shared module both `work-sample` and
- * `code-fingerprinting` document reusing (see either plan's spec header).
+ * public GitHub URL" feature. Path-selection heuristics and the shared GitHub
+ * error types come from `./content` (owned by `code-fingerprinting`, which
+ * both plans' specs designate as the shared module).
+ *
  * Only `api.github.com` requests built from the *parsed* (owner, repo,
  * number|path) parts are ever made — the user-supplied URL itself is never
  * fetched, which is the SSRF containment the spec requires.
  */
 
-export class GitHubTokenMissingError extends Error {
-  constructor() {
-    super('GITHUB_TOKEN is not configured')
-    this.name = 'GitHubTokenMissingError'
-  }
-}
-
-export class GitHubRateLimitedError extends Error {
-  constructor() {
-    super('GitHub API rate limit exceeded')
-    this.name = 'GitHubRateLimitedError'
-  }
-}
+export {
+  GitHubRateLimitedError,
+  GitHubTokenMissingError,
+} from './content'
+import { EXCLUDED_PATH_RE, GitHubRateLimitedError, GitHubTokenMissingError, isCodeFile } from './content'
 
 export class SampleNotFoundError extends Error {
   constructor() {
@@ -88,13 +82,6 @@ const PR_DIFF_CAP = 60_000
 const FILE_FETCH_CAP = 100_000
 const FILE_PROMPT_CAP = 20_000
 
-// Same exclusion set as code-fingerprinting's selection heuristics (lockfiles,
-// generated/vendor/build output, binaries) — kept local since content.ts
-// doesn't exist yet; whichever plan ships its shared module first should
-// fold this into it.
-const EXCLUDED_FILE_RE = /(^|\/)(node_modules|dist|build|vendor|\.min\.|package-lock\.json|pnpm-lock\.yaml|yarn\.lock|\.lock)($|\/)/i
-const CODE_FILE_RE = /\.(ts|tsx|js|jsx|py|go|rs|rb|java|kt|swift|c|cpp|h|hpp|cs|php|scala|ex|exs|clj|hs|ml|lua|zig|dart)$/i
-
 interface GhContentEntry {
   name: string
   path: string
@@ -157,12 +144,16 @@ async function listRepoFiles(owner: string, repo: string): Promise<GhContentEntr
   return entries.filter((e) => e.type === 'file')
 }
 
+/** Deliberately *not* `content.ts`'s `compareCandidates`: fingerprinting wants
+ *  mid-size files (densest style signal), whereas a work-sample review wants
+ *  the most substantial files it can show a recruiter. Only the exclusion set
+ *  and the "is this source code" test are genuinely shared. */
 function rankFiles(entries: GhContentEntry[]): GhContentEntry[] {
   return entries
-    .filter((e) => !EXCLUDED_FILE_RE.test(e.path))
+    .filter((e) => !EXCLUDED_PATH_RE.test(e.path))
     .sort((a, b) => {
-      const aCode = CODE_FILE_RE.test(a.path) ? 1 : 0
-      const bCode = CODE_FILE_RE.test(b.path) ? 1 : 0
+      const aCode = isCodeFile(a.path) ? 1 : 0
+      const bCode = isCodeFile(b.path) ? 1 : 0
       if (aCode !== bCode) return bCode - aCode
       return b.size - a.size
     })
