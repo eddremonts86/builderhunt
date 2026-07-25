@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { evaluateBillingAlerts, getBillingOperationsMetrics } from '~/shared/lib/billing/operations-metrics'
 import { metrics } from '~/shared/lib/metrics'
-import { getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
+import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
 
 export const Route = createFileRoute('/api/admin/metrics/')({
@@ -22,13 +22,21 @@ export const Route = createFileRoute('/api/admin/metrics/')({
           const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
 
           const accountMetrics = await getPlatformAccountMetrics(oneDayAgo, oneWeekAgo)
+          const onboardingMetrics = await getOnboardingActivationMetrics(oneWeekAgo)
           const discovery = await getDiscoveryState().catch(() => null)
           const billingMetrics = await getBillingOperationsMetrics()
+
+          const activationRate7d = accountMetrics.newUsersLast7d > 0
+            ? onboardingMetrics.onboardingCompletedLast7d / accountMetrics.newUsersLast7d
+            : null
 
           return Response.json({
             inProcess,
             db: {
               ...accountMetrics,
+              onboardingCompleted: onboardingMetrics.onboardingCompleted,
+              onboardingSkipped: onboardingMetrics.onboardingSkipped,
+              activationRate7d,
               totalSavedQueries: null,
               totalBuilders: null,
               totalNotes: null,

@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
   getPlatformAccountMetrics: vi.fn(),
+  getOnboardingActivationMetrics: vi.fn(),
   getDiscoveryState: vi.fn(),
   getBillingOperationsMetrics: vi.fn(),
 }))
@@ -14,7 +15,11 @@ vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
 
 vi.mock('~/shared/lib/repositories/platform-billing', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/repositories/platform-billing')>()
-  return { ...actual, getPlatformAccountMetrics: mocks.getPlatformAccountMetrics }
+  return {
+    ...actual,
+    getPlatformAccountMetrics: mocks.getPlatformAccountMetrics,
+    getOnboardingActivationMetrics: mocks.getOnboardingActivationMetrics,
+  }
 })
 
 vi.mock('~/shared/lib/repositories/discovery-state', async (importOriginal) => {
@@ -58,6 +63,7 @@ const SAMPLE_BILLING_METRICS = {
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.getPlatformAccountMetrics.mockResolvedValue({ totalAccounts: 0, newAccountsToday: 0, newAccountsThisWeek: 0 })
+  mocks.getOnboardingActivationMetrics.mockResolvedValue({ onboardingCompleted: 0, onboardingSkipped: 0, onboardingCompletedLast7d: 0 })
   mocks.getDiscoveryState.mockResolvedValue(null)
   mocks.getBillingOperationsMetrics.mockResolvedValue(SAMPLE_BILLING_METRICS)
 })
@@ -71,6 +77,30 @@ describe('GET /api/admin/metrics', () => {
 
     expect(response.status).toBe(200)
     expect(body.billing).toMatchObject({ ...SAMPLE_BILLING_METRICS, alerts: ['1 webhook event(s) permanently failed'] })
+  })
+
+  it('includes onboarding activation metrics, computing the 7d rate from completed/newUsersLast7d', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.getPlatformAccountMetrics.mockResolvedValue({ totalUsers: 100, newUsersLast24h: 5, newUsersLast7d: 20 })
+    mocks.getOnboardingActivationMetrics.mockResolvedValue({ onboardingCompleted: 12, onboardingSkipped: 3, onboardingCompletedLast7d: 8 })
+
+    const response = await callRoute()
+    const body = await response.json()
+
+    expect(body.db.onboardingCompleted).toBe(12)
+    expect(body.db.onboardingSkipped).toBe(3)
+    expect(body.db.activationRate7d).toBe(8 / 20)
+  })
+
+  it('reports a null activation rate when there were no new users in the last 7 days (avoids divide-by-zero)', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.getPlatformAccountMetrics.mockResolvedValue({ totalUsers: 100, newUsersLast24h: 0, newUsersLast7d: 0 })
+    mocks.getOnboardingActivationMetrics.mockResolvedValue({ onboardingCompleted: 12, onboardingSkipped: 3, onboardingCompletedLast7d: 0 })
+
+    const response = await callRoute()
+    const body = await response.json()
+
+    expect(body.db.activationRate7d).toBeNull()
   })
 
   it('surfaces no alerts when the billing metrics are fully clean', async () => {

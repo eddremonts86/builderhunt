@@ -196,6 +196,10 @@
     "0048_status_checks_grants": {
       "sql": "cc16801c493bf0ab985c7785fd56f4041568453568324b5ba95da6aac8f57675",
       "snapshot": "c4a06676d8e40b3bb0b7cee5f7755bbdfc4578ef94fd73d8d00c4ae374b964de"
+    },
+    "0049_onboarding_progress_platform_read": {
+      "sql": "ac273865bbf66e6686dac03eb01ec381cd1f44fa465a758167a3dc65bfcd9349",
+      "snapshot": "a6e9a69da21085d5e16b9f59690801a0d4650fb3a2871d0bd43d001862641e6a"
     }
   }
 }

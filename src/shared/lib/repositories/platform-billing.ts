@@ -3,7 +3,7 @@ import { randomId } from '~/lib/utils'
 import { env } from '../env'
 import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
-import { authUsers, planChanges, planRequests, plans } from '../db/schema'
+import { authUsers, onboardingProgress, planChanges, planRequests, plans } from '../db/schema'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
 /**
@@ -158,5 +158,26 @@ export async function getPlatformAccountMetrics(oneDayAgo: Date, oneWeekAgo: Dat
     totalUsers: Number(total?.value ?? 0),
     newUsersLast24h: Number(daily?.value ?? 0),
     newUsersLast7d: Number(weekly?.value ?? 0),
+  }
+}
+
+/**
+ * onboarding-flow plan, "Add activation metrics to the admin metrics endpoint" — needs
+ * `builderhunt_platform`'s new unscoped SELECT policy on `onboarding_progress`
+ * (0049_onboarding_progress_platform_read.sql), since that table's RLS was previously
+ * `builderhunt_app`-only, scoped per-organization.
+ */
+export async function getOnboardingActivationMetrics(oneWeekAgo: Date) {
+  const [[completedTotal], [skippedTotal], [completedLast7d]] = await Promise.all([
+    platformDb.select({ value: count() }).from(onboardingProgress).where(eq(onboardingProgress.completed, true)),
+    platformDb.select({ value: count() }).from(onboardingProgress).where(eq(onboardingProgress.skipped, true)),
+    platformDb.select({ value: count() }).from(onboardingProgress)
+      .innerJoin(authUsers, eq(onboardingProgress.userId, authUsers.id))
+      .where(and(eq(onboardingProgress.completed, true), gte(authUsers.createdAt, oneWeekAgo))),
+  ])
+  return {
+    onboardingCompleted: Number(completedTotal?.value ?? 0),
+    onboardingSkipped: Number(skippedTotal?.value ?? 0),
+    onboardingCompletedLast7d: Number(completedLast7d?.value ?? 0),
   }
 }
