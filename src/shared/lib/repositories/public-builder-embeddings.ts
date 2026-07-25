@@ -2,7 +2,8 @@
 // Every function here uses `publicDb` directly — never `withTenantContext` —
 // since this table has no organizationId (public profile data, shared across
 // all users). See schema.ts's "Semantic Search" section comment.
-import { asc, cosineDistance, desc, isNotNull, sql } from 'drizzle-orm'
+import { asc, cosineDistance, isNotNull, sql } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { builderEmbeddings } from '../db/schema'
 import { randomId } from '~/lib/utils'
@@ -82,13 +83,24 @@ export interface BuilderEmbeddingMatch {
 }
 
 /**
- * HNSW cosine-similarity search: top `limit` rows nearest `queryVector`
- * that already have an embedding. `similarity = 1 - cosine distance`
- * (1.0 = identical, 0.0 = orthogonal).
+ * Builds the HNSW cosine-similarity query without executing it, so the
+ * regression test can EXPLAIN exactly the SQL this module emits against a
+ * disposable database. Product code calls `findSimilarBuilderEmbeddings`.
+ *
+ * The ORDER BY shape is load-bearing. pgvector's HNSW index
+ * (`builder_embeddings_hnsw_idx`, `vector_cosine_ops`) can only serve an
+ * ordering written as the bare distance operator ascending —
+ * `ORDER BY embedding <=> $vec`. Ordering by the derived expression
+ * `1 - (embedding <=> $vec)` DESC yields the identical sequence, but the
+ * planner cannot match a monotonic transform back to the index and falls
+ * back to `Seq Scan + Sort` over the whole table. So similarity is a
+ * *selected column* here and the distance operator is the *sort key*;
+ * ascending distance is descending similarity, so callers see the same
+ * most-relevant-first order either way.
  */
-export async function findSimilarBuilderEmbeddings(queryVector: number[], limit: number): Promise<BuilderEmbeddingMatch[]> {
+export function similarBuilderEmbeddingsQuery(db: PostgresJsDatabase, queryVector: number[], limit: number) {
   const distance = cosineDistance(builderEmbeddings.embedding, queryVector)
-  const rows = await publicDb
+  return db
     .select({
       source: builderEmbeddings.source,
       sourceId: builderEmbeddings.sourceId,
@@ -97,8 +109,35 @@ export async function findSimilarBuilderEmbeddings(queryVector: number[], limit:
     })
     .from(builderEmbeddings)
     .where(isNotNull(builderEmbeddings.embedding))
-    .orderBy(desc(sql`1 - (${distance})`))
+    .orderBy(asc(distance))
     .limit(limit)
+}
+
+/**
+ * HNSW cosine-similarity search: top `limit` rows nearest `queryVector`
+ * that already have an embedding, most similar first.
+ * `similarity = 1 - cosine distance` (1.0 = identical, 0.0 = orthogonal).
+ *
+ * HNSW is an *approximate* index — it explores `max(hnsw.ef_search, limit)`
+ * candidates (`ef_search` defaults to 40) and returns the best it found, so
+ * `limit` rows always come back but they are not guaranteed to be the true
+ * nearest `limit`. That matters here because callers filter *after*
+ * retrieval: `semantic-search.ts` drops everything under
+ * `SEMANTIC_SIMILARITY_THRESHOLD` and compares the survivors against
+ * `SEMANTIC_MIN_LOCAL_MATCHES`, so a near-miss the index skipped becomes an
+ * unnecessary trip down the federated degradation ladder rather than a
+ * visibly wrong result. If recall ever needs tightening, raise it
+ * per-statement (`SET LOCAL hnsw.ef_search = ...`) instead of widening
+ * `limit`, which only buys more rows off the same candidate set.
+ *
+ * Note that an indexable ORDER BY makes the index *available*, not
+ * mandatory: the planner still costs it against a seq scan, and on a small
+ * corpus the seq scan legitimately wins. Measured locally at `limit` 50, the
+ * crossover sits around ~2k embedded rows (352 rows → seq scan at ~7 ms;
+ * 2k/5k/20k rows → HNSW index scan).
+ */
+export async function findSimilarBuilderEmbeddings(queryVector: number[], limit: number): Promise<BuilderEmbeddingMatch[]> {
+  const rows = await similarBuilderEmbeddingsQuery(publicDb, queryVector, limit)
   return rows.map((row) => ({ ...row, profile: row.profile as EmbeddedProfile }))
 }
 
