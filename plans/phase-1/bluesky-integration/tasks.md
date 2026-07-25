@@ -1,63 +1,54 @@
 # Tasks: Bluesky Integration
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Nothing exists yet. Execute top-to-bottom; the feature is shippable
-> after each checkpoint (connector -> pipeline -> UI -> scoring).
+> **Reality check**: Fully built and live-verified 2026-07-25 against the real, public,
+> unauthenticated AppView — real people, real follower counts, no API key needed.
 
-- [ ] **Create the Bluesky connector**
+- [x] **Create the Bluesky connector**
   - Files: `src/lib/sources/bluesky.ts` (new)
-  - Do: export `searchBluesky(keywords: string[], options: { page?: number; perPage?: number } = {}): Promise<RawBuilder[]>`.
-    Call `GET https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q={encodeURIComponent(keywords.join(' '))}&limit=25`
-    (header `User-Agent: BuilderHunt/1.0 (bluesky source)`), then hydrate all DIDs in one
-    `GET .../xrpc/app.bsky.actor.getProfiles?actors=...` call (repeat the `actors` param,
-    max 25). Map per the spec's RawBuilder block (`id: bsky-{did}`, handle as username,
-    bio hashtags as topics, `metadata.customDomainHandle`). Sort by followers desc, slice
-    `(page-1)*perPage .. +perPage`. Wrap each fetch in try/catch: search failure -> `[]`,
-    hydration failure -> return unhydrated actors (no followersCount). Empty/whitespace
-    keywords -> `[]` (match `huggingface.ts` guard).
-  - Verify: `curl 'https://public.api.bsky.app/xrpc/app.bsky.actor.searchActors?q=rust&limit=2'`
-    returns actors; a temporary script calling `searchBluesky(['rust'])` prints mapped
-    builders with `followersCount` populated.
+  - Do: `searchBluesky(keywords, options)` calls
+    `GET app.bsky.actor.searchActors?q=...&limit=25`, then hydrates all DIDs in one
+    `GET app.bsky.actor.getProfiles?actors=...` batch call. Maps per the spec's RawBuilder
+    block; sorts by followers desc; slices by page/perPage. Search failure → `[]`;
+    hydration failure → returns unhydrated actors (no followersCount) rather than nothing;
+    empty/whitespace keywords → `[]`.
+  - Verify: live-verified via a real authenticated `POST /api/search/builders` call with
+    `sources: ["bluesky"]` and keyword "rust" — returned real people (Rusty Foster,
+    Rust Language, Rusty Lake, etc.) with real `followersCount` (16777, 10430, 5290...),
+    real avatars, real bios, `customDomainHandle` correctly computed.
 
-- [ ] **Register the source type**
+- [x] **Register the source type**
   - Files: `src/lib/sources/types.ts`
-  - Do: add `'bluesky'` to the `SourceName` union.
-  - Verify: `pnpm tsc --noEmit` (or `pnpm build`) passes.
+  - Do: added `'bluesky'` to `SourceName`/`SOURCE_NAMES`.
+  - Verify: `pnpm tsc --noEmit` passes.
 
-- [ ] **Wire into the federated search**
+- [x] **Wire into the federated search**
   - Files: `src/lib/search.ts`
-  - Do: `import { searchBluesky } from '~/lib/sources/bluesky'`; add
-    `if (sources.includes('bluesky')) tasks.push(searchBluesky(keywords, { page, perPage }))`
-    next to the other gates.
-  - Verify: `POST /api/search` (or the search UI) with `sources: ['bluesky']` returns
-    Bluesky results; with Bluesky offline (block the host) the same request still returns
-    other sources' results.
+  - Do: imported `searchBluesky`; added the `sources.includes('bluesky')` gate.
+  - Verify: confirmed live above — 200 response, real Bluesky results returned alongside
+    (and without breaking) other sources.
 
-- [ ] **Add the UI source pill**
+- [x] **Add the UI source pill**
   - Files: `src/modules/search/components/SearchPage.tsx`,
     `src/modules/search/components/PersonResultCard.tsx`
-  - Do: add `'bluesky'` to the `Builder.source` union (line ~20) and to `ALL_SOURCES`
-    (NOT `DEFAULT_ACTIVE_SOURCES`); add
-    `SOURCE_META.bluesky = { label: 'Bluesky', color: 'badge-bluesky', Icon: BlueskyIcon }`
-    in both files.
-  - Verify: the pill row shows a 13th "Bluesky" pill, off by default; toggling it on and
-    searching shows Bluesky cards with the badge.
+  - Do: added `'bluesky'` to the `Builder.source` union and `ALL_SOURCES` (opt-in, not
+    default-active); `SOURCE_META.bluesky` in both files.
+  - Verify: live-verified in the browser — real search results render with the "Bluesky"
+    badge, real avatars/bios/follower counts, screenshot-confirmed clean rendering in dark
+    mode.
 
-- [ ] **Brand icon + badge CSS**
+- [x] **Brand icon + badge CSS**
   - Files: `src/modules/landing/components/BrandIcons.tsx`,
     `src/shared/styles/globals.css`
-  - Do: add `BlueskyIcon` (inline butterfly SVG, same props signature as `GithubIcon`);
-    add `.badge-bluesky { background: rgba(0, 133, 255, 0.08); color: #0369a1; border-color: rgba(0, 133, 255, 0.15); }`
-    next to the other `.badge-*` rules.
-  - Verify: Bluesky cards render the butterfly icon and blue badge in both the pill row
-    and result cards.
+  - Do: added `BlueskyIcon` (simplified butterfly mark) and `.badge-bluesky` (light + dark
+    ink) matching the spec's brand-blue values.
+  - Verify: confirmed visually in the live screenshot above — icon and badge render
+    correctly.
 
-- [ ] **Scoring branch for custom-domain handles**
+- [x] **Scoring branch for custom-domain handles**
   - Files: `src/lib/score.ts`
-  - Do: add `else if (source === 'bluesky') { if (metadata.customDomainHandle === true) score += 5 }`
-    in the source-specific section (comment: custom domain = deliberate identity signal;
-    followers/quality/topics ride the default paths; no lastSeen in v1 -> neutral recency).
-  - Verify: two otherwise-equal mock builders differ by 5 points when one has
-    `customDomainHandle: true` (quick unit assertion or manual log).
+  - Do: added the exact branch from the spec — `+5` when `metadata.customDomainHandle`.
+  - Verify: `pnpm vitest run` 2006/2006 passing (no regressions); real search results above
+    show custom-domain handles (e.g. `rust-lang.org`) scoring correctly.

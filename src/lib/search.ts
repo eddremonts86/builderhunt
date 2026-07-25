@@ -12,6 +12,7 @@ import { searchHashnode } from '~/lib/sources/hashnode'
 import { searchSourceHut } from '~/lib/sources/sourcehut'
 import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
+import { searchBluesky } from '~/lib/sources/bluesky'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/types'
@@ -85,6 +86,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('sourcehut')) tasks.push(searchSourceHut(keywords, { page, perPage }))
   if (sources.includes('devpost')) tasks.push(searchDevpost(keywords, { page, perPage }))
   if (sources.includes('producthunt')) tasks.push(searchProductHunt(keywords, { page, perPage }))
+  if (sources.includes('bluesky')) tasks.push(searchBluesky(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()

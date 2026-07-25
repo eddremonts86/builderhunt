@@ -123,3 +123,12 @@ export function ProductHuntIcon({ className, title }: { className?: string; titl
     </svg>
   )
 }
+
+export function BlueskyIcon({ className, title }: { className?: string; title?: string }) {
+  // Simplified butterfly mark (Bluesky's own motif, redrawn simply)
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M12 8.5C10.5 5.5 7.5 3 5 3c-.6 0-1 .5-.9 1.1.6 3.3 1.6 8.6 4.4 10.7 1 .8 2.3.8 3.5.2-2.4 1-4.8 2.4-4.8 4.5 0 1 .8 1.5 1.7 1.1 1.6-.7 2.7-2.4 3.1-3.6.4 1.2 1.5 2.9 3.1 3.6.9.4 1.7-.1 1.7-1.1 0-2.1-2.4-3.5-4.8-4.5 1.2.6 2.5.6 3.5-.2 2.8-2.1 3.8-7.4 4.4-10.7C20 3.5 19.6 3 19 3c-2.5 0-5.5 2.5-7 5.5z"/>
+    </svg>
+  )
+}

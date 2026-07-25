@@ -1,10 +1,10 @@
 # Feature: Bluesky Integration
 
-> **Status**: `pending`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: No `src/lib/sources/bluesky.ts` exists and `bluesky` is not in the
-> `SourceName` union (`src/lib/sources/types.ts`). The connector must copy the existing
+> **Reality check**: `src/lib/sources/bluesky.ts` implemented and live-verified 2026-07-25
+> with real data (no auth needed — see `tasks.md`). The connector copies the existing
 > pattern (one file, `search<Name>(keywords, opts) -> RawBuilder[]`, registered in
 > `src/lib/search.ts`). Downstream consumers `unified-timeline` and `proactive-discovery`
 > are enhanced by this source but do not depend on it.

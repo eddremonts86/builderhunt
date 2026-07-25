@@ -10,7 +10,7 @@ import { Tooltip } from '~/shared/components/Tooltip'
 import { ai } from '~/shared/lib/ai/client'
 import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon, ProductHuntIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon, ProductHuntIcon, BlueskyIcon } from '~/modules/landing/components/BrandIcons'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -20,7 +20,7 @@ type BuilderKind = 'person' | 'repo'
 interface Builder {
   id: string
   kind: BuilderKind
-  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg' | 'hashnode' | 'sourcehut' | 'devpost' | 'producthunt'
+  source: 'github' | 'reddit' | 'hn' | 'devto' | 'lobsters' | 'stackoverflow' | 'npm' | 'huggingface' | 'gitlab' | 'codeberg' | 'hashnode' | 'sourcehut' | 'devpost' | 'producthunt' | 'bluesky'
   sourceId: string
   username: string
   displayName?: string
@@ -64,7 +64,7 @@ type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
 /** All supported sources. Visible in the source-pills UI. */
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'sourcehut', 'devpost', 'producthunt']
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'sourcehut', 'devpost', 'producthunt', 'bluesky']
 /** Sources that are ON by default. Niche sources are opt-in. */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
@@ -83,6 +83,7 @@ const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.Co
   sourcehut: { label: 'SourceHut', color: 'badge-sourcehut', Icon: SourceHutIcon },
   devpost: { label: 'Devpost', color: 'badge-devpost', Icon: DevpostIcon },
   producthunt: { label: 'Product Hunt', color: 'badge-producthunt', Icon: ProductHuntIcon },
+  bluesky: { label: 'Bluesky', color: 'badge-bluesky', Icon: BlueskyIcon },
 }
 
 /* -------------------------------------------------------------------------- */

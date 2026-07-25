@@ -146,6 +146,11 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // metadata.lastSeen via the default branch above.
       const best = (metadata.bestVotes as number | undefined) ?? 0
       if (best > 0) score += Math.min(Math.log1p(best) * 1.2, 10)
+    } else if (source === 'bluesky') {
+      // Followers/quality/topics ride the default paths; no lastSeen in v1
+      // so recency uses the neutral default. Custom domain handle = a
+      // deliberate identity/verification act, worth a small flat bonus.
+      if (metadata.customDomainHandle === true) score += 5
     }
 
     // ---------- Quality signals (0-10 pts) ----------

@@ -15,6 +15,7 @@ export type SourceName =
   | 'lobsters'
   | 'devpost'
   | 'producthunt'
+  | 'bluesky'
 
 export const SOURCE_NAMES = [
   'github',
@@ -31,6 +32,7 @@ export const SOURCE_NAMES = [
   'lobsters',
   'devpost',
   'producthunt',
+  'bluesky',
 ] as const satisfies readonly SourceName[]
 
 export interface RawBuilder {
