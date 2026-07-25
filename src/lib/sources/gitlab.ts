@@ -24,6 +24,16 @@ import type { RawBuilder } from '~/lib/sources/types'
  *
  * Spec reference: plans/gitlab-integration/spec.md
  */
+/** Shape of `GET /api/v4/search?scope=users` — a lean directory match, not a full user profile
+ * (no bio, no followers — GitLab doesn't expose follower counts on any endpoint). */
+interface GLUserSearchResult {
+  id: number
+  username: string
+  name: string
+  avatar_url?: string | null
+  web_url: string
+}
+
 interface GLProject {
   id: number
   name: string
@@ -80,6 +90,62 @@ async function fetchProjectsPage(page: number, perPage: number): Promise<GLProje
     return (await res.json()) as GLProject[]
   } catch {
     return []
+  }
+}
+
+/**
+ * Authenticated search (`GITLAB_TOKEN` set only) — `/api/v4/search` (401 unauthenticated, see
+ * this file's header) genuinely searches GitLab's user/project directory by query, unlike the
+ * tokenless top-500-starred sampling above. Returns `[]` on any error or when no token is
+ * configured, so callers can always call these unconditionally.
+ */
+async function fetchUserSearchResults(query: string, perPage: number): Promise<GLUserSearchResult[]> {
+  if (!env.GITLAB_TOKEN) return []
+  try {
+    const url = `${GL_BASE}/search?scope=users&search=${encodeURIComponent(query)}&per_page=${perPage}`
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'BuilderHunt/1.0 (gitlab source)', ...authHeaders() },
+    })
+    if (!res.ok) return []
+    return (await res.json()) as GLUserSearchResult[]
+  } catch {
+    return []
+  }
+}
+
+async function fetchProjectSearchResults(query: string, perPage: number): Promise<GLProject[]> {
+  if (!env.GITLAB_TOKEN) return []
+  try {
+    const url = `${GL_BASE}/search?scope=projects&search=${encodeURIComponent(query)}&per_page=${perPage}`
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'BuilderHunt/1.0 (gitlab source)', ...authHeaders() },
+    })
+    if (!res.ok) return []
+    return (await res.json()) as GLProject[]
+  } catch {
+    return []
+  }
+}
+
+function userSearchResultToPersonBuilder(u: GLUserSearchResult): RawBuilder {
+  return {
+    id: `gl-user-${u.username}`,
+    kind: 'person' as const,
+    source: 'gitlab' as const,
+    sourceId: u.username,
+    username: u.username,
+    displayName: u.name || u.username,
+    avatarUrl: absoluteAvatar(u.avatar_url),
+    bio: undefined,
+    profileUrl: u.web_url,
+    // GitLab exposes no follower count anywhere — score falls back to recency/quality, same as
+    // the tokenless owner-aggregation path, just without a stars proxy since this user may own
+    // no public projects at all.
+    followersCount: undefined,
+    language: undefined,
+    country: undefined,
+    topics: [],
+    metadata: { matchedVia: 'authenticated-user-search' },
   }
 }
 
@@ -224,17 +290,22 @@ export async function searchGitLab(
   const { page = 1, perPage = 30 } = options
   const terms = keywords.map((k) => k.toLowerCase()).filter(Boolean)
   if (terms.length === 0) return []
+  const query = keywords.join(' ')
 
-  // Fetch top 500 by stars — enough surface for common stack keywords to
-  // match something (see fetchTopProjects doc comment).
-  const all = await fetchTopProjects(500)
-  if (all.length === 0) return []
+  // With GITLAB_TOKEN set, also run a real, precise directory search alongside the tokenless
+  // top-500-starred sampling below — these two return [] instantly when no token is configured,
+  // so the tokenless path is entirely unaffected.
+  const [all, tokenUsers, tokenProjects] = await Promise.all([
+    fetchTopProjects(500),
+    fetchUserSearchResults(query, 20),
+    fetchProjectSearchResults(query, 20),
+  ])
 
-  // Filter by query
+  // Filter the star-sampled set by query (the token-search results are already query-matched by
+  // GitLab itself, so this filter only applies to the tokenless sampling path).
   const matched = all.filter((p) => projectMatchesQuery(p, terms))
-  if (matched.length === 0) return []
 
-  // Build owners + repos
+  // Build owners + repos from the star-sampled, query-matched set.
   const owners = new Map<string, OwnerAggregate>()
   for (const p of matched) aggregateOwner(p, owners)
 
@@ -247,11 +318,25 @@ export async function searchGitLab(
   // Sort projects by stars
   const sortedProjects = [...matched].sort((a, b) => b.star_count - a.star_count)
 
-  // People first, then repos
+  // Token-search results come first (a real, precise directory match beats a star-sampled
+  // guess), then the tokenless owner/project sampling — deduped by id so a person who both
+  // matches the directory search and owns a top-500-starred project isn't shown twice.
+  const seen = new Set<string>()
+  function dedupe(builders: RawBuilder[]): RawBuilder[] {
+    return builders.filter((b) => {
+      if (seen.has(b.id)) return false
+      seen.add(b.id)
+      return true
+    })
+  }
+
   const all_results: RawBuilder[] = [
-    ...ownerList.map(ownerToPersonBuilder),
-    ...sortedProjects.map(projectToRepoBuilder),
+    ...dedupe(tokenUsers.map(userSearchResultToPersonBuilder)),
+    ...dedupe(ownerList.map(ownerToPersonBuilder)),
+    ...dedupe(tokenProjects.map(projectToRepoBuilder)),
+    ...dedupe(sortedProjects.map(projectToRepoBuilder)),
   ]
+  if (all_results.length === 0) return []
 
   const start = (page - 1) * perPage
   return all_results.slice(start, start + perPage)
