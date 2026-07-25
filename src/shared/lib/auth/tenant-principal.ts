@@ -17,6 +17,14 @@ export interface TenantPrincipalDependencies {
   // boundary breach. Awaited before throwing, but purely observational: it can never change
   // whether the request is rejected (abuse/anomalies.ts's cross-tenant-denial clustering).
   onMembershipDenied?(context: { userId: string; organizationId: string; requestId: string }): Promise<void> | void
+  // abuse-and-usage-integrity Phase 5's `resolveEnforcement()` — the ONE place request resolution
+  // itself acts on a user's enforcement stage. Only `'blocked'` changes anything here (turns a
+  // successful principal resolution into a 403, closest analogue to spec.md's "revoke extra
+  // sessions" for the front door); `warned`/`stepup`/`throttled` are surfaced elsewhere (dashboard
+  // banner, step-up route, tightened rate limits — Phase 5's own follow-up tasks), never here, to
+  // keep this function's blast radius to exactly what it already does: deciding whether a request
+  // gets a principal at all.
+  getEnforcementStage?(userId: string): Promise<'observe' | 'warned' | 'stepup' | 'throttled' | 'blocked'>
 }
 
 export class TenantAuthorizationError extends Error {
@@ -51,6 +59,13 @@ export async function resolveTenantPrincipal(
     throw new TenantAuthorizationError('Active organization membership is invalid', 403)
   }
 
+  if (dependencies.getEnforcementStage) {
+    const stage = await dependencies.getEnforcementStage(session.userId)
+    if (stage === 'blocked') {
+      throw new TenantAuthorizationError('This account is temporarily blocked pending review', 403)
+    }
+  }
+
   return {
     userId: session.userId,
     organizationId: session.activeOrganizationId,
@@ -60,7 +75,7 @@ export async function resolveTenantPrincipal(
 }
 
 export async function requireTenantPrincipal(request: Request): Promise<TenantPrincipal> {
-  const [{ and, eq }, { auth }, { authDb }, { organizationMembers }, { env }, { rateLimit }, { emitSecurityAudit }, { consoleSecurityAuditSink }, { checkCrossTenantDenialAndEmit }] = await Promise.all([
+  const [{ and, eq }, { auth }, { authDb }, { organizationMembers }, { env }, { rateLimit }, { emitSecurityAudit }, { consoleSecurityAuditSink }, { checkCrossTenantDenialAndEmit }, { resolveEnforcementForUser }] = await Promise.all([
     import('drizzle-orm'),
     import('./better-auth'),
     import('../db/auth-db'),
@@ -70,6 +85,7 @@ export async function requireTenantPrincipal(request: Request): Promise<TenantPr
     import('../security/audit'),
     import('../security/audit-sink'),
     import('../abuse/anomalies'),
+    import('../abuse/enforcement'),
   ])
 
   return resolveTenantPrincipal(request, {
@@ -116,6 +132,10 @@ export async function requireTenantPrincipal(request: Request): Promise<TenantPr
           },
         },
       )
+    },
+    getEnforcementStage: async (userId) => {
+      const decision = await resolveEnforcementForUser(userId)
+      return decision.stage
     },
   })
 }

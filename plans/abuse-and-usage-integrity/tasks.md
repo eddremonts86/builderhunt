@@ -1007,12 +1007,47 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 5 — Enforcement ladder + admin console (A–G response)
 
-- [ ] **`resolveEnforcement()` policy + request wiring**
+- [x] **`resolveEnforcement()` policy + request wiring**
   - Files: `src/shared/lib/abuse/enforcement.ts` (+ test), `src/shared/lib/auth/tenant-principal.ts`
   - Do: single policy mapping risk+mode → `observe|warned|stepup|throttled|blocked`; wire a check
     into authed request resolution so a stage applies consistently (warn banner flag, step-up
     required, tighter limits, or session revocation + upsell).
   - Verify: unit tests for every stage transition; integration test that `observe` is a no-op.
+  - Progress: `abuse/enforcement.ts` — pure `resolveEnforcement(mode, candidateStage)`: `observe`
+    mode always resolves to `'observe'` regardless of the candidate (matches this plan's fail-open
+    invariant); `warn` mode caps the effective stage at `'warned'` (this is the first place `warn`
+    is ever distinguished from `observe` in this codebase — every other gate built earlier in this
+    plan only branches on `=== 'enforce'`); `enforce` passes the candidate through unchanged.
+    `resolveEnforcementForUser(userId, deps?)` is the request-facing entry point (matches
+    `spec.md`'s own `resolveEnforcement(userId)` signature): reads the already-persisted
+    `account_risk.stage` via the existing cheap `getAccountRisk` read (no rescoring), defaulting to
+    `'observe'` for a user with no row yet or a corrupt/unexpected stage value. **Short-circuits
+    before touching the database at all when mode is `'observe'`** (the default) — since
+    `resolveEnforcement('observe', X)` is always `'observe'` regardless of `X`, the query result
+    could never matter, so the per-request cost in the default configuration is zero; the
+    worker-role read only happens once an operator deliberately opts into `warn`/`enforce`. This
+    resolved the one real design tension research surfaced: `account_risk` has no `builderhunt_app`
+    grant at all (by design — see `drizzle/0044`'s own comment), so a naive per-request check would
+    need either a new RLS grant or accept a worker-role round trip on every page load; the
+    observe-mode short-circuit sidesteps both.
+    Wired into `auth/tenant-principal.ts`: added an optional `getEnforcementStage?(userId)` hook to
+    `TenantPrincipalDependencies` (same DI seam as the existing `onMembershipDenied` hook) — only
+    `'blocked'` changes anything (`resolveTenantPrincipal` throws a 403 `TenantAuthorizationError`),
+    closest analogue to spec.md's "revoke extra sessions" for the front door. `'warned'`/`'stepup'`/
+    `'throttled'` intentionally do NOT alter request resolution here — those are Phase 5's own
+    follow-up tasks (dashboard banner, step-up route, rate-limit tightening) with their own specific
+    surfaces; keeping this function's blast radius to exactly what it already does (deciding whether
+    a request gets a principal at all). `requireTenantPrincipal` wires the real
+    `resolveEnforcementForUser` call. 18 new unit tests (14 for `resolveEnforcement`'s stage-cap
+    matrix + `resolveEnforcementForUser`'s short-circuit/DI/fallback behavior in `enforcement.test.ts`,
+    4 new tests in `tenant-principal.test.ts` for the blocked-rejects / non-blocked-passes-through /
+    membership-denied-short-circuits-before-enforcement-check cases) — all pass, no regressions
+    across the full `src/shared/lib/auth` + `src/shared/lib/abuse` suites (277 tests). `pnpm tsc
+    --noEmit`/`pnpm eslint` clean. Live-verified in the real dev browser: signed up a fresh test
+    account end-to-end (default `ABUSE_ENFORCEMENT_MODE=observe`), confirmed onboarding and the
+    dashboard both load with zero errors and zero added request latency (the short-circuit means
+    `account_risk` was never queried for this session) — test account and its cascaded rows deleted
+    from the dev database afterward.
 
 - [ ] **Warn banner + step-up re-auth UX**
   - Files: `src/modules/dashboard/components/AbuseWarningBanner.tsx` (+ test),

@@ -5,8 +5,8 @@ import type { AbuseSignalSeverity, AbuseSignalType } from './signals'
 
 /**
  * Candidate enforcement stage — "candidate" because this module only scores; deciding whether/how
- * to actually act on a stage is the enforcement ladder's job (`resolveEnforcement()`, Phase 5, not
- * built yet). Matches `account_risk.stage`'s check constraint exactly
+ * to actually act on a stage is the enforcement ladder's job (`abuse/enforcement.ts`'s
+ * `resolveEnforcement()`, Phase 5). Matches `account_risk.stage`'s check constraint exactly
  * (`drizzle/0043_abuse_usage_integrity_tables.sql`).
  */
 export type RiskStage = 'observe' | 'warned' | 'stepup' | 'throttled' | 'blocked'

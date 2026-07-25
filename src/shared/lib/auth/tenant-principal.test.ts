@@ -43,4 +43,36 @@ describe('resolveTenantPrincipal', () => {
     })
     expect(principal.organizationId).not.toBe('spoofed-org')
   })
+
+  it('rejects a request when the enforcement stage resolves to blocked (abuse-and-usage-integrity Phase 5)', async () => {
+    const getEnforcementStage = vi.fn().mockResolvedValue('blocked')
+    await expect(resolveTenantPrincipal(request, {
+      getSession: vi.fn().mockResolvedValue({ userId: 'user-a', activeOrganizationId: 'org-a' }),
+      findMembership: vi.fn().mockResolvedValue({ role: 'admin' }),
+      getEnforcementStage,
+    })).rejects.toMatchObject({ status: 403 })
+    expect(getEnforcementStage).toHaveBeenCalledWith('user-a')
+  })
+
+  it.each(['observe', 'warned', 'stepup', 'throttled'] as const)(
+    'still resolves a principal when the enforcement stage is %s (only blocked rejects)',
+    async (stage) => {
+      const principal = await resolveTenantPrincipal(request, {
+        getSession: vi.fn().mockResolvedValue({ userId: 'user-a', activeOrganizationId: 'org-a' }),
+        findMembership: vi.fn().mockResolvedValue({ role: 'admin' }),
+        getEnforcementStage: vi.fn().mockResolvedValue(stage),
+      })
+      expect(principal.userId).toBe('user-a')
+    },
+  )
+
+  it('never calls getEnforcementStage when membership was already denied', async () => {
+    const getEnforcementStage = vi.fn().mockResolvedValue('blocked')
+    await expect(resolveTenantPrincipal(request, {
+      getSession: vi.fn().mockResolvedValue({ userId: 'user-a', activeOrganizationId: 'org-a' }),
+      findMembership: vi.fn().mockResolvedValue(null),
+      getEnforcementStage,
+    })).rejects.toBeInstanceOf(TenantAuthorizationError)
+    expect(getEnforcementStage).not.toHaveBeenCalled()
+  })
 })
