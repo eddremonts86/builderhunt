@@ -5,6 +5,7 @@ import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { TeamFitCard } from '~/modules/builder-profile/components/TeamFitCard'
+import { WorkSamplePanel } from '~/modules/builder-profile/components/WorkSamplePanel'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
 import { Button, Input, LinkButton, Textarea } from '~/components/ui'
@@ -288,6 +289,8 @@ export function BuilderProfilePage() {
           />
 
           <TeamFitCard builderId={builder.id} trackedBuildersCount={trackedBuildersCount} />
+
+          <WorkSamplePanel builderId={builder.id} />
 
           {/* Action bar — varies based on auth + claim state */}
           <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm p-6">

@@ -228,6 +228,14 @@
     "0056_alerts_last_checked_grant": {
       "sql": "4eed08ff2ef2a28204b242cfea719cd85e4b55ab68c5bacb087013c13353f638",
       "snapshot": "b2ffc84505aeb76bd3412eceb25ffb551528361c668fe383c6bd4bab95ddbf3b"
+    },
+    "0057_wealthy_cyclops": {
+      "sql": "97ee442cc91cc3fe41499fa08eff765e370b9f016c53dfcdfcaad4d55a11d5ea",
+      "snapshot": "d7f892e446050c50fb44a12c05c00a8a2300820f8a624c6640a4a4d2c639fd99"
+    },
+    "0058_work_sample_analyses_policies": {
+      "sql": "19fc17f17f12f8ec48b8dc91efce4de787fdcc01f469bebc8c828c7a440aa65b",
+      "snapshot": "87f98cfbc211d2eb923dfa677e508811a83a6430d11befe77ad44503dde56a8e"
     }
   }
 }

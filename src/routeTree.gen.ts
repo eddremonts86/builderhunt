@@ -33,6 +33,7 @@ import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
 import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
 import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
+import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
 import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
@@ -52,6 +53,8 @@ import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/ind
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
+import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
+import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
 import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
@@ -300,6 +303,11 @@ const DashboardAlertsRoute = DashboardAlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const ApiWorkSamplesIndexRoute = ApiWorkSamplesIndexRouteImport.update({
+  id: '/api/work-samples/',
+  path: '/api/work-samples/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
   id: '/api/status/',
   path: '/api/status/',
@@ -393,6 +401,16 @@ const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
 const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
   id: '/team/invite/$invitationId',
   path: '/team/invite/$invitationId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkSamplesAnalyzeRoute = ApiWorkSamplesAnalyzeRouteImport.update({
+  id: '/api/work-samples/analyze',
+  path: '/api/work-samples/analyze',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWorkSamplesIdRoute = ApiWorkSamplesIdRouteImport.update({
+  id: '/api/work-samples/$id',
+  path: '/api/work-samples/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
@@ -1168,6 +1186,8 @@ export interface FileRoutesByFullPath {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
+  '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
+  '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
@@ -1187,6 +1207,7 @@ export interface FileRoutesByFullPath {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -1338,6 +1359,8 @@ export interface FileRoutesByTo {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
+  '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
+  '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
@@ -1357,6 +1380,7 @@ export interface FileRoutesByTo {
   '/api/roadmap': typeof ApiRoadmapIndexRoute
   '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
+  '/api/work-samples': typeof ApiWorkSamplesIndexRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -1513,6 +1537,8 @@ export interface FileRoutesById {
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
+  '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
+  '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
@@ -1532,6 +1558,7 @@ export interface FileRoutesById {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -1687,6 +1714,8 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/webhooks/stripe'
+    | '/api/work-samples/$id'
+    | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
     | '/dashboard/'
     | '/exports/'
@@ -1706,6 +1735,7 @@ export interface FileRouteTypes {
     | '/api/roadmap/'
     | '/api/sprints/'
     | '/api/status/'
+    | '/api/work-samples/'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -1857,6 +1887,8 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/webhooks/stripe'
+    | '/api/work-samples/$id'
+    | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
     | '/dashboard'
     | '/exports'
@@ -1876,6 +1908,7 @@ export interface FileRouteTypes {
     | '/api/roadmap'
     | '/api/sprints'
     | '/api/status'
+    | '/api/work-samples'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -2031,6 +2064,8 @@ export interface FileRouteTypes {
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/webhooks/stripe'
+    | '/api/work-samples/$id'
+    | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
@@ -2050,6 +2085,7 @@ export interface FileRouteTypes {
     | '/api/roadmap/'
     | '/api/sprints/'
     | '/api/status/'
+    | '/api/work-samples/'
     | '/_dashboard/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -2171,6 +2207,8 @@ export interface RootRouteChildren {
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
   ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute
+  ApiWorkSamplesIdRoute: typeof ApiWorkSamplesIdRoute
+  ApiWorkSamplesAnalyzeRoute: typeof ApiWorkSamplesAnalyzeRoute
   TeamInviteInvitationIdRoute: typeof TeamInviteInvitationIdRoute
   ApiAlertsIndexRoute: typeof ApiAlertsIndexRoute
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
@@ -2182,6 +2220,7 @@ export interface RootRouteChildren {
   ApiRoadmapIndexRoute: typeof ApiRoadmapIndexRoute
   ApiSprintsIndexRoute: typeof ApiSprintsIndexRoute
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
+  ApiWorkSamplesIndexRoute: typeof ApiWorkSamplesIndexRoute
   ApiAdminAbuseClustersRoute: typeof ApiAdminAbuseClustersRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
@@ -2408,6 +2447,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAlertsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/api/work-samples/': {
+      id: '/api/work-samples/'
+      path: '/api/work-samples'
+      fullPath: '/api/work-samples/'
+      preLoaderRoute: typeof ApiWorkSamplesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/status/': {
       id: '/api/status/'
       path: '/api/status'
@@ -2539,6 +2585,20 @@ declare module '@tanstack/react-router' {
       path: '/team/invite/$invitationId'
       fullPath: '/team/invite/$invitationId'
       preLoaderRoute: typeof TeamInviteInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-samples/analyze': {
+      id: '/api/work-samples/analyze'
+      path: '/api/work-samples/analyze'
+      fullPath: '/api/work-samples/analyze'
+      preLoaderRoute: typeof ApiWorkSamplesAnalyzeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/work-samples/$id': {
+      id: '/api/work-samples/$id'
+      path: '/api/work-samples/$id'
+      fullPath: '/api/work-samples/$id'
+      preLoaderRoute: typeof ApiWorkSamplesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/webhooks/stripe': {
@@ -3748,6 +3808,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
   ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,
+  ApiWorkSamplesIdRoute: ApiWorkSamplesIdRoute,
+  ApiWorkSamplesAnalyzeRoute: ApiWorkSamplesAnalyzeRoute,
   TeamInviteInvitationIdRoute: TeamInviteInvitationIdRoute,
   ApiAlertsIndexRoute: ApiAlertsIndexRoute,
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
@@ -3759,6 +3821,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRoadmapIndexRoute: ApiRoadmapIndexRoute,
   ApiSprintsIndexRoute: ApiSprintsIndexRoute,
   ApiStatusIndexRoute: ApiStatusIndexRoute,
+  ApiWorkSamplesIndexRoute: ApiWorkSamplesIndexRoute,
   ApiAdminAbuseClustersRoute: ApiAdminAbuseClustersRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,

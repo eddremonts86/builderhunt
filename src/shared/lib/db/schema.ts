@@ -4,6 +4,7 @@ import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
+import type { WorkSampleAnalysis } from '~/shared/lib/work-sample'
 
 // ---------------------------------------------------------------------------
 // Authentication Tables (Better Auth)
@@ -1663,5 +1664,35 @@ export const seatUsageDaily = pgTable(
     index('seat_usage_daily_organization_id_day_idx').on(table.organizationId, table.day),
     check('seat_usage_daily_action_check', sql`${table.action} in ('searches', 'reveals', 'exports', 'messages')`),
     check('seat_usage_daily_count_check', sql`${table.count} >= 0`),
+  ],
+)
+
+/**
+ * Plan: work-sample. The recruiter's own artifact, never the builder's — see
+ * the plan's spec header for the privacy rationale. Deliberately keyed by
+ * `user_id`, not `organization_id` (org-shared visibility arrives with
+ * `team-accounts`); RLS below mirrors `builder_claims`'s `app.user_id`
+ * policies rather than the usual `app.organization_id` ones.
+ * `builderIdentityId` links back to the profile the analysis was launched
+ * from — `set null` on delete keeps the artifact even if that identity row
+ * is later removed.
+ */
+export const workSampleAnalyses = pgTable(
+  'work_sample_analyses',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    builderIdentityId: text('builder_identity_id').references(() => builderIdentities.id, { onDelete: 'set null' }),
+    sampleUrl: text('sample_url').notNull(),
+    sampleType: text('sample_type').notNull(), // 'repo' | 'pr' | 'file'
+    analysis: jsonb('analysis').$type<WorkSampleAnalysis>().notNull(), // versioned envelope, see synergy.ts's schema
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique('work_sample_user_url_unique').on(table.userId, table.sampleUrl),
+    index('work_sample_analyses_user_id_idx').on(table.userId),
+    index('work_sample_analyses_builder_identity_id_idx').on(table.builderIdentityId),
+    check('work_sample_analyses_sample_type_check', sql`${table.sampleType} in ('repo', 'pr', 'file')`),
   ],
 )
