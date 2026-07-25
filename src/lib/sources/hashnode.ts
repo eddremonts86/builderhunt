@@ -4,15 +4,21 @@ import type { RawBuilder } from '~/lib/sources/types'
 /**
  * Hashnode source — GraphQL API.
  *
- * Status: as of 2026-07 the public GraphQL endpoint (api.hashnode.com)
- * returns "Stellate service not found" for all queries. The spec itself
- * recommends skip-for-v1 because of this fragility.
+ * Status (checked live 2026-07-25, this codebase's own migration task told us to move to
+ * `https://gql.hashnode.com` — that endpoint is ALSO dead now): both `api.hashnode.com` (the
+ * original endpoint, "Stellate service not found") and `gql.hashnode.com` (the endpoint this
+ * file's own migration task instructed moving to) now 301-redirect to
+ * `https://hashnode.com/announcements/graphql-api`, whose page title is literally "GraphQL API
+ * is moving to a paid offering." Hashnode has closed free public GraphQL access entirely —
+ * there is currently no live endpoint this connector could migrate to and still work for free.
+ * Left pointed at the dead `api.hashnode.com` (rather than the equally-dead `gql.hashnode.com`)
+ * since neither works and the old URL is at least the one already documented as broken.
  *
- * v1 strategy: try the GraphQL endpoint, return [] gracefully if down.
- * The source is wired in (pill, icon, badge) so we can detect when it
- * comes back. Zero impact on results when the API is unavailable.
+ * v1 strategy unchanged: try the GraphQL endpoint, return [] gracefully if down. The source
+ * stays wired in (pill, icon, badge) so it starts working automatically if Hashnode ever
+ * reopens a free tier — this file needs no code change for that, only a working URL swapped in.
  *
- * When the API is healthy, the canonical query for a username is:
+ * When a working endpoint existed, the canonical query for a username was:
  *   { user(username: "X") { username name bio followersCount
  *       posts { totalDocuments } tagline } }
  *
@@ -85,7 +91,9 @@ async function searchUsersByQuery(q: string): Promise<HashnodeSearchUser[]> {
 
 function userToBuilder(u: HashnodeUser | HashnodeSearchUser): RawBuilder {
   return {
-    id: `hn-${u.username}`,
+    // NOT `hn-` — that prefix is already taken by src/lib/sources/hn.ts (Hacker News),
+    // which would collide two entirely different people under the same builder id.
+    id: `hnode-${u.username}`,
     kind: 'person' as const,
     source: 'hashnode' as const,
     sourceId: u.username,

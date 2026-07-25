@@ -1,11 +1,15 @@
 # Tasks: Hashnode Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `partially-implemented` (blocked on an external vendor decision, not on code)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped but the API endpoint it targets is dead;
-> the source returns `[]` in production. Remaining: endpoint migration, id-prefix fix,
-> env docs.
+> **Reality check**: Connector + wiring shipped; id-prefix fix and env docs delivered
+> 2026-07-25. The endpoint-migration task is genuinely blocked, not just unimplemented:
+> Hashnode has closed free public GraphQL API access entirely (confirmed live 2026-07-25 —
+> both the old and the task's proposed replacement endpoint now redirect to a "moving to a
+> paid offering" page). The source stays wired in and degrades to `[]`, zero impact on the
+> rest of the app; flagged for the user to decide whether to pay for API access, accept the
+> source stays dark, or deprioritize this integration.
 
 ## Delivered
 
@@ -24,7 +28,8 @@
 
 ## Remaining
 
-- [ ] **Migrate the connector to `https://gql.hashnode.com`**
+- [ ] **NEEDS USER AWARENESS — Migrate the connector to `https://gql.hashnode.com`**
+      (genuinely blocked, not implemented — see finding below)
   - Files: `src/lib/sources/hashnode.ts`
   - Do: replace `HN_GQL` with `https://gql.hashnode.com`. The new API has no `searchUsers`;
     implement discovery as: query posts by the search term/tag (new-API post search),
@@ -36,15 +41,38 @@
   - Verify: `curl -X POST https://gql.hashnode.com -H 'Content-Type: application/json'`
     with the final query returns data; then search a common tag (e.g. "javascript") with
     only the Hashnode pill active and see person cards.
+  - **Blocked — checked live 2026-07-25, not implemented.** Curled the exact endpoint this
+    task instructs migrating to (`https://gql.hashnode.com`) before writing any query
+    against it, per this session's standing discipline of verifying live API behavior
+    rather than trusting task text. Both `api.hashnode.com` (the original, already known
+    dead) **and** `gql.hashnode.com` (this task's proposed destination) now 301-redirect to
+    `https://hashnode.com/announcements/graphql-api`, whose page title is literally
+    *"GraphQL API is moving to a paid offering."* Hashnode has closed free public GraphQL
+    access entirely — there is currently no free endpoint this connector could migrate to.
+    Implementing the migration as specified would just move the dead-endpoint problem from
+    one URL to another with identical `[]`-degradation behavior; not attempted. Left the
+    connector pointed at `api.hashnode.com` (updated its own header comment to document
+    this finding in detail, including the announcement page's exact title, so a future
+    reader doesn't waste time re-discovering the same dead end). **This needs a real
+    decision from the user**, not a code fix: either accept the source stays effectively
+    disabled (already zero-impact since it degrades to `[]`, per the existing design), pay
+    for Hashnode's new offering if it's worth it, or de-prioritize/remove this integration
+    entirely. Flagging rather than guessing which the user would want.
 
-- [ ] **Fix `hn-` id prefix collision with the Hacker News source**
+- [x] **Fix `hn-` id prefix collision with the Hacker News source**
   - Files: `src/lib/sources/hashnode.ts`
   - Do: change `id: hn-${u.username}` to `id: hnode-${u.username}` (the `hn-` prefix is
     taken by `src/lib/sources/hn.ts` line 116; `sourceId` stays the raw username).
   - Verify: `grep -n "id: \`hn-" src/lib/sources/hashnode.ts` returns nothing.
+  - **Done, independent of the endpoint being dead** — the id-prefix bug is real regardless
+    of whether Hashnode's API works, and fixing it now means the moment a working endpoint
+    exists again, results won't silently collide with Hacker News cards. Confirmed no other
+    file references the old `hn-${username}` Hashnode id.
 
-- [ ] **Document `HASHNODE_API_KEY` in `.env.example`**
+- [x] **Document `HASHNODE_API_KEY` in `.env.example`**
   - Files: `.env.example`
   - Do: add `HASHNODE_API_KEY=` under "External Source API Tokens" (comment: optional
     Personal Access Token from hashnode.com > Developer Settings; raises rate limits).
   - Verify: `grep HASHNODE_API_KEY .env.example` prints the documented line.
+  - **Done**, with an added note that the source currently returns `[]` regardless of
+    whether this key is set, given the finding above.
