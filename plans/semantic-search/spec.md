@@ -195,6 +195,14 @@ match` badge in place of the score chip; `mode: 'hybrid' | 'keyword-fallback'` r
 ## Success metrics
 
 - Warm-index semantic query p95 < 100 ms (local HNSW) vs ~1.5 s federated.
+  Note on how to read this once measured: an indexable `ORDER BY` makes the HNSW
+  index *available*, not mandatory — the planner still costs it against a seq
+  scan, and below roughly 2k embedded rows the seq scan legitimately wins and is
+  still well inside 100 ms. So this metric can be met without HNSW being used at
+  all on a small corpus; verify the *mechanism* with `EXPLAIN` (look for
+  `Index Scan using builder_embeddings_hnsw_idx`) rather than inferring it from
+  the latency number. Measured locally at `LIMIT 50`: 352 embedded rows → seq
+  scan at ~7 ms; 2k/5k/20k rows → HNSW index scan.
 - ≥ 60% of semantic queries answered fully locally after 2 weeks of organic use.
 - Zero-result semantic queries < 2% (degradation ladder catches the rest).
 
