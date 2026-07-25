@@ -4,7 +4,7 @@
 > **Depends on**: [`semantic-search`](../../semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW query path — already shipped); [`ai-expansion`](../../ai-expansion/spec.md) (task registry, budgets, zod validation, kill switches — already shipped); [`stripe-billing-platform`](../../stripe-billing-platform/spec.md) (the Pro Max tier this feature is gated on does not bill anyone yet). Enhanced by [`match-evidence-panel`](../match-evidence-panel/spec.md) (per-match evidence rendering) and [`availability-signals`](../availability-signals/spec.md) (ranking boost; neither is required).
 > **Blocks**: nothing
 > **Reality check**: The retrieval half exists — `src/lib/semantic/semantic-search.ts` (the `SEMANTIC_MIN_LOCAL_MATCHES` hybrid ladder), `src/shared/lib/repositories/public-builder-embeddings.ts#findSimilarBuilderEmbeddings`, `src/lib/semantic/embedding-doc.ts` (the exact profile template we must match), `src/shared/lib/ai/embeddings.ts#embedTexts`. The AI half plugs into `src/shared/lib/ai/tasks.ts` (7 tasks today, including `jd-parse`). The paid half plugs into the shipped `src/shared/lib/billing/rate-cards.ts` + `feature-authorization.ts#checkEntitlement`/`reserveCredits`. Nothing here re-implements search, embeddings, credits, or RLS.
-> **Pre-existing defect this plan must not inherit silently**: `findSimilarBuilderEmbeddings` (`public-builder-embeddings.ts:89-102`) orders by `desc(sql\`1 - (${distance})\`)` — a *derived, descending* expression. pgvector's HNSW index can only serve `ORDER BY embedding <=> $vec ASC`, so the shipped query measurably plans as `Limit → Sort → Seq Scan` and **`/api/search/semantic` is doing a sequential scan plus full sort of `builder_embeddings` today, not an HNSW lookup**. This is shipped-code behaviour, not something this plan introduces; Phase 3 fixes the ordering in the shared function (see §2) because stage 1 issues K such queries per run.
+> **Pre-existing defect — NOW FIXED, shipped outside fase 2 (kept here for context)**: `findSimilarBuilderEmbeddings` (`public-builder-embeddings.ts:89-102`) orders by `desc(sql\`1 - (${distance})\`)` — a *derived, descending* expression. pgvector's HNSW index can only serve `ORDER BY embedding <=> $vec ASC`, so the shipped query measurably planned as `Limit → Sort → Seq Scan` and **`/api/search/semantic` was doing a sequential scan plus full sort of `builder_embeddings`, not an HNSW lookup**. That was shipped-code behaviour, not something this plan introduced. It has since been corrected in place: the sort key is now the bare operator ascending and `similarity` is a selected column, exported as `similarBuilderEmbeddingsQuery` and covered by an EXPLAIN-based regression test with a negative control. **Phase 3 therefore no longer owns this change — it reuses the corrected shared function and asserts the shape.**
 
 ## Problem
 
@@ -123,13 +123,21 @@ this is the house convention, not a local invention.
 sort key from the derived `1 - (embedding <=> $vec)` DESC to the bare operator
 `embedding <=> $vec` ASC — and returning `1 - (embedding <=> $vec)` as an ordinary select column
 instead of the sort key — is **behaviour-preserving for every caller while turning a seq-scan +
-sort into an HNSW index scan**. Phase 3 therefore corrects `findSimilarBuilderEmbeddings` in
-place rather than leaving a slow shared function beside a fast private copy. The blast radius is
-exactly one other consumer, `/api/search/semantic` via `semantic-search.ts#semanticSearch`, which
-gets faster and returns identically-ordered rows; the change ships with an `EXPLAIN` check on the
-SQL Drizzle actually emits (not on a hand-written equivalent) plus a semantic-search regression
-test. [`look-alike-sourcing`](../look-alike-sourcing/spec.md) depends on the same function and the
-same fix — whichever plan lands first owns the correction, and the other asserts it.
+sort into an HNSW index scan**. This correction has **already landed** in
+`findSimilarBuilderEmbeddings` rather than leaving a slow shared function beside a fast private
+copy. The blast radius was exactly one other consumer, `/api/search/semantic` via
+`semantic-search.ts#semanticSearch`, and it was verified to return identically-ordered rows: 30
+builders, same order, same `similarity`, before and after, through the real route. It shipped with
+an `EXPLAIN` check on the SQL Drizzle actually emits (not a hand-written equivalent) plus a
+regression test carrying a negative control.
+[`look-alike-sourcing`](../look-alike-sourcing/spec.md) depends on the same function; **both plans
+now assert the shape rather than owning the change.**
+
+Two caveats survive the fix and matter for this plan's stage-1 budget: (1) an indexable
+`ORDER BY` makes the index *available*, not mandatory — below ~2k embedded rows the planner still
+picks a seq scan, so an `EXPLAIN` acceptance check needs `enable_seqscan = off` or a larger
+corpus; (2) `hnsw.ef_search` (default 40) bounds recall *quality* only — pgvector 0.8.5 searches
+with `ef = max(ef_search, limit)`, so a `LIMIT 60` returns 60 rows without tuning it.
 
 Stage 1, in order: (1) K HNSW queries, top 60 each, via a new
 `findSimilarBuilderEmbeddingsForMatch(vectors, perProbeLimit)` sharing the corrected

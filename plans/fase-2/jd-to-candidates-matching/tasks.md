@@ -139,20 +139,23 @@ Ordered so the app is shippable after every checkbox.
     `pro_max` and `team` → allowed.
   - Verify: `pnpm test feature-authorization`.
 
-- [ ] **Fix the shared retrieval ordering so HNSW is actually used**
-  - Files: `src/shared/lib/repositories/public-builder-embeddings.ts`, `src/routes/api/search/semantic.ts`
-  - Do: In `findSimilarBuilderEmbeddings` (lines 89-102) the sort key is
-    `desc(sql\`1 - (${distance})\`)` — a derived descending expression pgvector's HNSW index
-    cannot serve, so it plans as `Limit → Sort → Seq Scan`. Change the sort key to the bare
-    operator ascending (`.orderBy(distance)`, i.e. `ORDER BY embedding <=> $vec ASC`) and keep
-    `1 - (${distance}) AS similarity` as an ordinary **select column only**. Distance-ASC is the
-    same ordering as similarity-DESC, so the returned rows and their order are unchanged; do not
-    alter the signature, the selected columns, or the `WHERE embedding IS NOT NULL` clause.
-  - Verify: Print the generated SQL for the real call (`.toSQL()` in a scratch script — do **not**
-    hand-write an equivalent query) and run `EXPLAIN` on exactly that text against a seeded local
-    DB: it must show `Index Scan using builder_embeddings_hnsw_idx` and contain no `Sort` node.
-    Then `pnpm test` (semantic-search suites green) and a `POST /api/search/semantic` regression
-    check returning the same builders in the same order as before the change.
+- [x] **Fix the shared retrieval ordering so HNSW is actually used** — **DONE, shipped outside
+      fase 2.** `findSimilarBuilderEmbeddings` orders by the bare operator ascending with
+      `1 - (embedding <=> $vec) AS similarity` as a select column only; signature, selected
+      columns and `WHERE embedding IS NOT NULL` are unchanged. The query builder is exported as
+      `similarBuilderEmbeddingsQuery(db, queryVector, limit)`. This plan **reuses it unchanged**.
+  - Evidence on file: `EXPLAIN` over the drizzle-emitted SQL (via `.getSQL()`, not a hand-written
+    equivalent) shows `Limit → Index Scan using builder_embeddings_hnsw_idx` with
+    `Order By: (embedding <=> …)`; the pre-fix shape shows `Limit → Sort → Seq Scan`. A
+    `POST /api/search/semantic` before/after returned 30 identical builders in identical order
+    with identical `similarity`. `pnpm test` green (1862 tests). An EXPLAIN-based regression test
+    with a negative control lives in `public-builder-embeddings.test.ts`.
+  - **Correction to this task's original acceptance criterion**, for anyone reusing it: it
+    required `Index Scan …` and "no `Sort` node" against "a seeded local DB". An indexable
+    `ORDER BY` only makes the index *available* — the planner still costs it against a seq scan,
+    and below ~2k embedded rows the seq scan legitimately wins (measured at `LIMIT 50`: 352 rows →
+    seq scan at ~7 ms; 2k/5k/20k → HNSW index scan). As written the check fails on a **correct**
+    query at today's corpus size. Run it with `enable_seqscan = off`, or seed past the crossover.
 
 - [ ] **Extend the embeddings repository for multi-probe retrieval**
   - Files: `src/shared/lib/repositories/public-builder-embeddings.ts`
@@ -169,7 +172,10 @@ Ordered so the app is shippable after every checkbox.
     the vector query, so the index path survives.
   - Verify: `pnpm type-check`; against a seeded local DB, 3 probe vectors return 3 result arrays;
     `EXPLAIN` on the `.toSQL()` output of the single-probe query shows
-    `Index Scan using builder_embeddings_hnsw_idx` and no `Sort` node.
+    `Index Scan using builder_embeddings_hnsw_idx` and no `Sort` node — run it with
+    `enable_seqscan = off` (or seed past ~2k embedded rows), for the reason recorded in the
+    ordering task above, and mirror the negative-control pattern already in
+    `public-builder-embeddings.test.ts` so the assertion is known to discriminate.
 
 ## Phase 4 — Match service + repository
 

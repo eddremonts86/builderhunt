@@ -231,15 +231,27 @@ other caller (verified: `src/lib/semantic/semantic-search.ts:133`).
 
 Two consequences must be handled, not assumed away:
 
-- **Exact → approximate.** A seq scan returns exact KNN; HNSW returns approximate KNN. Recall is
-  bounded by `hnsw.ef_search` (default 40), which must be **≥ the requested `LIMIT`** or the query
-  silently returns fewer rows than asked for. This plan requests 60 candidates, so the query runs
-  with `SET LOCAL hnsw.ef_search = 100` inside the same transaction. Semantic search's `LIMIT 50`
-  is likewise covered.
+- **Exact → approximate.** A seq scan returns exact KNN; HNSW returns approximate KNN. Recall
+  quality is bounded by `hnsw.ef_search` (default 40) — raising it explores more candidates and
+  improves recall, at proportional cost.
+
+  Correction (measured, pgvector 0.8.5): an earlier draft of this spec claimed `ef_search` must be
+  **≥ the requested `LIMIT`** or the query "silently returns fewer rows than asked for". That is
+  false. pgvector searches with `ef = max(hnsw.ef_search, limit)`, so the requested row count
+  always comes back. Verified by `EXPLAIN (ANALYZE)` on a 5k-row HNSW index with `ef_search = 40`
+  and the index scan actually chosen: `LIMIT 50 → 50 rows`, `LIMIT 60 → 60 rows`,
+  `LIMIT 100 → 100 rows`. `SET LOCAL hnsw.ef_search = 100` is therefore a **recall-quality
+  tuning knob, not a correctness requirement** — this plan's `LIMIT 60` is safe without it. Keep it
+  if the extra recall is wanted; drop it if the cost isn't worth it. Either way, do not justify it
+  by an under-return that does not happen.
 - **Cross-plan touchpoint** (conventions rule 6): `findSimilarBuilderEmbeddings` is co-owned with
-  `semantic-search`. The ordering change and the `ef_search` setting are behaviour-preserving for
-  ordering and materially faster, but they do change semantic search's result set at the margin
-  (approximate recall), so the task carries a before/after result-set comparison on a real index.
+  `semantic-search`. The ordering change has already landed and its before/after comparison already
+  ran — `POST /api/search/semantic` returned 30 identical builders in identical order with identical
+  `similarity`, no membership delta, because at the current corpus (352 embedded rows) the planner
+  still chooses the exact seq scan. What remains for *this* plan is the run that matters: once the
+  corpus is past the ~2k-row crossover the index actually engages and approximate recall can move
+  the tail, so repeat the comparison then rather than treating the existing zero-delta result as
+  proof for the indexed regime.
 
 **Why the seed vector still round-trips through Node** rather than a self-joining SQL statement:
 the parameter/constant condition above. `ORDER BY e.embedding <=> seed.embedding` against a joined

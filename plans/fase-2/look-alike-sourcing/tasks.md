@@ -100,31 +100,33 @@ Ordered so the app ships cleanly after every checkbox.
     only — this table has no `organization_id`.
   - Verify: `pnpm type-check`.
 
-- [ ] **Make the vector search index-eligible (shared with semantic-search)**
-  - Files: `src/shared/lib/repositories/public-builder-embeddings.ts`
-  - Do: In `findSimilarBuilderEmbeddings`, change ``.orderBy(desc(sql`1 - (${distance})`))`` to
-    `.orderBy(asc(distance))`, keeping the ``sql`1 - (${distance})` `` expression as the returned
-    `similarity` column. HNSW requires the bare distance operator ascending; the derived descending
-    expression it uses today cannot be served by `builder_embeddings_hnsw_idx`, which is why
-    `/api/search/semantic` (the one other caller — `src/lib/semantic/semantic-search.ts:133`)
-    currently seq-scans. Ascending distance and descending `1 - distance` are the same total order,
-    so no caller's ordering changes. Wrap the query so it runs with
-    `SET LOCAL hnsw.ef_search = 100` in the same transaction — `ef_search` must be ≥ the requested
-    `LIMIT` (default 40 would silently under-return at `LIMIT 60`).
-  - Verify: on a local DB with ≥ 500 embedded rows, log the emitted SQL (drizzle `.toSQL()`) and
-    `EXPLAIN ANALYZE` **that exact statement with its bound parameters** — not a hand-written
-    equivalent — and confirm `Index Scan using builder_embeddings_hnsw_idx`. Re-run
-    `EXPLAIN ANALYZE` before the change to record the `Seq Scan` baseline in the PR.
+- [x] **Make the vector search index-eligible (shared with semantic-search)** — **DONE, shipped
+      outside fase 2.** `findSimilarBuilderEmbeddings` now orders by `asc(distance)` with
+      ``sql`1 - (${distance})` `` kept as the returned `similarity` column, and the query builder is
+      exported as `similarBuilderEmbeddingsQuery(db, queryVector, limit)` so callers and tests can
+      EXPLAIN the SQL the module actually emits. This plan **reuses that function unchanged** and
+      asserts the shape; do not re-apply the change.
+  - Note on `SET LOCAL hnsw.ef_search = 100`: keep it only if the extra recall is wanted. The
+    original rationale — "`ef_search` must be ≥ the requested `LIMIT` (default 40 would silently
+    under-return at `LIMIT 60`)" — is **false** on pgvector 0.8.5, which searches with
+    `ef = max(ef_search, limit)`. Measured with `EXPLAIN (ANALYZE)` on a 5k-row HNSW index at
+    `ef_search = 40`, index scan chosen: `LIMIT 50 → 50 rows`, `LIMIT 60 → 60 rows`,
+    `LIMIT 100 → 100 rows`.
+  - Also note: an indexable `ORDER BY` makes the index *available*, not mandatory. The planner
+    still costs it against a seq scan, and below ~2k embedded rows the seq scan wins. Any
+    `EXPLAIN` acceptance check needs either `enable_seqscan = off` or a corpus past that
+    crossover, or it will fail on a correct query.
 
-- [ ] **Prove the shared change does not disturb semantic search**
-  - Files: `src/lib/semantic/semantic-search.ts` (read-only), `src/routes/api/search/semantic.ts` (read-only)
-  - Do: On a local index of ≥ 500 embedded rows, capture `/api/search/semantic` responses for 10
-    representative queries before and after the ordering change. Ordering must be identical;
-    membership may differ at the tail because HNSW is approximate KNN where the seq scan was exact.
-    Record any membership delta and the `hnsw.ef_search` value used in the PR description —
-    `findSimilarBuilderEmbeddings` is co-owned with `semantic-search` (conventions rule 6).
-  - Verify: the top-10 ordering matches for all 10 queries; `pnpm test` and
-    `pnpm test:api-isolation:local` stay green.
+- [x] **Prove the shared change does not disturb semantic search** — **DONE.** `POST
+      /api/search/semantic` was captured before and after the ordering change against the local
+      index (352 embedded rows), through real Better Auth sign-up and a `pro` entitlement:
+      **30 builders, identical order, identical `similarity` values, element for element**, with
+      `mode: "semantic"` both times. A repository-level A/B over three probe vectors at `LIMIT 50`
+      likewise returned 50/50 identical rows. Zero membership delta — expected, since at this
+      corpus size the planner still chooses the seq scan, so retrieval was exact in both runs.
+  - Still open for **this plan**: re-run the comparison once the corpus is past the ~2k-row
+    crossover, where the index actually engages and approximate recall can move the tail. That is
+    the run where a membership delta may legitimately appear.
 
 - [ ] **Implement the look-alike orchestrator (seed modes only)**
   - Files: `src/lib/similar/lookalike.ts` (new)

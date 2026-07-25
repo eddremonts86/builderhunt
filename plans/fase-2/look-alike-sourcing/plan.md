@@ -29,11 +29,12 @@ regression. Nothing is wired up yet.
 ### Phase 3 — Repository + seed modes `indexed`/`tracked` behind `POST /api/search/similar`
 
 Add `findBuilderEmbeddingSeed` and `countEmbeddedBuilders` (5-minute Redis cache) to
-`public-builder-embeddings.ts`, and change `findSimilarBuilderEmbeddings`' sort key from
-``desc(sql`1 - (${distance})`)`` to `asc(distance)` so `builder_embeddings_hnsw_idx` can serve it
-(same total order, so no caller's ordering changes; `/api/search/semantic` is the one other caller
-and gains the index too — see spec.md). Run the query with `SET LOCAL hnsw.ef_search = 100` so
-approximate recall covers a `LIMIT 60`. Implement
+`public-builder-embeddings.ts`. The sort-key change — from ``desc(sql`1 - (${distance})`)`` to
+`asc(distance)`, so `builder_embeddings_hnsw_idx` can serve it — **has already landed** outside
+fase 2; reuse `similarBuilderEmbeddingsQuery` and assert the shape rather than re-applying the
+change (see spec.md). `SET LOCAL hnsw.ef_search = 100` is optional here: it buys recall quality,
+not correctness — a `LIMIT 60` returns 60 rows at the default `ef_search = 40` (measured; see
+spec.md). Implement
 `src/lib/similar/lookalike.ts` (seed resolution → index-size check → HNSW top-60 → collapse →
 rank → floor/min-results states) and the route: `requireTenantPrincipal`, free-tier 403,
 `rateLimit('search-similar', userId, 30, 60)`, tracked annotation via `getTrackedBuilderIds`,
@@ -74,7 +75,7 @@ event (`seedKind`, `status`, `candidates`, `collapsedCount`, `selfHitsSuppressed
 | Repositories appear in a "similar builders" list | High until `kind` backfills | Medium | Optional `kind` on the payload, filtered in collapse; rows without `kind` kept and self-healing; `repoRowsDropped` logged; seeds with `kind: 'repo'` rejected 400 |
 | Adding fields to the embedding document triggers a full re-embed | Low (only if Phase 1 is done wrong) | High (cost spike) | Phase 1 explicitly forbids touching `buildEmbeddingDoc`/`contentHashOf`; a test asserts `contentHashOf(buildEmbeddingDoc(p))` is unchanged for a fixture profile |
 | pgvector falls back to a seq scan (self-joined seed vector, or a derived/descending sort key) | Certain without mitigation — it is the shipped behaviour of `findSimilarBuilderEmbeddings` today | Medium (latency) | Seed vector fetched into Node and bound as a parameter, **and** the sort key changed to `asc(distance)`; proven by `EXPLAIN ANALYZE` on the SQL drizzle actually emits, not a hand-written equivalent |
-| Switching semantic search onto HNSW changes its result set (exact → approximate KNN) | Medium | Medium | `SET LOCAL hnsw.ef_search = 100` (must be ≥ the `LIMIT`, default 40 would silently under-return at `LIMIT 60`); a before/after result-set comparison on a real index is a task, since `findSimilarBuilderEmbeddings` is co-owned with `semantic-search` |
+| Switching semantic search onto HNSW changes its result set (exact → approximate KNN) | Medium | Medium | Optional `SET LOCAL hnsw.ef_search = 100` for recall quality — **not** a correctness requirement: pgvector 0.8.5 searches with `ef = max(ef_search, limit)`, so `LIMIT 60` returns 60 rows at the default 40 (measured, see spec.md). The before/after result-set comparison already ran for the shipped ordering fix — identical 30 builders in identical order through `POST /api/search/semantic` — so this row is now about *this plan's* `LIMIT 60` path only |
 | `identityKey` collapses two genuinely different people | Medium | Low | Documented accepted trade-off (dropping a match beats showing the seed); `collapsedCount` logged so the rate is observable |
 | Thin index produces a plausible-looking but useless ranking | High early | Medium | `LOOKALIKE_MIN_INDEX_ROWS = 500` → `index_warming`; `LOOKALIKE_MIN_RESULTS = 5` → `weak` label; no federated fallback that would hide the problem |
 | `countEmbeddedBuilders` full count becomes slow as the index grows | Medium | Low | 5-minute Redis cache; the value only gates a copy decision, so staleness is harmless |

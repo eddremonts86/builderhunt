@@ -133,14 +133,19 @@ Recorded because no single plan can see them:
   future plan adds a third writer — a guard against the *next* version of this same collision, not
   just this one.
 - **`src/shared/lib/repositories/public-builder-embeddings.ts`'s `findSimilarBuilderEmbeddings`** is
-  corrected by BOTH `look-alike-sourcing` and `jd-to-candidates-matching`, identically: order by the
-  bare `<=>` operator ascending so the HNSW index is actually used, keeping `similarity` as a
-  selected column. Whichever lands first owns the change; the other asserts it. This is a fix to
-  shipped code — `/api/search/semantic` sequentially scans `builder_embeddings` today (verified by
-  `EXPLAIN`: `Limit → Sort → Seq Scan` vs. `Limit → Index Scan using builder_embeddings_hnsw_idx`
-  for the two orderings). Tracked as a standalone fix outside fase 2 too. Note the consequence both
-  plans flag: retrieval becomes approximate, so `hnsw.ef_search` must be ≥ the query `LIMIT` or
-  results silently under-return.
+  was to be corrected by BOTH `look-alike-sourcing` and `jd-to-candidates-matching`, identically:
+  order by the bare `<=>` operator ascending so the HNSW index is actually used, keeping
+  `similarity` as a selected column. It was a fix to shipped code — `/api/search/semantic` used to
+  sequentially scan `builder_embeddings` (verified by `EXPLAIN`: `Limit → Sort → Seq Scan` vs.
+  `Limit → Index Scan using builder_embeddings_hnsw_idx`
+  for the two orderings). **This fix has now landed** as a standalone change outside fase 2 —
+  `similarBuilderEmbeddingsQuery` orders by the bare operator ascending with `similarity` as a
+  selected column, covered by an EXPLAIN-based regression test. Both plans now *assert* it rather
+  than owning it. Note the consequence both plans flag: retrieval becomes approximate, so recall is
+  bounded by `hnsw.ef_search` (default 40) — a quality knob. Both plans previously claimed
+  `ef_search` must be ≥ the query `LIMIT` "or results silently under-return"; that is false on
+  pgvector 0.8.5, which searches with `ef = max(ef_search, limit)` and always returns the requested
+  count (measured — see `look-alike-sourcing/spec.md`).
 - **New `PermissionAction` values**, one owner each, all verified non-colliding:
   `pipeline:move`/`pipeline:configure` (`hiring-pipeline-kanban`),
   `integration:read`/`integration:manage` (`ats-integrations`), `match:delete`
