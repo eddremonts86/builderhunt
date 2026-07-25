@@ -47,7 +47,7 @@ import {
 describe('legal constants', () => {
   it('has current versions for all required documents', () => {
     expect(CURRENT_CONSENT_VERSIONS.tos).toBe('v1.0')
-    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v1.0')
+    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v1.1')
     expect(CURRENT_CONSENT_VERSIONS.cookies).toBe('v1.0')
   })
 

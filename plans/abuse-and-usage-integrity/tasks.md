@@ -1239,11 +1239,55 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       `export_burst`, 2 `seat_overuse`). `pnpm tsc --noEmit` and `pnpm eslint
       scripts/abuse/baseline-report.ts` both clean.
 
-- [ ] **Privacy/consent update (with `legal-and-compliance`)**
+- [x] **Privacy/consent update (with `legal-and-compliance`)** — content done; legal sign-off is a
+      genuine outstanding item, see note below (cannot be performed by an agent).
   - Files: `src/routes/_landing/legal/privacy.tsx`, consent surface
   - Do: disclose device fingerprinting (salted hashes, coarse UA) and its abuse-prevention purpose;
     align retention with the existing 30-day window.
   - Verify: legal review sign-off recorded; privacy page renders the new disclosure.
+  - **Done (content).** Added a new "Device recognition data" bullet to section 1 ("Data we
+    collect"), a cross-reference in section 4 ("Cookies and localStorage") for the `bh_did` device
+    cookie, and a new paragraph in section 5 ("Data retention"). Two factual corrections made
+    versus the task's own wording, based on reading the actual code rather than assuming:
+    - **"Salted hash + coarse UA family" is accurate** — confirmed `abuse/device.ts`'s
+      `computeDeviceHash` is an HMAC-SHA256 of a random first-party cookie + a coarse UA-family
+      bucket (`chrome`/`firefox`/`safari`/`edge`/`other`/`unknown` only — never the raw UA string,
+      never canvas/WebGL/font fingerprinting). Copy states this precisely, including "never
+      reversible back to the original values."
+    - **"Align retention with the existing 30-day window" does not literally hold** — there is no
+      cron/purge job deleting `user_devices`/`session_signals`/`abuse_signals` rows on any
+      schedule. `user_devices`/`account_risk` are deleted only via the existing account-deletion
+      cascade (which does already run on the pre-existing 30-day grace-period path — so that part
+      lines up), but `abuse_signals` is *deliberately* schema-designed with no FK specifically so
+      it **outlives** account deletion for fraud-investigation purposes (`schema.ts`'s own
+      comment: "must outlive the account... compliance/investigation trail"). Writing "we delete
+      this after 30 days" would have been factually false. The new section 5 paragraph instead
+      says device-recognition data follows the account's own lifecycle, with an explicit,
+      narrowly-scoped exception for records still part of an active investigation — this is the
+      true behavior, not the literal "30-day window" framing in the task text.
+    - Bumped `CURRENT_CONSENT_VERSIONS.privacy` (`src/shared/lib/legal.ts`) `v1.0 → v1.1` (a minor
+      bump — per `isMaterialVersionChange`'s own doc-comment, this doesn't force re-acceptance of
+      existing consent, appropriate here since the new disclosure clarifies processing already
+      covered by section 2(c)'s existing "prevent abuse" purpose, not a new category of
+      processing) and updated the hardcoded "Version v1.1 · Last updated 2026-07-25" line on the
+      page itself (confirmed via research this line is NOT auto-derived from `legal.ts` — it's
+      separate hardcoded JSX that needs a manual edit on every version bump). Fixed one now-stale
+      assertion this broke: `legal.test.ts`'s `CURRENT_CONSENT_VERSIONS.privacy` expectation.
+    - **Legal review sign-off — genuinely outstanding, listing per the user's standing instruction
+      rather than blocking on it.** `docs/operations/stripe-live-readiness.md`'s own
+      `--confirm-terms-privacy` gate already establishes the precedent that this kind of sign-off
+      is a human attestation, not something a script or an agent can perform or fabricate — I
+      cannot review my own copy as "legal review" and mark it done. **Pending: a human needs to
+      read the new "Device recognition data" disclosure (section 1) and the new "Data retention"
+      paragraph (section 5) in `privacy.tsx` and confirm they're accurate/sufficient before this is
+      truly closed out**; the content is live and correct to the best of the technical facts
+      verified against the actual code, but the sign-off itself needs a person.
+    - Verify: `pnpm tsc --noEmit`, `pnpm eslint` on both touched files (clean), `pnpm vitest run
+      src/shared/lib/legal.test.ts src/shared/lib/billing/consent.test.ts` (42/42, confirmed
+      `checkout.test.ts`/`webhook-handlers.test.ts`'s hardcoded `{ terms: 'v1.0', privacy: 'v1.0' }`
+      fixtures are literal DB snapshot inputs for unrelated scenarios, not assertions against the
+      live constant, so they're unaffected by the bump), and a live browser check confirming the
+      new sections render on `/legal/privacy`.
 
 - [ ] **Wire abuse checks into the release-gate audit set**
   - Files: `.github/workflows/quality.yml`, `docs/operations/*`

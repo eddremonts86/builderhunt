@@ -23,6 +23,7 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
           <li><strong>Workspace data:</strong> saved searches, saved builders, private notes per builder, alerts, exports.</li>
           <li><strong>Claim data:</strong> if you claim a builder profile, your email and a one-time token. We never store the token after use.</li>
           <li><strong>Usage data:</strong> server logs (IP address, user agent, page path, response code) for 30 days. We use these for abuse prevention and capacity planning.</li>
+          <li><strong>Device recognition data:</strong> a one-way, salted hash of a random device identifier we set in a first-party cookie, combined with a coarse browser family (e.g. &quot;chrome&quot;, &quot;safari&quot;) — never your full browser/OS string, screen size, fonts, or any other device fingerprint, and never reversible back to the original values. We use this only to recognize when the same device signs in to multiple accounts or an unusual number of accounts sign up from it, as part of abuse prevention.</li>
           <li><strong>Cookies:</strong> see our <Link to="/legal/cookies" className="text-bh-accent underline">Cookie Policy</Link>.</li>
         </ul>
       </>
@@ -52,11 +53,16 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
   },
   {
     heading: '4. Cookies and localStorage',
-    body: 'We use cookies and localStorage for authentication (session), cookie-consent state, and onboarding state. We do not use third-party analytics cookies by default. See our Cookie Policy for details and how to opt out.',
+    body: 'We use cookies and localStorage for authentication (session), cookie-consent state, onboarding state, and a random device identifier used for abuse prevention (see "Device recognition data" above). We do not use third-party analytics cookies by default. See our Cookie Policy for details and how to opt out.',
   },
   {
     heading: '5. Data retention',
-    body: 'We retain your account data for as long as your account is active. If you delete your account, all your personal data is permanently deleted within 30 days (the grace period you can cancel). After 30 days, we retain only anonymized, aggregated statistics (e.g., "we had N searches today") that cannot identify you.',
+    body: (
+      <>
+        <p>We retain your account data for as long as your account is active. If you delete your account, all your personal data is permanently deleted within 30 days (the grace period you can cancel). After 30 days, we retain only anonymized, aggregated statistics (e.g., &quot;we had N searches today&quot;) that cannot identify you.</p>
+        <p className="mt-2">Device recognition data and internal abuse-review records follow the same lifecycle as your account and are deleted along with it, with one exception: where a specific signal was already part of an active fraud or abuse investigation, we may retain that specific record after account deletion, consistent with our need to keep an audit trail for that investigation — never for any other purpose.</p>
+      </>
+    ),
   },
   {
     heading: '6. Your rights (GDPR Art. 15–22)',
@@ -109,7 +115,7 @@ function PrivacyPage() {
             <Shield className="w-7 h-7 text-bh-accent" aria-hidden="true" />
             Privacy Policy
           </h1>
-          <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-24</p>
+          <p className="text-sm text-bh-text-muted">Version v1.1 · Last updated 2026-07-25</p>
         </header>
         <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
           {SECTIONS.map((s) => (

@@ -17,7 +17,11 @@ import { log } from '~/shared/lib/log'
 
 const CURRENT_VERSIONS = {
   tos: 'v1.0',
-  privacy: 'v1.0',
+  // v1.1 (2026-07-25): added the "Device recognition data" disclosure (abuse-and-usage-integrity
+  // Phase 6) — a clarification of processing already covered by section 2(c)'s existing "prevent
+  // abuse" purpose, not a new category of processing, so this is a minor bump: existing acceptances
+  // of v1.0 remain valid (see `isMaterialVersionChange`).
+  privacy: 'v1.1',
   cookies: 'v1.0',
 } as const
 
