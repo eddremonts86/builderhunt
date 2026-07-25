@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon, ProductHuntIcon } from '~/modules/landing/components/BrandIcons'
 
 export interface PersonCardData {
   id: string
@@ -30,6 +30,7 @@ const SOURCE_META: Record<string, { label: string; Icon: React.ComponentType<{ c
   hashnode: { label: 'Hashnode', Icon: HashnodeIcon },
   sourcehut: { label: 'SourceHut', Icon: SourceHutIcon },
   devpost: { label: 'Devpost', Icon: DevpostIcon },
+  producthunt: { label: 'Product Hunt', Icon: ProductHuntIcon },
 }
 
 const numberFormatter = new Intl.NumberFormat('en-US')

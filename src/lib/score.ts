@@ -140,6 +140,12 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       // only quantitative signal scraping can reliably get.
       const projectsCount = (metadata.projectsCount as number | undefined) ?? 0
       if (projectsCount > 0) score += Math.min(Math.log1p(projectsCount) * 4, 15)
+    } else if (source === 'producthunt') {
+      // Total votes across launches is already in followersCount; this
+      // rewards a single breakout launch specifically. Recency comes from
+      // metadata.lastSeen via the default branch above.
+      const best = (metadata.bestVotes as number | undefined) ?? 0
+      if (best > 0) score += Math.min(Math.log1p(best) * 1.2, 10)
     }
 
     // ---------- Quality signals (0-10 pts) ----------

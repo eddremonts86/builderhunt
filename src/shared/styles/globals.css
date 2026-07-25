@@ -580,6 +580,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .badge-hashnode { background: rgba(36, 77, 232, 0.08); color: #1d4ed8; border-color: rgba(36, 77, 232, 0.15); }
 .badge-sourcehut { background: rgba(255, 102, 0, 0.08); color: #c2410c; border-color: rgba(255, 102, 0, 0.15); }
 .badge-devpost { background: rgba(8, 145, 178, 0.08); color: #0e7490; border-color: rgba(8, 145, 178, 0.15); }
+.badge-producthunt { background: rgba(218, 85, 47, 0.08); color: #c2410c; border-color: rgba(218, 85, 47, 0.15); }
 .badge-success { background: rgba(22, 163, 74, 0.08); color: var(--color-bh-success); border-color: rgba(22, 163, 74, 0.15); }
 .badge-neutral { background: rgba(113, 113, 122, 0.08); color: var(--color-bh-text-muted); border-color: var(--color-bh-border); }
 
@@ -606,6 +607,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .dark .badge-hashnode { color: #7aa3ff; }
 .dark .badge-sourcehut { color: #ffab5e; }
 .dark .badge-devpost { color: #22d3ee; }
+.dark .badge-producthunt { color: #ff9a5e; }
 
 /* =============================================================================
    Scrollbar

@@ -38,6 +38,7 @@ const zodEnv = z.object({
   CODEBERG_TOKEN: z.string().optional(),
   HASHNODE_API_KEY: z.string().optional(),
   SOURCEHUT_TOKEN: z.string().optional(),
+  PRODUCTHUNT_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   MINIMAX_API_KEY: z.string().optional(),
   MINIMAX_BASE_URL: z.string().default('https://api.minimax.io'),

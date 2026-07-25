@@ -1,13 +1,13 @@
 # Feature: Product Hunt Integration
 
-> **Status**: `pending`
+> **Status**: `implemented — wired but dormant until a token is provisioned`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: No `src/lib/sources/producthunt.ts` exists; `producthunt` is not in
-> `SourceName` (`src/lib/sources/types.ts`). Product Hunt has an **official GraphQL API
-> that requires a token** — the connector must be token-gated exactly like
-> `src/lib/sources/sourcehut.ts` (returns `[]` when the env var is unset). Downstream
-> `unified-timeline` / `proactive-discovery` are enhanced by this source, not blocked.
+> **Reality check**: `src/lib/sources/producthunt.ts` implemented 2026-07-25, token-gated
+> exactly like `src/lib/sources/sourcehut.ts` (returns `[]` when `PRODUCTHUNT_TOKEN` is
+> unset — verified live). Provisioning a real Developer Token requires a human (real PH
+> account); see `tasks.md` for the full write-up. Downstream `unified-timeline` /
+> `proactive-discovery` are enhanced by this source, not blocked.
 
 ## Problem
 

@@ -114,3 +114,12 @@ export function DevpostIcon({ className, title }: { className?: string; title?: 
     </svg>
   )
 }
+
+export function ProductHuntIcon({ className, title }: { className?: string; title?: string }) {
+  // Simplified rocket/launch mark (launch motif, not the literal Product Hunt logo)
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M12 2c3 2 4.5 5.5 4.5 9 0 1.7-.4 3.2-1 4.5l-1.8-1a7 7 0 0 0 .3-3.5 7 7 0 0 0-2-4 7 7 0 0 0-2 4 7 7 0 0 0 .3 3.5l-1.8 1A9.6 9.6 0 0 1 7.5 11c0-3.5 1.5-7 4.5-9zm0 6.2a1.6 1.6 0 1 1 0 3.2 1.6 1.6 0 0 1 0-3.2zM8 17.5l1.7-.9.9 1.7L9 19.5l-1-2zm8 0-1 2-1.6-1.2.9-1.7 1.7.9z"/>
+    </svg>
+  )
+}
