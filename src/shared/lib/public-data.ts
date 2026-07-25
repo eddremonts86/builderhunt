@@ -50,6 +50,42 @@ export const searchPublicBuilders = createServerFn({ method: 'GET' })
     }))
   })
 
+export interface PublicRadar {
+  queryName: string
+  ownerName: string
+  keywords: string[]
+  sources: string[] | null
+  language: string | null
+  country: string | null
+}
+
+const radarSlugSchema = z.string().regex(/^[a-z0-9-]{1,128}$/)
+
+// Plan: public-landing-pages Phase 2. `~/shared/lib/repositories/public-radars`
+// imports `publicDb`, which eagerly opens a real `postgres()` client at
+// module scope — dynamically importing it here (not at this file's top
+// level) keeps that whole chain, and the Node-only `Buffer` reference deep
+// inside the `postgres` package, out of the client bundle that this route's
+// own `component` ships to the browser. Same convention as
+// `searchPublicBuilders` above and `getPublicBuilder` below.
+export const resolvePublicRadar = createServerFn({ method: 'GET' })
+  .validator(radarSlugSchema)
+  .handler(async ({ data: slug }): Promise<PublicRadar | null> => {
+    const { findPublicRadarBySlug, getPublicRadarQuery } = await import('~/shared/lib/repositories/public-radars')
+    const radar = await findPublicRadarBySlug(slug)
+    if (!radar) return null
+    const resolved = await getPublicRadarQuery(radar.organizationId, radar.savedQueryId)
+    if (!resolved) return null
+    return {
+      queryName: resolved.query.name,
+      ownerName: resolved.organizationName,
+      keywords: resolved.query.keywords,
+      sources: resolved.query.sources,
+      language: resolved.query.language,
+      country: resolved.query.country,
+    }
+  })
+
 export const getPublicBuilder = createServerFn({ method: 'GET' })
   .validator(builderIdSchema)
   .handler(async ({ data: builderId }) => {

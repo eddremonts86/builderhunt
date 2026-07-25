@@ -1,8 +1,7 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { ArrowRight, Radio, Sparkles } from 'lucide-react'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
-import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
-import { findPublicRadarBySlug, getPublicRadarQuery } from '~/shared/lib/repositories/public-radars'
+import { resolvePublicRadar, searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 import { LinkButton } from '~/components/ui/link'
 
@@ -17,21 +16,17 @@ interface RadarLoaderData {
 
 export const Route = createFileRoute('/r/$slug')({
   loader: async ({ params }): Promise<RadarLoaderData> => {
-    const radar = await findPublicRadarBySlug(params.slug)
+    const radar = await resolvePublicRadar({ data: params.slug })
     if (!radar) throw notFound()
-
-    const resolved = await getPublicRadarQuery(radar.organizationId, radar.savedQueryId)
-    if (!resolved) throw notFound()
-    const { query, organizationName } = resolved
 
     let results: PublicSearchBuilder[] = []
     try {
       const all = await searchPublicBuilders({
         data: {
-          keywords: query.keywords,
-          sources: query.sources ?? undefined,
-          language: query.language ?? undefined,
-          country: query.country ?? undefined,
+          keywords: radar.keywords,
+          sources: radar.sources ?? undefined,
+          language: radar.language ?? undefined,
+          country: radar.country ?? undefined,
           perPage: 30,
           page: 1,
         },
@@ -41,7 +36,7 @@ export const Route = createFileRoute('/r/$slug')({
       console.error('Public radar search error:', err)
     }
 
-    return { queryName: query.name, ownerName: organizationName, results }
+    return { queryName: radar.queryName, ownerName: radar.ownerName, results }
   },
   head: ({ loaderData, params }) => {
     if (!loaderData) return { meta: [{ title: `Radar not found — ${SITE_NAME}` }] }

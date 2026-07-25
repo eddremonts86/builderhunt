@@ -1,5 +1,4 @@
 import type { RawBuilder } from '~/lib/sources/types'
-import { searchDevpostProfiles } from '~/shared/lib/repositories/devpost-profiles'
 
 /**
  * Devpost source — reads the durable `devpost_profiles` store, never scrapes
@@ -7,6 +6,24 @@ import { searchDevpostProfiles } from '~/shared/lib/repositories/devpost-profile
  * is populated by src/lib/devpost/worker.ts on a cron cadence; see
  * plans/phase-1/devpost-integration/spec.md. Degrades to `[]` like every
  * other connector if the query has no matches or the DB read fails.
+ *
+ * `searchDevpostProfiles` is imported dynamically inside `searchDevpost`,
+ * not statically at the top of this file: this module is reachable from
+ * several `src/routes/api/**` route files via `~/lib/search`'s connector
+ * fan-out, and those route modules are pulled into the **client** bundle too
+ * (TanStack Start's generated route tree needs every route client-side for
+ * navigation, even ones whose only client-relevant export is `component:
+ * () => null`). `devpost-profiles.ts` imports `publicDb`, which eagerly
+ * constructs a real `postgres()` client at module-evaluation time — and the
+ * `postgres` package's own internals reference the Node-only `Buffer`
+ * global, so merely *importing* this chain (never mind calling it) crashed
+ * with `ReferenceError: Buffer is not defined` the moment the browser
+ * evaluated that chunk, silently breaking hydration for the entire app (no
+ * console error surfaces through normal means for this — it only shows up
+ * via `window.addEventListener('unhandledrejection', ...)`). A dynamic
+ * `import()` here means Vite code-splits this chain into its own chunk that
+ * the browser never actually fetches, since the client never calls this
+ * function.
  */
 function profileToBuilder(row: {
   username: string
@@ -54,6 +71,7 @@ export async function searchDevpost(
   if (!query) return []
 
   try {
+    const { searchDevpostProfiles } = await import('~/shared/lib/repositories/devpost-profiles')
     const rows = await searchDevpostProfiles(query, perPage * page)
     const start = (page - 1) * perPage
     return rows.slice(start, start + perPage).map(profileToBuilder)

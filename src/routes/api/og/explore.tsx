@@ -1,7 +1,15 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import type { ScoredBuilder } from '~/lib/search'
-import { findPublicRadarBySlug, getPublicRadarQuery } from '~/shared/lib/repositories/public-radars'
+// `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
+// opens a real `postgres()` client at module scope — and the `postgres`
+// package's own internals reference the Node-only `Buffer` global. This
+// route file is part of TanStack Start's client-navigable route tree, so a
+// static top-level import here would ship that whole chain into the browser
+// bundle and crash on load (`ReferenceError: Buffer is not defined`) before
+// React ever hydrates, even though the client never calls this GET handler.
+// Imported dynamically inside the handler instead — see the matching note
+// in src/lib/sources/devpost.ts, which hit the exact same failure mode.
 
 // Render the OG image as SVG, then rasterize to PNG via @resvg/resvg-js.
 // Twitter/Facebook/LinkedIn/Slack link previews don't render `og:image`
@@ -101,6 +109,7 @@ export const Route = createFileRoute('/api/og/explore')({
         let language: string | undefined
 
         if (radarSlug) {
+          const { findPublicRadarBySlug, getPublicRadarQuery } = await import('~/shared/lib/repositories/public-radars')
           const radar = await findPublicRadarBySlug(radarSlug)
           const resolved = radar ? await getPublicRadarQuery(radar.organizationId, radar.savedQueryId) : null
           if (resolved) {

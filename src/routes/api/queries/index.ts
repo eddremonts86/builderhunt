@@ -17,7 +17,10 @@ import {
   listLegacySavedQueries,
   listSavedQueries,
 } from '~/shared/lib/repositories/saved-queries'
-import { listPublicRadarSlugsForSavedQueryIds } from '~/shared/lib/repositories/public-radars'
+// `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
+// opens a real `postgres()` client at module scope — imported dynamically
+// below (not statically here) to keep that chain out of the client bundle.
+// See the matching note in src/lib/sources/devpost.ts.
 
 export const Route = createFileRoute('/api/queries/')({
   component: () => null,
@@ -34,6 +37,7 @@ export const Route = createFileRoute('/api/queries/')({
             canonical: () => listSavedQueries(tx, principal.organizationId),
             recordMismatch: recordMigrationMismatch,
           }))
+          const { listPublicRadarSlugsForSavedQueryIds } = await import('~/shared/lib/repositories/public-radars')
           const radarSlugs = await listPublicRadarSlugsForSavedQueryIds(queries.map((query) => query.id))
           return Response.json(queries.map((query) => ({
             ...query,
