@@ -73,6 +73,7 @@ jobs:
           pnpm db:restore-test
       - run: pnpm security:boundaries
       - run: pnpm security:route-coverage
+      - run: pnpm security:provider-metering
       - name: Tenant schema classification (informational until contract phase)
         continue-on-error: true
         run: pnpm db:audit-schema

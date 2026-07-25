@@ -767,12 +767,50 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     written for the blocked attempt (detection only runs after a successful reservation) — script and
     all seeded rows deleted afterward, confirmed zero residual rows in the dev database.
 
-- [ ] **Metering-bypass boundary test — every provider entry point is metered (G8)**
+- [x] **Metering-bypass boundary test — every provider entry point is metered (G8)**
   - Files: `scripts/check-provider-metering.mjs`, `package.json` (script), `.github/workflows/quality.yml`
   - Do: static check that every server path calling MiniMax/embeddings (`ai/minimax.ts`,
     `ai/embeddings.ts`) is reached only through `reserveCredits`/`checkAndConsumeBudget`, with an
     explicit allowlist for the free local (Chrome) tier. Fail CI on an un-metered provider call.
   - Verify: `node scripts/check-provider-metering.mjs` exits 0 on the current tree; add a failing fixture.
+  - Progress: **found and fixed a real un-metered provider call while building the check** —
+    `src/lib/semantic/semantic-search.ts`'s `embedQueryCached()` called `embedTexts()` (query
+    embedding for every semantic-search request) with zero budget/credit gating, unlike the file's
+    other MiniMax call (`translateQueryServerSide`, already gated by `checkAndConsumeBudget`). Fixed
+    by threading `principal`/`entitlement` into `embedQueryCached` and adding a
+    `checkAndConsumeBudget` call (new `SEMANTIC_SEARCH_EMBED_ALLOWANCES` — `{free:0, pro:500,
+    team:1000}`, matching `AITaskDefinition`'s allowance shape without forcing this into the
+    chat-shaped task registry, since `checkAndConsumeBudget` only needs `Pick<AITaskDefinition,
+    'id'|'allowances'>`) right before the actual provider call, on a cache miss only — a budget
+    exhaustion throws, which `routes/api/search/semantic.ts` already catches and degrades to
+    keyword-fallback search, matching this file's existing "any AI failure is caught by the caller"
+    contract. Confirmed the free/local (Chrome on-device) tier (`ai/local.ts`) needs no allowlist
+    entry — it calls the browser's `LanguageModel` global directly and never imports
+    `ai/minimax.ts`/`ai/embeddings.ts`, so it's structurally invisible to this check.
+    `scripts/check-provider-metering.mjs`: walks `src/`, and for any file importing
+    `ai/minimax.ts`/`ai/embeddings.ts`, tracks brace depth per line — `gatedInScope` resets to false
+    whenever depth returns to 0 (back to top level between sibling declarations), so a
+    `checkAndConsumeBudget(`/`reserveCredits(` call anywhere in the SAME top-level function as a
+    `minimaxChat(`/`embedTexts(` call satisfies it, but a call in an unrelated top-level function in
+    the same file does not — this was necessary because `semantic-search.ts` has one gated and one
+    (pre-fix) ungated call site in the same file, which a plain per-file grep (like the two sibling
+    `check-*.mjs` scripts use) would have missed. Two whole-file allowlist entries with inline
+    justification: `src/lib/semantic/embed-worker.ts` (internal scheduled backfill worker, no
+    per-request principal) and `src/routes/api/ai/embed.ts` (platform-admin-only operator surface,
+    not a tenant-billed feature). Verified the check actually catches a violation: added a temporary
+    fixture file with an ungated `minimaxChat()` call, confirmed `node
+    scripts/check-provider-metering.mjs` exits 1 with the exact file:line finding, then deleted the
+    fixture and confirmed a clean exit 0 again. Wired as `pnpm security:provider-metering` in
+    `package.json`, added as a new CI step in `.github/workflows/quality.yml` right after
+    `security:route-coverage` (this CI change was explicitly authorized by the user, per the
+    standing check-in agreement for pipeline modifications). `pnpm tsc --noEmit` and `pnpm eslint`
+    clean; full `pnpm vitest run src/lib/semantic src/shared/lib/ai src/routes/api/search
+    src/routes/api/ai src/routes/api/builders` (87 tests) passes with no regressions; all three
+    `security:*` check scripts (`boundaries`, `route-coverage`, `provider-metering`) pass on the
+    current tree. Not separately browser-verified end-to-end (semantic search requires seeding a
+    real pro/team org + pgvector embedding data, out of scope for this metering-wiring fix) — relies
+    on the passing test suite plus the two already-well-tested pieces being composed
+    (`checkAndConsumeBudget`, `embedTexts`) for confidence.
 
 - [ ] **First-payer credit-consumption cap + spend-velocity signal (G6)**
   - Files: `src/shared/lib/billing/reservations.ts`, `src/shared/lib/abuse/credit-abuse.ts`,

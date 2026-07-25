@@ -38,7 +38,6 @@ const providerImportPatterns = [
   { name: 'embedTexts', pattern: /\bembedTexts\s*\(/ },
 ]
 const gatePattern = /\b(?:checkAndConsumeBudget|reserveCredits)\s*\(/
-const functionStartPattern = /(?:^|\s)(?:async\s+)?function\b|=>\s*\{|=\s*(?:async\s*)?\(/
 
 const files = await sourceFiles(sourceRoot)
 const findings = []
@@ -50,32 +49,36 @@ for (const absolutePath of files) {
   if (!importsProvider) continue
 
   const lines = source.split('\n')
-  const functionStack = [] // { startLine, gated: boolean }
+  // Depth-based scoping, not a real parser: `depth` is the running brace
+  // balance from the top of the file. Whenever it returns to 0 we've closed
+  // back out to top level (between two sibling top-level declarations), so
+  // `gatedInScope` resets — this correctly isolates one top-level function
+  // from the next without needing to detect what a "function" looks like.
+  // Nested braces inside a function (object literals, if-blocks, other
+  // provider-call arguments) never bring `depth` back to 0 mid-function, so
+  // they don't reset the flag early.
+  let depth = 0
+  let gatedInScope = false
 
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i]
 
-    if (functionStartPattern.test(line)) {
-      functionStack.push({ startLine: i, gated: false })
-    }
-
-    if (gatePattern.test(line) && functionStack.length > 0) {
-      functionStack[functionStack.length - 1].gated = true
-    }
+    if (gatePattern.test(line)) gatedInScope = true
 
     for (const { name, pattern } of providerImportPatterns) {
       if (!pattern.test(line)) continue
-      const enclosing = functionStack[functionStack.length - 1]
-      const gated = enclosing?.gated ?? false
-      if (!gated && !fileAllowlist.has(path)) {
-        findings.push(`${path}:${i + 1}: ${name}() call is not preceded by checkAndConsumeBudget()/reserveCredits() in its enclosing function`)
+      if (!gatedInScope && !fileAllowlist.has(path)) {
+        findings.push(`${path}:${i + 1}: ${name}() call is not preceded by checkAndConsumeBudget()/reserveCredits() in its enclosing top-level function`)
       }
     }
 
     const opens = (line.match(/\{/g) ?? []).length
     const closes = (line.match(/\}/g) ?? []).length
-    for (let c = 0; c < closes - opens; c += 1) functionStack.pop()
-    for (let o = 0; o < opens - closes - 1; o += 1) functionStack.push({ startLine: i, gated: functionStack[functionStack.length - 1]?.gated ?? false })
+    depth += opens - closes
+    if (depth <= 0) {
+      depth = 0
+      gatedInScope = false
+    }
   }
 }
 
