@@ -6,7 +6,7 @@ import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
-import { Input, Textarea } from '~/components/ui'
+import { Button, Input, LinkButton, Textarea } from '~/components/ui'
 
 interface Builder {
   id: string
@@ -162,7 +162,12 @@ export function BuilderProfilePage() {
             </div>
           )}
 
-          <div className="flex-1">
+          {/* `min-w-0` overrides the flex-item default of `min-width: auto` —
+              without it, an unbreakable long token in the bio (a raw URL)
+              sizes this column to its own intrinsic content width instead of
+              respecting the row's available space, defeating `break-words`
+              below and overflowing the whole card/page horizontally. */}
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-2xl font-bold text-bh-text">
                 {builder.displayName ?? builder.username}
@@ -180,7 +185,7 @@ export function BuilderProfilePage() {
             </div>
 
             {builder.bio && (
-              <p className="text-bh-text-muted mb-3">{builder.bio}</p>
+              <p className="text-bh-text-muted mb-3 break-words">{builder.bio}</p>
             )}
 
             <div className="flex items-center gap-4 text-sm text-bh-text-muted mb-4 flex-wrap">
@@ -279,12 +284,13 @@ export function BuilderProfilePage() {
           <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm p-6">
             {isMyProfile ? (
               <div className="flex flex-wrap items-center gap-2">
-                <Link
+                <LinkButton
                   to="/me"
-                  className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                  variant="primary"
+                  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                 >
                   <Sparkles className="w-4 h-4" /> Manage your profile
-                </Link>
+                </LinkButton>
                 <span className="text-xs text-bh-text-muted">
                   You claimed this profile on {builder.claimedAt ? new Date(builder.claimedAt).toLocaleDateString() : '—'}.
                 </span>
@@ -310,13 +316,14 @@ export function BuilderProfilePage() {
             {!builder.isClaimed && !isMyProfile && (
               <div className="mt-4 pt-4 border-t border-bh-border">
                 {!claimOpen ? (
-                  <button
+                  <Button
+                    variant="secondary"
                     onClick={() => setClaimOpen(true)}
-                    className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                    className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     data-event="claim_cta_click"
                   >
                     <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
-                  </button>
+                  </Button>
                 ) : (
                   <form onSubmit={handleClaim} className="space-y-3">
                     <p className="text-sm text-bh-text-muted">
@@ -332,20 +339,22 @@ export function BuilderProfilePage() {
                         className="flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                         autoFocus
                       />
-                      <button
+                      <Button
                         type="submit"
+                        variant="primary"
                         disabled={claimSending}
-                        className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                       >
                         {claimSending ? 'Sending…' : 'Send verification email'}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
-                        className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                     {claimMsg && (
                       <div
@@ -408,14 +417,15 @@ export function BuilderProfilePage() {
                     className="flex-1 resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                     rows={2}
                   />
-                  <button
+                  <Button
+                    variant="primary"
                     onClick={handleSaveNote}
                     disabled={savingNote || !noteText.trim()}
-                    className="btn-primary flex items-center gap-2 h-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                    className="flex items-center gap-2 h-fit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <Save className="w-4 h-4" />
                     {savingNote ? 'Saving...' : 'Save'}
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (

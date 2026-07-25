@@ -17,6 +17,17 @@
   font-weight: 100 900;
   src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2');
 }
+/* Display face for hero/stat figures only ("numbers are the hero" — see
+   DESIGN.md) — a warm soft-serif, not the body grotesk, so large numbers
+   read as a deliberate typographic choice instead of oversized Inter. Below-
+   fold everywhere it's used, so no preload (unlike Inter above). */
+@font-face {
+  font-family: 'Fraunces';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url('/fonts/fraunces-latin-wght700-normal.woff2') format('woff2');
+}
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -26,6 +37,10 @@
    - WCAG AA contrast verified for text/text-muted vs. bg/surface
    ============================================================================= */
 @theme {
+  /* Hero/stat-figure display face — see the @font-face above. Not the body
+     font (`body` sets Inter directly); opt in per element with `font-display`. */
+  --font-display: 'Fraunces', Georgia, serif;
+
   --animate-fade-in: fade-in 0.4s ease-out both;
   --animate-fade-in-up: fade-in-up 0.5s ease-out both;
   --animate-slide-in: slide-in 0.3s ease-out;
@@ -73,35 +88,39 @@
   --color-bh-border-strong: #d4d4d8;
   --color-bh-text: #18181b;
   --color-bh-text-muted: #52525b;
-  --color-bh-text-dim: #71717a;
+  /* #71717a measured 4.1:1 against --color-bh-bg (#ececf0) — below the 4.5:1
+     text minimum (axe/pure-luminance test both caught it; only 4.83:1
+     against --color-bh-surface, so it read fine on cards but not on bare
+     page background). */
+  --color-bh-text-dim: #616168;
   --color-bh-accent: #e07338;
   --color-bh-accent-hover: #ca5d25;
   --color-bh-accent-soft: rgba(224, 115, 56, 0.1);
   --color-bh-accent-glow: rgba(224, 115, 56, 0.25);
   /* Text/icon color for content painted directly on a solid --color-bh-accent
-     fill (buttons, skip link, selection) — swapped per-accent below since a
-     bright accent (neon) needs dark text where a darker accent (brand) needs
-     light text; the accent color itself doesn't otherwise vary by theme. */
-  --color-bh-accent-contrast: #ffffff;
+     fill (buttons, skip link, selection). White measured 3.14:1 here — short
+     of the 4.5:1 text minimum (axe: color-contrast, plans/audit-accessibility).
+     Rather than darken the signature terracotta accent itself (used
+     everywhere: badges, links, focus rings, the brand mark), a dark ink
+     clears AA comfortably (5.98:1 on --color-bh-accent, 4.57:1 on
+     --color-bh-accent-hover) — same principle as amber/orange UI palettes
+     generally pairing better with dark text than white. */
+  --color-bh-accent-contrast: #1a0f0a;
   /* Rim/inset-highlight for solid-accent buttons — a light rim reads as a
-     highlight on a dark-ish accent (brand orange); the same light rim on a
-     bright accent (neon) just looks like a stray white ring, so it flips
-     alongside --color-bh-accent-contrast. */
+     highlight on the brand orange accent. */
   --color-bh-accent-rim: rgba(255, 255, 255, 0.15);
   --color-bh-cyan: #0891b2;
   --color-bh-cyan-soft: rgba(8, 145, 178, 0.1);
   --color-bh-success: #16a34a;
   --color-bh-warning: #d97706;
-  --color-bh-danger: #dc2626;
-  --color-bh-danger-hover: #b91c1c;
+  /* #dc2626 measured 4.1:1 against --color-bh-bg — below the 4.5:1 text
+     minimum (same issue as text-dim above). The old hover shade (#b91c1c)
+     already cleared it comfortably, so it becomes the new base; hover moves
+     one step darker again. */
+  --color-bh-danger: #b91c1c;
+  --color-bh-danger-hover: #991b1b;
   --color-bh-danger-soft: rgba(220, 38, 38, 0.08);
   --color-bh-danger-glow: rgba(220, 38, 38, 0.25);
-
-  /* Alternate ("neon") accent — opt-in via .accent-neon, dashboard-only experiment */
-  --color-bh-accent-alt: #39ff8c;
-  --color-bh-accent-alt-hover: #22e070;
-  --color-bh-accent-alt-soft: rgba(57, 255, 140, 0.12);
-  --color-bh-accent-alt-glow: rgba(57, 255, 140, 0.35);
 
   /* Source-specific badges contrast adjusted for light background */
   --color-bh-github: #24292f;
@@ -111,9 +130,9 @@
 
   /* shadcn/ui semantic tokens — aliased to the bh-* tokens above rather than a
      separate palette, so every generated shadcn component automatically
-     tracks the existing light/dark + brand/neon theming with zero extra
-     wiring (these are CSS custom properties, resolved where used, so the
-     .dark/.accent-neon overrides on --color-bh-* below still apply here). */
+     tracks the existing light/dark theming with zero extra wiring (these are
+     CSS custom properties, resolved where used, so the .dark overrides on
+     --color-bh-* below still apply here). */
   --color-background: var(--color-bh-bg);
   --color-foreground: var(--color-bh-text);
   --color-card: var(--color-bh-surface);
@@ -157,7 +176,16 @@
   --color-bh-border-strong: rgba(255, 255, 255, 0.16);
   --color-bh-text: #f4f4f5;
   --color-bh-text-muted: #a1a1aa;
-  --color-bh-text-dim: #71717a;
+  /* Lighter than the light-mode value (#71717a) — that value only clears
+     WCAG AA (4.5:1) against the light surfaces it was tuned for (~7:1); against
+     dark-mode surfaces it measured 3.1-3.7:1 (axe: color-contrast, found via
+     plans/audit-accessibility). Extra margin beyond the bare 4.5:1 floor is
+     deliberate: nested card/stat-tile contexts composite against slightly
+     different effective backgrounds than the flat surface tokens, so a
+     value that only just clears 4.5:1 against `--color-bh-surface` can still
+     read as borderline (~4.4-4.5:1) in one of those contexts. #a4a4ab clears
+     >=7.2:1 against every dark surface token (bg/bg-alt/surface). */
+  --color-bh-text-dim: #a4a4ab;
   --color-bh-accent-soft: rgba(224, 115, 56, 0.16);
   --color-bh-accent-glow: rgba(224, 115, 56, 0.4);
   --color-bh-danger-soft: rgba(220, 38, 38, 0.16);
@@ -169,37 +197,17 @@
   --color-bh-devto: #ffffff;
 }
 
-/* Alternate neon-green accent — toggle independently of theme via .accent-neon */
-.accent-neon {
-  --color-bh-accent: var(--color-bh-accent-alt);
-  --color-bh-accent-hover: var(--color-bh-accent-alt-hover);
-  --color-bh-accent-soft: var(--color-bh-accent-alt-soft);
-  --color-bh-accent-glow: var(--color-bh-accent-alt-glow);
-  /* Neon green is too bright for white text (~1.6:1) — dark text clears AA. */
-  --color-bh-accent-contrast: #0a0a0d;
-  --color-bh-accent-rim: rgba(10, 10, 13, 0.18);
-}
-
-/* Neon is calibrated for dark surfaces, where bright-green-on-near-black is
-   exactly the "hacker terminal" look it's going for. On a light page the
-   same bright green fails as *text* everywhere it's used that way — badges,
-   links, tags all pair `--color-bh-accent` as foreground with
-   `--color-bh-accent-soft` as background, and a near-white tint of neon
-   green behind neon-green text is unreadable (~1.1:1). Since every one of
-   those call sites already reads from these same few variables, retuning
-   them here (once) for light + neon fixes every page that uses them,
-   instead of hunting down each `text-bh-accent`/`.badge`/`.eyebrow` site.
-   Selector must live on `<html>` (`:root`), not `.accent-neon` alone,
-   because both `.dark` and `.accent-neon` are toggled on the same element —
-   `.accent-neon` by itself can't tell whether `.dark` is also present. */
-:root.accent-neon:not(.dark) {
-  --color-bh-accent: #0f7a44;
-  --color-bh-accent-hover: #0c6339;
-  --color-bh-accent-soft: rgba(15, 122, 68, 0.1);
-  --color-bh-accent-glow: rgba(15, 122, 68, 0.25);
-  --color-bh-accent-contrast: #ffffff;
-  --color-bh-accent-rim: rgba(255, 255, 255, 0.15);
-}
+/* `--color-bh-danger` itself stays the same in dark mode — it's also used as
+   a solid fill (`.btn-danger`, `bg-bh-danger`) and lightening it there would
+   shift a destructive-action button's whole look, not just fix text. But
+   the far more common usage (81 call sites) is `text-bh-danger` for plain
+   error/warning copy, which measured 3.3-3.73:1 against dark surfaces (axe:
+   color-contrast, below the 4.5:1 minimum) — override just the text
+   utility, not the shared token. */
+.dark .text-bh-danger { color: #f26464; }
+/* `.btn-danger-outline` sets its own `color: var(--color-bh-danger)` rather
+   than using the `.text-bh-danger` utility — same fix, same reasoning. */
+.dark .btn-danger-outline { color: #f26464; }
 
 /* =============================================================================
    Glass surfaces — dashboard shell/menus only. Reserve blur for elevated,
@@ -339,17 +347,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 /* =============================================================================
    Card
    ============================================================================= */
-.card {
-  background: var(--color-bh-surface);
-  border: 1px solid rgba(228, 228, 231, 0.4) !important;
-  border-radius: 24px; /* rounded-3xl equivalent */
-  padding: 1.5rem;
-  box-shadow: 0 10px 30px -15px rgba(24, 24, 27, 0.03), 0 1px 3px rgba(24, 24, 27, 0.01) !important;
-  transition: border-color 0.2s, transform 0.2s;
-}
-.dark .card {
-  border-color: rgba(255, 255, 255, 0.08) !important;
-  box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+/* Scoped into the Tailwind `components` layer (lower cascade priority than
+   the `utilities` layer) so call-site utility classes — e.g. `card
+   border-bh-danger/30 bg-bh-danger/5` — can override border/background
+   without `!important`. Plain custom classes elsewhere in this file are left
+   unlayered on purpose; only `.card` needed this because call sites
+   routinely pair it with a Tailwind border/bg utility to recolor it. */
+@layer components {
+  .card {
+    background: var(--color-bh-surface);
+    border: 1px solid rgba(228, 228, 231, 0.4);
+    border-radius: 24px; /* rounded-3xl equivalent */
+    padding: 1.5rem;
+    box-shadow: 0 10px 30px -15px rgba(24, 24, 27, 0.03), 0 1px 3px rgba(24, 24, 27, 0.01);
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .dark .card {
+    border-color: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 30px -15px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
 }
 .card-hover:hover {
   border-color: var(--color-bh-border-strong);
@@ -494,6 +510,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .btn-lg { padding: 0.875rem 1.75rem; font-size: 1rem; border-radius: 10px; }
 .btn-sm { padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
 
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--color-bh-text-muted);
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.btn-icon:hover { color: var(--color-bh-text); background: rgba(24, 24, 27, 0.05); }
+.btn-icon:disabled { opacity: 0.5; cursor: not-allowed; }
+
 /* =============================================================================
    Inputs
    ============================================================================= */
@@ -556,23 +588,22 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .dark .badge-github { background: rgba(240, 246, 252, 0.08); border-color: rgba(240, 246, 252, 0.18); }
 .dark .badge-devto { background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.18); }
 
-/* =============================================================================
-   Text gradient — for hero headlines
-   ============================================================================= */
-.text-gradient {
-  background: linear-gradient(135deg, #18181b 0%, #da552f 50%, #e07338 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
-.text-gradient-accent {
-  background: linear-gradient(135deg, #da552f 0%, #e07338 50%, #ca5d25 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-}
+/* The remaining source badges only had their light-mode ink tuned (comment
+   above) — every one of them measured under the 4.5:1 text-contrast minimum
+   against its own dark-tinted fill (axe: color-contrast, 2.5-3.2:1, found
+   via plans/audit-accessibility). Brighten each ink for dark mode; the fill/
+   border tints already scale with the brand color via currentColor-free
+   rgba() so they don't need their own override. */
+.dark .badge-reddit { color: #ff7a4d; }
+.dark .badge-hn { color: #ff9142; }
+.dark .badge-lobsters { color: #ff6b5e; }
+.dark .badge-stackoverflow { color: #ffab5e; }
+.dark .badge-npm { color: #ff7a72; }
+.dark .badge-huggingface { color: #ffb366; }
+.dark .badge-gitlab { color: #ff9a5e; }
+.dark .badge-codeberg { color: #5ee0d0; }
+.dark .badge-hashnode { color: #7aa3ff; }
+.dark .badge-sourcehut { color: #ffab5e; }
 
 /* =============================================================================
    Scrollbar
@@ -717,8 +748,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 
 .card-premium-glow:hover {
   transform: translateY(-4px);
-  border-color: var(--color-bh-accent) !important;
-  box-shadow: 0 12px 30px -10px rgba(224, 115, 56, 0.15) !important;
+  border-color: var(--color-bh-accent);
+  box-shadow: 0 12px 30px -10px rgba(224, 115, 56, 0.15);
 }
 
 /* Timeline vertical/horizontal lines */
@@ -730,5 +761,28 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 .timeline-line {
   position: absolute;
   background-image: repeating-linear-gradient(90deg, var(--color-bh-border), var(--color-bh-border) 6px, transparent 6px, transparent 12px);
+}
+
+/* =============================================================================
+   Table horizontal-scroll hint — for genuinely wide data tables (admin
+   billing queues, etc.), not primary navigation. Classic CSS-only "scroll
+   shadow" technique: two solid cover gradients (`background-attachment:
+   local`, scroll with the content) mask the edges when there's more to see
+   in that direction, and two thin shadow gradients (`background-attachment:
+   scroll`, fixed to the viewport) render the actual visible cue — so the
+   left/right hint fades out on its own once you've scrolled that edge into
+   view, no JS required.
+   ============================================================================= */
+.table-scroll {
+  overflow-x: auto;
+  background:
+    linear-gradient(to right, var(--color-bh-surface) 30%, rgba(255, 255, 255, 0)) 0 0,
+    linear-gradient(to left, var(--color-bh-surface) 30%, rgba(255, 255, 255, 0)) 100% 0,
+    linear-gradient(to right, rgba(24, 24, 27, 0.12), rgba(24, 24, 27, 0)) 0 0,
+    linear-gradient(to left, rgba(24, 24, 27, 0.12), rgba(24, 24, 27, 0)) 100% 0;
+  background-repeat: no-repeat;
+  background-color: var(--color-bh-surface);
+  background-size: 32px 100%, 32px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
 }
 

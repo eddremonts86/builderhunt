@@ -32,6 +32,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 RUN touch .env.docker
 COPY server.prod.mjs ./
+# server/security.mjs is imported by server.prod.mjs at runtime — src/ is not copied into this
+# stage, which is why that module lives outside it. Without this line the entrypoint cannot boot.
+COPY server ./server
 
 # Runtime files for drizzle-kit migrate + tsx seeds (Coolify post_deployment_command)
 COPY drizzle ./drizzle

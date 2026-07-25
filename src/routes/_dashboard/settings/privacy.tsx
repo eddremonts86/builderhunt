@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { Download, Trash2, Shield, AlertTriangle, FileJson, CheckCircle2, Clock, X, Users } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { Button } from '~/components/ui/button'
 
 interface ExportRecord {
   id: string
@@ -185,7 +186,7 @@ function PrivacySettingsPage() {
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="privacy-error">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="privacy-error">
           <p>{error}</p>
           {blockingOrganizations.length > 0 && (
             <ul className="mt-2 space-y-1" data-testid="blocking-organizations">
@@ -195,14 +196,16 @@ function PrivacySettingsPage() {
                     <Users className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                     {org.organizationName}
                   </span>
-                  <button
+                  <Button
                     type="button"
                     onClick={() => goManageOrganization(org.organizationId)}
-                    className="btn-ghost btn-sm text-bh-danger shrink-0"
+                    variant="ghost"
+                    size="sm"
+                    className="text-bh-danger shrink-0"
                     data-testid={`manage-org-${org.organizationId}`}
                   >
                     Transfer ownership
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -210,7 +213,7 @@ function PrivacySettingsPage() {
         </div>
       )}
       {success && (
-        <div className="glass-panel border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="privacy-success">
+        <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="privacy-success">
           <p>{success}</p>
           {referenceId && (
             <p className="text-xs text-bh-text-dim mt-1" data-testid="privacy-reference-id">Reference: {referenceId}</p>
@@ -220,7 +223,7 @@ function PrivacySettingsPage() {
 
       {/* Deletion warning */}
       {deletion && deletion.status === 'pending' && (
-        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-5 mb-6" data-testid="deletion-warning">
+        <div className="card border-bh-warning/30 bg-bh-warning/5 p-5 mb-6" data-testid="deletion-warning">
           <div className="flex items-start gap-3">
             <Clock className="w-5 h-5 text-bh-warning shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
@@ -230,22 +233,23 @@ function PrivacySettingsPage() {
                 (ends {new Date(deletion.gracePeriodEndsAt).toLocaleString()}).
                 After this date, all your data will be permanently deleted.
               </p>
-              <button
+              <Button
                 type="button"
                 onClick={cancelDeletion}
                 disabled={busy}
-                className="btn-primary btn-sm"
+                variant="primary"
+                size="sm"
                 data-testid="cancel-deletion-btn"
               >
                 Cancel deletion
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* Data export */}
-      <section className="glass-panel p-5 mb-6" data-testid="export-section">
+      <section className="card p-5 mb-6" data-testid="export-section">
         <h2 className="font-semibold flex items-center gap-2 mb-2">
           <Download className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Export my data
@@ -254,16 +258,17 @@ function PrivacySettingsPage() {
           Download all your data as a JSON file: profile, saved searches, saved builders, notes, alerts, consents, and claim history.
           Throttled to once per 24 hours.
         </p>
-        <button
+        <Button
           type="button"
           onClick={requestExport}
           disabled={busy}
-          className="btn-primary btn-sm"
+          variant="primary"
+          size="sm"
           data-testid="request-export-btn"
         >
           <FileJson className="w-4 h-4" aria-hidden="true" />
           {busy ? 'Preparing…' : 'Request export'}
-        </button>
+        </Button>
 
         {exports.length > 0 && (
           <div className="mt-4 space-y-2" data-testid="export-list">
@@ -281,14 +286,15 @@ function PrivacySettingsPage() {
                   {new Date(e.createdAt).toLocaleString()}
                 </span>
                 {e.status === 'ready' && (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => downloadExport(e.id)}
-                    className="btn-ghost btn-sm"
+                    variant="ghost"
+                    size="sm"
                     data-testid={`export-download-${e.id}`}
                   >
                     Download
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
@@ -297,7 +303,7 @@ function PrivacySettingsPage() {
       </section>
 
       {/* Delete account */}
-      <section className="glass-panel border-bh-danger/30 p-5 mb-6" data-testid="delete-section">
+      <section className="card border-bh-danger/30 p-5 mb-6" data-testid="delete-section">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="sm:pr-6">
             <h2 className="font-semibold flex items-center gap-2 text-bh-danger">
@@ -312,15 +318,17 @@ function PrivacySettingsPage() {
           </div>
 
           {(!deletion || deletion.status !== 'pending') && !confirmDelete && (
-            <button
+            <Button
               type="button"
               onClick={() => setConfirmDelete(true)}
-              className="btn-danger-outline btn-sm shrink-0"
+              variant="danger-outline"
+              size="sm"
+              className="shrink-0"
               data-testid="delete-account-btn"
             >
               <Trash2 className="w-4 h-4" aria-hidden="true" />
               Delete my account
-            </button>
+            </Button>
           )}
         </div>
 
@@ -336,31 +344,33 @@ function PrivacySettingsPage() {
               <li>Cancel any pending exports</li>
             </ul>
             <div className="flex gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={requestDeletion}
                 disabled={busy}
-                className="btn-danger btn-sm"
+                variant="danger"
+                size="sm"
                 data-testid="confirm-delete-btn"
               >
                 {busy ? 'Scheduling…' : 'Yes, schedule deletion'}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
                 onClick={() => setConfirmDelete(false)}
                 disabled={busy}
-                className="btn-secondary btn-sm"
+                variant="secondary"
+                size="sm"
                 data-testid="cancel-confirm-btn"
               >
                 <X className="w-3 h-3" aria-hidden="true" />
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         )}
       </section>
 
-      <section className="glass-panel p-5">
+      <section className="card p-5">
         <h2 className="font-semibold flex items-center gap-2 mb-2">
           <CheckCircle2 className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Your rights
@@ -369,7 +379,7 @@ function PrivacySettingsPage() {
           <li>Read our <Link to="/legal/privacy" className="text-bh-accent hover:underline">Privacy Policy</Link></li>
           <li>Read our <Link to="/legal/terms" className="text-bh-accent hover:underline">Terms of Service</Link></li>
           <li>Read our <Link to="/legal/cookies" className="text-bh-accent hover:underline">Cookie Policy</Link></li>
-          <li>Email <a href="mailto:privacy@builderhunt.dev" className="text-bh-accent hover:underline">privacy@builderhunt.dev</a> for any privacy request</li>
+          <li>Email <a href="mailto:privacy@builderhunt.dev" className="text-bh-accent underline">privacy@builderhunt.dev</a> for any privacy request</li>
         </ul>
       </section>
     </div>

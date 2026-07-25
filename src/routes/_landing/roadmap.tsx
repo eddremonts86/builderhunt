@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle2, Circle, Loader2, ArrowUp, Calendar } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 interface RoadmapItem {
   id: string
@@ -116,19 +117,19 @@ function RoadmapPage() {
                       </span>
                     )}
                     {col.key !== 'shipped' && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => vote(item.id)}
                         disabled={voting === item.id}
-                        className={`btn-sm ml-auto ${
-                          item.userHasVoted ? 'btn-primary' : 'btn-secondary'
-                        }`}
+                        variant={item.userHasVoted ? 'primary' : 'secondary'}
+                        size="sm"
+                        className="ml-auto"
                         data-testid="roadmap-vote-btn"
                         data-item-id={item.id}
                       >
                         <ArrowUp className="w-3 h-3" aria-hidden="true" />
                         {item.voteCount}
-                      </button>
+                      </Button>
                     )}
                     {col.key === 'shipped' && (
                       <span className="ml-auto text-xs text-bh-success">

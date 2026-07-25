@@ -4,7 +4,7 @@ export function BrandLogoMark({ size = 22 }: { size?: number }) {
   return (
     <span
       className="inline-flex items-center justify-center rounded-md shrink-0"
-      style={{ width: size, height: size, background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+      style={{ width: size, height: size, background: 'linear-gradient(135deg, #e07338, #ca5d25)' }}
       aria-hidden="true"
     >
       <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">

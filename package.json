@@ -16,6 +16,7 @@
     "test:security": "vitest run test/security",
     "test:rls": "pnpm test:rls:local",
     "test:e2e": "playwright test",
+    "test:a11y": "node test/test-accessibility.mjs",
     "db:up": "docker inspect workspace-postgres --format '{{.State.Running}}' 2>/dev/null | grep -q true || docker compose --profile standalone up -d db",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",
@@ -74,6 +75,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
     "@fontsource-variable/inter": "^5.3.0",
     "@fontsource-variable/jetbrains-mono": "^5.3.0",

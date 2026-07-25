@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { ArrowLeft, Calendar, Tag } from 'lucide-react'
+import { LinkButton } from '~/components/ui/link'
 
 interface ChangelogEntry {
   id: string
@@ -59,16 +60,16 @@ function ChangelogDetail() {
       <div className="p-8 max-w-3xl mx-auto text-center">
         <h1 className="text-2xl font-bold mb-2">Entry not found</h1>
         <p className="text-bh-text-muted mb-4">No changelog entry with slug "{slug}".</p>
-        <Link to="/changelog" className="btn-secondary inline-flex">Back to changelog</Link>
+        <LinkButton to="/changelog" variant="secondary" className="inline-flex">Back to changelog</LinkButton>
       </div>
     )
   }
 
   return (
     <article className="p-8 max-w-3xl mx-auto">
-      <Link to="/changelog" className="btn-ghost btn-sm mb-6 inline-flex">
+      <LinkButton to="/changelog" variant="ghost" size="sm" className="mb-6 inline-flex">
         <ArrowLeft className="w-3.5 h-3.5" /> All changelog
-      </Link>
+      </LinkButton>
 
       <header className="mb-8">
         <div className="flex items-center gap-2 mb-3 flex-wrap">

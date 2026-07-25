@@ -12,7 +12,14 @@ export function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body suppressHydrationWarning className="bg-app min-h-screen">
         <a href="#main-content" className="skip-link">Skip to main content</a>
-        {children}
+        {/* The one universal skip-link target for the whole app — routed
+            layouts (landing, dashboard, onboarding) must not declare their
+            own `id="main-content"`; this is the sole owner so activating the
+            skip link always moves focus here, regardless of which layout is
+            mounted. */}
+        <div id="main-content" tabIndex={-1} className="outline-none">
+          {children}
+        </div>
         <CookieBanner />
         <TosModal />
         <HydrationSignal />

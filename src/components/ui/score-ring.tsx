@@ -90,7 +90,7 @@ export function ScoreRing({ score, size = 56, showLabel = true, breakdown }: Sco
           </g>
         </svg>
         <div
-          className="absolute inset-0 flex items-center justify-center font-bold pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center font-bold font-display pointer-events-none"
           style={{ fontSize: size * 0.32, color: 'var(--bh-text)' }}
         >
           {Math.round(clamped)}

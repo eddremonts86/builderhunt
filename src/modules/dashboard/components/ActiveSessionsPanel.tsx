@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Laptop, LogOut, ShieldAlert, Sparkles } from 'lucide-react'
 import { authClient } from '~/shared/lib/auth/client'
+import { Button } from '~/components/ui'
 
 export interface ActiveSessionEntry {
   id: string
@@ -97,7 +98,7 @@ export function ActiveSessionsPanel() {
   }
 
   return (
-    <section className="glass-panel p-5" data-testid="active-sessions-panel">
+    <section className="card p-5" data-testid="active-sessions-panel">
       <div className="flex items-start justify-between gap-4 mb-4">
         <div>
           <h2 className="font-semibold flex items-center gap-2">
@@ -109,16 +110,18 @@ export function ActiveSessionsPanel() {
           </p>
         </div>
         {sessions && sessions.length > 1 && (
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={signOutOthers}
             disabled={busyAll}
-            className="btn-secondary btn-sm shrink-0"
+            className="shrink-0"
             data-testid="sign-out-others-btn"
           >
             <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
             {busyAll ? 'Signing out…' : 'Sign out everywhere else'}
-          </button>
+          </Button>
         )}
       </div>
 
@@ -168,15 +171,17 @@ export function ActiveSessionsPanel() {
                 </p>
               </div>
               {!entry.isCurrent && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => signOutSession(entry.token)}
                   disabled={busyToken === entry.token}
-                  className="btn-ghost btn-sm shrink-0"
+                  className="shrink-0"
                   data-testid={`sign-out-btn-${entry.id}`}
                 >
                   {busyToken === entry.token ? 'Signing out…' : 'Sign out'}
-                </button>
+                </Button>
               )}
             </li>
           ))}

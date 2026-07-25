@@ -7,6 +7,7 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
+import { clampRightAnchoredPanel } from '~/shared/lib/floatingPanel'
 import { Input } from '~/components/ui'
 import { canManageTeamSettings, type OrganizationRole } from '~/shared/lib/organizations/contracts'
 
@@ -53,7 +54,11 @@ export function OrganizationSwitcher() {
     // animation on the `transform` property itself, which overrides any
     // static inline transform value for the entire lifetime of the element
     // (fill-mode `both`), silently discarding a positioning translate.
-    setCoords({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
+    // Clamped so a trigger near the viewport's left edge (narrow phones)
+    // can't push the panel's own left edge off-screen.
+    const rawRight = window.innerWidth - rect.right
+    const panelWidth = panelRef.current?.getBoundingClientRect().width ?? 0
+    setCoords({ top: rect.bottom + 8, right: clampRightAnchoredPanel(rawRight, panelWidth) })
   }, [])
 
   React.useEffect(() => {
@@ -161,11 +166,15 @@ export function OrganizationSwitcher() {
       aria-haspopup="menu"
       aria-expanded={open}
       aria-label="Switch organization"
-      className={`relative z-10 flex items-center gap-1.5 h-9 pl-2.5 pr-2 rounded-full text-xs font-semibold text-bh-text-dim hover:text-bh-text hover:bg-bh-bg-alt ${ICON_TRANSITION}`}
+      className={`relative z-10 flex items-center gap-1.5 h-9 pl-2.5 pr-2 md:pr-2 rounded-full text-xs font-semibold text-bh-text-dim hover:text-bh-text hover:bg-bh-bg-alt ${ICON_TRANSITION}`}
     >
       <Building2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-      <span className="max-w-[120px] truncate">{activeOrganization?.name ?? 'Select organization'}</span>
-      <ChevronDown className="w-3 h-3 shrink-0" aria-hidden="true" />
+      {/* Below `md`, the topbar is already tight (logo, dashboard pill,
+          hamburger, theme toggle, this, and the account menu all need to
+          fit) — collapse to an icon-only trigger there, same as the
+          account menu is already icon/avatar-only at every size. */}
+      <span className="hidden md:inline max-w-[120px] truncate">{activeOrganization?.name ?? 'Select organization'}</span>
+      <ChevronDown className="hidden md:block w-3 h-3 shrink-0" aria-hidden="true" />
     </button>
   )
 

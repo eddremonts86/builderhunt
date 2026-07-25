@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { AlertTriangle, ArrowRight, Loader2, XCircle } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 /**
  * Preview and confirm a subscription plan change (plans/stripe-billing-platform/tasks.md §7
@@ -92,7 +93,7 @@ export function PlanChangePreview({ newCatalogKey, onChanged, onCancel }: PlanCh
 
   if (previewQuery.isLoading) {
     return (
-      <div className="glass-panel p-5 flex items-center gap-2 text-sm text-bh-text-muted" data-testid="plan-change-preview-loading">
+      <div className="card p-5 flex items-center gap-2 text-sm text-bh-text-muted" data-testid="plan-change-preview-loading">
         <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
         Loading preview…
       </div>
@@ -101,7 +102,7 @@ export function PlanChangePreview({ newCatalogKey, onChanged, onCancel }: PlanCh
 
   if (previewQuery.isError || !previewQuery.data) {
     return (
-      <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-5 text-sm text-bh-danger" data-testid="plan-change-preview-error">
+      <div className="card border-bh-danger/30 bg-bh-danger/5 p-5 text-sm text-bh-danger" data-testid="plan-change-preview-error">
         <XCircle className="w-4 h-4 inline-block mr-2" aria-hidden="true" />
         {previewQuery.error instanceof Error ? previewQuery.error.message : 'Failed to load preview'}
       </div>
@@ -112,9 +113,9 @@ export function PlanChangePreview({ newCatalogKey, onChanged, onCancel }: PlanCh
   const blocked = Boolean(preview.seatBlocker)
 
   return (
-    <section className="glass-panel p-5" data-testid="plan-change-preview">
+    <section className="card p-5" data-testid="plan-change-preview">
       {preview.seatBlocker && (
-        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-warning" data-testid="plan-change-seat-blocker">
+        <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-warning" data-testid="plan-change-seat-blocker">
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
           <p>
             You have <strong>{preview.seatBlocker.currentSeatsUsed}</strong> seats in use, but this plan only
@@ -156,20 +157,21 @@ export function PlanChangePreview({ newCatalogKey, onChanged, onCancel }: PlanCh
       )}
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
-          className="btn-primary btn-sm"
+          variant="primary"
+          size="sm"
           data-testid="plan-change-confirm"
           disabled={blocked || changeMutation.isPending}
           onClick={() => changeMutation.mutate(preview)}
         >
           {changeMutation.isPending ? 'Confirming…' : preview.timing === 'immediate' ? 'Confirm and pay' : 'Schedule change'}
           <ArrowRight className="w-3 h-3" aria-hidden="true" />
-        </button>
+        </Button>
         {onCancel && (
-          <button type="button" className="btn-secondary btn-sm" data-testid="plan-change-cancel" onClick={onCancel}>
+          <Button type="button" variant="secondary" size="sm" data-testid="plan-change-cancel" onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </section>

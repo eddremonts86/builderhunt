@@ -39,7 +39,7 @@ function SelectContent({
         position={position}
         style={{ zIndex: FLOATING_UI_Z }}
         className={cn(
-          'glass-panel relative max-h-96 min-w-[8rem] overflow-hidden p-1 animate-fade-in-up',
+          'card relative max-h-96 min-w-[8rem] overflow-hidden p-1 animate-fade-in-up',
           position === 'popper' &&
             'data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1 w-[var(--radix-select-trigger-width)]',
           className,

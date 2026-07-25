@@ -25,3 +25,7 @@ blob-report/
 # keep it out of the repo to avoid masking real leaks.
 e2e/harness/.e2e-run-id
 e2e/harness/.e2e-leftovers.log
+
+# test:a11y sanitized run artifacts (route/rule/selector only, but still
+# machine-generated output, not source).
+test/artifacts/

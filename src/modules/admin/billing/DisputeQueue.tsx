@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Button, Input, Label } from '~/components/ui'
+import { ErrorState } from '~/shared/components/ErrorState'
 
 interface DisputeRow {
   id: string
@@ -73,39 +74,39 @@ export function DisputeQueue() {
         </Button>
       </div>
 
-      {error && (
-        <div className="p-2.5 rounded border border-bh-danger/30 bg-bh-danger/5 text-sm text-bh-danger" role="alert">{error}</div>
-      )}
+      {error && <ErrorState message={error} icon={false} />}
 
       {disputes && disputes.length === 0 && (
         <p className="text-sm text-bh-text-muted">No disputes for this organization.</p>
       )}
 
       {disputes && disputes.length > 0 && (
-        <table className="w-full text-sm" data-testid="dispute-queue-table">
-          <thead>
-            <tr className="text-left text-bh-text-dim border-b border-bh-border">
-              <th className="py-2">Reason</th>
-              <th className="py-2">Amount</th>
-              <th className="py-2">Stripe status</th>
-              <th className="py-2">Outcome</th>
-              <th className="py-2">Evidence due</th>
-              <th className="py-2">Opened</th>
-            </tr>
-          </thead>
-          <tbody>
-            {disputes.map((dispute) => (
-              <tr className="border-b border-bh-border/50" key={dispute.id} data-testid={`dispute-row-${dispute.id}`}>
-                <td className="py-2">{dispute.reason ?? '—'}</td>
-                <td className="py-2">{formatUsd(dispute.amountCents)}</td>
-                <td className="py-2">{dispute.stripeStatus}</td>
-                <td className={`py-2 font-medium ${outcomeBadgeClass(dispute.outcome)}`}>{dispute.outcome}</td>
-                <td className="py-2">{dispute.evidenceDueBy ? new Date(dispute.evidenceDueBy).toLocaleString() : '—'}</td>
-                <td className="py-2">{new Date(dispute.createdAt).toLocaleString()}</td>
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Disputes table, scrollable">
+          <table className="w-full text-sm" data-testid="dispute-queue-table">
+            <thead>
+              <tr className="text-left text-bh-text-dim border-b border-bh-border">
+                <th className="py-2 px-2 whitespace-nowrap">Reason</th>
+                <th className="py-2 px-2 whitespace-nowrap">Amount</th>
+                <th className="py-2 px-2 whitespace-nowrap">Stripe status</th>
+                <th className="py-2 px-2 whitespace-nowrap">Outcome</th>
+                <th className="py-2 px-2 whitespace-nowrap">Evidence due</th>
+                <th className="py-2 px-2 whitespace-nowrap">Opened</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {disputes.map((dispute) => (
+                <tr className="border-b border-bh-border/50" key={dispute.id} data-testid={`dispute-row-${dispute.id}`}>
+                  <td className="py-2 px-2 whitespace-nowrap">{dispute.reason ?? '—'}</td>
+                  <td className="py-2 px-2 whitespace-nowrap">{formatUsd(dispute.amountCents)}</td>
+                  <td className="py-2 px-2 whitespace-nowrap">{dispute.stripeStatus}</td>
+                  <td className={`py-2 px-2 whitespace-nowrap font-medium ${outcomeBadgeClass(dispute.outcome)}`}>{dispute.outcome}</td>
+                  <td className="py-2 px-2 whitespace-nowrap">{dispute.evidenceDueBy ? new Date(dispute.evidenceDueBy).toLocaleString() : '—'}</td>
+                  <td className="py-2 px-2 whitespace-nowrap">{new Date(dispute.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   )

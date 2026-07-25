@@ -28,7 +28,7 @@ import {
   StackOverflowIcon,
 } from '~/modules/landing/components/BrandIcons'
 import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
-import { Input } from '~/components/ui'
+import { Button, Input, LinkButton } from '~/components/ui'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
@@ -273,10 +273,10 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                   data-testid="explore-input"
                 />
               </div>
-              <button type="submit" className="btn-primary min-h-12 whitespace-nowrap px-6" data-testid="explore-submit">
+              <Button type="submit" className="min-h-12 whitespace-nowrap px-6" data-testid="explore-submit">
                 Search builders
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </button>
+              </Button>
             </div>
           </form>
         </div>
@@ -340,10 +340,10 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                 <h2 id="explore-featured-title" className="mt-2 text-2xl font-bold tracking-tight text-bh-text">Builders worth discovering</h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-bh-text-muted">A live sample of maintainers and contributors found across the open web.</p>
               </div>
-              <Link to="/explore" search={{ q: FEATURED_QUERY }} className="btn-secondary whitespace-nowrap self-start md:self-auto">
+              <LinkButton to="/explore" search={{ q: FEATURED_QUERY }} variant="secondary" className="whitespace-nowrap self-start md:self-auto">
                 View all maintainers
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
+              </LinkButton>
             </div>
 
             {featured.length > 0 ? (
@@ -376,15 +376,16 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
             </div>
             <div className="flex max-w-2xl flex-wrap gap-2">
               {POPULAR_QUERIES.map((popularQuery) => (
-                <Link
+                <LinkButton
                   key={popularQuery}
                   to="/explore"
                   search={{ q: popularQuery }}
-                  className="btn-secondary btn-sm"
+                  variant="secondary"
+                  size="sm"
                   data-testid={`explore-popular-${popularQuery.replace(/\s+/g, '-')}`}
                 >
                   {popularQuery}
-                </Link>
+                </LinkButton>
               ))}
             </div>
           </section>
@@ -446,9 +447,9 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
               <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-bh-text-muted">Use a technology, role, or community instead of a very specific phrase.</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 {POPULAR_QUERIES.slice(0, 3).map((popularQuery) => (
-                  <Link key={popularQuery} to="/explore" search={{ q: popularQuery }} className="btn-secondary btn-sm">
+                  <LinkButton key={popularQuery} to="/explore" search={{ q: popularQuery }} variant="secondary" size="sm">
                     {popularQuery}
-                  </Link>
+                  </LinkButton>
                 ))}
               </div>
             </div>

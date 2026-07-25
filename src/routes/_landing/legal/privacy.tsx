@@ -23,7 +23,7 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
           <li><strong>Workspace data:</strong> saved searches, saved builders, private notes per builder, alerts, exports.</li>
           <li><strong>Claim data:</strong> if you claim a builder profile, your email and a one-time token. We never store the token after use.</li>
           <li><strong>Usage data:</strong> server logs (IP address, user agent, page path, response code) for 30 days. We use these for abuse prevention and capacity planning.</li>
-          <li><strong>Cookies:</strong> see our <Link to="/legal/cookies" className="text-bh-accent hover:underline">Cookie Policy</Link>.</li>
+          <li><strong>Cookies:</strong> see our <Link to="/legal/cookies" className="text-bh-accent underline">Cookie Policy</Link>.</li>
         </ul>
       </>
     ),

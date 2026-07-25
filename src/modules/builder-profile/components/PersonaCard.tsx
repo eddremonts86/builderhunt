@@ -10,6 +10,7 @@ import * as React from 'react'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import type { BuilderAIEnrichment } from '~/shared/lib/ai/enrichment'
+import { Button } from '~/components/ui'
 
 interface PersonaCardProps {
   builderId: string
@@ -99,16 +100,18 @@ export function PersonaCard({ builderId, canRefresh = false }: PersonaCardProps)
           AI Persona
         </h3>
         {canRefresh && (state.kind === 'ready' || state.kind === 'error') && (
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => load({ refresh: true })}
             disabled={refreshing}
-            className="btn-ghost btn-sm text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+            className="text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
             data-testid="persona-refresh"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
             Refresh
-          </button>
+          </Button>
         )}
       </div>
 

@@ -48,7 +48,7 @@ function CookiesPage() {
         </p>
 
         <h2 className="text-lg font-semibold text-bh-text mb-3">Cookies in use</h2>
-        <div className="card overflow-x-auto mb-8 p-0">
+        <div className="card table-scroll mb-8 p-0" tabIndex={0} role="region" aria-label="Cookies table, scrollable">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">

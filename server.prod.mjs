@@ -8,6 +8,11 @@ import { createServer } from 'node:http';
 import { extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// The single source of truth for security headers and the CSRF mutation-origin gate.
+// Plain ESM, and copied into the runtime image by the Dockerfile, precisely so this
+// entrypoint and the test suite share one implementation instead of drifting copies.
+import { isTrustedMutationOrigin, securityHeaderEntries } from './server/security.mjs';
+
 // Load .env.docker before any other modules (must happen before the dynamic import)
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const envPath = join(__dirname, '.env.docker');
@@ -33,19 +38,10 @@ const HOST = process.env.HOST ?? '0.0.0.0';
 const PUBLIC_ORIGIN = new URL(process.env.APP_URL ?? `http://localhost:${PORT}`);
 
 function securityHeaders() {
-  const headers = {
-    'Content-Security-Policy': "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; upgrade-insecure-requests",
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=()',
-    'Cross-Origin-Opener-Policy': 'same-origin',
-    'Cross-Origin-Resource-Policy': 'same-origin',
-  };
-  if (process.env.NODE_ENV === 'production' && PUBLIC_ORIGIN.protocol === 'https:') {
-    headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains';
-  }
-  return headers;
+  return securityHeaderEntries({
+    production: process.env.NODE_ENV === 'production',
+    secure: PUBLIC_ORIGIN.protocol === 'https:',
+  });
 }
 
 console.error('[server] Starting with env:', {
@@ -121,17 +117,10 @@ const server = createServer(async (req, res) => {
     }
   }
 
-  const hasCookie = typeof req.headers.cookie === 'string' && req.headers.cookie.length > 0;
-  const unsafeMethod = !['GET', 'HEAD', 'OPTIONS'].includes(req.method ?? 'GET');
-  if (hasCookie && unsafeMethod) {
-    const origin = req.headers.origin;
-    let trusted;
-    try { trusted = typeof origin === 'string' && new URL(origin).origin === PUBLIC_ORIGIN.origin; } catch { trusted = false; }
-    if (!trusted) {
-      res.writeHead(403, { ...securityHeaders(), 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 403, message: 'Forbidden' }));
-      return;
-    }
+  if (!isTrustedMutationOrigin(req, PUBLIC_ORIGIN.href)) {
+    res.writeHead(403, { ...securityHeaders(), 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ status: 403, message: 'Forbidden' }));
+    return;
   }
 
   const headers = new Headers();

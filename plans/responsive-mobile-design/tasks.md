@@ -1,9 +1,13 @@
 # Responsive Mobile Design — Tasks
 
-> **Status**: `pending`
+> **Status**: `partially-implemented`
 > **Depends on**: nothing
 > **Reality check**: see `spec.md` for the live-verified audit this plan is based on. Device matrix
-> (use for every "Verify" step below): 375×667, 390×844, 430×932, 768×1024, 1024×768.
+> (use for every "Verify" step below): 375×667, 390×844, 430×932, 768×1024, 1024×768. Phases 0-3
+> implemented and verified live (Browser tool, seeded admin). Phase 4's Dialog check and Phase 5's
+> sweep were done primarily at 375×667 with a 768×1024 spot check, not literally every page at all
+> 5 sizes — see `docs/design/responsive-qa-checklist.md` for what's covered vs. still open (sprint
+> wizard steps 2-3 need a live check with a real AI-processed sprint run).
 
 Execute top-to-bottom. Phase 1 is the highest-priority phase — it fixes the shared shell every
 authenticated page renders through — and should land before the later phases' component sweeps,
@@ -12,7 +16,7 @@ this phase touches.
 
 ## Phase 0 — Decide the mobile nav pattern
 
-- [ ] **Confirm the collapsed-nav approach**
+- [x] **Confirm the collapsed-nav approach**
   - Files: `plans/responsive-mobile-design/spec.md` (update the "Mobile nav decision" section with
     the final call)
   - Do: validate the spec's recommended default (hamburger sheet for Search/Sprints/Exports/Alerts,
@@ -25,7 +29,7 @@ this phase touches.
 
 ## Phase 1 — Dashboard shell (blocks: every other authenticated page's nav)
 
-- [ ] **Rebuild `DashboardLayout` topbar for narrow viewports**
+- [x] **Rebuild `DashboardLayout` topbar for narrow viewports**
   - Files: `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
   - Do: below `md` (768px), collapse `Search`/`Sprints`/`Exports`/`Alerts` into the Phase 0-decided
     pattern (hamburger/sheet by default); keep `Dashboard`'s home-anchor pill, `OrganizationSwitcher`,
@@ -39,7 +43,7 @@ this phase touches.
     reachable by tap at 375×667 (the tightest size) with no horizontal scroll needed for primary
     nav. Confirm ≥1024px desktop layout is pixel-unchanged (screenshot diff by eye).
 
-- [ ] **Clamp floating panel positioning to the viewport**
+- [x] **Clamp floating panel positioning to the viewport**
   - Files: `src/modules/dashboard/components/OrganizationSwitcher.tsx`,
     `src/modules/dashboard/components/UserMenu.tsx`
   - Do: both components' `reposition()` computes `right: window.innerWidth - rect.right` with no
@@ -53,7 +57,7 @@ this phase touches.
 
 ## Phase 2 — Data-heavy components (tables)
 
-- [ ] **Wrap admin billing tables for horizontal scroll**
+- [x] **Wrap admin billing tables for horizontal scroll**
   - Files: `src/modules/admin/billing/DisputeQueue.tsx`, `src/modules/admin/billing/RefundQueue.tsx`
   - Do: wrap both `<table>` elements in an `overflow-x-auto` container (matching the one existing
     precedent for this pattern, `DashboardLayout`'s topbar, but here it's the *correct* use of the
@@ -63,8 +67,12 @@ this phase touches.
   - Verify: at 375×667 and 768×1024, confirm both tables scroll horizontally with a visible hint,
     and that no column silently clips without a way to reach it.
 
-- [ ] **Sweep for other unwrapped wide content**
-  - Files: TBD — output of the sweep below
+- [x] **Sweep for other unwrapped wide content**
+  - Files: `src/routes/_dashboard/admin/users.tsx`, `src/routes/_landing/pricing.tsx` (2 tables),
+    `src/routes/_landing/legal/cookies.tsx` — upgraded to `.table-scroll` +
+    `tabIndex`/`role="region"`/`aria-label`. Also found and fixed a real page-level overflow bug on
+    `/builder/$builderId` (see the flexbox `min-w-0` gotcha in `docs/design/responsive-qa-checklist.md`)
+    — not a "wide fixed-width element" but the same overflow symptom, caught by the same sweep.
   - Do: grep `src/modules` and `src/routes` for any other raw `<table>`, or any fixed-width
     (`w-[…px]`, `min-w-[…px]` beyond the two floating-menu cases already fixed in Phase 1) elements
     that could overflow a 375px viewport; visually spot-check each hit at 375×667. Fix any genuine
@@ -75,7 +83,7 @@ this phase touches.
 
 ## Phase 3 — Forms & compound control rows
 
-- [ ] **Fix the search input/button/filter row**
+- [x] **Fix the search input/button/filter row**
   - Files: `src/modules/search/components/SearchPage.tsx` (the `flex gap-2` row at the keyword input)
   - Do: below `sm`, either stack the Search button and semantic-search toggle/filter icon below the
     input, or shrink the input's reserved right-padding (`pr-32`) so typed text isn't crowded out —
@@ -85,21 +93,23 @@ this phase touches.
   - Verify: at 375×667, type a realistic query ("rust async runtime") and confirm the full text
     remains visible and editable, with the Search button still reachable without scrolling the row.
 
-- [ ] **Sweep settings/onboarding/builder-profile pages for the same compound-row pattern**
-  - Files: `src/routes/_dashboard/settings/{team,billing,privacy}.tsx`,
-    `src/modules/dashboard` onboarding components, builder profile page — exact file list is the
-    output of this sweep
+- [x] **Sweep settings/onboarding/builder-profile pages for the same compound-row pattern**
+  - Files: `src/routes/_dashboard/settings/{team,billing,privacy}.tsx` (checked live, no compound-row
+    issue found — invite/export/danger-zone controls already stack), builder profile page (real
+    overflow bug found and fixed — see `min-w-0` gotcha, a flex-overflow issue rather than a
+    compound-row one, caught by the same live pass)
   - Do: visually check each at 375×667 and 768×1024 for the same "multiple controls forced into one
     non-stacking flex row" pattern found in `SearchPage.tsx`; apply the same stacking fix where found.
   - Verify: screenshot each swept page at 375×667; no clipped text, every control tappable.
 
 ## Phase 4 — Modals, dialogs, and the sprint wizard
 
-- [ ] **Confirm shadcn Dialog + sprint wizard remain correct at narrow widths**
-  - Files: `src/shared/components/Dialog.tsx` (or its shadcn equivalent), sprint wizard step
-    components under `src/modules` (already spot-checked as reflowing correctly at step 1 — this
-    task extends that check to steps 2-3 and any other modal-driven flows: delete confirmations,
-    admin action modals, etc.)
+- [x] **Confirm shadcn Dialog + sprint wizard remain correct at narrow widths**
+  - Files: `src/components/ui/dialog.tsx` — confirmed live at 375×667 (SearchPage's "Sources &
+    filters" dialog): full-width, no clipping, scrolls internally, close button reachable. Sprint
+    wizard step 1 confirmed correct at 375×667. Steps 2-3 need real AI processing to reach and were
+    **not** exercised (would trigger a real Chrome-AI/MiniMax sprint run) — flagged as a follow-up
+    in `docs/design/responsive-qa-checklist.md` rather than faked.
   - Do: this is a lighter-touch verification task since the wizard's step 1 already reflows
     correctly today — the goal is confirming steps 2-3 and other dialogs don't regress that, not a
     rebuild. Fix only what's actually found broken.
@@ -107,17 +117,21 @@ this phase touches.
 
 ## Phase 5 — Confirmation sweep + regression guard
 
-- [ ] **Full device-matrix pass across every representative page**
-  - Files: none (verification-only task)
-  - Do: using the iOS Simulator and Browser tool `resize_window`, walk the full page set — landing
-    home, auth (sign-in/sign-up/forgot/reset), dashboard overview, search, sprints (list + wizard),
-    exports, alerts, settings (team/billing/privacy), admin (metrics/users/plan-requests/incidents/
-    changelog/roadmap/refunds/disputes/billing-ops), builder profile, onboarding — at all 5
-    device-matrix sizes. Fix anything found that earlier phases didn't already cover.
+- [x] **Full device-matrix pass across every representative page**
+  - Files: none (verification-only task); one real bug found and fixed (builder-profile `min-w-0`)
+  - Do: walked landing home, auth (sign-in/sign-up), dashboard, search, sprints (list + wizard step
+    1), exports, alerts, settings (team/billing/privacy/security), admin (users, incidents, roadmap),
+    builder profile, onboarding (welcome), explore, pricing, legal/cookies — primarily at 375×667
+    (`document.documentElement.scrollWidth === window.innerWidth` check + screenshot), with a
+    768×1024 spot check on the dashboard confirming the `md` breakpoint flips correctly and desktop
+    is unchanged. Did **not** literally re-run all 5 sizes × every page (390×844/430×932/1024×768
+    weren't separately exercised) — this is an honest partial pass, not exhaustive; the Known Gotcha
+    in `docs/design/responsive-qa-checklist.md` is the highest-value catch from it. The iOS Simulator
+    (real WebKit) pass mentioned in the plan was not run this session.
   - Verify: no clipped content, no horizontal scroll outside the two intentional table wrappers, no
     control unreachable by tap, at any of the 5 sizes, on any page in this list.
 
-- [ ] **Write the repeatable QA checklist**
+- [x] **Write the repeatable QA checklist**
   - Files: `docs/design/responsive-qa-checklist.md` (new)
   - Do: capture the device matrix, the page list from the task above, and the specific
     tools/commands used to check them (iOS Simulator `open_url`/`screenshot`, Browser tool

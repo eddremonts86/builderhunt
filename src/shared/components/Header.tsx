@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useLocation } from '@tanstack/react-router'
-import { LinkButton } from '~/components/ui'
+import { Button, LinkButton } from '~/components/ui'
 import { LayoutDashboard, LogOut } from 'lucide-react'
 import { useSession, signOut } from '~/shared/lib/auth/client'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
@@ -86,14 +86,15 @@ export function Header() {
         <ThemeToggle />
         {isAuthed ? (
           <>
-            <LinkButton to="/dashboard" variant="secondary" className="btn-sm">
+            <LinkButton to="/dashboard" variant="secondary" size="sm">
               <LayoutDashboard className="w-4 h-4" /> Dashboard
             </LinkButton>
-            <button
+            <Button
               type="button"
               onClick={handleSignOut}
               disabled={signingOut}
-              className="btn-ghost btn-sm"
+              variant="ghost"
+              size="sm"
               aria-label="Sign out"
             >
               {signingOut ? (
@@ -102,12 +103,12 @@ export function Header() {
                 <LogOut className="w-4 h-4" aria-hidden="true" />
               )}
               <span className="hidden sm:inline">Sign out</span>
-            </button>
+            </Button>
           </>
         ) : (
           <>
             <LinkButton to="/auth/sign-in" variant="ghost" className="hidden sm:inline-flex">Sign in</LinkButton>
-            <LinkButton to="/auth/sign-up" variant="primary" className="btn-sm">Get started</LinkButton>
+            <LinkButton to="/auth/sign-up" variant="primary" size="sm">Get started</LinkButton>
           </>
         )}
       </div>

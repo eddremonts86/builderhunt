@@ -1,6 +1,8 @@
 import * as React from 'react'
 import { AlertTriangle, Zap } from 'lucide-react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
+import { LoadingState } from '~/shared/components/LoadingState'
+import { ErrorState } from '~/shared/components/ErrorState'
 
 interface PackOption {
   key: string
@@ -122,13 +124,17 @@ export function AutoRechargeSettings() {
   }
 
   if (loading) {
-    return <div className="glass-panel p-5 text-sm text-bh-text-muted">Loading auto-recharge…</div>
+    return (
+      <div className="card p-5">
+        <LoadingState message="Loading auto-recharge…" />
+      </div>
+    )
   }
 
   const isPaused = rule?.state === 'paused_needs_auth' || rule?.state === 'paused_failed'
 
   return (
-    <section className="glass-panel p-5" data-testid="auto-recharge-settings">
+    <section className="card p-5" data-testid="auto-recharge-settings">
       <h2 className="font-semibold mb-1 flex items-center gap-2">
         <Zap className="w-4 h-4 text-bh-accent" aria-hidden="true" />
         Auto-recharge
@@ -137,11 +143,7 @@ export function AutoRechargeSettings() {
         Automatically buy a credit pack when your balance runs low. Off by default — at most 3 charges or $1,000 per 24 hours, shared with manual pack purchases.
       </p>
 
-      {error && (
-        <div className="mb-4 p-2.5 rounded border border-bh-danger/30 bg-bh-danger/5 text-xs text-bh-danger" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <ErrorState message={error} icon={false} className="mb-4" />}
 
       {isPaused && (
         <div className="mb-4 p-3 rounded border border-bh-warning/30 bg-bh-warning/5 text-sm" data-testid="auto-recharge-paused">

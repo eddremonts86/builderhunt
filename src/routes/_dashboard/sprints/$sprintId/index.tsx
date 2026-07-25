@@ -6,6 +6,7 @@ import { ai } from '~/shared/lib/ai/client'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor, type SprintFilter } from '~/shared/lib/sprints-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button } from '~/components/ui/button'
 
 export const Route = createFileRoute('/_dashboard/sprints/$sprintId/')({
   beforeLoad: async () => {
@@ -166,7 +167,7 @@ function SprintDossierPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_220px] gap-6">
         <div>
-          <div className="glass-panel p-4 mb-4 space-y-3">
+          <div className="card p-4 mb-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <Input
                 value={keywordInput}
@@ -197,7 +198,7 @@ function SprintDossierPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <button type="button" onClick={applyFilters} className="btn-secondary px-3 py-2 text-sm">Apply</button>
+              <Button type="button" onClick={applyFilters} variant="secondary" className="px-3 py-2 text-sm">Apply</Button>
             </div>
             <div className="flex items-center gap-2">
               <Input
@@ -208,16 +209,17 @@ function SprintDossierPage() {
                 className="flex-1 text-sm"
                 data-testid="sprint-refine-input"
               />
-              <button
+              <Button
                 type="button"
                 onClick={refine}
                 disabled={refining}
-                className="btn-secondary inline-flex items-center gap-1.5 px-3 py-2 text-sm"
+                variant="secondary"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-sm"
                 data-testid="sprint-refine-button"
               >
                 {refining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 Refine
-              </button>
+              </Button>
             </div>
             {refineHistory.length > 0 && (
               <ul className="space-y-2 max-h-48 overflow-y-auto" data-testid="sprint-refine-history">
@@ -256,15 +258,16 @@ function SprintDossierPage() {
                     <div className="flex-1 min-w-0">
                       <PersonResultCard builder={cardData} />
                     </div>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => track(item)}
                       disabled={isTracked}
-                      className="btn-secondary px-3 py-2 text-xs shrink-0"
+                      variant="secondary"
+                      className="px-3 py-2 text-xs shrink-0"
                       data-testid={`sprint-track-${item.id}`}
                     >
                       {isTracked ? 'Tracked' : 'Track'}
-                    </button>
+                    </Button>
                   </li>
                 )
               })}
@@ -272,7 +275,7 @@ function SprintDossierPage() {
           )}
         </div>
 
-        <aside className="glass-panel p-4 h-fit">
+        <aside className="card p-4 h-fit">
           <h2 className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim mb-2">Locations</h2>
           <ul className="space-y-1 text-sm">
             {facets.map((facet) => (

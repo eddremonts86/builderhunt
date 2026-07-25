@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { ArrowLeft, Calendar, Clock, Tag as TagIcon, ArrowRight } from 'lucide-react'
 import { getBlogPostPage } from '~/shared/lib/blog-data'
+import { LinkButton } from '~/components/ui/link'
 
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
@@ -50,10 +51,10 @@ function BlogPostPage() {
   return (
     <article className="container py-12 max-w-4xl animate-fade-in" data-testid={`blog-post-${post.slug}`}>
       <div className="card p-8 md:p-12 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm">
-        <Link to="/blog" className="btn-ghost btn-sm mb-6 inline-flex" data-testid="blog-back">
+        <LinkButton to="/blog" variant="ghost" size="sm" className="mb-6 inline-flex" data-testid="blog-back">
           <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
           All posts
-        </Link>
+        </LinkButton>
 
         <header className="mb-8">
           <div className="flex items-center gap-3 text-xs text-bh-text-dim mb-3">
@@ -91,10 +92,10 @@ function BlogPostPage() {
             <p className="text-sm text-bh-text-muted mb-4">
               Search across 12 sources, save your queries, get daily alerts.
             </p>
-            <Link to="/explore" className="btn-primary inline-flex" data-testid="blog-cta-explore">
+            <LinkButton to="/explore" variant="primary" className="inline-flex" data-testid="blog-cta-explore">
               Try the explorer
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </Link>
+            </LinkButton>
           </div>
 
           {related.length > 0 && (

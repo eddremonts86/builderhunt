@@ -6,7 +6,7 @@ import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { getAICapability } from '~/shared/lib/ai/capabilities'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 import { AIDownloadPrompt } from '~/shared/components/AIDownloadPrompt'
-import { Input, Textarea } from '~/components/ui'
+import { Button, Input, Textarea } from '~/components/ui'
 
 interface OutreachCopilotProps {
   builder: OutreachContext['builder']
@@ -141,7 +141,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex items-center justify-between w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338] focus-visible:ring-offset-2 rounded-lg"
+        className="flex items-center justify-between w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded-lg"
         data-testid="outreach-copilot-toggle"
       >
         <span className="flex items-center gap-2 text-base font-semibold text-bh-text">
@@ -163,7 +163,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               type="text"
-              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
               placeholder="Job title (e.g. Senior Rust Engineer)"
               value={jobTitle}
               onChange={e => setJobTitle(e.target.value)}
@@ -171,7 +171,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
             />
             <Input
               type="text"
-              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
               placeholder="Company name"
               value={company}
               onChange={e => setCompany(e.target.value)}
@@ -180,7 +180,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
           </div>
 
           <Textarea
-            className="w-full resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+            className="w-full resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
             rows={2}
             placeholder="Optional: short description of the role"
             value={description}
@@ -190,25 +190,27 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
 
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Outreach tone">
             {TONES.map(t => (
-              <button
+              <Button
                 key={t.value}
                 type="button"
                 role="radio"
                 aria-checked={tone === t.value}
                 onClick={() => setTone(t.value)}
-                className={`${tone === t.value ? 'btn-secondary' : 'btn-ghost'} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]`}
+                variant={tone === t.value ? 'secondary' : 'ghost'}
+                className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
                 data-testid={`outreach-tone-${t.value}`}
               >
                 {t.label}
-              </button>
+              </Button>
             ))}
           </div>
 
-          <button
+          <Button
             type="button"
+            variant="primary"
             onClick={handleGenerate}
             disabled={!canGenerate}
-            className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
             data-testid="outreach-generate"
           >
             {generating ? (
@@ -217,7 +219,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
               <Sparkles className="w-4 h-4" aria-hidden="true" />
             )}
             {generating ? 'Generating…' : 'Generate draft'}
-          </button>
+          </Button>
 
           {draft && (
             <div
@@ -249,10 +251,11 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
                 {draft.body}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-2">
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={handleCopy}
-                  className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                  className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
                   data-testid="outreach-copy"
                 >
                   {copied ? (
@@ -264,14 +267,15 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
                       <Copy className="w-4 h-4" aria-hidden="true" /> Copy to clipboard
                     </>
                   )}
-                </button>
+                </Button>
                 {mode && mode !== 'template' && (
                   <>
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => handleRevise('rewrite')}
                       disabled={revising !== null}
-                      className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
                       data-testid="outreach-rewrite"
                     >
                       {revising === 'rewrite' ? (
@@ -280,12 +284,13 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
                         <Wand2 className="w-4 h-4" aria-hidden="true" />
                       )}
                       Rewrite
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => handleRevise('shorten')}
                       disabled={revising !== null}
-                      className="btn-ghost focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e07338]"
+                      className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
                       data-testid="outreach-shorten"
                     >
                       {revising === 'shorten' ? (
@@ -294,7 +299,7 @@ export function OutreachCopilot({ builder }: OutreachCopilotProps) {
                         <Scissors className="w-4 h-4" aria-hidden="true" />
                       )}
                       Shorten
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>

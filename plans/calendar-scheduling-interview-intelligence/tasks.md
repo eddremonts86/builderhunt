@@ -337,10 +337,15 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/lib/scheduling/capability.ts` (new),
     `src/lib/scheduling/capability.test.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/session.ts` (new),
-    `src/shared/lib/security/headers.ts`, `src/shared/lib/security/headers.test.ts`
+    `server/security.mjs`, `test/security/http-security.test.ts`
   - Do: Generate/hash 256-bit secrets, validate constant-time, exchange fragment token once for
     invitation-scoped secure cookie, bind expiry/revocation, replace client history, apply no-referrer
     and strict public scheduling CSP, and implement safe replay/rotation behavior.
+    Note (2026-07-24): `server/security.mjs` now holds the ONE security-header/CSRF implementation
+    (`server.prod.mjs` imports it; the old `src/shared/lib/security/headers.ts` duplicate is
+    deleted). Its CSP is a single shared constant, so a stricter per-route scheduling CSP means
+    adding a named variant export there — do not fork a second copy. The invitation cookie is a
+    cookie-authenticated mutation surface, so it inherits the existing mutation-origin gate.
   - Verify: tests cover valid, wrong, expired, revoked, replayed, timing-safe mismatch, cookie flags,
     token absent from logs/referrer/history, and non-enumerating responses.
 

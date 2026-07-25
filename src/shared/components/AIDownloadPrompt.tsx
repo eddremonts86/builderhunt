@@ -10,6 +10,7 @@
 import * as React from 'react'
 import { Sparkles, X } from 'lucide-react'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
+import { Button } from '~/components/ui'
 
 const PREFER_SERVER_STORAGE_KEY = 'bh-ai-prefer-server'
 const DISMISSED_STORAGE_KEY = 'bh-ai-download-dismissed'
@@ -78,22 +79,25 @@ export function AIDownloadPrompt() {
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 mt-3">
-            <button
+            <Button
               type="button"
-              className="btn-primary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              size="sm"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
               onClick={handleStartDownload}
               data-testid="ai-download-start"
             >
               Enable on-device AI
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="btn-ghost btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              variant="ghost"
+              size="sm"
+              className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
               onClick={handleUseServerInstead}
               data-testid="ai-download-use-server"
             >
               Use server instead
-            </button>
+            </Button>
           </div>
         )}
       </div>

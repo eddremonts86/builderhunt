@@ -2,7 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { BookOpen, Plus, Save, X, Trash2 } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
-import { Input, Textarea } from '~/components/ui'
+import { Button, Input, Textarea } from '~/components/ui'
 
 interface ChangelogEntry {
   id: string
@@ -170,25 +170,24 @@ function AdminChangelogPage() {
             Publish product updates. Public at /changelog.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={startCreate}
-          className="btn-primary"
           data-testid="admin-changelog-new"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           New entry
-        </button>
+        </Button>
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-changelog-form">
+        <div className="card p-5 mb-6 space-y-3" data-testid="admin-changelog-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New changelog entry' : 'Edit entry'}
           </h2>
@@ -238,40 +237,38 @@ function AdminChangelogPage() {
             </label>
             <div className="flex flex-wrap gap-2">
               {TAG_OPTIONS.map((t) => (
-                <button
+                <Button
                   key={t}
                   type="button"
                   onClick={() => toggleTag(t)}
-                  className={`btn-sm ${
-                    form.tags.includes(t) ? 'btn-primary' : 'btn-secondary'
-                  }`}
+                  variant={form.tags.includes(t) ? 'primary' : 'secondary'}
+                  size="sm"
                   data-testid={`admin-changelog-tag-${t}`}
                 >
                   {t}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <button
+            <Button
               type="button"
               onClick={creatingNew ? create : update}
               disabled={saving}
-              className="btn-primary"
               data-testid="admin-changelog-save"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
               {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={resetForm}
-              className="btn-secondary"
+              variant="secondary"
               data-testid="admin-changelog-cancel"
             >
               <X className="w-4 h-4" aria-hidden="true" />
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -285,7 +282,7 @@ function AdminChangelogPage() {
           entries.map((e) => (
             <div
               key={e.id}
-              className="glass-panel p-4 flex items-start gap-3"
+              className="card p-4 flex items-start gap-3"
               data-testid={`admin-changelog-row-${e.id}`}
             >
               <div className="flex-1 min-w-0">
@@ -299,22 +296,24 @@ function AdminChangelogPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
                   type="button"
                   onClick={() => startEdit(e)}
-                  className="btn-sm btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   data-testid="admin-changelog-edit"
                 >
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => remove(e.id)}
-                  className="btn-sm btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   data-testid="admin-changelog-delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
+                </Button>
               </div>
             </div>
           ))

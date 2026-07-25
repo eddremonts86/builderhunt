@@ -18,15 +18,15 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
-      { name: 'color-scheme', content: 'dark' },
-      { name: 'theme-color', content: '#0a0e17' },
+      { name: 'color-scheme', content: 'light dark' },
+      { name: 'theme-color', content: '#ececf0' },
       { name: 'generator', content: 'TanStack Start' },
       { name: 'application-name', content: SITE_NAME },
       { name: 'apple-mobile-web-app-title', content: SITE_NAME },
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
-      { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+      { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
       { name: 'format-detection', content: 'telephone=no' },
-      { name: 'msapplication-TileColor', content: '#0a0e17' },
+      { name: 'msapplication-TileColor', content: '#ececf0' },
 
       // Primary SEO
       { title: `${SITE_NAME} — Discover Active Builders Across the Open Web` },

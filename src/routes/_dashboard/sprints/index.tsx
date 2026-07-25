@@ -3,6 +3,8 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 import { Compass, Plus, Trash2, Pause, Play, PlayCircle, Loader2 } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor } from '~/shared/lib/sprints-shared'
+import { Button } from '~/components/ui/button'
+import { LinkButton } from '~/components/ui/link'
 
 interface SprintRow {
   id: string
@@ -109,21 +111,22 @@ function SprintsListPage() {
         </div>
         <div className="flex items-center gap-2">
           {isAdmin && (
-            <button
+            <Button
               type="button"
               onClick={runJobNow}
               disabled={runningJob}
-              className="btn-secondary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
+              variant="secondary"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm"
               data-testid="sprint-run-job-button"
               title="Manually run the sourcing worker now instead of waiting for the next scheduled run"
             >
               {runningJob ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
               Run job now
-            </button>
+            </Button>
           )}
-          <Link to="/sprints/new" className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
+          <LinkButton to="/sprints/new" variant="primary" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
             <Plus className="w-4 h-4" /> New sprint
-          </Link>
+          </LinkButton>
         </div>
       </div>
 
@@ -133,19 +136,19 @@ function SprintsListPage() {
       {loading ? (
         <p className="text-sm text-bh-text-dim">Loading…</p>
       ) : sprints.length === 0 ? (
-        <div className="glass-panel p-8 text-center">
+        <div className="card p-8 text-center">
           <p className="text-bh-text-muted mb-3">
             No sourcing sprints yet. A sprint saves a set of search-query variants and re-runs them in the
             background until it reaches a result quota.
           </p>
-          <Link to="/sprints/new" className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
+          <LinkButton to="/sprints/new" variant="primary" className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm">
             <Plus className="w-4 h-4" /> Start a sprint
-          </Link>
+          </LinkButton>
         </div>
       ) : (
         <ul className="space-y-3">
           {sprints.map((sprint) => (
-            <li key={sprint.id} className="glass-panel p-4 flex items-center justify-between gap-4" data-testid="sprint-row">
+            <li key={sprint.id} className="card p-4 flex items-center justify-between gap-4" data-testid="sprint-row">
               <Link to="/sprints/$sprintId" params={{ sprintId: sprint.id }} className="min-w-0 flex-1">
                 <p className="font-medium text-bh-text truncate">{sprint.name}</p>
                 <p className="text-xs text-bh-text-dim">

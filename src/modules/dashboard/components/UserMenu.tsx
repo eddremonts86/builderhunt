@@ -4,12 +4,12 @@ import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
   CircleUser, Users, CreditCard, Shield, ShieldCheck, Activity, Cog, Inbox, AlertTriangle,
-  BookOpen, Map, LogOut, Sparkles, RotateCcw, ShieldAlert, Gauge,
+  BookOpen, Map, LogOut, RotateCcw, ShieldAlert, Gauge,
 } from 'lucide-react'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
-import { useTheme } from '~/shared/lib/theme/ThemeProvider'
 import { motionTokens } from '~/shared/lib/motion/tokens'
+import { clampRightAnchoredPanel } from '~/shared/lib/floatingPanel'
 
 const WORKSPACE_LINKS = [
   { to: '/settings/team', icon: Users, label: 'Team' },
@@ -74,7 +74,6 @@ export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuP
   const [mounted, setMounted] = React.useState(false)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
   const panelRef = React.useRef<HTMLDivElement>(null)
-  const { accent, setAccent } = useTheme()
   const reduceMotion = useReducedMotion()
 
   // `document.body` (below) doesn't exist during SSR — same mounted-gate
@@ -86,7 +85,11 @@ export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuP
   const reposition = React.useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
-    setCoords({ top: rect.bottom + 8, right: window.innerWidth - rect.right })
+    // Clamped so a trigger near the viewport's left edge (narrow phones)
+    // can't push the panel's own left edge off-screen.
+    const rawRight = window.innerWidth - rect.right
+    const panelWidth = panelRef.current?.getBoundingClientRect().width ?? 0
+    setCoords({ top: rect.bottom + 8, right: clampRightAnchoredPanel(rawRight, panelWidth) })
   }, [])
 
   React.useEffect(() => {
@@ -179,19 +182,6 @@ export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuP
                   ))}
                 </div>
               )}
-
-              <div className="mt-1 pt-1.5 border-t border-bh-border/60 px-2 pb-1">
-                <button
-                  type="button"
-                  onClick={() => setAccent(accent === 'neon' ? 'brand' : 'neon')}
-                  aria-label={accent === 'neon' ? 'Use brand accent' : 'Use neon accent'}
-                  aria-pressed={accent === 'neon'}
-                  className="w-full flex items-center gap-2 text-xs font-medium text-bh-text-muted hover:text-bh-text px-2 py-1.5 rounded-lg hover:bg-bh-bg-alt transition-colors duration-150"
-                >
-                  <Sparkles className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                  Accent: {accent === 'neon' ? 'Neon' : 'Brand'}
-                </button>
-              </div>
 
               <div className="pt-1 border-t border-bh-border/60">
                 <button

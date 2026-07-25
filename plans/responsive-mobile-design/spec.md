@@ -119,15 +119,22 @@ and above) must not regress — this plan adds narrow-viewport handling, it does
   in `UserMenu.tsx`'s own top comment). Any positioning fix in Phase 1 should extend that shared
   pattern, not fork a second one.
 
-## Mobile nav decision (to confirm in Phase 0, task 1)
+## Mobile nav decision (confirmed, Phase 0 task 1)
 
-Recommended default, to validate against the actual 5-pill + org-switcher + user-menu content this
-topbar carries: collapse `Search`/`Sprints`/`Exports`/`Alerts` (everything except `Dashboard`, the
-home anchor) behind a single hamburger-triggered sheet below `md`; keep `OrganizationSwitcher` and
-`UserMenu` always visible as compact icon-only triggers (they already are icon/avatar-first on
-desktop) so account/org access is never hidden behind a second tap layer. This mirrors the existing
-`UserMenu` reasoning for why it consolidated three separate controls into one menu — apply the same
-"reduce visible chrome without hiding access" logic to the primary nav.
+**Confirmed as implemented**: collapse `Search`/`Sprints`/`Exports`/`Alerts` (everything except
+`Dashboard`, the home anchor) behind a single hamburger-triggered sheet below `md`; keep
+`Dashboard` as an icon-only pill, and `OrganizationSwitcher`/`UserMenu`/`ThemeToggle` always
+visible. The originally-recommended default held, with one adjustment found only by building the
+real thing at 375px rather than a static mockup: `OrganizationSwitcher`'s trigger also had to drop
+its text label (`hidden md:inline` on the org name + chevron) below `md` — with the full 5-pill
+row already collapsed to icon+hamburger, the switcher's `max-w-[120px]` name label was still wide
+enough that the topbar overflowed and pushed `UserMenu`'s avatar trigger off-screen at 375×667.
+Icon-only on both `OrganizationSwitcher` and `UserMenu` below `md` is what actually keeps every
+control (Dashboard, hamburger, theme toggle, org switcher, account menu) reachable by tap with zero
+horizontal scroll at the narrowest matrix size. Verified live via Browser tool `resize_window` at
+375×667 signed in as the seeded admin: topbar `scrollWidth === clientWidth` (no overflow), the
+hamburger sheet opens/positions/navigates/closes correctly, and desktop (`md`+) is unchanged (full
+pill row still renders, gated by `hidden md:flex`).
 
 ## Verification approach
 

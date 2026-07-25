@@ -9,7 +9,7 @@ import {
   type PackCatalogDto,
   type SubscriptionCatalogDto,
 } from '~/shared/lib/billing/catalog'
-import { Button, Checkbox, Input, Label } from '~/components/ui'
+import { Button, Checkbox, Input, Label, LinkButton } from '~/components/ui'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
 
@@ -255,7 +255,7 @@ function PricingPage() {
                 </div>
 
                 <div className="mb-2">
-                  <span className="text-3xl font-extrabold text-bh-text">{tier === 'free' ? '$0' : formatUsd(price)}</span>
+                  <span className="text-3xl font-extrabold text-bh-text font-display">{tier === 'free' ? '$0' : formatUsd(price)}</span>
                   <span className="text-bh-text-dim text-sm">{periodLabel}</span>
                 </div>
                 {tier !== 'free' && <p className="text-[11px] text-bh-text-dim mb-4">+ applicable tax</p>}
@@ -285,9 +285,9 @@ function PricingPage() {
                     Your current plan
                   </div>
                 ) : tier === 'free' ? (
-                  <Link to="/auth/sign-up" className="w-full btn-secondary justify-center rounded-xl font-bold">
+                  <LinkButton to="/auth/sign-up" variant="secondary" className="w-full justify-center rounded-xl font-bold">
                     Get started
-                  </Link>
+                  </LinkButton>
                 ) : !user.userId ? (
                   <Button
                     type="button"
@@ -312,7 +312,7 @@ function PricingPage() {
 
       <section className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl shadow-sm mb-12" data-testid="pricing-features">
         <h2 className="text-xl font-bold text-bh-text mb-6">Feature comparison</h2>
-        <div className="overflow-x-auto">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Feature comparison table, scrollable">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-bh-border text-left">
@@ -391,7 +391,7 @@ function PricingPage() {
           One-time top-ups for when you need more credits than your plan's monthly grant — separate from your subscription, on any plan.
           Pack credits expire 12 months after purchase and never roll over into a new grant period.
         </p>
-        <div className="overflow-x-auto">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Credit packs table, scrollable">
           <table className="w-full text-sm" data-testid="pricing-pack-table">
             <thead>
               <tr className="border-b border-bh-border text-left">

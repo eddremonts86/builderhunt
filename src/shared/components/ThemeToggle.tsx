@@ -23,6 +23,7 @@ export function ThemeToggle() {
             type="button"
             role="radio"
             aria-checked={active}
+            aria-label={option}
             onClick={() => setTheme(option)}
             className={`flex items-center gap-1.5 h-8 px-3 rounded-full text-xs font-semibold capitalize ${ICON_TRANSITION} ${
               active

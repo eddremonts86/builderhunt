@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Inbox, Check, X, Mail, Clock } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { PLAN_PRICING } from '~/shared/lib/billing-shared'
+import { Button } from '~/components/ui/button'
 
 interface PlanRequest {
   id: string
@@ -92,7 +93,7 @@ function AdminPlanRequestsPage() {
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">{error}</div>
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">{error}</div>
       )}
 
       <section className="mb-6">
@@ -102,7 +103,7 @@ function AdminPlanRequestsPage() {
         {loading ? (
           <p className="text-sm text-bh-text-muted">Loading…</p>
         ) : pending.length === 0 ? (
-          <div className="glass-panel text-center py-8 text-bh-text-muted" data-testid="plan-requests-empty">
+          <div className="card text-center py-8 text-bh-text-muted" data-testid="plan-requests-empty">
             No pending requests. 🎉
           </div>
         ) : (
@@ -110,7 +111,7 @@ function AdminPlanRequestsPage() {
             {pending.map((r) => (
               <div
                 key={r.id}
-                className="glass-panel p-4 flex items-start gap-3"
+                className="card p-4 flex items-start gap-3"
                 data-testid={`plan-request-row-${r.id}`}
               >
                 <div className="flex-1 min-w-0">
@@ -139,26 +140,28 @@ function AdminPlanRequestsPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => resolve(r.id, 'approved')}
                     disabled={busy === r.id}
-                    className="btn-primary btn-sm"
+                    variant="primary"
+                    size="sm"
                     data-testid="plan-request-approve"
                   >
                     <Check className="w-3 h-3" aria-hidden="true" />
                     Approve
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => resolve(r.id, 'declined')}
                     disabled={busy === r.id}
-                    className="btn-ghost btn-sm"
+                    variant="ghost"
+                    size="sm"
                     data-testid="plan-request-decline"
                   >
                     <X className="w-3 h-3" aria-hidden="true" />
                     Decline
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -175,7 +178,7 @@ function AdminPlanRequestsPage() {
             {resolved.slice(0, 10).map((r) => (
               <div
                 key={r.id}
-                className="glass-panel p-3 flex items-center gap-3 opacity-70"
+                className="card p-3 flex items-center gap-3 opacity-70"
                 data-testid={`plan-request-resolved-${r.id}`}
               >
                 <span className="text-sm">{r.userName ?? 'Unknown'}</span>

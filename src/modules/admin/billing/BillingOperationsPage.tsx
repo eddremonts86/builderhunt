@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Activity, AlertTriangle, BookOpen, CreditCard, Gauge, RotateCcw, ShieldAlert, Timer } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 interface WebhookBacklogMetrics {
   pending: number
@@ -54,7 +55,7 @@ function StatCard({
 }) {
   const toneClass = tone === 'danger' ? 'text-bh-danger' : tone === 'warning' ? 'text-bh-warning' : 'text-bh-text'
   return (
-    <div className="glass-panel p-4" data-testid={testId}>
+    <div className="card p-4" data-testid={testId}>
       <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-bh-text-dim mb-2">
         <Icon className="w-3.5 h-3.5" aria-hidden="true" />
         {label}
@@ -113,13 +114,13 @@ export function BillingOperationsPage() {
             Live aggregate health across every organization. Read-only — no raw payloads or per-organization detail.
           </p>
         </div>
-        <button type="button" onClick={load} disabled={loading} className="btn-secondary btn-sm shrink-0" data-testid="billing-operations-refresh">
+        <Button type="button" variant="secondary" size="sm" onClick={load} disabled={loading} className="shrink-0" data-testid="billing-operations-refresh">
           {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+        </Button>
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="billing-operations-error">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="billing-operations-error">
           {error}
         </div>
       )}
@@ -198,7 +199,7 @@ export function BillingOperationsPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <section className="glass-panel p-4" data-testid="billing-operations-reconciliation">
+            <section className="card p-4" data-testid="billing-operations-reconciliation">
               <h2 className="font-semibold text-sm mb-2">Reconciliation</h2>
               {metrics.reconciliation.lastRun ? (
                 <p className="text-sm text-bh-text-muted">
@@ -208,13 +209,13 @@ export function BillingOperationsPage() {
                 <p className="text-sm text-bh-text-muted">Not yet available — reconciliation has not been built yet.</p>
               )}
             </section>
-            <section className="glass-panel p-4" data-testid="billing-operations-cost-margin">
+            <section className="card p-4" data-testid="billing-operations-cost-margin">
               <h2 className="font-semibold text-sm mb-2">Cost &amp; margin</h2>
               <p className="text-sm text-bh-text-muted">Not yet available — cost/margin export has not been built yet.</p>
             </section>
           </div>
 
-          <section className="glass-panel p-4" data-testid="billing-operations-runbooks">
+          <section className="card p-4" data-testid="billing-operations-runbooks">
             <h2 className="font-semibold text-sm flex items-center gap-2 mb-2">
               <BookOpen className="w-4 h-4" aria-hidden="true" />
               Runbooks

@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { createFileRoute, useNavigate, Link, useSearch, redirect } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, useSearch, redirect } from '@tanstack/react-router'
 import { Bookmark, ArrowRight, AlertCircle, Loader2, ExternalLink, Check } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { Button, LinkButton } from '~/components/ui'
 
 interface Builder {
   id: string
@@ -162,26 +163,26 @@ function SaveStep() {
       )}
 
       {error && (
-        <div className="glass-panel border border-bh-danger/30 bg-bh-danger/10 p-4 mb-4" role="alert">
+        <div className="card border border-bh-danger/30 bg-bh-danger/10 p-4 mb-4" role="alert">
           <div className="flex items-start gap-2 text-bh-danger">
             <AlertCircle className="w-4 h-4 mt-0.5" aria-hidden="true" />
             <div>
               <p className="font-semibold">Search failed</p>
               <p className="text-sm">{error}</p>
-              <Link to="/onboarding/search" className="btn-secondary btn-sm mt-2 inline-flex">
+              <LinkButton to="/onboarding/search" variant="secondary" size="sm" className="mt-2 inline-flex">
                 Try a different query
-              </Link>
+              </LinkButton>
             </div>
           </div>
         </div>
       )}
 
       {!loading && !error && results.length === 0 && (
-        <div className="glass-panel text-center py-12">
+        <div className="card text-center py-12">
           <p className="text-bh-text-muted">No results for "{searchedQuery}".</p>
-          <Link to="/onboarding/search" className="btn-secondary btn-sm mt-3 inline-flex">
+          <LinkButton to="/onboarding/search" variant="secondary" size="sm" className="mt-3 inline-flex">
             Try a different query
-          </Link>
+          </LinkButton>
         </div>
       )}
 
@@ -192,7 +193,7 @@ function SaveStep() {
               const isSaved = savedIds.has(b.id)
               const isSaving = savingId === b.id
               return (
-                <article key={b.id} className="glass-panel p-4" data-testid="onboarding-builder-card" data-builder-id={b.id}>
+                <article key={b.id} className="card p-4" data-testid="onboarding-builder-card" data-builder-id={b.id}>
                   <div className="flex items-start gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-bh-accent to-bh-cyan flex items-center justify-center text-white font-semibold shrink-0 text-sm">
                       {(b.displayName ?? b.username)[0]?.toUpperCase()}
@@ -208,13 +209,13 @@ function SaveStep() {
                     <p className="text-xs text-bh-text-muted line-clamp-2 mb-3">{b.bio}</p>
                   )}
                   <div className="flex items-center gap-2">
-                    <button
+                    <Button
                       type="button"
                       onClick={() => !isSaved && saveOne(b)}
                       disabled={isSaved || isSaving}
-                      className={`btn-sm flex-1 justify-center ${
-                        isSaved ? 'btn-secondary' : 'btn-primary'
-                      }`}
+                      variant={isSaved ? 'secondary' : 'primary'}
+                      size="sm"
+                      className="flex-1 justify-center"
                       data-testid="onboarding-save-btn"
                       data-builder-id={b.id}
                     >
@@ -226,7 +227,7 @@ function SaveStep() {
                         <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
                       )}
                       {isSaved ? 'Saved' : isSaving ? 'Saving…' : 'Save'}
-                    </button>
+                    </Button>
                     <a
                       href={b.profileUrl}
                       target="_blank"
@@ -246,16 +247,15 @@ function SaveStep() {
             <div className="text-sm text-bh-text-muted">
               {savedIds.size} of {REQUIRED_SAVES} builders saved
             </div>
-            <button
+            <Button
               type="button"
               onClick={finish}
               disabled={!canFinish}
-              className="btn-primary"
               data-testid="onboarding-finish"
             >
               Finish
               <ArrowRight className="w-4 h-4" aria-hidden="true" />
-            </button>
+            </Button>
           </div>
         </>
       )}

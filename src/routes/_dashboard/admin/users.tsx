@@ -4,6 +4,7 @@ import { Users, Edit3, X, Save } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { PLAN_PRICING, type PlanTier } from '~/shared/lib/billing-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button } from '~/components/ui/button'
 
 interface UserRow {
   userId: string
@@ -133,13 +134,13 @@ function AdminUsersPage() {
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="admin-users-error">{error}</div>
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="admin-users-error">{error}</div>
       )}
       {success && (
-        <div className="glass-panel border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="admin-users-success">{success}</div>
+        <div className="card border-bh-success/30 bg-bh-success/5 p-3 mb-4 text-sm text-bh-success" data-testid="admin-users-success">{success}</div>
       )}
 
-      <div className="glass-panel overflow-x-auto p-0">
+      <div className="card table-scroll p-0" tabIndex={0} role="region" aria-label="Users table, scrollable">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">
@@ -202,22 +203,24 @@ function AdminUsersPage() {
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
-                          <button
+                          <Button
                             type="button"
                             onClick={save}
                             disabled={busy}
-                            className="btn-primary btn-sm"
+                            variant="primary"
+                            size="sm"
                             data-testid="admin-user-save"
                           >
                             <Save className="w-3 h-3" aria-hidden="true" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button
                             type="button"
                             onClick={cancelEdit}
-                            className="btn-ghost btn-sm"
+                            variant="ghost"
+                            size="sm"
                           >
                             <X className="w-3 h-3" aria-hidden="true" />
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </>
@@ -240,15 +243,16 @@ function AdminUsersPage() {
                         {new Date(u.createdAt).toLocaleDateString()}
                       </td>
                       <td className="px-3 py-2">
-                        <button
+                        <Button
                           type="button"
                           onClick={() => startEdit(u)}
-                          className="btn-ghost btn-sm"
+                          variant="ghost"
+                          size="sm"
                           data-testid="admin-user-edit"
                         >
                           <Edit3 className="w-3 h-3" aria-hidden="true" />
                           Edit
-                        </button>
+                        </Button>
                       </td>
                     </>
                   )}

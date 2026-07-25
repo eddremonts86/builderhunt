@@ -4,6 +4,7 @@ import { Bell, Check, Sparkles, ExternalLink, Clock, Plus, Trash2, X } from 'luc
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button } from '~/components/ui/button'
 
 interface Trigger {
   id: string
@@ -195,21 +196,21 @@ function AlertsInboxPage() {
             )}
           </p>
         </div>
-        <button
+        <Button
           type="button"
-          className="btn-primary"
+          variant="primary"
           data-testid="new-alert-button"
           onClick={() => setShowForm((s) => !s)}
         >
           {showForm ? <X className="w-4 h-4" aria-hidden="true" /> : <Plus className="w-4 h-4" aria-hidden="true" />}
           {showForm ? 'Cancel' : 'New alert'}
-        </button>
+        </Button>
       </header>
 
       {showForm && (
         <form
           onSubmit={createAlert}
-          className="glass-panel p-5 mb-6 space-y-4"
+          className="card p-5 mb-6 space-y-4"
           data-testid="alert-create-form"
         >
           <div>
@@ -299,12 +300,12 @@ function AlertsInboxPage() {
           )}
 
           <div className="flex items-center gap-2">
-            <button type="submit" disabled={submitting} className="btn-primary btn-sm" data-testid="alert-submit">
+            <Button type="submit" disabled={submitting} variant="primary" size="sm" data-testid="alert-submit">
               {submitting ? 'Creating…' : 'Create alert'}
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="btn-ghost btn-sm">
+            </Button>
+            <Button type="button" onClick={() => setShowForm(false)} variant="ghost" size="sm">
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -313,12 +314,12 @@ function AlertsInboxPage() {
         <div className="animate-pulse space-y-6" aria-hidden="true">
           <div className="space-y-2">
             <div className="h-3 w-24 bg-bh-surface rounded" />
-            <div className="glass-panel h-14 bg-bh-surface/50" />
+            <div className="card h-14 bg-bh-surface/50" />
           </div>
           <div className="space-y-2">
             <div className="h-3 w-20 bg-bh-surface rounded" />
-            <div className="glass-panel h-20 bg-bh-surface/50" />
-            <div className="glass-panel h-20 bg-bh-surface/50" />
+            <div className="card h-20 bg-bh-surface/50" />
+            <div className="card h-20 bg-bh-surface/50" />
           </div>
         </div>
       ) : (
@@ -332,7 +333,7 @@ function AlertsInboxPage() {
                 {userAlerts.map((a) => {
                   const Icon = EVENT_ICONS[a.triggerConditions.eventType] ?? Bell
                   return (
-                    <div key={a.id} className="glass-panel p-3 flex items-center gap-3" data-testid={`alert-config-${a.id}`}>
+                    <div key={a.id} className="card p-3 flex items-center gap-3" data-testid={`alert-config-${a.id}`}>
                       <div className="w-9 h-9 rounded-full bg-bh-accent/10 flex items-center justify-center shrink-0">
                         <Icon className="w-4 h-4 text-bh-accent" aria-hidden="true" />
                       </div>
@@ -348,16 +349,18 @@ function AlertsInboxPage() {
                           {a.deliveryChannel === 'email' ? 'Email + dashboard' : 'Dashboard only'}
                         </p>
                       </div>
-                      <button
+                      <Button
                         type="button"
                         onClick={() => deleteAlert(a.id)}
-                        className="btn-ghost btn-sm shrink-0 hover:text-bh-danger hover:bg-bh-danger/10"
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0 hover:text-bh-danger hover:bg-bh-danger/10"
                         aria-label="Delete alert"
                         title="Delete alert"
                         data-testid={`alert-delete-${a.id}`}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      </Button>
                     </div>
                   )
                 })}
@@ -369,20 +372,22 @@ function AlertsInboxPage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim">Activity</h2>
               {unread > 0 && (
-                <button
+                <Button
                   type="button"
                   onClick={markAllRead}
                   disabled={markingAll}
-                  className="btn-ghost btn-sm text-xs"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
                   data-testid="alerts-mark-all-read"
                 >
                   {markingAll ? 'Marking…' : 'Mark all as read'}
-                </button>
+                </Button>
               )}
             </div>
 
             {triggers.length === 0 ? (
-              <div className="glass-panel text-center py-12" data-testid="alerts-empty">
+              <div className="card text-center py-12" data-testid="alerts-empty">
                 <Bell className="w-8 h-8 text-bh-text-dim mx-auto mb-3" aria-hidden="true" />
                 <p className="text-bh-text-muted mb-2">
                   {hasAlerts ? 'No matches yet — sit tight.' : 'No alerts triggered yet.'}
@@ -401,7 +406,7 @@ function AlertsInboxPage() {
                   return (
                     <article
                       key={t.id}
-                      className={`glass-panel p-4 flex items-start gap-3 ${!t.readAt ? 'border-bh-accent/30 bg-bh-accent/5' : ''}`}
+                      className={`card p-4 flex items-start gap-3 ${!t.readAt ? 'border-bh-accent/30 bg-bh-accent/5' : ''}`}
                       data-testid={`alert-trigger-${t.id}`}
                     >
                       <div className="w-9 h-9 rounded-full bg-bh-accent/10 flex items-center justify-center shrink-0">
@@ -437,16 +442,18 @@ function AlertsInboxPage() {
                         )}
                       </div>
                       {!t.readAt && (
-                        <button
+                        <Button
                           type="button"
                           onClick={() => markRead(t.id)}
-                          className="btn-ghost btn-sm shrink-0"
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0"
                           data-testid="alert-mark-read"
                           aria-label="Mark as read"
                           title="Mark as read"
                         >
                           <Check className="w-3 h-3" />
-                        </button>
+                        </Button>
                       )}
                     </article>
                   )

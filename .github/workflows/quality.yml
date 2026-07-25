@@ -84,6 +84,29 @@ jobs:
         run: pnpm test:e2e -- e2e/team-accounts.spec.ts
       - run: pnpm security:dependencies
       - run: pnpm build
+      - name: Migrate + seed admin for the production-preview accessibility gate
+        run: |
+          pnpm exec drizzle-kit migrate
+          pnpm db:seed:admin
+      - name: Start production preview
+        run: pnpm preview --port 3000 &
+      - name: Wait for /api/health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health && exit 0
+            sleep 2
+          done
+          echo "Preview server never became healthy" >&2
+          exit 1
+      - name: Accessibility gate (axe-core, public + authenticated route matrix)
+        run: pnpm test:a11y
+      - name: Upload sanitized accessibility artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a11y-results
+          path: test/artifacts/a11y/
+          retention-days: 14
 
   # Optional, additive certification of the real Stripe-backed BillingProvider
   # (src/shared/lib/billing/real-provider.ts) against Stripe's actual test-mode API — never a

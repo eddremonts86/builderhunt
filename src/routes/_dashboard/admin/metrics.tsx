@@ -2,6 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Activity, Database, Cpu, RefreshCw, Compass } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
+import { Button } from '~/components/ui/button'
 
 interface MetricsResponse {
   inProcess: {
@@ -115,15 +116,16 @@ function AdminMetricsPage() {
             In-process counters + DB aggregates. Auto-refreshes every 15s.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={load}
-          className="btn-ghost btn-sm"
+          variant="ghost"
+          size="sm"
           aria-label="Refresh"
           data-testid="admin-metrics-refresh"
         >
           <RefreshCw className="w-4 h-4" />
-        </button>
+        </Button>
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6" data-testid="metrics-inprocess">
@@ -136,7 +138,7 @@ function AdminMetricsPage() {
         <MetricCard label="Signins" value={data.inProcess.signins} />
       </section>
 
-      <section className="glass-panel p-5 mb-6" data-testid="metrics-db">
+      <section className="card p-5 mb-6" data-testid="metrics-db">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Database className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Database
@@ -151,7 +153,7 @@ function AdminMetricsPage() {
         </div>
       </section>
 
-      <section className="glass-panel p-5 mb-6" data-testid="metrics-discovery">
+      <section className="card p-5 mb-6" data-testid="metrics-discovery">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Compass className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Proactive discovery
@@ -161,7 +163,7 @@ function AdminMetricsPage() {
             <MetricCard label="Runs" value={data.discovery.stats.runs} />
             <MetricCard label="Upserted" value={data.discovery.stats.upserted} />
             <MetricCard label="Errors" value={data.discovery.stats.errors} />
-            <div className="glass-panel p-3">
+            <div className="card p-3">
               <p className="text-xs text-bh-text-dim mb-1">Cursor / last cell</p>
               <p className="font-mono text-xs">
                 {data.discovery.cursor} · {data.discovery.lastCellKey ?? '—'}
@@ -176,7 +178,7 @@ function AdminMetricsPage() {
         )}
       </section>
 
-      <section className="glass-panel p-5" data-testid="metrics-server">
+      <section className="card p-5" data-testid="metrics-server">
         <h2 className="font-semibold mb-3 flex items-center gap-2">
           <Cpu className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Server
@@ -222,7 +224,7 @@ function AdminMetricsPage() {
 
 function MetricCard({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="glass-panel p-3" data-testid={`metric-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <div className="card p-3" data-testid={`metric-card-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       <p className="text-xs text-bh-text-dim mb-1">{label}</p>
       <p className="text-2xl font-bold text-bh-text">{value === null ? '—' : value.toLocaleString()}</p>
     </div>

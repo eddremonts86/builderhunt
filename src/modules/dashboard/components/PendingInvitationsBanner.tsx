@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { Link } from '@tanstack/react-router'
 import { Mail } from 'lucide-react'
+import { LinkButton } from '~/components/ui'
 
 interface MyPendingInvitation {
   id: string
@@ -31,7 +31,7 @@ export function PendingInvitationsBanner() {
 
   return (
     <div
-      className="glass-panel p-4 border-bh-accent/30 bg-bh-accent-soft/20"
+      className="card p-4 border-bh-accent/30 bg-bh-accent-soft/20"
       data-testid="pending-invitations-banner"
       role="status"
     >
@@ -55,13 +55,15 @@ export function PendingInvitationsBanner() {
               {' — as '}
               {invitation.role}
             </p>
-            <Link
+            <LinkButton
               to="/team/invite/$invitationId"
               params={{ invitationId: invitation.id }}
-              className="btn-primary btn-sm shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              variant="primary"
+              size="sm"
+              className="shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             >
               View invitation
-            </Link>
+            </LinkButton>
           </li>
         ))}
       </ul>

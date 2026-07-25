@@ -220,6 +220,16 @@ must include its tests and must not stage unrelated worktree changes.
   - Files: `src/shared/lib/env.ts`, `src/shared/lib/rate-limit.ts`, `src/shared/lib/security/headers.ts`, `src/shared/lib/security/audit.ts`, `src/shared/lib/ai/cache.ts`, `src/shared/lib/ai/budget.ts`, `server.prod.mjs`, `.github/dependabot.yml`
   - Do: Fail production on default/weak secrets or owner DB role; set CSP/frame/content/referrer/HSTS headers; require origin/CSRF protection for cookie-authenticated mutations; validate redirect/URL/provider inputs and SSRF boundaries; key distributed rate limits by appropriate IP+user+organization/action; redact DB URLs, cookies, emails, tokens, invite/reset IDs, prompts/responses, and export payloads. Tenant-scope AI cache/budget/artifacts; keep global embeddings public-source-only. Add lockfile vulnerability/license review with documented severity policy.
   - Verify (2026-07-22, re-run): `pnpm vitest run src/shared/lib/security/headers.test.ts src/shared/lib/security/audit.test.ts src/shared/lib/security/url-policy.test.ts src/shared/lib/env.security.test.ts src/shared/lib/ai/cache.test.ts src/shared/lib/ai/budget.test.ts src/shared/lib/log.test.ts` all passing; `.github/dependabot.yml` present. This session's own audit trail (`consoleSecurityAuditSink`, `emitSecurityAudit`) is now used by both `organization-lifecycle.ts` and `platform-admin.ts`, with redaction already covered by `log.test.ts`'s canaries.
+  - Follow-up (2026-07-24): the CSP/HSTS headers and the cookie-mutation origin check delivered
+    here existed as TWO implementations — the `src/shared/lib/security/headers.ts` one this task
+    tested, which no production code imported, and an untested inline copy in `server.prod.mjs`
+    that was the code actually enforcing it. They agreed behaviourally, so nothing was
+    exploitable, but the passing tests above proved nothing about the shipped posture. Collapsed
+    into a single `server/security.mjs` (plain ESM, outside `src/` because the runtime Docker
+    stage does not copy `src/`), imported by `server.prod.mjs` and covered by
+    `test/security/http-security.test.ts`. The old module and its test are deleted, so the
+    `headers.test.ts` path in the verify command above no longer exists — run
+    `pnpm vitest run test/security/http-security.test.ts` instead.
 
 - [ ] **Cut over canonical reads and validate tenant constraints**
   - Files: `drizzle/0007_tenant_constraints.sql`, `src/shared/lib/migration/tenant-readiness.ts`, `src/shared/lib/migration/tenant-readiness.test.ts`, `docs/operations/tenant-cutover.md`

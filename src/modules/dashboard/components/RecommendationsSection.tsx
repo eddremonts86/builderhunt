@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Sparkles, ExternalLink, X, Search, ArrowRight } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 interface Recommendation {
   builder: {
@@ -89,7 +90,7 @@ export function RecommendationsSection() {
   return (
     <section
       aria-labelledby="for-you-heading"
-      className="glass-panel p-5 md:p-6"
+      className="card p-5 md:p-6"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -113,17 +114,19 @@ export function RecommendationsSection() {
           </p>
         </div>
         {!loading && data?.meta?.reason !== 'no_saved_searches' && (
-          <button
+          <Button
             type="button"
             onClick={() => { setRefreshing(true); load() }}
             disabled={refreshing}
-            className="btn-ghost btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+            variant="ghost"
+            size="sm"
+            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
             aria-label="Refresh recommendations"
             title="Refresh"
           >
             <Sparkles className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
             <span className="hidden sm:inline">Refresh</span>
-          </button>
+          </Button>
         )}
       </div>
 
@@ -131,7 +134,7 @@ export function RecommendationsSection() {
       {loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="glass-panel animate-pulse h-32 bg-bh-surface/40" />
+            <div key={i} className="card animate-pulse h-32 bg-bh-surface/40" />
           ))}
         </div>
       )}
@@ -218,7 +221,7 @@ function RecommendationCard({
 
   return (
     <article
-      className="glass-panel card-hover p-4 group relative flex flex-col justify-between"
+      className="card card-hover p-4 group relative flex flex-col justify-between"
       data-event="recommendation_view"
     >
       <button
@@ -266,7 +269,7 @@ function RecommendationCard({
         </p>
 
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-accent text-white rounded-full shrink-0">
+          <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-accent text-[color:var(--color-bh-accent-contrast)] rounded-full shrink-0">
             {matchPercentage}% Match
           </span>
           <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-success/10 text-bh-success border border-bh-success/20 rounded-full shrink-0">

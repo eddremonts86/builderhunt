@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { RecommendationsSection } from './RecommendationsSection'
 import { OnboardingBanner } from './OnboardingBanner'
 import { PendingInvitationsBanner } from './PendingInvitationsBanner'
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp, fadeInUpVariants, staggerContainer } from '~/shared/lib/motion/tokens'
+import { Button, LinkButton } from '~/components/ui'
 
 interface Stats {
   totalBuilders: number
@@ -44,6 +45,7 @@ interface RecentBuilder {
 }
 
 export function DashboardPage() {
+  const reduceMotion = useReducedMotion()
   const [stats, setStats] = React.useState<Stats | null>(null)
   const [queries, setQueries] = React.useState<SavedQuery[]>([])
   const [recent, setRecent] = React.useState<RecentBuilder[]>([])
@@ -97,7 +99,7 @@ export function DashboardPage() {
           <div className="h-4 w-72 bg-bh-surface rounded" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="glass-panel h-24 bg-bh-surface/50" />
+              <div key={i} className="card h-24 bg-bh-surface/50" />
             ))}
           </div>
         </div>
@@ -166,7 +168,7 @@ export function DashboardPage() {
 
   return (
     <motion.div
-      initial={fadeInUp.initial}
+      initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
     >
@@ -184,12 +186,12 @@ export function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/search" className="btn-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            <LinkButton to="/search" variant="secondary" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
               <Search className="w-4 h-4" aria-hidden="true" /> Search
-            </Link>
-            <Link to="/search" className="btn-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+            </LinkButton>
+            <LinkButton to="/search" variant="primary" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
               <Plus className="w-4 h-4" aria-hidden="true" /> New hunt
-            </Link>
+            </LinkButton>
           </div>
         </div>
       </header>
@@ -200,7 +202,7 @@ export function DashboardPage() {
         <motion.div
           className="grid grid-cols-2 lg:grid-cols-4 gap-4"
           variants={staggerContainer()}
-          initial="hidden"
+          initial={reduceMotion ? false : 'hidden'}
           animate="visible"
         >
           {statsData.map((s) => (
@@ -230,9 +232,9 @@ export function DashboardPage() {
                   Pick a topic you care about — a framework, a stack, a community — and we'll surface
                   the people actively shipping in it.
                 </p>
-                <Link to="/search" className="btn-primary btn-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+                <LinkButton to="/search" variant="primary" size="sm" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-                </Link>
+                </LinkButton>
               </div>
             </div>
           )}
@@ -240,7 +242,7 @@ export function DashboardPage() {
           <RecommendationsSection />
 
           {/* Weekly Shipping Activity Bento Card */}
-          <div className="glass-panel p-5">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Activity className="w-4 h-4 text-bh-accent" aria-hidden="true" />
@@ -295,7 +297,7 @@ export function DashboardPage() {
         {/* Right Column (1/3) */}
         <div className="lg:col-span-1 space-y-6">
           {/* Saved searches Bento Card */}
-          <div className="glass-panel p-5">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 id="queries-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Bookmark className="w-4 h-4 text-bh-warning" aria-hidden="true" />
@@ -312,9 +314,9 @@ export function DashboardPage() {
                 <Bookmark className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
                 <p className="font-semibold text-sm text-bh-text mb-1">No saved searches yet</p>
                 <p className="text-xs text-bh-text-muted mb-3 font-light">Saved searches let you re-run hunts with one click.</p>
-                <Link to="/search" className="btn-secondary btn-sm text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+                <LinkButton to="/search" variant="secondary" size="sm" className="text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Set up a search
-                </Link>
+                </LinkButton>
               </div>
             ) : (
               <ul className="divide-y divide-bh-border -mx-5 -mb-5 border-t border-bh-border">
@@ -326,7 +328,7 @@ export function DashboardPage() {
           </div>
 
           {/* Recent builders Bento Card */}
-          <div className="glass-panel p-5">
+          <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 id="builders-heading" className="text-base font-semibold text-bh-text flex items-center gap-2">
                 <Activity className="w-4 h-4 text-bh-success" aria-hidden="true" />
@@ -343,9 +345,9 @@ export function DashboardPage() {
                 <Users className="w-8 h-8 text-bh-text-dim mx-auto mb-2 opacity-50" aria-hidden="true" />
                 <p className="font-semibold text-sm text-bh-text mb-1">No builders tracked yet</p>
                 <p className="text-xs text-bh-text-muted mb-3 font-light">Save builders from searches to see them here.</p>
-                <Link to="/search" className="btn-secondary btn-sm text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
+                <LinkButton to="/search" variant="secondary" size="sm" className="text-xs py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
                   Run a search
-                </Link>
+                </LinkButton>
               </div>
             ) : (
               <ul className="divide-y divide-bh-border -mx-5 -mb-5 border-t border-bh-border">
@@ -435,7 +437,7 @@ function StatCard({
   badge?: string
 }) {
   return (
-    <div className="glass-panel card-hover p-5">
+    <div className="card card-hover p-5">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-light text-bh-text-dim">{label}</span>
         <div className={`w-7 h-7 rounded-md border flex items-center justify-center ${TONE_ICON[tone]}`}>
@@ -443,7 +445,7 @@ function StatCard({
         </div>
       </div>
       <div className="flex items-baseline gap-2 mb-1">
-        <span className="text-3xl font-bold tracking-tight text-bh-text">
+        <span className="text-3xl font-bold tracking-tight text-bh-text font-display">
           {value.toLocaleString()}
         </span>
         {badge && (
@@ -589,11 +591,13 @@ function SavedSearchRow({
           </a>
 
           <div ref={menuRef} className="relative">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               onClick={() => setMenuOpen((o) => !o)}
               disabled={exporting !== null || deleting}
-              className="btn-secondary btn-sm p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+              className="p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
               aria-haspopup="menu"
               aria-expanded={menuOpen}
               aria-label="More actions"
@@ -604,7 +608,7 @@ function SavedSearchRow({
               ) : (
                 <MoreVertical className="w-3.5 h-3.5" aria-hidden="true" />
               )}
-            </button>
+            </Button>
             {menuOpen && (
               <ul role="menu" className="absolute right-0 mt-1 w-56 card p-1 z-10 animate-fade-in">
                 <li role="none">
@@ -645,18 +649,27 @@ function SavedSearchRow({
           </div>
 
           {!confirming ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setConfirming(true)}
               disabled={deleting || exporting !== null}
-              className="btn-ghost btn-sm p-1.5 text-bh-text-dim hover:text-bh-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-danger focus-visible:ring-offset-2"
+              className="p-1.5 text-bh-text-dim hover:text-bh-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-danger focus-visible:ring-offset-2"
               aria-label="Delete saved search"
               title="Delete"
             >
               <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-            </button>
+            </Button>
           ) : (
             <div className="flex items-center gap-1">
+              {/* Not converted to <Button>: this uses only the `btn-sm` size
+                  modifier with fully custom danger colors (bg/border/hover),
+                  not one of Button's variant classes (btn-primary/secondary/
+                  ghost/danger/danger-outline). Button always injects a
+                  variant class (defaulting to btn-primary) alongside size,
+                  which would layer a second background/border on top of
+                  these custom classes and visibly change this control. */}
               <button
                 type="button"
                 onClick={handleDelete}
@@ -667,16 +680,18 @@ function SavedSearchRow({
               >
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => setConfirming(false)}
                 disabled={deleting}
-                className="btn-ghost btn-sm p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                className="p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                 aria-label="Cancel delete"
                 title="Cancel"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -159,7 +159,7 @@ export function CreditBalance({ grants, recentRefunds, canRequestRefund, canPurc
         <div className="flex items-end gap-2 pt-2 border-t border-bh-border/60">
           <div className="flex-1">
             <Select value={selectedPack} onValueChange={setSelectedPack}>
-              <SelectTrigger data-testid="pack-purchase-select">
+              <SelectTrigger aria-label="Credit pack" data-testid="pack-purchase-select">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

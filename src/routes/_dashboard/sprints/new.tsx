@@ -368,7 +368,7 @@ function NewSprintWizard() {
 
       <AnimatePresence mode="wait">
         {step === 1 && (
-          <motion.div key="step-1" className="glass-panel p-5 space-y-4" {...stepMotion}>
+          <motion.div key="step-1" className="card p-5 space-y-4" {...stepMotion}>
             <div>
               <h2 className="font-semibold text-bh-text">Add job descriptions or CVs</h2>
               <p className="text-xs text-bh-text-dim mt-1">
@@ -446,7 +446,7 @@ function NewSprintWizard() {
       {step === 2 && (
           <motion.div key="step-2" className="space-y-4" data-testid="sprint-criteria-step" {...stepMotion}>
           {files.map((f) => (
-            <div key={f.id} className="glass-panel p-5 space-y-3">
+            <div key={f.id} className="card p-5 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="font-semibold text-bh-text truncate">{f.name}</h2>
                 <IncludeToggle checked={f.selected} onChange={() => toggleFileSelected(f.id)} />
@@ -475,7 +475,7 @@ function NewSprintWizard() {
       {step === 3 && (
         <motion.div key="step-3" className="space-y-4" data-testid="sprint-variants-step" {...stepMotion}>
           {drafts.map((draft) => (
-            <div key={draft.fileId} className="glass-panel p-5 space-y-3">
+            <div key={draft.fileId} className="card p-5 space-y-3">
               <div className="flex items-center justify-between gap-2">
                 <Input
                   value={draft.name}

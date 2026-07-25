@@ -1,9 +1,9 @@
 import * as React from 'react'
-import { createFileRoute, useNavigate, Link, redirect } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router'
 import { Search, X, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { STARTER_QUERIES } from '~/shared/lib/onboarding-shared'
-import { Input } from '~/components/ui'
+import { Button, Input, LinkButton } from '~/components/ui'
 
 export const Route = createFileRoute('/onboarding/search')({
   beforeLoad: async () => {
@@ -83,7 +83,7 @@ function SearchStep() {
             e.preventDefault()
             runSearch(query)
           }}
-          className="glass-panel p-4 mb-4"
+          className="card p-4 mb-4"
         >
           <label htmlFor="onboarding-q" className="text-xs uppercase tracking-wider text-bh-text-dim block mb-2">
             Or type your own
@@ -98,21 +98,21 @@ function SearchStep() {
               className="flex-1"
               data-testid="onboarding-query-input"
             />
-            <button type="submit" disabled={!query.trim()} className="btn-primary" data-testid="onboarding-search">
+            <Button type="submit" disabled={!query.trim()} data-testid="onboarding-search">
               <Search className="w-4 h-4" />
               Search
-            </button>
+            </Button>
           </div>
         </form>
 
         <div className="flex items-center justify-between">
-          <Link to="/onboarding/welcome" className="btn-ghost btn-sm">
+          <LinkButton to="/onboarding/welcome" variant="ghost" size="sm">
             ← Back
-          </Link>
-          <button onClick={skip} disabled={skipping} className="btn-ghost btn-sm" data-testid="onboarding-skip-2">
+          </LinkButton>
+          <Button onClick={skip} disabled={skipping} variant="ghost" size="sm" data-testid="onboarding-skip-2">
             <X className="w-3.5 h-3.5" />
             Skip
-          </button>
+          </Button>
         </div>
       </div>
     </div>

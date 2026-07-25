@@ -10,7 +10,7 @@ import {
   type OrganizationMemberDto,
   type OrganizationRole,
 } from '~/shared/lib/organizations/contracts'
-import { Dialog, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button, Dialog, Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { TransferOwnershipPreview } from './TransferOwnershipPreview'
 
 /**
@@ -74,7 +74,7 @@ export function OrganizationDangerZone({
   const nameMatches = confirmName.trim() === organizationName
 
   return (
-    <section className="glass-panel border-bh-danger/30 p-5" data-testid="team-danger-zone">
+    <section className="card border-bh-danger/30 p-5" data-testid="team-danger-zone">
       <h2 className="font-semibold flex items-center gap-2 text-bh-danger mb-4">
         <AlertTriangle className="w-4 h-4" aria-hidden="true" />
         Danger zone
@@ -88,7 +88,7 @@ export function OrganizationDangerZone({
         of a dead-end error string.
       */}
       {isStaleSession && (
-        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 text-sm text-bh-warning" data-testid="stale-session-banner">
+        <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 text-sm text-bh-warning" data-testid="stale-session-banner">
           <p>Your session isn't recent enough for this action.</p>
           <Link
             to="/auth/sign-in"
@@ -106,7 +106,7 @@ export function OrganizationDangerZone({
       )}
 
       {pendingDeletion && (
-        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-4 mb-4" data-testid="organization-deletion-warning">
+        <div className="card border-bh-warning/30 bg-bh-warning/5 p-4 mb-4" data-testid="organization-deletion-warning">
           <div className="flex items-start gap-3">
             <Clock className="w-4 h-4 text-bh-warning shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
@@ -115,15 +115,15 @@ export function OrganizationDangerZone({
                 {daysRemaining(pendingDeletion.gracePeriodEndsAt)} day{daysRemaining(pendingDeletion.gracePeriodEndsAt) === 1 ? '' : 's'} remaining
                 (ends {new Date(pendingDeletion.gracePeriodEndsAt).toLocaleString()}). All members will lose access after this date.
               </p>
-              <button
+              <Button
                 type="button"
                 onClick={() => (onCancelDeletion ?? noop)()}
                 disabled={busy}
-                className="btn-primary btn-sm"
+                size="sm"
                 data-testid="cancel-organization-deletion-btn"
               >
                 Cancel deletion
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -133,16 +133,18 @@ export function OrganizationDangerZone({
         {canLeaveOrganization(viewerRole) && (
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm text-bh-text-muted">Leave this organization.</p>
-            <button
+            <Button
               type="button"
               onClick={() => (onLeave ?? noop)()}
               disabled={busy}
-              className="btn-danger-outline btn-sm shrink-0"
+              variant="danger-outline"
+              size="sm"
+              className="shrink-0"
               data-testid="leave-organization-btn"
             >
               <LogOut className="w-4 h-4" aria-hidden="true" />
               Leave
-            </button>
+            </Button>
           </div>
         )}
 
@@ -169,16 +171,17 @@ export function OrganizationDangerZone({
                   </SelectContent>
                 </Select>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={() => transferTarget && setTransferPreviewOpen(true)}
                 disabled={busy || !transferTarget}
-                className="btn-danger-outline text-sm"
+                variant="danger-outline"
+                className="text-sm"
                 data-testid="transfer-ownership-btn"
               >
                 <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
                 Transfer
-              </button>
+              </Button>
             </div>
           </div>
         )}
@@ -209,15 +212,17 @@ export function OrganizationDangerZone({
                 <strong className="text-bh-text">30-day</strong> grace period. Cancel anytime before then.
               </p>
               {!confirmDelete && (
-                <button
+                <Button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="btn-danger-outline btn-sm shrink-0"
+                  variant="danger-outline"
+                  size="sm"
+                  className="shrink-0"
                   data-testid="delete-organization-btn"
                 >
                   <Trash2 className="w-4 h-4" aria-hidden="true" />
                   Delete organization
-                </button>
+                </Button>
               )}
             </div>
 
@@ -236,16 +241,17 @@ export function OrganizationDangerZone({
                     className="flex-1 text-sm"
                     data-testid="confirm-organization-name-input"
                   />
-                  <button
+                  <Button
                     type="button"
                     onClick={() => (onRequestDeletion ?? noop)()}
                     disabled={busy || !nameMatches}
-                    className="btn-danger text-sm shrink-0"
+                    variant="danger"
+                    className="text-sm shrink-0"
                     data-testid="confirm-delete-organization-btn"
                   >
                     Schedule deletion
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       setConfirmDelete(false)
@@ -254,12 +260,13 @@ export function OrganizationDangerZone({
                       setForfeitureAcknowledged(false)
                     }}
                     disabled={busy}
-                    className="btn-secondary text-sm shrink-0"
+                    variant="secondary"
+                    className="text-sm shrink-0"
                     data-testid="cancel-delete-organization-btn"
                   >
                     <X className="w-3 h-3" aria-hidden="true" />
                     Cancel
-                  </button>
+                  </Button>
                 </div>
 
                 {onRequestImmediateDeletion && !immediateMode && (
@@ -275,7 +282,7 @@ export function OrganizationDangerZone({
                 )}
 
                 {onRequestImmediateDeletion && immediateMode && (
-                  <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mt-3" data-testid="immediate-delete-warning">
+                  <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mt-3" data-testid="immediate-delete-warning">
                     <p className="text-sm text-bh-danger font-medium mb-2">
                       This forfeits any remaining paid subscription period — no partial-period credit — and deletes
                       all product data right now, not after 30 days. This cannot be undone.
@@ -290,15 +297,16 @@ export function OrganizationDangerZone({
                       />
                       I understand this forfeits the remaining paid period and cannot be undone.
                     </label>
-                    <button
+                    <Button
                       type="button"
                       onClick={() => (onRequestImmediateDeletion ?? noop)(confirmName)}
                       disabled={busy || !nameMatches || !forfeitureAcknowledged}
-                      className="btn-danger text-sm"
+                      variant="danger"
+                      className="text-sm"
                       data-testid="confirm-immediate-delete-organization-btn"
                     >
                       Delete immediately
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>

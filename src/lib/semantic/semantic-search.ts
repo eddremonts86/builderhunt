@@ -7,6 +7,7 @@
 // search with `mode: 'keyword-fallback'`.
 import { createHash } from 'node:crypto'
 import { searchBuilders, type ScoredBuilder } from '~/lib/search'
+import type { PlanTier } from '~/shared/lib/billing-shared'
 import { checkAndConsumeBudget } from '~/shared/lib/ai/budget'
 import { embedTexts } from '~/shared/lib/ai/embeddings'
 import { getCached, setCached } from '~/shared/lib/ai/cache'
@@ -18,6 +19,13 @@ import { getRedis } from '~/shared/lib/redis'
 import type { EntitlementPolicy } from '~/shared/lib/repositories/entitlements'
 import { findSimilarBuilderEmbeddings } from '~/shared/lib/repositories/public-builder-embeddings'
 import { upsertEmbeddingStubs } from './index-writer'
+
+// Same daily-allowance shape as `ai/tasks.ts`'s registry, but embedding
+// isn't a chat task (no system prompt/output schema) so it doesn't fit
+// `AITaskDefinition` — `checkAndConsumeBudget` only needs `id` + `allowances`.
+// The route already blocks `entitlement.tier === 'free'` before reaching
+// here; this is defense in depth against a future caller that skips it.
+const SEMANTIC_SEARCH_EMBED_ALLOWANCES: Record<PlanTier, number> = { free: 0, pro: 500, team: 1000 }
 
 /** Below this many kept local matches, the degradation ladder kicks in. */
 export const SEMANTIC_MIN_LOCAL_MATCHES = 10
@@ -59,8 +67,12 @@ export interface SemanticSearchOutcome {
   translated?: QueryTranslation
 }
 
-/** Redis-cached query embedding — 1 embed call per unique query per 24h. */
-async function embedQueryCached(query: string): Promise<number[]> {
+/** Redis-cached query embedding — 1 embed call per unique query per 24h. Throws (caught by the route, which degrades to keyword search) when the daily embed budget is exhausted. */
+async function embedQueryCached(
+  query: string,
+  principal: Pick<TenantPrincipal, 'organizationId' | 'userId'>,
+  entitlement: Pick<EntitlementPolicy, 'tier'>,
+): Promise<number[]> {
   const cacheKey = `ai:cache:query-embed:${createHash('sha256').update(query).digest('hex')}`
   try {
     const redis = await getRedis()
@@ -71,6 +83,12 @@ async function embedQueryCached(query: string): Promise<number[]> {
   } catch {
     // Redis unavailable — fall through to a live embed.
   }
+
+  const budget = await checkAndConsumeBudget(principal, entitlement, {
+    id: 'semantic-search-embed',
+    allowances: SEMANTIC_SEARCH_EMBED_ALLOWANCES,
+  })
+  if (!budget.allowed) throw new Error('semantic search embed budget exhausted')
 
   const [vector] = await embedTexts([query])
 
@@ -129,7 +147,7 @@ function matchesFilter(value: string | undefined, filter: string | undefined): b
 
 export async function semanticSearch(opts: SemanticSearchOptions): Promise<SemanticSearchOutcome> {
   const perPage = opts.perPage ?? 30
-  const queryVector = await embedQueryCached(opts.query)
+  const queryVector = await embedQueryCached(opts.query, opts.principal, opts.entitlement)
   const candidates = await findSimilarBuilderEmbeddings(queryVector, 50)
 
   const kept = candidates

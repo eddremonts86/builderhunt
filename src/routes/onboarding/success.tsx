@@ -1,6 +1,7 @@
-import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { createFileRoute, redirect } from '@tanstack/react-router'
 import { Sparkles, ArrowRight, ListChecks } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { LinkButton } from '~/components/ui'
 
 export const Route = createFileRoute('/onboarding/success')({
   beforeLoad: async () => {
@@ -28,7 +29,7 @@ function SuccessStep() {
           You'll get fresh picks in your dashboard every day. Your saved searches run continuously across 12 sources.
         </p>
 
-        <div className="glass-panel p-5 mb-6 text-left">
+        <div className="card p-5 mb-6 text-left">
           <p className="text-xs font-semibold uppercase tracking-wider text-bh-text-dim mb-3 flex items-center gap-2">
             <ListChecks className="w-3.5 h-3.5" aria-hidden="true" />
             What's next
@@ -50,13 +51,13 @@ function SuccessStep() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link to="/dashboard" className="btn-primary inline-flex" data-testid="onboarding-go-dashboard">
+          <LinkButton to="/dashboard" variant="primary" className="inline-flex" data-testid="onboarding-go-dashboard">
             Go to dashboard
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
-          </Link>
-          <Link to="/search" className="btn-secondary inline-flex">
+          </LinkButton>
+          <LinkButton to="/search" variant="secondary" className="inline-flex">
             Run another search
-          </Link>
+          </LinkButton>
         </div>
       </div>
     </div>

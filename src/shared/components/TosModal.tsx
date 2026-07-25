@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from '@tanstack/react-router'
 import { Scale, X } from 'lucide-react'
+import { LinkButton } from '~/components/ui'
 
 interface ConsentStatus {
   userId: string | null
@@ -15,6 +15,8 @@ export function TosModal() {
   const [busy, setBusy] = React.useState(false)
   const [mounted, setMounted] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const panelRef = React.useRef<HTMLDivElement>(null)
+  const acceptRef = React.useRef<HTMLButtonElement>(null)
 
   React.useEffect(() => {
     setMounted(true)
@@ -24,10 +26,62 @@ export function TosModal() {
       .catch(() => setStatus({ userId: null, consents: {}, required: { tos: 'v1.0' }, needsAcceptance: [] }))
   }, [])
 
-  if (!mounted || !status) return null
-  // Only block if user is signed in AND needs to accept TOS
-  if (!status.userId) return null
-  if (!status.needsAcceptance.includes('tos')) return null
+  const isOpen = mounted && !!status && !!status.userId && status.needsAcceptance.includes('tos')
+
+  // Hand-rolled focus contract (this modal deliberately isn't built on the
+  // shared Radix-based `Dialog` because it must stay non-dismissible — no
+  // Escape-to-close, no outside-click-to-close — which is the opposite of
+  // that component's default). Mirrors what Radix gives the shared Dialog
+  // for free: initial focus on the primary control, Tab/Shift+Tab contained
+  // inside the panel, body scroll locked, and focus restored to whatever
+  // was focused before the modal appeared once it closes.
+  React.useEffect(() => {
+    if (!isOpen) return
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    acceptRef.current?.focus()
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    // Isolate the rest of the page from assistive-tech navigation while this
+    // mandatory modal blocks the app — `inert` removes it from both the tab
+    // order and the accessibility tree, not just visually (the modal already
+    // covers it visually via its own overlay).
+    const mainContent = document.getElementById('main-content')
+    const cookieBanner = document.querySelector<HTMLElement>('[data-testid="cookie-banner"]')
+    mainContent?.setAttribute('inert', '')
+    cookieBanner?.setAttribute('inert', '')
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return
+      const panel = panelRef.current
+      if (!panel) return
+      const focusable = panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      )
+      if (focusable.length === 0) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+      mainContent?.removeAttribute('inert')
+      cookieBanner?.removeAttribute('inert')
+      previouslyFocused?.focus?.()
+    }
+  }, [isOpen])
+
+  if (!isOpen || !status) return null
 
   const accept = async () => {
     setBusy(true)
@@ -56,7 +110,7 @@ export function TosModal() {
       aria-labelledby="tos-modal-title"
       data-testid="tos-modal"
     >
-      <div className="card w-full max-w-lg p-6 relative">
+      <div ref={panelRef} className="card w-full max-w-lg p-6 relative">
         <button
           type="button"
           onClick={() => {/* can't dismiss without accepting */}}
@@ -84,13 +138,14 @@ export function TosModal() {
         </ul>
 
         <div className="flex flex-wrap gap-2 items-center">
-          <Link to="/legal/terms" className="btn-ghost btn-sm" data-testid="tos-modal-read">
+          <LinkButton to="/legal/terms" variant="ghost" size="sm" data-testid="tos-modal-read">
             Read full terms →
-          </Link>
-          <Link to="/legal/privacy" className="btn-ghost btn-sm" data-testid="tos-modal-privacy">
+          </LinkButton>
+          <LinkButton to="/legal/privacy" variant="ghost" size="sm" data-testid="tos-modal-privacy">
             Privacy policy
-          </Link>
+          </LinkButton>
           <button
+            ref={acceptRef}
             type="button"
             onClick={accept}
             disabled={busy}

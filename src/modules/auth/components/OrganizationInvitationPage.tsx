@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { useSession } from '~/shared/lib/auth/client'
+import { Button } from '~/components/ui'
 
 type AcceptState = 'idle' | 'pending' | 'accepted' | 'error'
 
@@ -98,15 +99,15 @@ export function OrganizationInvitationPage({ invitationId }: { invitationId: str
         <p className="text-bh-success text-sm mb-4" data-testid="invitation-success">Invitation accepted — redirecting…</p>
       )}
 
-      <button
+      <Button
         type="button"
-        className="btn-primary"
+        variant="primary"
         disabled={state === 'pending' || state === 'accepted'}
         onClick={handleAccept}
         data-testid="invitation-accept-btn"
       >
         {state === 'pending' ? 'Accepting…' : 'Accept invitation'}
-      </button>
+      </Button>
     </div>
   )
 }

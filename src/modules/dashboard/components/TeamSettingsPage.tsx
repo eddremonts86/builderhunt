@@ -10,7 +10,7 @@ import {
   type TeamSnapshotDto,
   type TenantPrincipal,
 } from '~/shared/lib/organizations/contracts'
-import { Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button, Input, Label, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { OrganizationDangerZone } from './OrganizationDangerZone'
 
 /**
@@ -104,13 +104,13 @@ export function TeamSettingsPage({
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="team-error">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger" data-testid="team-error">
           {error}
         </div>
       )}
 
       {/* Members */}
-      <section className="glass-panel p-5 mb-6" data-testid="members-section">
+      <section className="card p-5 mb-6" data-testid="members-section">
         <h2 className="font-semibold flex items-center gap-2 mb-4">
           <Shield className="w-4 h-4 text-bh-accent" aria-hidden="true" />
           Members
@@ -167,16 +167,18 @@ export function TeamSettingsPage({
                 )}
 
                 {canRemoveThis && (
-                  <button
+                  <Button
                     type="button"
                     onClick={() => (onRemoveMember ?? noop)(member.userId)}
                     disabled={busy}
-                    className="btn-ghost btn-sm text-bh-danger"
+                    variant="ghost"
+                    size="sm"
+                    className="text-bh-danger"
                     aria-label={`Remove ${member.name}`}
                     data-testid={`remove-member-${member.userId}`}
                   >
                     <X className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
+                  </Button>
                 )}
               </li>
             )
@@ -186,7 +188,7 @@ export function TeamSettingsPage({
 
       {/* Pending invitations */}
       {canManageMembers && (
-        <section className="glass-panel p-5 mb-6" data-testid="invitations-section">
+        <section className="card p-5 mb-6" data-testid="invitations-section">
           <h2 className="font-semibold flex items-center gap-2 mb-4">
             <Mail className="w-4 h-4 text-bh-accent" aria-hidden="true" />
             Pending invitations
@@ -213,10 +215,11 @@ export function TeamSettingsPage({
                     )}
                   </div>
                   {devLinkByInvitationId?.[invitation.id] && (
-                    <button
+                    <Button
                       type="button"
                       onClick={() => copyInviteLink(invitation.id, devLinkByInvitationId[invitation.id])}
-                      className="btn-ghost btn-sm"
+                      variant="ghost"
+                      size="sm"
                       aria-label={`Copy invite link for ${invitation.email}`}
                       title={devLinkByInvitationId[invitation.id]}
                       data-testid={`copy-invitation-link-${invitation.id}`}
@@ -226,28 +229,31 @@ export function TeamSettingsPage({
                       ) : (
                         <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
                       )}
-                    </button>
+                    </Button>
                   )}
-                  <button
+                  <Button
                     type="button"
                     onClick={() => (onResendInvite ?? noop)(invitation.id)}
                     disabled={busy}
-                    className="btn-ghost btn-sm"
+                    variant="ghost"
+                    size="sm"
                     aria-label={`Resend invitation to ${invitation.email}`}
                     data-testid={`resend-invitation-${invitation.id}`}
                   >
                     <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => (onCancelInvite ?? noop)(invitation.id)}
                     disabled={busy}
-                    className="btn-ghost btn-sm text-bh-danger"
+                    variant="ghost"
+                    size="sm"
+                    className="text-bh-danger"
                     aria-label={`Cancel invitation to ${invitation.email}`}
                     data-testid={`cancel-invitation-${invitation.id}`}
                   >
                     <X className="w-3.5 h-3.5" aria-hidden="true" />
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -294,15 +300,15 @@ export function TeamSettingsPage({
                   </SelectContent>
                 </Select>
               </div>
-              <button
+              <Button
                 type="submit"
                 disabled={busy || seatsFull}
-                className="btn-primary text-sm"
+                className="text-sm"
                 data-testid="invite-submit-btn"
               >
                 <UserPlus className="w-4 h-4" aria-hidden="true" />
                 {seatsFull ? 'Seat limit reached' : 'Invite'}
-              </button>
+              </Button>
             </form>
           )}
         </section>

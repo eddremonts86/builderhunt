@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Building2, History, Save } from 'lucide-react'
-import { Input, Label, Textarea } from '~/components/ui'
+import { Button, Input, Label, Textarea } from '~/components/ui'
 
 interface TaxRegistration {
   country: string
@@ -165,12 +165,12 @@ export function SellerConfiguration() {
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
-      <form onSubmit={submit} className="glass-panel p-5 mb-6 space-y-3" data-testid="seller-configuration-form">
+      <form onSubmit={submit} className="card p-5 mb-6 space-y-3" data-testid="seller-configuration-form">
         <h2 className="font-semibold">
           {current ? `New version (currently v${current.version})` : 'Record the first version'}
         </h2>
@@ -212,13 +212,13 @@ export function SellerConfiguration() {
           <Input id="effectiveAt" type="datetime-local" value={form.effectiveAt} onChange={(e) => setForm({ ...form, effectiveAt: e.target.value })} className="w-full" required />
         </div>
 
-        <button type="submit" className="btn-primary" disabled={saving} data-testid="seller-configuration-save">
+        <Button type="submit" variant="primary" disabled={saving} data-testid="seller-configuration-save">
           <Save className="w-4 h-4" aria-hidden="true" />
           {saving ? 'Saving…' : 'Save new version'}
-        </button>
+        </Button>
       </form>
 
-      <section className="glass-panel p-5" data-testid="seller-configuration-history">
+      <section className="card p-5" data-testid="seller-configuration-history">
         <h2 className="font-semibold flex items-center gap-2 mb-3">
           <History className="w-4 h-4" aria-hidden="true" />
           Version history

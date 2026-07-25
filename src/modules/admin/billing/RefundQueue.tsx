@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
+import { ErrorState } from '~/shared/components/ErrorState'
 
 interface RefundRow {
   id: string
@@ -98,15 +99,14 @@ export function RefundQueue() {
         </Button>
       </div>
 
-      {error && (
-        <div className="p-2.5 rounded border border-bh-danger/30 bg-bh-danger/5 text-sm text-bh-danger" role="alert">{error}</div>
-      )}
+      {error && <ErrorState message={error} icon={false} />}
 
       {refunds && refunds.length === 0 && (
         <p className="text-sm text-bh-text-muted">No refund requests for this organization.</p>
       )}
 
       {refunds && refunds.length > 0 && (
+        <div className="table-scroll" tabIndex={0} role="region" aria-label="Refund requests table, scrollable">
         <table className="w-full text-sm" data-testid="refund-queue-table">
           <thead>
             <tr className="text-left text-bh-text-dim border-b border-bh-border">
@@ -143,7 +143,7 @@ export function RefundQueue() {
                 {decidingId === refund.id && (
                   <tr>
                     <td colSpan={5} className="py-3">
-                      <div className="glass-panel p-3 space-y-3">
+                      <div className="card p-3 space-y-3">
                         <div>
                           <Label htmlFor="refund-policy-select">Policy decision</Label>
                           <Select value={policyDecision} onValueChange={setPolicyDecision}>
@@ -176,6 +176,7 @@ export function RefundQueue() {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )

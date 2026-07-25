@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { LinkButton, Input } from '~/components/ui'
+import { LinkButton, Input, Button } from '~/components/ui'
 import {
   Sparkles, Target, ArrowRight, Check, Search,
   Bell, FileText, Download, Zap, Shield, Star
@@ -15,7 +15,6 @@ export function HomePage() {
 
   return (
     <>
-      <div id="main-content">
         {/* ───────────────────────── HERO ───────────────────────── */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-grid" aria-hidden="true" />
@@ -27,7 +26,7 @@ export function HomePage() {
                   Public beta · Free during beta
                 </span>
                 <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[1.05] mb-6 animate-fade-in-up">
-                  Find <span className="text-gradient-accent">builders</span>,<br />
+                  Find <span className="text-bh-accent">builders</span>,<br />
                   not just repos.
                 </h1>
                 <p className="text-lg md:text-xl text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
@@ -201,7 +200,7 @@ export function HomePage() {
                             <div className="w-6 h-6 rounded-full bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center text-[10px] font-bold text-bh-accent">JD</div>
                             <span className="text-xs font-bold text-bh-text">Jane Dev</span>
                           </div>
-                          <span className="text-xs bg-bh-success/15 border border-bh-success/30 text-bh-success px-2 py-0.5 rounded font-mono font-bold">Score 98</span>
+                          <span className="text-xs bg-bh-success/15 border border-bh-success/30 text-bh-success px-2 py-0.5 rounded font-bold">Score 98</span>
                         </div>
                       </div>
                     )
@@ -229,7 +228,10 @@ export function HomePage() {
                         <div className="w-12 h-12 rounded-2xl bg-bh-accent-soft border border-bh-accent/20 flex items-center justify-center timeline-dot">
                           <step.icon className="w-6 h-6 text-bh-accent" aria-hidden="true" />
                         </div>
-                        <span className="text-4xl font-extrabold text-bh-accent/20 font-serif leading-none">{step.n}</span>
+                        {/* Decorative — the `<ol>` already conveys step order to
+                            assistive tech; a faint 20%-opacity numeral fails
+                            text-contrast checks for no accessibility benefit. */}
+                        <span className="text-4xl font-extrabold text-bh-accent/20 font-serif leading-none" aria-hidden="true">{step.n}</span>
                       </div>
                       <h3 className="text-xl font-bold text-bh-text mb-2">{step.title}</h3>
                       <p className="text-bh-text-muted text-sm leading-relaxed">{step.desc}</p>
@@ -406,11 +408,11 @@ export function HomePage() {
                         <div className="space-y-2">
                           <div className="flex justify-between items-center bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs">
                             <span className="font-bold text-bh-text">@hugo_oss</span>
-                            <span className="text-bh-accent font-semibold font-mono">14 PRs merged / 14d</span>
+                            <span className="text-bh-accent font-semibold">14 PRs merged / 14d</span>
                           </div>
                           <div className="flex justify-between items-center bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs">
                             <span className="font-bold text-bh-text">@anna_codes</span>
-                            <span className="text-bh-accent font-semibold font-mono">8 PRs merged / 14d</span>
+                            <span className="text-bh-accent font-semibold">8 PRs merged / 14d</span>
                           </div>
                         </div>
                       </div>
@@ -465,7 +467,7 @@ export function HomePage() {
                         <div className="space-y-2">
                           <div className="bg-bh-surface border border-bh-border/60 rounded-lg p-2 text-xs flex justify-between">
                             <span className="font-bold text-bh-text">@r_coder</span>
-                            <span className="text-bh-accent text-[11px] font-mono">Top contributor (r/reactjs)</span>
+                            <span className="text-bh-accent text-[11px]">Top contributor (r/reactjs)</span>
                           </div>
                         </div>
                       </div>
@@ -537,7 +539,7 @@ export function HomePage() {
         {/* ───────────────────── TESTIMONIAL ────────────────────── */}
         <section className="section border-t border-bh-border bg-bh-bg-alt/30">
           <div className="container-narrow text-center">
-            <div className="flex justify-center gap-1 mb-6" aria-label="5 out of 5 stars">
+            <div className="flex justify-center gap-1 mb-6" role="img" aria-label="5 out of 5 stars">
               {[...Array(5)].map((_, i) => (
                 <Star key={i} className="w-5 h-5 fill-bh-warning text-bh-warning" aria-hidden="true" />
               ))}
@@ -600,16 +602,15 @@ export function HomePage() {
                 className="!bg-transparent !border-0 !shadow-none !rounded-none !px-3 !py-2 text-sm text-bh-text flex-grow placeholder:text-bh-text-dim"
                 aria-label="Newsletter email input"
               />
-              <button type="submit" className="btn-primary btn-sm px-4 rounded-lg font-bold">
+              <Button type="submit" size="sm" className="px-4 rounded-lg font-bold">
                 Join Alerts
-              </button>
+              </Button>
             </div>
             <p className="text-xs text-bh-text-dim mt-3">
               We send launch updates and feature summaries. No spam, unsubscribe anytime.
             </p>
           </div>
         </section>
-      </div>
     </>
   )
 }

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Map, Plus, Save, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
 import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button } from '~/components/ui/button'
 
 type RoadmapStatus = 'planned' | 'in_progress' | 'shipped'
 
@@ -189,25 +190,25 @@ function AdminRoadmapPage() {
             What we're building next. Public at /roadmap.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={startCreate}
-          className="btn-primary"
+          variant="primary"
           data-testid="admin-roadmap-new"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           New item
-        </button>
+        </Button>
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-roadmap-form">
+        <div className="card p-5 mb-6 space-y-3" data-testid="admin-roadmap-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New roadmap item' : 'Edit item'}
           </h2>
@@ -302,25 +303,25 @@ function AdminRoadmapPage() {
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <button
+            <Button
               type="button"
               onClick={creatingNew ? create : update}
               disabled={saving}
-              className="btn-primary"
+              variant="primary"
               data-testid="admin-roadmap-save"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
               {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={resetForm}
-              className="btn-secondary"
+              variant="secondary"
               data-testid="admin-roadmap-cancel"
             >
               <X className="w-4 h-4" aria-hidden="true" />
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -334,7 +335,7 @@ function AdminRoadmapPage() {
           items.map((i) => (
             <div
               key={i.id}
-              className="glass-panel p-4 flex items-start gap-3"
+              className="card p-4 flex items-start gap-3"
               data-testid={`admin-roadmap-row-${i.id}`}
             >
               <div className="flex flex-col gap-1">
@@ -380,22 +381,24 @@ function AdminRoadmapPage() {
                 )}
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                <button
+                <Button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className="btn-sm btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   data-testid="admin-roadmap-edit"
                 >
                   Edit
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
                   onClick={() => remove(i.id)}
-                  className="btn-sm btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   data-testid="admin-roadmap-delete"
                 >
                   <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
-                </button>
+                </Button>
               </div>
             </div>
           ))

@@ -40,15 +40,15 @@ function ImprintPage() {
         <section className="pt-4 border-t border-bh-border/40">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-1">Contact</h2>
           <p className="text-bh-text">
-            Email: <a href="mailto:hello@builderhunt.dev" className="text-bh-accent hover:underline">hello@builderhunt.dev</a>
+            Email: <a href="mailto:hello@builderhunt.dev" className="text-bh-accent underline">hello@builderhunt.dev</a>
             <br />
-            Support: <a href="mailto:support@builderhunt.dev" className="text-bh-accent hover:underline">support@builderhunt.dev</a>
+            Support: <a href="mailto:support@builderhunt.dev" className="text-bh-accent underline">support@builderhunt.dev</a>
             <br />
-            Privacy: <a href="mailto:privacy@builderhunt.dev" className="text-bh-accent hover:underline">privacy@builderhunt.dev</a>
+            Privacy: <a href="mailto:privacy@builderhunt.dev" className="text-bh-accent underline">privacy@builderhunt.dev</a>
             <br />
-            Legal: <a href="mailto:legal@builderhunt.dev" className="text-bh-accent hover:underline">legal@builderhunt.dev</a>
+            Legal: <a href="mailto:legal@builderhunt.dev" className="text-bh-accent underline">legal@builderhunt.dev</a>
             <br />
-            DMCA: <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent hover:underline">dmca@builderhunt.dev</a>
+            DMCA: <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent underline">dmca@builderhunt.dev</a>
           </p>
         </section>
 
@@ -82,7 +82,7 @@ function ImprintPage() {
           <p className="text-bh-text-muted text-sm leading-relaxed">
             No formal DMCA agent has been designated with the U.S. Copyright Office yet — this is
             an informal reporting channel we monitor and respond to, not a registered agent
-            contact. To report copyright infringement, email <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent hover:underline">dmca@builderhunt.dev</a> with:
+            contact. To report copyright infringement, email <a href="mailto:dmca@builderhunt.dev" className="text-bh-accent underline">dmca@builderhunt.dev</a> with:
             (1) the copyrighted work, (2) the URL on BuilderHunt allegedly infringing, (3) your
             contact info, (4) a good-faith statement, (5) a statement under penalty of perjury
             that you are authorized to act for the owner. We respond within 5 business days.
@@ -93,7 +93,7 @@ function ImprintPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-1">Dispute resolution</h2>
           <p className="text-bh-text-muted text-sm leading-relaxed">
             The European Commission provides an online platform for online dispute resolution:{' '}
-            <a href="https://ec.europa.eu/consumers/odr" className="text-bh-accent hover:underline" rel="nofollow noreferrer">ec.europa.eu/consumers/odr</a>.
+            <a href="https://ec.europa.eu/consumers/odr" className="text-bh-accent underline" rel="nofollow noreferrer">ec.europa.eu/consumers/odr</a>.
             We are not obliged and do not commit to participate in dispute resolution procedures before a consumer arbitration board.
           </p>
         </section>

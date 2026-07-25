@@ -51,7 +51,7 @@ export function CheckoutReturn() {
 
   return (
     <div data-testid="checkout-return-page" className="max-w-md mx-auto py-12 text-center">
-      <div role="status" aria-live="polite" className="glass-panel p-8">
+      <div role="status" aria-live="polite" className="card p-8">
         {statusQuery.isLoading && <PendingView label="Checking your subscription…" />}
         {statusQuery.isError && <ErrorRecoveryView />}
         {!statusQuery.isLoading && !statusQuery.isError && renderForState(state)}

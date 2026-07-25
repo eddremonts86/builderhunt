@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { createFileRoute, Link, useNavigate, redirect } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router'
 import { Sparkles, ArrowRight, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { Button, LinkButton } from '~/components/ui'
 
 export const Route = createFileRoute('/onboarding/welcome')({
   beforeLoad: async () => {
@@ -70,7 +71,7 @@ function WelcomeStep() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           {VALUE_PROPS.map((vp) => (
-            <div key={vp.title} className="glass-panel p-5">
+            <div key={vp.title} className="card p-5">
               <h3 className="font-semibold text-bh-text mb-2">{vp.title}</h3>
               <p className="text-sm text-bh-text-muted leading-relaxed">{vp.body}</p>
             </div>
@@ -78,19 +79,19 @@ function WelcomeStep() {
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Link to="/onboarding/search" className="btn-primary inline-flex" data-testid="onboarding-start">
+          <LinkButton to="/onboarding/search" variant="primary" className="inline-flex" data-testid="onboarding-start">
             Show me how
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
-          </Link>
-          <button
+          </LinkButton>
+          <Button
             onClick={skip}
             disabled={skipping}
-            className="btn-ghost"
+            variant="ghost"
             data-testid="onboarding-skip"
           >
             <X className="w-4 h-4" aria-hidden="true" />
             {skipping ? 'Skipping…' : 'Skip, take me to dashboard'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Cookie, X, Settings } from 'lucide-react'
-import { Checkbox } from '~/components/ui'
+import { Button, Checkbox } from '~/components/ui'
 
 const STORAGE_KEY = 'bh_cookie_consent'
 
@@ -122,41 +122,44 @@ export function CookieBanner() {
         )}
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <Button
             type="button"
+            size="sm"
             onClick={() => accept({ functional: true, analytics: true })}
-            className="btn-primary btn-sm"
             data-testid="cookie-banner-accept-all"
           >
             Accept all
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => accept({ functional: false, analytics: false })}
-            className="btn-secondary btn-sm"
             data-testid="cookie-banner-essential"
           >
             Essential only
-          </button>
+          </Button>
           {!showCustomize ? (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setShowCustomize(true)}
-              className="btn-ghost btn-sm"
               data-testid="cookie-banner-customize-btn"
             >
               <Settings className="w-3 h-3" aria-hidden="true" />
               Customize
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => accept({ functional, analytics })}
-              className="btn-ghost btn-sm"
               data-testid="cookie-banner-save-prefs"
             >
               Save preferences
-            </button>
+            </Button>
           )}
         </div>
       </div>

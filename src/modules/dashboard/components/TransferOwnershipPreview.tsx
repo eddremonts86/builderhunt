@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { AlertTriangle, CreditCard, Loader2, XCircle } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 /**
  * Read-only preview shown inside the transfer-ownership confirm dialog
@@ -90,7 +91,7 @@ export function TransferOwnershipPreview({ targetName, confirmDisabled = false, 
       </p>
 
       {preview.hasBillingCustomer ? (
-        <dl className="text-sm space-y-1.5 mb-4 glass-panel p-3">
+        <dl className="text-sm space-y-1.5 mb-4 card p-3">
           <div className="flex justify-between">
             <dt className="text-bh-text-muted">Payment method</dt>
             <dd className="flex items-center gap-1.5" data-testid="transfer-ownership-payment-method">
@@ -124,7 +125,7 @@ export function TransferOwnershipPreview({ targetName, confirmDisabled = false, 
         </p>
       )}
 
-      <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-warning">
+      <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 mb-4 flex items-start gap-2 text-sm text-bh-warning">
         <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden="true" />
         <p>
           Billing continues uninterrupted under the new owner.{' '}
@@ -136,18 +137,19 @@ export function TransferOwnershipPreview({ targetName, confirmDisabled = false, 
       </div>
 
       <div className="flex gap-2">
-        <button
+        <Button
           type="button"
-          className="btn-danger-outline btn-sm"
+          variant="danger-outline"
+          size="sm"
           data-testid="transfer-ownership-confirm"
           disabled={confirmDisabled}
           onClick={onConfirm}
         >
           Confirm transfer
-        </button>
-        <button type="button" className="btn-secondary btn-sm" data-testid="transfer-ownership-preview-cancel" onClick={onCancel}>
+        </Button>
+        <Button type="button" variant="secondary" size="sm" data-testid="transfer-ownership-preview-cancel" onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   )

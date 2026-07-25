@@ -1,24 +1,36 @@
-# App Reality — Ground Truth (2026-07-23)
+# App Reality — Ground Truth (2026-07-24)
 
 This document is the single source of truth about what is ACTUALLY implemented in
 BuilderHunt today. Every plan in `plans/` must be written against this reality, not
 against what older specs (or older versions of this document) imagined. If a plan
 contradicts this document, the plan is wrong.
 
-> **2026-07-23 rewrite note**: the previous version of this file (dated 2026-07-19) was
+> **2026-07-24 rewrite note**: the 2026-07-23 version had drifted materially in one day,
+> almost entirely because of how much of `stripe-billing-platform` landed. It claimed
+> "no Checkout, webhooks, credit ledger, or real payment processing exist yet" and
+> "4/~40 tasks" — in fact ~60 billing modules, a Stripe webhook receipt endpoint, the
+> credit ledger, and 19 `billing_*` tables all exist in code. It also misclassified
+> `builder_notes` as legacy per-user, and its migration/table/test counts were roughly
+> half of the real numbers. Every count below was re-derived by command
+> (`ls drizzle/*.sql`, `grep -c '= pgTable('`, `pnpm test`), not carried forward.
+>
+> **2026-07-23 rewrite note**: the version before that (dated 2026-07-19) was
 > significantly stale — written before `security-and-multitenancy` shipped Better Auth
 > Organizations/RLS/tenant roles, before `team-accounts` completed, and before
 > `semantic-search`/`ai-sourcing-sprints`/`proactive-discovery`/`ai-expansion` all landed.
-> It still described a single-tenant, per-user, no-AI app. Every claim below was
-> re-verified against the current codebase (`schema.ts`, `env.ts`, `plans/*/tasks.md`
-> status headers) rather than carried forward from the old text.
+> It still described a single-tenant, per-user, no-AI app.
+>
+> **Lesson worth acting on**: this file has now been materially stale at two consecutive
+> checks. Treat every *count* and every "NOT implemented" claim here as needing
+> re-verification against the code before a plan leans on it. The architecture and
+> constraint sections age far better than the inventories.
 
 ## Stack
 
 - **Framework**: TanStack Start (React 19, file-based routes in `src/routes/`, API routes
   as server route files under `src/routes/api/`). Router tree generated in `src/routeTree.gen.ts`.
-- **DB**: PostgreSQL via Drizzle ORM (`src/shared/lib/db/schema.ts`, 27 migrations in
-  `drizzle/`, 43 tables). pgvector extension enabled (`builder_embeddings.embedding`, HNSW
+- **DB**: PostgreSQL via Drizzle ORM (`src/shared/lib/db/schema.ts`, **46 migrations** in
+  `drizzle/`, **68 tables** — verified 2026-07-24). pgvector extension enabled (`builder_embeddings.embedding`, HNSW
   index). Multi-tenant: Better Auth Organizations, tenant-scoped RLS on every private table,
   non-owner runtime/auth/worker/platform database roles
   (`DATABASE_URL`/`DATABASE_AUTH_URL`/`DATABASE_WORKER_URL`/`DATABASE_PLATFORM_URL`), and a
@@ -50,7 +62,16 @@ contradicts this document, the plan is wrong.
   closed on production misconfiguration, and — for Stripe billing specifically — on
   misconfiguration in every environment, not just production).
 - **Tests**: vitest; pure-logic modules in `src/shared/lib/*.ts` have sibling `*.test.ts`.
-  719 tests across 90 files (`pnpm test`, 2026-07-23). `scripts/db/verify-api-isolation-local.mjs`
+  **1898 tests across 184 files, all green** (`pnpm test` at commit `5f7beb4`, 2026-07-24:
+  1888 pass, 10 skipped, 0 failing).
+  Earlier the same day the suite had one failure — `migration-integrity.test.ts`, because
+  `drizzle/meta/0045_snapshot.json` was missing while `_journal.json` had 46 entries. It was
+  fixed within the hour; all 46 migrations now have a matching snapshot. Two things are worth
+  keeping from that episode: grants-only migrations DO get a snapshot (`0044_snapshot.json`
+  exists), so omitting one is a bug rather than a convention; and migration release gate 1 in
+  `security-policy.md` ("migration files and Drizzle journal/snapshots agree") is enforced by
+  a real test, so re-run it after hand-editing anything under `drizzle/meta/`.
+  `scripts/db/verify-api-isolation-local.mjs`
   (`pnpm test:api-isolation:local`) exercises real route handlers against a disposable Postgres
   connected as the exact non-owner runtime roles — 86/86 checks as of 2026-07-23.
 - **Deploy**: Docker (root `Dockerfile`, `server.prod.mjs`), Coolify on a Hetzner VPS.
@@ -90,8 +111,18 @@ contradicts this document, the plan is wrong.
   for organization-scoped React Query cache invalidation).
 - Routes: `_landing/*` public marketing, `_dashboard/*` authed app (org-scoped), `api/*` JSON
   endpoints, `api/admin/*` platform-admin-only.
+- `server/security.mjs` — **outside `src/` on purpose**. It is the single implementation of the
+  security headers and the CSRF mutation-origin gate, imported directly by the production
+  entrypoint `server.prod.mjs`. It lives in plain ESM because the runtime Docker stage copies
+  `server.prod.mjs` and `server/` but NOT `src/`, so a TypeScript module could not be imported
+  there. Tests: `test/security/http-security.test.ts`; types: `server/security.d.mts`. Enforcement
+  is at the wrapper because it must also cover paths the app handler never sees (static assets,
+  the 403 itself, and the 500 emitted when `app.fetch` throws). A parallel copy previously lived
+  at `src/shared/lib/security/headers.ts`, tested but imported by nothing while the shipped
+  enforcement was an untested inline duplicate; that copy was deleted 2026-07-24. **Do not
+  reintroduce a second copy** — a stricter per-route CSP means a named variant export there.
 
-## Database tables (schema.ts, 43 tables, all EXISTING)
+## Database tables (schema.ts, 68 tables, all EXISTING — verified 2026-07-24)
 
 **Auth/organizations** (better-auth + organization lifecycle): `auth_users`, `auth_sessions`,
 `auth_accounts`, `auth_verifications`, `organizations`, `organization_members`,
@@ -105,8 +136,24 @@ tracking + private metadata, unique `(organizationId, builderIdentityId)`), `bui
 
 **Legacy per-user cache** (still exists for migration evidence; NOT the live tracking path —
 `organization_builders` is): `builders` (per-user, `userId` NOT NULL, dual-written alongside
-`organization_builders` by `trackOrganizationBuilder`), `saved_queries`, `alerts`,
-`alert_triggers`, `builder_notes`.
+`organization_builders` by `trackOrganizationBuilder`).
+
+**Tenant-private, org-scoped, and LIVE** (previously misfiled above as "legacy per-user"):
+`saved_queries`, `alerts`, `alert_triggers`, `builder_notes`. All four carry `organization_id`
+(nullable, pending the canonical cutover) and have RLS enabled + FORCED (`drizzle/0008_tenant_rls.sql`).
+`builder_notes` specifically is the live tenant notes path via `listOrganizationBuilderNotes`
+in `src/shared/lib/repositories/organization-builders.ts`, with a composite tenant FK
+`builder_notes_organization_builder_fk`. **Caveat that matters for new work**: its
+`builder_id` still references the legacy `builders` table's id space, not
+`organization_builders` — so notes are org-scoped but not yet re-keyed onto the canonical
+tracking table.
+
+**Known dead-ish surfaces** (exist in schema, effectively unused at runtime — check before
+building on them): `builder_source_snapshots` has **no runtime writer** (its only writer is
+the one-shot backfill `scripts/db/backfills/builders.ts`) and no `builderhunt_app` grant;
+`organization_plan_changes` has no writer. `builder_identities.first_seen_at` is written only
+by `trackOrganizationBuilder`, so it measures *when a tenant tracked someone*, not when the
+person was first observed — it is not a market time series.
 
 **Onboarding**: `onboarding_progress`, `onboarding_selected_builders`.
 
@@ -119,6 +166,25 @@ tracking + private metadata, unique `(organizationId, builderIdentityId)`), `bui
 
 **Billing (canonical, per-organization)**: `organization_entitlements`, `organization_plan_changes`
 (schema exists but is currently dead code — nothing writes to it yet).
+
+**Billing (Stripe platform, 19 tables — ALL EXIST)**: `billing_customers`,
+`billing_subscriptions`, `billing_checkout_attempts`, `billing_credit_grants`,
+`billing_credit_reservations`, `billing_credit_allocations`, `billing_ledger_entries`,
+`billing_auto_recharge_rules`, `billing_refunds`, `billing_disputes`, `billing_risk_events`,
+`billing_risk_exceptions`, `billing_webhook_events`, `billing_reconciliation_runs`,
+`billing_provider_usage`, `billing_notification_log`, `billing_contacts`,
+`billing_terms_acceptances`, `billing_seller_profiles`.
+
+**Abuse and usage integrity** (plan `abuse-and-usage-integrity`, header still says `pending` but
+17/33 tasks are done — treat it as partially-implemented): `abuse_signals`, `account_risk`,
+`session_signals`, `user_devices`, `seat_usage_daily`. Logic in `src/shared/lib/abuse/`
+(anomalies, anti-automation, device, email-hygiene, linked-accounts, risk, session-guard,
+signals — all with sibling tests). The decayed combined-signal risk score in
+`src/shared/lib/abuse/risk.ts` is the reusable scoring/decay precedent for any new scoring
+feature.
+
+**Organization deletion**: `organization_deletion_financial_records` (in addition to
+`organization_deletion_requests`).
 
 **Migration tooling** (owner-role only, never touched by the app runtime): `migration_backfill_runs`,
 `migration_backfill_conflicts`.
@@ -211,14 +277,34 @@ against the real roles, not just the DB owner.
   subscribers keep their contracted price until migration), limit enforcement (`billing.ts`,
   `repositories/entitlements.ts`), plan-change requests + admin approval (`plan_requests`,
   admin UI).
-- **Stripe billing platform** (plan: `stripe-billing-platform`, `in_progress`, 4/~40 tasks):
-  dependency contracts pinned, launch decision register (`docs/operations/stripe-launch-register.md`,
-  every gate `_pending_` — no Stripe account exists yet), Stripe SDK pinned + lazy fail-closed
-  client (`src/shared/lib/billing/stripe-client.ts`), new immutable catalog with Pro Max added
-  (`src/shared/lib/billing/catalog.ts` — separate from and NOT reconciled with the legacy
-  `PLAN_PRICING` except where intentionally matching), deterministic fake billing provider for
-  tests. **No Checkout, webhooks, credit ledger, or real payment processing exist yet.**
-  Supersedes `pricing-and-billing` (superseded).
+- **Stripe billing platform** (plan: `stripe-billing-platform`, `in_progress`, ~29/40 sections
+  done, 49/51 task checkboxes): **this is now a large, largely-built subsystem** —
+  `src/shared/lib/billing/` holds ~60 modules, each with a sibling test, including
+  `catalog.ts` (immutable catalog incl. Pro Max), `rate-cards.ts`, `feature-authorization.ts`,
+  `credits.ts` / `reservations.ts` (the credit ledger), `checkout.ts`, `portal.ts`,
+  `refunds.ts`, `disputes.ts`, `dunning.ts`, `auto-recharge.ts`, `annual-grants.ts`,
+  `reconciliation.ts`, `accounting-export.ts`, `notifications.ts`, `risk.ts`,
+  `legacy-migration.ts`, `price-migrations.ts`, `webhook-inbox.ts`, plus `provider.ts`, a
+  `real-provider.ts`, a deterministic `fake-provider.ts` and a shared
+  `provider-contract-suite.ts`. Routes exist: `src/routes/api/webhooks/stripe.ts` (signature
+  verification + inbox), `src/routes/api/billing/*` (checkout, portal, subscription,
+  auto-recharge, refunds, disputes, contact, summary), `src/routes/api/admin/billing/*`
+  (reconcile, refunds, disputes, risk-exceptions, metrics, accounting-export, configuration,
+  events, `run-worker`), and admin pages `_dashboard/admin/{billing,refunds,disputes}.tsx`.
+  Payload encryption at rest exists (`src/shared/lib/crypto/webhook-payload.ts`, AES-256-GCM
+  keyed on `WEBHOOK_PAYLOAD_ENCRYPTION_KEY`).
+  **What is still genuinely absent is operational, not code**: `STRIPE_BILLING_ENABLED`
+  defaults to `false` and is false everywhere, no Stripe account/Products/Prices exist, and
+  every gate in `docs/operations/stripe-launch-register.md` is `_pending_`. Consequence for
+  plans: no organization has a `billing_subscriptions` row, so a feature gated on a
+  subscription ships dark. Supersedes `pricing-and-billing` (superseded).
+
+  **Two gating surfaces are live and a plan must pick deliberately**: (a) the *entitlement*
+  path — `organization_entitlements` + `resolveLegacyPlanTier` + `PLAN_LIMITS`, admin-granted,
+  works today with Stripe off, correct for boolean/numeric capability gates (this is what the
+  shipped sprints gate uses); (b) the *credit* path — a rate-card entry +
+  `feature-authorization.ts` + `billing_credit_*`, correct when the feature has a real
+  per-request marginal cost (LLM tokens, third-party API calls) that must be metered.
 - **Legal & privacy**: `/legal/*` pages, consent API, data export requests, account deletion
   (org-aware: blocks a sole owner of a multi-member organization from deleting their account
   until ownership transfers; personal-org-only owners are never blocked).
@@ -236,6 +322,14 @@ against the real roles, not just the DB owner.
 - **Code-style fingerprinting v1 (heuristic, NO LLM)**: `src/shared/lib/code-style.ts` —
   per-language heuristic vectors, stored per builder.
 - **Project hygiene v1 (heuristic)**: `src/shared/lib/hygiene.ts` + `HygieneCard.tsx`.
+- **Abuse and usage integrity** (plan: `abuse-and-usage-integrity`, header says `pending` but
+  17/33 tasks are done — the header is stale): device-keyed sign-up rate limiting, disposable-domain
+  blocking + plus-address normalization, linked-account clustering, impossible-travel / UA-change /
+  seat-overuse anomaly detectors, a decayed combined-signal account risk score, session concurrency
+  and idle/absolute timeout guards, per-seat daily quotas. Code in `src/shared/lib/abuse/*`,
+  `src/shared/lib/repositories/{account-risk,abuse-signals,user-devices,seat-usage}.ts`,
+  migrations `drizzle/0043`–`0045`. `ABUSE_ENFORCEMENT_MODE` defaults to `observe`, so detection
+  is live but enforcement is not.
 
 ## NOT implemented (zero or near-zero code)
 
@@ -250,11 +344,17 @@ against the real roles, not just the DB owner.
 - Waitlist/launch gating (plan: `waitlist-launch`, `pending`).
 - Solutions intelligence (plan: `solutions-intelligence`, `pending` — newly added, no
   implementation yet).
-- Stripe Checkout, webhooks, Customer Portal, credit ledger, refunds/disputes, reconciliation —
-  see "Stripe billing platform" above; only the dependency/catalog/fake-provider foundation
-  exists.
-- Live Stripe payment processing of any kind — `STRIPE_BILLING_ENABLED` is `false` everywhere;
-  no Stripe account, Products, or Prices exist.
+- **Everything in `plans/fase-2/`** (added 2026-07-24, all 10 `pending`, zero code):
+  `hiring-pipeline-kanban`, `match-evidence-panel`, `saved-search-health`,
+  `jd-to-candidates-matching`, `collaboration-graph`, `look-alike-sourcing`,
+  `availability-signals`, `browser-extension-overlay`, `ats-integrations`,
+  `talent-market-intelligence`. These live one directory deeper than the other plans, so their
+  cross-plan links use `../../<plan>/` for phase-1 plans and `../<plan>/` for siblings.
+- **Live** Stripe payment processing of any kind — `STRIPE_BILLING_ENABLED` is `false`
+  everywhere; no Stripe account, Products, or Prices exist; no organization has a
+  `billing_subscriptions` row. The *code* for Checkout, webhooks, Customer Portal, the credit
+  ledger, refunds/disputes and reconciliation all exists — see "Stripe billing platform" above.
+  Do not repeat the older claim that it does not.
 
 ## Env vars (env.ts today)
 
@@ -290,7 +390,26 @@ Public profile enrichment (disabled by default — see
 Stripe billing (disabled by default — see `docs/operations/stripe-launch-register.md` before
 enabling anywhere; fails closed in every environment, not just production, if enabled without
 a fully valid configuration): `STRIPE_BILLING_ENABLED`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_API_VERSION`.
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_WEBHOOK_SECRET_PREVIOUS` (webhook-secret rotation window),
+`STRIPE_API_VERSION`, `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` (64 hex chars / 32 bytes; **required**
+when `STRIPE_BILLING_ENABLED=true`).
+
+Cron authentication: `CRON_SECRET` (optional; `src/shared/lib/auth/cron.ts`).
+
+Abuse and usage integrity (`abuse-and-usage-integrity`): `ABUSE_ENFORCEMENT_MODE`
+(`observe|warn|enforce`, defaults `observe`), `ABUSE_ALLOWLIST_ASNS`,
+`ABUSE_CROSS_TENANT_DENIAL_THRESHOLD`, `ABUSE_CROSS_TENANT_DENIAL_WINDOW_MINUTES`,
+`SIGNUP_BLOCK_DISPOSABLE_EMAILS`, `SIGNUP_DEVICE_DAILY_LIMIT`, `SIGNUP_REQUIRE_VERIFIED_EMAIL`.
+
+Session limits: `SESSION_IDLE_TIMEOUT_MINUTES`, `SESSION_ABSOLUTE_TIMEOUT_HOURS`,
+`SESSION_MAX_CONCURRENT_FREE`, `SESSION_MAX_CONCURRENT_PRO`,
+`SESSION_MAX_CONCURRENT_TEAM_PER_SEAT`.
+
+Per-seat daily quotas: `SEAT_DAILY_SEARCHES`, `SEAT_DAILY_EXPORTS`, `SEAT_DAILY_MESSAGES`,
+`SEAT_DAILY_REVEALS`.
+
+`env.ts` declares **73 variables** as of 2026-07-24; the lists above are grouped, not exhaustive —
+read `src/shared/lib/env.ts` when a plan adds one.
 
 Read directly from `process.env`, NOT part of the validated `env` schema: `ADMIN_USER_IDS`
 (platform-admin allow-list), `REDIS_URL` (optional; in-memory fallback when unset).
@@ -305,10 +424,12 @@ Read directly from `process.env`, NOT part of the validated `env` schema: `ADMIN
    `trackOrganizationBuilder` — but `organization_builders` (tenant-private, keyed by
    `(organizationId, builderIdentityId)`) is the canonical tracking store. New features read/
    write `organization_builders` under `withTenantContext`, never `builders` directly.
-3. No background job runner exists. Every worker (alerts, discovery, sprints, embeddings,
-   enrichment) runs via an admin-triggered HTTP endpoint under `/api/admin/*/run-worker`,
-   designed to be hit by an external cron (Coolify/VPS cron or Stripe's future worker). New
-   background work should follow this same pattern, NOT invent a queue system.
+3. No background job runner exists. All **seven** workers — alerts, discovery, sprints,
+   embeddings, enrichment, legal, billing — run via an admin-triggered HTTP endpoint under
+   `/api/admin/*/run-worker`, designed to be hit by an external cron (Coolify/VPS cron).
+   Cron authentication now exists as a shared helper (`CRON_SECRET`,
+   `src/shared/lib/auth/cron.ts`). New background work should follow this same pattern, NOT
+   invent a queue system.
 4. Search results are ephemeral (cache TTL) — anything needing durable profiles must write
    through to `organization_builders`/`builder_identities` or a new global table.
 5. The legacy manual billing system (`plans`, `plan_requests`) and the canonical
@@ -329,6 +450,18 @@ Read directly from `process.env`, NOT part of the validated `env` schema: `ADMIN
    Date-vs-string bug) were found this way in one session by extending
    `scripts/db/verify-api-isolation-local.mjs`, none of them caught by code review or the
    existing (owner-role-only) test suite.
-8. Platform-admin authority (`ADMIN_USER_IDS`) is completely separate from organization roles —
+8. **Several `RawBuilder` fields are synthesized by the source adapters, not fetched.** Any plan
+   that presents source data as measured evidence must check the adapter first. Verified
+   examples as of 2026-07-24: `stackoverflow.ts` sets `bio` to `"NN% accept rate"` and
+   `metadata.lastSeen` to `Date.now()` (so every Stack Overflow result harvests full recency
+   credit); `npm.ts` sets `bio` to `"Maintains <pkg> on npm"` and `followersCount` to
+   `maxScore * 100000` (a 0–1 quality score rendered as a follower count); `hn.ts` sets
+   `topics` to the query keywords (making any "matches your topic" claim circular) and `bio` to
+   `Posted: "<title>"`; `lobsters.ts` has no `bio` at all; GitHub *repository* results use
+   `repo.description` as the `bio`, and `bio` is declared on `GitHubSearchUser` but is not part
+   of what `/search/users` returns. This is the same class of defect `project-hygiene` exists to
+   fix, and it is not fully fixed. Treat `bio`, `followersCount`, `topics` and
+   `metadata.lastSeen` as per-source-provenance fields, never as uniform measured facts.
+9. Platform-admin authority (`ADMIN_USER_IDS`) is completely separate from organization roles —
    an organization owner has zero platform-admin capability, and vice versa. Never conflate the
    two, and never gate a platform-admin route on an organization role check.

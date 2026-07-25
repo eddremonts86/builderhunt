@@ -2,7 +2,7 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { AlertTriangle, Plus, Save, X } from 'lucide-react'
 import { getAppAuthSession, getIsAppAdmin } from '~/shared/lib/auth/auth-session'
-import { Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
+import { Button, Input, Textarea, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 
 type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved'
 type IncidentSeverity = 'minor' | 'major' | 'critical'
@@ -173,25 +173,24 @@ function AdminIncidentsPage() {
             Manage active and historical incidents. Status page auto-updates.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           onClick={startCreate}
-          className="btn-primary"
           data-testid="admin-incident-new"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           New incident
-        </button>
+        </Button>
       </header>
 
       {error && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 mb-4 text-sm text-bh-danger">
           {error}
         </div>
       )}
 
       {(creatingNew || editingId) && (
-        <div className="glass-panel p-5 mb-6 space-y-3" data-testid="admin-incident-form">
+        <div className="card p-5 mb-6 space-y-3" data-testid="admin-incident-form">
           <h2 className="font-semibold">
             {creatingNew ? 'New incident' : 'Edit incident'}
           </h2>
@@ -246,42 +245,40 @@ function AdminIncidentsPage() {
                 </label>
                 <div className="flex flex-wrap gap-2">
                   {COMPONENTS.map((c) => (
-                    <button
+                    <Button
                       key={c}
                       type="button"
                       onClick={() => toggleComponent(c)}
-                      className={`btn-sm ${
-                        form.affectedComponents.includes(c) ? 'btn-primary' : 'btn-secondary'
-                      }`}
+                      variant={form.affectedComponents.includes(c) ? 'primary' : 'secondary'}
+                      size="sm"
                       data-testid={`admin-incident-component-${c}`}
                     >
                       {c}
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </div>
             </>
           )}
           <div className="flex gap-2 pt-2">
-            <button
+            <Button
               type="button"
               onClick={creatingNew ? create : update}
               disabled={saving}
-              className="btn-primary"
               data-testid="admin-incident-save"
             >
               <Save className="w-4 h-4" aria-hidden="true" />
               {saving ? 'Saving…' : 'Save'}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               onClick={resetForm}
-              className="btn-secondary"
+              variant="secondary"
               data-testid="admin-incident-cancel"
             >
               <X className="w-4 h-4" aria-hidden="true" />
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -295,7 +292,7 @@ function AdminIncidentsPage() {
           incidents.map((i) => (
             <div
               key={i.id}
-              className="glass-panel p-4 flex items-start gap-3"
+              className="card p-4 flex items-start gap-3"
               data-testid={`admin-incident-row-${i.id}`}
             >
               <div className="flex-1 min-w-0">
@@ -330,45 +327,48 @@ function AdminIncidentsPage() {
                 {i.status !== 'resolved' && (
                   <>
                     {i.status === 'investigating' && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => updateStatus(i.id, 'identified')}
                         disabled={saving}
-                        className="btn-sm btn-secondary"
+                        variant="secondary"
+                        size="sm"
                         data-testid="admin-incident-mark-identified"
                       >
                         Mark identified
-                      </button>
+                      </Button>
                     )}
                     {(i.status === 'identified' || i.status === 'monitoring') && (
-                      <button
+                      <Button
                         type="button"
                         onClick={() => updateStatus(i.id, 'monitoring')}
                         disabled={saving}
-                        className="btn-sm btn-secondary"
+                        variant="secondary"
+                        size="sm"
                       >
                         Monitoring
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
                       type="button"
                       onClick={() => updateStatus(i.id, 'resolved')}
                       disabled={saving}
-                      className="btn-sm btn-primary"
+                      size="sm"
                       data-testid="admin-incident-resolve"
                     >
                       Resolve
-                    </button>
+                    </Button>
                   </>
                 )}
-                <button
+                <Button
                   type="button"
                   onClick={() => startEdit(i)}
-                  className="btn-sm btn-secondary"
+                  variant="secondary"
+                  size="sm"
                   data-testid="admin-incident-edit"
                 >
                   Edit
-                </button>
+                </Button>
               </div>
             </div>
           ))

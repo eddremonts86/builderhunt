@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Download, Bookmark, Trash2, ExternalLink, Search } from 'lucide-react'
-import { LinkComponent, ScoreRing } from '~/components/ui'
+import { Button, LinkButton, LinkComponent, ScoreRing } from '~/components/ui'
 
 interface TrackedBuilder {
   id: string
@@ -93,7 +93,7 @@ export function ExportsPage() {
       </div>
 
       {error && (
-        <div className="glass-panel mb-6 border-bh-danger/30 bg-bh-danger/5">
+        <div className="card mb-6 border-bh-danger/30 bg-bh-danger/5">
           <p className="text-sm text-bh-danger">{error}</p>
         </div>
       )}
@@ -102,13 +102,13 @@ export function ExportsPage() {
         <div className="space-y-3 animate-pulse">
           <div className="h-20 bg-bh-surface/50 rounded-3xl" />
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="glass-panel h-16 bg-bh-surface/50" />
+            <div key={i} className="card h-16 bg-bh-surface/50" />
           ))}
         </div>
       )}
 
       {!loading && count === 0 && !error && (
-        <div className="glass-panel text-center py-14">
+        <div className="card text-center py-14">
           <div className="w-12 h-12 rounded-xl bg-bh-accent-soft flex items-center justify-center mx-auto mb-4">
             <Bookmark className="w-6 h-6 text-bh-accent" />
           </div>
@@ -116,16 +116,16 @@ export function ExportsPage() {
           <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-5">
             Search for builders and click "Track" on the ones you want to keep — they'll show up here, ready to export.
           </p>
-          <LinkComponent to="/search" className="btn-primary btn-sm inline-flex items-center gap-2">
+          <LinkButton to="/search" variant="primary" size="sm" className="inline-flex items-center gap-2">
             <Search className="w-4 h-4" /> Track your first builder
-          </LinkComponent>
+          </LinkButton>
         </div>
       )}
 
       {!loading && count > 0 && (
         <>
           {/* Toolbar: count + source mix + primary export action, all in one place */}
-          <div className="glass-panel mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <div className="card mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
             <div className="flex-1 min-w-0">
               <p className="text-2xl font-bold text-bh-text leading-none mb-1.5">
                 {count} <span className="text-base font-medium text-bh-text-muted">builder{count === 1 ? '' : 's'} tracked</span>
@@ -140,14 +140,15 @@ export function ExportsPage() {
             </div>
             <div className="sm:text-right shrink-0">
               {downloadMsg && <p className="text-sm mb-2 text-bh-danger">{downloadMsg}</p>}
-              <button
+              <Button
+                variant="primary"
                 onClick={handleDownload}
                 disabled={downloading}
-                className="btn-primary w-full sm:w-auto flex items-center justify-center gap-2"
+                className="w-full sm:w-auto flex items-center justify-center gap-2"
               >
                 {downloading ? <span className="spinner" /> : <Download className="w-4 h-4" />}
                 {downloading ? 'Preparing...' : 'Download CSV'}
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -155,7 +156,7 @@ export function ExportsPage() {
             {builders!.map((b) => (
               <li
                 key={b.id}
-                className="glass-panel card-hover p-3 flex items-center gap-3"
+                className="card card-hover p-3 flex items-center gap-3"
                 data-testid={`tracked-builder-${b.id}`}
               >
                 {b.avatarUrl ? (
@@ -185,15 +186,17 @@ export function ExportsPage() {
                 >
                   <ExternalLink className="w-4 h-4" />
                 </a>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   onClick={() => handleRemove(b.id)}
                   disabled={removingId === b.id}
-                  className="btn-ghost btn-sm shrink-0 text-bh-danger"
+                  className="shrink-0 text-bh-danger"
                   title="Remove from tracked builders"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

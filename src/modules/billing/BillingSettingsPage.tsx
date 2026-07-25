@@ -5,6 +5,7 @@ import { AlertTriangle, Crown, ExternalLink } from 'lucide-react'
 import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { Button } from '~/components/ui'
+import { LoadingState } from '~/shared/components/LoadingState'
 import { listActiveSubscriptionCatalog, TIER_PRESENTATION, type CatalogTier } from '~/shared/lib/billing/catalog'
 import { AutoRechargeSettings } from './AutoRechargeSettings'
 import { BillingContact } from './BillingContact'
@@ -152,12 +153,12 @@ export function BillingSettingsPage() {
   }
 
   if (summaryQuery.isLoading) {
-    return <p className="text-bh-text-muted" data-testid="billing-settings-loading">Loading…</p>
+    return <LoadingState testId="billing-settings-loading" />
   }
 
   if (summaryQuery.isError || !summary) {
     return (
-      <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 text-sm text-bh-danger" data-testid="billing-settings-error">
+      <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 text-sm text-bh-danger" data-testid="billing-settings-error">
         Unable to load billing right now.
       </div>
     )
@@ -167,7 +168,7 @@ export function BillingSettingsPage() {
   // owner-contact action." No plan/period/seats/credit-grant/refund detail is even fetched for them.
   if (!isElevatedSummary(summary)) {
     return (
-      <div className="glass-panel p-5 text-sm" data-testid="billing-availability">
+      <div className="card p-5 text-sm" data-testid="billing-availability">
         <p className="text-bh-text">
           {summary.capabilities.paidActionsAllowed
             ? 'Your organization has paid features enabled.'
@@ -186,7 +187,7 @@ export function BillingSettingsPage() {
   return (
     <div className="space-y-6" data-testid="billing-settings-content">
       {summary.grace.paymentBlockedAt && (
-        <div className="glass-panel border-bh-danger/30 bg-bh-danger/5 p-3 text-sm text-bh-danger flex items-start gap-2" data-testid="warning-payment-blocked">
+        <div className="card border-bh-danger/30 bg-bh-danger/5 p-3 text-sm text-bh-danger flex items-start gap-2" data-testid="warning-payment-blocked">
           <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
           <p>Paid features are on hold because a payment failed and the grace period ended. Update your payment method to restore access.</p>
         </div>
@@ -195,7 +196,7 @@ export function BillingSettingsPage() {
         const remaining = daysUntil(summary.grace.gracePeriodEndsAt!)
         const severe = remaining <= 1
         return (
-          <div className={`glass-panel p-3 text-sm flex items-start gap-2 ${severe ? 'border-bh-danger/30 bg-bh-danger/5 text-bh-danger' : 'border-bh-warning/30 bg-bh-warning/5 text-bh-warning'}`} data-testid="warning-grace-period">
+          <div className={`card p-3 text-sm flex items-start gap-2 ${severe ? 'border-bh-danger/30 bg-bh-danger/5 text-bh-danger' : 'border-bh-warning/30 bg-bh-warning/5 text-bh-warning'}`} data-testid="warning-grace-period">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
             <p>
               {severe
@@ -206,22 +207,22 @@ export function BillingSettingsPage() {
         )
       })()}
       {summary.scheduledChange && (
-        <div className="glass-panel border-bh-accent/30 bg-bh-accent/5 p-3 text-sm text-bh-accent" data-testid="warning-scheduled-change">
+        <div className="card border-bh-accent/30 bg-bh-accent/5 p-3 text-sm text-bh-accent" data-testid="warning-scheduled-change">
           Your plan will change to <strong>{summary.scheduledChange.catalogKey}</strong> on {new Date(summary.scheduledChange.effectiveAt).toLocaleDateString()}.
         </div>
       )}
       {summary.cancelAtPeriodEnd && (
-        <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 text-sm text-bh-warning" data-testid="warning-cancel-scheduled">
+        <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 text-sm text-bh-warning" data-testid="warning-cancel-scheduled">
           Your subscription is set to cancel{summary.currentPeriodEnd ? ` on ${new Date(summary.currentPeriodEnd).toLocaleDateString()}` : ''}. You keep access until then.
         </div>
       )}
       {!summary.cancelAtPeriodEnd && summary.currentPeriodEnd && daysUntil(summary.currentPeriodEnd) <= 30 && daysUntil(summary.currentPeriodEnd) > 0 && (
-        <div className="glass-panel p-3 text-sm text-bh-text-muted" data-testid="notice-renewal-soon">
+        <div className="card p-3 text-sm text-bh-text-muted" data-testid="notice-renewal-soon">
           Renews on {new Date(summary.currentPeriodEnd).toLocaleDateString()}.
         </div>
       )}
 
-      <section className="glass-panel p-5">
+      <section className="card p-5">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-lg font-bold text-bh-text flex items-center gap-2">
             <Crown className="w-5 h-5 text-bh-accent" aria-hidden="true" />
@@ -263,7 +264,7 @@ export function BillingSettingsPage() {
           </div>
         )}
         {portalError && portalError === STALE_SESSION_MESSAGE ? (
-          <div className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-3 mt-3 text-sm text-bh-warning" data-testid="stale-session-banner">
+          <div className="card border-bh-warning/30 bg-bh-warning/5 p-3 mt-3 text-sm text-bh-warning" data-testid="stale-session-banner">
             <p>Your session isn't recent enough for this action.</p>
             <Link to="/auth/sign-in" className="inline-block mt-1 font-medium underline" data-testid="reauth-link">Sign in again to continue</Link>
           </div>
@@ -273,7 +274,7 @@ export function BillingSettingsPage() {
       </section>
 
       {isOwner && (
-        <section className="glass-panel p-5">
+        <section className="card p-5">
           {changingPlan ? (
             <PlanChangePreview
               newCatalogKey={changingPlan}
@@ -286,7 +287,7 @@ export function BillingSettingsPage() {
         </section>
       )}
 
-      <section className="glass-panel p-5">
+      <section className="card p-5">
         <CreditBalance
           grants={summary.activeCreditGrants}
           recentRefunds={summary.recentRefunds}
@@ -296,17 +297,17 @@ export function BillingSettingsPage() {
       </section>
 
       {isOwner && (
-        <section className="glass-panel p-5">
+        <section className="card p-5">
           <AutoRechargeSettings />
         </section>
       )}
 
-      <section className="glass-panel p-5">
+      <section className="card p-5">
         <BillingContact />
       </section>
 
       {disputesQuery.data && disputesQuery.data.length > 0 && (
-        <section className="glass-panel border-bh-warning/30 bg-bh-warning/5 p-5" data-testid="disputes-section">
+        <section className="card border-bh-warning/30 bg-bh-warning/5 p-5" data-testid="disputes-section">
           <h3 className="text-sm font-bold text-bh-warning mb-2">Disputes</h3>
           <ul className="space-y-2 text-sm">
             {disputesQuery.data.map((dispute) => (
@@ -360,7 +361,7 @@ function UsageSection({ usage, limits }: {
     { key: 'savedBuilders' as const, label: 'Saved builders', description: "Builders you've added to your pipeline for tracking and outreach." },
   ]
   return (
-    <section className="glass-panel p-5" data-testid="usage-section">
+    <section className="card p-5" data-testid="usage-section">
       <h2 className="font-semibold mb-1">Usage</h2>
       <p className="text-xs text-bh-text-dim mb-4">
         These are limits on how much you can keep saved at once, not a monthly quota — delete old items anytime to
