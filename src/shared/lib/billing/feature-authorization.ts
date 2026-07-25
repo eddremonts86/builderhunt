@@ -5,8 +5,10 @@ import { env } from '../env'
 import {
   checkFirstPayerSpendVelocityAndEmit,
   checkPoolDrainAndEmit,
+  checkRefundFarmingAndEmit,
   detectFirstPayerCapExceeded,
   detectPoolDrain,
+  detectRefundCapExceeded,
   isWithinFirstPayerWindow,
 } from '../abuse/credit-abuse'
 import type { EmitAbuseSignalDeps } from '../abuse/signals'
@@ -20,7 +22,9 @@ import {
   insertLedgerEntry,
   listAllocationsForReservation,
   lockReservation,
+  sumRefundedUnitsSince,
   sumReservedUnitsSince,
+  sumSettledUnitsSince,
   updateAllocationConsumed,
 } from '../repositories/billing-ledger'
 import { adjustCreditGrant, grantCredits, isActivePaidSubscription } from './credits'
@@ -292,6 +296,8 @@ export interface RefundUsageInput {
   units: number
   reason: string
   idempotencyKey: string
+  /** Required provider-side evidence justifying the refund (e.g. a provider error code, upstream refund/dispute id) — a usage refund is never accepted on the caller's say-so alone (abuse-and-usage-integrity "G4"). */
+  providerEvidenceReference: string
 }
 
 export interface RefundUsageResult {
@@ -312,9 +318,13 @@ export async function refundUsage(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
   input: RefundUsageInput,
+  deps?: EmitAbuseSignalDeps,
 ): Promise<RefundUsageResult> {
   if (!Number.isInteger(input.units) || input.units <= 0) {
     throw new FeatureBillingError('Refund units must be a positive integer', 'invalid_state')
+  }
+  if (!input.providerEvidenceReference.trim()) {
+    throw new FeatureBillingError('Refund requires a provider-evidence reference', 'invalid_state')
   }
 
   const existingMarker = await findLedgerEntryByIdempotencyKey(transaction, principal.organizationId, input.idempotencyKey)
@@ -331,6 +341,17 @@ export async function refundUsage(
   }
   if (reservation.settledUnits === null || input.units > reservation.settledUnits) {
     throw new FeatureBillingError(`Cannot refund ${input.units} units — only ${reservation.settledUnits ?? 0} were settled`, 'invalid_state')
+  }
+
+  // Refund-farming daily cap (Phase 4B "G4") — checked BEFORE refunding so a blocked attempt never
+  // partially compensates. Only a real `enforce`-mode gate.
+  const refundWindowStart = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const refundedUnitsInWindow = await sumRefundedUnitsSince(transaction, principal.organizationId, refundWindowStart)
+  if (
+    env.ABUSE_ENFORCEMENT_MODE === 'enforce'
+    && detectRefundCapExceeded({ refundedUnitsInWindow, thisRefundUnits: input.units, cap: env.CREDIT_REFUND_MAX_PER_DAY })
+  ) {
+    throw new FeatureBillingError('This organization has reached its daily refund cap', 'blocked')
   }
 
   const allocations = await listAllocationsForReservation(transaction, principal.organizationId, reservation.id)
@@ -369,15 +390,38 @@ export async function refundUsage(
     remainingToRefund -= refundFromThis
   }
 
+  // `unitsDelta` records the total refunded here (not 0, like most other markers) — this is the
+  // one entry `sumRefundedUnitsSince` reads to compute the daily cap/ratio without double-counting
+  // the per-allocation `adjustCreditGrant` entries above, which never set `reservationId`.
   await insertLedgerEntry(transaction, {
     id: `${input.idempotencyKey}-marker`,
     organizationId: principal.organizationId,
     entryType: 'adjust',
     reservationId: reservation.id,
-    unitsDelta: 0,
+    unitsDelta: input.units,
     sourceIdempotencyKey: input.idempotencyKey,
     reason: input.reason,
   })
+
+  // Refund-to-settle ratio signal (Phase 4B "G4") — always on (any enforcement mode), independent
+  // of the daily-cap gate above: a low-and-slow farmer staying under the daily cap can still trip
+  // this if enough of what they settle keeps coming back as a refund.
+  const farmingWindowStart = new Date(Date.now() - env.CREDIT_REFUND_FARMING_WINDOW_HOURS * 60 * 60 * 1000)
+  const [refundedUnitsInFarmingWindow, settledUnitsInFarmingWindow] = await Promise.all([
+    sumRefundedUnitsSince(transaction, principal.organizationId, farmingWindowStart),
+    sumSettledUnitsSince(transaction, principal.organizationId, farmingWindowStart),
+  ])
+  await checkRefundFarmingAndEmit(
+    {
+      refundedUnits: refundedUnitsInFarmingWindow,
+      settledUnits: settledUnitsInFarmingWindow,
+      ratioThreshold: env.CREDIT_REFUND_FARMING_RATIO_THRESHOLD,
+      minSettledUnits: env.CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS,
+      windowHours: env.CREDIT_REFUND_FARMING_WINDOW_HOURS,
+    },
+    { userId: principal.userId, organizationId: principal.organizationId, requestId: principal.requestId },
+    deps,
+  )
 
   return { reservation, refundedUnits: input.units }
 }

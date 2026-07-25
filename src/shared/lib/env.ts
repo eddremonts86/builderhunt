@@ -121,6 +121,16 @@ const zodEnv = z.object({
   // (this one caps *consumption* of already-granted credits, not new purchases).
   CREDIT_FIRST_PAYER_WINDOW_HOURS: z.coerce.number().int().positive().default(48),
   CREDIT_FIRST_PAYER_CAP_UNITS: z.coerce.number().int().positive().default(500),
+  // Refund-farming cap + signal (G4) — a rolling 24h cap on how many credit units one organization
+  // can refund via `refundUsage` (`enforce` mode only), plus a wider ratio check: if refunded units
+  // over `CREDIT_REFUND_FARMING_WINDOW_HOURS` (default 30 days) exceed
+  // `CREDIT_REFUND_FARMING_RATIO_THRESHOLD` of settled units in that same window, emit
+  // `refund_farming` regardless of mode. `CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS` guards a
+  // brand-new org with a tiny sample (e.g. 1 settle + 1 refund) from tripping the ratio spuriously.
+  CREDIT_REFUND_MAX_PER_DAY: z.coerce.number().int().positive().default(300),
+  CREDIT_REFUND_FARMING_WINDOW_HOURS: z.coerce.number().int().positive().default(720),
+  CREDIT_REFUND_FARMING_RATIO_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
+  CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS: z.coerce.number().int().positive().default(100),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

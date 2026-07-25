@@ -128,3 +128,66 @@ export async function checkFirstPayerSpendVelocityAndEmit(
   }
   return flagged
 }
+
+/**
+ * Refund-farming cap + `refund_farming` signal (Phase 4B "G4"). Two independent checks:
+ * a hard daily cap on refunded units (`detectRefundCapExceeded`), and a ratio check
+ * (`detectRefundFarming`) — repeatedly refunding a large share of what's actually settled is
+ * suspicious even when each individual refund stayed under the daily cap.
+ */
+
+export interface RefundCapInput {
+  /** Units already refunded in the rolling window, BEFORE this refund. */
+  refundedUnitsInWindow: number
+  thisRefundUnits: number
+  cap: number
+}
+
+/** True when adding this refund would push the org's rolling refund total over its daily cap. */
+export function detectRefundCapExceeded(input: RefundCapInput): boolean {
+  return input.refundedUnitsInWindow + input.thisRefundUnits > input.cap
+}
+
+export interface RefundFarmingInput {
+  refundedUnits: number
+  settledUnits: number
+  ratioThreshold: number
+  /** Below this many settled units, the ratio is too noisy to mean anything — never flags a tiny sample. */
+  minSettledUnits: number
+}
+
+/** True when the refund-to-settle ratio exceeds the threshold, with enough settled volume for the ratio to be meaningful. */
+export function detectRefundFarming(input: RefundFarmingInput): boolean {
+  if (input.settledUnits < input.minSettledUnits) return false
+  return input.refundedUnits / input.settledUnits > input.ratioThreshold
+}
+
+export interface CheckRefundFarmingInput extends RefundFarmingInput {
+  windowHours: number
+}
+
+/** Emits `refund_farming` if the refund-to-settle ratio crosses the threshold. Detection only — never blocks by itself (that's `detectRefundCapExceeded`'s job). */
+export async function checkRefundFarmingAndEmit(
+  input: CheckRefundFarmingInput,
+  context: AnomalyEmitContext,
+  deps?: EmitAbuseSignalDeps,
+): Promise<boolean> {
+  const flagged = detectRefundFarming(input)
+  if (flagged) {
+    await emitAbuseSignal({
+      type: 'refund_farming',
+      severity: 'high',
+      userId: context.userId,
+      organizationId: context.organizationId ?? undefined,
+      requestId: context.requestId,
+      details: {
+        refundedUnits: input.refundedUnits,
+        settledUnits: input.settledUnits,
+        ratio: input.refundedUnits / input.settledUnits,
+        ratioThreshold: input.ratioThreshold,
+        windowHours: input.windowHours,
+      },
+    }, deps)
+  }
+  return flagged
+}

@@ -429,3 +429,41 @@ export async function updateAllocationConsumed(
     .returning()
   return row
 }
+
+/**
+ * Units refunded via `feature-authorization.ts`'s `refundUsage` since `since` — the G4
+ * refund-farming cap/ratio. `refundUsage`'s own trailing marker entry is the only 'adjust' entry
+ * that ever sets `reservationId` (the per-allocation compensating entries it also writes go through
+ * `adjustCreditGrant`, whose `AdjustCreditGrantInput` has no `reservationId` field at all — same for
+ * `billing/refunds.ts`'s unrelated pack-refund grant revocations), so filtering on
+ * `reservationId IS NOT NULL` uniquely identifies a completed usage refund without double-counting
+ * the per-allocation entries or catching an unrelated money-refund's credit revocation.
+ */
+export async function sumRefundedUnitsSince(
+  transaction: TenantTransaction,
+  organizationId: string,
+  since: Date,
+): Promise<number> {
+  const rows = await transaction
+    .select({ unitsDelta: billingLedgerEntries.unitsDelta, reservationId: billingLedgerEntries.reservationId, createdAt: billingLedgerEntries.createdAt })
+    .from(billingLedgerEntries)
+    .where(and(eq(billingLedgerEntries.organizationId, organizationId), eq(billingLedgerEntries.entryType, 'adjust')))
+  return rows
+    .filter((row) => row.reservationId !== null && row.unitsDelta > 0 && row.createdAt.getTime() >= since.getTime())
+    .reduce((sum, row) => sum + row.unitsDelta, 0)
+}
+
+/** Units actually settled (permanently consumed) since `since` — the denominator for the G4 refund-to-settle ratio. Only a `settled` reservation can ever be refunded, so this is the correct base to compare refunded units against. */
+export async function sumSettledUnitsSince(
+  transaction: TenantTransaction,
+  organizationId: string,
+  since: Date,
+): Promise<number> {
+  const rows = await transaction
+    .select({ settledUnits: billingCreditReservations.settledUnits, state: billingCreditReservations.state, updatedAt: billingCreditReservations.updatedAt })
+    .from(billingCreditReservations)
+    .where(eq(billingCreditReservations.organizationId, organizationId))
+  return rows
+    .filter((row) => row.state === 'settled' && row.settledUnits !== null && row.updatedAt.getTime() >= since.getTime())
+    .reduce((sum, row) => sum + (row.settledUnits ?? 0), 0)
+}

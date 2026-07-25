@@ -2,9 +2,12 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   checkFirstPayerSpendVelocityAndEmit,
   checkPoolDrainAndEmit,
+  checkRefundFarmingAndEmit,
   computeSeatShare,
   detectFirstPayerCapExceeded,
   detectPoolDrain,
+  detectRefundCapExceeded,
+  detectRefundFarming,
   isWithinFirstPayerWindow,
 } from './credit-abuse'
 
@@ -136,6 +139,61 @@ describe('checkFirstPayerSpendVelocityAndEmit', () => {
       userId: 'user-1',
       organizationId: 'org-1',
       details: expect.objectContaining({ unitsReservedInWindow: 480, thisReservationUnits: 50, cap: 500, windowHours: 48 }),
+    }))
+  })
+})
+
+describe('detectRefundCapExceeded', () => {
+  it('does not flag when the running total stays at or under the cap', () => {
+    expect(detectRefundCapExceeded({ refundedUnitsInWindow: 0, thisRefundUnits: 300, cap: 300 })).toBe(false)
+    expect(detectRefundCapExceeded({ refundedUnitsInWindow: 250, thisRefundUnits: 50, cap: 300 })).toBe(false)
+  })
+
+  it('flags once the running total (including this refund) exceeds the cap', () => {
+    expect(detectRefundCapExceeded({ refundedUnitsInWindow: 250, thisRefundUnits: 51, cap: 300 })).toBe(true)
+  })
+})
+
+describe('detectRefundFarming', () => {
+  it('never flags below the minimum settled-units sample size, however high the ratio', () => {
+    expect(detectRefundFarming({ refundedUnits: 10, settledUnits: 10, ratioThreshold: 0.5, minSettledUnits: 100 })).toBe(false)
+  })
+
+  it('does not flag a ratio at or under the threshold', () => {
+    expect(detectRefundFarming({ refundedUnits: 50, settledUnits: 100, ratioThreshold: 0.5, minSettledUnits: 100 })).toBe(false)
+  })
+
+  it('flags a ratio over the threshold with enough settled volume', () => {
+    expect(detectRefundFarming({ refundedUnits: 51, settledUnits: 100, ratioThreshold: 0.5, minSettledUnits: 100 })).toBe(true)
+  })
+})
+
+describe('checkRefundFarmingAndEmit', () => {
+  it('does not emit for a small sample even at a high ratio', async () => {
+    const insert = vi.fn()
+    const flagged = await checkRefundFarmingAndEmit(
+      { refundedUnits: 10, settledUnits: 10, ratioThreshold: 0.5, minSettledUnits: 100, windowHours: 720 },
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(flagged).toBe(false)
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('emits refund_farming with the computed ratio once the threshold is crossed with enough volume', async () => {
+    const insert = vi.fn()
+    const flagged = await checkRefundFarmingAndEmit(
+      { refundedUnits: 60, settledUnits: 100, ratioThreshold: 0.5, minSettledUnits: 100, windowHours: 720 },
+      { userId: 'user-1', organizationId: 'org-1', requestId: 'req-1' },
+      { insert, sink: { write: vi.fn() } },
+    )
+    expect(flagged).toBe(true)
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'refund_farming',
+      severity: 'high',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      details: expect.objectContaining({ refundedUnits: 60, settledUnits: 100, ratio: 0.6, ratioThreshold: 0.5, windowHours: 720 }),
     }))
   })
 })

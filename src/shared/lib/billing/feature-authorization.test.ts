@@ -6,6 +6,10 @@ const mockEnv = vi.hoisted(() => ({
   CREDIT_SEAT_DAILY_UNITS: 2000,
   CREDIT_FIRST_PAYER_WINDOW_HOURS: 48,
   CREDIT_FIRST_PAYER_CAP_UNITS: 500,
+  CREDIT_REFUND_MAX_PER_DAY: 300,
+  CREDIT_REFUND_FARMING_WINDOW_HOURS: 720,
+  CREDIT_REFUND_FARMING_RATIO_THRESHOLD: 0.5,
+  CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS: 100,
 }))
 vi.mock('../env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../env')>()
@@ -17,6 +21,10 @@ vi.mock('../env', async (importOriginal) => {
       get CREDIT_SEAT_DAILY_UNITS() { return mockEnv.CREDIT_SEAT_DAILY_UNITS },
       get CREDIT_FIRST_PAYER_WINDOW_HOURS() { return mockEnv.CREDIT_FIRST_PAYER_WINDOW_HOURS },
       get CREDIT_FIRST_PAYER_CAP_UNITS() { return mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS },
+      get CREDIT_REFUND_MAX_PER_DAY() { return mockEnv.CREDIT_REFUND_MAX_PER_DAY },
+      get CREDIT_REFUND_FARMING_WINDOW_HOURS() { return mockEnv.CREDIT_REFUND_FARMING_WINDOW_HOURS },
+      get CREDIT_REFUND_FARMING_RATIO_THRESHOLD() { return mockEnv.CREDIT_REFUND_FARMING_RATIO_THRESHOLD },
+      get CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS() { return mockEnv.CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS },
     },
   }
 })
@@ -100,6 +108,10 @@ afterEach(() => {
   mockEnv.CREDIT_SEAT_DAILY_UNITS = 2000
   mockEnv.CREDIT_FIRST_PAYER_WINDOW_HOURS = 48
   mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS = 500
+  mockEnv.CREDIT_REFUND_MAX_PER_DAY = 300
+  mockEnv.CREDIT_REFUND_FARMING_WINDOW_HOURS = 720
+  mockEnv.CREDIT_REFUND_FARMING_RATIO_THRESHOLD = 0.5
+  mockEnv.CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS = 100
 })
 
 describe('checkEntitlement', () => {
@@ -415,7 +427,7 @@ describe('refundUsage', () => {
 
     const beforeRefund = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
     const refund = await db.transaction((tx) => refundUsage(tx, principal, {
-      settlementId: reservationId, units: 3, reason: 'downstream provider call was itself refunded', idempotencyKey: uniqueId('idem'),
+      settlementId: reservationId, units: 3, reason: 'downstream provider call was itself refunded', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-1',
     }))
     expect(refund.refundedUnits).toBe(3)
 
@@ -438,12 +450,12 @@ describe('refundUsage', () => {
 
     const refundIdempotencyKey = uniqueId('idem')
     await db.transaction((tx) => refundUsage(tx, principal, {
-      settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey,
+      settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey, providerEvidenceReference: 'evidence-2',
     }))
     const afterFirst = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
 
     await db.transaction((tx) => refundUsage(tx, principal, {
-      settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey,
+      settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey, providerEvidenceReference: 'evidence-2',
     }))
     const afterSecond = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
 
@@ -464,7 +476,7 @@ describe('refundUsage', () => {
     }))
 
     await expect(db.transaction((tx) => refundUsage(tx, principal, {
-      settlementId: reservationId, units: 4, reason: 'over-refund attempt', idempotencyKey: uniqueId('idem'),
+      settlementId: reservationId, units: 4, reason: 'over-refund attempt', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-3',
     }))).rejects.toMatchObject({ code: 'invalid_state' })
   })
 
@@ -479,7 +491,114 @@ describe('refundUsage', () => {
     }))
 
     await expect(db.transaction((tx) => refundUsage(tx, principal, {
-      settlementId: reservationId, units: 1, reason: 'not settled yet', idempotencyKey: uniqueId('idem'),
+      settlementId: reservationId, units: 1, reason: 'not settled yet', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-4',
     }))).rejects.toMatchObject({ code: 'invalid_state' })
+  })
+
+  it('requires a non-empty provider-evidence reference', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 100)
+    const reservationId = uniqueId('reservation')
+
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
+    }))
+    await db.transaction((tx) => settleReservation(tx, principal, {
+      reservationId, actualUnits: 3, idempotencyKey: uniqueId('idem'),
+    }))
+
+    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+      settlementId: reservationId, units: 1, reason: 'no evidence', idempotencyKey: uniqueId('idem'), providerEvidenceReference: '   ',
+    }))).rejects.toMatchObject({ code: 'invalid_state' })
+  })
+})
+
+describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-usage-integrity G4)', () => {
+  it('enforce mode: blocks once the rolling refund cap would be crossed, before any credits are refunded', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    const grantId = await seedGrant(principal.organizationId, 1000)
+    const reservationId = uniqueId('reservation')
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }))
+    await db.transaction((tx) => settleReservation(tx, principal, {
+      reservationId, actualUnits: 10, idempotencyKey: uniqueId('idem'),
+    }))
+
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_REFUND_MAX_PER_DAY = 3
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // First refund reaches exactly the 3-unit cap — must succeed.
+    await db.transaction((tx) => refundUsage(tx, principal, {
+      settlementId: reservationId, units: 3, reason: 'partial refund 1', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-cap-1',
+    }, deps))
+
+    const beforeBlockedAttempt = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+
+    // Second refund would push the rolling total to 4 (> 3 cap) — must block BEFORE crediting anything.
+    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+      settlementId: reservationId, units: 1, reason: 'partial refund 2', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-cap-2',
+    }, deps))).rejects.toMatchObject({ code: 'blocked' })
+
+    const afterBlockedAttempt = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    expect(afterBlockedAttempt!.remainingUnits).toBe(beforeBlockedAttempt!.remainingUnits) // unchanged — the blocked attempt never credited anything
+  })
+
+  it('observe mode: emits refund_farming but never blocks once the refund-to-settle ratio crosses the threshold', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 1000)
+    const reservationId = uniqueId('reservation')
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }))
+    await db.transaction((tx) => settleReservation(tx, principal, {
+      reservationId, actualUnits: 20, idempotencyKey: uniqueId('idem'),
+    }))
+
+    mockEnv.CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS = 10 // observe mode is the afterEach default
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // 11/20 = 0.55 > the default 0.5 ratio threshold.
+    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+      settlementId: reservationId, units: 11, reason: 'large refund', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-ratio',
+    }, deps))).resolves.toBeDefined()
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'refund_farming',
+      organizationId: principal.organizationId,
+      userId: principal.userId,
+      details: expect.objectContaining({ refundedUnits: 11, settledUnits: 20, ratio: 0.55 }),
+    }))
+  })
+
+  it('enforce mode: the ratio signal never blocks by itself — only the daily cap does', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 1000)
+    const reservationId = uniqueId('reservation')
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }))
+    await db.transaction((tx) => settleReservation(tx, principal, {
+      reservationId, actualUnits: 20, idempotencyKey: uniqueId('idem'),
+    }))
+
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS = 10
+    // Daily cap left at the default 300 — well above this refund, so only the ratio should fire.
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+      settlementId: reservationId, units: 11, reason: 'large refund', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-ratio-enforce',
+    }, deps))).resolves.toBeDefined()
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ type: 'refund_farming' }))
   })
 })

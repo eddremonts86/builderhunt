@@ -870,13 +870,54 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     (confirmed via research this task; it has no per-type special-casing), so `credit_spend_velocity`
     is picked up by the existing risk-scoring pipeline the next time that user's risk is recomputed.
 
-- [ ] **Refund-farming cap + `refund_farming` signal (G4)**
+- [x] **Refund-farming cap + `refund_farming` signal (G4)**
   - Files: `src/shared/lib/billing/reservations.ts` (`refundUsage` path),
     `src/shared/lib/abuse/credit-abuse.ts` (+ test)
   - Do: require provider-evidence for a usage refund, make it idempotent per settlement, cap refunds
     per account/day at `CREDIT_REFUND_MAX_PER_DAY`, and emit `refund_farming` on a high
     refund-to-settle ratio.
   - Verify: unit tests: a second refund for the same settlement is rejected; ratio threshold fires a signal.
+  - Progress: like G2/G6, `refundUsage` actually lives in `billing/feature-authorization.ts`, not
+    `reservations.ts` (doc/reality mismatch already noted for those two tasks — confirmed
+    `reservations.ts` has no `refundUsage` at all). Idempotency-per-settlement was already correctly
+    handled by the existing implementation (duplicate idempotency key replays; per-allocation
+    `consumedUnits` naturally caps cumulative refunds to what was actually settled) — verified this
+    by reading the code rather than assuming, so no change was needed there. Three net-new pieces:
+    (1) **provider-evidence requirement** — `RefundUsageInput` gained a required
+    `providerEvidenceReference: string`, rejected if blank; (2) **daily refund cap** — new
+    `sumRefundedUnitsSince`/`sumSettledUnitsSince` in `repositories/billing-ledger.ts` plus
+    `detectRefundCapExceeded`/`detectRefundFarming`/`checkRefundFarmingAndEmit` in
+    `abuse/credit-abuse.ts` (same `detect*`/`check*AndEmit` convention); (3) **ratio signal**
+    (`refund_farming` — already a valid `AbuseSignalType`, no new migration needed here). Key design
+    finding from reading `billing/credits.ts`'s `adjustCreditGrant`: its `AdjustCreditGrantInput` has
+    no `reservationId` field at all, so its own ledger entries (used both by `refundUsage`'s
+    per-allocation compensating credits AND by the unrelated `billing/refunds.ts` money-refund
+    grant-revocation path) never set `reservationId` — only `refundUsage`'s own trailing marker
+    entry does. This meant changing that ONE marker's `unitsDelta` from the previous convention (`0`,
+    a pure idempotency pointer) to the actual `input.units` gives an unambiguous, non-double-counting
+    signal to sum for "refunded units in a window", with zero collision risk against either the
+    per-allocation entries or `refunds.ts`'s unrelated pack-refund revocations. `refundUsage` now: in
+    `enforce` mode only, pre-checks the rolling-24h refund total against `CREDIT_REFUND_MAX_PER_DAY`,
+    throwing `FeatureBillingError('blocked')` BEFORE crediting anything if exceeded; always (any
+    mode) computes the refund-to-settle ratio over `CREDIT_REFUND_FARMING_WINDOW_HOURS` (default 30
+    days) and emits `refund_farming` when it crosses `CREDIT_REFUND_FARMING_RATIO_THRESHOLD` (default
+    0.5) with at least `CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS` (default 100) settled units in the
+    window (guards a brand-new org's tiny sample from tripping the ratio) — this signal never blocks
+    by itself, only the daily cap does; both checks are fully independent. Added optional
+    `deps?: EmitAbuseSignalDeps` param to `refundUsage` (same DI seam as G2/G6). 4 new unit tests for
+    the two new pure functions + `checkRefundFarmingAndEmit` (23 total in `credit-abuse.test.ts`),
+    plus 1 new "requires non-empty evidence" test and 3 new real-Postgres integration tests in
+    `feature-authorization.test.ts` (enforce mode blocks once the daily cap would be crossed, leaving
+    the grant's `remainingUnits` unchanged; observe mode emits `refund_farming` at a 0.55 ratio
+    without blocking; enforce mode confirms the ratio signal alone never blocks — only the cap does)
+    — all 25 tests in that file plus all 23 credit-abuse tests pass, no regressions across the full
+    `src/shared/lib/billing` + `src/shared/lib/abuse` suites (843 tests). `pnpm tsc --noEmit`/
+    `pnpm eslint` clean. Live-verified against the real local dev Postgres database via a throwaway
+    direct-call script: a 3-unit refund reaching exactly a 3-unit daily cap succeeds, a further
+    1-unit refund (crossing the cap) throws `FeatureBillingError('blocked')` with the grant's
+    `remainingUnits` provably unchanged, and (since 3/10 = 0.3 is under the 0.5 ratio threshold) zero
+    `refund_farming` signals were recorded, confirming the ratio check correctly stayed silent in
+    this scenario — script and all seeded rows deleted afterward, confirmed zero residual rows.
 
 - [ ] **Provider cost-vs-credit margin monitor + `margin_drift` signal (G7)**
   - Files: `src/shared/lib/abuse/margin.ts` (+ test), `src/shared/lib/ai/minimax.ts` (cost capture)
