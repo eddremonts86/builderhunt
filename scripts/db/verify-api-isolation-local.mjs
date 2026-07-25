@@ -12,8 +12,11 @@
 // (data-export, delete-account, verified builder claims, evidence-provenance,
 // restrict-processing, org-tracked builders), the two grant-only public
 // tables (builder_embeddings, discovery_state), account-export privacy,
-// alerts-worker cross-organization isolation, and the legal/run-worker
-// pending-deletion sweep (real hard-delete, own/other-due-date matrix). Still
+// alerts-worker cross-organization isolation, the legal/run-worker
+// pending-deletion sweep (real hard-delete, own/other-due-date matrix), the
+// platform-admin abuse console (`/api/admin/abuse`, `/api/admin/abuse/clusters`
+// — non-admin rejection plus confirming a manual action lands on the targeted
+// user, not the admin caller), and `/api/me/sessions` cross-user isolation. Still
 // not the full ~34-route inventory in src/routes/api/** — the alerts/
 // discovery/embeddings/enrichment/sprints run-worker endpoints (all call a
 // live external network search/embedding/enrichment provider) and a couple
@@ -1107,6 +1110,61 @@ async function checkCreditLedgerInvariantsUnderWorkerRole() {
   )
 }
 
+// abuse-and-usage-integrity Phase 6 task 3, "Wire abuse checks into the release-gate audit set" —
+// table-level RLS for the 5 abuse tables is already fully covered by verify-rls-local.mjs; the real
+// gap this closes is route-handler-level isolation for the two abuse-console routes and the
+// sessions-panel route, which were never exercised here. `/api/admin/abuse` mutations act on
+// ANOTHER user's account_risk row by design (a platform admin acting on a flagged user, not on
+// themselves) — that is not a same-tenant/cross-tenant leak, it is the feature; the assertions
+// below instead confirm non-admins are rejected and that the mutation actually lands on the
+// targeted user, not silently on the caller.
+async function checkAbuseConsoleAndSessionsRoutes() {
+  process.env.ADMIN_USER_IDS = IDS.userA
+
+  const { Route: AbuseFeedRoute } = await import('../../src/routes/api/admin/abuse/index.ts')
+  const { GET: abuseFeedGET, POST: abuseFeedPOST } = AbuseFeedRoute.options.server.handlers
+  const { Route: AbuseClustersRoute } = await import('../../src/routes/api/admin/abuse/clusters.ts')
+  const { GET: abuseClustersGET } = AbuseClustersRoute.options.server.handlers
+
+  const nonAdminFeed = await abuseFeedGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/admin/abuse') })
+  record('admin abuse feed: non-admin session (B) is rejected at runtime', nonAdminFeed.status === 403, `status=${nonAdminFeed.status}`)
+
+  const nonAdminClusters = await abuseClustersGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/admin/abuse/clusters') })
+  record('admin abuse clusters: non-admin session (B) is rejected at runtime', nonAdminClusters.status === 403, `status=${nonAdminClusters.status}`)
+
+  const nonAdminAction = await abuseFeedPOST({
+    request: sessionRequest('iso-session-token-b', 'https://iso.test/api/admin/abuse', { method: 'POST', body: JSON.stringify({ userId: IDS.userA, action: 'block' }) }),
+  })
+  record('admin abuse action: non-admin session (B) is rejected at runtime', nonAdminAction.status === 403, `status=${nonAdminAction.status}`)
+
+  const adminFeed = await (await abuseFeedGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/abuse') })).json()
+  record('admin abuse feed: admin session (A) can read the feed', Array.isArray(adminFeed.signals) && typeof adminFeed.stageByUserId === 'object', JSON.stringify(adminFeed).slice(0, 200))
+
+  const adminClusters = await (await abuseClustersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/abuse/clusters') })).json()
+  record('admin abuse clusters: admin session (A) can read clusters', Array.isArray(adminClusters.clusters), JSON.stringify(adminClusters).slice(0, 200))
+
+  // Admin A acts on B's account (the intended cross-user shape of this feature, not a leak).
+  const actionOnB = await (await abuseFeedPOST({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/abuse', { method: 'POST', body: JSON.stringify({ userId: IDS.userB, action: 'warn', reason: 'iso test' }) }),
+  })).json()
+  record('admin abuse action: admin A can act on user B\'s account, and it lands on B, not A', actionOnB.userId === IDS.userB && actionOnB.stage === 'warned', JSON.stringify(actionOnB))
+
+  const [riskRowB] = await owner`select user_id, stage from account_risk where user_id = ${IDS.userB}`
+  const [riskRowA] = await owner`select user_id, stage from account_risk where user_id = ${IDS.userA}`
+  record('admin abuse action: only B\'s account_risk row changed, A\'s is untouched (no self-application)', riskRowB?.stage === 'warned' && !riskRowA, JSON.stringify({ riskRowA, riskRowB }))
+
+  const { Route: MeSessionsRoute } = await import('../../src/routes/api/me/sessions/index.ts')
+  const { GET: meSessionsGET } = MeSessionsRoute.options.server.handlers
+  const sessionsA = await (await meSessionsGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/sessions') })).json()
+  const sessionsB = await (await meSessionsGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/sessions') })).json()
+  record(
+    'me/sessions: A\'s session list never includes B\'s session id, and vice versa',
+    Array.isArray(sessionsA) && Array.isArray(sessionsB)
+      && !sessionsA.some((s) => s.id === 'iso-session-b') && !sessionsB.some((s) => s.id === 'iso-session-a'),
+    JSON.stringify({ sessionsA: sessionsA.map?.((s) => s.id), sessionsB: sessionsB.map?.((s) => s.id) }),
+  )
+}
+
 async function main() {
   await seed()
   await checkSavedQueries()
@@ -1126,6 +1184,7 @@ async function main() {
   await checkAccountExportPrivacy()
   await checkWorkerIsolation()
   await checkCreditLedgerInvariantsUnderWorkerRole()
+  await checkAbuseConsoleAndSessionsRoutes()
   // Run last: checkAdminContentManagement approves a plan-request for B
   // (legitimately recording admin A's id in B's own plan-change history) and
   // checkMeSubjectRoutes requests/cancels a real account deletion — both

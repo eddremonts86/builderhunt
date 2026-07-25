@@ -84,3 +84,21 @@ write the signal, not just by tenant:
 and tenant-private isolation, cross-subject/cross-tenant insert/update denial, the app role's total
 lack of access to `account_risk`/`session_signals`/`abuse_signals`, and worker/platform read-write
 against the system-operational tables.
+
+`scripts/db/verify-api-isolation-local.mjs` (`pnpm test:api-isolation:local`) additionally exercises
+the abuse-console **route handlers** (`/api/admin/abuse`, `/api/admin/abuse/clusters`) and
+`/api/me/sessions` under real tenant-A/tenant-B sessions: non-admin rejection, and confirming a
+platform admin's manual action lands on the *targeted* user's `account_risk` row, never the admin's
+own — this is the intentional cross-user shape of that feature, not a leak, so the assertions check
+"lands on the right target" rather than "never touches another user."
+
+`src/shared/lib/abuse/enforcement-kill-switch.test.ts` is the release-gate kill-switch smoke
+(runs as part of the ordinary `pnpm test` step, no separate CI job needed): it seeds a real
+`account_risk` row at `stage: 'blocked'` in a disposable database, mocks
+`env.ABUSE_ENFORCEMENT_MODE` to `'observe'` with no `mode` override passed to
+`resolveEnforcementForUser` (the exact way every real caller — `requireTenantPrincipal`'s
+`getEnforcementStage` wiring — actually calls it), and confirms the decision is still `observe` for
+that real, already-flagged account, and that the account-risk read never even happens (mirroring
+`enforcement.test.ts`'s existing short-circuit assertion, but end-to-end against a real DB row
+instead of a mocked function). A final sanity check flips the same mock back to `'enforce'` and
+confirms the same row resolves to `blocked`, proving the fixture is real rather than a tautology.

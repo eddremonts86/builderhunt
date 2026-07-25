@@ -51,6 +51,8 @@ jobs:
       - run: pnpm test:migrations:local
       - run: node scripts/db/prepare-rls-fixture.mjs
       - name: Verify exact runtime roles and RLS
+        # Also covers the 5 abuse-and-usage-integrity tables (user_devices, account_risk,
+        # seat_usage_daily, session_signals, abuse_signals) — see docs/operations/database-roles.md.
         env:
           RLS_TEST_APP_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
           RLS_TEST_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
@@ -58,6 +60,7 @@ jobs:
           RLS_TEST_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
         run: pnpm test:rls:local
       - name: Two-tenant API/worker/privacy isolation (real routes, exact roles)
+        # Also covers /api/admin/abuse[/clusters] and /api/me/sessions route-handler isolation.
         env:
           OWNER_SEED_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
           DATABASE_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
@@ -79,6 +82,9 @@ jobs:
         run: pnpm db:audit-schema
       - run: pnpm lint
       - run: pnpm type-check
+      # Includes the ABUSE_ENFORCEMENT_MODE=observe kill-switch smoke
+      # (src/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed, `pnpm test`
+      # picks up every *.test.ts file already.
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end team-accounts journey

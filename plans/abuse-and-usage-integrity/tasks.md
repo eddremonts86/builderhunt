@@ -1289,11 +1289,58 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       live constant, so they're unaffected by the bump), and a live browser check confirming the
       new sections render on `/legal/privacy`.
 
-- [ ] **Wire abuse checks into the release-gate audit set**
+- [x] **Wire abuse checks into the release-gate audit set**
   - Files: `.github/workflows/quality.yml`, `docs/operations/*`
   - Do: add the RLS/isolation tests for new tables and a kill-switch smoke (`ABUSE_ENFORCEMENT_MODE=observe`
     disables enforcement) to CI; treat as a recurring gate like the five audits.
   - Verify: CI green; kill-switch test proves enforcement fully disables.
+  - **Done.** Key finding while researching: table-level RLS/grant isolation for all 5 abuse tables
+    (`user_devices`, `account_risk`, `seat_usage_daily`, `session_signals`, `abuse_signals`) was
+    **already** fully covered by the existing `pnpm test:rls:local` step — confirmed by reading
+    `scripts/db/verify-rls-local.mjs` directly, which already asserts app-role denial, worker
+    read/write, platform scoped access, and cross-subject/cross-tenant insert/update denial for
+    every one of them. The real, concrete gap was route-**handler**-level isolation: the two abuse-
+    console routes (`/api/admin/abuse`, `/api/admin/abuse/clusters`) and `/api/me/sessions` had
+    never been exercised by `scripts/db/verify-api-isolation-local.mjs` (the separate two-tenant
+    real-route harness) under actual restricted runtime roles.
+    - Added `checkAbuseConsoleAndSessionsRoutes()` to `verify-api-isolation-local.mjs`: confirms
+      non-admin (session B) is rejected (403) on all three route/method combinations, confirms an
+      admin (session A) can read the feed/clusters, and — since a platform admin acting on
+      *another* user's `account_risk` row is the intentional shape of this feature, not a leak —
+      confirms a manual action by admin A on user B lands on B's row and never touches A's (no
+      self-application). Also confirms `/api/me/sessions` never leaks the other user's session id.
+      Wired into `main()`'s existing call chain.
+    - **Kill-switch smoke — deliberately went beyond the existing pure-function unit test.**
+      `enforcement.test.ts` already proves `resolveEnforcement('observe', candidate)` is a total
+      override with a literal mode argument, but every real caller
+      (`requireTenantPrincipal`'s `getEnforcementStage` wiring) calls
+      `resolveEnforcementForUser(userId)` with **no mode override at all**, relying entirely on
+      `env.ABUSE_ENFORCEMENT_MODE`'s default. New file
+      `src/shared/lib/abuse/enforcement-kill-switch.test.ts` seeds a REAL `account_risk` row at
+      `stage: 'blocked'` in a disposable database, mocks `env.ABUSE_ENFORCEMENT_MODE` to
+      `'observe'` (no `mode` passed to the function — the exact production default path), and
+      confirms the decision is still `observe` for that real flagged account, and that the
+      `account_risk` read never even happens. A final sanity-check flips the same mock to
+      `'enforce'` and confirms the identical row resolves to `blocked`, proving the fixture is
+      real, not a tautology. No new CI job/step was needed for this — `pnpm test`'s existing,
+      already-unfiltered `vitest run` picks up any new `*.test.ts` file automatically (confirmed
+      via `vitest.config.ts`'s `include` glob).
+    - `.github/workflows/quality.yml`: added inline comments above the existing RLS/isolation/test
+      steps documenting what abuse coverage now runs there — no new steps or jobs were needed since
+      every new check rides the existing, already-blocking (non-`continue-on-error`) steps, matching
+      "treat as a recurring gate like the five audits" without duplicating work.
+    - `docs/operations/database-roles.md`: extended the existing "Abuse-and-usage-integrity tables"
+      section with the new route-isolation and kill-switch coverage.
+    - **Live-verified, not just read**: spun up a throwaway, fully isolated Postgres container
+      (port 5433, separate from the shared local dev cluster — `docs/operations/database-migrations.md`
+      warns that `prepare-rls-fixture.mjs` can overwrite the dev cluster's real role passwords on a
+      shared instance) and ran the exact CI sequence end to end: `pnpm test:migrations:local` →
+      `prepare-rls-fixture.mjs` → `pnpm test:rls:local` → `pnpm test:api-isolation:local`. All 102
+      checks passed (0 failed, exit 0), including every new abuse-console/sessions assertion. Also
+      ran `pnpm vitest run` (full suite, 1998/1998 passing) confirming the new kill-switch test
+      passes alongside everything else, and validated the edited YAML with a plain parser
+      (`python3 -c "import yaml; yaml.safe_load(...)"`). Tore down the throwaway container
+      afterward — the shared dev database/roles were never touched.
 
 - [ ] **Staged enforce rollout**
   - Files: deployment config (Coolify env)
