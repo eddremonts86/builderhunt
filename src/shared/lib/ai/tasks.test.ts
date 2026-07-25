@@ -14,6 +14,20 @@ describe('AI task registry', () => {
     expect(getTask('does-not-exist')).toBeNull()
   })
 
+  // abuse-and-usage-integrity Phase 4B "G7": every server AI task must cap its own worst-case
+  // output — an unbounded/absurdly large maxOutputTokens is exactly the kind of misconfiguration a
+  // provider-cost-vs-credit margin monitor exists to catch, so it must never be possible to ship a
+  // task without one. 8192 is a generous ceiling for MiniMax M3 chat completions (well above every
+  // task's actual value below) — this is a sanity bound, not a target.
+  it('caps every task\'s maxOutputTokens to a finite, sane ceiling', () => {
+    const MAX_SANE_OUTPUT_TOKENS = 8192
+    for (const [id, task] of Object.entries(AI_TASKS)) {
+      expect(Number.isFinite(task.maxOutputTokens), `${id}.maxOutputTokens must be finite`).toBe(true)
+      expect(task.maxOutputTokens, `${id}.maxOutputTokens must be positive`).toBeGreaterThan(0)
+      expect(task.maxOutputTokens, `${id}.maxOutputTokens must stay under the sane ceiling`).toBeLessThanOrEqual(MAX_SANE_OUTPUT_TOKENS)
+    }
+  })
+
   it('registers query-translate as local-first, Pro-gated, with the QueryTranslation output schema', () => {
     const task = getTask('query-translate')
     expect(task).not.toBeNull()

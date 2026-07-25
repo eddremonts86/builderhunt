@@ -919,12 +919,46 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `refund_farming` signals were recorded, confirming the ratio check correctly stayed silent in
     this scenario — script and all seeded rows deleted afterward, confirmed zero residual rows.
 
-- [ ] **Provider cost-vs-credit margin monitor + `margin_drift` signal (G7)**
+- [x] **Provider cost-vs-credit margin monitor + `margin_drift` signal (G7)**
   - Files: `src/shared/lib/abuse/margin.ts` (+ test), `src/shared/lib/ai/minimax.ts` (cost capture)
   - Do: record estimated provider cost per settled op; when provider cost ÷ credits charged exceeds
     `CREDIT_MARGIN_ALERT_RATIO`, emit `margin_drift` (alert only, never auto-block). Confirm each op's
     reserved max covers worst-case provider cost and max output tokens are capped per `_meta/ai-policy.md`.
   - Verify: unit tests for the ratio + a capped-max-tokens assertion per server AI task.
+  - Progress: **explicitly NOT wired to production** — confirmed by research (and surfaced to the
+    user before building, per the standing check-in agreement for scope surprises) that
+    `reserveCredits` (the dollar-based credit ledger built in G2/G6/G4) is never called from ANY
+    production route today; all 3 real `minimaxChat` call sites (`semantic-search.ts`,
+    `enrichment.ts`, `/api/ai/complete`) use the call-count `checkAndConsumeBudget` budget instead.
+    There is therefore no live "settled op with credits actually charged" to attach a margin ratio
+    to yet — building a "live" monitor with no real integration point would be theater. Per the
+    user's explicit choice, built the pure/tested detection logic only, ready for a future feature
+    that actually reserves+settles dollar credits for an AI call to wire in.
+    `ai/minimax.ts`: added an optional `onUsage?: (usage: MinimaxUsage) => void` observer param to
+    `minimaxChat` (fully backward compatible — omitted by every existing caller/test, changes
+    nothing about the call itself) that reports `{promptTokens, completionTokens}` parsed from the
+    provider response's `usage` field for EVERY underlying provider call, including the
+    JSON-correction retry (a real, separately-billed second call when it happens). New
+    `abuse/margin.ts`: `estimateProviderCostCents` (tokens → cents via the new placeholder
+    `MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS`/`MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS` env vars,
+    explicitly documented as NOT confirmed MiniMax pricing), `detectMarginDrift` (pure ratio check
+    against `CREDIT_MARGIN_ALERT_RATIO`, never flags when nothing was charged), `checkMarginDriftAndEmit`
+    (alert-only — this signal never blocks anything by itself, matching the task's "alert only, never
+    auto-block" requirement). Added a "capped max-tokens" assertion test to the existing
+    `ai/tasks.test.ts` asserting every `AI_TASKS` entry's `maxOutputTokens` is finite, positive, and
+    under a generous 8192-token sanity ceiling — protects against a future task shipping without an
+    explicit cap (no numeric ceiling was actually stated in `_meta/ai-policy.md`, so this bound is a
+    defensive sanity check, not a transcription of a documented policy number). 3 new tests for
+    `minimaxChat`'s usage reporting (single call, missing-usage-field default, both calls on a
+    retry) plus 1 new capped-max-tokens test, plus a new `margin.test.ts` (8 tests: cost estimation,
+    ratio detection at/under/over/with-a-looser-threshold, emit gating) — 33 new/changed tests total,
+    all pass; no regressions across `src/shared/lib/ai` + `src/shared/lib/abuse` + `src/lib/semantic`
+    + `src/routes/api/ai` + the enrichment route (266 tests). `pnpm tsc --noEmit`/`pnpm eslint`
+    clean. No migration needed (`margin_drift` was already a valid `AbuseSignalType`). No live-database
+    verification for this task specifically — nothing writes a real `margin_drift` row in production
+    yet (by design, per the scope decision above), so there is no additional real-world behavior
+    beyond what the unit tests already prove; `checkMarginDriftAndEmit`'s emit path is structurally
+    identical to the other `check*AndEmit` functions already live-verified this session.
 
 - [ ] **Promo/trial grant caps per identity cluster (G1)**
   - Files: `src/shared/lib/abuse/linked-accounts.ts`, promo/trial grant path in `billing/*`

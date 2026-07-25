@@ -18,8 +18,8 @@ function jsonResponse(body: unknown, init?: { status?: number }) {
   return new Response(JSON.stringify(body), { status: init?.status ?? 200 })
 }
 
-function chatCompletion(content: string) {
-  return jsonResponse({ choices: [{ message: { content } }] })
+function chatCompletion(content: string, usage?: { prompt_tokens: number, completion_tokens: number }) {
+  return jsonResponse({ choices: [{ message: { content } }], ...(usage ? { usage } : {}) })
 }
 
 afterEach(() => {
@@ -95,6 +95,42 @@ describe('minimaxChat', () => {
     await expect(minimaxChat({ system: 'sys', prompt: 'ping', schema, maxOutputTokens: 32 })).rejects.toThrow(
       AIProviderError,
     )
+  })
+
+  it('reports the response usage via onUsage (abuse-and-usage-integrity "G7" cost capture)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatCompletion('{"pong":true}', { prompt_tokens: 42, completion_tokens: 8 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onUsage = vi.fn()
+
+    await minimaxChat({ system: 'sys', prompt: 'ping', schema, maxOutputTokens: 32, onUsage })
+
+    expect(onUsage).toHaveBeenCalledTimes(1)
+    expect(onUsage).toHaveBeenCalledWith({ promptTokens: 42, completionTokens: 8 })
+  })
+
+  it('defaults usage to 0/0 when the provider response omits the usage field', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(chatCompletion('{"pong":true}'))
+    vi.stubGlobal('fetch', fetchMock)
+    const onUsage = vi.fn()
+
+    await minimaxChat({ system: 'sys', prompt: 'ping', schema, maxOutputTokens: 32, onUsage })
+
+    expect(onUsage).toHaveBeenCalledWith({ promptTokens: 0, completionTokens: 0 })
+  })
+
+  it('reports usage for BOTH calls on a correction retry — each is a separately-billed provider call', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(chatCompletion('not json at all', { prompt_tokens: 10, completion_tokens: 5 }))
+      .mockResolvedValueOnce(chatCompletion('{"pong":true}', { prompt_tokens: 15, completion_tokens: 3 }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onUsage = vi.fn()
+
+    await minimaxChat({ system: 'sys', prompt: 'ping', schema, maxOutputTokens: 32, onUsage })
+
+    expect(onUsage).toHaveBeenCalledTimes(2)
+    expect(onUsage).toHaveBeenNthCalledWith(1, { promptTokens: 10, completionTokens: 5 })
+    expect(onUsage).toHaveBeenNthCalledWith(2, { promptTokens: 15, completionTokens: 3 })
   })
 })
 

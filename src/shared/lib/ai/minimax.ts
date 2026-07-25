@@ -13,15 +13,31 @@ import { AIDisabledError, AIParseError, AIProviderError } from './errors'
 
 const REQUEST_TIMEOUT_MS = 30_000
 
+export interface MinimaxUsage {
+  promptTokens: number
+  completionTokens: number
+}
+
 export interface MinimaxChatOptions<O> {
   system: string
   prompt: string
   schema: z.ZodType<O>
   maxOutputTokens: number
+  /**
+   * Optional observer for the raw token usage of every underlying provider call, including the
+   * JSON-correction retry below if one happens (each is a real, separately-billed provider call).
+   * Never required — omitting it changes nothing about the call itself. Exists for the
+   * abuse-and-usage-integrity "G7" margin monitor (`abuse/margin.ts`) to estimate provider cost once
+   * a caller wires it to a real credit charge; no production caller does that yet (confirmed: none
+   * of the 3 current `minimaxChat` call sites use the dollar-based credit ledger, only the
+   * call-count `checkAndConsumeBudget`), so this is intentionally inert until one does.
+   */
+  onUsage?: (usage: MinimaxUsage) => void
 }
 
 interface MinimaxChatCompletionResponse {
   choices?: Array<{ message?: { content?: string } }>
+  usage?: { prompt_tokens?: number, completion_tokens?: number }
 }
 
 function chatCompletionUrl(): string {
@@ -29,7 +45,7 @@ function chatCompletionUrl(): string {
   return base.endsWith('/v1') ? `${base}/chat/completions` : `${base}/v1/chat/completions`
 }
 
-async function callMinimax(system: string, prompt: string, maxOutputTokens: number): Promise<string> {
+async function callMinimax(system: string, prompt: string, maxOutputTokens: number): Promise<{ content: string, usage: MinimaxUsage }> {
   let response: Response
   try {
     response = await fetch(chatCompletionUrl(), {
@@ -63,7 +79,11 @@ async function callMinimax(system: string, prompt: string, maxOutputTokens: numb
   if (typeof content !== 'string') {
     throw new AIProviderError(502, 'MiniMax response is missing choices[0].message.content')
   }
-  return content
+  const usage: MinimaxUsage = {
+    promptTokens: typeof json.usage?.prompt_tokens === 'number' ? json.usage.prompt_tokens : 0,
+    completionTokens: typeof json.usage?.completion_tokens === 'number' ? json.usage.completion_tokens : 0,
+  }
+  return { content, usage }
 }
 
 function extractJson(text: string): unknown {
@@ -99,16 +119,18 @@ function tryParseOutput<O>(text: string, schema: z.ZodType<O>): O | null {
  * caller's `prompt` (via each task's `buildPrompt`) must already embed the
  * JSON Schema instructions.
  */
-export async function minimaxChat<O>({ system, prompt, schema, maxOutputTokens }: MinimaxChatOptions<O>): Promise<O> {
+export async function minimaxChat<O>({ system, prompt, schema, maxOutputTokens, onUsage }: MinimaxChatOptions<O>): Promise<O> {
   if (!env.MINIMAX_API_KEY) throw new AIDisabledError('MINIMAX_API_KEY is not configured')
 
   const first = await callMinimax(system, prompt, maxOutputTokens)
-  const firstResult = tryParseOutput(first, schema)
+  onUsage?.(first.usage)
+  const firstResult = tryParseOutput(first.content, schema)
   if (firstResult !== null) return firstResult
 
   const correctionPrompt = `${prompt}\n\nYour previous response did not match the required JSON schema. Return ONLY valid JSON matching the schema, with no other text.`
   const second = await callMinimax(system, correctionPrompt, maxOutputTokens)
-  const secondResult = tryParseOutput(second, schema)
+  onUsage?.(second.usage)
+  const secondResult = tryParseOutput(second.content, schema)
   if (secondResult !== null) return secondResult
 
   throw new AIParseError('MiniMax response did not match the expected schema after one retry')

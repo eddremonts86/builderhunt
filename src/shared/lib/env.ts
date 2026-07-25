@@ -42,6 +42,16 @@ const zodEnv = z.object({
   MINIMAX_API_KEY: z.string().optional(),
   MINIMAX_BASE_URL: z.string().default('https://api.minimax.io'),
   MINIMAX_MODEL: z.string().default('MiniMax-M3'),
+  // PLACEHOLDER cost estimates for the abuse-and-usage-integrity "G7" margin monitor — not
+  // confirmed MiniMax M3 pricing, a rough order-of-magnitude stand-in (similar-tier model pricing)
+  // until real pricing is provisioned. Update before relying on `abuse/margin.ts` for anything
+  // beyond its own unit tests; nothing in production reads these yet (see `abuse/margin.ts`'s
+  // header comment for why).
+  MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS: z.coerce.number().nonnegative().default(0.03),
+  MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS: z.coerce.number().nonnegative().default(0.12),
+  // Provider-cost-vs-credit-charged ratio above which `margin_drift` fires (alert only, never
+  // auto-blocks — a real margin problem needs a pricing/rate-card fix, not a runtime block).
+  CREDIT_MARGIN_ALERT_RATIO: z.coerce.number().positive().default(1),
   AI_EMBEDDING_URL: z.string().optional(),
   AI_EMBEDDING_MODEL: z.string().optional(),
   AI_EMBEDDING_API_KEY: z.string().optional(),
