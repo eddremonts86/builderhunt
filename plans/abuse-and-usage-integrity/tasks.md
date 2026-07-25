@@ -1342,9 +1342,20 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       (`python3 -c "import yaml; yaml.safe_load(...)"`). Tore down the throwaway container
       afterward — the shared dev database/roles were never touched.
 
-- [ ] **Staged enforce rollout**
+- [ ] **NEEDS USER DECISION — Staged enforce rollout** (genuinely pending, not started; this is a
+      real production deployment/monitoring action, not something an agent should do
+      autonomously)
   - Files: deployment config (Coolify env)
   - Do: flip `observe`→`warn`, monitor false positives via `abuse_signals` + support tags, then
     enable `stepup`/`throttle`/`block` stage by stage; keep instant rollback to `observe`.
   - Verify: post-flip monitoring shows no allowlisted-ASN false-positive blocks; support-ticket rate
     within the agreed threshold.
+  - **Why this is left pending rather than done autonomously**: every other Phase 6 task built the
+    tooling/evidence this rollout needs (the baseline report, the CI kill-switch proof, the privacy
+    disclosure) — but the rollout itself is a live production change to a real Coolify deployment's
+    environment variable, followed by days/weeks of watching real user support tickets and
+    `abuse_signals` volume before advancing each stage. That is qualitatively different from every
+    other task in this plan: it has no "done" state reachable by writing code, and a wrong call
+    here directly affects real users' ability to use the product. Needs the user to decide when to
+    start it and to actually watch the real monitoring signals — not something to simulate or
+    fast-forward through.
