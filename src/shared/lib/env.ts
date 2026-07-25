@@ -65,6 +65,17 @@ const zodEnv = z.object({
   // Plan: proactive-discovery
   DISCOVERY_CELLS_PER_RUN: z.coerce.number().int().positive().default(2),
   DISCOVERY_DAILY_STUB_CAP: z.coerce.number().int().positive().default(1500),
+  // Plan: devpost-integration — headless-browser scraping worker. Disabled by
+  // default: this is the first source that scrapes a bot-protected site with
+  // a real Chromium instance rather than a plain API fetch, so it stays off
+  // until explicitly turned on in each environment (see
+  // docs/operations/deploy-runbook.md). Caps below are the per-run
+  // politeness budget, not a rate limit — kept small since Devpost has no
+  // published API and every request risks a ban.
+  DEVPOST_ENABLED: z.enum(['true', 'false']).default('false'),
+  DEVPOST_PROJECTS_PER_RUN: z.coerce.number().int().positive().default(8),
+  DEVPOST_PROFILES_PER_RUN: z.coerce.number().int().positive().default(20),
+  DEVPOST_REQUEST_DELAY_MS: z.coerce.number().int().nonnegative().default(1500),
   // Plan: stealth-scraping (Public Profile Enrichment) — spec §12. Disabled by
   // default; enabling requires the source register + legal copy to be
   // reviewed first (see docs/operations/public-enrichment-source-register.md).

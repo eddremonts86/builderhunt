@@ -1,14 +1,14 @@
 # Feature: Devpost Integration
 
-> **Status**: `blocked`
+> **Status**: `implemented — dark by default`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: No `src/lib/sources/devpost.ts` exists; `devpost` is not in
-> `SourceName` (`src/lib/sources/types.ts`). Devpost has **no official API**, and its
-> unofficial JSON search endpoint is behind bot protection — verified 2026-07-19:
-> `GET https://devpost.com/software/search?query=ai` with JSON/XHR/browser-like headers
-> returns **HTTP 202 with an HTML challenge page**, not data. A decision is required
-> before any implementation (see "Blocking decision").
+> **Reality check**: Blocking decision made 2026-07-25 — option (b), approve scraping.
+> Built as a headless-browser (Playwright) ingestion worker writing into a durable
+> `devpost_profiles` table; `src/lib/sources/devpost.ts` now exists and `devpost` is in
+> `SourceName`. Live-verified end to end (see `tasks.md` for the full write-up, including
+> a real design gap found and fixed during testing). Ships with `DEVPOST_ENABLED=false`
+> everywhere — turning it on in production is a separate pending decision (`tasks.md`).
 
 ## Problem
 
@@ -37,7 +37,7 @@ extract team members, map their profiles (bio, linked GitHub/Twitter, wins).
   2. Third-party scraping API (paid) — recurring cost, still fragile, still gray-area.
   3. Wait / periodic re-check whether the JSON endpoint reopens.
 
-## Blocking decision (owner: product)
+## Blocking decision (owner: product) — DECIDED 2026-07-25: (b), approve scraping
 
 Choose one:
 

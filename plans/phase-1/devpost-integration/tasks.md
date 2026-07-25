@@ -1,28 +1,93 @@
 # Tasks: Devpost Integration
 
-> **Status**: `blocked`
+> **Status**: `implemented — dark by default`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Blocked on data access — Devpost has no official API and bot-challenges
-> server-side requests (verified 2026-07-19). Only decision/probe tasks are valid; no
-> connector code until unblocked.
+> **Reality check**: Blocking decision made 2026-07-25 (product owner): option (b), approve
+> scraping via a headless-browser ingestion worker, per this session's confirmed choice
+> ("Headless browser worker en el VPS"). Built end-to-end and live-verified against the
+> real site. `DEVPOST_ENABLED` defaults to `false` in every environment — the code ships
+> inert; turning it on in production is a separate, deliberate follow-up (see bottom).
 
-- [ ] **Make the blocking decision: skip / approve scraping / re-check**
-  - Files: `plans/devpost-integration/spec.md`, `plans/devpost-integration/plan.md`
-  - Do: product owner picks option (a), (b), or (c) from the spec's "Blocking decision"
-    section. On (a): update all three status headers to a final note and stop. On (b):
-    replace this plan with the ingestion-worker plan outlined in `plan.md` (worker +
-    durable storage + thin connector). On (c): keep `blocked` and schedule the probe task
-    below.
-  - Verify: the three status headers in this directory reflect the decision and agree
-    with each other.
+- [x] **Make the blocking decision: skip / approve scraping / re-check** — decided
+  2026-07-25: **(b) approve scraping**, as a background ingestion worker (not a live
+  connector — Devpost cannot support per-search latency).
 
-- [ ] **(Only under option (c)) Quarterly endpoint probe**
-  - Files: none (operator check; log the result as a dated line in this file)
-  - Do: run
-    `curl -s -o /dev/null -w "%{http_code} %{content_type}\n" 'https://devpost.com/software/search?query=ai' -H 'Accept: application/json' -H 'X-Requested-With: XMLHttpRequest'`.
-    `200` + `application/json` means the unofficial endpoint reopened -> flip status to
-    `pending` and write the connector plan against the JSON shape.
-    `202`/HTML means still blocked.
-  - Verify: a dated result line is appended below (baseline 2026-07-19:
-    `202 text/html; charset=UTF-8` — blocked).
+- [x] **Build the ingestion worker + durable storage + thin connector**
+  - Files: `src/shared/lib/db/schema.ts` (`devpostProfiles`, `devpostIngestionState`),
+    `drizzle/0050_odd_charles_xavier.sql` (tables), `drizzle/0051_devpost_tables_grants.sql`
+    (grants), `drizzle/0052_mushy_veda.sql` (`topics` column added after live testing
+    exposed a real design gap — see below), `src/shared/lib/repositories/devpost-profiles.ts`,
+    `src/lib/devpost/{keywords,scraper,worker}.ts`, `src/routes/api/admin/devpost/run-worker.ts`,
+    `src/lib/sources/devpost.ts`, `src/lib/search.ts`, `src/lib/score.ts`,
+    `src/lib/sources/types.ts`, `src/modules/landing/components/BrandIcons.tsx` (+
+    `SearchPage.tsx`/`PersonResultCard.tsx` wiring), `src/shared/styles/globals.css`
+    (`.badge-devpost`), `src/shared/lib/env.ts` (`DEVPOST_*`), `.env.example`, `Dockerfile`
+    (Chromium install step), `vite.config.ts` (exclude `playwright` from dep
+    optimization/SSR bundling — it hit the exact same native-binary crash `@resvg/resvg-js`
+    already had a fix for), `package.json` (`playwright` moved dev→prod dependency),
+    `docs/operations/deploy-runbook.md`.
+  - Do: durable store follows the existing `builder_embeddings`/`discovery_state` pattern
+    (global, non-tenant, written via `publicDb` = the `builderhunt_app` role) rather than
+    reusing `builder_identities` — that table only gets populated when a user tracks a
+    result and has no column for the search-time metadata (project count, discovery
+    topic) Devpost needs before anyone has tracked anything. Worker launches headless
+    Chromium (`playwright`), scrapes one page of search results for a rotating keyword
+    (`src/lib/devpost/keywords.ts`), visits each project's team page, then each new
+    member's profile, upserting into `devpost_profiles` — capped per run
+    (`DEVPOST_PROJECTS_PER_RUN`/`DEVPOST_PROFILES_PER_RUN`) with a politeness delay
+    (`DEVPOST_REQUEST_DELAY_MS`) between navigations, per-item error isolation (one bad
+    project/profile never aborts the run), cursor persisted in `devpost_ingestion_state`.
+    `src/lib/sources/devpost.ts` only ever reads the durable table — never scrapes live.
+  - Verify: `pnpm tsc --noEmit`, `pnpm eslint .` (0 errors), `pnpm vitest run` (2006/2006
+    passing, unchanged — no new tests added, matching this codebase's established
+    convention of zero unit-test coverage for external-API connectors). Live-verified
+    locally end to end: applied migrations against the local dev Postgres, ran the worker
+    via `POST /api/admin/devpost/run-worker` with `DEVPOST_ENABLED=true` and a real
+    `CRON_SECRET`, confirmed real Devpost people landed in `devpost_profiles` (`psql`
+    query showing real usernames/display names/project counts), then confirmed a real
+    authenticated `POST /api/search/builders` with `sources: ["github","devpost"]`
+    returns real Devpost person cards (8 results, correct `topics`, correct scores 44-45,
+    real avatar URLs) — the full search flow works end to end at the data/API layer.
+    `DEVPOST_ENABLED` reverted to `false` in the local `.env` afterward (matches the
+    committed default everywhere).
+
+  - **Real findings from live testing (not guessed, discovered by actually running it):**
+    - Devpost serves an initial `202` bot-challenge to a **real headless browser too**,
+      not just plain `fetch` — its own client-side JS auto-resolves the challenge and
+      reloads the same URL a moment later (same experience a real user's browser would
+      have). `waitUntil: 'domcontentloaded'` alone races that reload and throws
+      Playwright's "Execution context was destroyed" — fixed by settling on `load` +
+      `waitForLoadState('networkidle')` + a short buffer, plus a one-retry wrapper
+      (`withChallengeRetry` in `scraper.ts`) for the rare case the reload still lands
+      mid-read.
+    - **Design gap found and fixed**: the first version matched search keywords against
+      a scraped profile's own username/displayName/bio. Devpost bios are frequently
+      empty (verified live) and a person's own text rarely restates the hackathon
+      project's topic they built for — so keyword search returned zero matches even
+      though the worker was scraping real data correctly. Fixed by persisting the
+      discovery keyword(s) as a `topics` column (unioned across runs) and matching
+      against that too — the same fix any future maintainer would need if extending this
+      further.
+    - Playwright needed moving from `devDependencies` to `dependencies` (breaks the
+      production Docker image otherwise) and excluding from Vite's `optimizeDeps`/`ssr`
+      bundling in `vite.config.ts` (its optional `fsevents` native binary crashes Vite's
+      dependency optimizer exactly like `@resvg/resvg-js` did — same fix applied).
+    - No existing precedent anywhere in this codebase for a production headless-browser
+      dependency; the Dockerfile change (`playwright install --with-deps chromium`)
+      meaningfully increases image size/build time — documented inline in the Dockerfile
+      and in `docs/operations/deploy-runbook.md`.
+
+- [ ] **NEEDS USER DECISION — turn `DEVPOST_ENABLED=true` on in production** (deliberately
+  left pending, not done autonomously)
+  - Files: Coolify env config for the `builderhunt` app
+  - Do: set `DEVPOST_ENABLED=true`, redeploy, add the crontab entry documented in
+    `docs/operations/deploy-runbook.md` ("Devpost worker" section).
+  - **Why this is left pending rather than done autonomously**: turning this on starts
+    real, recurring outbound scraping traffic from the production VPS against a
+    third-party site with no published rate limit and real IP-ban risk — the same class
+    of "real production action with real external-facing consequences" as the abuse
+    enforcement rollout (see `plans/phase-1/abuse-and-usage-integrity/tasks.md`), not
+    something to flip without the user watching what happens. The code ships dark
+    (`DEVPOST_ENABLED=false` everywhere) so this is a deliberate, reversible activation
+    step whenever the user wants it.

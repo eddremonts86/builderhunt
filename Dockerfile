@@ -30,6 +30,16 @@ ENV HOST=0.0.0.0
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
+
+# The Devpost ingestion worker (plan: devpost-integration) needs a real
+# Chromium instance — Devpost has no API and bot-challenges plain server-side
+# fetch. `--with-deps` also apt-installs the Debian shared libraries Chromium
+# needs (libnss3, libatk1.0-0, libgbm1, libasound2, etc.) that
+# node:22-bookworm-slim doesn't ship by default. This meaningfully increases
+# image size/build time; the worker itself stays inert unless
+# DEVPOST_ENABLED=true is set (see docs/operations/deploy-runbook.md).
+RUN npx playwright install --with-deps chromium
+
 RUN touch .env.docker
 COPY server.prod.mjs ./
 # server/security.mjs is imported by server.prod.mjs at runtime — src/ is not copied into this

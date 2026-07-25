@@ -10,6 +10,7 @@ import { searchGitLab } from '~/lib/sources/gitlab'
 import { searchCodeberg } from '~/lib/sources/codeberg'
 import { searchHashnode } from '~/lib/sources/hashnode'
 import { searchSourceHut } from '~/lib/sources/sourcehut'
+import { searchDevpost } from '~/lib/sources/devpost'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/types'
@@ -81,6 +82,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   if (sources.includes('codeberg')) tasks.push(searchCodeberg(keywords, { page, perPage }))
   if (sources.includes('hashnode')) tasks.push(searchHashnode(keywords, { page, perPage }))
   if (sources.includes('sourcehut')) tasks.push(searchSourceHut(keywords, { page, perPage }))
+  if (sources.includes('devpost')) tasks.push(searchDevpost(keywords, { page, perPage }))
 
   const results = await Promise.all(tasks)
   const all = results.flat()

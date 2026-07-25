@@ -38,10 +38,15 @@ export default defineConfig(() => ({
   // @resvg/resvg-js ships a native .node binary (used server-side only, to
   // rasterize the OG image to PNG). Vite's dep optimizer tries to parse it
   // as JS and crashes — keep it out of pre-bundling entirely.
+  //
+  // playwright (devpost-integration's headless-browser worker, server-only)
+  // hits the exact same failure via its own optional `fsevents` native
+  // binary transitively pulled in once playwright moved from devDependencies
+  // to dependencies.
   optimizeDeps: {
-    exclude: ['@resvg/resvg-js'],
+    exclude: ['@resvg/resvg-js', 'playwright'],
   },
   ssr: {
-    external: ['@resvg/resvg-js'],
+    external: ['@resvg/resvg-js', 'playwright'],
   },
 }))

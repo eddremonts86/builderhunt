@@ -105,3 +105,12 @@ export function SourceHutIcon({ className, title }: { className?: string; title?
     </svg>
   )
 }
+
+export function DevpostIcon({ className, title }: { className?: string; title?: string }) {
+  // Simplified "D" hexagon mark (hackathon/build motif, not the literal Devpost logo)
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} role={title ? 'img' : undefined} aria-label={title} aria-hidden={title ? undefined : true}>
+      <path d="M12 2 21 7v10l-9 5-9-5V7l9-5zm0 4.2L9 10h1.2v6.5h1.6V10H13z"/>
+    </svg>
+  )
+}

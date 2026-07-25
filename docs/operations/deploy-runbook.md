@@ -132,6 +132,7 @@ what keeps them working.
 | `POST /api/admin/legal/run-worker` | legal/retention sweeps | — |
 | `POST /api/admin/sprints/run-worker` | sourcing sprints | — |
 | `POST /api/admin/status/snapshot` | uptime-history snapshot for `/status`'s 30-day figure — run every 5 minutes, matching `computeUptime`'s default interval (`src/shared/lib/status.ts`); prunes rows older than 90 days each run | — |
+| `POST /api/admin/devpost/run-worker` | headless-browser (Playwright/Chromium) scrape of Devpost hackathon projects/team profiles into `devpost_profiles` — Devpost has no API, so this is not a live connector; no-ops unless `DEVPOST_ENABLED=true` | `DEVPOST_*` |
 
 `POST /api/admin/status/snapshot` also accepts `CRON_SECRET` via `Authorization: Bearer <token>` or
 `x-cron-secret: <token>` as an unattended alternative to a platform-admin session (same
@@ -147,6 +148,24 @@ in (orchestrator step 5/6), (b) its feature env set (`ENRICHMENT_ENABLED=true`,
 `ENRICHMENT_ALLOWED_CONNECTORS=github`, `GITHUB_TOKEN`), (c) for embeddings, the pgvector
 extension + embeddings resource reachable. A cron (VPS crontab or Coolify scheduled task)
 must POST each endpoint on its cadence, authenticated as a platform admin.
+
+### Devpost worker (first headless-browser worker — different risk profile)
+
+`DEVPOST_ENABLED` defaults to `false` and must be flipped deliberately in each environment —
+unlike every other worker above, this one launches a real Chromium instance against a live
+third-party site with no published API and no rate-limit contract; every request risks an
+IP ban of whichever host runs it. Before setting it `true` in production:
+
+- Confirm the runtime image actually has Chromium (`docker exec <container> npx playwright
+  --version` and a successful `chromium.launch()` — the Dockerfile's `playwright install
+  --with-deps chromium` step must have run during the image build).
+- Suggested cadence is hourly, not every 5 minutes, given the request cost per run:
+  ```
+  0 * * * * curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/devpost/run-worker
+  ```
+- Rollback is the same instant kill switch as every other feature flag in this codebase: set
+  `DEVPOST_ENABLED=false` and no further scrape requests happen (existing `devpost_profiles`
+  rows are left as-is — they're just data, not something that needs cleanup).
 
 ---
 

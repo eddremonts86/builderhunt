@@ -155,6 +155,7 @@ import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/inci
 import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
+import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
@@ -933,6 +934,12 @@ const ApiAdminDiscoveryRunWorkerRoute =
     path: '/api/admin/discovery/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminDevpostRunWorkerRoute =
+  ApiAdminDevpostRunWorkerRouteImport.update({
+    id: '/api/admin/devpost/run-worker',
+    path: '/api/admin/devpost/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   id: '/api/admin/changelog/$id',
   path: '/api/admin/changelog/$id',
@@ -1144,6 +1151,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -1306,6 +1314,7 @@ export interface FileRoutesByTo {
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -1473,6 +1482,7 @@ export interface FileRoutesById {
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
+  '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -1639,6 +1649,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -1801,6 +1812,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -1967,6 +1979,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
     | '/api/admin/changelog/$id'
+    | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -2090,6 +2103,7 @@ export interface RootRouteChildren {
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
+  ApiAdminDevpostRunWorkerRoute: typeof ApiAdminDevpostRunWorkerRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
@@ -3156,6 +3170,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDiscoveryRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/devpost/run-worker': {
+      id: '/api/admin/devpost/run-worker'
+      path: '/api/admin/devpost/run-worker'
+      fullPath: '/api/admin/devpost/run-worker'
+      preLoaderRoute: typeof ApiAdminDevpostRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/changelog/$id': {
       id: '/api/admin/changelog/$id'
       path: '/api/admin/changelog/$id'
@@ -3601,6 +3622,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
+  ApiAdminDevpostRunWorkerRoute: ApiAdminDevpostRunWorkerRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,

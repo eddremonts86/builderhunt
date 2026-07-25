@@ -200,6 +200,18 @@
     "0049_onboarding_progress_platform_read": {
       "sql": "ac273865bbf66e6686dac03eb01ec381cd1f44fa465a758167a3dc65bfcd9349",
       "snapshot": "a6e9a69da21085d5e16b9f59690801a0d4650fb3a2871d0bd43d001862641e6a"
+    },
+    "0050_odd_charles_xavier": {
+      "sql": "e7668944257fdd933399a54078d8af85c54e6a689f5b293b2e74e4d6ff4795c1",
+      "snapshot": "e4474e862f7cf68d8ac93801f2b1166472b63fad69f7c4a426370f3ed2aa1f19"
+    },
+    "0051_devpost_tables_grants": {
+      "sql": "19a7edb4d7074b7e9af424d9c1d021ace181e52c4baa270aa7c59dfbc908de3a",
+      "snapshot": "c827ebaf98acec23661d82e45527be9e5d880a2139e4bcca89f6161550c6bd4a"
+    },
+    "0052_mushy_veda": {
+      "sql": "cb2bcde522a2121c3db1245cc234325228ef8531f2c6c960e0f3136bf2c5f994",
+      "snapshot": "d336060d5ef1820af83aee93e6f1723a45e27bb4f212f3466092f36ffa85eec4"
     }
   }
 }

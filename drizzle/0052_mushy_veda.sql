@@ -1,0 +1,1 @@
+ALTER TABLE "devpost_profiles" ADD COLUMN "topics" jsonb DEFAULT '[]'::jsonb NOT NULL;

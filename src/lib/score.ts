@@ -134,6 +134,12 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
       const bio = builder.bio ?? ''
       if (bio.length > 50) score += 2
       if (bio.length > 200) score += 3
+    } else if (source === 'devpost') {
+      // Devpost exposes no followers; followersCount is intentionally left
+      // undefined (see src/lib/sources/devpost.ts). Project count is the
+      // only quantitative signal scraping can reliably get.
+      const projectsCount = (metadata.projectsCount as number | undefined) ?? 0
+      if (projectsCount > 0) score += Math.min(Math.log1p(projectsCount) * 4, 15)
     }
 
     // ---------- Quality signals (0-10 pts) ----------

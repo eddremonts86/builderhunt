@@ -1,12 +1,11 @@
 # Plan: Devpost Integration
 
-> **Status**: `blocked`
+> **Status**: `implemented — dark by default`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Blocked on data access, not on engineering. Devpost has no official
-> API and its unofficial JSON search returns an HTTP 202 bot-challenge to server-side
-> requests (verified 2026-07-19). No connector work should start until the decision in
-> `spec.md` ("Blocking decision") is made.
+> **Reality check**: Option (b) chosen 2026-07-25 — see `tasks.md` for the full
+> implementation write-up (files touched, real findings from live testing, and the
+> pending "turn it on in production" decision left for the user).
 
 ## Why there are no implementation phases yet
 

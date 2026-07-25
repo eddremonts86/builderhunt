@@ -703,6 +703,54 @@ export const discoveryState = pgTable('discovery_state', {
 })
 
 // ---------------------------------------------------------------------------
+// Devpost Ingestion (plan: devpost-integration) — global, non-tenant scraped
+// store. Devpost has no API and bot-challenges plain server-side fetch (see
+// plans/phase-1/devpost-integration/spec.md), so a headless-browser worker
+// (src/lib/devpost/worker.ts) populates this table on a cron cadence; the
+// `devpost` source connector (src/lib/sources/devpost.ts) only ever reads
+// it, never scrapes live inside a search request. Deliberately a table of
+// its own rather than reusing `builderIdentities`: that table only gets
+// populated when a user tracks a specific result (same as every other
+// source, via `trackOrganizationBuilder`), and it has no column for the
+// search-time metadata (`projectsCount`) Devpost needs for scoring before
+// anyone has tracked anything.
+// ---------------------------------------------------------------------------
+
+export const devpostProfiles = pgTable('devpost_profiles', {
+  id: text('id').primaryKey(), // Devpost username — globally unique on Devpost
+  username: text('username').notNull(),
+  displayName: text('display_name'),
+  avatarUrl: text('avatar_url'),
+  bio: text('bio'),
+  profileUrl: text('profile_url').notNull(),
+  projectsCount: integer('projects_count').notNull().default(0),
+  // The discovery keyword(s) that surfaced this profile (e.g. "open source")
+  // — Devpost bios are frequently empty (verified live), so the profile's
+  // OWN text is a poor keyword-match signal; the hackathon project topic
+  // that led to discovering this person is the real one. Unioned across
+  // runs as the same person keeps turning up under different keywords.
+  topics: jsonb('topics').$type<string[]>().notNull().default([]),
+  firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+// Single-row cursor state for the worker: which keyword/page it scrapes
+// next. Postgres, not Redis, so the cursor survives restarts (same rationale
+// as `discoveryState` above).
+export const devpostIngestionState = pgTable('devpost_ingestion_state', {
+  id: text('id').primaryKey(), // constant 'default'
+  keywordIndex: integer('keyword_index').notNull().default(0),
+  page: integer('page').notNull().default(1),
+  lastRunAt: timestamp('last_run_at', { withTimezone: true }),
+  stats: jsonb('stats')
+    .$type<{ runs: number; projectsSeen: number; profilesUpserted: number; errors: number }>()
+    .notNull()
+    .default({ runs: 0, projectsSeen: 0, profilesUpserted: 0, errors: 0 }),
+})
+
+// ---------------------------------------------------------------------------
 // AI Sourcing Sprints (plan: ai-sourcing-sprints) — organization-scoped
 // saved query variants re-executed by a background worker until a result
 // quota is reached. No FK to `organizationBuilders`/`builders` — results are
