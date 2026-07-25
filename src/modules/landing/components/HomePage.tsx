@@ -58,33 +58,64 @@ export function HomePage() {
               <div className="relative animate-fade-in-up" style={{ animationDelay: '120ms' }}>
                 <div className="card-glow">
                   <div className="p-2">
-                    <img
-                      src="/images/search-desktop.png"
-                      alt="BuilderHunt's search page: 118 real results for “react” across GitHub, Reddit and other sources, each with a match score."
-                      width={1280}
-                      height={973}
-                      loading="eager"
-                      decoding="async"
-                      className="rounded-xl w-full h-auto"
-                    />
+                    {/* This is the page's LCP element — responsive AVIF/WebP
+                        with the PNG kept only as a last-resort fallback, plus
+                        fetchPriority so the browser fetches it before other
+                        below-priority resources. */}
+                    <picture>
+                      <source
+                        type="image/avif"
+                        srcSet="/images/search-desktop-640.avif 640w, /images/search-desktop-1280.avif 1280w, /images/search-desktop-1920.avif 1920w"
+                        sizes="(min-width: 1024px) 45vw, 100vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet="/images/search-desktop-640.webp 640w, /images/search-desktop-1280.webp 1280w, /images/search-desktop-1920.webp 1920w"
+                        sizes="(min-width: 1024px) 45vw, 100vw"
+                      />
+                      <img
+                        src="/images/search-desktop.png"
+                        alt="BuilderHunt's search page: 118 real results for “react” across GitHub, Reddit and other sources, each with a match score."
+                        width={1280}
+                        height={973}
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
+                        className="rounded-xl w-full h-auto"
+                      />
+                    </picture>
                   </div>
                 </div>
 
                 {/* Real mobile screenshot, peeking from the corner — same live
-                    results, proof the product (not a mockup) works on any screen. */}
+                    results, proof the product (not a mockup) works on any screen.
+                    Stays lazy + inside a `hidden` (display:none) ancestor below
+                    `lg`, so it isn't fetched on phones where it's never shown. */}
                 <div
                   className="hidden lg:block absolute -bottom-10 -right-10 w-36 rounded-[20px] border-4 border-bh-surface bg-bh-surface shadow-2xl overflow-hidden animate-fade-in-up"
                   style={{ animationDelay: '360ms' }}
                 >
-                  <img
-                    src="/images/search-mobile.png"
-                    alt="The same search results on a phone."
-                    width={360}
-                    height={220}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-44 object-cover object-top"
-                  />
+                  <picture>
+                    <source
+                      type="image/avif"
+                      srcSet="/images/search-mobile-360.avif 360w, /images/search-mobile-720.avif 720w"
+                      sizes="144px"
+                    />
+                    <source
+                      type="image/webp"
+                      srcSet="/images/search-mobile-360.webp 360w, /images/search-mobile-720.webp 720w"
+                      sizes="144px"
+                    />
+                    <img
+                      src="/images/search-mobile.png"
+                      alt="The same search results on a phone."
+                      width={360}
+                      height={220}
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-44 object-cover object-top"
+                    />
+                  </picture>
                 </div>
 
                 {/* One real, live signal — not decorative chips duplicating what's already on screen. */}
