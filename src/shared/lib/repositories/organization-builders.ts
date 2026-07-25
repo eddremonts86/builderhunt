@@ -247,6 +247,30 @@ export async function setOrganizationBuilderHygiene(
   return projectHygiene
 }
 
+/**
+ * Third sibling of the two above, for `code-fingerprinting`'s v2 envelope.
+ *
+ * Note the key lives on `organization_builders.privateMetadata`, not
+ * `builders.metadata` as that plan's spec text says — the spec predates the
+ * tenant migration, and `privateMetadata` is both where the other two AI
+ * artifacts live and where `synergy.ts` already reads
+ * `codeStyleFingerprint` from.
+ */
+export async function setOrganizationBuilderFingerprint(
+  transaction: TenantTransaction,
+  organizationId: string,
+  builderIdentityId: string,
+  codeStyleFingerprint: Record<string, unknown>,
+) {
+  const existing = await findOrganizationBuilderByIdentity(transaction, organizationId, builderIdentityId)
+  if (!existing) return null
+  const privateMetadata = { ...existing.privateMetadata, codeStyleFingerprint }
+  await transaction.update(organizationBuilders)
+    .set({ privateMetadata, updatedAt: new Date() })
+    .where(and(eq(organizationBuilders.organizationId, organizationId), eq(organizationBuilders.id, existing.id)))
+  return codeStyleFingerprint
+}
+
 export async function trackOrganizationBuilder(
   transaction: TenantTransaction,
   input: TrackOrganizationBuilderInput,

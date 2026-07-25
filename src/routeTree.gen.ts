@@ -144,6 +144,7 @@ import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builder
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
 import { Route as ApiBuildersBuilderIdHygieneRouteImport } from './routes/api/builders/$builderId/hygiene'
+import { Route as ApiBuildersBuilderIdFingerprintRouteImport } from './routes/api/builders/$builderId/fingerprint'
 import { Route as ApiBuildersBuilderIdEvidenceRefreshRouteImport } from './routes/api/builders/$builderId/evidence-refresh'
 import { Route as ApiBuildersBuilderIdEnrichmentRouteImport } from './routes/api/builders/$builderId/enrichment'
 import { Route as ApiBuildersBuilderIdClaimRouteImport } from './routes/api/builders/$builderId/claim'
@@ -878,6 +879,12 @@ const ApiBuildersBuilderIdHygieneRoute =
     path: '/hygiene',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersBuilderIdFingerprintRoute =
+  ApiBuildersBuilderIdFingerprintRouteImport.update({
+    id: '/fingerprint',
+    path: '/fingerprint',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdEvidenceRefreshRoute =
   ApiBuildersBuilderIdEvidenceRefreshRouteImport.update({
     id: '/evidence-refresh',
@@ -1242,6 +1249,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
@@ -1415,6 +1423,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
@@ -1593,6 +1602,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
@@ -1770,6 +1780,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/fingerprint'
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
@@ -1943,6 +1954,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/fingerprint'
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
@@ -2120,6 +2132,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/claim'
     | '/api/builders/$builderId/enrichment'
     | '/api/builders/$builderId/evidence-refresh'
+    | '/api/builders/$builderId/fingerprint'
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
@@ -3224,6 +3237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdHygieneRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/$builderId/fingerprint': {
+      id: '/api/builders/$builderId/fingerprint'
+      path: '/fingerprint'
+      fullPath: '/api/builders/$builderId/fingerprint'
+      preLoaderRoute: typeof ApiBuildersBuilderIdFingerprintRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/evidence-refresh': {
       id: '/api/builders/$builderId/evidence-refresh'
       path: '/evidence-refresh'
@@ -3677,6 +3697,7 @@ interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
   ApiBuildersBuilderIdEvidenceRefreshRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRoute
+  ApiBuildersBuilderIdFingerprintRoute: typeof ApiBuildersBuilderIdFingerprintRoute
   ApiBuildersBuilderIdHygieneRoute: typeof ApiBuildersBuilderIdHygieneRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
   ApiBuildersBuilderIdSynergyRoute: typeof ApiBuildersBuilderIdSynergyRoute
@@ -3689,6 +3710,7 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdEnrichmentRoute: ApiBuildersBuilderIdEnrichmentRoute,
   ApiBuildersBuilderIdEvidenceRefreshRoute:
     ApiBuildersBuilderIdEvidenceRefreshRoute,
+  ApiBuildersBuilderIdFingerprintRoute: ApiBuildersBuilderIdFingerprintRoute,
   ApiBuildersBuilderIdHygieneRoute: ApiBuildersBuilderIdHygieneRoute,
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
   ApiBuildersBuilderIdSynergyRoute: ApiBuildersBuilderIdSynergyRoute,
