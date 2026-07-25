@@ -5,32 +5,46 @@ import type { RawBuilder } from '~/lib/sources/types'
  * no other source captures.
  *
  * Strategy:
- *   1. Search packages via npms.io (`/v2/search?q=...&size=20`) — gives us
- *      a ranked list with quality/popularity scores baked in.
- *   2. For each result, fetch full metadata from the registry
- *      (`/registry.npmjs.org/{name}`) — gives us maintainers, keywords,
- *      last-modified time.
+ *   1. Search packages via the first-party registry search endpoint
+ *      (`registry.npmjs.org/-/v1/search?text=...&size=20`) — gives us a
+ *      ranked list of packages with maintainers, keywords, license, and
+ *      version already inline (no separate per-package fetch needed to
+ *      build the base entities).
+ *   2. For the packages that actually end up in the returned page slice
+ *      (not every result — pagination-aware), fetch full registry metadata
+ *      (`/registry.npmjs.org/{name}`) to prefer `time.modified` /
+ *      `dist-tags.latest` when available, falling back to the search
+ *      result's own `updated`/`version` fields if that fetch fails.
  *   3. Emit two entity types:
  *        - kind: 'repo' for the packages themselves
  *        - kind: 'person' for the maintainers (deduped across packages)
- *   4. The npms.io `score.final` is used as `followersCount` proxy for
+ *   4. `score.detail.quality` (bounded 0-1, same semantic npms.io's old
+ *      `score.final` had) is used as the `followersCount` proxy for
  *      packages; maintainers get aggregated package quality + count.
  *
  * Quota: no documented limit. The registry is CORS-friendly. We cap at
  * 20 packages per search to be polite.
  *
- * Spec reference: plans/npm-registry-integration/spec.md
+ * Spec reference: plans/npm-registry-integration/spec.md. Migrated off
+ * npms.io (shut down/unreliable) to this endpoint 2026-07-25 — one real
+ * deviation from the migration task's own assumption worth flagging:
+ * `score.final` on THIS endpoint is an unbounded relevance/ranking score
+ * (e.g. ~2300 for an exact-name hit like "react"), not npms.io's bounded
+ * 0-1 quality score the task assumed — using it directly would multiply
+ * out to absurd `followersCount` values. `score.detail.quality` is the
+ * actual bounded 0-1 field and is what's used here instead.
  */
-interface NpmsSearchResult {
+interface NpmSearchObject {
   package: {
     name: string
-    version: string
+    version?: string
     description?: string
     keywords?: string[]
+    license?: string
+    date?: string
     publisher?: { username: string; email: string }
     maintainers?: Array<{ username: string; email: string }>
     links?: { npm?: string; homepage?: string; repository?: string }
-    date?: string
   }
   score?: {
     final: number
@@ -41,7 +55,9 @@ interface NpmsSearchResult {
     }
   }
   searchScore?: number
-  highlight?: string
+  /** ISO timestamp of the package's last publish — always present on every search result,
+   * unlike `time.modified` which requires a separate per-package registry fetch. */
+  updated?: string
 }
 
 interface NpmRegistryPackage {
@@ -55,19 +71,19 @@ interface NpmRegistryPackage {
   homepage?: string
 }
 
-const NPMS_SEARCH = 'https://api.npms.io/v2/search'
 const NPM_REGISTRY = 'https://registry.npmjs.org'
+const NPM_SEARCH = `${NPM_REGISTRY}/-/v1/search`
 
-async function searchPackages(keywords: string[]): Promise<NpmsSearchResult[]> {
+async function searchPackages(keywords: string[]): Promise<NpmSearchObject[]> {
   const q = keywords.join(' ')
   try {
     const res = await fetch(
-      `${NPMS_SEARCH}?q=${encodeURIComponent(q)}&size=20`,
+      `${NPM_SEARCH}?text=${encodeURIComponent(q)}&size=20`,
       { headers: { 'User-Agent': 'BuilderHunt/1.0 (npm source)' } },
     )
     if (!res.ok) return []
-    const data = (await res.json()) as { results: NpmsSearchResult[] }
-    return data.results ?? []
+    const data = (await res.json()) as { objects: NpmSearchObject[] }
+    return data.objects ?? []
   } catch {
     return []
   }
@@ -85,8 +101,19 @@ async function fetchPackage(name: string): Promise<NpmRegistryPackage | null> {
   }
 }
 
-function packageToRepoBuilder(pkg: NpmRegistryPackage, score: number): RawBuilder {
-  const lastModified = pkg.time?.modified ? Date.parse(pkg.time.modified) : Date.now()
+function qualityScore(obj: NpmSearchObject): number {
+  return obj.score?.detail?.quality ?? 0
+}
+
+function packageToRepoBuilder(obj: NpmSearchObject, registryMeta: NpmRegistryPackage | null): RawBuilder {
+  const pkg = obj.package
+  const lastModified = registryMeta?.time?.modified
+    ? Date.parse(registryMeta.time.modified)
+    : obj.updated ? Date.parse(obj.updated) : Date.now()
+  const version = registryMeta?.['dist-tags']?.latest ?? pkg.version
+  const license = registryMeta?.license ?? pkg.license
+  const maintainerCount = (registryMeta?.maintainers ?? pkg.maintainers)?.length ?? 0
+
   return {
     id: `npm-${pkg.name}`,
     kind: 'repo' as const,
@@ -97,16 +124,16 @@ function packageToRepoBuilder(pkg: NpmRegistryPackage, score: number): RawBuilde
     avatarUrl: undefined,
     bio: pkg.description,
     profileUrl: `https://www.npmjs.com/package/${pkg.name}`,
-    // npms.io score is 0-1; multiply by 100k for a followers-like scale
-    followersCount: Math.round(score * 100000),
+    // Bounded 0-1 quality score, multiplied for a followers-like scale.
+    followersCount: Math.round(qualityScore(obj) * 100000),
     language: 'javascript',
     country: undefined,
     topics: (pkg.keywords ?? []).slice(0, 8),
     metadata: {
-      version: pkg['dist-tags']?.latest,
-      license: pkg.license,
-      lastSeen: lastModified,
-      maintainerCount: pkg.maintainers?.length ?? 0,
+      version,
+      license,
+      lastSeen: isNaN(lastModified) ? Date.now() : lastModified,
+      maintainerCount,
     },
   }
 }
@@ -124,12 +151,13 @@ interface MaintainerAggregate {
 function aggregateMaintainer(
   username: string,
   email: string | undefined,
-  pkg: NpmRegistryPackage,
+  obj: NpmSearchObject,
   score: number,
   byName: Map<string, MaintainerAggregate>,
 ): void {
+  const pkg = obj.package
   const existing = byName.get(username)
-  const lastSeen = pkg.time?.modified ? Date.parse(pkg.time.modified) : Date.now()
+  const lastSeen = obj.updated ? Date.parse(obj.updated) : Date.now()
   const entry: MaintainerAggregate = existing ?? {
     username,
     email,
@@ -149,7 +177,7 @@ function aggregateMaintainer(
   })
   entry.totalScore += score
   if (score > entry.maxScore) entry.maxScore = score
-  if (lastSeen > entry.lastSeen) entry.lastSeen = lastSeen
+  if (!isNaN(lastSeen) && lastSeen > entry.lastSeen) entry.lastSeen = lastSeen
   for (const k of pkg.keywords ?? []) entry.allKeywords.add(k)
   byName.set(username, entry)
 }
@@ -173,7 +201,7 @@ function maintainerToPersonBuilder(m: MaintainerAggregate): RawBuilder {
     avatarUrl: undefined,
     bio,
     profileUrl: `https://www.npmjs.com/~${m.username}`,
-    // No followers. Use max package score × 100k as a "top package quality" proxy
+    // No followers. Use max package quality score × 100k as a "top package quality" proxy
     followersCount: Math.round(m.maxScore * 100000),
     language: undefined,
     country: undefined,
@@ -205,41 +233,48 @@ export async function searchNpm(
   const results = await searchPackages(keywords)
   if (results.length === 0) return []
 
-  // Fetch full metadata in parallel. Cap at 20 to be polite.
   const top = results.slice(0, 20)
-  const metas = await Promise.all(top.map((r) => fetchPackage(r.package.name)))
 
-  // Build packages + maintainer aggregates
-  const packages: RawBuilder[] = []
+  // Build maintainer aggregates from every result's inline `maintainers` — no per-package
+  // fetch needed for this, unlike the npms.io-era version of this file.
   const maintainers = new Map<string, MaintainerAggregate>()
-
-  for (let i = 0; i < top.length; i++) {
-    const meta = metas[i]
-    if (!meta) continue
-    const score = top[i].score?.final ?? 0
-
-    // Package entity
-    packages.push(packageToRepoBuilder(meta, score))
-
-    // Maintainer entities (deduped by username)
-    for (const m of meta.maintainers ?? []) {
-      if (!m.name) continue
-      aggregateMaintainer(m.name, m.email, meta, score, maintainers)
+  for (const obj of top) {
+    for (const m of obj.package.maintainers ?? []) {
+      if (!m.username) continue
+      aggregateMaintainer(m.username, m.email, obj, qualityScore(obj), maintainers)
     }
   }
-
-  // Sort maintainers by total score, then package count
   const maintainerList = Array.from(maintainers.values()).sort((a, b) => {
     if (b.totalScore !== a.totalScore) return b.totalScore - a.totalScore
     return b.packages.length - a.packages.length
   })
 
-  // Combine and paginate. People first, then repos.
-  const all: RawBuilder[] = [
+  // People first, then repos — build package entities from the inline search data by default.
+  const peopleAndPackages: RawBuilder[] = [
     ...maintainerList.map(maintainerToPersonBuilder),
-    ...packages,
+    ...top.map((obj) => packageToRepoBuilder(obj, null)),
   ]
 
   const start = (page - 1) * perPage
-  return all.slice(start, start + perPage)
+  const pageSlice = peopleAndPackages.slice(start, start + perPage)
+
+  // Only for the packages actually landing in this page slice, fetch full registry metadata
+  // to prefer `time.modified`/`dist-tags.latest` over the search result's own `updated`/
+  // `version` fields — the one place this migration still makes a per-package call, and only
+  // for what's actually displayed, not all 20 search results.
+  const packageNamesInSlice = pageSlice
+    .filter((b) => b.kind === 'repo' && b.source === 'npm')
+    .map((b) => b.sourceId)
+  if (packageNamesInSlice.length === 0) return pageSlice
+
+  const registryMetas = await Promise.all(packageNamesInSlice.map((name) => fetchPackage(name)))
+  const registryMetaByName = new Map(packageNamesInSlice.map((name, i) => [name, registryMetas[i]]))
+  const objByName = new Map(top.map((obj) => [obj.package.name, obj]))
+
+  return pageSlice.map((b) => {
+    if (b.kind !== 'repo' || b.source !== 'npm') return b
+    const obj = objByName.get(b.sourceId)
+    const registryMeta = registryMetaByName.get(b.sourceId) ?? null
+    return obj ? packageToRepoBuilder(obj, registryMeta) : b
+  })
 }
