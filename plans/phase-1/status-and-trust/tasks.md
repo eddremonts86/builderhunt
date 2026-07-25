@@ -5,7 +5,9 @@
 > **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
 > **Reality check**: Status/incidents/changelog/roadmap delivered (checked below). Phase 1 (uptime
 > history) delivered 2026-07-25. Phase 2 (incident email subscriptions) remains explicitly
-> optional per its own task text ("build only on demonstrated need") — deliberately not built.
+> optional per its own task text ("build only on demonstrated need") — deliberately not built,
+> also blocked from ever being auto-built by touching `src/shared/lib/email.ts` (reserved file).
+> Nothing else actionable remains in this plan.
 
 ## Phase 0 — Delivered (audited against src, 2026-07-19)
 
@@ -114,7 +116,11 @@ intervalMinutes = 5): number | null` — expected samples = days×24×60/interva
 
 ## Phase 2 — Incident email subscriptions (OPTIONAL — build only on demonstrated need)
 
-- [ ] **Subscribers table + subscribe endpoint + send hooks**
+- [ ] **Subscribers table + subscribe endpoint + send hooks** — **deliberately not built,
+      2026-07-25**: explicitly optional per this task's own text ("build only on
+      demonstrated need" — no such need has been demonstrated), and its own Files list
+      requires editing `src/shared/lib/email.ts`, which is reserved for a concurrent
+      e2e-design session this repo must never touch. Leaving unbuilt on both grounds.
   - Files: `src/shared/lib/db/schema.ts` (`status_subscribers`: id, email unique, createdAt),
     `src/routes/api/status/subscribe.ts` (new, POST, zod email, rate-limited via
     `src/shared/lib/rate-limit.ts`), `src/routes/api/admin/incidents/index.ts` + `$id.ts`
