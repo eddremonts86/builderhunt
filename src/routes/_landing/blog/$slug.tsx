@@ -15,6 +15,7 @@ export const Route = createFileRoute('/_landing/blog/$slug')({
     const { post } = loaderData
     const title = `${post.title} — BuilderHunt Blog`
     const url = `https://builderhunt.dev/blog/${post.slug}`
+    const ogImage = `https://builderhunt.dev/api/og/blog?slug=${encodeURIComponent(post.slug)}`
     return {
       meta: [
         { title },
@@ -23,11 +24,13 @@ export const Route = createFileRoute('/_landing/blog/$slug')({
         { property: 'og:description', content: post.description },
         { property: 'og:type', content: 'article' },
         { property: 'og:url', content: url },
+        { property: 'og:image', content: ogImage },
         { property: 'article:published_time', content: post.date },
         { property: 'article:author', content: post.author },
         { name: 'twitter:card', content: 'summary_large_image' },
         { name: 'twitter:title', content: post.title },
         { name: 'twitter:description', content: post.description },
+        { name: 'twitter:image', content: ogImage },
       ],
     }
   },

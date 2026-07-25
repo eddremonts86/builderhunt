@@ -23,30 +23,29 @@
 
 ## Phase 1 — SEO fixes
 
-- [ ] **Add /pricing, /blog, and blog posts to the sitemap**
+- [x] **Add /pricing, /blog, and blog posts to the sitemap**
   - Files: `src/routes/sitemap[.]xml.ts`
-  - Do: In the GET handler's `entries` array (lines 79-89) add
-    `{ loc: `${SITE}/pricing`, changefreq: 'weekly', priority: 0.8 }` and
-    `{ loc: `${SITE}/blog`, changefreq: 'weekly', priority: 0.8 }`. Then
-    `const posts = await getAllPosts()` (from `~/shared/lib/blog`) and push
-    `{ loc: `${SITE}/blog/${p.slug}`, lastmod: p.date, changefreq: 'monthly', priority: 0.7 }`
-    per post.
-  - Verify: `curl localhost:3000/sitemap.xml` contains `/pricing`, `/blog`, and one `<url>`
-    per file in `content/posts/`; XML still validates (open in a browser, no parse error).
+  - Done: Added `/pricing` and `/blog` static entries, plus one `<url>` per post from
+    `getAllPosts()` (`lastmod` = post date, `monthly`/0.7).
+  - Verify: **live-verified** — `sitemap.xml` in the browser contains `/pricing`, `/blog`,
+    and all 3 `content/posts/*.md` slugs; XML parses with no error banner.
 
-- [ ] **Blog OG images**
-  - Files: `src/routes/api/og/blog.tsx` (new), `src/routes/_landing/blog/$slug.tsx`,
-    `src/routes/_landing/blog/index.tsx`
-  - Do: New OG route modeled on `api/og/explore.tsx` (same SVG→PNG resvg pipeline): input
-    `?slug=…`, look up the post via `getPostBySlug`, render title (wrapped, max 3 lines),
-    date + author, BuilderHunt branding; 404 for unknown slug; `Cache-Control: public,
-max-age=86400`. In `blog/$slug.tsx` `head:` add
-    `{ property: 'og:image', content: `${SITE}/api/og/blog?slug=${post.slug}` }` and
-    `{ name: 'twitter:card', content: 'summary_large_image' }`; give the blog index a static
-    OG using the same endpoint style or the site default.
-  - Verify: `curl -I "localhost:3000/api/og/blog?slug=why-i-built-builderhunt"` →
-    `image/png` 200; view-source of a post page shows the `og:image` tag; X card validator
-    renders the image on prod.
+- [x] **Blog OG images**
+  - Files: `src/routes/api/og/blog.tsx` (new), `src/routes/_landing/blog/$slug.tsx`
+  - Done: New OG route (SVG→PNG via `@resvg/resvg-js`, same pipeline as `api/og/explore.tsx`):
+    `?slug=…` → `getPostBySlug`, greedy word-wrapped title (max 3 lines, ellipsis truncation
+    only when words actually overflow), date + author, BuilderHunt branding; unknown slug →
+    404 JSON; `Cache-Control: public, max-age=86400`. `blog/$slug.tsx` now sets
+    `og:image`/`twitter:image` to `/api/og/blog?slug=…`. Blog index needed no change — it
+    already inherits the root's default `og:image`/`twitter:card` via TanStack Router's head
+    merge (verified by reading `__root.tsx`, which sets both site-wide).
+  - Verify: **live-verified** — `curl`'d the endpoint for all 3 real posts: correct PNG
+    (`image/png`, 200) for each, unknown slug → 404 JSON; one-line title renders with no
+    stray ellipsis (caught and fixed a real bug where the wrap function appended "…" even
+    when the title fit on one line); 3-line wrap confirmed clean with no clipping on the
+    longest real title. `view-source`-equivalent (`javascript_tool` reading
+    `document.querySelector`) on `/blog/why-i-built-builderhunt` confirms the real `og:image`
+    and `twitter:card`/`twitter:image` tags are present with the correct URL.
 
 ## Phase 2 — Public radars (post-launch)
 

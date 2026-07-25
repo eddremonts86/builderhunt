@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { getAllPosts } from '~/shared/lib/blog'
 
 const SITE = 'https://builderhunt.dev'
 
@@ -79,6 +80,8 @@ export const Route = createFileRoute('/sitemap.xml')({
         const entries: UrlEntry[] = [
           { loc: `${SITE}/`, lastmod: today, changefreq: 'weekly', priority: 1.0 },
           { loc: `${SITE}/explore`, lastmod: today, changefreq: 'weekly', priority: 0.9 },
+          { loc: `${SITE}/pricing`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
+          { loc: `${SITE}/blog`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
           { loc: `${SITE}/changelog`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
           { loc: `${SITE}/roadmap`, lastmod: today, changefreq: 'weekly', priority: 0.7 },
           { loc: `${SITE}/status`, lastmod: today, changefreq: 'daily', priority: 0.6 },
@@ -87,6 +90,16 @@ export const Route = createFileRoute('/sitemap.xml')({
           { loc: `${SITE}/legal/cookies`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
           { loc: `${SITE}/legal/imprint`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
         ]
+
+        const posts = await getAllPosts()
+        for (const p of posts) {
+          entries.push({
+            loc: `${SITE}/blog/${p.slug}`,
+            lastmod: p.date,
+            changefreq: 'monthly',
+            priority: 0.7,
+          })
+        }
 
         // /explore pages for each popular query
         for (const q of POPULAR_QUERIES) {

@@ -67,6 +67,7 @@ import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
 import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
+import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
@@ -465,6 +466,11 @@ const ApiOnboardingCompleteRoute = ApiOnboardingCompleteRouteImport.update({
 const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
   id: '/api/og/explore',
   path: '/api/og/explore',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
+  id: '/api/og/blog',
+  path: '/api/og/blog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
@@ -1111,6 +1117,7 @@ export interface FileRoutesByFullPath {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
@@ -1275,6 +1282,7 @@ export interface FileRoutesByTo {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
@@ -1444,6 +1452,7 @@ export interface FileRoutesById {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
@@ -1612,6 +1621,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
@@ -1776,6 +1786,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
@@ -1944,6 +1955,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
@@ -2078,6 +2090,7 @@ export interface RootRouteChildren {
   ApiE2eOutboxRoute: typeof ApiE2eOutboxRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
+  ApiOgBlogRoute: typeof ApiOgBlogRoute
   ApiOgExploreRoute: typeof ApiOgExploreRoute
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
@@ -2565,6 +2578,13 @@ declare module '@tanstack/react-router' {
       path: '/api/og/explore'
       fullPath: '/api/og/explore'
       preLoaderRoute: typeof ApiOgExploreRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og/blog': {
+      id: '/api/og/blog'
+      path: '/api/og/blog'
+      fullPath: '/api/og/blog'
+      preLoaderRoute: typeof ApiOgBlogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/feeds/$searchId': {
@@ -3604,6 +3624,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiE2eOutboxRoute: ApiE2eOutboxRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
+  ApiOgBlogRoute: ApiOgBlogRoute,
   ApiOgExploreRoute: ApiOgExploreRoute,
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
