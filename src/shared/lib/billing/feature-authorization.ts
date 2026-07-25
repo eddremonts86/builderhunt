@@ -1,5 +1,10 @@
+import { randomUUID } from 'node:crypto'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
+import { env } from '../env'
+import { checkPoolDrainAndEmit, detectPoolDrain } from '../abuse/credit-abuse'
+import type { EmitAbuseSignalDeps } from '../abuse/signals'
+import { getSeatUsage, incrementSeatUsage, listSeatUsageForOrgDay } from '../repositories/seat-usage'
 import { findActiveBillingSubscription } from '../repositories/billing'
 import type { BillingCreditAllocationRecord, BillingCreditReservationRecord } from '../repositories/billing-ledger'
 import {
@@ -101,12 +106,31 @@ export interface FeatureReservationResult {
 }
 
 /** The one call a feature makes before starting any provider-backed work. Throws `FeatureBillingError('insufficient_entitlement')` if the tier doesn't cover this feature, or `('insufficient_credits')` if the reservation itself fails — either way, the caller must not proceed. */
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export async function reserveCredits(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
   input: ReserveCreditsInput,
+  deps?: EmitAbuseSignalDeps,
 ): Promise<FeatureReservationResult> {
   const rateCard = await requireEntitledRateCard(transaction, principal, input.operation)
+  const today = todayUtc()
+
+  // Per-seat credit sub-budget (Phase 4B "G2") — checked BEFORE reserving so a blocked seat never
+  // partially reserves against the shared pool. Only a real `enforce`-mode gate; `observe`/`warn`
+  // skip the query entirely and rely on the always-on signal below instead.
+  if (env.ABUSE_ENFORCEMENT_MODE === 'enforce') {
+    const existing = await getSeatUsage(transaction, principal.organizationId, principal.userId, today, 'messages')
+    const orgUsageToday = await listSeatUsageForOrgDay(transaction, principal.organizationId, today, 'messages')
+    const seatCount = new Set(orgUsageToday.map((row) => row.userId)).size + (existing ? 0 : 1)
+    const seatUnitsAfterThisReservation = (existing?.creditUnits ?? 0) + rateCard.maxUnits
+    if (detectPoolDrain({ seatUnits: seatUnitsAfterThisReservation, cap: env.CREDIT_SEAT_DAILY_UNITS, seatCount })) {
+      throw new FeatureBillingError('This seat has reached its daily credit sub-budget', 'blocked')
+    }
+  }
 
   try {
     const result = await reserveCreditsRaw(transaction, {
@@ -118,6 +142,29 @@ export async function reserveCredits(
       maximumUnits: rateCard.maxUnits,
       maxDurationSeconds: rateCard.maxDurationSeconds,
     })
+
+    // Record the acting seat's credit units into seat_usage_daily on every reservation — always,
+    // regardless of enforcement mode (this is the counter, not the gate). `pool_drain` is emitted
+    // whenever a seat crosses its sub-cap; detection only here, never blocks (the enforce-mode
+    // block already happened above, before any credits were reserved).
+    const updatedSeatUsage = await incrementSeatUsage(transaction, {
+      id: randomUUID(), organizationId: principal.organizationId, userId: principal.userId,
+      day: today, action: 'messages', count: 1, creditUnits: rateCard.maxUnits,
+    })
+    const orgUsageAfter = await listSeatUsageForOrgDay(transaction, principal.organizationId, today, 'messages')
+    const poolTotalUnits = orgUsageAfter.reduce((sum, row) => sum + row.creditUnits, 0)
+    const seatCountAfter = new Set(orgUsageAfter.map((row) => row.userId)).size
+    await checkPoolDrainAndEmit(
+      {
+        seatUnits: updatedSeatUsage.creditUnits,
+        cap: env.CREDIT_SEAT_DAILY_UNITS,
+        seatCount: seatCountAfter,
+        poolTotalUnits,
+      },
+      { userId: principal.userId, organizationId: principal.organizationId, requestId: principal.requestId },
+      deps,
+    )
+
     return { reservation: result.reservation, allocations: result.allocations }
   } catch (error) {
     if (error instanceof ReservationError && error.code === 'insufficient_credits') {

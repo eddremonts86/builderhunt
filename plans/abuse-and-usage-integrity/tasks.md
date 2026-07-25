@@ -729,13 +729,43 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `node scripts/db/verify-migration-integrity.mjs` valid, `pnpm security:boundaries` → 0 legacy
     imports. Removed the throwaway Docker container afterward.
 
-- [ ] **Per-seat credit sub-budget + `pool_drain` signal (G2)**
+- [x] **Per-seat credit sub-budget + `pool_drain` signal (G2)**
   - Files: `src/shared/lib/billing/reservations.ts`, `src/shared/lib/repositories/seat-usage.ts`,
     `src/shared/lib/abuse/credit-abuse.ts` (+ test)
   - Do: on each reservation, record the acting seat's credit units into `seat_usage_daily`; when a
     small number of seats consume a disproportionate share of a Team pool, emit `pool_drain`. Observe:
     record + signal only; `enforce` applies `CREDIT_SEAT_DAILY_UNITS` as a per-seat sub-cap.
   - Verify: unit tests for the share computation + sub-cap math; no change to pooled total in observe.
+  - Progress: implemented at the `billing/feature-authorization.ts` `reserveCredits` layer (not raw
+    `reservations.ts`, which is organization-scoped only and has no `userId`/seat concept — see
+    Phase 4B task 1's finding) rather than `reservations.ts` itself. Added `CREDIT_SEAT_DAILY_UNITS`
+    (default 2000) to `env.ts`; `listSeatUsageForOrgDay` to `repositories/seat-usage.ts` (every
+    seat's usage row for one org/day/action, used for both the seat-count and pool-total
+    computation); new `abuse/credit-abuse.ts` (`computeSeatShare`, `detectPoolDrain` — never flags a
+    single-seat org — `checkPoolDrainAndEmit`). `reserveCredits` now: (1) in `enforce` mode only,
+    pre-checks whether this reservation would push the acting seat over `CREDIT_SEAT_DAILY_UNITS`
+    in a multi-seat org, throwing `FeatureBillingError('blocked')` BEFORE any credits are reserved
+    if so; (2) always (any mode) records the seat's consumed units into `seat_usage_daily` (action
+    `'messages'`) after a successful reservation and emits `pool_drain` via `checkPoolDrainAndEmit`
+    when the post-increment total crosses the cap — detection only, no change to the pooled total.
+    Added an optional `deps?: EmitAbuseSignalDeps` parameter to `reserveCredits` (same DI seam as
+    every other `check*AndEmit` call site in this plan) so tests never write to the real
+    `abuse_signals` table. 8 new unit tests for `credit-abuse.ts` (pure functions + emit gating) and
+    3 new real-Postgres integration tests in `feature-authorization.test.ts` (single-seat org never
+    blocks/flags however far over cap; observe mode records usage + emits `pool_drain` but never
+    blocks a multi-seat org's over-cap seat; enforce mode blocks a multi-seat org's seat before any
+    credits are reserved, leaving `seat_usage_daily` unchanged) — all 18 tests in that file plus all
+    8 new tests pass (`pnpm vitest run src/shared/lib/billing/feature-authorization.test.ts
+    src/shared/lib/abuse/credit-abuse.test.ts`). Full `src/shared/lib/billing` + `src/shared/lib/abuse`
+    suites (821 tests) pass with no regressions; `pnpm tsc --noEmit` and `pnpm eslint` on every
+    touched file are clean. Live-verified end-to-end against the real local dev Postgres database
+    (not disposable/mocked) via a throwaway direct-call script (no route wires to
+    `feature-authorization.ts` yet, so there is no HTTP path to exercise): seeded a real multi-seat
+    org + subscription + credit grant, confirmed the first reservation (reaching exactly the cap)
+    succeeds, the second (crossing the cap) throws `FeatureBillingError('blocked')`, `seat_usage_daily`
+    stays at 50 units (the blocked attempt never reserves or records), and no `pool_drain` row is
+    written for the blocked attempt (detection only runs after a successful reservation) — script and
+    all seeded rows deleted afterward, confirmed zero residual rows in the dev database.
 
 - [ ] **Metering-bypass boundary test — every provider entry point is metered (G8)**
   - Files: `scripts/check-provider-metering.mjs`, `package.json` (script), `.github/workflows/quality.yml`

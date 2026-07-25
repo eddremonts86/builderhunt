@@ -108,6 +108,11 @@ const zodEnv = z.object({
   // Sign-ups from the same first-party device cookie, per day — survives IP rotation (unlike
   // better-auth's own built-in per-IP sign-up limiter), catching multi-accounting from one browser.
   SIGNUP_DEVICE_DAILY_LIMIT: z.coerce.number().int().positive().default(3),
+  // Per-seat share of a Team's pooled daily credit consumption before `pool_drain` fires — never
+  // applies to a single-seat org (there's no one else's pool to protect). `observe` only signals;
+  // `enforce` also refuses to reserve further credits for that seat once its own daily total
+  // would cross this, independent of whether the org's overall pool still has balance.
+  CREDIT_SEAT_DAILY_UNITS: z.coerce.number().int().positive().default(2000),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

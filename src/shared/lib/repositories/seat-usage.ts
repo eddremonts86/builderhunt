@@ -38,6 +38,25 @@ export async function getSeatUsage(
   return row ?? null
 }
 
+/**
+ * Every seat's usage row for one (organization, day, action) — used by
+ * `abuse/credit-abuse.ts`'s `pool_drain` share computation, which needs every seat's contribution
+ * to today's pool, not just the acting seat's own row.
+ */
+export async function listSeatUsageForOrgDay(
+  transaction: TenantTransaction,
+  organizationId: string,
+  day: string,
+  action: string,
+): Promise<SeatUsageRecord[]> {
+  return transaction.select().from(seatUsageDaily)
+    .where(and(
+      eq(seatUsageDaily.organizationId, organizationId),
+      eq(seatUsageDaily.day, day),
+      eq(seatUsageDaily.action, action),
+    ))
+}
+
 export interface IncrementSeatUsageInput {
   id: string
   organizationId: string

@@ -1,5 +1,22 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+
+const mockEnv = vi.hoisted(() => ({
+  ABUSE_ENFORCEMENT_MODE: 'observe' as 'observe' | 'warn' | 'enforce',
+  CREDIT_SEAT_DAILY_UNITS: 2000,
+}))
+vi.mock('../env', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../env')>()
+  return {
+    ...actual,
+    env: {
+      ...actual.env,
+      get ABUSE_ENFORCEMENT_MODE() { return mockEnv.ABUSE_ENFORCEMENT_MODE },
+      get CREDIT_SEAT_DAILY_UNITS() { return mockEnv.CREDIT_SEAT_DAILY_UNITS },
+    },
+  }
+})
+
 import type { TenantPrincipal } from '../authorization/permissions'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
 import { authUsers, billingSubscriptions, organizations } from '../db/schema'
@@ -64,6 +81,11 @@ afterAll(async () => {
   await drop()
 })
 
+afterEach(() => {
+  mockEnv.ABUSE_ENFORCEMENT_MODE = 'observe'
+  mockEnv.CREDIT_SEAT_DAILY_UNITS = 2000
+})
+
 describe('checkEntitlement', () => {
   it('rejects an unknown feature', async () => {
     const principal = await freshPrincipal()
@@ -124,6 +146,94 @@ describe('reserveCredits (feature layer)', () => {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
     expect(result.reservation.maximumUnits).toBe(50) // RATE_CARDS.ai_sourcing_sprint.maxUnits
+  })
+})
+
+describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-usage-integrity G2)', () => {
+  function todayUtc(): string {
+    return new Date().toISOString().slice(0, 10)
+  }
+
+  it('never blocks or flags a single-seat org, however far over the cap its own seat goes', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 1000)
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_SEAT_DAILY_UNITS = 50 // first reservation alone (50 units) already meets the cap
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+    // Second reservation pushes this seat to 100 units against a 50-unit cap — still not flagged/blocked, solo seat.
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).resolves.toBeDefined()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('observe mode: records usage and emits pool_drain but never blocks a multi-seat org\'s over-cap seat', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 1000)
+    mockEnv.CREDIT_SEAT_DAILY_UNITS = 50 // observe mode is the afterEach default
+
+    const { incrementSeatUsage } = await import('../repositories/seat-usage')
+    const otherSeatUserId = uniqueId('user')
+    await db.insert(authUsers).values({ id: otherSeatUserId, name: otherSeatUserId, email: `${otherSeatUserId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
+    await db.transaction((tx) => incrementSeatUsage(tx, {
+      id: uniqueId('seat-usage'), organizationId: principal.organizationId, userId: otherSeatUserId,
+      day: todayUtc(), action: 'messages', count: 1, creditUnits: 10,
+    }))
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // First reservation (50 units) already exceeds the 50-unit cap is false (== cap, not over); second pushes to 100, over cap.
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).resolves.toBeDefined() // observe mode: never throws, however over cap
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'pool_drain',
+      organizationId: principal.organizationId,
+      userId: principal.userId,
+      details: expect.objectContaining({ seatUnits: 100, cap: 50 }),
+    }))
+  })
+
+  it('enforce mode: blocks a multi-seat org\'s seat once it would cross the per-seat cap, before any credits are reserved', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedGrant(principal.organizationId, 1000)
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_SEAT_DAILY_UNITS = 50
+
+    const { incrementSeatUsage, getSeatUsage } = await import('../repositories/seat-usage')
+    const otherSeatUserId = uniqueId('user')
+    await db.insert(authUsers).values({ id: otherSeatUserId, name: otherSeatUserId, email: `${otherSeatUserId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
+    await db.transaction((tx) => incrementSeatUsage(tx, {
+      id: uniqueId('seat-usage'), organizationId: principal.organizationId, userId: otherSeatUserId,
+      day: todayUtc(), action: 'messages', count: 1, creditUnits: 10,
+    }))
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // First reservation brings this seat to exactly 50 (== cap, not over) — must succeed.
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+
+    // Second reservation would push this seat to 100 (> 50 cap) in a multi-seat org — must block BEFORE reserving.
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).rejects.toMatchObject({ code: 'blocked' })
+
+    const seatUsageAfterBlock = await db.transaction((tx) => getSeatUsage(tx, principal.organizationId, principal.userId, todayUtc(), 'messages'))
+    expect(seatUsageAfterBlock?.creditUnits).toBe(50) // unchanged — the blocked attempt never reserved or recorded anything
   })
 })
 
