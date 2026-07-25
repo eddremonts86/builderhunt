@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
+import { platformDb } from '../db/client'
 import { accountRisk } from '../db/schema'
 
 /**
@@ -70,5 +71,70 @@ export async function upsertAccountRisk(
       updatedAt: new Date(),
     },
   }).returning()
+  return row
+}
+
+/**
+ * Mirrors `withWorkerUser` but runs under `builderhunt_platform` — the abuse console (Phase 5 task
+ * 3) reads/overrides one account's risk row on behalf of an admin who has no ambient session for
+ * that user. Same `account_risk_platform_select`/`account_risk_platform_update` RLS shape as
+ * worker (0044): still scoped to a single `app.user_id` per transaction, not a bulk cross-user
+ * read — a "list every flagged account" view is explicitly deferred per 0044's own comment.
+ */
+export function withPlatformUser<TResult>(
+  userId: string,
+  operation: (transaction: WorkerTransaction) => Promise<TResult>,
+  db: PostgresJsDatabase | typeof platformDb = platformDb,
+): Promise<TResult> {
+  return db.transaction(async (transaction) => {
+    await transaction.execute(sql`
+      select
+        set_config('app.user_id', ${userId}, true),
+        set_config('app.request_id', ${crypto.randomUUID()}, true)
+    `)
+    return operation(transaction as WorkerTransaction)
+  })
+}
+
+export interface SetAccountRiskStageByAdminDeps {
+  withWorkerUser?: typeof withWorkerUser
+  withPlatformUser?: typeof withPlatformUser
+}
+
+/**
+ * Admin manual override for the abuse console. `builderhunt_platform` only has SELECT/UPDATE on
+ * `account_risk` (no INSERT — see 0044 §5's grant split), so a row must already exist before the
+ * platform role can touch it. Ensures a baseline row first via the worker role's INSERT grant using
+ * `ON CONFLICT DO NOTHING`, which never resets an already-scored row, then applies the admin's
+ * stage under the platform role. If the automated risk-scoring sweep (`recomputeAccountRisk`)
+ * later re-runs for this user, it can overwrite this manual override — there is no persisted
+ * "admin locked this stage" flag in the schema today; documented as a known limitation rather than
+ * a blocker, matching the deferral precedent already set in 0044's own comments.
+ */
+export async function setAccountRiskStageByAdmin(
+  userId: string,
+  stage: string,
+  reason: string,
+  deps: SetAccountRiskStageByAdminDeps = {},
+): Promise<AccountRiskRecord> {
+  const runWithWorkerUser = deps.withWorkerUser ?? withWorkerUser
+  const runWithPlatformUser = deps.withPlatformUser ?? withPlatformUser
+
+  await runWithWorkerUser(userId, (transaction) =>
+    transaction.insert(accountRisk).values({
+      userId,
+      riskScore: 0,
+      stage: 'observe',
+      reason: 'admin-baseline (row created for manual action)',
+      updatedAt: new Date(),
+    }).onConflictDoNothing(),
+  )
+
+  const [row] = await runWithPlatformUser(userId, (transaction) =>
+    transaction.update(accountRisk)
+      .set({ stage, reason, updatedAt: new Date() })
+      .where(eq(accountRisk.userId, userId))
+      .returning(),
+  )
   return row
 }

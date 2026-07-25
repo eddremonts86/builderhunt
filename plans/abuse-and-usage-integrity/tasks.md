@@ -1110,13 +1110,70 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     healthy with the setting back to its default (`observe`). Deleted the test account and all its
     cascaded rows from the dev database afterward.
 
-- [ ] **Platform-admin abuse console**
+- [x] **Platform-admin abuse console**
   - Files: `src/routes/api/admin/abuse/index.ts`, `src/routes/_dashboard/admin/abuse.tsx`,
     `src/modules/dashboard/components/AbuseConsole.tsx` (+ test)
   - Do: `abuse_signals` feed + linked-account clusters + per-account stage; manual actions (clear,
     warn, force step-up, block), each audited via `emitSecurityAudit` behind
     `requirePlatformAdminPrincipal`.
   - Verify: route-coverage (`pnpm security:route-coverage`), admin-only access test, audit-row test.
+  - **Done.** Linked-account clusters already had their own route from Phase 3
+    (`/api/admin/abuse/clusters`) — this task built the other two pieces the console needs and left
+    clusters as-is rather than duplicating it.
+    - `repositories/abuse-signals.ts`: added `listRecentAbuseSignals(limit, db?)` — unscoped,
+      most-recent-first, bounded read (the table has no RLS/owning subject, so this is a plain
+      sequential scan bounded by `LIMIT`, same risk profile the existing per-user/per-org readers
+      already accept).
+    - `repositories/account-risk.ts`: added `withPlatformUser` (mirrors `withWorkerUser` but runs
+      under `builderhunt_platform`) and `setAccountRiskStageByAdmin(userId, stage, reason, deps?)`.
+      Key design constraint discovered while researching: `builderhunt_platform` only has
+      SELECT/UPDATE on `account_risk` (no INSERT — see 0044's grant split), so a manual action on a
+      user with no existing risk row would fail outright. Fixed by ensuring a baseline row first via
+      the worker role's INSERT grant with `ON CONFLICT DO NOTHING` (never resets an already-scored
+      row), then applying the admin's stage under the platform role. Also confirmed via 0044's own
+      comments that a bulk "list every flagged account" cross-user read is explicitly out of scope
+      for both worker and platform RLS policies (both are still `app.user_id`-scoped) — so the
+      console resolves stage per-account for only the unique user IDs appearing in the current
+      signals page, not a global list.
+    - `routes/api/admin/abuse/index.ts` (new): `GET` returns the recent signals feed plus a
+      `stageByUserId` map (one `withPlatformUser` read per unique user ID in the page); `POST` takes
+      `{ userId, action: 'clear'|'warn'|'stepup'|'block', reason? }`, maps action → `EnforcementStage`
+      (`clear→observe`, `warn→warned`, `stepup→stepup`, `block→blocked`), calls
+      `setAccountRiskStageByAdmin`, then audits via `auditPlatformAdminAction` with
+      `action: 'admin.abuse.account.<action>'`, `targetType: 'account_risk'` — matching the
+      `admin.<area>.<entity>.<verb>` convention already used by every other admin mutation route.
+    - `modules/dashboard/components/AbuseConsole.tsx` (+ test) and
+      `routes/_dashboard/admin/abuse.tsx`: same self-fetching zero-props page/component split as
+      `BillingOperationsPage`/`admin/billing.tsx`, with an inline expand-a-row action form (no modal)
+      matching `RefundQueue`'s established pattern. Added an "Abuse console" entry to `UserMenu`'s
+      `ADMIN_LINKS`.
+    - **Known limitation, not a blocker:** there is no persisted "admin locked this stage" flag
+      anywhere in the schema. If the automated risk-scoring sweep (`recomputeAccountRisk`) re-runs
+      for a user after a manual override, it can silently overwrite the admin's stage. Documented in
+      code comments rather than fixed now — adding a lock column is a larger schema change than this
+      task's scope, and the existing 0044 migration already defers the analogous "list all flagged
+      accounts" feature for the same reason. Flagging here for future follow-up, not treating it as
+      blocking.
+    - **Real bug found and fixed during live verification:** the manual-action form was originally
+      keyed by `userId`, not by signal ID. Since a single account can have many signals (very common
+      in this dataset — one admin test account had 30+ `concurrent_sessions` signals), clicking
+      "Act on account" on one row expanded the form under *every* row for that user simultaneously.
+      Fixed by keying the expand/collapse state on `signal.id` instead.
+    - **Live-verified end-to-end** in the real dev browser as the seeded platform admin
+      (`edd_admin@local.com`, `ADMIN_USER_IDS`): confirmed admin-gated access via
+      `_dashboard/admin/abuse.tsx`'s `beforeLoad`, saw the real `abuse_signals` feed (many real rows
+      from earlier session activity) and the real linked-account clusters feed composed side by
+      side. Seeded one `account_risk` row directly via `psql` to confirm the stage badge resolves
+      correctly through the platform-role RLS read (`—` before seeding, `warned` after). Opened the
+      manual-action form, used the shadcn `Select` to choose "Block", submitted with a reason,
+      confirmed via `psql` that `account_risk.stage` flipped to `blocked` and the reason recorded
+      admin attribution, and confirmed via `preview_logs` that both the `clear` (default-option) and
+      `block` actions were each audited with the correct `action`/`targetType`/`targetId`/`result`.
+      Deleted the seeded test row afterward — no lingering state.
+    - Verify sweep: `pnpm tsc --noEmit`, `pnpm eslint` (0 errors — 2 pre-existing-style
+      `set-state-in-effect` warnings matching every other self-fetching dashboard component),
+      `pnpm vitest run` (40/40 across the touched files), `pnpm security:route-coverage` (105 routes,
+      valid).
 
 - [ ] **Pricing/FAQ fair-use copy**
   - Files: `src/routes/_landing/pricing.tsx`

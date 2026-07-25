@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { insertAbuseSignal, listAbuseSignalsForOrganization, listAbuseSignalsForUser } from './abuse-signals'
+import { insertAbuseSignal, listAbuseSignalsForOrganization, listAbuseSignalsForUser, listRecentAbuseSignals } from './abuse-signals'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -55,5 +55,19 @@ describe('abuse-signals repository', () => {
     expect(row.userId).toBeNull()
     expect(row.organizationId).toBeNull()
     expect(row.details).toEqual({})
+  })
+
+  it('lists recent signals across every user/organization, most-recent-first (admin console feed)', async () => {
+    const idA = randomUUID()
+    const idB = randomUUID()
+    await insertAbuseSignal({ id: idA, type: 'seat_overuse', severity: 'medium', userId: 'abuse-recent-user-a', requestId: 'req-recent-a' }, db)
+    await insertAbuseSignal({ id: idB, type: 'export_burst', severity: 'high', organizationId: 'abuse-recent-org-b', requestId: 'req-recent-b' }, db)
+
+    const recent = await listRecentAbuseSignals(50, db)
+    const ids = recent.map((row) => row.id)
+
+    expect(ids).toContain(idA)
+    expect(ids).toContain(idB)
+    expect(ids.indexOf(idB)).toBeLessThan(ids.indexOf(idA))
   })
 })

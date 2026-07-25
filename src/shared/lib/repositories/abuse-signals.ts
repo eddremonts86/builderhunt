@@ -72,3 +72,18 @@ export async function listAbuseSignalsForOrganization(
     .orderBy(desc(abuseSignals.createdAt))
     .limit(limit)
 }
+
+/**
+ * Unscoped, most-recent-first, bounded — the platform-admin abuse console feed
+ * (abuse-and-usage-integrity Phase 5 task 3). `abuse_signals` has no owning subject and no RLS at
+ * all (see this file's header comment), so an unscoped read is a plain sequential scan bounded by
+ * `LIMIT`, same risk profile the per-user/per-org readers above already accept.
+ */
+export async function listRecentAbuseSignals(
+  limit = 100,
+  db: PostgresJsDatabase | typeof workerDb = workerDb,
+): Promise<AbuseSignalRecord[]> {
+  return db.select().from(abuseSignals)
+    .orderBy(desc(abuseSignals.createdAt))
+    .limit(limit)
+}
