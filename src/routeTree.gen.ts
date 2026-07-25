@@ -72,6 +72,7 @@ import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/s
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
 import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
 import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
+import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprint/match'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
@@ -500,6 +501,11 @@ const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
 const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
   id: '/api/og/blog',
   path: '/api/og/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFingerprintMatchRoute = ApiFingerprintMatchRouteImport.update({
+  id: '/api/fingerprint/match',
+  path: '/api/fingerprint/match',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFeedsSearchIdRoute = ApiFeedsSearchIdRouteImport.update({
@@ -1176,6 +1182,7 @@ export interface FileRoutesByFullPath {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -1350,6 +1357,7 @@ export interface FileRoutesByTo {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -1529,6 +1537,7 @@ export interface FileRoutesById {
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
+  '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -1707,6 +1716,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/fingerprint/match'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -1881,6 +1891,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/fingerprint/match'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -2059,6 +2070,7 @@ export interface FileRouteTypes {
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
+    | '/api/fingerprint/match'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -2203,6 +2215,7 @@ export interface RootRouteChildren {
   ApiE2eOutboxRoute: typeof ApiE2eOutboxRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
+  ApiFingerprintMatchRoute: typeof ApiFingerprintMatchRoute
   ApiOgBlogRoute: typeof ApiOgBlogRoute
   ApiOgExploreRoute: typeof ApiOgExploreRoute
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
@@ -2731,6 +2744,13 @@ declare module '@tanstack/react-router' {
       path: '/api/og/blog'
       fullPath: '/api/og/blog'
       preLoaderRoute: typeof ApiOgBlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/fingerprint/match': {
+      id: '/api/fingerprint/match'
+      path: '/api/fingerprint/match'
+      fullPath: '/api/fingerprint/match'
+      preLoaderRoute: typeof ApiFingerprintMatchRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/feeds/$searchId': {
@@ -3811,6 +3831,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiE2eOutboxRoute: ApiE2eOutboxRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
+  ApiFingerprintMatchRoute: ApiFingerprintMatchRoute,
   ApiOgBlogRoute: ApiOgBlogRoute,
   ApiOgExploreRoute: ApiOgExploreRoute,
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,

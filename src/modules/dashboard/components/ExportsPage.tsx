@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Download, Bookmark, Trash2, ExternalLink, Search } from 'lucide-react'
 import { Button, LinkButton, LinkComponent, ScoreRing } from '~/components/ui'
+import { StyleMatchPanel } from '~/modules/dashboard/components/StyleMatchPanel'
 
 interface TrackedBuilder {
   id: string
@@ -202,6 +203,13 @@ export function ExportsPage() {
           </ul>
         </>
       )}
+
+      {/* Style matching lives here rather than on a route of its own: it acts
+          on the tracked-builder set this page is already about. It gates
+          itself on fingerprint density (plan: code-fingerprinting Phase 4). */}
+      <div className="mt-8">
+        <StyleMatchPanel />
+      </div>
 
       <p className="text-xs text-bh-text-dim mt-8 text-center">
         Looking to export <em>all your BuilderHunt account data</em> (profile, saved searches, notes) instead? That's a

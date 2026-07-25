@@ -17,17 +17,16 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 
 | # | Plan | Open | Why this position |
 |---|------|-----:|-------------------|
-| 1 | `code-fingerprinting` | 9 | v2 builds on selection heuristics already written for `work-sample` (`src/lib/github/work-sample.ts`); shared module was explicitly deferred to whichever plan shipped first. Highest reuse, lowest new surface. |
-| 2 | `content-marketing` | 9 | Mostly prose (blog posts) + a frontmatter template. Low technical risk, no schema. |
-| 3 | `claimable-profiles` | 10 | Extends an existing shipped flow (`builder_claims` + claim/verify routes already live). |
-| 4 | `audit-performance-qa` | 10 | Measurement + targeted fixes over existing pages; no new product surface. |
-| 5 | `audit-trust` | 11 | Copy/proof surfaces over existing pages. |
-| 6 | `design-modernization` | 12 | Visual sweep; large but mechanical, and the token/`.card`/glass system already exists. |
-| 7 | `portfolio-builder` | 12 | New public surface; builds on `published_builder_profiles`. |
-| 8 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
-| 9 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
-| 10 | `solutions-intelligence` | 30 | Large new domain. |
-| 11 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
+| 1 | `content-marketing` | 9 | Mostly prose (blog posts) + a frontmatter template. Low technical risk, no schema. |
+| 2 | `claimable-profiles` | 10 | Extends an existing shipped flow (`builder_claims` + claim/verify routes already live). |
+| 3 | `audit-performance-qa` | 10 | Measurement + targeted fixes over existing pages; no new product surface. |
+| 4 | `audit-trust` | 11 | Copy/proof surfaces over existing pages. |
+| 5 | `design-modernization` | 12 | Visual sweep; large but mechanical, and the token/`.card`/glass system already exists. |
+| 6 | `portfolio-builder` | 12 | New public surface; builds on `published_builder_profiles`. |
+| 7 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
+| 8 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
+| 9 | `solutions-intelligence` | 30 | Large new domain. |
+| 10 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
 
 ## B. Blocked by another plan (do not start)
 
@@ -66,6 +65,9 @@ them without new information.
 | `abuse-and-usage-integrity` | Enforcement rollout closed out at "warn" by user decision. |
 
 ## E. Complete (no open tasks)
+
+`code-fingerprinting` (all 4 phases shipped 2026-07-25 — see its tasks.md for what is
+verified vs. blocked on credentials),
 
 `ai-expansion`, `ai-profile-enrichment`, `audit-accessibility`, `bluesky-integration`,
 `codeberg-integration`, `devpost-integration`, `gitlab-integration`,
