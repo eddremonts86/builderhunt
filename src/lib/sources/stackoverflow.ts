@@ -1,4 +1,5 @@
 import { env } from '~/shared/lib/env'
+import { log } from '~/shared/lib/log'
 import type { RawBuilder } from '~/lib/sources/types'
 
 /**
@@ -77,14 +78,29 @@ function authParams(): string {
   return ''
 }
 
+const LOW_QUOTA_THRESHOLD = 50
+
+/** StackExchange API responses carry `quota_remaining`/`quota_max` alongside `items` on every
+ * call — warn once it's running low so quota exhaustion shows up in logs well before every
+ * search silently starts returning `[]`, not just when it's already too late. */
+function warnIfQuotaLow(data: { quota_remaining?: number; quota_max?: number }): void {
+  if (typeof data.quota_remaining === 'number' && data.quota_remaining < LOW_QUOTA_THRESHOLD) {
+    log.warn('stackoverflow_quota_low', { quotaRemaining: data.quota_remaining, quotaMax: data.quota_max })
+  }
+}
+
 async function fetchTopAnswerersForTag(tag: string, period: 'all_time' | 'month' = 'all_time'): Promise<SOTagTopUser[]> {
   try {
     const url = `${SO_BASE}/tags/${encodeURIComponent(tag)}/top-answerers/${period}?site=stackoverflow${authParams()}`
     const res = await fetch(url, {
       headers: { 'User-Agent': 'BuilderHunt/1.0 (stackoverflow source)' },
     })
-    if (!res.ok) return []
-    const data = (await res.json()) as { items: SOTagTopUser[] }
+    if (!res.ok) {
+      log.warn('stackoverflow_request_failed', { status: res.status, endpoint: 'top-answerers' })
+      return []
+    }
+    const data = (await res.json()) as { items: SOTagTopUser[]; quota_remaining?: number; quota_max?: number }
+    warnIfQuotaLow(data)
     return data.items ?? []
   } catch {
     return []
@@ -100,8 +116,12 @@ async function fetchTopTags(userIds: number[]): Promise<Map<number, string[]>> {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'BuilderHunt/1.0 (stackoverflow source)' },
     })
-    if (!res.ok) return new Map()
-    const data = (await res.json()) as { items: SOTopTag[] }
+    if (!res.ok) {
+      log.warn('stackoverflow_request_failed', { status: res.status, endpoint: 'top-tags' })
+      return new Map()
+    }
+    const data = (await res.json()) as { items: SOTopTag[]; quota_remaining?: number; quota_max?: number }
+    warnIfQuotaLow(data)
     const byUser = new Map<number, string[]>()
     for (const t of data.items ?? []) {
       const arr = byUser.get(t.user_id) ?? []

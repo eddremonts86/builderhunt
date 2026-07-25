@@ -1,10 +1,11 @@
 # Tasks: SourceHut Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `partially-implemented` (only the explicitly-optional item remains)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and an
-> optional repo-search extension.
+> **Reality check**: Connector + wiring shipped. `.env.example` docs delivered 2026-07-25.
+> Remaining: an optional repo-search extension (nice-to-have, not required for the plan to
+> be considered done).
 
 ## Delivered
 
@@ -23,12 +24,13 @@
 
 ## Remaining
 
-- [ ] **Document `SOURCEHUT_TOKEN` in `.env.example`**
+- [x] **Document `SOURCEHUT_TOKEN` in `.env.example`**
   - Files: `.env.example`
   - Do: add `SOURCEHUT_TOKEN=` under "External Source API Tokens" with a comment: REQUIRED
     for the SourceHut source to return anything (API 401s unauthenticated); create at
     meta.sr.ht > OAuth > personal access token.
   - Verify: `grep SOURCEHUT_TOKEN .env.example` prints the documented line.
+  - **Done.**
 
 - [ ] **(Optional) Emit repo results from git.sr.ht**
   - Files: `src/lib/sources/sourcehut.ts`

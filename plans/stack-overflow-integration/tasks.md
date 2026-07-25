@@ -1,10 +1,10 @@
 # Tasks: Stack Overflow Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and quota
-> logging.
+> **Reality check**: Connector + wiring shipped. `.env.example` docs and quota-exhaustion
+> logging both delivered 2026-07-25.
 
 ## Delivered
 
@@ -29,13 +29,14 @@
 
 ## Remaining
 
-- [ ] **Document `STACKOVERFLOW_API_KEY` in `.env.example`**
+- [x] **Document `STACKOVERFLOW_API_KEY` in `.env.example`**
   - Files: `.env.example`
   - Do: add `STACKOVERFLOW_API_KEY=` under "External Source API Tokens" (comment: register
     an app at stackapps.com/apps/register; raises quota 300/day/IP to 10k/day).
   - Verify: `grep STACKOVERFLOW_API_KEY .env.example` prints the documented line.
+  - **Done.**
 
-- [ ] **Log quota exhaustion instead of failing silently**
+- [x] **Log quota exhaustion instead of failing silently**
   - Files: `src/lib/sources/stackoverflow.ts`
   - Do: in `fetchTopAnswerersForTag` / `fetchTopTags`, read `quota_remaining` from the
     parsed body; if `< 50`, call `log.warn('stackoverflow_quota_low', { quotaRemaining })`
@@ -43,3 +44,8 @@
     `log.warn('stackoverflow_request_failed', { status })` before returning `[]`.
   - Verify: temporarily force a bad `key=` value and run a search — the warn line appears
     in server logs and search results still render (SO contributes `[]`).
+  - **Done.** Live-verified with real network calls in both directions: a deliberately bad
+    `STACKOVERFLOW_API_KEY` produced `{"event":"stackoverflow_request_failed","status":400,
+    "endpoint":"top-answerers"}` in the logs and `searchStackOverflow` still returned `[]`
+    cleanly (no throw); a real search for "react" with no key returned real answerer cards
+    (Dan Abramov et al.) with no warning, confirming the happy path is unaffected.

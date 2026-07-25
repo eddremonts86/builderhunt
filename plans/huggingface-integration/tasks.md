@@ -1,10 +1,11 @@
 # Tasks: Hugging Face Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `partially-implemented` (only the explicitly-optional item remains)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped. Remaining: `.env.example` docs and an
-> optional author-profile enrichment.
+> **Reality check**: Connector + wiring shipped. `.env.example` docs delivered 2026-07-25.
+> Remaining: an optional author-profile enrichment ("build only on demonstrated need"-style
+> nice-to-have, not required for the plan to be considered done).
 
 ## Delivered
 
@@ -23,11 +24,12 @@
 
 ## Remaining
 
-- [ ] **Document `HUGGINGFACE_TOKEN` in `.env.example`**
+- [x] **Document `HUGGINGFACE_TOKEN` in `.env.example`**
   - Files: `.env.example`
   - Do: add `HUGGINGFACE_TOKEN=` under "External Source API Tokens" (comment: optional,
     raises rate limits; from huggingface.co Settings > Access Tokens, read scope).
   - Verify: `grep HUGGINGFACE_TOKEN .env.example` prints the documented line.
+  - **Done.**
 
 - [ ] **(Optional) Enrich top authors with avatar + real followers**
   - Files: `src/lib/sources/huggingface.ts`
