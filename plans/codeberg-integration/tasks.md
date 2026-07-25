@@ -1,10 +1,10 @@
 # Tasks: Codeberg (Gitea) Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Everything shipped except `.env.example` documentation of the two
-> Codeberg env vars.
+> **Reality check**: Everything shipped, including `.env.example` documentation of the two
+> Codeberg env vars (2026-07-25).
 
 ## Delivered
 
@@ -27,10 +27,12 @@
 
 ## Remaining
 
-- [ ] **Document `CODEBERG_API_URL` and `CODEBERG_TOKEN` in `.env.example`**
+- [x] **Document `CODEBERG_API_URL` and `CODEBERG_TOKEN` in `.env.example`**
   - Files: `.env.example`
   - Do: add both under "External Source API Tokens":
     `CODEBERG_API_URL=` (comment: defaults to `https://codeberg.org/api/v1`; point at any
     Gitea/Forgejo instance) and `CODEBERG_TOKEN=` (comment: optional, raises rate limit;
     from codeberg.org Settings > Applications).
   - Verify: `grep CODEBERG .env.example` prints both documented lines.
+  - **Done.** Confirmed the default URL against `codeberg.ts`'s actual fallback
+    (`env.CODEBERG_API_URL ?? 'https://codeberg.org/api/v1'`) before documenting it as fact.
