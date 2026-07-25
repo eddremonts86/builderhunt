@@ -42,7 +42,8 @@
     "deploy:db:dry": "node scripts/deploy/orchestrate.mjs --dry-run",
     "deploy:preflight": "node scripts/deploy/preflight.mjs",
     "stripe:provision": "tsx --env-file=.env scripts/billing/provision-stripe-catalog.ts",
-    "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts"
+    "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts",
+    "abuse:baseline-report": "tsx --env-file=.env scripts/abuse/baseline-report.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "^1.6.23",

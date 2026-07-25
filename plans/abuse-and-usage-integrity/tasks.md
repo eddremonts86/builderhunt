@@ -1195,11 +1195,49 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 6 — Baseline, calibrate, gate
 
-- [ ] **Observe-window baseline report**
+- [x] **Observe-window baseline report**
   - Files: `scripts/abuse/baseline-report.ts`, `docs/operations/abuse-baseline.md`
   - Do: query `session_signals`/`abuse_signals`/`seat_usage_daily` for per-tier medians (devices,
     IPs, actions per seat); document recommended thresholds + ASN allowlist.
   - Verify: script runs against a seeded DB; doc committed before any `enforce` flip.
+  - **Done.** Key finding while researching: `user_devices`/`account_risk`/`seat_usage_daily` are
+    RLS-protected and scoped to a single `app.user_id`/`app.organization_id` per transaction — an
+    unscoped connection sees zero rows, not all rows, and no runtime role has an unscoped
+    cross-user policy on them (0044's own comment confirms a bulk "list all flagged accounts" view
+    is deliberately deferred). A genuine cross-user aggregate therefore needs
+    `DATABASE_MIGRATION_URL` (the real Postgres superuser), the same connection
+    `scripts/db/backfills/organizations.ts` already uses for its cross-tenant backfill — this
+    script only runs `select`s, never writes.
+    - Also discovered `session_signals` (the abuse-specific table) stores only derived booleans
+      (`concurrent_distinct_ip`, `impossible_travel`, etc.), never a raw IP — the only raw-IP
+      source in the schema is `auth_sessions.ip_address` (better-auth's own session table), so the
+      "distinct IPs per user" query joins through that instead.
+    - `scripts/abuse/baseline-report.ts` queries (via one `Promise.all`, single migration-role
+      connection): device-count medians per user by tier, distinct-IP medians per user by tier,
+      `seat_usage_daily` action medians/p95 by tier, `abuse_signals` counts by type/severity,
+      current `account_risk` stage distribution (how many real accounts would move to each stage
+      if `enforce` were flipped on today), and `session_signals` flag rates as a fraction of total
+      sessions. Prints one JSON object; `pnpm abuse:baseline-report [--window-days=N]` alias added
+      to `package.json`.
+    - **ASN allowlist section is honest about a real gap, not fabricated**: confirmed (again) that
+      no IP→ASN resolution capability exists anywhere in this codebase — `last_ip_asn`/`ip_asn`
+      columns are always `null`, no geo-IP dependency is installed, this was an explicit scope
+      decision earlier in this same plan (Phase 3). The report's `asnAllowlist` field and the doc's
+      final section both state this plainly and recommend adding a geo-IP/ASN dependency as a
+      prerequisite, rather than inventing ASN numbers with no way to verify them.
+    - `docs/operations/abuse-baseline.md`: explains what the report is for, why it needs the
+      migration-role connection, how to run it, and — most importantly — how to read each field
+      when picking a real threshold (e.g., "if the real median already sits at or above the
+      configured cap, that cap is too tight"). Explicitly warns that a dev/staging run mixes this
+      session's own repeated live-verification activity with real test-org data and should not be
+      copied directly into `env.ts` — re-run against production once `observe` mode has a genuine,
+      representative window.
+    - **Live-verified**: ran `pnpm abuse:baseline-report` and `pnpm abuse:baseline-report
+      --window-days=7` against the real local dev database — both produced correct, sensible JSON
+      output (real per-tier device/IP medians, real `abuse_signals` counts by type from this
+      session's earlier work, e.g. 28 medium + 17 high `concurrent_sessions` signals, 7
+      `export_burst`, 2 `seat_overuse`). `pnpm tsc --noEmit` and `pnpm eslint
+      scripts/abuse/baseline-report.ts` both clean.
 
 - [ ] **Privacy/consent update (with `legal-and-compliance`)**
   - Files: `src/routes/_landing/legal/privacy.tsx`, consent surface
