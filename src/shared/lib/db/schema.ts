@@ -210,6 +210,8 @@ export const builderClaims = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     verifiedAt: timestamp('verified_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    revokedByUserId: text('revoked_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    revocationReason: text('revocation_reason'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

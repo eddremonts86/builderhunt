@@ -8,7 +8,17 @@ import { TeamFitCard } from '~/modules/builder-profile/components/TeamFitCard'
 import { WorkSamplePanel } from '~/modules/builder-profile/components/WorkSamplePanel'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
-import { Button, Input, LinkButton, Textarea } from '~/components/ui'
+import { Button, LinkButton, Textarea } from '~/components/ui'
+
+const CLAIM_ERROR_MESSAGES: Record<string, string> = {
+  unsupported_source: "This profile's source doesn't support automatic verification yet.",
+  not_found: "We couldn't find that account — the username may have changed.",
+  challenge_missing: "We didn't find the code in your bio yet — add it, save, then try again.",
+  rate_limited: 'The source rate-limited us — try again in a minute.',
+  timeout: 'The check timed out — try again.',
+  expired: 'This claim expired — start again.',
+  no_pending_claim: 'Start a claim first.',
+}
 
 interface Builder {
   id: string
@@ -48,9 +58,9 @@ export function BuilderProfilePage() {
   const [savingNote, setSavingNote] = React.useState(false)
   const [meId, setMeId] = React.useState<string | null>(null)
   const [claimOpen, setClaimOpen] = React.useState(false)
-  const [claimEmail, setClaimEmail] = React.useState('')
-  const [claimSending, setClaimSending] = React.useState(false)
-  const [claimMsg, setClaimMsg] = React.useState<{ ok: boolean; text: string; devLink?: string } | null>(null)
+  const [claimStatus, setClaimStatus] = React.useState<'idle' | 'loading' | 'verifying' | 'verified'>('idle')
+  const [claimChallenge, setClaimChallenge] = React.useState<{ source: string; challenge: string; instructions: string } | null>(null)
+  const [claimError, setClaimError] = React.useState<string | null>(null)
   const [trackedBuildersCount, setTrackedBuildersCount] = React.useState(0)
 
   React.useEffect(() => {
@@ -89,28 +99,55 @@ export function BuilderProfilePage() {
     }
   }
 
-  const handleClaim = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!claimEmail.trim()) return
-    setClaimSending(true)
-    setClaimMsg(null)
-    try {
-      const res = await fetch(`/api/builders/${builderId}/claim`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: claimEmail.trim() }),
+  // Opening the panel re-fetches any of the caller's own in-flight claims
+  // (GET, not POST) so a page reload shows the same challenge instead of
+  // silently minting — and racing — a second one.
+  React.useEffect(() => {
+    if (!claimOpen || !builderId || claimChallenge) return
+    fetch(`/api/builders/${builderId}/claim`, { credentials: 'include' })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.pending) setClaimChallenge({ source: data.source, challenge: data.challenge, instructions: data.instructions })
       })
+      .catch(() => {})
+  }, [claimOpen, builderId, claimChallenge])
+
+  const handleStartClaim = async () => {
+    setClaimStatus('loading')
+    setClaimError(null)
+    try {
+      const res = await fetch(`/api/builders/${builderId}/claim`, { method: 'POST', credentials: 'include' })
+      const data = await res.json()
+      if (!res.ok) {
+        setClaimError(CLAIM_ERROR_MESSAGES[data.error] ?? data.error ?? 'Failed to start claim')
+        setClaimStatus('idle')
+        return
+      }
+      setClaimChallenge({ source: data.source, challenge: data.challenge, instructions: data.instructions })
+      setClaimStatus('idle')
+    } catch {
+      setClaimError('Network error')
+      setClaimStatus('idle')
+    }
+  }
+
+  const handleVerifyClaim = async () => {
+    setClaimStatus('verifying')
+    setClaimError(null)
+    try {
+      const res = await fetch(`/api/builders/${builderId}/claim/verify`, { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (res.ok) {
-        setClaimMsg({ ok: true, text: data.message ?? 'Check your email for the verification link.', devLink: data.devLink })
-      } else {
-        setClaimMsg({ ok: false, text: data.error ?? 'Failed to start claim' })
+        setClaimStatus('verified')
+        const refreshed = await fetch(`/api/builders/${builderId}`, { credentials: 'include' }).then((r) => r.ok ? r.json() : null)
+        if (refreshed) setBuilder(refreshed)
+        return
       }
+      setClaimError(CLAIM_ERROR_MESSAGES[data.error] ?? data.error ?? 'Verification failed')
+      setClaimStatus('idle')
     } catch {
-      setClaimMsg({ ok: false, text: 'Network error' })
-    } finally {
-      setClaimSending(false)
+      setClaimError('Network error')
+      setClaimStatus('idle')
     }
   }
 
@@ -340,61 +377,83 @@ export function BuilderProfilePage() {
                     <BadgeCheck className="w-4 h-4" /> Is this you? Claim this profile
                   </Button>
                 ) : (
-                  <form onSubmit={handleClaim} className="space-y-3">
-                    <p className="text-sm text-bh-text-muted">
-                      Enter the email associated with this profile. We'll send a verification link.
-                    </p>
-                    <div className="flex gap-2 flex-wrap">
-                      <Input
-                        type="email"
-                        value={claimEmail}
-                        onChange={e => setClaimEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        required
-                        className="flex-1 min-w-[200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-                        autoFocus
-                      />
-                      <Button
-                        type="submit"
-                        variant="primary"
-                        disabled={claimSending}
-                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-                      >
-                        {claimSending ? 'Sending…' : 'Send verification email'}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => { setClaimOpen(false); setClaimMsg(null) }}
-                        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                    {claimMsg && (
+                  <div className="space-y-3" data-testid="claim-panel">
+                    {!claimChallenge ? (
+                      <>
+                        <p className="text-sm text-bh-text-muted">
+                          We'll ask you to prove you control this account by adding a short code to
+                          its public bio — not by typing an email we can't verify belongs to it.
+                        </p>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            onClick={handleStartClaim}
+                            disabled={claimStatus === 'loading'}
+                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                            data-testid="claim-start"
+                          >
+                            {claimStatus === 'loading' ? 'Starting…' : 'Get verification code'}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => { setClaimOpen(false); setClaimError(null) }}
+                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </>
+                    ) : claimStatus === 'verified' ? (
                       <div
-                        className={`text-sm p-3 rounded-lg border ${
-                          claimMsg.ok
-                            ? 'border-bh-success/30 bg-bh-success/10 text-bh-success'
-                            : 'border-bh-danger/30 bg-bh-danger/10 text-bh-danger'
-                        }`}
-                        role={claimMsg.ok ? 'status' : 'alert'}
+                        className="text-sm p-3 rounded-lg border border-bh-success/30 bg-bh-success/10 text-bh-success"
+                        role="status"
+                        data-testid="claim-verified"
                       >
-                        <p>{claimMsg.text}</p>
-                        {claimMsg.devLink && (
-                          <p className="mt-2 text-xs">
-                            <strong>Dev mode:</strong>{' '}
-                            <a
-                              href={claimMsg.devLink}
-                              className="underline break-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
-                            >
-                              {claimMsg.devLink}
-                            </a>
-                          </p>
-                        )}
+                        Verified — this profile is now yours. Refreshing…
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-sm text-bh-text-muted">{claimChallenge.instructions}</p>
+                        <code
+                          className="block text-sm font-mono bg-bh-bg border border-bh-border rounded-lg px-3 py-2 select-all"
+                          data-testid="claim-challenge"
+                        >
+                          {claimChallenge.challenge}
+                        </code>
+                        <div className="flex gap-2 flex-wrap">
+                          <Button
+                            type="button"
+                            variant="primary"
+                            onClick={handleVerifyClaim}
+                            disabled={claimStatus === 'verifying'}
+                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                            data-testid="claim-verify"
+                          >
+                            {claimStatus === 'verifying' ? 'Checking…' : "I've added it — verify"}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => { setClaimOpen(false); setClaimError(null) }}
+                            className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </>
+                    )}
+                    {claimError && (
+                      <div
+                        className="text-sm p-3 rounded-lg border border-bh-danger/30 bg-bh-danger/10 text-bh-danger"
+                        role="alert"
+                        data-testid="claim-error"
+                      >
+                        {claimError}
                       </div>
                     )}
-                  </form>
+                  </div>
                 )}
               </div>
             )}

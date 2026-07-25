@@ -236,6 +236,10 @@
     "0058_work_sample_analyses_policies": {
       "sql": "19fc17f17f12f8ec48b8dc91efce4de787fdcc01f469bebc8c828c7a440aa65b",
       "snapshot": "87f98cfbc211d2eb923dfa677e508811a83a6430d11befe77ad44503dde56a8e"
+    },
+    "0059_green_winter_soldier": {
+      "sql": "3d26adf53f155bcc4961bd1b3e24e6c5997639af69bc6e99a673a380068965ef",
+      "snapshot": "b84e6adb9ba6a18423fb23a55d6c5dcbd91221b7a965b9db40ceba09c0359baa"
     }
   }
 }

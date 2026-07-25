@@ -185,6 +185,8 @@ import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } fro
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
+import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
+import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -1112,6 +1114,18 @@ const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
     path: '/evidence/$evidenceId',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiBuildersBuilderIdClaimVerifyRoute =
+  ApiBuildersBuilderIdClaimVerifyRouteImport.update({
+    id: '/verify',
+    path: '/verify',
+    getParentRoute: () => ApiBuildersBuilderIdClaimRoute,
+  } as any)
+const ApiAdminBuilderClaimsClaimIdRevokeRoute =
+  ApiAdminBuilderClaimsClaimIdRevokeRouteImport.update({
+    id: '/api/admin/builder-claims/$claimId/revoke',
+    path: '/api/admin/builder-claims/$claimId/revoke',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminBillingEventsEventIdReplayRoute =
   ApiAdminBillingEventsEventIdReplayRouteImport.update({
     id: '/api/admin/billing/events/$eventId/replay',
@@ -1253,7 +1267,7 @@ export interface FileRoutesByFullPath {
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
-  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRouteWithChildren
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
@@ -1289,6 +1303,8 @@ export interface FileRoutesByFullPath {
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1428,7 +1444,7 @@ export interface FileRoutesByTo {
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
-  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRouteWithChildren
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
@@ -1464,6 +1480,8 @@ export interface FileRoutesByTo {
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1608,7 +1626,7 @@ export interface FileRoutesById {
   '/api/billing/subscription/cancel': typeof ApiBillingSubscriptionCancelRoute
   '/api/billing/subscription/change': typeof ApiBillingSubscriptionChangeRoute
   '/api/billing/subscription/preview': typeof ApiBillingSubscriptionPreviewRoute
-  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRoute
+  '/api/builders/$builderId/claim': typeof ApiBuildersBuilderIdClaimRouteWithChildren
   '/api/builders/$builderId/enrichment': typeof ApiBuildersBuilderIdEnrichmentRoute
   '/api/builders/$builderId/evidence-refresh': typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   '/api/builders/$builderId/fingerprint': typeof ApiBuildersBuilderIdFingerprintRoute
@@ -1644,6 +1662,8 @@ export interface FileRoutesById {
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1823,6 +1843,8 @@ export interface FileRouteTypes {
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
+    | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -1998,6 +2020,8 @@ export interface FileRouteTypes {
     | '/api/me/sessions'
     | '/api/me/stepup'
     | '/api/organizations/invitations'
+    | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2177,6 +2201,8 @@ export interface FileRouteTypes {
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
+    | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2300,6 +2326,7 @@ export interface RootRouteChildren {
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
+  ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 
@@ -3537,6 +3564,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/builders/$builderId/claim/verify': {
+      id: '/api/builders/$builderId/claim/verify'
+      path: '/verify'
+      fullPath: '/api/builders/$builderId/claim/verify'
+      preLoaderRoute: typeof ApiBuildersBuilderIdClaimVerifyRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdClaimRoute
+    }
+    '/api/admin/builder-claims/$claimId/revoke': {
+      id: '/api/admin/builder-claims/$claimId/revoke'
+      path: '/api/admin/builder-claims/$claimId/revoke'
+      fullPath: '/api/admin/builder-claims/$claimId/revoke'
+      preLoaderRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
       path: '/api/admin/billing/events/$eventId/replay'
@@ -3713,8 +3754,22 @@ const ApiBillingContactRouteChildren: ApiBillingContactRouteChildren = {
 const ApiBillingContactRouteWithChildren =
   ApiBillingContactRoute._addFileChildren(ApiBillingContactRouteChildren)
 
+interface ApiBuildersBuilderIdClaimRouteChildren {
+  ApiBuildersBuilderIdClaimVerifyRoute: typeof ApiBuildersBuilderIdClaimVerifyRoute
+}
+
+const ApiBuildersBuilderIdClaimRouteChildren: ApiBuildersBuilderIdClaimRouteChildren =
+  {
+    ApiBuildersBuilderIdClaimVerifyRoute: ApiBuildersBuilderIdClaimVerifyRoute,
+  }
+
+const ApiBuildersBuilderIdClaimRouteWithChildren =
+  ApiBuildersBuilderIdClaimRoute._addFileChildren(
+    ApiBuildersBuilderIdClaimRouteChildren,
+  )
+
 interface ApiBuildersBuilderIdRouteChildren {
-  ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRoute
+  ApiBuildersBuilderIdClaimRoute: typeof ApiBuildersBuilderIdClaimRouteWithChildren
   ApiBuildersBuilderIdEnrichmentRoute: typeof ApiBuildersBuilderIdEnrichmentRoute
   ApiBuildersBuilderIdEvidenceRefreshRoute: typeof ApiBuildersBuilderIdEvidenceRefreshRoute
   ApiBuildersBuilderIdFingerprintRoute: typeof ApiBuildersBuilderIdFingerprintRoute
@@ -3726,7 +3781,7 @@ interface ApiBuildersBuilderIdRouteChildren {
 }
 
 const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
-  ApiBuildersBuilderIdClaimRoute: ApiBuildersBuilderIdClaimRoute,
+  ApiBuildersBuilderIdClaimRoute: ApiBuildersBuilderIdClaimRouteWithChildren,
   ApiBuildersBuilderIdEnrichmentRoute: ApiBuildersBuilderIdEnrichmentRoute,
   ApiBuildersBuilderIdEvidenceRefreshRoute:
     ApiBuildersBuilderIdEvidenceRefreshRoute,
@@ -3919,6 +3974,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
+  ApiAdminBuilderClaimsClaimIdRevokeRoute:
+    ApiAdminBuilderClaimsClaimIdRevokeRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,
 }

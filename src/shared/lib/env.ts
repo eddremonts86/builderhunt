@@ -61,6 +61,9 @@ const zodEnv = z.object({
   AI_EMBEDDING_API_KEY: z.string().optional(),
   AI_EMBEDDING_DIM: z.coerce.number().int().positive().default(1536),
   AI_EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  // Kill switch for the claimable-profiles source-bound verification flow
+  // (bio-challenge fetches against GitHub/GitLab/Codeberg/DEV.to).
+  CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
   AI_DISABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED_TASKS: z.string().default(''),
   // Plan: proactive-discovery
