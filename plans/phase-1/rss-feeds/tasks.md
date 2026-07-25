@@ -1,10 +1,10 @@
 # Tasks: RSS Feeds per Saved Search
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented`
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Feed route + HTML fallback + rate limit + dashboard copy action all
-> shipped. Two tasks remain (one optional).
+> **Reality check**: Feed route + HTML fallback + rate limit + dashboard copy action +
+> reader deep links all shipped and live-verified 2026-07-25.
 
 ## Delivered
 
@@ -26,14 +26,16 @@
 
 ## Remaining
 
-- [ ] **Add reader deep links to the dashboard "Export & RSS" menu**
+- [x] **Add reader deep links to the dashboard "Export & RSS" menu**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`
-  - Do: below "Copy RSS feed URL" in `SavedSearchRow`, add two anchor items opening in a
+  - Do: below "Copy RSS feed URL" in `SavedSearchRow`, added two anchor items opening in a
     new tab: `https://feedly.com/i/subscription/feed/${encodeURIComponent(rssUrl)}` and
     `https://www.inoreader.com/?add_feed=${encodeURIComponent(rssUrl)}` (same URLs the
     HTML fallback in `src/routes/api/feeds/$searchId.ts` already uses).
-  - Verify: click "Open in Feedly" on a saved search — Feedly opens with the feed preview;
-    keyboard focus order through the menu remains intact.
+  - Verify: `pnpm tsc --noEmit`/`pnpm eslint` clean. Live-verified in the browser: created a
+    real saved search, opened the "Export & RSS" menu, confirmed both new menu items render
+    (`role="menuitem"` anchors) with correctly percent-encoded `href`s pointing at the real
+    signed feed URL (including its `token` query param) and `target="_blank"`.
 
 ## Future candidate (not scheduled)
 

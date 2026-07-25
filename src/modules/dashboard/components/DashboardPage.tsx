@@ -644,6 +644,30 @@ function SavedSearchRow({
                     Copy RSS feed URL
                   </button>
                 </li>
+                <li role="none">
+                  <a
+                    role="menuitem"
+                    href={`https://feedly.com/i/subscription/feed/${encodeURIComponent(rssUrl)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
+                    Open in Feedly
+                  </a>
+                </li>
+                <li role="none">
+                  <a
+                    role="menuitem"
+                    href={`https://www.inoreader.com/?add_feed=${encodeURIComponent(rssUrl)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
+                    Open in Inoreader
+                  </a>
+                </li>
               </ul>
             )}
           </div>
