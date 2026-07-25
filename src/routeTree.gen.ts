@@ -106,6 +106,7 @@ import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
+import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
 import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
@@ -661,6 +662,11 @@ const ApiOrganizationsInvitationsIndexRoute =
     path: '/api/organizations/invitations/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiMeStepupIndexRoute = ApiMeStepupIndexRouteImport.update({
+  id: '/api/me/stepup/',
+  path: '/api/me/stepup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   id: '/api/me/sessions/',
   path: '/api/me/sessions/',
@@ -1164,6 +1170,7 @@ export interface FileRoutesByFullPath {
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
+  '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1322,6 +1329,7 @@ export interface FileRoutesByTo {
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
+  '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1485,6 +1493,7 @@ export interface FileRoutesById {
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
   '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
+  '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
@@ -1647,6 +1656,7 @@ export interface FileRouteTypes {
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
     | '/api/me/sessions/'
+    | '/api/me/stepup/'
     | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -1805,6 +1815,7 @@ export interface FileRouteTypes {
     | '/api/me/delete-account'
     | '/api/me/plan-changes'
     | '/api/me/sessions'
+    | '/api/me/stepup'
     | '/api/organizations/invitations'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -1967,6 +1978,7 @@ export interface FileRouteTypes {
     | '/api/me/delete-account/'
     | '/api/me/plan-changes/'
     | '/api/me/sessions/'
+    | '/api/me/stepup/'
     | '/api/organizations/invitations/'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/me/builder/$builderId/evidence-provenance'
@@ -2077,6 +2089,7 @@ export interface RootRouteChildren {
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
   ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
+  ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
@@ -2760,6 +2773,13 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/invitations'
       fullPath: '/api/organizations/invitations/'
       preLoaderRoute: typeof ApiOrganizationsInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/me/stepup/': {
+      id: '/api/me/stepup/'
+      path: '/api/me/stepup'
+      fullPath: '/api/me/stepup/'
+      preLoaderRoute: typeof ApiMeStepupIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/me/sessions/': {
@@ -3556,6 +3576,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
   ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
+  ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,

@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
+import { AbuseWarningBanner } from '~/modules/dashboard/components/AbuseWarningBanner'
 import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 import { TenantQueryProvider } from '~/shared/components/TenantQueryProvider'
 
@@ -21,6 +22,7 @@ function DashboardRoute() {
   return (
     <TenantQueryProvider activeOrganizationId={user.activeOrganizationId}>
       <DashboardLayout>
+        <AbuseWarningBanner />
         <Outlet />
       </DashboardLayout>
     </TenantQueryProvider>

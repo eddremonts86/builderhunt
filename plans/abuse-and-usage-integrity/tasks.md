@@ -1049,12 +1049,66 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `account_risk` was never queried for this session) — test account and its cascaded rows deleted
     from the dev database afterward.
 
-- [ ] **Warn banner + step-up re-auth UX**
+- [x] **Warn banner + step-up re-auth UX**
   - Files: `src/modules/dashboard/components/AbuseWarningBanner.tsx` (+ test),
     `src/routes/_dashboard/route.tsx`, `src/routes/api/me/stepup/index.ts`
   - Do: show a fairness-framed banner at `warned`; require password/verified-email re-auth at
     `stepup` before the next sensitive action.
   - Verify: component test; Playwright: forced `stepup` prompts re-auth once, then proceeds.
+  - Progress: **No Playwright added** — standing instruction this session never builds new
+    e2e/Playwright test files; verified the flow live in the real dev browser instead (below).
+    `AbuseWarningBanner.tsx`: zero-props, self-fetching client component (same convention as
+    `OnboardingBanner`/`PendingInvitationsBanner`), fetching `GET /api/me/stepup` on mount. At
+    `warned`: a dismissible (per-stage, `sessionStorage`-remembered so it isn't a permanent
+    dismiss) fairness-framed notice ("Just so you know... no action needed right now"). At
+    `stepup` with `requiresStepUp: true`: a non-bypassable password-challenge `Dialog` ("Please
+    confirm it's you... this is a routine check, not an accusation") — dismissing the dialog just
+    re-shows it next load since the requirement lives server-side, not in component state.
+    `throttled`/`blocked` intentionally have no UI here (`blocked` is already rejected at the
+    request layer by Phase 5 task 1; `throttled` is a rate-limit concern for a later task, not a
+    banner). New `src/routes/api/me/stepup/index.ts`: `GET` reports `{stage, requiresStepUp}` via
+    `resolveEnforcementForUser`; `POST` verifies the supplied password via better-auth's own
+    `auth.api.verifyPassword` (confirmed via research to already exist in better-auth core, no new
+    dependency) and on success sets a signed `bh_stepup` cookie. Rate-limited 5/5min per user
+    against password-guessing.
+    New `src/shared/lib/auth/stepup.ts`: no persisted "verified at" column exists anywhere in this
+    schema (confirmed by research — `auth_sessions`/`auth_users`/`account_risk` all lack one, and
+    the existing "recent auth" convention in `billing/permissions.ts` means something different —
+    session *age*, not a password re-check), so step-up verification is recorded in a signed,
+    15-minute HttpOnly cookie (same HMAC-with-`BETTER_AUTH_SECRET` convention as
+    `abuse/device.ts`'s `computeDeviceHash`, constant-time-compared) rather than a new migration —
+    reasonable for something this short-lived and session-scoped. Also exports `requireStepUp`, a
+    reusable guard for a future "sensitive action" route to call — not wired into a specific route
+    yet since neither the task text nor spec.md names one (same "primitive ready, not yet
+    connected" pattern as G7/G1).
+    `_dashboard/route.tsx`: `<AbuseWarningBanner />` now renders dashboard-wide (a new pattern —
+    the two existing banners are dashboard-HOME-page-only — justified because the step-up gate
+    needs to appear on every page, not just the landing one).
+    22 new unit tests for `auth/stepup.ts` (cookie sign/verify roundtrip, expiry boundary,
+    tampered-signature rejection, `requireStepUp`'s stage gating) and 8 new component tests for
+    `AbuseWarningBanner.tsx` (stage-by-stage rendering, dismiss-per-stage, password submit
+    success/failure) — all pass. Discovered and worked around a real happy-dom (vitest's test
+    environment) limitation while writing the `requireStepUp` tests: happy-dom's `Request`
+    constructor silently strips the `Cookie` header (enforcing the Fetch spec's "forbidden
+    request header" rule, which is meant for outgoing `fetch()` calls, not inbound server
+    requests — confirmed via a throwaway script that real Node's `undici` preserves it fine) —
+    worked around by duck-typing a minimal `{headers: {get}}` object in the test instead of a real
+    `Request`, since `requireStepUp` only ever calls `.headers.get('cookie')`; the real production
+    route is unaffected (it receives the browser's genuine incoming header). `pnpm tsc --noEmit`/
+    `pnpm eslint` clean; `pnpm security:route-coverage` recognizes the new route (104 routes, still
+    valid) using the same session-check guard pattern as `/api/me/sessions`. No regressions across
+    `src/shared/lib/auth` + `src/modules/dashboard/components` + `src/shared/lib/abuse` (347 tests).
+    **Live-verified the full flow end-to-end** in the real dev browser against the real database:
+    temporarily set `ABUSE_ENFORCEMENT_MODE=enforce` in `.env.local`, restarted the dev server,
+    signed up a fresh test account, manually inserted an `account_risk` row with `stage='warned'`
+    — confirmed the fairness-framed banner rendered; updated the row to `stage='stepup'` —
+    confirmed the password dialog appeared, that a wrong password showed "Incorrect password" and
+    kept the dialog open, and that the correct password dismissed the dialog and stayed dismissed
+    across a full page reload (proving the `bh_stepup` cookie round-trips correctly through a real
+    browser, not just the duck-typed test). No console errors. Reverted the temporary
+    `.env.local` override, restarted the server again, and confirmed via `curl` that the server is
+    healthy with the setting back to its default (`observe`). Deleted the test account and all its
+    cascaded rows from the dev database afterward.
 
 - [ ] **Platform-admin abuse console**
   - Files: `src/routes/api/admin/abuse/index.ts`, `src/routes/_dashboard/admin/abuse.tsx`,
