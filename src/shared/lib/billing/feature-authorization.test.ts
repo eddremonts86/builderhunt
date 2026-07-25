@@ -4,6 +4,8 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 const mockEnv = vi.hoisted(() => ({
   ABUSE_ENFORCEMENT_MODE: 'observe' as 'observe' | 'warn' | 'enforce',
   CREDIT_SEAT_DAILY_UNITS: 2000,
+  CREDIT_FIRST_PAYER_WINDOW_HOURS: 48,
+  CREDIT_FIRST_PAYER_CAP_UNITS: 500,
 }))
 vi.mock('../env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../env')>()
@@ -13,6 +15,8 @@ vi.mock('../env', async (importOriginal) => {
       ...actual.env,
       get ABUSE_ENFORCEMENT_MODE() { return mockEnv.ABUSE_ENFORCEMENT_MODE },
       get CREDIT_SEAT_DAILY_UNITS() { return mockEnv.CREDIT_SEAT_DAILY_UNITS },
+      get CREDIT_FIRST_PAYER_WINDOW_HOURS() { return mockEnv.CREDIT_FIRST_PAYER_WINDOW_HOURS },
+      get CREDIT_FIRST_PAYER_CAP_UNITS() { return mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS },
     },
   }
 })
@@ -71,6 +75,16 @@ async function seedGrant(organizationId: string, units: number): Promise<string>
   return grantId
 }
 
+/** A paid-source grant (unlike `seedGrant`'s `promotional` default) — makes the org a "payer" for `findEarliestPaidGrantCreatedAt`/the G6 first-payer window. */
+async function seedPaidGrant(organizationId: string, units: number): Promise<string> {
+  const grantId = uniqueId('grant')
+  await db.transaction((tx) => grantCredits(tx, {
+    grantId, ledgerEntryId: uniqueId('entry'), organizationId, source: 'pack',
+    units, expiresAt: new Date(Date.now() + 30 * 86_400_000), idempotencyKey: uniqueId('idem'),
+  }))
+  return grantId
+}
+
 beforeAll(async () => {
   const disposable = await createDisposableTestDatabase('feature_authorization')
   db = disposable.db
@@ -84,6 +98,8 @@ afterAll(async () => {
 afterEach(() => {
   mockEnv.ABUSE_ENFORCEMENT_MODE = 'observe'
   mockEnv.CREDIT_SEAT_DAILY_UNITS = 2000
+  mockEnv.CREDIT_FIRST_PAYER_WINDOW_HOURS = 48
+  mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS = 500
 })
 
 describe('checkEntitlement', () => {
@@ -234,6 +250,73 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
 
     const seatUsageAfterBlock = await db.transaction((tx) => getSeatUsage(tx, principal.organizationId, principal.userId, todayUtc(), 'messages'))
     expect(seatUsageAfterBlock?.creditUnits).toBe(50) // unchanged — the blocked attempt never reserved or recorded anything
+  })
+})
+
+describe('reserveCredits — first-payer credit-consumption cap + credit_spend_velocity (abuse-and-usage-integrity G6)', () => {
+  it('never caps or flags an established payer, however far over the cap it reserves', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedPaidGrant(principal.organizationId, 1000) // just paid moments ago
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS = 50
+    mockEnv.CREDIT_FIRST_PAYER_WINDOW_HOURS = 0 // 0-hour window: even a just-created grant is already "outside" it
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // Two reservations of 50 units each (100 total) — well over the 50-unit cap, but never applies once outside the window.
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).resolves.toBeDefined()
+    expect(insert).not.toHaveBeenCalled()
+  })
+
+  it('observe mode: emits credit_spend_velocity but never blocks a new payer over the cap', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedPaidGrant(principal.organizationId, 1000)
+    mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS = 50 // observe mode is the afterEach default; window stays the 48h default
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // First reservation reaches exactly the cap (== 50, not over) — must succeed, no signal yet.
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+    // Second reservation pushes the window total to 100 (> 50 cap) — observe mode never throws.
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).resolves.toBeDefined()
+
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'credit_spend_velocity',
+      organizationId: principal.organizationId,
+      userId: principal.userId,
+      details: expect.objectContaining({ unitsReservedInWindow: 50, thisReservationUnits: 50, cap: 50 }),
+    }))
+  })
+
+  it('enforce mode: blocks a new payer\'s reservation once the window total would cross the cap, before any credits are reserved', async () => {
+    const principal = await freshPrincipal()
+    await seedSubscription(principal.organizationId, 'pro_max')
+    await seedPaidGrant(principal.organizationId, 1000)
+    mockEnv.ABUSE_ENFORCEMENT_MODE = 'enforce'
+    mockEnv.CREDIT_FIRST_PAYER_CAP_UNITS = 50
+
+    const insert = vi.fn()
+    const deps = { insert, sink: { write: vi.fn() } }
+    // First reservation reaches exactly the cap (== 50) — must succeed.
+    await db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))
+
+    // Second reservation would push the window total to 100 (> 50 cap) — must block BEFORE reserving.
+    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+      reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
+    }, deps))).rejects.toMatchObject({ code: 'blocked' })
   })
 })
 

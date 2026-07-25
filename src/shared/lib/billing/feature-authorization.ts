@@ -2,17 +2,25 @@ import { randomUUID } from 'node:crypto'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { env } from '../env'
-import { checkPoolDrainAndEmit, detectPoolDrain } from '../abuse/credit-abuse'
+import {
+  checkFirstPayerSpendVelocityAndEmit,
+  checkPoolDrainAndEmit,
+  detectFirstPayerCapExceeded,
+  detectPoolDrain,
+  isWithinFirstPayerWindow,
+} from '../abuse/credit-abuse'
 import type { EmitAbuseSignalDeps } from '../abuse/signals'
 import { getSeatUsage, incrementSeatUsage, listSeatUsageForOrgDay } from '../repositories/seat-usage'
 import { findActiveBillingSubscription } from '../repositories/billing'
 import type { BillingCreditAllocationRecord, BillingCreditReservationRecord } from '../repositories/billing-ledger'
 import {
   findCreditGrant,
+  findEarliestPaidGrantCreatedAt,
   findLedgerEntryByIdempotencyKey,
   insertLedgerEntry,
   listAllocationsForReservation,
   lockReservation,
+  sumReservedUnitsSince,
   updateAllocationConsumed,
 } from '../repositories/billing-ledger'
 import { adjustCreditGrant, grantCredits, isActivePaidSubscription } from './credits'
@@ -118,6 +126,7 @@ export async function reserveCredits(
 ): Promise<FeatureReservationResult> {
   const rateCard = await requireEntitledRateCard(transaction, principal, input.operation)
   const today = todayUtc()
+  const now = new Date()
 
   // Per-seat credit sub-budget (Phase 4B "G2") — checked BEFORE reserving so a blocked seat never
   // partially reserves against the shared pool. Only a real `enforce`-mode gate; `observe`/`warn`
@@ -129,6 +138,24 @@ export async function reserveCredits(
     const seatUnitsAfterThisReservation = (existing?.creditUnits ?? 0) + rateCard.maxUnits
     if (detectPoolDrain({ seatUnits: seatUnitsAfterThisReservation, cap: env.CREDIT_SEAT_DAILY_UNITS, seatCount })) {
       throw new FeatureBillingError('This seat has reached its daily credit sub-budget', 'blocked')
+    }
+  }
+
+  // First-payer credit-consumption cap (Phase 4B "G6") — only relevant while the org is still
+  // inside its first-payer window; an established payer skips the (heavier) consumption-history
+  // query entirely. `firstPaidGrantAt`/`isNewPayer` are computed once and reused below for the
+  // always-on post-reservation signal, so a new payer's request costs exactly one extra query.
+  const firstPaidGrantAt = await findEarliestPaidGrantCreatedAt(transaction, principal.organizationId)
+  const isNewPayer = isWithinFirstPayerWindow({ firstPaidGrantAt, now, windowHours: env.CREDIT_FIRST_PAYER_WINDOW_HOURS })
+  let unitsReservedInWindow = 0
+  if (isNewPayer) {
+    const windowStart = new Date(now.getTime() - env.CREDIT_FIRST_PAYER_WINDOW_HOURS * 60 * 60 * 1000)
+    unitsReservedInWindow = await sumReservedUnitsSince(transaction, principal.organizationId, windowStart)
+    if (
+      env.ABUSE_ENFORCEMENT_MODE === 'enforce'
+      && detectFirstPayerCapExceeded({ unitsReservedInWindow, thisReservationUnits: rateCard.maxUnits, cap: env.CREDIT_FIRST_PAYER_CAP_UNITS })
+    ) {
+      throw new FeatureBillingError('This organization has reached its new-payer credit consumption cap', 'blocked')
     }
   }
 
@@ -164,6 +191,21 @@ export async function reserveCredits(
       { userId: principal.userId, organizationId: principal.organizationId, requestId: principal.requestId },
       deps,
     )
+
+    // Always-on signal (any enforcement mode) — only queried a moment ago when the org is a new
+    // payer, so this is a no-op cost for every established payer.
+    if (isNewPayer) {
+      await checkFirstPayerSpendVelocityAndEmit(
+        {
+          unitsReservedInWindow,
+          thisReservationUnits: rateCard.maxUnits,
+          cap: env.CREDIT_FIRST_PAYER_CAP_UNITS,
+          windowHours: env.CREDIT_FIRST_PAYER_WINDOW_HOURS,
+        },
+        { userId: principal.userId, organizationId: principal.organizationId, requestId: principal.requestId },
+        deps,
+      )
+    }
 
     return { reservation: result.reservation, allocations: result.allocations }
   } catch (error) {

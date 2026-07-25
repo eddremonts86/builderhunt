@@ -201,6 +201,37 @@ export async function listRecentGrantsBySource(
   return rows.filter((row) => row.createdAt.getTime() >= since.getTime())
 }
 
+/** Grant `source` values that represent an actual payment, distinct from promotional/manual/trial grants — used by `abuse/credit-abuse.ts`'s first-payer spend-velocity cap (G6) to define "when did this organization first pay us". */
+const PAID_GRANT_SOURCES: ReadonlySet<string> = new Set(['pack', 'subscription_monthly', 'subscription_annual_window', 'subscription_upgrade_delta'])
+
+/** The organization's earliest paid-source grant, or `null` if it has never paid — the "new payer" clock for the G6 first-payer cap starts here, not at organization/customer creation (a long-dormant free org that just made its first purchase is a new payer today). */
+export async function findEarliestPaidGrantCreatedAt(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<Date | null> {
+  const rows = await transaction
+    .select({ source: billingCreditGrants.source, createdAt: billingCreditGrants.createdAt })
+    .from(billingCreditGrants)
+    .where(eq(billingCreditGrants.organizationId, organizationId))
+  const paidTimestamps = rows.filter((row) => PAID_GRANT_SOURCES.has(row.source)).map((row) => row.createdAt.getTime())
+  return paidTimestamps.length > 0 ? new Date(Math.min(...paidTimestamps)) : null
+}
+
+/** Units actually reserved (removed from a grant's balance) since `since` — the `reserve` ledger entry carries `unitsDelta: -take` at the moment credits leave the pool (see `billing/reservations.ts`), unlike `consume`/`release` markers which record `0`. Counts every reservation attempt in the window regardless of whether it was later settled or released, since the point is capping how much a possibly-fraudulent new payment method can spend before it's caught, not netting out refunds. */
+export async function sumReservedUnitsSince(
+  transaction: TenantTransaction,
+  organizationId: string,
+  since: Date,
+): Promise<number> {
+  const rows = await transaction
+    .select({ unitsDelta: billingLedgerEntries.unitsDelta, createdAt: billingLedgerEntries.createdAt })
+    .from(billingLedgerEntries)
+    .where(and(eq(billingLedgerEntries.organizationId, organizationId), eq(billingLedgerEntries.entryType, 'reserve')))
+  return rows
+    .filter((row) => row.unitsDelta < 0 && row.createdAt.getTime() >= since.getTime())
+    .reduce((sum, row) => sum - row.unitsDelta, 0)
+}
+
 /** Grants still marked `active` whose `expiresAt` has already passed — the daily worker's expiry sweep target (a later task builds the actual worker; this is the read it will use). */
 export async function listExpiredButStillActiveGrants(
   transaction: TenantTransaction,

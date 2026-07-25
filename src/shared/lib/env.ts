@@ -113,6 +113,14 @@ const zodEnv = z.object({
   // `enforce` also refuses to reserve further credits for that seat once its own daily total
   // would cross this, independent of whether the org's overall pool still has balance.
   CREDIT_SEAT_DAILY_UNITS: z.coerce.number().int().positive().default(2000),
+  // First-payer credit-consumption cap (G6) — a "new payer" is an organization whose earliest
+  // paid-source credit grant (pack/subscription, never promotional/trial/manual) is younger than
+  // this window; once outside the window they're no longer capped by this rule. Guards against a
+  // stolen card/new payment method being used to burn through credits before a chargeback lands —
+  // coordinates with, but doesn't duplicate, `billing/risk.ts`'s payment-*failure*-velocity gate
+  // (this one caps *consumption* of already-granted credits, not new purchases).
+  CREDIT_FIRST_PAYER_WINDOW_HOURS: z.coerce.number().int().positive().default(48),
+  CREDIT_FIRST_PAYER_CAP_UNITS: z.coerce.number().int().positive().default(500),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({

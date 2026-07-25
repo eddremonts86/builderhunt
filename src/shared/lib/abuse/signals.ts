@@ -17,6 +17,7 @@ export type AbuseSignalType =
   | 'refund_farming'
   | 'margin_drift'
   | 'reserve_leak'
+  | 'credit_spend_velocity'
 
 export type AbuseSignalSeverity = 'low' | 'medium' | 'high'
 

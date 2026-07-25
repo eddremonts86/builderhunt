@@ -184,6 +184,10 @@
     "0045_user_devices_worker_read_grant": {
       "sql": "e9a8b2bce370662c4e0855fb49d368d77bb4bac6981d5f788403aeed6f10a173",
       "snapshot": "7f70fbb9d14b4bf652da8e621241c439b17ca13ae52e06aab1c29efc8b314dc9"
+    },
+    "0046_abuse_signals_credit_spend_velocity": {
+      "sql": "88d6776a0a9a36d0a22fd71bbd41a6de439216299b42b39a04bace2888278fee",
+      "snapshot": "d2e76fe98799a26ba1401fa3e781d2f9a7154056d513e0a9d6384158ec7b8432"
     }
   }
 }

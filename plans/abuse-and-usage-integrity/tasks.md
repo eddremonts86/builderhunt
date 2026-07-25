@@ -812,13 +812,63 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     on the passing test suite plus the two already-well-tested pieces being composed
     (`checkAndConsumeBudget`, `embedTexts`) for confidence.
 
-- [ ] **First-payer credit-consumption cap + spend-velocity signal (G6)**
+- [x] **First-payer credit-consumption cap + spend-velocity signal (G6)**
   - Files: `src/shared/lib/billing/reservations.ts`, `src/shared/lib/abuse/credit-abuse.ts`,
     `src/shared/lib/abuse/risk.ts`
   - Do: cap credit consumption for a new payer / new payment method to `CREDIT_FIRST_PAYER_CAP_UNITS`
     within `CREDIT_FIRST_PAYER_WINDOW_HOURS`; feed a spend-velocity input into `account_risk` so a
     buy→burn burst can gate high-cost ops behind step-up. Coordinate with Stripe Radar (do not duplicate).
   - Verify: unit tests for the first-payer window + cap; integration test that observe mode never blocks.
+  - Progress: implemented at the `billing/feature-authorization.ts` `reserveCredits` layer (same
+    reasoning as G2 — `reservations.ts` is organization-scoped only, no `userId`, so it can't emit a
+    per-actor signal). "New payer" = an org whose earliest **paid-source** credit grant (`pack`,
+    `subscription_monthly`, `subscription_annual_window`, `subscription_upgrade_delta` — never
+    `promotional`/`operator_trial`/`legacy_manual`) is younger than `CREDIT_FIRST_PAYER_WINDOW_HOURS`
+    (default 48). New `repositories/billing-ledger.ts` reads: `findEarliestPaidGrantCreatedAt` (MIN
+    createdAt across paid-source grants) and `sumReservedUnitsSince` (sums the `reserve` ledger
+    entry's `unitsDelta` — the actual moment credits leave a grant's balance, per
+    `billing/reservations.ts`; `consume`/`release` markers always carry `0` and were confirmed via
+    direct code read, not assumption). New env vars `CREDIT_FIRST_PAYER_WINDOW_HOURS` (default 48)
+    and `CREDIT_FIRST_PAYER_CAP_UNITS` (default 500). New pure functions in `abuse/credit-abuse.ts`:
+    `isWithinFirstPayerWindow`, `detectFirstPayerCapExceeded`, `checkFirstPayerSpendVelocityAndEmit`
+    (same `detect*`/`check*AndEmit` convention as G2). **Required a new migration** (user explicitly
+    authorized touching CI/migrations for this task, per the standing check-in agreement) —
+    `abuse_signals.type` has a real Postgres CHECK constraint, and none of the 5 existing
+    `AbuseSignalType` values (`credit_farming`, `pool_drain`, `refund_farming`, `margin_drift`,
+    `reserve_leak`) semantically fit "spend velocity"; added `credit_spend_velocity` to the union
+    (`abuse/signals.ts`) and `drizzle/0046_abuse_signals_credit_spend_velocity.sql` (DROP/ADD
+    CONSTRAINT widening the CHECK list — no existing rows affected), with `0046_snapshot.json`
+    derived from `0045`'s (same RLS/CHECK-only precedent as 0045 itself — drizzle-kit's snapshot
+    format doesn't track CHECK constraints). `reserveCredits`: in `enforce` mode only, and only
+    while the org is inside its first-payer window (an established payer skips the heavier
+    consumption-history query entirely), pre-checks whether this reservation would push the
+    window's total reserved units over the cap, throwing `FeatureBillingError('blocked')` BEFORE any
+    credits are reserved; always (any mode, new-payer orgs only) emits `credit_spend_velocity` after
+    a successful reservation crosses the cap — detection only, reusing the same pre-fetched
+    `unitsReservedInWindow` value for both the pre-check and the post-emit (one extra query per
+    new-payer request, zero extra for established payers). Confirmed explicitly this does NOT
+    duplicate `billing/risk.ts`'s `assertNotRiskBlocked` (a payment-*failure*-velocity gate on new
+    Checkout/PaymentIntent creation, already coordinating with Stripe Radar/3DS per its own header
+    comment) — G6 caps *consumption* of already-granted credits, a genuinely separate surface.
+    16 new unit tests for `credit-abuse.ts` (window/cap pure functions + emit gating) and 3 new
+    real-Postgres integration tests in `feature-authorization.test.ts` (established payer — 0-hour
+    window — never capped/flagged however far over cap; observe mode emits `credit_spend_velocity`
+    but never blocks a new payer over cap; enforce mode blocks a new payer's reservation before any
+    credits are reserved) — all 21 tests in that file plus all 16 new tests pass. Full
+    `src/shared/lib/billing` + `src/shared/lib/abuse` suites (832 tests) pass with no regressions;
+    `pnpm tsc --noEmit`/`pnpm eslint` clean; `node scripts/db/verify-migration-integrity.mjs`
+    (47 migrations) and `pnpm exec drizzle-kit check` both clean. Live-verified against the real
+    local dev Postgres database: applied migration 0046 via `drizzle-kit migrate` and confirmed via
+    `psql \d abuse_signals` that the CHECK constraint now includes `credit_spend_velocity`; ran a
+    throwaway direct-call script seeding a real paid-source grant for a fresh org, confirming the
+    first reservation (reaching exactly the cap) succeeds, the second (crossing the cap) throws
+    `FeatureBillingError('blocked')`, exactly one `billing_credit_reservations` row exists afterward
+    (the blocked attempt never reserved), and no `credit_spend_velocity` signal was written for the
+    blocked attempt — script and all seeded rows deleted afterward, confirmed zero residual rows.
+    Note: feeding this into `account_risk`/`recomputeAccountRisk` needs no extra wiring —
+    `recomputeAccountRisk` already reads any signal type for that `userId` from `abuse_signals`
+    (confirmed via research this task; it has no per-type special-casing), so `credit_spend_velocity`
+    is picked up by the existing risk-scoring pipeline the next time that user's risk is recomputed.
 
 - [ ] **Refund-farming cap + `refund_farming` signal (G4)**
   - Files: `src/shared/lib/billing/reservations.ts` (`refundUsage` path),
