@@ -81,6 +81,18 @@ const zodEnv = z.object({
   // Off by default — instrumentation only starts recording once explicitly turned on, after
   // cookie/privacy copy is updated (see docs/conversion-baseline.md).
   CONVERSION_EVENTS_ENABLED: z.enum(['true', 'false']).default('false'),
+  // Plan: solutions-intelligence — seven independent capability flags (spec.md/design doc:
+  // "Feature flags independently control catalog ingestion, public scraping, live enrichment,
+  // LLM interpretation, external human profiles, and paid generation"). All off by default;
+  // each turns on only after its own prerequisite review (source register sign-off, billing
+  // cost-benchmark certification, etc. — see solutions/config.ts).
+  SOLUTIONS_CATALOG_INGESTION_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_PUBLIC_SCRAPE_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_LIVE_ENRICHMENT_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_INTERPRETATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_EXPLANATION_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_EXTERNAL_HUMAN_ENABLED: z.enum(['true', 'false']).default('false'),
+  SOLUTIONS_PAID_GENERATION_ENABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED_TASKS: z.string().default(''),
   // Plan: proactive-discovery
