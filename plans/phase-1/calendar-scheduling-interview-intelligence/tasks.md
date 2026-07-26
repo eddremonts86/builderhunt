@@ -126,7 +126,7 @@ src/shared/lib/env.security.test.ts`.
 
 ## Phase 1 — Pure domain contracts
 
-- [ ] **Implement calendar contracts and state machine**
+- [x] **Implement calendar contracts and state machine**
   - Files: `src/shared/lib/calendar.ts` (new), `src/shared/lib/calendar.test.ts` (new)
   - Do: Add event/occurrence/participant/reminder/delivery/feed DTO schemas, event types/statuses,
     source types, visibility fixed to `private`, optimistic-version and `this|following|series`
@@ -135,6 +135,31 @@ src/shared/lib/env.security.test.ts`.
   - Verify: tests cover every valid/invalid transition, invalid ranges, stale version mapping,
     participant DTO minimization, and projection `editable: false`; `pnpm test
 src/shared/lib/calendar.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `calendar.ts` (Zod `.strict()` throughout, matching
+    `solutions/contracts.ts`'s convention). `CalendarEventError` (coded, mirrors
+    `billing/credits.ts`'s `CreditLedgerError`) backs `assertValidEventStatusTransition` (a
+    `Record<Status, Status[]>` transition table for the spec.md Appointment machine:
+    scheduled→confirmed/cancelled, confirmed→in_progress/cancelled/rescheduled/no_show,
+    in_progress→completed/cancelled, all four terminal states reject everything) and
+    `assertMatchingEventVersion` (throws `code: 'event_changed'` on mismatch — the first numeric
+    optimistic-version helper in the codebase). `eventParticipantSchema` models "exactly one of
+    user_id/external_email" as a discriminated `identity` union; `toEventParticipantPublicDto`
+    strips it down to displayName/role/response only. `assertSupportedRecurrenceRule` allowlists
+    exactly `FREQ|INTERVAL|BYDAY|BYMONTHDAY|COUNT|UNTIL` and `FREQ∈{DAILY,WEEKLY,MONTHLY,YEARLY}`
+    before delegating to `rrule`'s `RRule.parseString` for structural validation — rejects
+    `SECONDLY`/`HOURLY`/`BYSETPOS`/`BYWEEKNO`/malformed strings rather than approximating them.
+    `resolveRecurrenceMutationPlan` implements the this/following/series split guard as a
+    discriminated-result function (not a throw-only guard). `rangesOverlap` is a half-open
+    `[start,end)` check (back-to-back ranges do not conflict). `calendarFeedItemSchema` is a
+    `z.discriminatedUnion('kind', ...)` of the editable event item (built via
+    `eventObjectSchema.extend({editable: z.literal(true)})`, confirming `.strict()` survives
+    `.extend()`) plus four `editable: z.literal(false)` projection kinds
+    (job_projection/alert_projection/job_run/alert_result) — a projection item claiming
+    `editable: true` fails to parse. 102 tests cover every one of the 49 valid/invalid status-
+    transition pairs (exhaustively generated from the full Cartesian product, not hand-picked),
+    invalid date ranges, the coded stale-version throw, participant-DTO minimization (asserts the
+    serialized DTO never contains the raw email/userId), and the projection discrimination cases.
+    `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2503 passed) are clean.
 
 - [ ] **Implement timezone, recurrence, and availability calculations**
   - Files: `src/shared/lib/scheduling.ts` (new), `src/shared/lib/scheduling.test.ts` (new)
