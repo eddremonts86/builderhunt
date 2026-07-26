@@ -260,7 +260,7 @@ src/shared/lib/calendar.test.ts`.
     strings). `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2750 passed) are
     clean.
 
-- [ ] **Define provider interfaces without SDK leakage**
+- [x] **Define provider interfaces without SDK leakage**
   - Files: `src/lib/storage/types.ts` (new), `src/lib/interviews/transcription/types.ts` (new),
     `src/lib/interviews/sensitive-ai/types.ts` (new)
   - Do: Define narrow interfaces for signed upload/download/delete/move, scan/extract, ephemeral
@@ -269,6 +269,21 @@ src/shared/lib/calendar.test.ts`.
     vendor response types.
   - Verify: TypeScript fake adapters implement every interface without provider packages;
     `pnpm type-check`.
+  - **Evidence (2026-07-26)**: Wrote all three files as pure interface/error-shape definitions
+    with zero imports from `@aws-sdk/*`/deepgram/openai. `storage/types.ts`: `StorageProvider`
+    (signed upload/download URLs, head/delete/move) plus separate `VirusScanProvider`
+    (ClamAV-shaped `ScanResult`) and `DocumentExtractionProvider` interfaces, each with its own
+    normalized error class (`StorageProviderError`/`ScanProviderError`/`DocumentExtractionError`).
+    `interviews/transcription/types.ts`: `TranscriptionProvider` issuing an ephemeral token (30s
+    per spec.md) and normalized `TranscriptionUsage`. `interviews/sensitive-ai/types.ts`:
+    `SensitiveAIProvider.completeStructured<TInput,TOutput>` — the exact name spec.md's "AI task
+    contracts" section names as the required routing target, with a doc comment restating "never
+    silently degrade to MiniMax/browser AI." Wrote a fake, dependency-free adapter for each
+    interface in a paired `.test.ts` (round-tripping upload/move/delete for storage, token issuance
+    for transcription, structured completion for sensitive AI) — 6 tests, all passing, proving each
+    interface is genuinely implementable without the real provider packages installed for this
+    purpose. `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2756 passed) are
+    clean.
 
 - [ ] **Implement the normative HTTP and error schemas**
   - Files: `src/shared/lib/interview-api.ts` (new),
