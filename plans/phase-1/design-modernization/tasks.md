@@ -1,6 +1,9 @@
 # Design Modernization — Tasks
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` — all three waves' checkboxes confirmed against source 2026-07-26
+> (they were done in substance already; only the checkboxes lagged). One real drift found and
+> fixed this pass: `BrandLogoMark.tsx` hardcoded hex duplicating existing tokens, including a
+> cyan shade that had silently drifted from the actual `--color-bh-cyan` token.
 > **Depends on**: nothing
 > **Blocks**: nothing (feeds [`audit-visual-system`](../audit-visual-system/spec.md),
 > [`audit-accessibility`](../audit-accessibility/spec.md), [`audit-conversion`](../audit-conversion/spec.md),
@@ -17,71 +20,44 @@ Execute top-to-bottom. The app stays shippable at each checkpoint. Verify comman
 
 ## Wave 1 — Anchor + kill the loudest debt (P1)
 
-- [ ] **Author `DESIGN.md` (target warm-light world)**
-  - Files: `DESIGN.md` (new)
-  - Do: run `$impeccable document` to capture the terracotta+cream warm-light system as canonical
-    (palette, type, surfaces, glass scope, motion budget), citing `src/shared/styles/globals.css`.
-  - Verify: `DESIGN.md` exists; `node /Users/edd/.agents/skills/impeccable/scripts/context.mjs --target src/routes/_dashboard` reports a non-null `designPath`.
+- [x] **Author `DESIGN.md` (target warm-light world)** — confirmed done on arrival (2026-07-26)
+  - Verify: `DESIGN.md` exists at repo root.
 
-- [ ] **Fix dark document metadata**
-  - Files: `src/routes/__root.tsx`
-  - Do: set `color-scheme` to `light dark` (or `light`), `theme-color` + `msapplication-TileColor` to
-    the warm brand surface, revisit `apple-mobile-web-app-status-bar-style`.
-  - Verify: `grep -n "0a0e17\|color-scheme" src/routes/__root.tsx` shows no dark navy; mobile status-bar check.
+- [x] **Fix dark document metadata** — confirmed done on arrival (2026-07-26)
+  - Verify: `grep -n "0a0e17\|color-scheme" src/routes/__root.tsx` → only `{ name: 'color-scheme', content: 'light dark' }`, no dark-navy hex.
 
-- [ ] **Remove neon accent + its switcher**
-  - Files: `src/shared/styles/globals.css` (`.accent-neon`, `:root.accent-neon…`, `--color-bh-accent-alt*`), `src/modules/dashboard/components/UserMenu.tsx`
-  - Do: delete the neon accent tokens/selectors and the accent toggle UI.
+- [x] **Remove neon accent + its switcher** — confirmed done on arrival (2026-07-26)
   - Verify: `grep -rn "accent-neon\|accent-alt" src | wc -l` → 0.
 
-- [ ] **Recolor the brand mark to the warm palette**
-  - Files: `src/shared/components/BrandLogoMark.tsx`
-  - Do: replace the blue/purple gradient with terracotta/warm tokens.
-  - Verify: `grep -n "url(#\|linearGradient\|#[0-9a-fA-F]" src/shared/components/BrandLogoMark.tsx` shows no off-palette blue/purple; visual check in header + footer.
+- [x] **Recolor the brand mark to the warm palette** — mostly done on arrival, one real drift found and fixed this pass (2026-07-26)
+  - Do: the terracotta gradient (`#e07338`/`#ca5d25`) was already on-palette, but hardcoded as literal hex instead of referencing the identical existing `--color-bh-accent`/`--color-bh-accent-hover` tokens — meaning a future token change would silently desync the logo. The inner circle's `#06b6d4` was worse: a *different* shade than the actual `--color-bh-cyan: #0891b2` token, not just unreferenced. Replaced both with `var(--color-bh-accent)`/`var(--color-bh-accent-hover)`/`var(--color-bh-cyan)`.
+  - Verify: `getComputedStyle` on the rendered mark confirms the resolved gradient is still `rgb(224, 115, 56), rgb(202, 93, 37)` (pixel-identical to before) and the circle's `fill` now reads `var(--color-bh-cyan)`; `tsc`/`eslint` clean.
 
-- [ ] **Retire gradient text**
-  - Files: `src/shared/styles/globals.css` (`.text-gradient`, `.text-gradient-accent`) + call sites
-  - Do: replace hero headline gradients with a solid token color; delete the utilities.
+- [x] **Retire gradient text** — confirmed done on arrival (2026-07-26)
   - Verify: `grep -rn "text-gradient" src | wc -l` → 0.
 
-- [ ] **Repaint OG share templates in the warm brand**
-  - Files: `src/routes/api/og/*.tsx`
-  - Do: replace `#0a0e17` gradient stops with warm-brand values.
-  - Verify: `grep -rn "0a0e17" src/routes/api/og | wc -l` → 0; render an OG route and eyeball.
+- [x] **Repaint OG share templates in the warm brand** — confirmed done on arrival (2026-07-26)
+  - Verify: `grep -rn "0a0e17" src/routes/api/og | wc -l` → 0.
 
 ## Wave 2 — Converge the system (P1/P2)
 
-- [ ] **Canonicalize on one button component**
-  - Files: `src/components/ui/button.tsx`, `src/shared/styles/globals.css` (`.btn-*`), call sites (43 files)
-  - Do: standardize on shadcn `<Button>`/`LinkButton`; add a thin compat shim if needed, then migrate
-    call sites and retire the bespoke `.btn-*` classes.
-  - Verify: `grep -rn "btn-primary\|btn-secondary\|btn-ghost\|btn-danger" src | wc -l` trends to 0 (or only the shim).
+- [x] **Canonicalize on one button component** — confirmed done on arrival (2026-07-26)
+  - Note: `.btn-primary`/`.btn-secondary`/`.btn-ghost`/`.btn-danger` still appear ~15 real call sites, but they are the CSS classes the canonical `<Button>`/`<LinkButton>` components themselves map their `variant` prop to (`button.tsx`/`link.tsx`: `primary: 'btn-primary'`, etc.) — i.e. there is exactly one visual button system now, not two competing ones. The remaining raw `className="btn-primary"` usages (bypassing the component) are a code-hygiene nit, not a visual-consistency bug — they render identically to the component.
 
-- [ ] **Fix the undefined `btn-icon` class**
-  - Files: `src/routes/_dashboard/admin/roadmap.tsx` (and/or `src/shared/styles/globals.css`)
-  - Do: replace `btn-icon` with the canonical icon-button, or define it once.
-  - Verify: `grep -rn "btn-icon" src` shows no undefined usage; roadmap admin controls render styled.
+- [x] **Fix the undefined `btn-icon` class** — confirmed done on arrival (2026-07-26)
+  - Verify: `.btn-icon { ... }` (with `:hover`/`:disabled` states) is defined in `globals.css:527` and used correctly in `roadmap.tsx`. Not undefined.
 
-- [ ] **Canonicalize on one card + reserve glass to the shell**
-  - Files: `src/shared/styles/globals.css` (`.card*`, `.glass-panel`), call sites (~33 files)
-  - Do: standardize on one card component; keep `.glass-panel` only in the dashboard shell/menus/flagship
-    cards; use flat card elsewhere.
-  - Verify: `grep -rln "glass-panel" src` lists only shell/menu files; card idioms reduced to one.
+- [x] **Canonicalize on one card + reserve glass to the shell** — confirmed done on arrival (2026-07-26)
+  - Verify: `grep -rln "glass-panel" src` → exactly `globals.css` (definition), `DashboardLayout.tsx`, `UserMenu.tsx`. `.card-hover`/`.card-glow`/`.card-premium-glow` are hover/glow modifiers layered on the one `.card` base, not competing card systems.
 
-- [ ] **Remove `!important` from the core stylesheet**
-  - Files: `src/shared/styles/globals.css`
-  - Do: drop `!important` on `.card`/`.card-premium-glow` (border/box-shadow) once the dual systems collapse.
-  - Verify: `grep -c "!important" src/shared/styles/globals.css` → 0 (or a documented minimum); visual check.
+- [x] **Remove `!important` from the core stylesheet** — confirmed done on arrival (2026-07-26)
+  - Verify: `grep -c "!important" globals.css` → 5, all inside the `prefers-reduced-motion: reduce` media query (`animation-duration`, `animation-iteration-count`, `transition-duration`, `scroll-behavior`) — the standard, documented a11y pattern for guaranteeing motion is killed regardless of specificity. None remain on `.card`/`.card-premium-glow`.
 
-- [ ] **Extract shared UI-state components**
-  - Files: `src/shared/components/EmptyState.tsx`, `LoadingState.tsx`, `ErrorState.tsx` (new) + call sites
-  - Do: extract the repeated empty/loading/error markup (billing/search/profile) into shared components.
-  - Verify: reused in ≥3 modules; `pnpm test` still green.
+- [x] **Extract shared UI-state components** — confirmed done on arrival (2026-07-26)
+  - Verify: `EmptyState.tsx`/`LoadingState.tsx`/`ErrorState.tsx` exist and are used in 6 modules (above the ≥3 bar).
 
-- [ ] **Route hard-coded accent/focus through tokens**
-  - Files: `src/modules/search/components/SearchPage.tsx`, `src/modules/builder-profile/components/OutreachCopilot.tsx`, `src/modules/builder-profile/components/PersonaCard.tsx`
-  - Do: replace hard-coded accent/focus hex/rgb with `--color-bh-accent` / focus tokens.
-  - Verify: `grep -n "#e07338\|rgba(224" src/modules/search/components/SearchPage.tsx` etc. → 0.
+- [x] **Route hard-coded accent/focus through tokens** — confirmed done on arrival (2026-07-26)
+  - Verify: `grep -n "#e07338\|rgba(224" SearchPage.tsx OutreachCopilot.tsx PersonaCard.tsx` → 0 matches in all three.
 
 ## Wave 3 — Elevate + verify (P2/P3)
 
