@@ -66,6 +66,10 @@ const zodEnv = z.object({
   CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
   // Kill switch for the verified-owner portfolio feature (public /portfolio/$claimId pages).
   PORTFOLIOS_ENABLED: z.enum(['true', 'false']).default('true'),
+  // Kill switch for the landing-funnel conversion-event collector (plan: audit-conversion).
+  // Off by default — instrumentation only starts recording once explicitly turned on, after
+  // cookie/privacy copy is updated (see docs/conversion-baseline.md).
+  CONVERSION_EVENTS_ENABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED_TASKS: z.string().default(''),
   // Plan: proactive-discovery

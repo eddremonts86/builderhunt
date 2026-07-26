@@ -1702,3 +1702,41 @@ export const workSampleAnalyses = pgTable(
     check('work_sample_analyses_sample_type_check', sql`${table.sampleType} in ('repo', 'pr', 'file')`),
   ],
 )
+
+/**
+ * Plan: audit-conversion. Append-only, privacy-minimized landing-funnel
+ * events — no user id, email, IP, query text, referrer, or user agent, only
+ * what `conversion-events.ts`'s closed schema allows. `serverDay` is the
+ * server-computed UTC calendar day (not the client's `occurredAt`), used for
+ * date-range aggregate queries without re-parsing every row's timestamp.
+ * `(sessionId, name, surface, variant)` is unique so a retried client
+ * request is a no-op rather than double-counting a funnel step.
+ */
+export const conversionEvents = pgTable(
+  'conversion_events',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    surface: text('surface').notNull(),
+    sessionId: text('session_id').notNull(),
+    variant: text('variant').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+    serverDay: text('server_day').notNull(), // 'YYYY-MM-DD', UTC
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('conversion_events_identity_unique').on(table.sessionId, table.name, table.surface, table.variant),
+    index('conversion_events_server_day_idx').on(table.serverDay),
+    index('conversion_events_name_server_day_idx').on(table.name, table.serverDay),
+    index('conversion_events_created_at_idx').on(table.createdAt),
+    check(
+      'conversion_events_name_check',
+      sql`${table.name} in (
+        'landing_view', 'hero_signup_click', 'hero_explore_click',
+        'explore_search_complete', 'explore_signup_click', 'signup_submit', 'signup_complete'
+      )`,
+    ),
+    check('conversion_events_surface_check', sql`${table.surface} in ('hero', 'final_cta', 'explore', 'signup')`),
+    check('conversion_events_variant_check', sql`${table.variant} in ('baseline', 'treatment')`),
+  ],
+)

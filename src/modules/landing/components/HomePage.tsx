@@ -7,11 +7,16 @@ import {
 import { useSession } from '~/shared/lib/auth/client'
 import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon } from './BrandIcons'
 import { FAQSection } from './FAQSection'
+import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
 export function HomePage() {
   const session = useSession()
   const [activePersonaIdx, setActivePersonaIdx] = React.useState(0)
   const isAuthed = !!session.data?.user
+
+  React.useEffect(() => {
+    trackConversionEvent('landing_view', 'hero')
+  }, [])
 
   return (
     <>
@@ -30,9 +35,9 @@ export function HomePage() {
                   not just repos.
                 </h1>
                 <p className="text-lg md:text-xl text-bh-text-muted max-w-xl mb-8 animate-fade-in-up">
-                  BuilderHunt aggregates public activity from GitHub, Reddit, Hacker News and DEV.to,
-                  scores it for recency, and lets you save searches, get email alerts, and track the
-                  people shipping the work — not just the repositories.
+                  BuilderHunt aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and
+                  more, scores it for recency, and lets you save searches, get email alerts, and track
+                  the people shipping the work — not just the repositories.
                 </p>
                 <div className="flex flex-wrap items-center gap-3 mb-8 animate-fade-in-up">
                   {isAuthed ? (
@@ -40,11 +45,23 @@ export function HomePage() {
                       Go to dashboard <ArrowRight className="w-4 h-4" aria-hidden="true" />
                     </LinkButton>
                   ) : (
-                    <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
-                      Start hunting <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                    </LinkButton>
+                    <>
+                      {/* onClick on the wrapper (not the Link itself) — TanStack's
+                          typed LinkProps doesn't accept a raw onClick, and event
+                          bubbling from the inner anchor reaches it identically. */}
+                      <span onClick={() => trackConversionEvent('hero_signup_click', 'hero')}>
+                        <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
+                          Start hunting <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                        </LinkButton>
+                      </span>
+                      <span onClick={() => trackConversionEvent('hero_explore_click', 'hero')}>
+                        <LinkButton to="/explore" variant="secondary" className="btn-lg" data-testid="hero-explore-cta">
+                          Try it without an account
+                        </LinkButton>
+                      </span>
+                    </>
                   )}
-                  <a href="#how-it-works" className="btn-secondary btn-lg">See how it works</a>
+                  <a href="#how-it-works" className="text-sm text-bh-text-muted hover:text-bh-text underline underline-offset-4">See how it works</a>
                 </div>
                 <ul className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-bh-text-muted animate-fade-in">
                   {['No credit card', 'OAuth-free', 'Email or RSS alerts'].map((t) => (
@@ -586,9 +603,11 @@ export function HomePage() {
                 </LinkButton>
               ) : (
                 <>
-                  <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
-                    Create free account <ArrowRight className="w-4 h-4" aria-hidden="true" />
-                  </LinkButton>
+                  <span onClick={() => trackConversionEvent('hero_signup_click', 'final_cta')}>
+                    <LinkButton to="/auth/sign-up" variant="primary" className="btn-lg">
+                      Create free account <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                    </LinkButton>
+                  </span>
                   <LinkButton to="/auth/sign-in" variant="secondary" className="btn-lg">
                     I already have an account
                   </LinkButton>

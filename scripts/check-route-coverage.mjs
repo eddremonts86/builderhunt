@@ -24,6 +24,8 @@ const publicAllowlist = new Map([
   ['src/routes/api/feeds/$searchId.ts', 'documented public RSS feed, gated by a capability token rather than a session'],
   ['src/routes/api/webhooks/stripe.ts', 'Stripe cannot hold a user session — Stripe-Signature verification (receiveStripeWebhook) is the entire authentication mechanism, enforced before any DB write'],
   ['src/routes/api/e2e/outbox.ts', 'E2E-only email-outbox debug seam; hard-gated on E2E_MODE=true and returns a bare 404 for every method in any other mode'],
+  ['src/routes/api/portfolio/$claimId.ts', 'fail-closed public portfolio API — reads only via getPublicPortfolioClaim, an explicit published/verified-only DTO repository; never a bare 404 vs. data distinction that would leak claim state'],
+  ['src/routes/api/analytics/conversion.ts', 'fires from anonymous landing/explore/signup pages by design; validates a closed event schema server-side and never reads/returns tenant or account data'],
 ])
 
 const guardPatterns = [

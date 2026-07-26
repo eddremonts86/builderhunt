@@ -1,13 +1,17 @@
 import * as React from 'react'
-import { useNavigate, Link } from '@tanstack/react-router'
+import { useNavigate, useSearch, Link } from '@tanstack/react-router'
 import { signUpEmail } from '~/shared/lib/auth/client'
 import { Input, Button } from '~/components/ui'
 import { ArrowLeft, Check } from 'lucide-react'
 import { BrandLogoMark } from '~/shared/components/BrandLogoMark'
 import { ThemeToggle } from '~/shared/components/ThemeToggle'
+import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { parseSafeNext } from '~/shared/lib/safe-next'
+import { POST_ONBOARDING_NEXT_KEY } from '~/shared/lib/post-onboarding-next'
 
 export function SignUpPage() {
   const navigate = useNavigate()
+  const search = useSearch({ from: '/auth/sign-up' })
   const [name, setName] = React.useState('')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -18,9 +22,22 @@ export function SignUpPage() {
     e.preventDefault()
     setError('')
     setLoading(true)
+    trackConversionEvent('signup_submit', 'signup')
     try {
       const result = await signUpEmail({ email, password, name })
       if (result.data?.user) {
+        trackConversionEvent('signup_complete', 'signup')
+        // Preserve guest-search intent (plan: audit-conversion) — stashed for
+        // the onboarding flow to restore once its own tour finishes, rather
+        // than skipping onboarding entirely for a new account.
+        const safeNext = parseSafeNext(search.next)
+        if (safeNext) {
+          try {
+            window.sessionStorage.setItem(POST_ONBOARDING_NEXT_KEY, safeNext)
+          } catch {
+            // sessionStorage unavailable — intent is simply not restored, not a hard failure.
+          }
+        }
         // Ensure onboarding row exists, then redirect to the tour
         try {
           await fetch('/api/onboarding/complete', {

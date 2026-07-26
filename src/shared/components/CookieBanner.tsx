@@ -115,7 +115,11 @@ export function CookieBanner() {
               />
               <div>
                 <span className="font-semibold text-bh-text">Analytics</span>
-                <p className="text-bh-text-muted">Currently unused. Reserved for future opt-in analytics.</p>
+                <p className="text-bh-text-muted">
+                  Not currently in use — if enabled, would record only anonymous landing-page/signup
+                  funnel events (no query text, no account data), never sold or shared. See our Cookie
+                  Policy for the current status.
+                </p>
               </div>
             </label>
           </div>

@@ -89,6 +89,7 @@ import { Route as ApiBillingDisputesRouteImport } from './routes/api/billing/dis
 import { Route as ApiBillingContactRouteImport } from './routes/api/billing/contact'
 import { Route as ApiBillingAutoRechargeRouteImport } from './routes/api/billing/auto-recharge'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiAnalyticsConversionRouteImport } from './routes/api/analytics/conversion'
 import { Route as ApiAlertsTestTriggerRouteImport } from './routes/api/alerts/test-trigger'
 import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
@@ -165,6 +166,7 @@ import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/user
 import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
+import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
@@ -180,6 +182,7 @@ import { Route as ApiAdminBillingMetricsRouteImport } from './routes/api/admin/b
 import { Route as ApiAdminBillingDisputesRouteImport } from './routes/api/admin/billing/disputes'
 import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/admin/billing/configuration'
 import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
+import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
@@ -596,6 +599,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAnalyticsConversionRoute = ApiAnalyticsConversionRouteImport.update({
+  id: '/api/analytics/conversion',
+  path: '/api/analytics/conversion',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAlertsTestTriggerRoute = ApiAlertsTestTriggerRouteImport.update({
   id: '/api/alerts/test-trigger',
   path: '/api/alerts/test-trigger',
@@ -1006,6 +1014,12 @@ const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   path: '/api/admin/roadmap/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminMetricsConversionRoute =
+  ApiAdminMetricsConversionRouteImport.update({
+    id: '/api/admin/metrics/conversion',
+    path: '/api/admin/metrics/conversion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminLegalRunWorkerRoute = ApiAdminLegalRunWorkerRouteImport.update({
   id: '/api/admin/legal/run-worker',
   path: '/api/admin/legal/run-worker',
@@ -1088,6 +1102,12 @@ const ApiAdminBillingAccountingExportRoute =
   ApiAdminBillingAccountingExportRouteImport.update({
     id: '/api/admin/billing/accounting-export',
     path: '/api/admin/billing/accounting-export',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiAdminAnalyticsRunRetentionRoute =
+  ApiAdminAnalyticsRunRetentionRouteImport.update({
+    id: '/api/admin/analytics/run-retention',
+    path: '/api/admin/analytics/run-retention',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
@@ -1223,6 +1243,7 @@ export interface FileRoutesByFullPath {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
+  '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
@@ -1281,6 +1302,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
@@ -1296,6 +1318,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
+  '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -1406,6 +1429,7 @@ export interface FileRoutesByTo {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
+  '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
@@ -1464,6 +1488,7 @@ export interface FileRoutesByTo {
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
@@ -1479,6 +1504,7 @@ export interface FileRoutesByTo {
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
+  '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -1594,6 +1620,7 @@ export interface FileRoutesById {
   '/api/ai/embed': typeof ApiAiEmbedRoute
   '/api/alerts/$id': typeof ApiAlertsIdRoute
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
+  '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
   '/api/billing/auto-recharge': typeof ApiBillingAutoRechargeRoute
   '/api/billing/contact': typeof ApiBillingContactRouteWithChildren
@@ -1652,6 +1679,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
+  '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
   '/api/admin/billing/configuration': typeof ApiAdminBillingConfigurationRoute
   '/api/admin/billing/disputes': typeof ApiAdminBillingDisputesRoute
@@ -1667,6 +1695,7 @@ export interface FileRoutesById {
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
+  '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -1781,6 +1810,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
+    | '/api/analytics/conversion'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
@@ -1839,6 +1869,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
@@ -1854,6 +1885,7 @@ export interface FileRouteTypes {
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
+    | '/api/admin/metrics/conversion'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -1964,6 +1996,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
+    | '/api/analytics/conversion'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
@@ -2022,6 +2055,7 @@ export interface FileRouteTypes {
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
@@ -2037,6 +2071,7 @@ export interface FileRouteTypes {
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
+    | '/api/admin/metrics/conversion'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -2151,6 +2186,7 @@ export interface FileRouteTypes {
     | '/api/ai/embed'
     | '/api/alerts/$id'
     | '/api/alerts/test-trigger'
+    | '/api/analytics/conversion'
     | '/api/auth/$'
     | '/api/billing/auto-recharge'
     | '/api/billing/contact'
@@ -2209,6 +2245,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
+    | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
     | '/api/admin/billing/configuration'
     | '/api/admin/billing/disputes'
@@ -2224,6 +2261,7 @@ export interface FileRouteTypes {
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
+    | '/api/admin/metrics/conversion'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -2304,6 +2342,7 @@ export interface RootRouteChildren {
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
   ApiAlertsIdRoute: typeof ApiAlertsIdRoute
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
+  ApiAnalyticsConversionRoute: typeof ApiAnalyticsConversionRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiBillingAutoRechargeRoute: typeof ApiBillingAutoRechargeRoute
   ApiBillingContactRoute: typeof ApiBillingContactRouteWithChildren
@@ -2353,6 +2392,7 @@ export interface RootRouteChildren {
   ApiWorkSamplesIndexRoute: typeof ApiWorkSamplesIndexRoute
   ApiAdminAbuseClustersRoute: typeof ApiAdminAbuseClustersRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
+  ApiAdminAnalyticsRunRetentionRoute: typeof ApiAdminAnalyticsRunRetentionRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
   ApiAdminBillingConfigurationRoute: typeof ApiAdminBillingConfigurationRoute
   ApiAdminBillingDisputesRoute: typeof ApiAdminBillingDisputesRoute
@@ -2368,6 +2408,7 @@ export interface RootRouteChildren {
   ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
+  ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminStatusSnapshotRoute: typeof ApiAdminStatusSnapshotRoute
@@ -2971,6 +3012,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/analytics/conversion': {
+      id: '/api/analytics/conversion'
+      path: '/api/analytics/conversion'
+      fullPath: '/api/analytics/conversion'
+      preLoaderRoute: typeof ApiAnalyticsConversionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/alerts/test-trigger': {
       id: '/api/alerts/test-trigger'
       path: '/api/alerts/test-trigger'
@@ -3503,6 +3551,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminRoadmapIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/metrics/conversion': {
+      id: '/api/admin/metrics/conversion'
+      path: '/api/admin/metrics/conversion'
+      fullPath: '/api/admin/metrics/conversion'
+      preLoaderRoute: typeof ApiAdminMetricsConversionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/legal/run-worker': {
       id: '/api/admin/legal/run-worker'
       path: '/api/admin/legal/run-worker'
@@ -3606,6 +3661,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/billing/accounting-export'
       fullPath: '/api/admin/billing/accounting-export'
       preLoaderRoute: typeof ApiAdminBillingAccountingExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/analytics/run-retention': {
+      id: '/api/admin/analytics/run-retention'
+      path: '/api/admin/analytics/run-retention'
+      fullPath: '/api/admin/analytics/run-retention'
+      preLoaderRoute: typeof ApiAdminAnalyticsRunRetentionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/alerts/run-worker': {
@@ -4014,6 +4076,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAiEmbedRoute: ApiAiEmbedRoute,
   ApiAlertsIdRoute: ApiAlertsIdRoute,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
+  ApiAnalyticsConversionRoute: ApiAnalyticsConversionRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiBillingAutoRechargeRoute: ApiBillingAutoRechargeRoute,
   ApiBillingContactRoute: ApiBillingContactRouteWithChildren,
@@ -4065,6 +4128,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWorkSamplesIndexRoute: ApiWorkSamplesIndexRoute,
   ApiAdminAbuseClustersRoute: ApiAdminAbuseClustersRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
+  ApiAdminAnalyticsRunRetentionRoute: ApiAdminAnalyticsRunRetentionRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
   ApiAdminBillingConfigurationRoute: ApiAdminBillingConfigurationRoute,
   ApiAdminBillingDisputesRoute: ApiAdminBillingDisputesRoute,
@@ -4080,6 +4144,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
+  ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminStatusSnapshotRoute: ApiAdminStatusSnapshotRoute,

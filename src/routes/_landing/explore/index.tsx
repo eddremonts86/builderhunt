@@ -29,6 +29,7 @@ import {
 } from '~/modules/landing/components/BrandIcons'
 import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
 import { Button, Input, LinkButton } from '~/components/ui'
+import { trackConversionEvent } from '~/shared/lib/conversion-client'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
@@ -207,6 +208,17 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
     if (trimmed.length < 2) return
     navigate({ search: { q: trimmed, sources: sources || undefined, type: resultType } })
   }
+
+  // Fires once per distinct completed query (not on every re-render/param
+  // no-op) — a "completed" guest search per the conversion-events spec,
+  // regardless of whether it returned zero or many results.
+  const trackedQueryRef = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!hasQuery) return
+    if (trackedQueryRef.current === query) return
+    trackedQueryRef.current = query
+    trackConversionEvent('explore_search_complete', 'explore')
+  }, [hasQuery, query])
 
   const people = results.filter((builder) => builder.kind === 'person')
   const resources = results.filter((builder) => builder.kind === 'repo')
@@ -481,6 +493,7 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
                 search={{ next: `/search?q=${encodeURIComponent(query)}` }}
                 className="btn-primary whitespace-nowrap"
                 data-testid="explore-cta-signup"
+                onClick={() => trackConversionEvent('explore_signup_click', 'explore')}
               >
                 Sign up free
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />

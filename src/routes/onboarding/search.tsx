@@ -4,6 +4,7 @@ import { Search, X, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { STARTER_QUERIES } from '~/shared/lib/onboarding-shared'
 import { Button, Input, LinkButton } from '~/components/ui'
+import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 
 export const Route = createFileRoute('/onboarding/search')({
   beforeLoad: async () => {
@@ -35,10 +36,12 @@ function SearchStep() {
     setSkipping(true)
     try {
       await fetch('/api/onboarding/skip', { method: 'POST', credentials: 'include' })
-      navigate({ to: '/dashboard' })
     } catch {
-      navigate({ to: '/dashboard' })
+      // Skip is best-effort — the user still leaves onboarding either way.
     }
+    const next = consumePostOnboardingNext()
+    if (next) navigate({ href: next })
+    else navigate({ to: '/dashboard' })
   }
 
   const runSearch = (q: string) => {

@@ -244,6 +244,14 @@
     "0060_rich_katie_power": {
       "sql": "1e02ee152252b362e971c167aef7052696c0d6ffe39ba206dc24d6f81acebdde",
       "snapshot": "981f7214b4df8645b219d263b40ca53c8bb07ccb8bfabe88011b052a3763b3ce"
+    },
+    "0061_sleepy_ma_gnuci": {
+      "sql": "a4de0cb9ee339b24d46bbcbd389deab479f22ea5bd65908956ea2d3452b2650d",
+      "snapshot": "245c3d070f8c3a9973894c673024e15506864ec144b612a99c06727d499ba0c8"
+    },
+    "0062_conversion_events_grants": {
+      "sql": "95acaec7dccc5c6e6bbfcf6bc8ce37d4015a9f41a27987cdd591dae3e0f4226f",
+      "snapshot": "c3616855b50ac80ff4bbbf803226dfc36a51779b2d0e3ff8b3f12f4077d7b2a8"
     }
   }
 }

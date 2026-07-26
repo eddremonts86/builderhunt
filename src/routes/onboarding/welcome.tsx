@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate, redirect } from '@tanstack/react-router'
 import { Sparkles, ArrowRight, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Button, LinkButton } from '~/components/ui'
+import { consumePostOnboardingNext } from '~/shared/lib/post-onboarding-next'
 
 export const Route = createFileRoute('/onboarding/welcome')({
   beforeLoad: async () => {
@@ -48,10 +49,14 @@ function WelcomeStep() {
     setSkipping(true)
     try {
       await fetch('/api/onboarding/skip', { method: 'POST', credentials: 'include' })
-      navigate({ to: '/dashboard' })
     } catch {
-      navigate({ to: '/dashboard' })
+      // Skip is best-effort — the user still leaves onboarding either way.
     }
+    const next = consumePostOnboardingNext()
+    // `href` (not `to`): `next` may carry a query string (e.g.
+    // "/search?q=rust") and `to` treats "?" as part of the pathname.
+    if (next) navigate({ href: next })
+    else navigate({ to: '/dashboard' })
   }
 
   return (

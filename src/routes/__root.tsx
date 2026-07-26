@@ -5,7 +5,7 @@ import appCss from '~/shared/styles/globals.css?url'
 
 const SITE_URL = 'https://builderhunt.dev'
 const SITE_NAME = 'BuilderHunt'
-const SITE_DESC = 'Discover active open-source builders across GitHub, Reddit, Hacker News and DEV.to. Save searches, get alerts, and track the people shipping the work — not just the repos.'
+const SITE_DESC = 'Discover active open-source builders across GitHub, Reddit, Hacker News, DEV.to and more. Save searches, get alerts, and track the people shipping the work — not just the repos.'
 const OG_IMAGE = `${SITE_URL}/brand/og-image.png`
 const LOGO = `${SITE_URL}/brand/logo-mark.png`
 
@@ -85,7 +85,11 @@ export const Route = createRootRoute({
             publisher: { '@id': `${SITE_URL}#organization` },
             potentialAction: {
               '@type': 'SearchAction',
-              target: { '@type': 'EntryPoint', urlTemplate: `${SITE_URL}/search?q={search_term_string}` },
+              // `/search` requires an authenticated session — a crawler or
+              // anonymous visitor following this SearchAction must land
+              // somewhere that actually works, so this points at the public
+              // guest-search route instead (plan: audit-conversion).
+              target: { '@type': 'EntryPoint', urlTemplate: `${SITE_URL}/explore?q={search_term_string}` },
               'query-input': 'required name=search_term_string',
             },
           },
@@ -140,7 +144,7 @@ export const Route = createRootRoute({
                 name: 'What is BuilderHunt?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'BuilderHunt is a developer discovery tool that aggregates public activity from GitHub, Reddit, Hacker News and DEV.to, scores it for recency, and lets you save searches, get alerts, and track the people behind the work — not just the repositories.',
+                  text: 'BuilderHunt is a developer discovery tool that aggregates public activity from GitHub, Reddit, Hacker News, DEV.to and more, scores it for recency, and lets you save searches, get alerts, and track the people behind the work — not just the repositories.',
                 },
               },
               {
