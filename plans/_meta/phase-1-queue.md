@@ -17,11 +17,10 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 
 | # | Plan | Open | Why this position |
 |---|------|-----:|-------------------|
-| 1 | `portfolio-builder` | 12 | New public surface; builds on `published_builder_profiles`. |
-| 2 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
-| 3 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
-| 4 | `solutions-intelligence` | 30 | Large new domain. |
-| 5 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
+| 1 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
+| 2 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
+| 3 | `solutions-intelligence` | 30 | Large new domain. |
+| 4 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
 
 ## A1. Done this session (2026-07-26) — see each plan's tasks.md for full evidence
 
