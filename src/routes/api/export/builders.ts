@@ -4,6 +4,7 @@ import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { listOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 import { detectSeatOveruse, meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
 import { checkExportBurstAndEmit, detectMissingOrImplausibleHeaders, recordExportRequestCadence } from '~/shared/lib/abuse/anti-automation'
+import { filterSuppressed } from '~/shared/lib/profile-suppression'
 import { env } from '~/shared/lib/env'
 
 export const Route = createFileRoute('/api/export/builders')({
@@ -50,8 +51,9 @@ export const Route = createFileRoute('/api/export/builders')({
             return Response.json({ error: 'Daily export limit reached for this seat. Try again tomorrow.' }, { status: 429 })
           }
 
+          const visibleBuilders = await filterSuppressed(builders)
           const header = ['username', 'source', 'score', 'language', 'country', 'topics', 'profileUrl']
-          const rows = builders.map((builder) => [
+          const rows = visibleBuilders.map((builder) => [
             builder.username,
             builder.source,
             typeof builder.privateMetadata.score === 'number' ? builder.privateMetadata.score : 0,

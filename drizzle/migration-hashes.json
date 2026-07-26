@@ -252,6 +252,14 @@
     "0062_conversion_events_grants": {
       "sql": "95acaec7dccc5c6e6bbfcf6bc8ce37d4015a9f41a27987cdd591dae3e0f4226f",
       "snapshot": "c3616855b50ac80ff4bbbf803226dfc36a51779b2d0e3ff8b3f12f4077d7b2a8"
+    },
+    "0063_dark_gideon": {
+      "sql": "c492b4a0b6d71bac2bde4ff89538bc73f5923eb1d87c34d571bd2625c3ccb83c",
+      "snapshot": "12dc567b3b1f2a7353193c43ba58d6afd57ba1484deca838372d6394126cea5e"
+    },
+    "0064_profile_removal_grants": {
+      "sql": "21fd552e8f59e9711338a66f5525782dd4f1d6074ed8e7878c74956c1b0e8098",
+      "snapshot": "ad93330891a0cb97484b3f331709bc155e590bd9e4d8244159e2d03c9bae1519"
     }
   }
 }

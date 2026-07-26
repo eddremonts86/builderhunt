@@ -66,6 +66,17 @@ const zodEnv = z.object({
   CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
   // Kill switch for the verified-owner portfolio feature (public /portfolio/$claimId pages).
   PORTFOLIOS_ENABLED: z.enum(['true', 'false']).default('true'),
+  // Plan: audit-trust — profile-removal/global-suppression subsystem. Off by default: a new
+  // security-critical flow that hashes requester email/challenge with a dedicated key distinct
+  // from BETTER_AUTH_SECRET (spec.md: "must not reuse BETTER_AUTH_SECRET").
+  PROFILE_REMOVAL_ENABLED: z.enum(['true', 'false']).default('false'),
+  // 64 hex chars (32 bytes), same shape/convention as WEBHOOK_PAYLOAD_ENCRYPTION_KEY.
+  PROFILE_REMOVAL_HMAC_KEY: z.string().optional(),
+  // Set only while rotating PROFILE_REMOVAL_HMAC_KEY — pending removal requests hashed under the
+  // previous key remain matchable until they expire, same overlap-window convention as
+  // STRIPE_WEBHOOK_SECRET_PREVIOUS. Suppressions themselves are matched by plaintext
+  // (source, sourceId), not a hash, so rotation never affects already-verified suppressions.
+  PROFILE_REMOVAL_HMAC_KEY_PREVIOUS: z.string().optional(),
   // Kill switch for the landing-funnel conversion-event collector (plan: audit-conversion).
   // Off by default — instrumentation only starts recording once explicitly turned on, after
   // cookie/privacy copy is updated (see docs/conversion-baseline.md).
@@ -205,6 +216,19 @@ const zodEnv = z.object({
     // live key outside NODE_ENV=production is never intentional here.
     if (data.STRIPE_SECRET_KEY?.startsWith('sk_live_') && data.NODE_ENV !== 'production') {
       context.addIssue({ code: 'custom', path: ['STRIPE_SECRET_KEY'], message: 'A live Stripe secret key must never be used outside NODE_ENV=production' })
+    }
+  }
+
+  if (data.PROFILE_REMOVAL_ENABLED === 'true') {
+    if (!data.PROFILE_REMOVAL_HMAC_KEY) {
+      context.addIssue({ code: 'custom', path: ['PROFILE_REMOVAL_HMAC_KEY'], message: 'PROFILE_REMOVAL_HMAC_KEY is required when PROFILE_REMOVAL_ENABLED=true — generate with: openssl rand -hex 32' })
+    } else if (!/^[0-9a-f]{64}$/i.test(data.PROFILE_REMOVAL_HMAC_KEY)) {
+      context.addIssue({ code: 'custom', path: ['PROFILE_REMOVAL_HMAC_KEY'], message: 'PROFILE_REMOVAL_HMAC_KEY must be 64 hex characters (32 bytes) — generate with: openssl rand -hex 32' })
+    } else if (data.BETTER_AUTH_SECRET && data.PROFILE_REMOVAL_HMAC_KEY === data.BETTER_AUTH_SECRET) {
+      context.addIssue({ code: 'custom', path: ['PROFILE_REMOVAL_HMAC_KEY'], message: 'PROFILE_REMOVAL_HMAC_KEY must not reuse BETTER_AUTH_SECRET' })
+    }
+    if (data.PROFILE_REMOVAL_HMAC_KEY_PREVIOUS && !/^[0-9a-f]{64}$/i.test(data.PROFILE_REMOVAL_HMAC_KEY_PREVIOUS)) {
+      context.addIssue({ code: 'custom', path: ['PROFILE_REMOVAL_HMAC_KEY_PREVIOUS'], message: 'PROFILE_REMOVAL_HMAC_KEY_PREVIOUS must be 64 hex characters (32 bytes)' })
     }
   }
 

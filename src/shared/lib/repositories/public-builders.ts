@@ -6,6 +6,7 @@ export async function findPublishedBuilderProfile(builderIdentityId: string) {
   const [profile] = await publicDb.select({
     id: builderIdentities.id,
     source: builderIdentities.source,
+    sourceId: builderIdentities.sourceId,
     username: builderIdentities.username,
     avatarUrl: builderIdentities.avatarUrl,
     profileUrl: builderIdentities.profileUrl,

@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { listRecentOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
+import { filterSuppressed } from '~/shared/lib/profile-suppression'
 
 export const Route = createFileRoute('/api/builders/recent/')({
   component: () => null,
@@ -13,7 +14,8 @@ export const Route = createFileRoute('/api/builders/recent/')({
           const rows = await withTenantContext(principal, (tx) =>
             listRecentOrganizationBuilders(tx, principal.organizationId),
           )
-          return Response.json(rows.map((row) => ({
+          const visible = await filterSuppressed(rows)
+          return Response.json(visible.map((row) => ({
             id: row.id,
             // The profile page route (/builder/$builderId, /builders/$builderId)
             // and GET /api/builders/:id both key on the global builder_identities

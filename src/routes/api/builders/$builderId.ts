@@ -10,6 +10,7 @@ import {
 } from '~/shared/lib/repositories/organization-builders'
 import { findPublishedBuilderProfile, findVerifiedBuilderClaim } from '~/shared/lib/repositories/public-builders'
 import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
+import { isSuppressed } from '~/shared/lib/profile-suppression'
 import { env } from '~/shared/lib/env'
 
 const PatchBody = z.object({
@@ -84,9 +85,16 @@ export const Route = createFileRoute('/api/builders/$builderId')({
           }
           const builder = await findPublishedBuilderProfile(params.builderId)
           if (!builder) return Response.json({ error: 'Builder not found' }, { status: 404 })
+          // A suppressed identity's published profile must never be publicly reachable, even
+          // though its `published_builder_profiles`/`builder_identities` rows are a separate
+          // table from `builders` (which the removal flow does delete) — see profile-suppression.ts.
+          if (await isSuppressed(builder.source, builder.sourceId)) {
+            return Response.json({ error: 'Builder not found' }, { status: 404 })
+          }
           const claim = await findVerifiedBuilderClaim(builder.id)
+          const { sourceId: _sourceId, ...publicBuilder } = builder
           return Response.json({
-            ...builder,
+            ...publicBuilder,
             isClaimed: Boolean(claim),
             isVerified: Boolean(claim),
             claimedByUserId: claim?.subjectUserId ?? null,

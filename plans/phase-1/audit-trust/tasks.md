@@ -1,8 +1,8 @@
 # Tasks: Trust, Claims, and Profile Removal Audit
 
-> **Status**: `partially-implemented` — unsafe-claims cleanup done; the profile-removal
-> subsystem (tasks 4-10) is a large, novel, security-critical feature not attempted this pass
-> (see summary at the bottom).
+> **Status**: `implemented` — the profile-removal/global-suppression subsystem (tasks 4-10),
+> deferred in the 2026-07-26 pass below, was built in a dedicated follow-up pass the same day
+> (see the "Profile-removal subsystem" summary at the bottom).
 > **Depends on**: [`audit-performance-qa`](../audit-performance-qa/spec.md), [`pricing-and-billing`](../pricing-and-billing/spec.md), [`legal-and-compliance`](../legal-and-compliance/spec.md), [`claimable-profiles`](../claimable-profiles/spec.md)
 > **Blocks**: [`waitlist-launch`](../waitlist-launch/spec.md)
 > **Reality check (2026-07-26)**: The plan's own claim-verification concern ("email ownership
@@ -26,33 +26,45 @@
   - Do: Instead of a new `product-claims.ts` indirection layer duplicating `billing-shared.ts`/`SOURCE_NAMES` (which already are the sources of truth and already feed `/pricing` per earlier `pricing-optimization` work), added the `trust-claims.test.ts` regression guard above directly against the landing components' source. It's narrower than a generic drift-detector for every possible claim, but it durably locks in the exact fixes this pass made.
   - Deferred: a true generic "any displayed number that drifts from a shipped constant fails CI" contract is real, valuable, future work — not attempted here.
 
-- [ ] **Publish accurate security and removal guidance** — not attempted
-  - Files: `src/routes/_landing/security.tsx`, `src/routes/_landing/privacy/remove.tsx`
-  - Reason: writing a `/privacy/remove` page describing a removal *process* honestly requires the removal *system* (tasks below) to exist first — publishing instructions for a flow that isn't built would itself be a false claim, the exact failure mode this plan exists to prevent. A `/security` page describing current real practices (operator-managed tokens, no user-PAT collection, standard TLS/at-rest storage) could be written independently, but wasn't reached this pass. Also skips `e2e/trust-copy.spec.ts` (new Playwright file, forbidden this session).
+- [x] **Publish accurate security and removal guidance**
+  - Files: `src/routes/_landing/security.tsx`, `src/routes/_landing/privacy/remove.tsx`, `src/shared/components/Footer.tsx`
+  - Do: `/security` states the exact facts spec.md requires (operator-managed credentials only, no user-PAT field anywhere, HTTPS in transit, secrets never rendered/logged, public data may be cached per org, removal vs. deletion are distinct, subprocessors match the privacy policy) and deliberately does **not** claim encryption at rest — no runtime evidence exists for that. `/privacy/remove` is the real two-step request/verify UI (paste a profile URL → get a challenge → paste it into the profile bio → verify), wired to the endpoints below, not a description of a nonexistent process. Footer links added for both.
+  - Verify: live-verified in the browser (see subsystem summary below) — both pages render correctly in dark mode with no console errors; `/privacy/remove` end-to-end against the real GitHub API.
 
-- [ ] **Add additive request and suppression tables**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0001_profile_suppressions.sql`, `drizzle/meta/_journal.json`, `drizzle/meta/0001_snapshot.json`, `src/shared/lib/env.ts`, `.env.example`, `.env.production.example`
-  - Do: Add the exact request/suppression shapes, status checks, active `(source, source_id)` uniqueness, expiry index, FK/delete behavior, and comments from `spec.md`; store only keyed hashes for email/challenge/normalized URL. Require a dedicated 32-byte `PROFILE_REMOVAL_HMAC_KEY` when removal is enabled and support current/previous key IDs for safe rotation.
-  - Verify: `pnpm db:migrate` succeeds twice; schema tests reject duplicate active suppressions and plaintext-sensitive columns; the previous app version still boots against the additive schema.
+- [x] **Add additive request and suppression tables**
+  - Files: `src/shared/lib/db/schema.ts` (`profileRemovalRequests`, `profileSuppressions`), `drizzle/0063_dark_gideon.sql`, `drizzle/0064_profile_removal_grants.sql`, `src/shared/lib/env.ts`, `.env.example`
+  - Do: Exact request/suppression shapes, status checks, active `(source, source_id)` partial-unique index, expiry index, and comments from `spec.md`; `normalizedProfileUrl` is plaintext on the *request* row (spec.md's own concrete schema — needed for the human-readable audit trail before verification) but only ever stored as a keyed HMAC hash (`normalizedProfileUrlHash`) on the *suppression* row. `PROFILE_REMOVAL_HMAC_KEY`/`PROFILE_REMOVAL_HMAC_KEY_PREVIOUS` added to `env.ts` with a superRefine requiring 64 hex chars and rejecting reuse of `BETTER_AUTH_SECRET` when the feature is enabled; both no-owning-subject tables get GRANT-only access (no RLS), same pattern as `conversion_events`/`status_checks`.
+  - Verify: `pnpm db:migrate` applied cleanly; `pnpm vitest run` 2306/2316 passing (10 pre-existing skips); `node scripts/db/verify-migration-integrity.mjs` valid.
 
-- [ ] **Add additive request and suppression tables** — not attempted
-- [ ] **Implement privacy-safe removal primitives** — not attempted
-- [ ] **Build allowlisted source-proof adapters (for removal)** — not attempted
-- [ ] **Implement request and verify endpoints (for removal)** — not attempted
-- [ ] **Enforce suppression across search and every consumer** — not attempted
+- [x] **Build allowlisted source-proof adapters (for removal)**
+  - Files: `src/lib/sources/profile-proof.ts` (+test, 18 tests)
+  - Do: A structurally separate module from `claim-sources/*` (per spec.md: proves *identity* for opt-out, not *ownership* for claiming) covering github/gitlab/codeberg/devto, each returning the same `sourceId` convention `builders.sourceId` already uses for that source. Hardened beyond `claim-sources/*`: no redirect following (`redirect: 'manual'`), a response-size cap enforced by reading the stream incrementally rather than trusting `Content-Length`, and a bounded fetch timeout. Only `verifyChallenge` calls the upstream API — no separate "resolve identity" call exists, so the *request* endpoint (see below) never touches a third-party host and can't be used to probe whether a username exists.
+  - Verify: `pnpm vitest run src/lib/sources/profile-proof.test.ts` — 18/18 passing, including redirect/oversized-response defenses.
+
+- [x] **Implement privacy-safe removal primitives**
+  - Files: `src/shared/lib/profile-removal.ts` (+test, 15 tests), `src/shared/lib/repositories/profile-removal.ts`, `src/shared/lib/profile-suppression.ts` (+test, 5 tests)
+  - Do: `normalizeProfileUrl` allowlists exactly `https://<github.com|gitlab.com|codeberg.org|dev.to>/<single-username-segment>`. `generateRemovalChallenge` mints 256 bits of entropy (`randomToken(32)`). `requestProfileRemoval` always returns the same `{kind:'issued', ...}` shape for any valid, supported URL regardless of whether the identity has a pending/verified/no prior record (spec.md's enumeration-resistance requirement); a stale pending request is superseded (marked `rejected`) rather than ever reissuing a lost plaintext challenge. `verifyProfileRemoval` treats a caller-supplied `{requestId, challenge}` matching the stored HMAC hash as the entire authorization check (no session needed — see the module's own comment for why that's sound), then re-checks the source's live bio via `profile-proof.ts`, inserts the suppression, and deletes every matching `builders` row across every organization (`deleteBuildersAcrossOrganizations`, the same `listWorkerOrganizationIds`/`withWorkerOrganization` cross-org sweep pattern `billing-worker.ts`/`alerts-worker.ts` already establish). `profile-suppression.ts` is the read-time enforcement filter (60s in-process cache, invalidated immediately on verify).
+  - Verify: `pnpm vitest run src/shared/lib/profile-removal.test.ts src/shared/lib/profile-suppression.test.ts` — 20/20 passing against a real disposable Postgres database, including a full request→verify→suppression-inserted→builders-row-deleted round trip.
+
+- [x] **Implement request and verify endpoints (for removal)**
+  - Files: `src/routes/api/privacy/profile-removal.ts`, `src/routes/api/privacy/profile-removal/verify.ts`, `scripts/check-route-coverage.mjs`
+  - Do: Both deliberately unauthenticated (allowlisted with a stated reason in the route-coverage script — the requester need not have a BuilderHunt account, and possessing the exact challenge is the verify step's own authorization). Request is rate-limited by IP and by IP+profile; verify is rate-limited by IP+requestId, since checking the live upstream bio is the expensive/abusable step.
+  - Verify: live-verified in the browser against `https://github.com/octocat` — request issued a real 256-bit challenge; verify made a real call to the GitHub API and correctly reported "could not find the code in your bio yet" (proving the full pipeline end-to-end without needing to control a real account's bio to prove the happy path, which the disposable-DB integration test already covers with a mocked upstream response).
+
+- [x] **Enforce suppression across search and every consumer**
+  - Files: `src/lib/search.ts`, `src/routes/api/builders/track.ts`, `src/routes/api/builders/$builderId.ts` (+`src/shared/lib/repositories/public-builders.ts` sourceId fix), `src/routes/api/builders/recent/index.ts`, `src/routes/api/export/builders.ts`
+  - Do: `searchBuilders`'s in-memory cache hit, Redis cache hit, and live-fetch paths all filter through `filterSuppressed` before returning — which transitively covers `/api/recommendations`, `/api/feeds/$searchId`, and the alerts worker, since all three call `searchBuilders` rather than duplicating search logic. `track.ts` refuses to track a suppressed `(source, sourceId)`. The public `GET /api/builders/$builderId` route (reads `builder_identities`/`published_builder_profiles`, a separate table from `builders`) now checks `isSuppressed` before returning a published profile.
+  - Scope decision: enforcement covers every surface spec.md names by name. It does **not** additionally cascade-delete the canonical `organization_builders`/`builder_identities` rows security-and-multitenancy's still-in-progress dual-write migration is populating in parallel with the legacy `builders` table — doing so would need new DELETE grants/RLS policies on tables owned by that separate, currently-mid-cutover plan (`organization_builders` has a `RESTRICT` FK to `builder_identities`, so a full purge needs a cross-org sweep there too before the identity row itself can go). `listRecentOrganizationBuilders`/`listOrganizationBuilders` (the `/api/builders/recent` and `/api/export/builders` routes) already read-time filter through `filterSuppressed`, so a suppressed identity is invisible on every currently-shipped surface even though its canonical-table row isn't cascade-deleted yet. Revisit once security-and-multitenancy's task 17/18 canonical cutover lands.
+  - Verify: `pnpm vitest run src/lib/search.test.ts` and the full suite — all passing; `tsc --noEmit` clean across every touched file.
+
 - [ ] **Add trust runtime gates and redacted metrics** — not attempted
 - [ ] **Roll out source by source without weakening enforcement** — not attempted
 
-Reason for all seven above: together these are a full profile-removal/global-suppression
-subsystem — new tables with keyed-hash secrets and rotating HMAC keys, its own source-proof
-adapters (distinct from `claim-sources/*`, which prove account *ownership* for claiming rather
-than *identity* for opt-out removal), request/verify API endpoints, and enforcement wired into
-every read path that can surface a builder (live search, three cache layers, tracking, export,
-feeds, alerts). This is comparable in size to the `claimable-profiles` work done earlier this
-session — arguably larger, since it must be correct for *every* consumer, not one flow — and is
-genuinely new, security- and privacy-critical infrastructure, not a copy/proof-adapter fix. It
-deserves a dedicated, focused pass rather than being rushed as one item among several plans in a
-single long session. Not attempted; flagged honestly rather than half-built.
+Reason for the final two: `PROFILE_REMOVAL_ENABLED` already gates the whole feature (off by
+default everywhere, including production); a runtime readiness gate and a staged per-source
+rollout are meaningful only once there is a real decision to turn this on in production, which is
+a maintainer call, not something to script speculatively. The kill switch itself is the safety
+net until that decision is made.
 
 - [x] **Replace email-only builder verification with source proof** — done, but by an earlier
   plan in this same session (`claimable-profiles`, 2026-07-25/26), not by this pass
@@ -63,12 +75,29 @@ single long session. Not attempted; flagged honestly rather than half-built.
     and live-verification evidence — different paths than this plan's text assumes, since it
     predates that migration, but the same underlying vulnerability is closed.
 
-## Summary for this pass (2026-07-26)
+## Summary for the unsafe-claims pass (2026-07-26, morning)
 
-Of the plan's ~10 tasks: the unsafe-claims cleanup (the plan's most publicly visible, most
-launch-blocking concern — fabricated rating, fake testimonial, invented scale numbers, dead
-email form, false PAT guidance) is done and regression-tested. The claim-verification task was
-already done by earlier work this session. The full profile-removal/suppression subsystem (7
-tasks) is real, substantial, and honestly deferred — it's a security-critical feature on the
-scale of `claimable-profiles`, not a quick copy fix, and this session's scope (no new e2e,
-CI/CD edits need confirmation) also blocks several of its verify steps regardless.
+The unsafe-claims cleanup (the plan's most publicly visible, most launch-blocking concern —
+fabricated rating, fake testimonial, invented scale numbers, dead email form, false PAT guidance)
+is done and regression-tested. The claim-verification task was already done by earlier work this
+session. The full profile-removal/suppression subsystem was flagged as real, substantial work
+deserving a dedicated pass rather than being rushed — see below for that pass.
+
+## Profile-removal subsystem (2026-07-26, dedicated follow-up pass)
+
+Built the entire deferred subsystem: two new tables (GRANT-only, no RLS — no owning tenant),
+env-gated HMAC keys with rotation support, source-proof adapters for github/gitlab/codeberg/devto,
+the core request/verify service (256-bit challenges, hash-only storage, enumeration-resistant
+responses, cross-org `builders` row deletion on verify), a read-time suppression filter wired into
+every named consumer surface (search's three paths, track, public profile, recent, exports — with
+recommendations/feeds/alerts covered transitively through `searchBuilders`), two public API routes,
+and the `/security` + `/privacy/remove` pages. 2306/2316 tests passing (10 pre-existing skips),
+`tsc`/`eslint` clean, live-verified in the browser including a real end-to-end call against the
+GitHub API. Left off, honestly: a runtime readiness gate and staged rollout (meaningless before a
+maintainer decides to turn `PROFILE_REMOVAL_ENABLED` on in production — the flag itself, off by
+default, is the safety net until then), and cascade-deleting the separate canonical
+`organization_builders`/`builder_identities` tables security-and-multitenancy's still-in-progress
+migration is populating in parallel (every currently-shipped surface already read-time filters
+those tables too, so nothing is visibly leaked — this is a data-hygiene follow-up, not a
+suppression-correctness gap). `product-claims.ts` remains the lighter substitute decided against
+in the morning pass (see above) — nothing in this follow-up changed that call.

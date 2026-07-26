@@ -18,6 +18,7 @@ import { scoreBuilders, sortByScore } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/types'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
+import { filterSuppressed } from '~/shared/lib/profile-suppression'
 
 export interface SearchOptions {
   keywords: string[]
@@ -46,9 +47,10 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   // Check in-memory cache first
   const cached = cache.get(cacheKeyStr)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    const visible = await filterSuppressed(cached.results)
     metrics.increment('searchCacheHits')
-    log.info('search_executed', { keywords, sources, resultsCount: cached.results.length, durationMs: Date.now() - start, cache: 'memory' })
-    return sortByScore(scoreBuilders(cached.results))
+    log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'memory' })
+    return sortByScore(scoreBuilders(visible))
   }
 
   // Check Redis cache (if available)
@@ -61,9 +63,10 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
       if (cachedRaw) {
         const parsed = JSON.parse(cachedRaw) as RawBuilder[]
         cache.set(cacheKeyStr, { results: parsed, timestamp: Date.now() })
+        const visible = await filterSuppressed(parsed)
         metrics.increment('searchCacheHits')
-        log.info('search_executed', { keywords, sources, resultsCount: parsed.length, durationMs: Date.now() - start, cache: 'redis' })
-        return sortByScore(scoreBuilders(parsed))
+        log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'redis' })
+        return sortByScore(scoreBuilders(visible))
       }
     }
   } catch {
@@ -116,6 +119,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
     // Redis unavailable — in-memory cache is enough
   }
 
-  log.info('search_executed', { keywords, sources, resultsCount: deduped.length, durationMs: Date.now() - start, cache: 'miss' })
-  return sortByScore(scoreBuilders(deduped))
+  const visible = await filterSuppressed(deduped)
+  log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'miss' })
+  return sortByScore(scoreBuilders(visible))
 }

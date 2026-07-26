@@ -30,6 +30,7 @@ import { Route as AuthResetRouteImport } from './routes/auth/reset'
 import { Route as AuthForgotRouteImport } from './routes/auth/forgot'
 import { Route as ApiHealthRouteImport } from './routes/api/health'
 import { Route as LandingStatusRouteImport } from './routes/_landing/status'
+import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
 import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
 import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
 import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
@@ -61,6 +62,7 @@ import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/prev
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
 import { Route as ApiPortfolioClaimIdRouteImport } from './routes/api/portfolio/$claimId'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
@@ -95,6 +97,7 @@ import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
 import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
 import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
+import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
 import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
 import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal/imprint'
@@ -138,6 +141,7 @@ import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_das
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
+import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
 import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './routes/api/organizations/invitations/$invitationId'
@@ -301,6 +305,11 @@ const LandingStatusRoute = LandingStatusRouteImport.update({
   path: '/status',
   getParentRoute: () => LandingRouteRoute,
 } as any)
+const LandingSecurityRoute = LandingSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
 const LandingRoadmapRoute = LandingRoadmapRouteImport.update({
   id: '/roadmap',
   path: '/roadmap',
@@ -456,6 +465,12 @@ const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   path: '/api/search/builders',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPrivacyProfileRemovalRoute =
+  ApiPrivacyProfileRemovalRouteImport.update({
+    id: '/api/privacy/profile-removal',
+    path: '/api/privacy/profile-removal',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPortfolioClaimIdRoute = ApiPortfolioClaimIdRouteImport.update({
   id: '/api/portfolio/$claimId',
   path: '/api/portfolio/$claimId',
@@ -628,6 +643,11 @@ const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
   id: '/api/ai/complete',
   path: '/api/ai/complete',
   getParentRoute: () => rootRouteImport,
+} as any)
+const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
+  id: '/privacy/remove',
+  path: '/privacy/remove',
+  getParentRoute: () => LandingRouteRoute,
 } as any)
 const LandingLegalTermsRoute = LandingLegalTermsRouteImport.update({
   id: '/legal/terms',
@@ -854,6 +874,12 @@ const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
   path: '/api/queries/$id/share',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPrivacyProfileRemovalVerifyRoute =
+  ApiPrivacyProfileRemovalVerifyRouteImport.update({
+    id: '/verify',
+    path: '/verify',
+    getParentRoute: () => ApiPrivacyProfileRemovalRoute,
+  } as any)
 const ApiOrganizationsMembersMemberIdRoute =
   ApiOrganizationsMembersMemberIdRouteImport.update({
     id: '/api/organizations/members/$memberId',
@@ -1203,6 +1229,7 @@ export interface FileRoutesByFullPath {
   '/changelog': typeof LandingChangelogRouteWithChildren
   '/pricing': typeof LandingPricingRoute
   '/roadmap': typeof LandingRoadmapRoute
+  '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
@@ -1238,6 +1265,7 @@ export interface FileRoutesByFullPath {
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
+  '/privacy/remove': typeof LandingPrivacyRemoveRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -1272,6 +1300,7 @@ export interface FileRoutesByFullPath {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
+  '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1347,6 +1376,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1390,6 +1420,7 @@ export interface FileRoutesByTo {
   '/alerts': typeof DashboardAlertsRoute
   '/pricing': typeof LandingPricingRoute
   '/roadmap': typeof LandingRoadmapRoute
+  '/security': typeof LandingSecurityRoute
   '/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
@@ -1424,6 +1455,7 @@ export interface FileRoutesByTo {
   '/legal/imprint': typeof LandingLegalImprintRoute
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
+  '/privacy/remove': typeof LandingPrivacyRemoveRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -1458,6 +1490,7 @@ export interface FileRoutesByTo {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
+  '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1533,6 +1566,7 @@ export interface FileRoutesByTo {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1579,6 +1613,7 @@ export interface FileRoutesById {
   '/_landing/changelog': typeof LandingChangelogRouteWithChildren
   '/_landing/pricing': typeof LandingPricingRoute
   '/_landing/roadmap': typeof LandingRoadmapRoute
+  '/_landing/security': typeof LandingSecurityRoute
   '/_landing/status': typeof LandingStatusRoute
   '/api/health': typeof ApiHealthRoute
   '/auth/forgot': typeof AuthForgotRoute
@@ -1615,6 +1650,7 @@ export interface FileRoutesById {
   '/_landing/legal/imprint': typeof LandingLegalImprintRoute
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
   '/_landing/legal/terms': typeof LandingLegalTermsRoute
+  '/_landing/privacy/remove': typeof LandingPrivacyRemoveRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -1649,6 +1685,7 @@ export interface FileRoutesById {
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
+  '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1724,6 +1761,7 @@ export interface FileRoutesById {
   '/api/organizations/invitations/$invitationId': typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
+  '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1770,6 +1808,7 @@ export interface FileRouteTypes {
     | '/changelog'
     | '/pricing'
     | '/roadmap'
+    | '/security'
     | '/status'
     | '/api/health'
     | '/auth/forgot'
@@ -1805,6 +1844,7 @@ export interface FileRouteTypes {
     | '/legal/imprint'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/privacy/remove'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -1839,6 +1879,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
+    | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -1914,6 +1955,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
@@ -1957,6 +1999,7 @@ export interface FileRouteTypes {
     | '/alerts'
     | '/pricing'
     | '/roadmap'
+    | '/security'
     | '/status'
     | '/api/health'
     | '/auth/forgot'
@@ -1991,6 +2034,7 @@ export interface FileRouteTypes {
     | '/legal/imprint'
     | '/legal/privacy'
     | '/legal/terms'
+    | '/privacy/remove'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -2025,6 +2069,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
+    | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -2100,6 +2145,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
@@ -2145,6 +2191,7 @@ export interface FileRouteTypes {
     | '/_landing/changelog'
     | '/_landing/pricing'
     | '/_landing/roadmap'
+    | '/_landing/security'
     | '/_landing/status'
     | '/api/health'
     | '/auth/forgot'
@@ -2181,6 +2228,7 @@ export interface FileRouteTypes {
     | '/_landing/legal/imprint'
     | '/_landing/legal/privacy'
     | '/_landing/legal/terms'
+    | '/_landing/privacy/remove'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -2215,6 +2263,7 @@ export interface FileRouteTypes {
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
+    | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -2290,6 +2339,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/$invitationId'
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
+    | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
@@ -2371,6 +2421,7 @@ export interface RootRouteChildren {
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiPortfolioClaimIdRoute: typeof ApiPortfolioClaimIdRoute
+  ApiPrivacyProfileRemovalRoute: typeof ApiPrivacyProfileRemovalRouteWithChildren
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
@@ -2599,6 +2650,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingStatusRouteImport
       parentRoute: typeof LandingRouteRoute
     }
+    '/_landing/security': {
+      id: '/_landing/security'
+      path: '/security'
+      fullPath: '/security'
+      preLoaderRoute: typeof LandingSecurityRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
     '/_landing/roadmap': {
       id: '/_landing/roadmap'
       path: '/roadmap'
@@ -2814,6 +2872,13 @@ declare module '@tanstack/react-router' {
       path: '/api/search/builders'
       fullPath: '/api/search/builders'
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/privacy/profile-removal': {
+      id: '/api/privacy/profile-removal'
+      path: '/api/privacy/profile-removal'
+      fullPath: '/api/privacy/profile-removal'
+      preLoaderRoute: typeof ApiPrivacyProfileRemovalRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/portfolio/$claimId': {
@@ -3053,6 +3118,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/ai/complete'
       preLoaderRoute: typeof ApiAiCompleteRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_landing/privacy/remove': {
+      id: '/_landing/privacy/remove'
+      path: '/privacy/remove'
+      fullPath: '/privacy/remove'
+      preLoaderRoute: typeof LandingPrivacyRemoveRouteImport
+      parentRoute: typeof LandingRouteRoute
     }
     '/_landing/legal/terms': {
       id: '/_landing/legal/terms'
@@ -3354,6 +3426,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/queries/$id/share'
       preLoaderRoute: typeof ApiQueriesIdShareRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/privacy/profile-removal/verify': {
+      id: '/api/privacy/profile-removal/verify'
+      path: '/verify'
+      fullPath: '/api/privacy/profile-removal/verify'
+      preLoaderRoute: typeof ApiPrivacyProfileRemovalVerifyRouteImport
+      parentRoute: typeof ApiPrivacyProfileRemovalRoute
     }
     '/api/organizations/members/$memberId': {
       id: '/api/organizations/members/$memberId'
@@ -3860,6 +3939,7 @@ interface LandingRouteRouteChildren {
   LandingChangelogRoute: typeof LandingChangelogRouteWithChildren
   LandingPricingRoute: typeof LandingPricingRoute
   LandingRoadmapRoute: typeof LandingRoadmapRoute
+  LandingSecurityRoute: typeof LandingSecurityRoute
   LandingStatusRoute: typeof LandingStatusRoute
   LandingIndexRoute: typeof LandingIndexRoute
   LandingBlogSlugRoute: typeof LandingBlogSlugRoute
@@ -3867,6 +3947,7 @@ interface LandingRouteRouteChildren {
   LandingLegalImprintRoute: typeof LandingLegalImprintRoute
   LandingLegalPrivacyRoute: typeof LandingLegalPrivacyRoute
   LandingLegalTermsRoute: typeof LandingLegalTermsRoute
+  LandingPrivacyRemoveRoute: typeof LandingPrivacyRemoveRoute
   LandingBlogIndexRoute: typeof LandingBlogIndexRoute
   LandingExploreIndexRoute: typeof LandingExploreIndexRoute
 }
@@ -3875,6 +3956,7 @@ const LandingRouteRouteChildren: LandingRouteRouteChildren = {
   LandingChangelogRoute: LandingChangelogRouteWithChildren,
   LandingPricingRoute: LandingPricingRoute,
   LandingRoadmapRoute: LandingRoadmapRoute,
+  LandingSecurityRoute: LandingSecurityRoute,
   LandingStatusRoute: LandingStatusRoute,
   LandingIndexRoute: LandingIndexRoute,
   LandingBlogSlugRoute: LandingBlogSlugRoute,
@@ -3882,6 +3964,7 @@ const LandingRouteRouteChildren: LandingRouteRouteChildren = {
   LandingLegalImprintRoute: LandingLegalImprintRoute,
   LandingLegalPrivacyRoute: LandingLegalPrivacyRoute,
   LandingLegalTermsRoute: LandingLegalTermsRoute,
+  LandingPrivacyRemoveRoute: LandingPrivacyRemoveRoute,
   LandingBlogIndexRoute: LandingBlogIndexRoute,
   LandingExploreIndexRoute: LandingExploreIndexRoute,
 }
@@ -3998,6 +4081,20 @@ const ApiOrganizationsDeletionRouteWithChildren =
     ApiOrganizationsDeletionRouteChildren,
   )
 
+interface ApiPrivacyProfileRemovalRouteChildren {
+  ApiPrivacyProfileRemovalVerifyRoute: typeof ApiPrivacyProfileRemovalVerifyRoute
+}
+
+const ApiPrivacyProfileRemovalRouteChildren: ApiPrivacyProfileRemovalRouteChildren =
+  {
+    ApiPrivacyProfileRemovalVerifyRoute: ApiPrivacyProfileRemovalVerifyRoute,
+  }
+
+const ApiPrivacyProfileRemovalRouteWithChildren =
+  ApiPrivacyProfileRemovalRoute._addFileChildren(
+    ApiPrivacyProfileRemovalRouteChildren,
+  )
+
 interface ApiSprintsSprintIdRouteChildren {
   ApiSprintsSprintIdResultsRoute: typeof ApiSprintsSprintIdResultsRoute
 }
@@ -4107,6 +4204,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiPortfolioClaimIdRoute: ApiPortfolioClaimIdRoute,
+  ApiPrivacyProfileRemovalRoute: ApiPrivacyProfileRemovalRouteWithChildren,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,

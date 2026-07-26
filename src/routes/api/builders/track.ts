@@ -13,6 +13,7 @@ import {
   trackOrganizationBuilder,
 } from '~/shared/lib/repositories/organization-builders'
 import { isAllowedBuilderProfileUrl } from '~/shared/lib/security/url-policy'
+import { isSuppressed } from '~/shared/lib/profile-suppression'
 
 const TrackBody = z.object({
   source: z.enum([
@@ -46,6 +47,9 @@ export const Route = createFileRoute('/api/builders/track')({
           const parsed = TrackBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) {
             return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })
+          }
+          if (await isSuppressed(parsed.data.source, parsed.data.sourceId)) {
+            return Response.json({ error: 'Builder not found' }, { status: 404 })
           }
           const result = await withTenantContext(principal, async (tx) => {
             const [entitlement, current, existing] = await Promise.all([

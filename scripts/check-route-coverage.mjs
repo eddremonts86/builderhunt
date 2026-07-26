@@ -26,6 +26,8 @@ const publicAllowlist = new Map([
   ['src/routes/api/e2e/outbox.ts', 'E2E-only email-outbox debug seam; hard-gated on E2E_MODE=true and returns a bare 404 for every method in any other mode'],
   ['src/routes/api/portfolio/$claimId.ts', 'fail-closed public portfolio API — reads only via getPublicPortfolioClaim, an explicit published/verified-only DTO repository; never a bare 404 vs. data distinction that would leak claim state'],
   ['src/routes/api/analytics/conversion.ts', 'fires from anonymous landing/explore/signup pages by design; validates a closed event schema server-side and never reads/returns tenant or account data'],
+  ['src/routes/api/privacy/profile-removal.ts', 'deliberately unauthenticated — the person requesting removal need not have a BuilderHunt account; IP+profile rate-limited, and possessing the returned challenge is the only thing the verify step accepts as authorization'],
+  ['src/routes/api/privacy/profile-removal/verify.ts', 'deliberately unauthenticated — matching the caller-supplied challenge against its stored hash IS the authorization check (see profile-removal.ts); rate-limited per (ip, requestId)'],
 ])
 
 const guardPatterns = [

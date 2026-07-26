@@ -44,6 +44,7 @@ export function Footer() {
               </li>
               <li><Link to="/changelog" className="hover:text-bh-accent transition-colors" data-testid="footer-changelog">Changelog</Link></li>
               <li><Link to="/roadmap" className="hover:text-bh-accent transition-colors" data-testid="footer-roadmap">Roadmap</Link></li>
+              <li><Link to="/security" className="hover:text-bh-accent transition-colors" data-testid="footer-security">Security</Link></li>
             </ul>
           </div>
 
@@ -64,6 +65,7 @@ export function Footer() {
               <li><Link to="/legal/privacy" className="hover:text-bh-accent transition-colors" data-testid="footer-privacy">Privacy Policy</Link></li>
               <li><Link to="/legal/cookies" className="hover:text-bh-accent transition-colors" data-testid="footer-cookies">Cookie Policy</Link></li>
               <li><Link to="/legal/imprint" className="hover:text-bh-accent transition-colors" data-testid="footer-imprint">Imprint</Link></li>
+              <li><Link to="/privacy/remove" className="hover:text-bh-accent transition-colors" data-testid="footer-remove-profile">Remove my profile</Link></li>
               <li><a href="mailto:privacy@builderhunt.dev" className="hover:text-bh-accent transition-colors" data-testid="footer-do-not-sell">Do Not Sell My Info</a></li>
             </ul>
           </div>

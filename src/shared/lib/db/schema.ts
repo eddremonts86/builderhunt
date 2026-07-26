@@ -1740,3 +1740,61 @@ export const conversionEvents = pgTable(
     check('conversion_events_variant_check', sql`${table.variant} in ('baseline', 'treatment')`),
   ],
 )
+
+/**
+ * Plan: audit-trust. A pending request to prove ownership of a public
+ * profile in order to suppress it from BuilderHunt (opt-out removal — a
+ * different concern from `builder_claims`, which proves ownership *to claim
+ * and enrich* a profile). No plaintext email/challenge is ever persisted —
+ * both are keyed-HMAC hashes (`profile-removal.ts`), and the challenge hash
+ * itself is only used transiently during verification, never re-read after.
+ */
+export const profileRemovalRequests = pgTable(
+  'profile_removal_requests',
+  {
+    id: text('id').primaryKey(),
+    source: text('source').notNull(),
+    sourceId: text('source_id').notNull(),
+    normalizedProfileUrl: text('normalized_profile_url').notNull(),
+    requesterEmailHash: text('requester_email_hash'),
+    challengeHash: text('challenge_hash').notNull(),
+    status: text('status').notNull().default('pending'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('profile_removal_requests_status_expires_idx').on(table.status, table.expiresAt),
+    index('profile_removal_requests_source_source_id_idx').on(table.source, table.sourceId),
+    check('profile_removal_requests_status_check', sql`${table.status} in ('pending', 'verified', 'rejected', 'expired')`),
+  ],
+)
+
+/**
+ * A verified (or legal/abuse-driven) global suppression — enforced by
+ * `profile-suppression.ts` across every consumer surface (search, cache,
+ * tracking, public routes, exports, feeds, alerts). Retains only the
+ * minimum stable identifier needed to keep filtering the identity out;
+ * `normalizedProfileUrlHash` is unkeyed-but-hashed purely to avoid storing a
+ * literal URL, not a secret. Revoking a suppression is a deliberate audited
+ * admin/legal action (`revokedAt`), never automatic expiry.
+ */
+export const profileSuppressions = pgTable(
+  'profile_suppressions',
+  {
+    id: text('id').primaryKey(),
+    source: text('source').notNull(),
+    sourceId: text('source_id').notNull(),
+    normalizedProfileUrlHash: text('normalized_profile_url_hash').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex('profile_suppressions_active_source_source_id_unique')
+      .on(table.source, table.sourceId)
+      .where(sql`${table.revokedAt} is null`),
+    index('profile_suppressions_source_source_id_idx').on(table.source, table.sourceId),
+    check('profile_suppressions_reason_check', sql`${table.reason} in ('verified-removal', 'legal', 'abuse')`),
+  ],
+)
