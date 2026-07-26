@@ -285,7 +285,7 @@ src/shared/lib/calendar.test.ts`.
     purpose. `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2756 passed) are
     clean.
 
-- [ ] **Implement the normative HTTP and error schemas**
+- [x] **Implement the normative HTTP and error schemas**
   - Files: `src/shared/lib/interview-api.ts` (new),
     `src/shared/lib/interview-api.test.ts` (new), `src/shared/lib/api-errors.ts`
   - Do: Encode every method/route request, success DTO, authority, idempotency key, bounded range,
@@ -295,6 +295,31 @@ src/shared/lib/calendar.test.ts`.
   - Verify: contract tests instantiate every route row, reject unknown fields and oversized ranges/
     batches, assert every declared error has stable HTTP mapping, and prove no private ORM/provider
     object is assignable to a public DTO; `pnpm test src/shared/lib/interview-api.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `src/shared/lib/api-errors.ts` (new, generic/reusable) — the
+    14 error codes from spec.md's "HTTP contract" (10 common + `invitation_unavailable`), a fixed
+    `API_ERROR_HTTP_STATUS` map, an `ApiError` class, and `httpStatusForApiErrorCode`.
+    `invitation_unavailable` deliberately shares 404 with `not_found`, matching spec.md's "same
+    `404 invitation_unavailable` for unknown, revoked, expired, or foreign resources." Wrote
+    `interview-api.ts`: a 29-entry `INTERVIEW_API_ROUTES` registry covering every method/route row
+    in spec.md's HTTP contract table (calendar feed/events/availability/export/notifications,
+    scheduling invitations, all 8 public-capability routes, all 6 interview routes, plus the two
+    billing-platform-owned routes referenced but not redefined). Request schemas reuse
+    `eventDraftInputSchema`/`eventMutationInputSchema`/`interviewFollowupSuggestOutputSchema` etc.
+    directly where they're already client-safe; a handful of dedicated `*InputSchema`s
+    (availability rules/overrides) exist specifically to omit `ownerUserId` from schemas that the
+    persisted version in `scheduling.ts` includes — response schemas reuse the full persisted DTOs
+    since server-authoritative read data is not the leak concern. `findForbiddenAuthorityFields`
+    mechanically sweeps every request schema's own shape keys against
+    `organizationId`/`ownerUserId`/`provider`/`price`/`priceId`/`creditAmount`/`creditUnits`. 80
+    tests: every route row instantiated with a unique method+path and valid authority; every
+    request schema rejects an unexpected extra field (`.strict()` sweep); bounded-range/oversized-
+    batch rejection (feed date range, layers array, notification-mark-read batch, segment batch,
+    availability rules array, empty consent-receipt array); every error code's HTTP mapping
+    matches the fixed table and falls in the declared status set; the authority-field sweep across
+    every request schema; and a "no private ORM/provider object satisfies a public DTO" test that
+    feeds a fake raw-row object (with `organization_id`/`__raw_provider_response`) into every
+    response schema and confirms none of them parse it. `pnpm tsc --noEmit`, `pnpm eslint`, and the
+    full `pnpm vitest run` (2836 passed) are clean.
 
 ## Phase 2 — Calendar persistence and RLS
 
