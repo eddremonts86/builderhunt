@@ -1,8 +1,18 @@
 import { randomUUID } from 'node:crypto'
-import { and, eq, gte, inArray, isNotNull, lt, notInArray, sql } from 'drizzle-orm'
+import { and, asc, eq, gte, inArray, isNotNull, lt, lte, notInArray, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
-import { calendarEventOccurrences, calendarEvents, jobRuns, operationalSchedules, organizations } from '../db/schema'
+import {
+  authUsers,
+  calendarEventOccurrences,
+  calendarEventReminders,
+  calendarEvents,
+  calendarNotificationDeliveries,
+  eventParticipants,
+  jobRuns,
+  operationalSchedules,
+  organizations,
+} from '../db/schema'
 
 /**
  * Worker-role data access for calendar materialization and reminder delivery (plan:
@@ -180,4 +190,114 @@ export async function listRecentJobRuns(
       gte(jobRuns.scheduledFor, range.from),
       lt(jobRuns.scheduledFor, range.to),
     ))
+}
+
+// ── Reminder delivery (plan Phase 3, "Implement reminder and participant-notification delivery") ──
+
+/**
+ * A due reminder joined to everything the delivery decision needs, in one query.
+ *
+ * The join is deliberately eager rather than a per-reminder follow-up read: the suppression rules
+ * (cancelled event, removed participant, stale materialization) all depend on the CURRENT state of
+ * the event and participant rows, and reading them in the same snapshot as the reminder is what
+ * makes "the event was cancelled a millisecond ago" resolve consistently instead of racing.
+ *
+ * `participantId is null` means the reminder belongs to the event owner — the LEFT JOIN keeps that
+ * row rather than dropping it, and the null participant columns are the signal.
+ */
+export async function listDueReminderJobs(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  now: Date,
+  limit: number,
+) {
+  return transaction
+    .select({
+      reminderId: calendarEventReminders.id,
+      channel: calendarEventReminders.channel,
+      offsetMinutes: calendarEventReminders.offsetMinutes,
+      attempts: calendarEventReminders.attempts,
+      nextFireAt: calendarEventReminders.nextFireAt,
+      participantId: calendarEventReminders.participantId,
+      eventId: calendarEvents.id,
+      eventTitle: calendarEvents.title,
+      eventStartsAt: calendarEvents.startsAt,
+      eventEndsAt: calendarEvents.endsAt,
+      eventTimezone: calendarEvents.timezone,
+      eventLocation: calendarEvents.location,
+      eventMeetingUrl: calendarEvents.meetingUrl,
+      eventStatus: calendarEvents.status,
+      eventVersion: calendarEvents.version,
+      ownerUserId: calendarEvents.ownerUserId,
+      ownerEmail: authUsers.email,
+      participantUserId: eventParticipants.userId,
+      participantExternalEmail: eventParticipants.externalEmail,
+      participantResponse: eventParticipants.response,
+    })
+    .from(calendarEventReminders)
+    .innerJoin(calendarEvents, and(
+      eq(calendarEvents.organizationId, calendarEventReminders.organizationId),
+      eq(calendarEvents.id, calendarEventReminders.eventId),
+    ))
+    .innerJoin(authUsers, eq(authUsers.id, calendarEvents.ownerUserId))
+    .leftJoin(eventParticipants, and(
+      eq(eventParticipants.organizationId, calendarEventReminders.organizationId),
+      eq(eventParticipants.id, calendarEventReminders.participantId),
+    ))
+    .where(and(
+      eq(calendarEventReminders.organizationId, organizationId),
+      eq(calendarEventReminders.state, 'pending'),
+      eq(calendarEventReminders.enabled, true),
+      lte(calendarEventReminders.nextFireAt, now),
+    ))
+    .orderBy(asc(calendarEventReminders.nextFireAt))
+    .limit(limit)
+}
+
+/** Resolves an internal participant's login email; external participants carry their own address. */
+export async function findUserEmail(transaction: WorkerTransaction, userId: string) {
+  const [row] = await transaction.select({ email: authUsers.email }).from(authUsers).where(eq(authUsers.id, userId)).limit(1)
+  return row?.email ?? null
+}
+
+/** Closes out a delivery attempt. `errorCode` stays a short code — deliveries surface in the UI. */
+export async function markDeliveryOutcome(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  deliveryId: string,
+  outcome: { state: 'sent' | 'failed'; providerReference?: string | null; errorCode?: string | null },
+) {
+  const now = new Date()
+  const [row] = await transaction
+    .update(calendarNotificationDeliveries)
+    .set({
+      state: outcome.state,
+      attemptedAt: now,
+      deliveredAt: outcome.state === 'sent' ? now : null,
+      providerReference: outcome.providerReference ?? null,
+      errorCode: outcome.errorCode ?? null,
+      updatedAt: now,
+    })
+    .where(and(
+      eq(calendarNotificationDeliveries.organizationId, organizationId),
+      eq(calendarNotificationDeliveries.id, deliveryId),
+    ))
+    .returning({ id: calendarNotificationDeliveries.id, state: calendarNotificationDeliveries.state })
+  return row ?? null
+}
+
+/** Looked up on an idempotency-key conflict so a previously FAILED delivery can be retried rather than mistaken for a success. */
+export async function findDeliveryByIdempotencyKey(transaction: WorkerTransaction, organizationId: string, idempotencyKey: string) {
+  const [row] = await transaction
+    .select({
+      id: calendarNotificationDeliveries.id,
+      state: calendarNotificationDeliveries.state,
+    })
+    .from(calendarNotificationDeliveries)
+    .where(and(
+      eq(calendarNotificationDeliveries.organizationId, organizationId),
+      eq(calendarNotificationDeliveries.idempotencyKey, idempotencyKey),
+    ))
+    .limit(1)
+  return row ?? null
 }

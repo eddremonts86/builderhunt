@@ -591,11 +591,13 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `pnpm tsc --noEmit`, `pnpm eslint`, `node scripts/check-route-coverage.mjs`, and the full
     `pnpm vitest run` (2926 passed) are clean.
 
-- [ ] **Implement reminder and participant-notification delivery**
+- [x] **Implement reminder and participant-notification delivery**
   - Files: `src/lib/calendar/reminder-worker.ts` (new),
-    `src/lib/calendar/reminder-worker.test.ts` (new),
+    `src/lib/calendar/reminder-worker.test.ts` (new), `src/lib/calendar/ics.ts` (new),
+    `src/lib/calendar/ics.test.ts` (new),
     `src/routes/api/admin/calendar/run-reminders.ts` (new), `src/shared/lib/email.ts`,
-    `src/shared/lib/repositories/calendar-worker.ts`
+    `src/shared/lib/repositories/calendar-worker.ts`, `src/shared/lib/repositories/calendar.ts`,
+    `src/lib/calendar/service.ts`
   - Do: Lease due reminders per tenant, send in-app/email delivery and stable UID/increasing SEQUENCE
     ICS `REQUEST`/`CANCEL` updates, write idempotent delivery/read state, retry transient failures with cap, and
     suppress cancelled events, removed participants, stale occurrence versions, and duplicate
@@ -603,6 +605,49 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: tests cover each allowed offset/channel, exactly-once concurrent delivery, retry,
     cancellation/reschedule update, participant removal, tenant isolation, and unauthorized worker;
     a test inbox imports an update and cancellation into a standards-compliant calendar.
+  - Evidence: 26 worker tests + 6 ICS tests, all green; full suite 2967 passed.
+
+    **Exactly-once is the database's job, not the code's.** Every send is preceded by an insert
+    into `calendar_notification_deliveries` on a deterministic idempotency key with a unique index.
+    The insert happens BEFORE the send deliberately: a crash in between costs one missed reminder,
+    whereas insert-after-send would cost a duplicate on every retry, forever. On conflict the
+    worker re-reads the row and only retries it if its state is `failed`.
+
+    **The first version of the concurrency test was worthless and I only found out by breaking the
+    code.** `Promise.all([run(), run()])` passed even after I made the idempotency key random,
+    because the second sweep simply saw `state = 'sent'` and skipped — it was testing reminder-state
+    terminality, not the index. Rewrote it to hold the first transaction open at the send step while
+    a second sweep reads a still-pending reminder and races on the same key. Re-ran the random-key
+    mutation: now fails with `expected [2 items] to have a length of 1`. The `stale_schedule`
+    suppression was checked the same way (removing the branch fails its test).
+
+    **Found and fixed a real bug in the process.** `updateEvent` deleted materialized occurrences on
+    a timing change but left each reminder's absolute `nextFireAt` pinned to the ORIGINAL start — so
+    a meeting moved from Tuesday to Friday still fired its "in 15 minutes" notice on Tuesday. Added
+    `rearmRemindersForEvent` (recomputes the fire time from the durable offset) and called it from
+    `updateEvent`. The worker also suppresses any reminder whose `nextFireAt` no longer matches the
+    event's current start, as a second line of defence against out-of-band writes.
+
+    **The `participant_removed` branch is currently unreachable and the test says so.** The
+    reminder's composite FK to the participant is ON DELETE CASCADE, so removing an attendee removes
+    their reminders in the same statement. The test asserts what actually happens (the reminder row
+    is gone) rather than pretending the branch fired; the branch stays as defence for a future
+    soft-removal path, and because a dangling participant link must never fall through to the
+    owner's address.
+
+    **ICS is validated by a parser, not a regex.** Added `node-ical` as a devDependency and parse
+    our own output with it: a regex confirms characters were emitted, a parser confirms a compliant
+    client can read them (line folding at 75 octets, CRLF, `,`/`;` escaping, VTIMEZONE placement).
+    Tests confirm CANCEL reuses the REQUEST's UID and carries a strictly higher SEQUENCE — without
+    both, a client files the cancellation as an unrelated event and the original never disappears.
+
+    **Live-verified end to end, not just under vitest.** `POST /api/admin/calendar/run-reminders`
+    returns 401 unauthenticated; with the cron secret it runs under the real `builderhunt_worker`
+    role across 198 organizations. Seeded a due reminder in the local DB: run 1 returned
+    `delivered: 1`, run 2 returned `delivered: 0`, the reminder row went to `state=sent, attempts=1`,
+    exactly one delivery row exists in `sent`, and the dev email log shows
+    `Calendar reminder email would be sent to: edd_admin2@local.com`. (Local `builderhunt_worker`
+    had a stale password that broke this endpoint AND the pre-existing recurrence worker; reset it.)
 
 - [x] **Add calendar event APIs** (partial — see evidence)
   - Files: `src/routes/api/calendar/events/index.ts` (new),

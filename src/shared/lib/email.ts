@@ -1012,3 +1012,122 @@ function reconciliationAlertEmailHtml(details: { result: string; mismatchCount: 
   </body>
 </html>`
 }
+
+// ── Calendar event notifications (plan: calendar-scheduling-interview-intelligence, Phase 3) ──
+
+export type CalendarEmailKind = 'reminder' | 'invitation' | 'reschedule' | 'cancellation'
+
+export interface CalendarEventEmailDetails {
+  kind: CalendarEmailKind
+  title: string
+  startsAt: Date
+  endsAt: Date
+  timezone: string
+  location?: string | null
+  meetingUrl?: string | null
+  /** RFC 5545 body. Attached so the recipient's own calendar applies the update, not just reads about it. */
+  icsContent: string
+}
+
+/**
+ * Sends a calendar notification with its ICS payload attached.
+ *
+ * The attachment is the point: a REQUEST or CANCEL carrying a stable UID and an increasing
+ * SEQUENCE is what makes a real calendar client update the existing entry in place rather than
+ * creating a duplicate. The HTML body is a courtesy for clients that ignore the attachment.
+ *
+ * The MIME type is spelled `text/calendar; method=...` because Outlook decides between "update
+ * this event" and "here is a file" from that parameter alone.
+ */
+export async function sendCalendarEventEmail(to: string, details: CalendarEventEmailDetails): Promise<SendResult> {
+  const subject = calendarEmailSubject(details)
+  const html = calendarEventEmailHtml(details)
+  const method = details.kind === 'cancellation' ? 'CANCEL' : 'REQUEST'
+  const filename = details.kind === 'cancellation' ? 'cancel.ics' : 'invite.ics'
+
+  if (isE2EOutboxActive()) {
+    return dispatchEmail({ to, subject, html, scenario: `calendar:${details.kind}` })
+  }
+  if (!env.RESEND_API_KEY) {
+    console.log(`\n📧 [DEV] Calendar ${details.kind} email would be sent to:`, to, '—', subject, '\n')
+    return { ok: true }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to,
+        subject,
+        html,
+        attachments: [{
+          filename,
+          content: Buffer.from(details.icsContent, 'utf8').toString('base64'),
+          content_type: `text/calendar; charset=utf-8; method=${method}`,
+        }],
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+function calendarEmailSubject(details: CalendarEventEmailDetails): string {
+  switch (details.kind) {
+    case 'invitation': return `Invitation: ${details.title}`
+    case 'reschedule': return `Rescheduled: ${details.title}`
+    case 'cancellation': return `Cancelled: ${details.title}`
+    case 'reminder': return `Reminder: ${details.title}`
+  }
+}
+
+/** Formatted in the EVENT's timezone, not the server's — a reminder showing the wrong hour is worse than none. */
+function formatEventWindow(details: CalendarEventEmailDetails): string {
+  const formatter = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', timeZone: details.timezone, timeZoneName: 'short',
+  })
+  const endFormatter = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', timeZone: details.timezone,
+  })
+  return `${formatter.format(details.startsAt)} – ${endFormatter.format(details.endsAt)}`
+}
+
+function calendarEventEmailHtml(details: CalendarEventEmailDetails): string {
+  const heading = calendarEmailSubject(details)
+  const cancelled = details.kind === 'cancellation'
+  const whereRow = details.meetingUrl
+    ? `<p style="margin:0.25rem 0;"><strong>Join:</strong> <a href="${escapeHtml(details.meetingUrl)}">${escapeHtml(details.meetingUrl)}</a></p>`
+    : details.location
+      ? `<p style="margin:0.25rem 0;"><strong>Where:</strong> ${escapeHtml(details.location)}</p>`
+      : ''
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">${escapeHtml(heading)}</h1>
+    <div style="border-left:3px solid ${cancelled ? '#ef4444' : '#6366f1'};padding-left:1rem;margin:1.25rem 0;">
+      <p style="margin:0.25rem 0;font-weight:600;${cancelled ? 'text-decoration:line-through;color:#6b7280;' : ''}">${escapeHtml(details.title)}</p>
+      <p style="margin:0.25rem 0;">${escapeHtml(formatEventWindow(details))}</p>
+      ${cancelled ? '' : whereRow}
+    </div>
+    <p style="color:#6b7280;font-size:0.85rem;">${cancelled
+      ? 'This event has been cancelled. The attached file removes it from your calendar.'
+      : 'The attached calendar file adds or updates this event in your calendar.'}</p>
+    <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
+  </body>
+</html>`
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}

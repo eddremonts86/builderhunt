@@ -183,6 +183,7 @@ import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/adm
 import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
 import { Route as ApiAdminCalendarRunWorkerRouteImport } from './routes/api/admin/calendar/run-worker'
+import { Route as ApiAdminCalendarRunRemindersRouteImport } from './routes/api/admin/calendar/run-reminders'
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
 import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
@@ -1117,6 +1118,12 @@ const ApiAdminCalendarRunWorkerRoute =
     path: '/api/admin/calendar/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminCalendarRunRemindersRoute =
+  ApiAdminCalendarRunRemindersRouteImport.update({
+    id: '/api/admin/calendar/run-reminders',
+    path: '/api/admin/calendar/run-reminders',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminBillingRunWorkerRoute =
   ApiAdminBillingRunWorkerRouteImport.update({
     id: '/api/admin/billing/run-worker',
@@ -1374,6 +1381,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-reminders': typeof ApiAdminCalendarRunRemindersRoute
   '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
@@ -1569,6 +1577,7 @@ export interface FileRoutesByTo {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-reminders': typeof ApiAdminCalendarRunRemindersRoute
   '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
@@ -1769,6 +1778,7 @@ export interface FileRoutesById {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-reminders': typeof ApiAdminCalendarRunRemindersRoute
   '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
@@ -1968,6 +1978,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-reminders'
     | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
@@ -2163,6 +2174,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-reminders'
     | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
@@ -2362,6 +2374,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-reminders'
     | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
@@ -2514,6 +2527,7 @@ export interface RootRouteChildren {
   ApiAdminBillingRefundsRoute: typeof ApiAdminBillingRefundsRoute
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
+  ApiAdminCalendarRunRemindersRoute: typeof ApiAdminCalendarRunRemindersRoute
   ApiAdminCalendarRunWorkerRoute: typeof ApiAdminCalendarRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDevpostRunWorkerRoute: typeof ApiAdminDevpostRunWorkerRoute
@@ -3786,6 +3800,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminCalendarRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/calendar/run-reminders': {
+      id: '/api/admin/calendar/run-reminders'
+      path: '/api/admin/calendar/run-reminders'
+      fullPath: '/api/admin/calendar/run-reminders'
+      preLoaderRoute: typeof ApiAdminCalendarRunRemindersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/run-worker': {
       id: '/api/admin/billing/run-worker'
       path: '/api/admin/billing/run-worker'
@@ -4339,6 +4360,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminBillingRefundsRoute: ApiAdminBillingRefundsRoute,
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
+  ApiAdminCalendarRunRemindersRoute: ApiAdminCalendarRunRemindersRoute,
   ApiAdminCalendarRunWorkerRoute: ApiAdminCalendarRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDevpostRunWorkerRoute: ApiAdminDevpostRunWorkerRoute,

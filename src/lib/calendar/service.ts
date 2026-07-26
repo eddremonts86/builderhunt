@@ -21,6 +21,7 @@ import {
   insertEvent,
   insertParticipants,
   insertReminders,
+  rearmRemindersForEvent,
   listBusyRanges,
   listEventsInRange,
   listParticipants,
@@ -316,6 +317,12 @@ export async function updateEvent(
   // rebuilds them on its next pass.
   if (input.patch.startsAt || input.patch.endsAt || input.patch.rrule !== undefined || input.patch.recurrenceUntil !== undefined) {
     await deleteOccurrencesForEvent(transaction, principal.organizationId, eventId)
+  }
+
+  // Reminders store an absolute `nextFireAt` derived from the start, so a moved start has to
+  // re-derive it. Skipping this leaves reminders firing against the event's previous schedule.
+  if (input.patch.startsAt) {
+    await rearmRemindersForEvent(transaction, principal.organizationId, eventId, input.patch.startsAt)
   }
 
   return { event: updated, recurrencePlan: plan }

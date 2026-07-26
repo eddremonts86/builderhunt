@@ -547,6 +547,34 @@ export async function markReminderState(
   return row ?? null
 }
 
+/**
+ * Re-arms every still-pending reminder against a new event start.
+ *
+ * Without this, rescheduling an event leaves each reminder's `nextFireAt` pinned to the ORIGINAL
+ * start, so a meeting moved from Tuesday to Friday still fires its "in 15 minutes" reminder on
+ * Tuesday. The offset is the durable intent; the absolute fire time is derived from it, so it has
+ * to be recomputed whenever the thing it is derived from moves.
+ */
+export async function rearmRemindersForEvent(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+  startsAt: Date,
+) {
+  return transaction
+    .update(calendarEventReminders)
+    .set({
+      nextFireAt: sql`${startsAt.toISOString()}::timestamptz - make_interval(mins => ${calendarEventReminders.offsetMinutes})`,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(calendarEventReminders.organizationId, organizationId),
+      eq(calendarEventReminders.eventId, eventId),
+      eq(calendarEventReminders.state, 'pending'),
+    ))
+    .returning({ id: calendarEventReminders.id, nextFireAt: calendarEventReminders.nextFireAt })
+}
+
 /** spec.md: reminders "never resend after event cancellation or recipient removal". */
 export async function cancelRemindersForEvent(transaction: TenantTransaction, organizationId: string, eventId: string) {
   return transaction
