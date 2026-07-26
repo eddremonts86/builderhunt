@@ -280,6 +280,14 @@
     "0069_calendar_scheduling_rls_grants": {
       "sql": "dbf50d75a3608e5e10a024d94e73a904c30bb37b18e0fcf6e2e48182b6fbce88",
       "snapshot": "b2f9fa04e19d4f23d8accbb0a54133c4354f23cc6110ee269ace19d0fe51a9b3"
+    },
+    "0070_availability_policy": {
+      "sql": "d13af0422489aeeee9a92c1e1cafa6e84b0465ded9b8ecd5a85e849c8ba4ca48",
+      "snapshot": "8ded430d21f41d25c34a702f7e748c03f8a1a8024404e0c8e069541a4e0d0e29"
+    },
+    "0071_availability_policy_rls": {
+      "sql": "458e6d431486a5f99f5cbd85bdb9145bb31a504f5beb7c1d77fd7e0999b8b57e",
+      "snapshot": "bbc178c9121eddbbfc5a9898cda35c40c78cb419146c57601f1225421653d2a2"
     }
   }
 }

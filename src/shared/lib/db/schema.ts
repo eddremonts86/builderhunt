@@ -2079,6 +2079,37 @@ export const availabilityRules = pgTable(
   ],
 )
 
+/**
+ * Per-owner availability policy header (plan: calendar-scheduling-interview-intelligence,
+ * Phase 3 "Add availability APIs").
+ *
+ * `availability_rules` and `availability_overrides` hold the *contents* of a policy but have
+ * nowhere to record a version or the owner's default reminder preferences, both of which
+ * `putAvailabilityRequestSchema` requires. Deriving a version from the contents would not work:
+ * two clients that both delete rule A and add rule B produce the same content and would both
+ * think they won. A monotonic counter on a single row per owner is what makes a concurrent
+ * overwrite detectable.
+ */
+export const availabilityPolicies = pgTable(
+  'availability_policies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    defaultReminderOffsets: integer('default_reminder_offsets').array().notNull().default([]),
+    defaultReminderChannels: text('default_reminder_channels').array().notNull().default([]),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('availability_policies_organization_id_id_unique').on(table.organizationId, table.id),
+    // One policy per owner per organization — the row IS the owner's policy identity.
+    uniqueIndex('availability_policies_owner_unique').on(table.organizationId, table.ownerUserId),
+    check('availability_policies_version_check', sql`${table.version} >= 1`),
+  ],
+)
+
 export const availabilityOverrides = pgTable(
   'availability_overrides',
   {

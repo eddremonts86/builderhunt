@@ -432,6 +432,33 @@ try {
   })
   if (participantCandidates !== 0) throw new Error('participant saw candidate submissions')
 
+  // availability_policies: owner-only, and specifically NOT readable by an org admin. This table
+  // is where a policy's version and default reminder settings live, so a leak here would expose
+  // when a colleague changed their working hours.
+  const availabilityOwner = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select id from availability_policies order by id`
+  })
+  assertIds(availabilityOwner, ['eeeeeeee-0000-4000-8000-00000000000a'], 'availability policy owner read')
+
+  const availabilityAdmin = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-d', true)`
+    await transaction`select set_config('app.organization_role', 'admin', true)`
+    const rows = await transaction`select id from availability_policies`
+    return rows.length
+  })
+  if (availabilityAdmin !== 0) throw new Error('org admin saw another member\'s availability policy')
+
+  const availabilityForeignWrite = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    const rows = await transaction`update availability_policies set version = 99 where organization_id = 'org-a' returning id`
+    return rows.length
+  })
+  if (availabilityForeignWrite !== 0) throw new Error('a non-owner was able to rewrite an availability policy')
+
   const calendarSpoofedUser = await app.begin(async (transaction) => {
     await transaction`select set_config('app.organization_id', 'org-a', true)`
     await transaction`select set_config('app.user_id', 'user-a-attacker', true)`
@@ -519,6 +546,9 @@ try {
     calendarSpoofedUser: 'denied',
     calendarCrossTenantInsert: 'denied',
     workerCalendarScope: workerCalendar.map((row) => row.id),
+    availabilityPolicyOwnerRead: availabilityOwner.map((row) => row.id),
+    availabilityPolicyAdminRead: 'denied',
+    availabilityPolicyForeignWrite: 'denied',
     workerCandidateWrite: 'denied',
   }))
 } finally {

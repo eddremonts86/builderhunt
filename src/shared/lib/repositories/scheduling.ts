@@ -2,6 +2,7 @@ import { and, asc, eq, isNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   availabilityOverrides,
+  availabilityPolicies,
   availabilityRules,
   candidateLinks,
   candidateSubmissions,
@@ -81,6 +82,65 @@ export async function listAvailabilityOverrides(transaction: TenantTransaction, 
  * the caller's transaction keeps it atomic: a partial policy is never observable, and the delete
  * is owner-scoped so it can never clear someone else's rules.
  */
+const availabilityPolicyColumns = {
+  id: availabilityPolicies.id,
+  organizationId: availabilityPolicies.organizationId,
+  ownerUserId: availabilityPolicies.ownerUserId,
+  defaultReminderOffsets: availabilityPolicies.defaultReminderOffsets,
+  defaultReminderChannels: availabilityPolicies.defaultReminderChannels,
+  version: availabilityPolicies.version,
+} as const
+
+export async function findAvailabilityPolicy(transaction: TenantTransaction, organizationId: string, ownerUserId: string) {
+  const [row] = await transaction
+    .select(availabilityPolicyColumns)
+    .from(availabilityPolicies)
+    .where(and(eq(availabilityPolicies.organizationId, organizationId), eq(availabilityPolicies.ownerUserId, ownerUserId)))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * Bumps the owner's policy header only if the caller held the current version.
+ *
+ * Returns `null` on a version mismatch, which is what turns a lost update into a visible `409`
+ * instead of one editor silently overwriting the other. The row is created on first write, so an
+ * owner who has never set availability starts at version 1 without a separate bootstrap step.
+ */
+export async function upsertAvailabilityPolicyWithVersion(
+  transaction: TenantTransaction,
+  organizationId: string,
+  ownerUserId: string,
+  expectedVersion: number,
+  header: { defaultReminderOffsets: number[]; defaultReminderChannels: string[] },
+) {
+  const existing = await findAvailabilityPolicy(transaction, organizationId, ownerUserId)
+  if (!existing) {
+    // First write: only version 1 is a coherent claim, since an owner with no row reads as the
+    // empty policy at version 1.
+    if (expectedVersion !== 1) return null
+    // The new row lands at 2, not 1. Creating at 1 would make "saved once" indistinguishable from
+    // "never saved", so two clients racing on the very first write would both see their expected
+    // version satisfied and the second would silently overwrite the first.
+    const [created] = await transaction
+      .insert(availabilityPolicies)
+      .values({ organizationId, ownerUserId, ...header, version: 2 })
+      .returning(availabilityPolicyColumns)
+    return created ?? null
+  }
+
+  const [updated] = await transaction
+    .update(availabilityPolicies)
+    .set({ ...header, version: existing.version + 1, updatedAt: new Date() })
+    .where(and(
+      eq(availabilityPolicies.organizationId, organizationId),
+      eq(availabilityPolicies.ownerUserId, ownerUserId),
+      eq(availabilityPolicies.version, expectedVersion),
+    ))
+    .returning(availabilityPolicyColumns)
+  return updated ?? null
+}
+
 export async function replaceAvailabilityPolicy(
   transaction: TenantTransaction,
   organizationId: string,

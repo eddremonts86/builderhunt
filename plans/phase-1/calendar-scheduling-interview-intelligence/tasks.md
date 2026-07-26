@@ -710,13 +710,65 @@ src/shared/lib/repositories/scheduling.test.ts`.
     tenant B, stale-version 409 over HTTP) are not yet automated — those paths are covered at the
     service layer by `service.test.ts`'s 32 tests, but not yet through the routes.
 
-- [ ] **Add availability APIs**
+- [x] **Add availability APIs**
   - Files: `src/routes/api/calendar/availability/index.ts` (new),
-    `src/routes/api/calendar/availability/overrides.ts` (new)
+    `src/routes/api/calendar/availability/overrides.ts` (new),
+    `src/lib/scheduling/availability.ts` (new), `src/lib/scheduling/availability.test.ts` (new),
+    `src/shared/lib/scheduling.ts`, `src/shared/lib/interview-api.ts`,
+    `src/shared/lib/repositories/scheduling.ts`, `src/shared/lib/db/schema.ts`,
+    `drizzle/0070_availability_policy.sql`, `drizzle/0071_availability_policy_rls.sql`,
+    `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
   - Do: Add GET/PUT weekly rules and POST/DELETE overrides for the authenticated owner, bounded
     effective ranges, timezone validation, overlap normalization, versioning, and cache invalidation.
   - Verify: tests/curl cover timezone/DST inputs, overlapping rules, invalid overnight interval,
     tenant B, stale version, and normalized response.
+  - Evidence: 19 tests green; full suite 2993 passed.
+
+    **The schema was missing a place to put the version.** `putAvailabilityRequestSchema` requires
+    `version`, `defaultReminderOffsets` and `defaultReminderChannels`, and none of the three had a
+    column anywhere — `availability_rules`/`availability_overrides` hold only rule *contents*.
+    Deriving a version from the contents does not work: two clients that both delete rule A and add
+    rule B produce identical content and would both conclude they won. Added
+    `availability_policies` (0070) as a one-row-per-owner header with a monotonic counter, plus RLS
+    and grants (0071) following the same owner-only pattern as 0069 — no admin escape hatch,
+    worker gets SELECT only.
+
+    **A test caught a real off-by-one in that versioning.** Creating the row at version 1 made
+    "saved once" indistinguishable from "never saved" (an absent policy also reads as 1), so two
+    clients racing the very first write would both see their expected version satisfied and the
+    second would silently overwrite the first. The create now lands at 2. The test that failed is
+    the one asserting a stale version is refused.
+
+    **Overlap normalization merges what can be merged and refuses what cannot.** Two windows on the
+    same weekday and timezone combine when slot length, buffers, notice and horizon all agree —
+    including windows that merely touch, since leaving those split inserts a phantom boundary that
+    fragments slot generation. When those settings differ there is no honest answer: picking either
+    rule's settings generates slots the owner never configured, and keeping both double-books the
+    overlap. That case is rejected with a message rather than resolved by guesswork. Same clock
+    window in two different timezones is *not* an overlap, and a test pins that.
+
+    **Timezones are validated against ICU, not just against a regex.** Zod can confirm a string
+    looks like a zone; only `isValidIanaTimeZone` can say `Europe/Atlantis` does not exist. A bogus
+    zone that passed would silently generate slots at the wrong wall-clock time.
+
+    **Override writes route through the same versioned path as a full PUT.** A bare insert or delete
+    would leave the version untouched, so a client holding the previous version would keep believing
+    its copy was current. Deleting a date with no override is treated as success, not 404 —
+    reporting "not found" would tell a prober whether the owner had blocked that day.
+
+    **RLS verified by breaking it.** Added `availability_policies` fixtures and three checks to
+    `verify-rls-local.mjs` (owner read, admin denied, non-owner write denied), then added an
+    org-wide admin SELECT policy and confirmed the verifier fails with
+    `Error: org admin saw another member's availability policy`; removing it passes again.
+
+    **Live-verified against the running server with a real session.** `GET` on an empty policy
+    returns `version: 1`; a `PUT` with two overlapping Monday rules came back normalized to one
+    09:00–15:00 window for Monday plus the untouched 09:00–12:00 for Tue/Wed at `version: 2`;
+    re-`PUT` at version 1 returns `409 state_changed`; a bogus timezone returns
+    `400 {"error":"invalid_input","message":"Unknown time zone: Europe/Atlantis"}`; conflicting slot
+    settings return `400` with the overlap message; a blocked override carrying times is rejected at
+    the Zod boundary; `POST` then `DELETE` of an override moved the version 2→3→4. Unauthenticated
+    requests return `401`.
 
 - [x] **Build calendar feature components** (partial — see evidence)
   - Files: `src/modules/calendar/components/CalendarPage.tsx` (new),

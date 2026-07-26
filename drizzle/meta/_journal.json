@@ -491,6 +491,20 @@
       "when": 1785067600847,
       "tag": "0069_calendar_scheduling_rls_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 70,
+      "version": "7",
+      "when": 1785073752394,
+      "tag": "0070_availability_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 71,
+      "version": "7",
+      "when": 1785073759415,
+      "tag": "0071_availability_policy_rls",
+      "breakpoints": true
     }
   ]
 }

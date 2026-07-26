@@ -157,6 +157,13 @@ try {
     on conflict (id) do nothing
   `
   await owner`
+    insert into availability_policies (id, organization_id, owner_user_id, default_reminder_offsets, default_reminder_channels, version)
+    values
+      ('eeeeeeee-0000-4000-8000-00000000000a', 'org-a', 'user-a', '{15}', '{email}', 2),
+      ('eeeeeeee-0000-4000-8000-00000000000b', 'org-b', 'user-b', '{60}', '{in_app}', 2)
+    on conflict (id) do nothing
+  `
+  await owner`
     insert into scheduling_invitations (id, organization_id, owner_user_id, role_title, role_context, duration_minutes, timezone, modality, capability_hash, policy_version)
     values ('dddddddd-0000-4000-8000-00000000000a', 'org-a', 'user-a', 'Engineer', 'context', 60, 'Europe/Copenhagen', 'remote_call', 'capability-hash-a', 'v1')
     on conflict (id) do nothing

@@ -108,13 +108,23 @@ const availabilityRuleInputSchema = z.object({
   enabled: z.boolean(),
 }).strict()
 
-const availabilityOverrideInputSchema = z.object({
+/**
+ * Exported because `POST/DELETE /api/calendar/availability/overrides` takes exactly one of these.
+ * The refinement mirrors the table's check constraint so a bad shape fails at the boundary with a
+ * readable message instead of surfacing as a Postgres constraint violation.
+ */
+export const availabilityOverrideInputSchema = z.object({
   localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   localStart: z.string().regex(HHMM_PATTERN).nullable(),
   localEnd: z.string().regex(HHMM_PATTERN).nullable(),
   kind: z.enum(AVAILABILITY_OVERRIDE_KINDS),
   timeZone: z.string().min(1),
-}).strict()
+}).strict().refine(
+  (override) => (override.kind === 'blocked'
+    ? override.localStart === null && override.localEnd === null
+    : override.localStart !== null && override.localEnd !== null && override.localEnd > override.localStart),
+  { message: 'blocked overrides must have null times; available overrides require localEnd after localStart', path: ['kind'] },
+)
 
 export const putAvailabilityRequestSchema = z.object({
   version: z.number().int().positive(),

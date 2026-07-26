@@ -116,6 +116,90 @@ export const availabilityRuleSchema = availabilityRuleObjectSchema.refine(
 )
 export type AvailabilityRule = z.infer<typeof availabilityRuleObjectSchema>
 
+/** A rule may not reach further ahead than this; an unbounded horizon is an unbounded slot query. */
+export const MAX_AVAILABILITY_HORIZON_DAYS = 365
+
+/** Owner-free because the caller is always the owner — the API never accepts a client-supplied one. */
+export type AvailabilityRuleInput = Omit<AvailabilityRule, 'ownerUserId'>
+
+export type AvailabilityNormalizationResult =
+  | { ok: true; rules: AvailabilityRuleInput[] }
+  | { ok: false; reason: 'conflicting_overlap'; weekday: number; timeZone: string }
+
+function sameSlotSettings(a: AvailabilityRuleInput, b: AvailabilityRuleInput): boolean {
+  return a.slotMinutes === b.slotMinutes
+    && a.bufferBeforeMinutes === b.bufferBeforeMinutes
+    && a.bufferAfterMinutes === b.bufferAfterMinutes
+    && a.minNoticeMinutes === b.minNoticeMinutes
+    && a.horizonDays === b.horizonDays
+    && a.enabled === b.enabled
+}
+
+function minutesToTime(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
+}
+
+/**
+ * Merges overlapping availability windows, and refuses to merge the ones that cannot be merged
+ * honestly.
+ *
+ * Two rules covering the same weekday and overlapping in local time are only combinable when their
+ * slot length, buffers, notice and horizon all agree — then the union is unambiguous. When those
+ * settings differ, there is no correct answer: picking either rule's settings would generate slots
+ * the owner never configured, and generating both would double-book the overlap. So that case is
+ * rejected and surfaced to the user rather than resolved by guesswork.
+ *
+ * Adjacent windows (one ending exactly where the next begins) merge too — leaving them split would
+ * insert a phantom boundary that fragments slot generation for no reason.
+ */
+export function normalizeAvailabilityRules(rules: AvailabilityRuleInput[]): AvailabilityNormalizationResult {
+  // Group by the two axes that make two windows actually collide: same weekday, same wall clock.
+  const groups = new Map<string, { weekday: number; timeZone: string; rules: AvailabilityRuleInput[] }>()
+  for (const rule of rules) {
+    for (const weekday of rule.weekdays) {
+      const key = `${rule.timeZone}\u0000${weekday}`
+      const group = groups.get(key) ?? { weekday, timeZone: rule.timeZone, rules: [] }
+      group.rules.push({ ...rule, weekdays: [weekday] })
+      groups.set(key, group)
+    }
+  }
+
+  const normalized: AvailabilityRuleInput[] = []
+  for (const group of groups.values()) {
+    const sorted = [...group.rules].sort((a, b) => timeToMinutes(a.localStart) - timeToMinutes(b.localStart))
+    let current = sorted[0]
+    if (!current) continue
+
+    for (const next of sorted.slice(1)) {
+      const currentEnd = timeToMinutes(current.localEnd)
+      const nextStart = timeToMinutes(next.localStart)
+      if (nextStart > currentEnd) {
+        normalized.push(current)
+        current = next
+        continue
+      }
+      if (!sameSlotSettings(current, next)) {
+        return { ok: false, reason: 'conflicting_overlap', weekday: group.weekday, timeZone: group.timeZone }
+      }
+      const mergedEnd = Math.max(currentEnd, timeToMinutes(next.localEnd))
+      current = { ...current, localEnd: minutesToTime(mergedEnd) }
+    }
+    normalized.push(current)
+  }
+
+  // Re-collapse identical windows back into one rule carrying several weekdays, so a normalized
+  // policy round-trips to roughly the shape the user typed rather than exploding one row per day.
+  const byWindow = new Map<string, AvailabilityRuleInput>()
+  for (const rule of normalized) {
+    const key = JSON.stringify([rule.timeZone, rule.localStart, rule.localEnd, rule.slotMinutes, rule.bufferBeforeMinutes, rule.bufferAfterMinutes, rule.minNoticeMinutes, rule.horizonDays, rule.enabled])
+    const existing = byWindow.get(key)
+    if (existing) existing.weekdays = [...new Set([...existing.weekdays, ...rule.weekdays])].sort((a, b) => a - b)
+    else byWindow.set(key, { ...rule, weekdays: [...rule.weekdays] })
+  }
+
+  return { ok: true, rules: [...byWindow.values()] }
+}
+
 export const AVAILABILITY_OVERRIDE_KINDS = ['available', 'blocked'] as const
 export type AvailabilityOverrideKind = (typeof AVAILABILITY_OVERRIDE_KINDS)[number]
 
@@ -141,6 +225,7 @@ export const availabilityOverrideSchema = availabilityOverrideObjectSchema.refin
   { message: 'blocked overrides must have null times; available overrides require localEnd after localStart', path: ['kind'] },
 )
 export type AvailabilityOverride = z.infer<typeof availabilityOverrideObjectSchema>
+export type AvailabilityOverrideInput = Omit<AvailabilityOverride, 'ownerUserId'>
 
 // ── Deterministic slot IDs (spec.md: "opaque slot IDs/start/end only") ──────────────────────
 

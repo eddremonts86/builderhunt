@@ -132,6 +132,7 @@ import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-e
 import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
 import { Route as ApiCalendarEventsIndexRouteImport } from './routes/api/calendar/events/index'
+import { Route as ApiCalendarAvailabilityIndexRouteImport } from './routes/api/calendar/availability/index'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
 import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
 import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
@@ -154,6 +155,7 @@ import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
+import { Route as ApiCalendarAvailabilityOverridesRouteImport } from './routes/api/calendar/availability/overrides'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
@@ -833,6 +835,12 @@ const ApiCalendarEventsIndexRoute = ApiCalendarEventsIndexRouteImport.update({
   path: '/api/calendar/events/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCalendarAvailabilityIndexRoute =
+  ApiCalendarAvailabilityIndexRouteImport.update({
+    id: '/api/calendar/availability/',
+    path: '/api/calendar/availability/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
   id: '/api/builders/recent/',
   path: '/api/builders/recent/',
@@ -952,6 +960,12 @@ const ApiCalendarEventsEventIdRoute =
   ApiCalendarEventsEventIdRouteImport.update({
     id: '/api/calendar/events/$eventId',
     path: '/api/calendar/events/$eventId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiCalendarAvailabilityOverridesRoute =
+  ApiCalendarAvailabilityOverridesRouteImport.update({
+    id: '/api/calendar/availability/overrides',
+    path: '/api/calendar/availability/overrides',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
@@ -1428,6 +1442,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1450,6 +1465,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/availability/': typeof ApiCalendarAvailabilityIndexRoute
   '/api/calendar/events/': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
@@ -1626,6 +1642,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1648,6 +1665,7 @@ export interface FileRoutesByTo {
   '/api/admin/users': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/availability': typeof ApiCalendarAvailabilityIndexRoute
   '/api/calendar/events': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
@@ -1829,6 +1847,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1851,6 +1870,7 @@ export interface FileRoutesById {
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/availability/': typeof ApiCalendarAvailabilityIndexRoute
   '/api/calendar/events/': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
@@ -2031,6 +2051,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -2053,6 +2074,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
+    | '/api/calendar/availability/'
     | '/api/calendar/events/'
     | '/api/me/builder/'
     | '/api/me/builders/'
@@ -2229,6 +2251,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -2251,6 +2274,7 @@ export interface FileRouteTypes {
     | '/api/admin/users'
     | '/api/alerts/triggers'
     | '/api/builders/recent'
+    | '/api/calendar/availability'
     | '/api/calendar/events'
     | '/api/me/builder'
     | '/api/me/builders'
@@ -2431,6 +2455,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -2453,6 +2478,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
+    | '/api/calendar/availability/'
     | '/api/calendar/events/'
     | '/api/me/builder/'
     | '/api/me/builders/'
@@ -2577,6 +2603,7 @@ export interface RootRouteChildren {
   ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
   ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
+  ApiCalendarAvailabilityOverridesRoute: typeof ApiCalendarAvailabilityOverridesRoute
   ApiCalendarEventsEventIdRoute: typeof ApiCalendarEventsEventIdRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
@@ -2593,6 +2620,7 @@ export interface RootRouteChildren {
   ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
   ApiAlertsTriggersIndexRoute: typeof ApiAlertsTriggersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
+  ApiCalendarAvailabilityIndexRoute: typeof ApiCalendarAvailabilityIndexRoute
   ApiCalendarEventsIndexRoute: typeof ApiCalendarEventsIndexRoute
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
@@ -3470,6 +3498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiCalendarEventsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/calendar/availability/': {
+      id: '/api/calendar/availability/'
+      path: '/api/calendar/availability'
+      fullPath: '/api/calendar/availability/'
+      preLoaderRoute: typeof ApiCalendarAvailabilityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/recent/': {
       id: '/api/builders/recent/'
       path: '/api/builders/recent'
@@ -3622,6 +3657,13 @@ declare module '@tanstack/react-router' {
       path: '/api/calendar/events/$eventId'
       fullPath: '/api/calendar/events/$eventId'
       preLoaderRoute: typeof ApiCalendarEventsEventIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/availability/overrides': {
+      id: '/api/calendar/availability/overrides'
+      path: '/api/calendar/availability/overrides'
+      fullPath: '/api/calendar/availability/overrides'
+      preLoaderRoute: typeof ApiCalendarAvailabilityOverridesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/builders/claim/verify': {
@@ -4426,6 +4468,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
   ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
+  ApiCalendarAvailabilityOverridesRoute: ApiCalendarAvailabilityOverridesRoute,
   ApiCalendarEventsEventIdRoute: ApiCalendarEventsEventIdRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
@@ -4443,6 +4486,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
   ApiAlertsTriggersIndexRoute: ApiAlertsTriggersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
+  ApiCalendarAvailabilityIndexRoute: ApiCalendarAvailabilityIndexRoute,
   ApiCalendarEventsIndexRoute: ApiCalendarEventsIndexRoute,
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
