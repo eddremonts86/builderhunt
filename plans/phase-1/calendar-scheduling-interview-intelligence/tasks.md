@@ -161,7 +161,7 @@ src/shared/lib/calendar.test.ts`.
     serialized DTO never contains the raw email/userId), and the projection discrimination cases.
     `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2503 passed) are clean.
 
-- [ ] **Implement timezone, recurrence, and availability calculations**
+- [x] **Implement timezone, recurrence, and availability calculations**
   - Files: `src/shared/lib/scheduling.ts` (new), `src/shared/lib/scheduling.test.ts` (new)
   - Do: Add availability/override/invitation/slot/consent-receipt schemas, IANA timezone validation, Temporal-based
     local-to-instant conversion, RFC 5545/RRule expansion contract, exception dates, buffers,
@@ -169,6 +169,32 @@ src/shared/lib/calendar.test.ts`.
   - Verify: fixtures cover Copenhagen spring-forward/fall-back, UTC, America/New_York, half-hour
     offsets, overnight invalid rules, recurrence exclusions, buffer collisions, no availability,
     and deterministic ordering; `pnpm test src/shared/lib/scheduling.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `scheduling.ts`. `resolveLocalWallClockInstant` uses
+    `Temporal.ZonedDateTime.from` with all three disambiguation modes to distinguish
+    `nonexistent` (spring-forward gap — omitted, never shifted), `ambiguous` (fall-back — resolved
+    deterministically to the earlier/`'compatible'` occurrence, both candidate instants still
+    returned), and `unique`. `generateAvailabilitySlots` walks day-by-day in the rule's own IANA
+    timezone (bounded by min-notice/horizon), applies date overrides (`blocked` skips the day
+    entirely, `available` substitutes its own local window), expands slots, and subtracts busy
+    ranges pre-expanded by `bufferBeforeMinutes`/`bufferAfterMinutes` — reusing `calendar.ts`'s
+    `rangesOverlap` half-open helper rather than reimplementing overlap math.
+    `expandRecurrenceRule` re-validates via `calendar.ts`'s `assertSupportedRecurrenceRule`, then
+    round-trips each `rrule`-generated occurrence through the target timezone (via a "floating
+    UTC-labeled" `DTSTART`/occurrence trick) so a 9am-local weekly meeting stays 9am local across a
+    DST transition instead of holding a fixed UTC offset; occurrences whose wall-clock time doesn't
+    exist are omitted, and `exceptionInstants` are excluded by instant equality. `computeSlotId` is
+    a truncated SHA-256 of `ownerUserId|startsAt|endsAt` (opaque, deterministic, never exposes its
+    inputs). `assertValidInvitationStatusTransition` implements the full Invitation machine.
+    Consent-receipt schema plus `resolveRequiredConsentPurposes`/`hasAcceptedAllRequiredConsents`
+    model `terms_and_privacy` as always-required and the three feature purposes
+    (document-processing/web-import/AI-assistance/live-transcription) as required only when that
+    booking actually invokes the feature — and require *acceptance*, not merely a recorded
+    decision. `toSafePublicSchedulingErrorCode` maps any internal code to the fixed public
+    allowlist. 44 tests cover Copenhagen spring-forward (2026-03-29) and fall-back (2026-10-25),
+    UTC, America/New_York, the fixed half-hour offset `Asia/Kolkata`, overnight-rule rejection,
+    recurrence exclusions, a genuine buffer-collision case (verified against the half-open-overlap
+    boundary, not assumed), a fully-blocked no-availability case, and deterministic re-run ordering.
+    `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2547 passed) are clean.
 
 - [ ] **Implement interview schemas and prohibited-output validation**
   - Files: `src/shared/lib/interviews.ts` (new), `src/shared/lib/interviews.test.ts` (new)
