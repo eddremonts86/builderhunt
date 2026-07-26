@@ -444,7 +444,7 @@ test:rls:local`.
     `pnpm test:migrations:local` returns `{"firstRun":"ok","secondRun":"ok","applied":70}`.
     `pnpm tsc --noEmit` and the full `pnpm vitest run` (2836 passed) are clean.
 
-- [ ] **Implement calendar repository**
+- [x] **Implement calendar repository**
   - Files: `src/shared/lib/repositories/calendar.ts` (new),
     `src/shared/lib/repositories/calendar.test.ts` (new)
   - Do: Add calendar/event/occurrence/participant/reminder/delivery CRUD, search, and range queries using an injected
@@ -453,8 +453,30 @@ test:rls:local`.
   - Verify: repository tests cover tenant predicates, no unrestricted row serialization, stale
     update, occurrence upsert, participant access, and admin denial; `pnpm test
 src/shared/lib/repositories/calendar.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `repositories/calendar.ts` — calendar/event/occurrence/
+    participant/reminder/delivery access over an injected `TenantTransaction`. Every select names
+    its columns explicitly (never `select()`), so a column added later is never accidentally
+    serialized; `calendar_notification_deliveries` deliberately omits `idempotencyKey`,
+    `providerReference`, and `externalRecipientHash` as delivery plumbing with no product meaning.
+    Every predicate carries the server-resolved `organizationId` and, for private resources, the
+    `ownerUserId` — layered on top of the RLS policies rather than trusting them alone.
+    `updateEventWithVersion`/`deleteEventWithVersion` match `id + organization + owner + version`
+    and return `null` on a miss, which the route maps to `409 event_changed`. `upsertOccurrences`
+    is idempotent on the table's `(org, event, recurrence_id)` identity. `listBusyRanges` returns
+    only busy, non-cancelled events for availability subtraction, and range reads use the same
+    half-open `[from, to)` semantics as `calendar.ts`'s `rangesOverlap`. 25 disposable-DB tests
+    cover: same-id-wrong-tenant returning null, the projection genuinely omitting `createdAt`/
+    `updatedAt`, half-open range filtering, a stale optimistic update leaving the row untouched
+    (asserted by re-reading the title, not just the null return), non-owner and cross-tenant update
+    refusal, delete honouring both owner and version, title/type/participant search, upsert
+    idempotency, `hasGrantedParticipation` distinguishing a present-but-not-access-granted
+    participant from a granted one, RSVP touching only the caller's own row, the composite FK
+    rejecting a participant that claims the wrong event owner, due-reminder sweep + state marking,
+    cancellation affecting only still-pending reminders, the DB rejecting a non-allowlisted
+    reminder offset, delivery idempotency, and a user attempting to mark someone else's delivery
+    read affecting only their own. `pnpm tsc --noEmit` and `pnpm eslint` are clean.
 
-- [ ] **Implement scheduling repository**
+- [x] **Implement scheduling repository**
   - Files: `src/shared/lib/repositories/scheduling.ts` (new),
     `src/shared/lib/repositories/scheduling.test.ts` (new)
   - Do: Add availability/override/invitation/submission/link methods, hashed-capability lookup,
@@ -463,6 +485,25 @@ src/shared/lib/repositories/calendar.test.ts`.
   - Verify: tests cover tenant scope, capability hash lookup, expired/revoked/used tokens,
     non-enumerating misses, and cross-invitation mutation denial; `pnpm test
 src/shared/lib/repositories/scheduling.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `repositories/scheduling.ts` with two deliberately different
+    audiences. Organizer functions re-filter on `organizationId` + `ownerUserId`. Public-capability
+    functions return a `PublicInvitationDto` that structurally omits `organizationId`,
+    `ownerUserId`, and `capabilityHash` — `capabilityHash` appears in **no** projection anywhere in
+    the file, so it cannot leak to organizer or candidate. `findInvitationByCapabilityHash` returns
+    plain `null` for unknown, revoked, expired-by-timestamp, expired-by-status, and declined
+    invitations alike, so a caller cannot probe which case a secret hit (spec.md's non-enumerating
+    requirement). `replaceAvailabilityPolicy` is delete-then-insert inside the caller's
+    transaction, owner-scoped so it can never clear another user's rules. `upsertSubmission` keeps
+    one row per invitation; `upsertLink` is idempotent on `(org, submission, normalizedUrl)`.
+    Link mutations are scoped by `submissionId` as well as link id, so a capability for one
+    invitation can never move another invitation's link. 22 disposable-DB tests cover all of the
+    above plus: the capability hash absent from both insert and list results, optimistic
+    invitation state change succeeding once then refusing a stale retry, non-owner refusal,
+    the DB rejecting an overnight availability rule, the `authorized_crawl` check constraint
+    rejecting a decision with no recorded attestation and accepting it once attested, a
+    cross-submission link mutation returning null while the correct one succeeds, and the
+    retention sweeps being both idempotent (a second `markInvitationExpired` returns null) and
+    tenant-scoped. `pnpm tsc --noEmit` and `pnpm eslint` are clean.
 
 ## Phase 3 — Calendar service, API, worker, and UI
 
