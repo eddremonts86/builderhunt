@@ -233,7 +233,7 @@ src/shared/lib/calendar.test.ts`.
     and deterministic-template equality. `pnpm tsc --noEmit`, `pnpm eslint`, and the full
     `pnpm vitest run` (2729 passed) are clean.
 
-- [ ] **Implement interview usage estimation arithmetic**
+- [x] **Implement interview usage estimation arithmetic**
   - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`,
     `src/shared/lib/billing/rate-cards.ts`
   - Do: Define only interview-specific duration/token-to-unit estimation, maximum reservations,
@@ -241,6 +241,24 @@ src/shared/lib/calendar.test.ts`.
     reservation/ledger types and do not reimplement balance, expiry, refund, or allocation logic.
   - Verify: property-style tests cover rounding, maximums, warning boundaries, and <1% provider
     variance; a boundary test rejects local grant/ledger state machines.
+  - **Evidence (2026-07-26)**: Wrote `src/modules/interviews/billing.ts` — pure arithmetic only,
+    no local reservation/grant state. `estimateTranscriptionUnitsForSeconds` rounds a partial
+    minute up to a full minute (never under-charges), reusing `interview-config.ts`'s
+    `INTERVIEW_RATE_CARD_KEYS`. `estimateBriefUnits`/`estimateReportUnits` pin the flat 5-credit
+    costs. `MAX_LIVE_TRANSCRIPTION_RESERVATION_MINUTES` (180) is this module's own local sanity
+    ceiling — explicitly not registered with `billing/rate-cards.ts`'s `RATE_CARDS` map yet (a
+    separate later task, matching `solutions-intelligence`'s precedent); left that file untouched.
+    `resolveLowBalanceWarnings` returns every applicable warning (80%/90%/10-minutes-remaining)
+    rather than only the most severe. `normalizeProviderUsageVariance` compares an estimate against
+    the actual provider-billed duration; a variance of exactly 1% is deliberately *not* within
+    tolerance (strict `<`). 21 tests include `fast-check` property tests (rounding always rounds up
+    and stays a non-negative integer; over-max requests are always rejected;
+    `remainingUnits` is always within `[0, reservedUnits]`; variance is always non-negative) plus a
+    boundary test asserting the module's exports contain none of the billing platform's actual
+    reservation/grant lifecycle function names (`reserveCredits`, `grantCredits`, etc. — verified
+    against the real exports of `billing/reservations.ts`/`credits.ts`, not just hand-typed
+    strings). `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2750 passed) are
+    clean.
 
 - [ ] **Define provider interfaces without SDK leakage**
   - Files: `src/lib/storage/types.ts` (new), `src/lib/interviews/transcription/types.ts` (new),
