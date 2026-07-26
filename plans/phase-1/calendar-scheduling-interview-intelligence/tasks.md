@@ -196,7 +196,7 @@ src/shared/lib/calendar.test.ts`.
     boundary, not assumed), a fully-blocked no-availability case, and deterministic re-run ordering.
     `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2547 passed) are clean.
 
-- [ ] **Implement interview schemas and prohibited-output validation**
+- [x] **Implement interview schemas and prohibited-output validation**
   - Files: `src/shared/lib/interviews.ts` (new), `src/shared/lib/interviews.test.ts` (new)
   - Do: Add document/session/segment/suggestion/report/consent schemas, all state transitions,
     speaker estimate/mapping, evidence reference integrity, source manifest, capture capability
@@ -204,6 +204,34 @@ src/shared/lib/calendar.test.ts`.
   - Verify: tests cover all transitions, dangling evidence, duplicate segment IDs/sequences,
     prohibited outputs, unknown speaker, correction audit, and deterministic manual templates;
     `pnpm test src/shared/lib/interviews.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `interviews.ts`, reusing `interview-config.ts`'s capture-mode/
+    capability enums rather than redefining them. `assertValidDocumentStatusTransition` and
+    `assertValidInterviewSessionTransition` implement the exact Document (7-state) and Interview
+    (10-state) machines from spec.md's "State contracts", each with every terminal state
+    exhaustively verified to reject all outgoing transitions. `transcriptSegmentSchema` models
+    speaker estimates as `speaker_a|speaker_b|unknown` (never biometric identity) plus an optional
+    `speaker_mapping` (`organizer|candidate_or_remote`), and a correction-audit refine requiring
+    `correctedByUserId`/`correctedAt` together. `assertNoDuplicateSegments` is a pure batch-
+    invariant function modeling the two DB unique constraints (session+providerSegmentId,
+    session+sequence) that a single-row schema can't express. `assertNoDanglingSegmentEvidence`/
+    `assertNoDanglingSourceReference`/`assertBriefEvidenceIntegrity` reject any evidence reference
+    to a segment or source ID outside the known set. `sourceManifestEntrySchema` enforces that a
+    restricted `submitted_link` source can never carry factual `text`. The prohibited-output gate
+    (`findProhibitedInterviewContent`/`assertNoProhibitedInterviewContent`/
+    `assertReportContentIsClean`) is a word-boundary regex bank covering score/rank/personality/
+    emotion/culture-fit/hire/reject language, applied to every free-text field of a generated
+    report. `interviewBriefContentSchema`/`interviewReportContentSchema`/
+    `interviewFollowupSuggestOutputSchema` match the exact input/output shapes from spec.md's "AI
+    task contracts" (including the 3-question cap on follow-up suggestions).
+    `buildFallbackReportTemplate`/`buildFallbackBriefTemplate` are pure, argument-only functions
+    (no `Date.now()`/randomness) producing the deterministic editable template spec.md requires on
+    persistent AI failure — verified to be schema-valid and to pass the clean-content gate. 182
+    tests cover every one of the 49 document and 100 interview-session transition pairs
+    (exhaustively generated), dangling evidence (segment and source), duplicate segment IDs and
+    sequences (including the same ID/sequence being fine across *different* sessions), unknown
+    speaker-estimate rejection, correction-audit pairing, 7 real-world prohibited-phrase fixtures,
+    and deterministic-template equality. `pnpm tsc --noEmit`, `pnpm eslint`, and the full
+    `pnpm vitest run` (2729 passed) are clean.
 
 - [ ] **Implement interview usage estimation arithmetic**
   - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`,
