@@ -50,6 +50,7 @@ import { Route as LandingExploreIndexRouteImport } from './routes/_landing/explo
 import { Route as LandingChangelogIndexRouteImport } from './routes/_landing/changelog/index'
 import { Route as LandingBlogIndexRouteImport } from './routes/_landing/blog/index'
 import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/sprints/index'
+import { Route as DashboardSolutionsIndexRouteImport } from './routes/_dashboard/solutions/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
@@ -403,6 +404,11 @@ const LandingBlogIndexRoute = LandingBlogIndexRouteImport.update({
 const DashboardSprintsIndexRoute = DashboardSprintsIndexRouteImport.update({
   id: '/sprints/',
   path: '/sprints/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardSolutionsIndexRoute = DashboardSolutionsIndexRouteImport.update({
+  id: '/solutions/',
+  path: '/solutions/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardSearchIndexRoute = DashboardSearchIndexRouteImport.update({
@@ -1313,6 +1319,7 @@ export interface FileRoutesByFullPath {
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
+  '/solutions/': typeof DashboardSolutionsIndexRoute
   '/sprints/': typeof DashboardSprintsIndexRoute
   '/blog/': typeof LandingBlogIndexRoute
   '/changelog/': typeof LandingChangelogIndexRoute
@@ -1503,6 +1510,7 @@ export interface FileRoutesByTo {
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
+  '/solutions': typeof DashboardSolutionsIndexRoute
   '/sprints': typeof DashboardSprintsIndexRoute
   '/blog': typeof LandingBlogIndexRoute
   '/changelog': typeof LandingChangelogIndexRoute
@@ -1698,6 +1706,7 @@ export interface FileRoutesById {
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
+  '/_dashboard/solutions/': typeof DashboardSolutionsIndexRoute
   '/_dashboard/sprints/': typeof DashboardSprintsIndexRoute
   '/_landing/blog/': typeof LandingBlogIndexRoute
   '/_landing/changelog/': typeof LandingChangelogIndexRoute
@@ -1892,6 +1901,7 @@ export interface FileRouteTypes {
     | '/exports/'
     | '/me/'
     | '/search/'
+    | '/solutions/'
     | '/sprints/'
     | '/blog/'
     | '/changelog/'
@@ -2082,6 +2092,7 @@ export interface FileRouteTypes {
     | '/exports'
     | '/me'
     | '/search'
+    | '/solutions'
     | '/sprints'
     | '/blog'
     | '/changelog'
@@ -2276,6 +2287,7 @@ export interface FileRouteTypes {
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
+    | '/_dashboard/solutions/'
     | '/_dashboard/sprints/'
     | '/_landing/blog/'
     | '/_landing/changelog/'
@@ -2788,6 +2800,13 @@ declare module '@tanstack/react-router' {
       path: '/sprints'
       fullPath: '/sprints/'
       preLoaderRoute: typeof DashboardSprintsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/solutions/': {
+      id: '/_dashboard/solutions/'
+      path: '/solutions'
+      fullPath: '/solutions/'
+      preLoaderRoute: typeof DashboardSolutionsIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/search/': {
@@ -3887,6 +3906,7 @@ interface DashboardRouteRouteChildren {
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
   DashboardMeIndexRoute: typeof DashboardMeIndexRoute
   DashboardSearchIndexRoute: typeof DashboardSearchIndexRoute
+  DashboardSolutionsIndexRoute: typeof DashboardSolutionsIndexRoute
   DashboardSprintsIndexRoute: typeof DashboardSprintsIndexRoute
   DashboardBuilderBuilderIdIndexRoute: typeof DashboardBuilderBuilderIdIndexRoute
   DashboardSprintsSprintIdIndexRoute: typeof DashboardSprintsSprintIdIndexRoute
@@ -3913,6 +3933,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
   DashboardMeIndexRoute: DashboardMeIndexRoute,
   DashboardSearchIndexRoute: DashboardSearchIndexRoute,
+  DashboardSolutionsIndexRoute: DashboardSolutionsIndexRoute,
   DashboardSprintsIndexRoute: DashboardSprintsIndexRoute,
   DashboardBuilderBuilderIdIndexRoute: DashboardBuilderBuilderIdIndexRoute,
   DashboardSprintsSprintIdIndexRoute: DashboardSprintsSprintIdIndexRoute,

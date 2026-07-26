@@ -284,7 +284,9 @@ export const solutionRouteSchema = z.object({
   mandatoryCapabilitiesCovered: z.boolean(),
   coverageGapCapabilityKeys: z.array(z.string().min(1).max(80)).default([]),
   limitations: z.array(z.string().min(1).max(300)).default([]),
-  estimate: estimateSchema,
+  // Optional only for an `unavailable` route — a route that isn't offered has no meaningful
+  // cost/time to estimate. Enforced below: required for `recommended`/`available`.
+  estimate: estimateSchema.optional(),
   risks: z.array(z.string().min(1).max(300)).default([]),
   humanReviewPoints: z.array(z.string().min(1).max(300)).default([]),
   evidenceIds: z.array(z.string().min(1)).min(1),
@@ -294,6 +296,9 @@ export const solutionRouteSchema = z.object({
 ).refine(
   (route) => route.status !== 'recommended' || route.mandatoryCapabilitiesCovered || route.humanReviewPoints.length > 0,
   { message: 'A recommended route must cover every mandatory capability or delegate the gap to a human review point' },
+).refine(
+  (route) => route.status === 'unavailable' || Boolean(route.estimate),
+  { message: 'A recommended or available route must include a cost/time estimate' },
 )
 export type SolutionRoute = z.infer<typeof solutionRouteSchema>
 
