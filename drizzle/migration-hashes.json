@@ -240,6 +240,10 @@
     "0059_green_winter_soldier": {
       "sql": "3d26adf53f155bcc4961bd1b3e24e6c5997639af69bc6e99a673a380068965ef",
       "snapshot": "b84e6adb9ba6a18423fb23a55d6c5dcbd91221b7a965b9db40ceba09c0359baa"
+    },
+    "0060_rich_katie_power": {
+      "sql": "1e02ee152252b362e971c167aef7052696c0d6ffe39ba206dc24d6f81acebdde",
+      "snapshot": "981f7214b4df8645b219d263b40ca53c8bb07ccb8bfabe88011b052a3763b3ce"
     }
   }
 }

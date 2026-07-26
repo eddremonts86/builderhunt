@@ -17,6 +17,7 @@ import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
 import { Route as RSlugRouteImport } from './routes/r/$slug'
+import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
 import { Route as OnboardingSuccessRouteImport } from './routes/onboarding/success'
 import { Route as OnboardingSearchRouteImport } from './routes/onboarding/search'
@@ -60,6 +61,7 @@ import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/prev
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
+import { Route as ApiPortfolioClaimIdRouteImport } from './routes/api/portfolio/$claimId'
 import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
 import { Route as ApiOrganizationsTransferOwnershipPreviewRouteImport } from './routes/api/organizations/transfer-ownership-preview'
@@ -184,9 +186,12 @@ import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
 import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
 import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
+import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -225,6 +230,11 @@ const LandingIndexRoute = LandingIndexRouteImport.update({
 const RSlugRoute = RSlugRouteImport.update({
   id: '/r/$slug',
   path: '/r/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortfolioClaimIdRoute = PortfolioClaimIdRouteImport.update({
+  id: '/portfolio/$claimId',
+  path: '/portfolio/$claimId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingWelcomeRoute = OnboardingWelcomeRouteImport.update({
@@ -440,6 +450,11 @@ const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
 const ApiSearchBuildersRoute = ApiSearchBuildersRouteImport.update({
   id: '/api/search/builders',
   path: '/api/search/builders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPortfolioClaimIdRoute = ApiPortfolioClaimIdRouteImport.update({
+  id: '/api/portfolio/$claimId',
+  path: '/api/portfolio/$claimId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPlansRequestUpgradeRoute = ApiPlansRequestUpgradeRouteImport.update({
@@ -1108,6 +1123,12 @@ const ApiMeBuilderBuilderIdEvidenceProvenanceRoute =
     path: '/evidence-provenance',
     getParentRoute: () => ApiMeBuilderBuilderIdRoute,
   } as any)
+const ApiMeBuilderClaimsClaimIdPortfolioRoute =
+  ApiMeBuilderClaimsClaimIdPortfolioRouteImport.update({
+    id: '/api/me/builder-claims/$claimId/portfolio',
+    path: '/api/me/builder-claims/$claimId/portfolio',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
   ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport.update({
     id: '/evidence/$evidenceId',
@@ -1125,6 +1146,18 @@ const ApiAdminBuilderClaimsClaimIdRevokeRoute =
     id: '/api/admin/builder-claims/$claimId/revoke',
     path: '/api/admin/builder-claims/$claimId/revoke',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute =
+  ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport.update({
+    id: '/unpublish',
+    path: '/unpublish',
+    getParentRoute: () => ApiMeBuilderClaimsClaimIdPortfolioRoute,
+  } as any)
+const ApiMeBuilderClaimsClaimIdPortfolioPublishRoute =
+  ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport.update({
+    id: '/publish',
+    path: '/publish',
+    getParentRoute: () => ApiMeBuilderClaimsClaimIdPortfolioRoute,
   } as any)
 const ApiAdminBillingEventsEventIdReplayRoute =
   ApiAdminBillingEventsEventIdReplayRouteImport.update({
@@ -1155,6 +1188,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -1209,6 +1243,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
+  '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1306,11 +1341,14 @@ export interface FileRoutesByFullPath {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
+  '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
+  '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
 }
 export interface FileRoutesByTo {
   '/': typeof LandingIndexRoute
@@ -1333,6 +1371,7 @@ export interface FileRoutesByTo {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
@@ -1386,6 +1425,7 @@ export interface FileRoutesByTo {
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
+  '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1483,11 +1523,14 @@ export interface FileRoutesByTo {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
+  '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
+  '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -1513,6 +1556,7 @@ export interface FileRoutesById {
   '/onboarding/search': typeof OnboardingSearchRoute
   '/onboarding/success': typeof OnboardingSuccessRoute
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
+  '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
@@ -1568,6 +1612,7 @@ export interface FileRoutesById {
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
   '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
+  '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
@@ -1665,11 +1710,14 @@ export interface FileRoutesById {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
+  '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
+  '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -1695,6 +1743,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/portfolio/$claimId'
     | '/r/$slug'
     | '/admin/abuse'
     | '/admin/billing'
@@ -1749,6 +1798,7 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
+    | '/api/portfolio/$claimId'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -1846,11 +1896,14 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
     | '/api/admin/billing/events/$eventId/replay'
+    | '/api/me/builder-claims/$claimId/portfolio/publish'
+    | '/api/me/builder-claims/$claimId/portfolio/unpublish'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -1873,6 +1926,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/portfolio/$claimId'
     | '/r/$slug'
     | '/admin/abuse'
     | '/admin/billing'
@@ -1926,6 +1980,7 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
+    | '/api/portfolio/$claimId'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -2023,11 +2078,14 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence'
     | '/api/admin/billing/events/$eventId/replay'
+    | '/api/me/builder-claims/$claimId/portfolio/publish'
+    | '/api/me/builder-claims/$claimId/portfolio/unpublish'
   id:
     | '__root__'
     | '/_dashboard'
@@ -2052,6 +2110,7 @@ export interface FileRouteTypes {
     | '/onboarding/search'
     | '/onboarding/success'
     | '/onboarding/welcome'
+    | '/portfolio/$claimId'
     | '/r/$slug'
     | '/_landing/'
     | '/_dashboard/admin/abuse'
@@ -2107,6 +2166,7 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
     | '/api/plans/request-upgrade'
+    | '/api/portfolio/$claimId'
     | '/api/search/builders'
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
@@ -2204,11 +2264,14 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
     | '/api/builders/$builderId/evidence/'
     | '/api/admin/billing/events/$eventId/replay'
+    | '/api/me/builder-claims/$claimId/portfolio/publish'
+    | '/api/me/builder-claims/$claimId/portfolio/unpublish'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -2221,6 +2284,7 @@ export interface RootRouteChildren {
   ApiHealthRoute: typeof ApiHealthRoute
   BlogAtomDotxmlRoute: typeof BlogAtomDotxmlRoute
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
+  PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
@@ -2254,6 +2318,7 @@ export interface RootRouteChildren {
   ApiOrganizationsTransferOwnershipPreviewRoute: typeof ApiOrganizationsTransferOwnershipPreviewRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
   ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
+  ApiPortfolioClaimIdRoute: typeof ApiPortfolioClaimIdRoute
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
@@ -2327,6 +2392,7 @@ export interface RootRouteChildren {
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  ApiMeBuilderClaimsClaimIdPortfolioRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 
@@ -2386,6 +2452,13 @@ declare module '@tanstack/react-router' {
       path: '/r/$slug'
       fullPath: '/r/$slug'
       preLoaderRoute: typeof RSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portfolio/$claimId': {
+      id: '/portfolio/$claimId'
+      path: '/portfolio/$claimId'
+      fullPath: '/portfolio/$claimId'
+      preLoaderRoute: typeof PortfolioClaimIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding/welcome': {
@@ -2687,6 +2760,13 @@ declare module '@tanstack/react-router' {
       path: '/api/search/builders'
       fullPath: '/api/search/builders'
       preLoaderRoute: typeof ApiSearchBuildersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/portfolio/$claimId': {
+      id: '/api/portfolio/$claimId'
+      path: '/api/portfolio/$claimId'
+      fullPath: '/api/portfolio/$claimId'
+      preLoaderRoute: typeof ApiPortfolioClaimIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/plans/request-upgrade': {
@@ -3557,6 +3637,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport
       parentRoute: typeof ApiMeBuilderBuilderIdRoute
     }
+    '/api/me/builder-claims/$claimId/portfolio': {
+      id: '/api/me/builder-claims/$claimId/portfolio'
+      path: '/api/me/builder-claims/$claimId/portfolio'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/$builderId/evidence/$evidenceId': {
       id: '/api/builders/$builderId/evidence/$evidenceId'
       path: '/evidence/$evidenceId'
@@ -3577,6 +3664,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/admin/builder-claims/$claimId/revoke'
       preLoaderRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/me/builder-claims/$claimId/portfolio/unpublish': {
+      id: '/api/me/builder-claims/$claimId/portfolio/unpublish'
+      path: '/unpublish'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio/unpublish'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport
+      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
+    }
+    '/api/me/builder-claims/$claimId/portfolio/publish': {
+      id: '/api/me/builder-claims/$claimId/portfolio/publish'
+      path: '/publish'
+      fullPath: '/api/me/builder-claims/$claimId/portfolio/publish'
+      preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport
+      parentRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRoute
     }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
@@ -3856,6 +3957,24 @@ const ApiOrganizationsInvitationsInvitationIdRouteWithChildren =
     ApiOrganizationsInvitationsInvitationIdRouteChildren,
   )
 
+interface ApiMeBuilderClaimsClaimIdPortfolioRouteChildren {
+  ApiMeBuilderClaimsClaimIdPortfolioPublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
+  ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
+}
+
+const ApiMeBuilderClaimsClaimIdPortfolioRouteChildren: ApiMeBuilderClaimsClaimIdPortfolioRouteChildren =
+  {
+    ApiMeBuilderClaimsClaimIdPortfolioPublishRoute:
+      ApiMeBuilderClaimsClaimIdPortfolioPublishRoute,
+    ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute:
+      ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute,
+  }
+
+const ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren =
+  ApiMeBuilderClaimsClaimIdPortfolioRoute._addFileChildren(
+    ApiMeBuilderClaimsClaimIdPortfolioRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   DashboardRouteRoute: DashboardRouteRouteWithChildren,
   LandingRouteRoute: LandingRouteRouteWithChildren,
@@ -3866,6 +3985,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiHealthRoute: ApiHealthRoute,
   BlogAtomDotxmlRoute: BlogAtomDotxmlRoute,
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
+  PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
@@ -3901,6 +4021,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiOrganizationsTransferOwnershipPreviewRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
   ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
+  ApiPortfolioClaimIdRoute: ApiPortfolioClaimIdRoute,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
@@ -3976,6 +4097,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiAdminBuilderClaimsClaimIdRevokeRoute:
     ApiAdminBuilderClaimsClaimIdRevokeRoute,
+  ApiMeBuilderClaimsClaimIdPortfolioRoute:
+    ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,
 }

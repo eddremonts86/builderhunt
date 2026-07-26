@@ -421,6 +421,13 @@
       "when": 1785017834095,
       "tag": "0059_green_winter_soldier",
       "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1785052333646,
+      "tag": "0060_rich_katie_power",
+      "breakpoints": true
     }
   ]
 }

@@ -117,6 +117,19 @@ export const Route = createFileRoute('/sitemap.xml')({
           })
         }
 
+        // Only published, actively-verified portfolios — never a draft or a revoked claim.
+        const { publicDb } = await import('~/shared/lib/db/client')
+        const { listPublishedPortfolioClaimIds } = await import('~/shared/lib/repositories/builder-claims')
+        const portfolioClaimIds = await listPublishedPortfolioClaimIds(publicDb)
+        for (const claimId of portfolioClaimIds) {
+          entries.push({
+            loc: `${SITE}/portfolio/${claimId}`,
+            lastmod: today,
+            changefreq: 'weekly',
+            priority: 0.6,
+          })
+        }
+
         // /explore pages for each popular query
         for (const q of POPULAR_QUERIES) {
           entries.push({

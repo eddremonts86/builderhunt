@@ -212,6 +212,10 @@ export const builderClaims = pgTable(
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     revokedByUserId: text('revoked_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     revocationReason: text('revocation_reason'),
+    // Namespaced like organization_builders.privateMetadata — sibling
+    // features (portfolio, future ones) get their own top-level key so a
+    // read-modify-write on one never clobbers another's data.
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

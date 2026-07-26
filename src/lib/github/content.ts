@@ -201,6 +201,48 @@ export function selectRepos(repos: GhRepo[], max: number, now = Date.now()): GhR
     .slice(0, max)
 }
 
+interface GhRepoWithMeta extends GhRepo {
+  id: number
+  description: string | null
+  html_url: string
+}
+
+export interface PortfolioProjectCandidate {
+  id: string
+  name: string
+  description: string | null
+  url: string
+  stars: number
+  language: string | null
+}
+
+/**
+ * Real public repos for the portfolio-builder plan's project picker —
+ * deliberately not fingerprinting's file-sample fetch (different shape: this
+ * needs repo metadata for a project card, not source-file content). Reuses
+ * the same `selectRepos` ranking (non-fork, non-empty, active within 24mo,
+ * top-N by stars) so "which repos are worth featuring" stays one rule.
+ */
+export async function fetchPortfolioProjectCandidates(
+  username: string,
+  max = 12,
+): Promise<PortfolioProjectCandidate[]> {
+  const res = await ghFetch(`/users/${encodeURIComponent(username)}/repos?sort=pushed&per_page=30`)
+  if (!res.ok) return []
+  const repos = (await res.json()) as GhRepoWithMeta[]
+  return selectRepos(repos, max).map((r) => {
+    const meta = r as GhRepoWithMeta
+    return {
+      id: String(meta.id),
+      name: meta.name,
+      description: meta.description,
+      url: meta.html_url,
+      stars: meta.stargazers_count,
+      language: meta.language,
+    }
+  })
+}
+
 export function truncateForPrompt(content: string): string {
   const lines = content.split('\n')
   const capped = lines.length > PROMPT_LINE_CAP ? lines.slice(0, PROMPT_LINE_CAP).join('\n') : content

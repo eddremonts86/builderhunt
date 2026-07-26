@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { revokeBuilderClaim } from '~/shared/lib/repositories/builder-claims'
 import { publicDb } from '~/shared/lib/db/client'
+import { purgePortfolioCache } from '~/shared/lib/portfolio-cache'
 
 const Body = z.object({ reason: z.string().min(3).max(500) })
 
@@ -24,6 +25,10 @@ export const Route = createFileRoute('/api/admin/builder-claims/$claimId/revoke'
           if (!revoked) {
             return Response.json({ error: 'No active verified claim found for that id' }, { status: 404 })
           }
+          // A revoked claim's own public read independently rechecks status
+          // on every uncached fetch, but a warm cache entry from before the
+          // revocation would otherwise keep serving for up to the cache TTL.
+          await purgePortfolioCache(params.claimId)
 
           await auditPlatformAdminAction(principal, {
             action: 'admin.builder-claim.revoke',

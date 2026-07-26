@@ -5,9 +5,11 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { Input } from '~/components/ui'
 import { Button } from '~/components/ui/button'
 import { LinkButton } from '~/components/ui/link'
+import { PortfolioSettings } from '~/modules/builder-profile/components/PortfolioSettings'
 
 interface ClaimedBuilder {
   id: string
+  claimId: string
   username: string
   displayName?: string | null
   avatarUrl?: string | null
@@ -321,6 +323,10 @@ function MePage() {
                     </Button>
                   </div>
                 )}
+
+                <div className="mt-4 pt-4 border-t border-bh-border">
+                  <PortfolioSettings claimId={b.claimId} />
+                </div>
               </div>
             )
           })}

@@ -64,6 +64,8 @@ const zodEnv = z.object({
   // Kill switch for the claimable-profiles source-bound verification flow
   // (bio-challenge fetches against GitHub/GitLab/Codeberg/DEV.to).
   CLAIMABLE_PROFILES_ENABLED: z.enum(['true', 'false']).default('true'),
+  // Kill switch for the verified-owner portfolio feature (public /portfolio/$claimId pages).
+  PORTFOLIOS_ENABLED: z.enum(['true', 'false']).default('true'),
   AI_DISABLED: z.enum(['true', 'false']).default('false'),
   AI_DISABLED_TASKS: z.string().default(''),
   // Plan: proactive-discovery

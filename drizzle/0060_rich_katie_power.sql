@@ -1,0 +1,1 @@
+ALTER TABLE "builder_claims" ADD COLUMN "metadata" jsonb DEFAULT '{}'::jsonb NOT NULL;
