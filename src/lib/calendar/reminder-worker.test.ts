@@ -432,14 +432,21 @@ describe('runReminderWorker — isolation and bookkeeping', () => {
   })
 
   it('opens and closes a job run for every sweep', async () => {
+    const before = (await db.select().from(jobRuns).where(eq(jobRuns.jobKey, REMINDER_JOB_KEY))).length
+
     await run()
 
     const runs = await db.select().from(jobRuns).where(eq(jobRuns.jobKey, REMINDER_JOB_KEY))
-    expect(runs.length).toBeGreaterThan(0)
+    expect(runs.length).toBe(before + 1)
+    // Every row is closed, including the ones the retry tests above deliberately failed — a
+    // half-open `running` row is the failure this assertion exists to catch.
     for (const row of runs) {
-      expect(row.state).toBe('succeeded')
+      expect(['succeeded', 'failed']).toContain(row.state)
       expect(row.finishedAt).not.toBeNull()
       expect(row.durationMs).not.toBeNull()
     }
+    // This sweep itself had nothing to deliver and nothing to fail.
+    const latest = runs.sort((a, b) => b.scheduledFor.getTime() - a.scheduledFor.getTime())[0]
+    expect(latest.state).toBe('succeeded')
   })
 })

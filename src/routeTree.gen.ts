@@ -178,6 +178,7 @@ import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/user
 import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
+import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
@@ -1094,6 +1095,12 @@ const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   path: '/api/admin/roadmap/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminOperationsSyncSchedulesRoute =
+  ApiAdminOperationsSyncSchedulesRouteImport.update({
+    id: '/api/admin/operations/sync-schedules',
+    path: '/api/admin/operations/sync-schedules',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminMetricsConversionRoute =
   ApiAdminMetricsConversionRouteImport.update({
     id: '/api/admin/metrics/conversion',
@@ -1420,6 +1427,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -1620,6 +1628,7 @@ export interface FileRoutesByTo {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -1825,6 +1834,7 @@ export interface FileRoutesById {
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -2029,6 +2039,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -2229,6 +2240,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -2433,6 +2445,7 @@ export interface FileRouteTypes {
     | '/api/admin/incidents/$id'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -2590,6 +2603,7 @@ export interface RootRouteChildren {
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
+  ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminStatusSnapshotRoute: typeof ApiAdminStatusSnapshotRoute
@@ -3820,6 +3834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminRoadmapIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/operations/sync-schedules': {
+      id: '/api/admin/operations/sync-schedules'
+      path: '/api/admin/operations/sync-schedules'
+      fullPath: '/api/admin/operations/sync-schedules'
+      preLoaderRoute: typeof ApiAdminOperationsSyncSchedulesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/metrics/conversion': {
       id: '/api/admin/metrics/conversion'
       path: '/api/admin/metrics/conversion'
@@ -4455,6 +4476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
+  ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminStatusSnapshotRoute: ApiAdminStatusSnapshotRoute,

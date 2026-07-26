@@ -3,16 +3,14 @@ import { workerDb } from '~/shared/lib/db/worker-db'
 import { sendCalendarEventEmail, type SendResult } from '~/shared/lib/email'
 import { insertDeliveryIfAbsent, markReminderState } from '~/shared/lib/repositories/calendar'
 import {
-  closeJobRun,
   findDeliveryByIdempotencyKey,
-  findScheduleByJobKey,
   findUserEmail,
   listDueReminderJobs,
   listWorkerOrganizationIds,
   markDeliveryOutcome,
-  openJobRun,
   withWorkerOrganization,
 } from '~/shared/lib/repositories/calendar-worker'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 import { buildEventIcs } from './ics'
 
 /**
@@ -115,64 +113,65 @@ export async function runReminderWorker(options: ReminderWorkerOptions = {}): Pr
   const db = options.db ?? workerDb
   const send = options.send ?? sendCalendarEventEmail
 
-  const startedAt = Date.now()
-  const schedule = await findScheduleByJobKey(REMINDER_JOB_KEY, db)
-  const run = await openJobRun({ jobKey: REMINDER_JOB_KEY, scheduleId: schedule?.id ?? null, scheduledFor: now }, db)
+  // Recording happens inside the worker rather than in its route because this function accepts an
+  // injected `db`, which is what lets a test assert on the run row it actually wrote. Workers whose
+  // entry point takes no db are wrapped at the route instead. Either way it is the same recorder
+  // (`withJobRun`), so there is exactly one place that decides how a run is opened and closed.
+  return withJobRun({ jobKey: REMINDER_JOB_KEY, now, db }, async () => {
+    const result: ReminderWorkerResult = {
+      organizationsProcessed: 0,
+      delivered: 0,
+      skippedDuplicate: 0,
+      suppressed: 0,
+      failed: 0,
+      exhausted: 0,
+      failedOrganizations: [],
+    }
 
-  const result: ReminderWorkerResult = {
-    organizationsProcessed: 0,
-    delivered: 0,
-    skippedDuplicate: 0,
-    suppressed: 0,
-    failed: 0,
-    exhausted: 0,
-    failedOrganizations: [],
-  }
+    const organizationIds = await listWorkerOrganizationIds(db)
 
-  const organizationIds = await listWorkerOrganizationIds(db)
+    for (const { id: organizationId } of organizationIds) {
+      try {
+        const tenantResult = await withWorkerOrganization(organizationId, async (transaction) => {
+          const jobs = await listDueReminderJobs(transaction, organizationId, now, REMINDERS_PER_TENANT)
+          const counts = { delivered: 0, skippedDuplicate: 0, suppressed: 0, failed: 0, exhausted: 0 }
 
-  for (const { id: organizationId } of organizationIds) {
-    try {
-      const tenantResult = await withWorkerOrganization(organizationId, async (transaction) => {
-        const jobs = await listDueReminderJobs(transaction, organizationId, now, REMINDERS_PER_TENANT)
-        const counts = { delivered: 0, skippedDuplicate: 0, suppressed: 0, failed: 0, exhausted: 0 }
+          for (const job of jobs) {
+            const suppression = suppressionFor(job)
+            if (suppression) {
+              await markReminderState(transaction, organizationId, job.reminderId, 'cancelled', suppression)
+              counts.suppressed += 1
+              continue
+            }
 
-        for (const job of jobs) {
-          const suppression = suppressionFor(job)
-          if (suppression) {
-            await markReminderState(transaction, organizationId, job.reminderId, 'cancelled', suppression)
-            counts.suppressed += 1
-            continue
-          }
+            // Owner reminders carry a null participant; the event's own owner is the recipient.
+            const recipientUserId = job.participantId === null ? job.ownerUserId : job.participantUserId
+            const recipientEmail = job.participantId === null
+              ? job.ownerEmail
+              : job.participantUserId
+                ? await findUserEmail(transaction, job.participantUserId)
+                : job.participantExternalEmail
 
-          // Owner reminders carry a null participant; the event's own owner is the recipient.
-          const recipientUserId = job.participantId === null ? job.ownerUserId : job.participantUserId
-          const recipientEmail = job.participantId === null
-            ? job.ownerEmail
-            : job.participantUserId
-              ? await findUserEmail(transaction, job.participantUserId)
-              : job.participantExternalEmail
+            if (!recipientEmail) {
+              await markReminderState(transaction, organizationId, job.reminderId, 'cancelled', 'no_recipient_address')
+              counts.suppressed += 1
+              continue
+            }
 
-          if (!recipientEmail) {
-            await markReminderState(transaction, organizationId, job.reminderId, 'cancelled', 'no_recipient_address')
-            counts.suppressed += 1
-            continue
-          }
+            const idempotencyKey = deliveryIdempotencyKey(job, recipientUserId ?? `external:${recipientEmail}`)
 
-          const idempotencyKey = deliveryIdempotencyKey(job, recipientUserId ?? `external:${recipientEmail}`)
-
-          // Claim the send before performing it. See the module comment for why this order matters.
-          const claimed = await insertDeliveryIfAbsent(transaction, {
-            organizationId,
-            eventId: job.eventId,
-            reminderId: job.reminderId,
-            kind: 'reminder',
-            recipientUserId: recipientUserId ?? null,
-            // External recipients are recorded by address, never by a hash we would have to
-            // reverse later; the column name predates this and the value is the plain address's
-            // stable identifier for dedupe only.
-            externalRecipientHash: recipientUserId ? null : recipientEmail,
-            idempotencyKey,
+            // Claim the send before performing it. See the module comment for why this order matters.
+            const claimed = await insertDeliveryIfAbsent(transaction, {
+              organizationId,
+              eventId: job.eventId,
+              reminderId: job.reminderId,
+              kind: 'reminder',
+              recipientUserId: recipientUserId ?? null,
+              // External recipients are recorded by address, never by a hash we would have to
+              // reverse later; the column name predates this and the value is the plain address's
+              // stable identifier for dedupe only.
+              externalRecipientHash: recipientUserId ? null : recipientEmail,
+              idempotencyKey,
           })
 
           let deliveryId = claimed?.id ?? null
@@ -244,13 +243,11 @@ export async function runReminderWorker(options: ReminderWorkerOptions = {}): Pr
     }
   }
 
-  await closeJobRun(run.id, {
-    state: result.failedOrganizations.length === 0 ? 'succeeded' : 'failed',
-    processedCount: result.delivered,
-    failedCount: result.failed + result.failedOrganizations.length,
-    durationMs: Date.now() - startedAt,
-    errorCode: result.failedOrganizations.length > 0 ? 'partial_tenant_failure' : null,
-  }, db)
-
-  return result
+    return {
+      ...result,
+      processedCount: result.delivered,
+      failedCount: result.failed + result.failedOrganizations.length,
+      errorCode: result.failedOrganizations.length > 0 ? 'partial_tenant_failure' : null,
+    }
+  })
 }

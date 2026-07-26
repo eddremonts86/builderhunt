@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { runDiscoveryWorker } from '~/lib/discovery/worker'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 /**
  * Manually (or via external scheduler) runs the proactive-discovery worker.
@@ -18,7 +19,14 @@ export const Route = createFileRoute('/api/admin/discovery/run-worker')({
       POST: async ({ request }) => {
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
-          const result = await runDiscoveryWorker()
+          // Every scheduled run gets exactly one `job_runs` row, closed even if the worker
+          // throws (plan: calendar-scheduling-interview-intelligence, Phase 4). Counters are
+          // mapped per worker rather than guessed generically, so the calendar feed's numbers
+          // mean what its labels say. `payload` keeps the HTTP response shape unchanged.
+          const { payload: result } = await withJobRun({ jobKey: 'discovery.crawl' }, async () => {
+            const outcome = await runDiscoveryWorker()
+            return { processedCount: outcome.upserted, failedCount: 0, payload: outcome }
+          })
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',
             targetType: 'worker',

@@ -797,17 +797,54 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 4 — Operational projections
 
-- [ ] **Implement schedule registry and next-run calculation**
+- [x] **Implement schedule registry and next-run calculation**
   - Files: `src/shared/lib/operational-schedules.ts` (new),
     `src/shared/lib/operational-schedules.test.ts` (new),
-    `src/shared/lib/repositories/platform-operations.ts`
+    `src/shared/lib/repositories/platform-operations.ts`,
+    `src/shared/lib/db/platform-db.ts` (new),
+    `src/routes/api/admin/operations/sync-schedules.ts` (new), `package.json`
   - Do: Register stable keys/cadences/timezones/labels/source routes for current alert, sprint,
     enrichment, discovery, embeddings, legal, calendar, document, retention, and reconciliation
     workers; calculate next runs deterministically and upsert registry state.
   - Verify: tests cover DST, disabled schedule, next-run boundary, duplicate key, and safe route;
     registry sync twice is idempotent.
+  - Evidence: 16 registry tests + 26 repository tests green; full suite 3032 passed.
 
-- [ ] **Write job-run records from every worker entry point**
+    **DST is delegated to `cron-parser`, not hand-rolled.** Cadences are stored as real cron
+    expressions against a named IANA zone, so a daily job stays at the same *local* hour across both
+    transitions. Tests assert 03:00 Europe/Copenhagen stays 03:00 either side of spring-forward and
+    fall-back while its UTC hour changes — a fixed offset would drift an hour twice a year, which is
+    exactly the class of bug that is invisible until it happens. A job scheduled inside the
+    nonexistent 02:30 gap still fires that day rather than being skipped for 24 hours.
+
+    **Label and source route live in code, not in the table.** They are properties of the deployed
+    build; a stale label in a row would be worse than no label. The table holds only what changes at
+    runtime (`enabled`, `next_run_at`). `assertRegistryIsSafe` rejects duplicate keys, a route
+    outside `/api/admin/`, a query string, a traversal attempt, an unknown timezone, and an
+    unparseable cron — the last one matters because an unparseable expression would otherwise
+    present as a job that looks healthy and simply never runs.
+
+    **Frequent jobs are pinned to UTC on purpose**, local zones only where a human notices the hour.
+    A `*/15` job in a DST zone gains or loses one interval twice a year for no benefit.
+
+    **Sync never re-enables what an operator paused**, and never deletes a retired key — it disables
+    it, so `job_runs` history stays joinable and a returning job keeps its identity. It also repairs
+    a `next_run_at` that has fallen into the past after a deployment gap, which otherwise never
+    self-corrects.
+
+    **A permission error corrected the design rather than the grant.** The first version ran the
+    sync as `builderhunt_worker` and got `42501 permission denied`: 0067 grants the worker only
+    SELECT/UPDATE on `operational_schedules`, because creating and retiring a schedule *identity* is
+    an operator action while advancing `next_run_at` after a run is a worker action. The fix was to
+    add `platform-db.ts` and run the sync as the platform role — widening the worker's grant would
+    have erased a distinction the migration author put there deliberately.
+
+    **Live-verified:** `POST /api/admin/operations/sync-schedules` returns `401` unauthenticated;
+    with the cron secret the first call returned `{"created":10}` and the second
+    `{"created":0,"updated":10,"retired":0}` with byte-identical rows — idempotent against the real
+    database, all 10 jobs enabled with future `next_run_at`.
+
+- [x] **Write job-run records from every worker entry point**
   - Files: `src/routes/api/admin/alerts/run-worker.ts`,
     `src/routes/api/admin/discovery/run-worker.ts`,
     `src/routes/api/admin/embeddings/run-worker.ts`,
@@ -820,6 +857,42 @@ src/shared/lib/repositories/scheduling.test.ts`.
     occurrence, counters and redacted error codes; never store payload/candidate content.
   - Verify: success/failure/retry tests produce one monotonic run row and no raw error secrets;
     execute at least two real local workers and inspect API projection DTOs.
+  - Evidence: `withJobRun` is now the single recorder for all seven workers.
+
+    **It is a wrapper, not a pair of calls each worker makes.** The failure path is the reason: a
+    worker that throws must still close its run row, and relying on every author to remember a
+    try/finally is how half-open `running` rows accumulate until someone notices the dashboard is
+    lying. The error is re-thrown after recording — swallowing it would turn a crashed worker into
+    an HTTP 200.
+
+    **Counters are mapped per worker, not guessed generically.** Each worker reports its own shape
+    (`alertsEvaluated`/`errors[]`, `sprintsRun`, `processed`/`failed`, `upserted`, `embedded`), so a
+    single generic mapping would record numbers that do not mean what the calendar feed's labels
+    say. A `payload` field carries the worker's own result through unchanged, so no HTTP response
+    body was altered by adding the recorder.
+
+    **The two calendar workers record inside the function; the other five at their route.** The
+    calendar workers accept an injected `db`, which is what lets a test assert on the run row it
+    actually wrote. Either way it is the same `withJobRun`, so there is exactly one place that
+    decides how a run opens and closes — the previous duplicate `openJobRun`/`closeJobRun` pair was
+    removed.
+
+    **Error codes are redacted at the boundary.** Only a `^[a-z0-9_]{1,64}$` code is persisted;
+    anything else collapses to `worker_failed`. A test throws
+    `postgres://user:hunter2@db.internal refused` with `code: 'ECONNREFUSED extra'` and asserts the
+    stored row contains neither the credential nor the host.
+
+    **Two real workers executed through their routes** (`calendar/run-reminders`,
+    `embeddings/run-worker`, plus `alerts/run-worker`): each wrote one closed row with a duration,
+    `alerts.evaluate` recorded `succeeded 1/0`, and `embeddings.backfill` honestly recorded
+    `failed 0/256` because the local embedding provider is down — the recorder reported reality
+    rather than a green 200. After the registry sync, a subsequent run linked to its `schedule_id`.
+    (`next_run_at` did not visibly move in that check because the run happened at 14:17 and the
+    next 5-minute boundary was still 14:20; the advance itself is asserted in the unit test.)
+
+    Local hazard worth recording: running the RLS fixture resets cluster-global role passwords, which
+    breaks the dev server's worker/auth connections mid-session (`28P01`). Symptom is a 500 from any
+    worker route or sign-in; fix is to re-`ALTER ROLE ... PASSWORD` from `.env`.
 
 - [ ] **Persist honest alert evaluation timing**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,

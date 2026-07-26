@@ -3,15 +3,13 @@ import { workerDb } from '~/shared/lib/db/worker-db'
 import { expandRecurrenceRule } from '~/shared/lib/scheduling'
 import { upsertOccurrences } from '~/shared/lib/repositories/calendar'
 import {
-  closeJobRun,
-  findScheduleByJobKey,
   listRecurringEventsForMaterialization,
   listWorkerOrganizationIds,
-  openJobRun,
   pruneObsoleteOccurrences,
   pruneOccurrencesForCancelledEvents,
   withWorkerOrganization,
 } from '~/shared/lib/repositories/calendar-worker'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 /**
  * Materializes recurring calendar events into concrete occurrence rows (plan:
@@ -57,50 +55,49 @@ export async function runRecurrenceWorker(options: RecurrenceWorkerOptions = {})
   const pastDays = options.pastDays ?? MATERIALIZATION_PAST_DAYS
   const futureDays = options.futureDays ?? MATERIALIZATION_FUTURE_DAYS
 
-  const startedAt = Date.now()
   const rangeFrom = new Date(now.getTime() - pastDays * 24 * 60 * 60_000)
   const rangeTo = new Date(now.getTime() + futureDays * 24 * 60 * 60_000)
 
-  const schedule = await findScheduleByJobKey(RECURRENCE_JOB_KEY, db)
-  const run = await openJobRun({ jobKey: RECURRENCE_JOB_KEY, scheduleId: schedule?.id ?? null, scheduledFor: now }, db)
+  // Same shared recorder as every other worker; see reminder-worker.ts for why calendar workers
+  // record inside the function rather than at their route.
+  return withJobRun({ jobKey: RECURRENCE_JOB_KEY, now, db }, async () => {
+    const result: RecurrenceWorkerResult = {
+      organizationsProcessed: 0,
+      eventsExpanded: 0,
+      occurrencesWritten: 0,
+      occurrencesPruned: 0,
+      failedOrganizations: [],
+    }
 
-  const result: RecurrenceWorkerResult = {
-    organizationsProcessed: 0,
-    eventsExpanded: 0,
-    occurrencesWritten: 0,
-    occurrencesPruned: 0,
-    failedOrganizations: [],
-  }
+    const organizationIds = await listWorkerOrganizationIds(db)
 
-  const organizationIds = await listWorkerOrganizationIds(db)
+    for (const { id: organizationId } of organizationIds) {
+      try {
+        const tenantResult = await withWorkerOrganization(organizationId, async (transaction) => {
+          // Cancelled events lose their whole materialization first, so a cancelled series never
+          // keeps firing reminders off stale occurrence rows.
+          const cancelledPruned = await pruneOccurrencesForCancelledEvents(transaction, organizationId)
 
-  for (const { id: organizationId } of organizationIds) {
-    try {
-      const tenantResult = await withWorkerOrganization(organizationId, async (transaction) => {
-        // Cancelled events lose their whole materialization first, so a cancelled series never
-        // keeps firing reminders off stale occurrence rows.
-        const cancelledPruned = await pruneOccurrencesForCancelledEvents(transaction, organizationId)
+          const events = await listRecurringEventsForMaterialization(transaction, organizationId, EVENTS_PER_TENANT)
+          let written = 0
+          let pruned = cancelledPruned.length
 
-        const events = await listRecurringEventsForMaterialization(transaction, organizationId, EVENTS_PER_TENANT)
-        let written = 0
-        let pruned = cancelledPruned.length
+          for (const event of events) {
+            if (!event.rrule) continue
 
-        for (const event of events) {
-          if (!event.rrule) continue
+            // `recurrenceUntil` narrows the window further, but never widens it past the horizon.
+            const effectiveTo = event.recurrenceUntil && event.recurrenceUntil < rangeTo ? event.recurrenceUntil : rangeTo
+            if (effectiveTo <= rangeFrom) continue
 
-          // `recurrenceUntil` narrows the window further, but never widens it past the horizon.
-          const effectiveTo = event.recurrenceUntil && event.recurrenceUntil < rangeTo ? event.recurrenceUntil : rangeTo
-          if (effectiveTo <= rangeFrom) continue
-
-          const durationMs = event.endsAt.getTime() - event.startsAt.getTime()
-          const occurrences = expandRecurrenceRule({
-            rruleText: event.rrule,
-            eventStartsAt: event.startsAt,
-            eventDurationMs: durationMs,
-            timeZone: event.timezone,
-            rangeFrom,
-            rangeTo: effectiveTo,
-            exceptionInstants: [],
+            const durationMs = event.endsAt.getTime() - event.startsAt.getTime()
+            const occurrences = expandRecurrenceRule({
+              rruleText: event.rrule,
+              eventStartsAt: event.startsAt,
+              eventDurationMs: durationMs,
+              timeZone: event.timezone,
+              rangeFrom,
+              rangeTo: effectiveTo,
+              exceptionInstants: [],
           })
 
           if (occurrences.length > 0) {
@@ -145,13 +142,11 @@ export async function runRecurrenceWorker(options: RecurrenceWorkerOptions = {})
     }
   }
 
-  await closeJobRun(run.id, {
-    state: result.failedOrganizations.length === 0 ? 'succeeded' : 'failed',
+  return {
+    ...result,
     processedCount: result.occurrencesWritten,
     failedCount: result.failedOrganizations.length,
-    durationMs: Date.now() - startedAt,
     errorCode: result.failedOrganizations.length > 0 ? 'partial_tenant_failure' : null,
-  }, db)
-
-  return result
+  }
+  })
 }
