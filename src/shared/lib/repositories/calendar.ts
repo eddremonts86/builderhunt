@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   calendarEventOccurrences,
@@ -590,20 +590,34 @@ export async function cancelRemindersForEvent(transaction: TenantTransaction, or
 
 // ── Notification deliveries ──────────────────────────────────────────────────────────────────
 
+/**
+ * Newest-first page of the caller's OWN deliveries.
+ *
+ * Paged by keyset on `(createdAt, id)` rather than OFFSET. Offset paging over a table that is
+ * actively receiving inserts skips or repeats rows as the page boundary shifts under the reader —
+ * exactly what a notification drawer must not do. The `id` tiebreak matters because two reminders
+ * armed for the same event can land in the same millisecond, and a bare timestamp cursor would
+ * silently drop one of them.
+ */
 export async function listOwnDeliveries(
   transaction: TenantTransaction,
   organizationId: string,
   recipientUserId: string,
   limit: number,
+  cursor?: { createdAt: Date; id: string } | null,
 ) {
+  const conditions = [
+    eq(calendarNotificationDeliveries.organizationId, organizationId),
+    eq(calendarNotificationDeliveries.recipientUserId, recipientUserId),
+  ]
+  if (cursor) {
+    conditions.push(sql`(${calendarNotificationDeliveries.createdAt}, ${calendarNotificationDeliveries.id}) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`)
+  }
   return transaction
-    .select(deliveryColumns)
+    .select({ ...deliveryColumns, createdAt: calendarNotificationDeliveries.createdAt })
     .from(calendarNotificationDeliveries)
-    .where(and(
-      eq(calendarNotificationDeliveries.organizationId, organizationId),
-      eq(calendarNotificationDeliveries.recipientUserId, recipientUserId),
-    ))
-    .orderBy(asc(calendarNotificationDeliveries.createdAt))
+    .where(and(...conditions))
+    .orderBy(desc(calendarNotificationDeliveries.createdAt), desc(calendarNotificationDeliveries.id))
     .limit(limit)
 }
 

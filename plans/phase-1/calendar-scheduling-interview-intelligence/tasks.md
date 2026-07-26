@@ -670,10 +670,45 @@ src/shared/lib/repositories/scheduling.test.ts`.
     (132 routes). Verified live against the running dev server: unauthenticated GET returns
     `401 {"error":"authentication_required"}` and a malformed range still returns 401 (auth
     precedes validation, so an unauthenticated prober learns nothing about parameter shape).
-    **STILL OPEN for this task**: `export[.]ics.ts` and `notifications.ts` are not written, and the
-    role-matrix API tests (participant read-only, admin denial, tenant B, stale-version 409 over
-    HTTP) are not yet automated — those paths are covered at the service layer by
-    `service.test.ts`'s 32 tests, but not yet through the routes.
+  - **Evidence (2026-07-26, export + notifications now shipped)**: Added
+    `src/routes/api/calendar/export[.]ics.ts` and `src/routes/api/calendar/notifications.ts`
+    against the existing `interview-api.ts` contracts, plus
+    `src/lib/calendar/notifications.test.ts` (7 tests).
+
+    **The ICS export is authenticated per request, with no subscribable URL.** A signed feed link
+    is the conventional way to ship this and also the conventional way to leak an entire calendar
+    to whoever the link gets forwarded to. The range is required and bounded by
+    `exportIcsRequestSchema`, so "export my calendar" cannot become an unbounded scan, and the
+    response carries `Cache-Control: private, no-store` because the body is personal data.
+
+    **Notifications page by keyset on `(createdAt, id)`, not OFFSET.** Offset paging over a table
+    that is actively receiving inserts skips or repeats rows as the boundary shifts under the
+    reader — the exact failure a notification drawer must not have. The `id` tiebreak is load-
+    bearing: two reminders for one event can land in the same millisecond. Verified by removing the
+    tiebreak, at which point the shared-timestamp test fails with
+    `expected [ Array(1) ] to deeply equal [ …(2) ]`.
+
+    **No admin override exists on this resource, and a test enforces that.** A delivery has exactly
+    one recipient, so an org admin reading the feed gets zero rows rather than everyone's. Mark-read
+    takes an explicit id list; an id the caller does not own comes back simply unmarked, making
+    "not yours" and "does not exist" indistinguishable to a prober. A malformed cursor is rejected
+    with `400` rather than silently treated as page one — silently restarting would make a paging
+    client loop over the same rows forever.
+
+    **Live-verified authenticated, not just unauthenticated.** Signed in as the seeded admin,
+    created an event through the real API, then: `GET /api/calendar/export.ics` returned `200` with
+    `text/calendar; charset=utf-8`, `attachment; filename="builderhunt.ics"`, `private, no-store`,
+    and a body containing `METHOD:PUBLISH`, `UID:…@builderhunt.dev`, `SEQUENCE:0`,
+    `DTSTART;TZID=Europe/Copenhagen`. Ran the reminder worker to produce a real delivery; the feed
+    returned it with `unreadCount: 1`; `PATCH` with its id returned
+    `{"markedIds":[…],"unreadCount":0}`; `PATCH` with a foreign id returned `{"markedIds":[]}`.
+    Unauthenticated, all three verbs return `401 authentication_required`, including a request with
+    no range at all — auth precedes validation, so a prober learns nothing about parameter shape.
+    `node scripts/check-route-coverage.mjs` passes at 135 routes.
+
+    **STILL OPEN for this task**: the role-matrix API tests (participant read-only, admin denial,
+    tenant B, stale-version 409 over HTTP) are not yet automated — those paths are covered at the
+    service layer by `service.test.ts`'s 32 tests, but not yet through the routes.
 
 - [ ] **Add availability APIs**
   - Files: `src/routes/api/calendar/availability/index.ts` (new),

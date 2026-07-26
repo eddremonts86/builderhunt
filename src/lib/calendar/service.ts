@@ -14,6 +14,7 @@ import {
 } from '~/shared/lib/calendar'
 import {
   cancelRemindersForEvent,
+  countUnreadDeliveries,
   deleteEventWithVersion,
   deleteOccurrencesForEvent,
   findEventById,
@@ -21,6 +22,8 @@ import {
   insertEvent,
   insertParticipants,
   insertReminders,
+  listOwnDeliveries,
+  markDeliveriesRead,
   rearmRemindersForEvent,
   listBusyRanges,
   listEventsInRange,
@@ -396,4 +399,50 @@ export function icsUidForEvent(eventId: string): string {
 /** SEQUENCE must increase monotonically; the event's own optimistic version already does. */
 export function icsSequenceForEvent(version: number): number {
   return version - 1
+}
+
+// ── Notification deliveries ──────────────────────────────────────────────────────────────────
+
+/**
+ * The caller's own notification feed (plan Phase 3, "Add calendar event APIs").
+ *
+ * There is deliberately no `can()` call here and no admin path. Ownership is not a permission
+ * question for this resource — a delivery belongs to exactly one recipient, and the repository
+ * filters on `recipientUserId = principal.userId`. Adding an elevation branch would be the only
+ * way to make an org admin able to read someone else's notifications, so there isn't one.
+ */
+export async function listOwnNotifications(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  input: { limit: number; cursor?: { createdAt: Date; id: string } | null },
+) {
+  // Fetch one extra row to learn whether another page exists without a second COUNT query.
+  const rows = await listOwnDeliveries(transaction, principal.organizationId, principal.userId, input.limit + 1, input.cursor ?? null)
+  const page = rows.slice(0, input.limit)
+  const last = rows.length > input.limit ? page[page.length - 1] : null
+  return {
+    deliveries: page,
+    nextCursor: last ? { createdAt: last.createdAt, id: last.id } : null,
+  }
+}
+
+export async function countOwnUnreadNotifications(transaction: TenantTransaction, principal: TenantPrincipal) {
+  return countUnreadDeliveries(transaction, principal.organizationId, principal.userId)
+}
+
+/**
+ * Marks an explicit list of the caller's own deliveries read.
+ *
+ * Takes IDs rather than offering "mark all read" on purpose: the repository re-filters on
+ * `recipientUserId`, so an id belonging to someone else simply matches nothing and is returned as
+ * unaffected. The caller learns which ids actually changed, and never whether an id it does not
+ * own exists.
+ */
+export async function markOwnNotificationsRead(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  deliveryIds: string[],
+) {
+  const updated = await markDeliveriesRead(transaction, principal.organizationId, principal.userId, deliveryIds)
+  return { markedIds: updated.map((row) => row.id) }
 }
