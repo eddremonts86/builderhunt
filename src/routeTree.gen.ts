@@ -85,6 +85,7 @@ import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
+import { Route as ApiCalendarFeedRouteImport } from './routes/api/calendar/feed'
 import { Route as ApiCalendarExportDoticsRouteImport } from './routes/api/calendar/export[.]ics'
 import { Route as ApiBuildersTrackRouteImport } from './routes/api/builders/track'
 import { Route as ApiBuildersBuilderIdRouteImport } from './routes/api/builders/$builderId'
@@ -596,6 +597,11 @@ const ApiCalendarNotificationsRoute =
     path: '/api/calendar/notifications',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiCalendarFeedRoute = ApiCalendarFeedRouteImport.update({
+  id: '/api/calendar/feed',
+  path: '/api/calendar/feed',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiCalendarExportDoticsRoute = ApiCalendarExportDoticsRouteImport.update({
   id: '/api/calendar/export.ics',
   path: '/api/calendar/export.ics',
@@ -1355,6 +1361,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/calendar/export.ics': typeof ApiCalendarExportDoticsRoute
+  '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -1556,6 +1563,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/calendar/export.ics': typeof ApiCalendarExportDoticsRoute
+  '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -1762,6 +1770,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId': typeof ApiBuildersBuilderIdRouteWithChildren
   '/api/builders/track': typeof ApiBuildersTrackRoute
   '/api/calendar/export.ics': typeof ApiCalendarExportDoticsRoute
+  '/api/calendar/feed': typeof ApiCalendarFeedRoute
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
@@ -1967,6 +1976,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/calendar/export.ics'
+    | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
@@ -2168,6 +2178,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/calendar/export.ics'
+    | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
@@ -2373,6 +2384,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId'
     | '/api/builders/track'
     | '/api/calendar/export.ics'
+    | '/api/calendar/feed'
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
@@ -2542,6 +2554,7 @@ export interface RootRouteChildren {
   ApiBuildersBuilderIdRoute: typeof ApiBuildersBuilderIdRouteWithChildren
   ApiBuildersTrackRoute: typeof ApiBuildersTrackRoute
   ApiCalendarExportDoticsRoute: typeof ApiCalendarExportDoticsRoute
+  ApiCalendarFeedRoute: typeof ApiCalendarFeedRoute
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
@@ -3181,6 +3194,13 @@ declare module '@tanstack/react-router' {
       path: '/api/calendar/notifications'
       fullPath: '/api/calendar/notifications'
       preLoaderRoute: typeof ApiCalendarNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/feed': {
+      id: '/api/calendar/feed'
+      path: '/api/calendar/feed'
+      fullPath: '/api/calendar/feed'
+      preLoaderRoute: typeof ApiCalendarFeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/calendar/export.ics': {
@@ -4413,6 +4433,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersBuilderIdRoute: ApiBuildersBuilderIdRouteWithChildren,
   ApiBuildersTrackRoute: ApiBuildersTrackRoute,
   ApiCalendarExportDoticsRoute: ApiCalendarExportDoticsRoute,
+  ApiCalendarFeedRoute: ApiCalendarFeedRoute,
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,

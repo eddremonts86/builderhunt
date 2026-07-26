@@ -945,15 +945,63 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `DATABASE_WORKER_URL` that the worker can write `next_evaluation_at` but still gets
     `permission denied` on `enabled` and `trigger_conditions`.
 
-- [ ] **Implement unified calendar feed**
+- [x] **Implement unified calendar feed**
   - Files: `src/lib/calendar/projections.ts` (new),
     `src/lib/calendar/projections.test.ts` (new),
-    `src/routes/api/calendar/feed.ts` (new)
+    `src/routes/api/calendar/feed.ts` (new),
+    `src/shared/lib/repositories/organization-alerts.ts`
   - Do: Merge authorized internal events, operational next runs, alert estimates, job runs, and
     existing alert triggers over a bounded range; preserve discriminated DTOs, `estimated|actual`,
     `editable: false`, stale timestamps, and source links; paginate agenda results.
   - Verify: tests cover layer filters, range boundaries, stale source, no irrelevant tenant job,
     read-only fields, and query-count ceiling; p95 local fixture query under 500 ms.
+  - Evidence: 20 tests green; full suite 3073 passed; route coverage 139.
+
+    **The event item is built field-by-field, not spread.** `feedEventItemSchema` is `.strict()` and
+    deliberately has no `organizationId`, so a spread would both fail validation and be the exact
+    leak the closed schema exists to prevent. A test parses the whole response through the schema,
+    which is what makes that guarantee mechanical rather than a convention.
+
+    **`editable: false` on every projection is a type-level literal, not a runtime flag.** A
+    draggable projection would edit nothing — the change would vanish on the next fetch — so the
+    contract makes an editable projection unrepresentable.
+
+    **`estimateOnly` separates intent from history.** `job_projection`/`alert_projection` say "we
+    intend to run then"; `job_run`/`alert_result` say "this happened". A user planning around a
+    prediction is making a different decision than one reading a record, so they must not render
+    identically. The alert projection's title is `Next check — <name>`; a test asserts it never
+    contains the word "match", because "next match" would promise a result we cannot promise.
+
+    **Platform-scoped jobs are excluded from a tenant feed.** Billing reconciliation and builder
+    discovery are not the organization's work; showing them would read as "your account is doing
+    this", which is untrue and unactionable. Only `scope: 'organization'` entries appear.
+
+    **Alerts are scoped to the caller, not the organization.** An alert is a personal watch list, so
+    showing a colleague's evaluation schedule would leak what they track — the same reasoning that
+    gives calendar events no admin read path. Tests cover both the projection and the match buckets.
+
+    **`staleSources` is the honest-uncertainty channel.** A schedule whose next run is already in the
+    past means nothing is executing, so it is named rather than drawn as a confident future entry. A
+    failing alert is named *and still shown*, because hiding it would look like the alert was
+    deleted. The list is de-duplicated so one broken worker reads as one problem.
+
+    **Cost is measured, not assumed.** The query-ceiling test wraps the transaction in a Proxy that
+    counts real `select`/`execute` calls, seeds 25 events plus 25 triggers, and asserts ≤ 6 queries —
+    a per-item query would push it into the dozens. Alert matches are aggregated per alert per day in
+    SQL (`date_trunc` + `count(*)`), so feed cost scales with items rendered, not with match volume.
+
+    **A test caught its own fixture bug.** The range test initially failed with seven leftover
+    `Standup` events because `beforeEach` cleaned alerts and job runs but not `calendar_events` — the
+    assertion was strong enough to notice, which is the point of asserting on exact titles rather
+    than counts.
+
+    **Live-verified against the running server with a real session.** All three layers return a
+    chronologically sorted list with `alert_result`, `job_run` and `alert_projection` items, every
+    projection `editable: false`, and no `organizationId` on any item. `?layers=jobs` alone returns
+    only `job_run`. `?layers=bogus` returns `400` naming the valid options; a reversed range returns
+    `400 "to must be after from"`; unauthenticated returns `401`. `staleSources` correctly named all
+    four org-scoped schedules, because this machine has no cron driving them — the feed reporting
+    that is the designed behavior, not a defect.
 
 - [ ] **Add calendar layer UI**
   - Files: `src/modules/calendar/components/CalendarLayers.tsx` (new),

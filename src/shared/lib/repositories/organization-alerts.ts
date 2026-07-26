@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { alerts, alertTriggers } from '../db/schema'
 
@@ -153,4 +153,76 @@ function toTriggerRecord(row: typeof alertTriggers.$inferSelect): AlertTriggerRe
     matchedAt: row.matchedAt.toISOString(),
     readAt: row.readAt?.toISOString() ?? null,
   }
+}
+
+// ── Calendar feed projections (plan: calendar-scheduling-interview-intelligence, Phase 4) ─────
+
+/**
+ * The caller's OWN alerts whose next evaluation falls inside the range.
+ *
+ * Scoped to `userId`, not just the organization. An alert is a personal watch list, and the calendar
+ * is a private surface — showing a colleague's alert schedule would leak what they are tracking,
+ * which is the same reasoning that gives calendar events no admin read path.
+ */
+export function listOwnAlertProjections(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+  range: { from: Date; to: Date },
+) {
+  return transaction
+    .select({
+      id: alerts.id,
+      name: alerts.name,
+      frequency: alerts.frequency,
+      nextEvaluationAt: alerts.nextEvaluationAt,
+      consecutiveFailures: alerts.consecutiveFailures,
+      lastEvaluationErrorCode: alerts.lastEvaluationErrorCode,
+    })
+    .from(alerts)
+    .where(and(
+      eq(alerts.organizationId, organizationId),
+      eq(alerts.userId, userId),
+      eq(alerts.enabled, true),
+      isNotNull(alerts.nextEvaluationAt),
+      gte(alerts.nextEvaluationAt, range.from),
+      lt(alerts.nextEvaluationAt, range.to),
+    ))
+    .orderBy(asc(alerts.nextEvaluationAt))
+}
+
+/**
+ * The caller's own alert matches inside the range, pre-aggregated per alert per local day.
+ *
+ * Aggregated in SQL rather than in JS because the feed needs one `alert_result` item per
+ * alert-per-day, and a busy alert can produce hundreds of triggers in a range — shipping them all to
+ * the app to be counted there would make the feed's cost scale with match volume instead of with the
+ * number of items it actually renders.
+ */
+export function listOwnAlertResultBuckets(
+  transaction: TenantTransaction,
+  organizationId: string,
+  userId: string,
+  range: { from: Date; to: Date },
+) {
+  return transaction
+    .select({
+      alertId: alertTriggers.alertId,
+      alertName: alerts.name,
+      bucketStart: sql<string>`date_trunc('day', ${alertTriggers.matchedAt})`.as('bucket_start'),
+      matchCount: sql<number>`count(*)::int`.as('match_count'),
+    })
+    .from(alertTriggers)
+    .innerJoin(alerts, and(
+      eq(alerts.organizationId, alertTriggers.organizationId),
+      eq(alerts.id, alertTriggers.alertId),
+    ))
+    .where(and(
+      eq(alertTriggers.organizationId, organizationId),
+      eq(alertTriggers.userId, userId),
+      gte(alertTriggers.matchedAt, range.from),
+      lt(alertTriggers.matchedAt, range.to),
+    ))
+    .groupBy(alertTriggers.alertId, alerts.name, sql`date_trunc('day', ${alertTriggers.matchedAt})`)
+    .orderBy(sql`bucket_start asc`)
 }
