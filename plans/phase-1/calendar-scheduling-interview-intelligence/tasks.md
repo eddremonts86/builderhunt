@@ -42,7 +42,7 @@
   - Verify: every required billing-platform task is complete before provider-backed interview flags
     can enable; interview-only beta works with platform operator grants and all paid providers off.
 
-- [ ] **Add environment schema and kill switches**
+- [x] **Add environment schema and kill switches**
   - Files: `src/shared/lib/env.ts`, `src/shared/lib/env.security.test.ts`, `.env.example`,
     `.env.production.example`
   - Do: Add server-only R2 endpoint/account/bucket/access keys/jurisdiction, ClamAV host/port,
@@ -54,8 +54,23 @@
   - Verify: env tests cover disabled minimal config, each enabled dependency, non-EU rejection,
     missing secret, malformed retention/price values, and public-secret leakage; `pnpm test
 src/shared/lib/env.security.test.ts`.
+  - **Evidence (2026-07-26)**: Added all 8 release flags (`CALENDAR_ENABLED` through
+    `CALENDAR_OPERATIONAL_LAYERS_ENABLED`), R2/ClamAV/Deepgram/Azure OpenAI config, and 3
+    retention ceilings to `src/shared/lib/env.ts`. Production-only `superRefine` requires R2+ClamAV
+    when `CANDIDATE_UPLOADS_ENABLED=true` (endpoint regex-checked against
+    `*.eu.r2.cloudflarestorage.com`), Deepgram key + EU base URL when
+    `INTERVIEW_TRANSCRIPTION_ENABLED=true`, and Azure endpoint/key/deployment/version + EU-region
+    hostname check when `SENSITIVE_AI_ENABLED=true`. `parseEnvironment()` rejects any stray
+    `VITE_`-prefixed copy of an R2/ClamAV/Deepgram/Azure secret in every environment (not just
+    production), since that's a static shape mistake, not a runtime dependency. Extended
+    `env.security.test.ts` with a new describe block: disabled-default boot, all-dependencies-valid,
+    17 individual rejection cases (missing/malformed config, non-EU endpoints, retention ceilings),
+    5 VITE_-leakage rejection cases, and a "no provider config required outside production" case
+    mirroring the existing enrichment precedent. `.env.example`/`.env.production.example` updated to
+    match. All 62 tests in the file pass; `pnpm tsc --noEmit`, `pnpm eslint`, and the full
+    `pnpm vitest run` (2373 passed) are clean. Committed as `f9e7285`.
 
-- [ ] **Install and lock reviewed dependencies**
+- [x] **Install and lock reviewed dependencies**
   - Files: `package.json`, `pnpm-lock.yaml`
   - Do: Add FullCalendar Standard React/day-grid/time-grid/list/interaction/RRule packages, `rrule`,
     `@js-temporal/polyfill`, AWS S3 client/presigner, `file-type`, `pdfjs-dist`, `mammoth`,
@@ -64,6 +79,21 @@ src/shared/lib/env.security.test.ts`.
     FullCalendar Premium or an unmaintained ClamAV wrapper.
   - Verify: `pnpm list --depth 0` has no invalid tree; `pnpm build`,
     `pnpm security:dependencies`, and a license report show no unapproved runtime license.
+  - **Evidence (2026-07-26)**: Installed `@fullcalendar/{core,react,daygrid,timegrid,list,
+    interaction,rrule}` — pinned all to `6.1.21` (not the newly-published `7.0.2` line for
+    core/react/rrule) because `@fullcalendar/{daygrid,timegrid,list,interaction}` have not yet
+    published a matching v7 release; mixing majors produced an unmet-peer error. `rrule`,
+    `@js-temporal/polyfill`, `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `file-type`,
+    `pdfjs-dist`, `mammoth`, `ical-generator`, and `openai` installed at their current latest.
+    `pnpm peers check` reports no issues. Licenses verified from each package's own
+    `package.json`: MIT (FullCalendar ×7, `file-type`, `ical-generator`), BSD-3-Clause (`rrule`),
+    ISC (`@js-temporal/polyfill`), Apache-2.0 (`@aws-sdk/*`, `pdfjs-dist`, `openai`), BSD-2-Clause
+    (`mammoth`) — all approved, no unmaintained ClamAV wrapper or FullCalendar Premium package
+    installed. `pnpm build` succeeds. `pnpm security:dependencies` reports one pre-existing high
+    `js-yaml` advisory via `@tanstack/react-start` → `xmlbuilder2`; confirmed via
+    `git stash`/re-run that this identical finding exists on `master` before this change, so it is
+    not a regression from the new dependencies. Full `pnpm tsc --noEmit` and `pnpm vitest run`
+    (2373 passed) stay clean after the install.
 
 - [ ] **Define shared feature/catalog configuration**
   - Files: `src/shared/lib/interview-config.ts` (new),
