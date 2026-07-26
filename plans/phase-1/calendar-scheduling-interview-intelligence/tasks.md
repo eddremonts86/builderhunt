@@ -31,6 +31,15 @@
     do not duplicate it. Complete a DPIA before production voice enablement. Store no secret values.
   - Verify: security/privacy reviewer signs the register; each regional endpoint is confirmed from a
     test response/console and every provider can be disabled independently.
+  - **Evidence (2026-07-26, PARTIAL — register written, accounts NOT provisioned)**: Wrote
+    `docs/operations/interview-provider-register.md` with the exact provisioning steps, the EU
+    constraints `env.ts` already enforces at boot, the env var names, and a per-provider "Recorded"
+    block to fill in. It stores no secret values. Flagged two things that need a human decision
+    rather than a workaround: (a) Deepgram's EU endpoint may be plan-gated, and the code
+    deliberately cannot fall back to the global endpoint; (b) Azure OpenAI access is an
+    application with a review queue, so it should be started first. **This task is NOT complete**:
+    no account exists, no DPA is signed, no DPIA is done, and no reviewer has signed the register —
+    all of which require a human. The register is the prerequisite artifact, not the sign-off.
 
 - [ ] **Verify the billing platform certification dependency**
   - Files: `plans/stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
