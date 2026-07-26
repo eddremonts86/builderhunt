@@ -264,6 +264,14 @@
     "0065_awesome_lorna_dane": {
       "sql": "898eae3e3514184c642fc909d14a481de1838c028035d0990e953b7bf6448b9f",
       "snapshot": "440bb6f419cb61a75979b89b91f7a16d35c634c49a58458e08fe7bfc4b21080f"
+    },
+    "0066_orange_the_enforcers": {
+      "sql": "e26a5cdf7ac10b0c3631f9bb3d2fdfd138cf8aded827e96bb7dd6d28d401370e",
+      "snapshot": "8b12e894ae88307fd6f6a66ee2b22826ddd493a9bdc03653ea87a6f7c2700d61"
+    },
+    "0067_operational_schedule_grants": {
+      "sql": "7240b52a4b36c45c2f9862cb9df6a84fd02d4395099e846ab99725bd9778b2c1",
+      "snapshot": "21f50162cab5f301ee8914f3acd8bf3c8937fea1a18c9721bd93a91b585aaed5"
     }
   }
 }

@@ -2203,3 +2203,58 @@ export const candidateLinks = pgTable(
     ),
   ],
 )
+
+/**
+ * System-operational scheduling and run history (spec.md §Data model → "Operations and usage").
+ * These are NOT tenant tables: a job identity is stable and platform-owned, not owned by any one
+ * organization, so they carry no `organization_id` and get no RLS — access is controlled entirely
+ * by per-role GRANT (same reasoning as `status_checks`, `conversion_events`, and the
+ * profile-removal tables). The calendar feed exposes them only as redacted, read-only
+ * `job_projection`/`job_run` DTOs (spec.md §Calendar projection contract), never as editable rows.
+ */
+export const operationalSchedules = pgTable(
+  'operational_schedules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    jobKey: text('job_key').notNull(),
+    cronExpression: text('cron_expression').notNull(),
+    timezone: text('timezone').notNull(),
+    scope: text('scope').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    nextRunAt: timestamp('next_run_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('operational_schedules_job_key_unique').on(table.jobKey),
+    index('operational_schedules_next_run_idx').on(table.enabled, table.nextRunAt),
+    check('operational_schedules_scope_check', sql`${table.scope} in ('platform', 'organization')`),
+  ],
+)
+
+export const jobRuns = pgTable(
+  'job_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    scheduleId: uuid('schedule_id').references(() => operationalSchedules.id, { onDelete: 'set null' }),
+    jobKey: text('job_key').notNull(),
+    scheduledFor: timestamp('scheduled_for', { withTimezone: true }).notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    state: text('state').notNull().default('scheduled'),
+    processedCount: integer('processed_count').notNull().default(0),
+    failedCount: integer('failed_count').notNull().default(0),
+    durationMs: integer('duration_ms'),
+    // Redacted: a stable short code only, never a provider message or stack trace — these rows
+    // are projected into a user-visible calendar feed.
+    errorCode: text('error_code'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('job_runs_job_key_scheduled_idx').on(table.jobKey, table.scheduledFor),
+    index('job_runs_state_idx').on(table.state, table.scheduledFor),
+    check('job_runs_state_check', sql`${table.state} in ('scheduled', 'running', 'succeeded', 'failed', 'skipped')`),
+    check('job_runs_counters_check', sql`${table.processedCount} >= 0 and ${table.failedCount} >= 0 and (${table.durationMs} is null or ${table.durationMs} >= 0)`),
+    check('job_runs_finished_check', sql`${table.finishedAt} is null or ${table.startedAt} is not null`),
+  ],
+)

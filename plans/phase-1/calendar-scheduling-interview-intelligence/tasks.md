@@ -364,7 +364,7 @@ drizzle-kit check && pnpm test:migrations:local`.
     migrations). `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2836 passed)
     are clean.
 
-- [ ] **Add operational schedule and run schema**
+- [x] **Add operational schedule and run schema**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `docs/architecture/data-classification.md`
   - Do: Add system-operational `operational_schedules` and `job_runs` with stable job key,
     cron/timezone, scope, enabled/next-run, scheduled/actual timestamps, state checks, counters,
@@ -372,6 +372,33 @@ drizzle-kit check && pnpm test:migrations:local`.
     allow calendar projection reads through repository DTOs.
   - Verify: migration checks pass; direct web-role insert/update fails; worker insert and redacted
     projection select pass in local PostgreSQL.
+  - **Evidence (2026-07-26)**: Added `operational_schedules` (unique `job_key`, cron expression,
+    IANA timezone, `platform|organization` scope check, enabled/next-run with a scan index) and
+    `job_runs` (schedule FK, scheduled/started/finished timestamps, 5-state check, non-negative
+    counter/duration check, a `finished_at implies started_at` check, and a deliberately *redacted*
+    `error_code` short code — never a provider message or stack trace, because these rows are
+    projected into a user-visible calendar feed). Both are deliberately **not** tenant tables: a
+    job identity is stable and platform-owned, so they carry no `organization_id` and get no RLS —
+    access is controlled entirely by GRANT, the same pattern as `status_checks` (0048),
+    `conversion_events` (0062), and the profile-removal tables (0064). Generated
+    `drizzle/0066_orange_the_enforcers.sql` (2 CREATE TABLEs, no DROP/ALTER) plus a hand-written
+    `drizzle/0067_operational_schedule_grants.sql` registered via
+    `drizzle-kit generate --custom`. Grants: `builderhunt_app` gets **SELECT only** on both tables
+    (spec.md's projection contract says these "cannot be dragged or edited" — a request handler must
+    never be able to create, reschedule, or rewrite platform job history);
+    `builderhunt_worker` gets SELECT+UPDATE on schedules (claim a due job) and SELECT+INSERT+UPDATE
+    on runs, but no DELETE (run history is append-only evidence); `builderhunt_platform` registers/
+    enables/disables schedules and trims aged run history.
+    `pnpm test:migrations:local` against a fresh disposable database returns
+    `{"firstRun":"ok","secondRun":"ok","applied":68}`. **Verified the boundary behaviorally against
+    live Postgres using `SET LOCAL ROLE`**, not just by reading the grant table: as
+    `builderhunt_app`, `INSERT INTO operational_schedules` and `UPDATE job_runs` both fail with
+    `permission denied`; a full transaction then proves the real pipeline works — platform INSERTs
+    the schedule, worker UPDATEs it to claim, worker INSERTs the run row, worker UPDATEs it closed
+    with counters/duration, and `builderhunt_app` SELECTs the resulting redacted projection
+    (`job_key`/`state`/`processed_count`/`duration_ms`/`error_code`). Also confirmed the worker
+    genuinely *cannot* register a new schedule (that's the platform role's job), which the grant
+    design intends. `pnpm tsc --noEmit` and the full `pnpm vitest run` (2836 passed) are clean.
 
 - [ ] **Add strict private-user RLS policies**
   - Files: `drizzle/`, `src/shared/lib/security/rls-policy.test.ts`,
