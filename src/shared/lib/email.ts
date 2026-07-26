@@ -1,5 +1,6 @@
 import { env } from '~/shared/lib/env'
 import { recordOutbox } from '~/shared/lib/email/outbox'
+import { SITE_URL } from '~/shared/lib/site-url'
 
 /**
  * Email helper. Uses Resend in production (when RESEND_API_KEY is set);
@@ -242,7 +243,7 @@ function alertDigestEmailHtml(items: AlertDigestItem[]): string {
     <p>Here's what matched your smart alerts since the last check:</p>
     <table style="width:100%;border-collapse:collapse;margin:1rem 0;">${rows}</table>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/alerts" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View all in dashboard</a>
+      <a href="${SITE_URL}/alerts" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View all in dashboard</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
@@ -596,7 +597,7 @@ function deletionScheduledEmailHtml(gracePeriodEndDate: string): string {
     <p>We received a request to delete your BuilderHunt account. If you don't cancel it, your account and its
       associated data will be permanently deleted on <strong>${gracePeriodEndDate}</strong>.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Sign in to cancel</a>
+      <a href="${SITE_URL}/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Sign in to cancel</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">If you didn't request this, sign in and cancel it immediately from your privacy settings.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
@@ -624,7 +625,7 @@ function exportReadyEmailHtml(): string {
     <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your data export is ready</h1>
     <p>The data export you requested from BuilderHunt is ready to view.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
+      <a href="${SITE_URL}/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">This export link expires 7 days after the request. Request a new one anytime from your privacy settings.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
@@ -656,7 +657,7 @@ function billingReceiptEmailHtml(details: { description: string; amountCents: nu
     <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Receipt from BuilderHunt</h1>
     <p>${details.description} — <strong>${amount}</strong>.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View billing</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View billing</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
@@ -671,7 +672,7 @@ function billingPaymentFailedEmailHtml(): string {
     <p>We couldn't process your latest BuilderHunt subscription payment. Update your payment method to avoid
       losing access when your grace period ends.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
@@ -701,7 +702,7 @@ function ownershipTransferredToEmailHtml(organizationName: string, previousOwner
       authority — the subscription, saved payment method, and Customer Portal access — moved to you along with
       ownership. Nothing was charged as part of this transfer.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review billing</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review billing</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">If you didn't expect this, contact us immediately.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
@@ -934,7 +935,7 @@ function creditExpiryNoticeEmailHtml(details: { remainingUnits: number; daysUnti
       <strong>${details.daysUntilExpiry} day${details.daysUntilExpiry === 1 ? '' : 's'}</strong>. Unused credits are
       not refunded or extended once they expire.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Use your credits</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Use your credits</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
@@ -950,7 +951,7 @@ function subscriptionRenewalReminderEmailHtml(details: { tier: string; currentPe
     <p>Your BuilderHunt subscription will renew automatically on <strong>${date}</strong> using your saved payment
       method. No action is needed unless you want to make a change.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review your plan</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Review your plan</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>
@@ -965,7 +966,7 @@ function actionRequiredEmailHtml(): string {
     <p>We still haven't been able to charge your saved payment method after your grace period ended. Your
       BuilderHunt subscription access is now paused. Update your payment method to restore it.</p>
     <p style="margin:1.5rem 0;">
-      <a href="https://builderhunt.dev/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
+      <a href="${SITE_URL}/settings/billing" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Update payment method</a>
     </p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
   </body>

@@ -894,16 +894,56 @@ src/shared/lib/repositories/scheduling.test.ts`.
     breaks the dev server's worker/auth connections mid-session (`28P01`). Symptom is a 500 from any
     worker route or sign-in; fix is to re-`ALTER ROLE ... PASSWORD` from `.env`.
 
-- [ ] **Persist honest alert evaluation timing**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
-    `src/shared/lib/repositories/organization-alerts.ts`,
-    `src/shared/lib/repositories/alerts-worker.ts`, `src/lib/alerts/worker.ts`,
-    `src/shared/lib/alerts.test.ts`
+- [x] **Persist honest alert evaluation timing**
+  - Files: `src/shared/lib/db/schema.ts`,
+    `drizzle/0072_alert_evaluation_timing.sql`,
+    `drizzle/0073_alert_evaluation_timing_grant.sql`,
+    `src/shared/lib/alerts.ts`, `src/shared/lib/alerts.test.ts`,
+    `src/shared/lib/repositories/alerts-worker.ts`,
+    `src/shared/lib/repositories/alerts-timing.test.ts` (new), `src/lib/alerts/worker.ts`
   - Do: Add/normalize `next_evaluation_at`, cadence, pause state, and last evaluated timestamp for
     alerts so calendar estimates come from source state. Update worker atomically on success/failure;
     do not promise a match.
   - Verify: migration and alert tests cover active/paused/failure/retry cadence; existing alert UI
     remains correct.
+  - Evidence: 32 pure timing tests + 7 real-DB tests; full suite 3053 passed.
+
+    **Fixed a real bug: a transient failure silenced an alert for its whole window.** The worker's
+    `finally` advanced `lastCheckedAt` identically whether the evaluation succeeded or threw, so one
+    network blip meant a *weekly* alert went quiet for a week. Added `next_evaluation_at`,
+    `consecutive_failures` and `last_evaluation_error_code`, and a failed attempt now gets a 5-minute
+    backoff doubling per consecutive failure — capped at the frequency window, because uncapped
+    backoff turns a bug into an indefinite outage. `enabled` already served as pause state, so no new
+    column for that.
+
+    **Written in one UPDATE, on purpose.** `nextAlertTimingState` returns all four fields together so
+    the caller cannot split the write; a split would leave a window where the calendar feed reads a
+    next-run derived from the *previous* attempt's failure count.
+
+    **`next_evaluation_at` is a checking time, never a promise of a match.** That is stated in the
+    column comment and the function docs, because the calendar feed renders it and "next evaluation"
+    read as "you will get a result then" would be a lie the schema encouraged.
+
+    **No backfill needed.** `isDueForEvaluation` prefers the persisted value and falls back to the
+    frequency window when it is null, so existing rows keep working and a fresh alert is still due
+    immediately. A test pins both branches.
+
+    **The permission error was the most valuable thing here.** The new write failed against the real
+    database with `42501 permission denied for table alerts` while every test passed, because the
+    disposable test DB runs as owner. Cause: `builderhunt_worker` holds **column-level** UPDATE on
+    exactly `last_checked_at` and `last_triggered_at` (0010, 0056) — someone deliberately scoped it so
+    a compromised worker cannot disable every alert or rewrite what they match on. `GRANT UPDATE ON
+    TABLE alerts` would have made the error go away and erased that. 0073 grants only the three new
+    timing columns, and a test parses the migration's executable lines to fail if the table-wide form
+    ever appears (verified by adding it: the test fails).
+
+    **Live-verified under the real worker role:** forced the hourly alert due with
+    `consecutive_failures = 2, last_evaluation_error_code = 'rate_limited'`, ran
+    `POST /api/admin/alerts/run-worker`, and the row came back
+    `gap = 00:55:00, consecutive_failures = 0, last_evaluation_error_code = NULL` — success resets
+    the failure state and schedules exactly one hourly window out. Also confirmed directly against
+    `DATABASE_WORKER_URL` that the worker can write `next_evaluation_at` but still gets
+    `permission denied` on `enabled` and `trigger_conditions`.
 
 - [ ] **Implement unified calendar feed**
   - Files: `src/lib/calendar/projections.ts` (new),

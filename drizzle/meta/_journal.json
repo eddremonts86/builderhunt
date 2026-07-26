@@ -505,6 +505,20 @@
       "when": 1785073759415,
       "tag": "0071_availability_policy_rls",
       "breakpoints": true
+    },
+    {
+      "idx": 72,
+      "version": "7",
+      "when": 1785077467258,
+      "tag": "0072_alert_evaluation_timing",
+      "breakpoints": true
+    },
+    {
+      "idx": 73,
+      "version": "7",
+      "when": 1785077695067,
+      "tag": "0073_alert_evaluation_timing_grant",
+      "breakpoints": true
     }
   ]
 }

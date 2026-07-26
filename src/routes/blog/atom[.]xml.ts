@@ -1,7 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAllPosts } from '~/shared/lib/blog'
-
-const SITE = 'https://builderhunt.dev'
+import { SITE_URL as SITE } from '~/shared/lib/site-url'
 
 function escapeXml(s: string): string {
   return s.replace(/[<>&'"]/g, (c) => {

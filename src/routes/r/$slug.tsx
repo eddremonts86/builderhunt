@@ -4,8 +4,7 @@ import { PersonResultCard, type PersonCardData } from '~/modules/search/componen
 import { resolvePublicRadar, searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 import { LinkButton } from '~/components/ui/link'
-
-const SITE_URL = 'https://builderhunt.dev'
+import { SITE_URL } from '~/shared/lib/site-url'
 const SITE_NAME = 'BuilderHunt'
 
 interface RadarLoaderData {

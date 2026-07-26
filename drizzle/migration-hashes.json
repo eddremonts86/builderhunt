@@ -288,6 +288,14 @@
     "0071_availability_policy_rls": {
       "sql": "458e6d431486a5f99f5cbd85bdb9145bb31a504f5beb7c1d77fd7e0999b8b57e",
       "snapshot": "bbc178c9121eddbbfc5a9898cda35c40c78cb419146c57601f1225421653d2a2"
+    },
+    "0072_alert_evaluation_timing": {
+      "sql": "3df16942a03ec4f1e10785863577a5f6dafe6273a5c5cb2a8c3040602d087060",
+      "snapshot": "9592c8450e1017e77ade7da403082a6facb070085d8c475a4f8035573bf866b1"
+    },
+    "0073_alert_evaluation_timing_grant": {
+      "sql": "5cc6131ccb301a5a3ee82a8186822b768c8f0fcd32a5f66750b22825aadfb868",
+      "snapshot": "7bc9715bae76a6cccc22564114b89c51f4eb253a61830ecaef69152911a87d1f"
     }
   }
 }

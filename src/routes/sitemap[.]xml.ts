@@ -1,12 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { getAllPosts } from '~/shared/lib/blog'
+import { SITE_URL as SITE } from '~/shared/lib/site-url'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
 // opens a real `postgres()` client at module scope — importing it dynamically
 // inside the handler (not statically here) keeps that chain out of the
 // client bundle this route file's own module contributes to the generated
 // route tree. See the matching note in src/lib/sources/devpost.ts.
-
-const SITE = 'https://builderhunt.dev'
 
 // Curated top queries that we know produce results.
 const POPULAR_QUERIES = [

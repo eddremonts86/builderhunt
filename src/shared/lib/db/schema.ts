@@ -329,6 +329,20 @@ export const alerts = pgTable('alerts', {
   // (set on every worker pass regardless of match outcome), so `isDueForCheck`
   // can honor `frequency` instead of re-evaluating every alert every run.
   lastCheckedAt: timestamp('last_checked_at'),
+  /**
+   * When the worker intends to evaluate this alert next (plan:
+   * calendar-scheduling-interview-intelligence, Phase 4 "Persist honest alert evaluation timing").
+   *
+   * This is the *checking* time, never a promise that something will be found. The calendar feed
+   * reads it directly instead of recomputing a frequency window client-side, so what a user sees is
+   * the worker's actual intent — including a shortened retry after a failure, which a recomputed
+   * estimate would silently get wrong.
+   */
+  nextEvaluationAt: timestamp('next_evaluation_at'),
+  /** Drives retry backoff. Reset to 0 on any successful evaluation. */
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  /** Short redacted code only — this surfaces in the alerts UI and the calendar feed. */
+  lastEvaluationErrorCode: text('last_evaluation_error_code'),
   createdAt: timestamp('created_at').defaultNow(),
   // Plan: smart-alerts
   triggerConditions: jsonb('trigger_conditions')
@@ -349,6 +363,9 @@ export const alerts = pgTable('alerts', {
     foreignColumns: [savedQueries.organizationId, savedQueries.id],
     name: 'alerts_organization_query_fk',
   }),
+  // The worker's due-set scan; also the calendar feed's read path for upcoming evaluations.
+  nextEvaluationIdx: index('alerts_next_evaluation_idx').on(table.enabled, table.nextEvaluationAt),
+  failuresCheck: check('alerts_consecutive_failures_check', sql`${table.consecutiveFailures} >= 0`),
 }))
 
 export const alertTriggers = pgTable('alert_triggers', {

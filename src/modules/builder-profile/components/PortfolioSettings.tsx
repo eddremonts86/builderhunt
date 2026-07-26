@@ -9,14 +9,13 @@ import {
   type PortfolioProject,
   type PortfolioSettings as PortfolioSettingsData,
 } from '~/shared/lib/portfolio'
+import { SITE_URL } from '~/shared/lib/site-url'
 
 interface DraftResponse {
   claimId: string
   settings: PortfolioSettingsData
   projectCandidates: PortfolioProject[]
 }
-
-const SITE_URL = 'https://builderhunt.dev'
 
 interface PortfolioSettingsProps {
   claimId: string

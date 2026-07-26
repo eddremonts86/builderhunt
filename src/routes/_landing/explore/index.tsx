@@ -30,6 +30,7 @@ import {
 import { searchPublicBuilders, type PublicSearchBuilder } from '~/shared/lib/public-data'
 import { Button, Input, LinkButton } from '~/components/ui'
 import { trackConversionEvent } from '~/shared/lib/conversion-client'
+import { SITE_URL } from '~/shared/lib/site-url'
 
 const SearchSchema = z.object({
   q: z.string().optional().default(''),
@@ -98,9 +99,11 @@ export const Route = createFileRoute('/_landing/explore/')({
     const description = q
       ? `Discover people and technical resources related to ${q} across GitHub, Hacker News, Reddit, DEV.to, npm and more.`
       : 'Discover active developers and technical resources across the open web. Free during public beta.'
+    // SITE_URL, not window.location.origin: this value is emitted into og:image
+    // and must be byte-identical between the SSR render and hydration.
     const ogUrl = q
-      ? `${typeof window !== 'undefined' ? window.location.origin : 'https://builderhunt.dev'}/api/og/explore?q=${encodeURIComponent(q)}`
-      : `${typeof window !== 'undefined' ? window.location.origin : 'https://builderhunt.dev'}/brand/og-image.png`
+      ? `${SITE_URL}/api/og/explore?q=${encodeURIComponent(q)}`
+      : `${SITE_URL}/brand/og-image.png`
     return {
       meta: [
         { title },
@@ -239,9 +242,7 @@ function ExplorePageContent({ results, featured, query, sources, resultType }: E
     itemListElement: activeResults.slice(0, 20).map((builder, index) => ({
       '@type': 'ListItem',
       position: index + 1,
-      url: typeof window !== 'undefined'
-        ? `${window.location.origin}/builders/${builder.id}`
-        : `https://builderhunt.dev/builders/${builder.id}`,
+      url: `${SITE_URL}/builders/${builder.id}`,
       name: builder.displayName ?? builder.username,
     })),
   } : null

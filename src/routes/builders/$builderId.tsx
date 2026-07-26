@@ -2,8 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { BuilderProfilePage } from '~/modules/builder-profile/components/BuilderProfilePage'
 import { getPublicBuilder } from '~/shared/lib/public-data'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
-
-const SITE_URL = 'https://builderhunt.dev'
+import { SITE_URL } from '~/shared/lib/site-url'
 const SITE_NAME = 'BuilderHunt'
 
 interface LoaderBuilder {

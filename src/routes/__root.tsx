@@ -2,8 +2,8 @@ import { createRootRoute, Outlet } from '@tanstack/react-router'
 import { RootDocument, RootErrorBoundary } from './-root-components'
 import { NotFoundPage } from '~/components/composite/NotFoundPage'
 import appCss from '~/shared/styles/globals.css?url'
+import { SITE_URL } from '~/shared/lib/site-url'
 
-const SITE_URL = 'https://builderhunt.dev'
 const SITE_NAME = 'BuilderHunt'
 const SITE_DESC = 'Discover active open-source builders across GitHub, Reddit, Hacker News, DEV.to and more. Save searches, get alerts, and track the people shipping the work — not just the repos.'
 const OG_IMAGE = `${SITE_URL}/brand/og-image.png`

@@ -4,8 +4,7 @@ import { z } from 'zod'
 import { PublicPortfolio } from '~/modules/builder-profile/components/PublicPortfolio'
 import type { PublicPortfolio as PublicPortfolioData } from '~/shared/lib/portfolio'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
-
-const SITE_URL = 'https://builderhunt.dev'
+import { SITE_URL } from '~/shared/lib/site-url'
 const SITE_NAME = 'BuilderHunt'
 
 // createServerFn + dynamic imports inside .handler() keeps node-only deps

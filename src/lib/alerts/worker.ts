@@ -1,6 +1,6 @@
 import { searchBuilders } from '~/lib/search'
 import { randomId } from '~/lib/utils'
-import { evaluateMatch, isDueForCheck, type AlertFrequency, type AlertMatchPayload, type TriggerConditions } from '~/shared/lib/alerts'
+import { evaluateMatch, isDueForEvaluation, type AlertMatchPayload, type TriggerConditions } from '~/shared/lib/alerts'
 import { sendAlertDigestEmail, type AlertDigestItem } from '~/shared/lib/email'
 import { log } from '~/shared/lib/log'
 import {
@@ -9,7 +9,7 @@ import {
   listEnabledWorkerAlerts,
   listWorkerOrganizationIds,
   listWorkerSeenSourceIds,
-  markWorkerAlertChecked,
+  markWorkerAlertEvaluated,
   recordWorkerTrigger,
   withWorkerOrganization,
 } from '~/shared/lib/repositories/alerts-worker'
@@ -38,9 +38,15 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
       listEnabledWorkerAlerts(tx, organizationId),
     )
     for (const alert of activeAlerts) {
-      const frequency = (alert.frequency ?? 'daily') as AlertFrequency
-      if (!isDueForCheck(frequency, alert.lastCheckedAt, new Date())) continue
+      // Reads the persisted next-evaluation intent when there is one, so a failure's backoff is
+      // honored instead of being flattened back to a full frequency window.
+      if (!isDueForEvaluation(alert, new Date())) continue
       result.alertsEvaluated++
+      // Tracked per alert so the `finally` below can record whether THIS evaluation succeeded.
+      // Without it, a failure would advance the alert a full frequency window as if it had run
+      // cleanly, and a weekly alert would go silent for a week over one transient error.
+      let evaluationSucceeded = true
+      let evaluationErrorCode: string | null = null
       try {
         const conditions = alert.triggerConditions as TriggerConditions
         const wantsEmail = (alert.deliveryChannel ?? 'email') === 'email'
@@ -177,10 +183,21 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
           })
         }
       } catch (error) {
+        evaluationSucceeded = false
+        // The persisted column gets a short slug (it renders in the alerts UI); the admin-only
+        // worker response keeps the full message, which is where an operator needs it.
+        evaluationErrorCode = error instanceof Error && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : null
         result.errors.push(`alert ${alert.id} failed: ${error instanceof Error ? error.message : String(error)}`)
         log.error('alerts_worker_alert_failed', { organizationId, alertId: alert.id, error })
       } finally {
-        await withWorkerOrganization(organizationId, (tx) => markWorkerAlertChecked(tx, organizationId, alert.id))
+        await withWorkerOrganization(organizationId, (tx) => markWorkerAlertEvaluated(
+          tx,
+          organizationId,
+          { id: alert.id, frequency: alert.frequency, consecutiveFailures: alert.consecutiveFailures },
+          { succeeded: evaluationSucceeded, errorCode: evaluationErrorCode },
+        ))
       }
     }
   }

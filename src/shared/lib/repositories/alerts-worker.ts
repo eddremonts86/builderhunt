@@ -5,6 +5,7 @@ import { workerDb, type WorkerTransaction } from '../db/worker-db'
 // through authDb, not workerDb.
 import { authDb } from '../db/auth-db'
 import { alerts, alertTriggers, authUsers, builders, organizations } from '../db/schema'
+import { nextAlertTimingState, type AlertEvaluationOutcome, type AlertFrequency } from '../alerts'
 
 export function listWorkerOrganizationIds() {
   return workerDb.select({ id: organizations.id }).from(organizations)
@@ -53,13 +54,40 @@ export async function listWorkerSeenSourceIds(
     .filter((value): value is string => typeof value === 'string'))
 }
 
-export async function markWorkerAlertChecked(
+/**
+ * Records the outcome of one evaluation attempt in a single UPDATE (plan:
+ * calendar-scheduling-interview-intelligence, Phase 4 "Persist honest alert evaluation timing").
+ *
+ * One statement, not four: `lastCheckedAt` and `nextEvaluationAt` have to move together or the
+ * calendar feed can read a next-run derived from the previous attempt's failure count. The timing
+ * itself is computed by `nextAlertTimingState`, which is pure and tested separately.
+ *
+ * A failed attempt gets a short backoff rather than a full frequency window — advancing to the full
+ * window would let one transient error silence a weekly alert for a week.
+ */
+export async function markWorkerAlertEvaluated(
   transaction: WorkerTransaction,
   organizationId: string,
-  alertId: string,
+  alert: { id: string; frequency: string | null; consecutiveFailures: number },
+  outcome: AlertEvaluationOutcome,
+  evaluatedAt: Date = new Date(),
 ) {
-  await transaction.update(alerts).set({ lastCheckedAt: new Date() })
-    .where(and(eq(alerts.organizationId, organizationId), eq(alerts.id, alertId)))
+  const state = nextAlertTimingState(
+    (alert.frequency ?? 'daily') as AlertFrequency,
+    evaluatedAt,
+    alert.consecutiveFailures,
+    outcome,
+  )
+  const [row] = await transaction.update(alerts).set(state)
+    .where(and(eq(alerts.organizationId, organizationId), eq(alerts.id, alert.id)))
+    .returning({
+      id: alerts.id,
+      lastCheckedAt: alerts.lastCheckedAt,
+      nextEvaluationAt: alerts.nextEvaluationAt,
+      consecutiveFailures: alerts.consecutiveFailures,
+      lastEvaluationErrorCode: alerts.lastEvaluationErrorCode,
+    })
+  return row ?? null
 }
 
 export async function recordWorkerTrigger(

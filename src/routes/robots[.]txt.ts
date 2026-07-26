@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-
-const SITE = 'https://builderhunt.dev'
+import { SITE_URL as SITE } from '~/shared/lib/site-url'
 
 export const Route = createFileRoute('/robots.txt')({
   component: () => null,

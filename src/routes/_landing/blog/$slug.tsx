@@ -3,6 +3,7 @@ import { createFileRoute, Link, notFound } from '@tanstack/react-router'
 import { ArrowLeft, Calendar, Clock, Tag as TagIcon, ArrowRight } from 'lucide-react'
 import { getBlogPostPage } from '~/shared/lib/blog-data'
 import { LinkButton } from '~/components/ui/link'
+import { SITE_URL } from '~/shared/lib/site-url'
 
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
@@ -14,8 +15,8 @@ export const Route = createFileRoute('/_landing/blog/$slug')({
     if (!loaderData) return { meta: [{ title: 'Post not found — BuilderHunt' }] }
     const { post } = loaderData
     const title = `${post.title} — BuilderHunt Blog`
-    const url = `https://builderhunt.dev/blog/${post.slug}`
-    const ogImage = `https://builderhunt.dev/api/og/blog?slug=${encodeURIComponent(post.slug)}`
+    const url = `${SITE_URL}/blog/${post.slug}`
+    const ogImage = `${SITE_URL}/api/og/blog?slug=${encodeURIComponent(post.slug)}`
     return {
       meta: [
         { title },
