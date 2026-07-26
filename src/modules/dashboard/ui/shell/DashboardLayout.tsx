@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from '@tanstack/react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import {
-  LayoutDashboard, Search, Download, Mail, Compass, Menu, Lightbulb,
+  LayoutDashboard, Search, Download, Mail, Compass, Menu, Lightbulb, CalendarDays,
 } from 'lucide-react'
 import { signOut } from '~/shared/lib/auth/client'
 import { BackToTop } from '~/shared/components/BackToTop'
@@ -26,6 +26,7 @@ const NAV = [
   { to: '/exports', icon: Download, label: 'Exports', end: false },
   { to: '/alerts', icon: Mail, label: 'Alerts', end: false },
   { to: '/solutions', icon: Lightbulb, label: 'Solutions', end: false },
+  { to: '/calendar', icon: CalendarDays, label: 'Calendar', end: false },
 ] as const
 
 /** Same set, minus the home-anchor pill that stays always-visible on mobile. */

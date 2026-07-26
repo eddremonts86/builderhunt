@@ -10,7 +10,10 @@
 import { createHash } from 'node:crypto'
 import { Temporal } from '@js-temporal/polyfill'
 import { z } from 'zod'
-import { rrulestr } from 'rrule'
+// CommonJS default import — see the note in `calendar.ts`.
+import rrulePkg from 'rrule'
+
+const { rrulestr } = rrulePkg
 import { assertSupportedRecurrenceRule, rangesOverlap } from './calendar'
 
 export class SchedulingError extends Error {

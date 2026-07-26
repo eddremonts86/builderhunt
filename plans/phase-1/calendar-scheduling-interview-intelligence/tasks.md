@@ -595,7 +595,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     cancellation/reschedule update, participant removal, tenant isolation, and unauthorized worker;
     a test inbox imports an update and cancellation into a standards-compliant calendar.
 
-- [ ] **Add calendar event APIs**
+- [x] **Add calendar event APIs** (partial — see evidence)
   - Files: `src/routes/api/calendar/events/index.ts` (new),
     `src/routes/api/calendar/events/$eventId.ts` (new),
     `src/routes/api/calendar/events/$eventId/cancel.ts` (new),
@@ -607,6 +607,19 @@ src/shared/lib/repositories/scheduling.test.ts`.
     explicit DTOs, and audit events.
   - Verify: API tests/curl cover 401, no active org, malformed range, owner success, participant
     read-only, admin denial, tenant B, stale version `409`, and redacted errors.
+  - **Evidence (2026-07-26, PARTIAL)**: Shipped `/api/calendar/events` (GET range/search, POST
+    create) and `/api/calendar/events/$eventId` (GET detail, PATCH versioned/scoped update and
+    cancel, DELETE). All authorization lives in `lib/calendar/service.ts`; the routes parse, enter
+    tenant context, and map coded errors. Error bodies carry a stable code only. A caller who may
+    not see an event gets the same `404 not_found` as one asking for a missing id. Every handler
+    also refuses when `CALENDAR_ENABLED=false`. `node scripts/check-route-coverage.mjs` passes
+    (132 routes). Verified live against the running dev server: unauthenticated GET returns
+    `401 {"error":"authentication_required"}` and a malformed range still returns 401 (auth
+    precedes validation, so an unauthenticated prober learns nothing about parameter shape).
+    **STILL OPEN for this task**: `export[.]ics.ts` and `notifications.ts` are not written, and the
+    role-matrix API tests (participant read-only, admin denial, tenant B, stale-version 409 over
+    HTTP) are not yet automated — those paths are covered at the service layer by
+    `service.test.ts`'s 32 tests, but not yet through the routes.
 
 - [ ] **Add availability APIs**
   - Files: `src/routes/api/calendar/availability/index.ts` (new),
@@ -616,7 +629,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: tests/curl cover timezone/DST inputs, overlapping rules, invalid overnight interval,
     tenant B, stale version, and normalized response.
 
-- [ ] **Build calendar feature components**
+- [x] **Build calendar feature components** (partial — see evidence)
   - Files: `src/modules/calendar/components/CalendarPage.tsx` (new),
     `src/modules/calendar/components/CalendarView.tsx` (new),
     `src/modules/calendar/components/EventEditor.tsx` (new),
@@ -632,7 +645,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: component tests cover keyboard and mutation rollback; Playwright creates/moves/recurs/
     cancels an event at desktop and 320 px; axe scan has no critical violations.
 
-- [ ] **Add calendar route and navigation**
+- [x] **Add calendar route and navigation**
   - Files: `src/routes/_dashboard/calendar/index.tsx` (new),
     `src/modules/dashboard/ui/shell/DashboardLayout.tsx`, `src/routeTree.gen.ts`
   - Do: Add `/calendar`, lazy-load heavy calendar UI, add Calendar navigation icon/active state,

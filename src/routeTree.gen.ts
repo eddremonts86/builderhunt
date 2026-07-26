@@ -55,6 +55,7 @@ import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/se
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
+import { Route as DashboardCalendarIndexRouteImport } from './routes/_dashboard/calendar/index'
 import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite/$invitationId'
 import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
 import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
@@ -128,6 +129,7 @@ import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/del
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
 import { Route as ApiMeBuilderIndexRouteImport } from './routes/api/me/builder/index'
+import { Route as ApiCalendarEventsIndexRouteImport } from './routes/api/calendar/events/index'
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
 import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
 import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
@@ -149,6 +151,7 @@ import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './r
 import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
+import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
 import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
@@ -179,6 +182,7 @@ import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/ad
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
+import { Route as ApiAdminCalendarRunWorkerRouteImport } from './routes/api/admin/calendar/run-worker'
 import { Route as ApiAdminBillingRunWorkerRouteImport } from './routes/api/admin/billing/run-worker'
 import { Route as ApiAdminBillingRiskExceptionsRouteImport } from './routes/api/admin/billing/risk-exceptions'
 import { Route as ApiAdminBillingRefundsRouteImport } from './routes/api/admin/billing/refunds'
@@ -429,6 +433,11 @@ const DashboardExportsIndexRoute = DashboardExportsIndexRouteImport.update({
 const DashboardDashboardIndexRoute = DashboardDashboardIndexRouteImport.update({
   id: '/dashboard/',
   path: '/dashboard/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardCalendarIndexRoute = DashboardCalendarIndexRouteImport.update({
+  id: '/calendar/',
+  path: '/calendar/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const TeamInviteInvitationIdRoute = TeamInviteInvitationIdRouteImport.update({
@@ -805,6 +814,11 @@ const ApiMeBuilderIndexRoute = ApiMeBuilderIndexRouteImport.update({
   path: '/api/me/builder/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCalendarEventsIndexRoute = ApiCalendarEventsIndexRouteImport.update({
+  id: '/api/calendar/events/',
+  path: '/api/calendar/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiBuildersRecentIndexRoute = ApiBuildersRecentIndexRouteImport.update({
   id: '/api/builders/recent/',
   path: '/api/builders/recent/',
@@ -920,6 +934,12 @@ const ApiMeBuilderBuilderIdRoute = ApiMeBuilderBuilderIdRouteImport.update({
   path: '/api/me/builder/$builderId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCalendarEventsEventIdRoute =
+  ApiCalendarEventsEventIdRouteImport.update({
+    id: '/api/calendar/events/$eventId',
+    path: '/api/calendar/events/$eventId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
   id: '/api/builders/claim/verify',
   path: '/api/builders/claim/verify',
@@ -1091,6 +1111,12 @@ const ApiAdminChangelogIdRoute = ApiAdminChangelogIdRouteImport.update({
   path: '/api/admin/changelog/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminCalendarRunWorkerRoute =
+  ApiAdminCalendarRunWorkerRouteImport.update({
+    id: '/api/admin/calendar/run-worker',
+    path: '/api/admin/calendar/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminBillingRunWorkerRoute =
   ApiAdminBillingRunWorkerRouteImport.update({
     id: '/api/admin/billing/run-worker',
@@ -1315,6 +1341,7 @@ export interface FileRoutesByFullPath {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/calendar/': typeof DashboardCalendarIndexRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
@@ -1347,6 +1374,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1377,6 +1405,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -1398,6 +1427,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/events/': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -1506,6 +1536,7 @@ export interface FileRoutesByTo {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/calendar': typeof DashboardCalendarIndexRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/me': typeof DashboardMeIndexRoute
@@ -1538,6 +1569,7 @@ export interface FileRoutesByTo {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1568,6 +1600,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -1589,6 +1622,7 @@ export interface FileRoutesByTo {
   '/api/admin/users': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/events': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder': typeof ApiMeBuilderIndexRoute
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
@@ -1702,6 +1736,7 @@ export interface FileRoutesById {
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
   '/team/invite/$invitationId': typeof TeamInviteInvitationIdRoute
+  '/_dashboard/calendar/': typeof DashboardCalendarIndexRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
@@ -1734,6 +1769,7 @@ export interface FileRoutesById {
   '/api/admin/billing/refunds': typeof ApiAdminBillingRefundsRoute
   '/api/admin/billing/risk-exceptions': typeof ApiAdminBillingRiskExceptionsRoute
   '/api/admin/billing/run-worker': typeof ApiAdminBillingRunWorkerRoute
+  '/api/admin/calendar/run-worker': typeof ApiAdminCalendarRunWorkerRoute
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
@@ -1764,6 +1800,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
+  '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -1785,6 +1822,7 @@ export interface FileRoutesById {
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
+  '/api/calendar/events/': typeof ApiCalendarEventsIndexRoute
   '/api/me/builder/': typeof ApiMeBuilderIndexRoute
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
@@ -1897,6 +1935,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/calendar/'
     | '/dashboard/'
     | '/exports/'
     | '/me/'
@@ -1929,6 +1968,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
@@ -1959,6 +1999,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -1980,6 +2021,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
+    | '/api/calendar/events/'
     | '/api/me/builder/'
     | '/api/me/builders/'
     | '/api/me/data-export/'
@@ -2088,6 +2130,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/calendar'
     | '/dashboard'
     | '/exports'
     | '/me'
@@ -2120,6 +2163,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
@@ -2150,6 +2194,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -2171,6 +2216,7 @@ export interface FileRouteTypes {
     | '/api/admin/users'
     | '/api/alerts/triggers'
     | '/api/builders/recent'
+    | '/api/calendar/events'
     | '/api/me/builder'
     | '/api/me/builders'
     | '/api/me/data-export'
@@ -2283,6 +2329,7 @@ export interface FileRouteTypes {
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
     | '/team/invite/$invitationId'
+    | '/_dashboard/calendar/'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/me/'
@@ -2315,6 +2362,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/refunds'
     | '/api/admin/billing/risk-exceptions'
     | '/api/admin/billing/run-worker'
+    | '/api/admin/calendar/run-worker'
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
@@ -2345,6 +2393,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
+    | '/api/calendar/events/$eventId'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -2366,6 +2415,7 @@ export interface FileRouteTypes {
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
+    | '/api/calendar/events/'
     | '/api/me/builder/'
     | '/api/me/builders/'
     | '/api/me/data-export/'
@@ -2464,6 +2514,7 @@ export interface RootRouteChildren {
   ApiAdminBillingRefundsRoute: typeof ApiAdminBillingRefundsRoute
   ApiAdminBillingRiskExceptionsRoute: typeof ApiAdminBillingRiskExceptionsRoute
   ApiAdminBillingRunWorkerRoute: typeof ApiAdminBillingRunWorkerRoute
+  ApiAdminCalendarRunWorkerRoute: typeof ApiAdminCalendarRunWorkerRoute
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDevpostRunWorkerRoute: typeof ApiAdminDevpostRunWorkerRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
@@ -2485,6 +2536,7 @@ export interface RootRouteChildren {
   ApiBillingSubscriptionChangeRoute: typeof ApiBillingSubscriptionChangeRoute
   ApiBillingSubscriptionPreviewRoute: typeof ApiBillingSubscriptionPreviewRoute
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
+  ApiCalendarEventsEventIdRoute: typeof ApiCalendarEventsEventIdRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
@@ -2500,6 +2552,7 @@ export interface RootRouteChildren {
   ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
   ApiAlertsTriggersIndexRoute: typeof ApiAlertsTriggersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
+  ApiCalendarEventsIndexRoute: typeof ApiCalendarEventsIndexRoute
   ApiMeBuilderIndexRoute: typeof ApiMeBuilderIndexRoute
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
@@ -2835,6 +2888,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard/'
       preLoaderRoute: typeof DashboardDashboardIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/calendar/': {
+      id: '/_dashboard/calendar/'
+      path: '/calendar'
+      fullPath: '/calendar/'
+      preLoaderRoute: typeof DashboardCalendarIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/team/invite/$invitationId': {
@@ -3348,6 +3408,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeBuilderIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/calendar/events/': {
+      id: '/api/calendar/events/'
+      path: '/api/calendar/events'
+      fullPath: '/api/calendar/events/'
+      preLoaderRoute: typeof ApiCalendarEventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/recent/': {
       id: '/api/builders/recent/'
       path: '/api/builders/recent'
@@ -3493,6 +3560,13 @@ declare module '@tanstack/react-router' {
       path: '/api/me/builder/$builderId'
       fullPath: '/api/me/builder/$builderId'
       preLoaderRoute: typeof ApiMeBuilderBuilderIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/calendar/events/$eventId': {
+      id: '/api/calendar/events/$eventId'
+      path: '/api/calendar/events/$eventId'
+      fullPath: '/api/calendar/events/$eventId'
+      preLoaderRoute: typeof ApiCalendarEventsEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/builders/claim/verify': {
@@ -3705,6 +3779,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminChangelogIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/calendar/run-worker': {
+      id: '/api/admin/calendar/run-worker'
+      path: '/api/admin/calendar/run-worker'
+      fullPath: '/api/admin/calendar/run-worker'
+      preLoaderRoute: typeof ApiAdminCalendarRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/billing/run-worker': {
       id: '/api/admin/billing/run-worker'
       path: '/api/admin/billing/run-worker'
@@ -3902,6 +3983,7 @@ interface DashboardRouteRouteChildren {
   DashboardSettingsSecurityRoute: typeof DashboardSettingsSecurityRoute
   DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
+  DashboardCalendarIndexRoute: typeof DashboardCalendarIndexRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
   DashboardMeIndexRoute: typeof DashboardMeIndexRoute
@@ -3929,6 +4011,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardSettingsSecurityRoute: DashboardSettingsSecurityRoute,
   DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
+  DashboardCalendarIndexRoute: DashboardCalendarIndexRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
   DashboardMeIndexRoute: DashboardMeIndexRoute,
@@ -4256,6 +4339,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminBillingRefundsRoute: ApiAdminBillingRefundsRoute,
   ApiAdminBillingRiskExceptionsRoute: ApiAdminBillingRiskExceptionsRoute,
   ApiAdminBillingRunWorkerRoute: ApiAdminBillingRunWorkerRoute,
+  ApiAdminCalendarRunWorkerRoute: ApiAdminCalendarRunWorkerRoute,
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDevpostRunWorkerRoute: ApiAdminDevpostRunWorkerRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
@@ -4277,6 +4361,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBillingSubscriptionChangeRoute: ApiBillingSubscriptionChangeRoute,
   ApiBillingSubscriptionPreviewRoute: ApiBillingSubscriptionPreviewRoute,
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
+  ApiCalendarEventsEventIdRoute: ApiCalendarEventsEventIdRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
   ApiOrganizationsInvitationsInvitationIdRoute:
@@ -4293,6 +4378,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
   ApiAlertsTriggersIndexRoute: ApiAlertsTriggersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,
+  ApiCalendarEventsIndexRoute: ApiCalendarEventsIndexRoute,
   ApiMeBuilderIndexRoute: ApiMeBuilderIndexRoute,
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,

@@ -9,7 +9,12 @@
  * columns directly.").
  */
 import { z } from 'zod'
-import { RRule } from 'rrule'
+// `rrule` ships CommonJS. A named import resolves under vitest but throws
+// "Named export 'RRule' not found" in Vite's SSR runtime, so the page 500s while tests pass —
+// import the default and destructure.
+import rrulePkg from 'rrule'
+
+const { RRule } = rrulePkg
 
 export class CalendarEventError extends Error {
   constructor(message: string, readonly code: string) {
