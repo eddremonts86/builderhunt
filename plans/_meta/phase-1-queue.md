@@ -15,10 +15,7 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 
 ## A. Actionable queue (work these in order)
 
-| # | Plan | Open | Why this position |
-|---|------|-----:|-------------------|
-| 1 | `solutions-intelligence` | 30 | Large new domain. |
-| 2 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
+*(empty — see A2 below: both remaining plans are blocked on an unresolved dependency, not just large)*
 
 ## A1. Done this session (2026-07-26) — see each plan's tasks.md for full evidence
 
@@ -32,6 +29,23 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 | `portfolio-builder` | Verified-owner public portfolio pages at `/portfolio/$claimId` (theme, headline, intro, up to 6 selected projects), fail-closed public API, owner draft/publish/unpublish UX, cache invalidation on revoke. Two real bugs found+fixed live: publish didn't save in-progress draft edits first; the public route was missing `<ThemeProvider>` so it always rendered light. | AI-persona/timeline integrations left as honest `false` stubs (both genuinely optional); e2e task out of scope this session. |
 | `unified-timeline` | Per-builder "Recent activity" section on the profile page — live, read-through-cached (6h TTL) fetch from github/hn/devto/gitlab/stackoverflow's own public APIs, all 4 phases including the optional AI summary. Real bug found+fixed live: GitHub's public events feed never includes a PR's title/html_url (confirmed against the real API) — every PR event rendered blank; fixed by building the title/URL from the event's own `number` + repo name. | Nothing pending — plan fully closed. |
 | `audit-conversion` | Full first-party consent-aware conversion-event pipeline (closed schema, privacy-minimized table, ingestion route, 30-day retention, admin aggregate reporting w/ Wilson-score CIs), hero guest-value CTA + tertiary "how it works" demotion, accurate source-count copy, fixed `/search`→`/explore` SearchAction JSON-LD. Two real bugs found+fixed live: `/explore`'s `next` param was silently dropped by `SignUpPage.tsx` (every guest-search signup lost its query); root JSON-LD SearchAction pointed at the authenticated-only `/search`. Live-verified full guest→signup→onboarding-skip→restored-search flow end to end. | **Pending, needs your input**: real baseline collection (needs ≥14 real days/1,000 sessions once `CONVERSION_EVENTS_ENABLED=true` is deployed), the `test:conversion` Playwright script + CI workflow gate (blocked by the same two standing rules as `audit-performance-qa`'s deferred item), and the staged 10%/50%/100% rollout decision (depends on the baseline). Tell me if/when to turn collection on. |
+
+## A2. Blocked, needs your decision (2026-07-26) — the entire remaining actionable queue
+
+Both plans below explicitly hard-depend on `security-and-multitenancy`'s **completed, certified**
+canonical tenant/RLS cutover ("for completed canonical tenant cutover/RLS" — their own words).
+That plan sits in section C with 2 open items already flagged as **needing maintainer approval** —
+i.e. this isn't a stale reality-check, the block is real and current. Both are also each a
+multi-week, money-and-identity-critical platform build (new credit-ledger charges, cross-source
+human-identity merging, a new calendar/audio/transcription pipeline) — exactly the kind of thing
+where a shallow autonomous pass would do more harm than good (charging real credits for a fake
+feature, merging the wrong people's identities). Recommend resolving `security-and-multitenancy`'s
+2 approval-gated items first, or explicitly telling me to proceed despite the stated dependency.
+
+| Plan | Open | Blocked on |
+|------|-----:|-----------|
+| `solutions-intelligence` | 30 | `security-and-multitenancy` (completed canonical tenant/RLS gates — not yet certified) + `stealth-scraping` (itself dark/inactive, `ENRICHMENT_ENABLED=false`) + a 60-brief gold-set quality bar before any of it can be trusted. |
+| `calendar-scheduling-interview-intelligence` | 81 | `security-and-multitenancy` (completed canonical tenant cutover/RLS) — largest plan in the whole backlog by a wide margin. |
 
 ## B. Blocked by another plan (do not start)
 
