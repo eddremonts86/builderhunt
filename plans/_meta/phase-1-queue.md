@@ -17,12 +17,11 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 
 | # | Plan | Open | Why this position |
 |---|------|-----:|-------------------|
-| 1 | `design-modernization` | 12 | Visual sweep; large but mechanical, and the token/`.card`/glass system already exists. |
-| 2 | `portfolio-builder` | 12 | New public surface; builds on `published_builder_profiles`. |
-| 3 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
-| 4 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
-| 5 | `solutions-intelligence` | 30 | Large new domain. |
-| 6 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
+| 1 | `portfolio-builder` | 12 | New public surface; builds on `published_builder_profiles`. |
+| 2 | `unified-timeline` | 13 | New fetch/normalize layer across sources; also unblocks real event detection for `smart-alerts`. |
+| 3 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
+| 4 | `solutions-intelligence` | 30 | Large new domain. |
+| 5 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
 
 ## A1. Done this session (2026-07-26) — see each plan's tasks.md for full evidence
 
@@ -32,6 +31,7 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 | `claimable-profiles` | Replaced email-only claim "proof" with real source-bound verification (bio-challenge checked against the live GitHub/GitLab/Codeberg/DEV.to API). Admin revocation route. Live-verified against the real GitHub API. | Profile-view analytics (separate net-new feature) not built. |
 | `audit-performance-qa` | Responsive AVIF/WebP hero images + budget checker script; confirmed tsc/eslint/fonts were already clean (stale plan text). | **Pending, needs your input**: Playwright/Lighthouse harness + CI quality-gate workflow. Blocked by two standing rules: no new e2e/Playwright files this session, and CI/CD pipeline edits (`.github/workflows/*`) need your explicit go-ahead before I touch them autonomously. Tell me if you want me to proceed on either. |
 | `audit-trust` | Removed 6 real fabricated trust claims (fake 4.8★ rating, invented "420M+ profiles" stats, a fabricated testimonial, a hardcoded fake live-signal chip, a dead "Join Alerts" form, false user-PAT copy) — all with a source-level regression test. Claim-verification concern already closed by `claimable-profiles`. | **Pending, needs your input**: the full profile-removal/global-suppression subsystem (new tables, HMAC keys, source-proof adapters, enforcement across 8 consumer surfaces — `/security` and `/privacy/remove` pages, GDPR-style de-index). This is a large, security-critical feature comparable in size to `claimable-profiles` — deliberately not rushed. Also depends on the same CI/e2e-gated verify steps as above. Say the word and I'll scope it as its own pass. |
+| `design-modernization` | Verified every Wave 1/2 task against real source (they were already done — the tasks.md checkboxes had just never been updated) and fixed one real drift: `BrandLogoMark.tsx` had a cyan dot at a hardcoded hex that had silently drifted from the actual `--color-bh-cyan` token. Routed through CSS vars, pixel-verified identical output. | Nothing pending — plan fully closed. |
 
 ## B. Blocked by another plan (do not start)
 
