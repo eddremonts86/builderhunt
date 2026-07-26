@@ -507,7 +507,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 3 — Calendar service, API, worker, and UI
 
-- [ ] **Implement calendar service and authorization**
+- [x] **Implement calendar service and authorization**
   - Files: `src/lib/calendar/service.ts` (new), `src/lib/calendar/service.test.ts` (new),
     `src/shared/lib/authorization/permissions.ts`,
     `src/shared/lib/authorization/permissions.test.ts`
@@ -517,6 +517,31 @@ src/shared/lib/repositories/scheduling.test.ts`.
     reminders, stable ICS UID/SEQUENCE, version, and event-source mutation rules.
   - Verify: service tests cover every role/action, stale membership, stale version, recurrence edit
     scope, cancel vs delete, and no admin implicit access; targeted tests pass.
+  - **Evidence (2026-07-26)**: Added 5 calendar `PermissionAction`s to
+    `authorization/permissions.ts` plus an `isGrantedParticipant` context flag. These are the only
+    actions in that file that **never consult `elevated`** — being an org owner/admin grants
+    nothing on someone else's calendar, matching spec.md and the RLS policies. `calendar:read`
+    allows owner-or-granted-participant; `calendar:mutate`/`scheduling:manage`/
+    `candidate-data:read` are owner-only; `calendar:respond` covers RSVP.
+    Wrote `src/lib/calendar/service.ts` as the single place routes call. `resolveEventAccess`
+    resolves the caller's relationship once and returns `null` for both "does not exist" and "may
+    not see it", so a probe cannot confirm an event's existence — the update path surfaces this as
+    `not_found`, never `forbidden`. Implements the spec's split overlap policy: a personal-event
+    overlap raises `overlap_warning` (allowed once acknowledged), while an interview overlap is a
+    hard `slot_unavailable` that acknowledgement cannot override. Recurring edits require an
+    explicit `this|following|series` scope so a user never silently rewrites a whole series;
+    invitation-sourced events refuse rescheduling through the ordinary edit path. Cancel and delete
+    are deliberately distinct (cancel keeps the row, its `.ics` UID and history, and stops pending
+    reminders; delete removes it). `icsUidForEvent` derives a stable UID from the event id so a
+    later `CANCEL` matches the original `REQUEST`, and `icsSequenceForEvent` reuses the optimistic
+    version as the monotonic SEQUENCE. The three enforcement layers stack on purpose: `can()` here,
+    owner/version predicates in the repository, RLS in Postgres. 32 disposable-DB tests cover the
+    full role matrix (owner/participant/unrelated member/admin, the last asserted for **both**
+    `admin` and `owner` roles), participant-can-read-but-not-mutate, a not-access-granted
+    participant still being denied, `editable:false` in the participant's DTO, personal-warning vs
+    interview-conflict, back-to-back events not colliding, stale version, every recurrence scope
+    resolving to its own plan, the illegal `confirmed → completed` jump, and cancel-vs-delete
+    semantics. `pnpm tsc --noEmit`, `pnpm eslint`, and the existing 18 permissions tests are clean.
 
 - [ ] **Implement recurrence materialization worker**
   - Files: `src/lib/calendar/recurrence-worker.ts` (new),
