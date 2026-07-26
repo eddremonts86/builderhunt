@@ -95,7 +95,7 @@ src/shared/lib/env.security.test.ts`.
     not a regression from the new dependencies. Full `pnpm tsc --noEmit` and `pnpm vitest run`
     (2373 passed) stay clean after the install.
 
-- [ ] **Define shared feature/catalog configuration**
+- [x] **Define shared feature/catalog configuration**
   - Files: `src/shared/lib/interview-config.ts` (new),
     `src/shared/lib/interview-config.test.ts` (new)
   - Do: Define supported MIME/extensions, 10 MB/25 MB document and 2 MB web-import limits,
@@ -105,6 +105,24 @@ src/shared/lib/env.security.test.ts`.
     grant-expiry, or pack authority here.
   - Verify: tests reject negative/zero limits, unknown rate-card key, excessive retention, and
     missing fallback; `pnpm test src/shared/lib/interview-config.test.ts`.
+  - **Evidence (2026-07-26)**: Wrote `interview-config.ts` — PDF/DOCX/TXT MIME allowlist,
+    10 MB/25 MB/2 MB size limits with `assertPositiveByteLimit`, retention defaults
+    (90d/180d/24mo) plus `resolveRetentionDays` (org override capped by the operator ceiling from
+    `env.ts`, falls back to the default when unset), a Chrome current/previous-major matrix
+    (`CHROME_CURRENT_SUPPORTED_MAJOR = 139`, flagged as needing periodic operator bumps),
+    `in_person`/`remote_call` capture modes (manual-only documented as a fallback *state*, not a
+    third mode), `en`/`da` supported languages, a 60-day default/365-day max booking horizon,
+    `INTERVIEW_RATE_CARD_KEYS` (brief=5, transcriptionPerMinute=1, report=5 — same immutable
+    versioned-key convention as `billing/rate-cards.ts`/`solutions/config.ts`) with
+    `getInterviewRateCardKey` throwing on an unknown operation, an
+    `INTERVIEW_TYPICAL_60_MINUTE_ESTIMATE_UNITS` constant asserting the spec's 70-credit figure,
+    80%/90%/10-remaining-minute low-balance thresholds, `INTERVIEW_ENTITLEMENT_TIERS` (pro/pro_max/
+    team, imported `CatalogTier` from `billing/catalog.ts`), and `getInterviewFeatureFlags()`
+    returning a safe public DTO. 28 tests in `interview-config.test.ts` (using the established
+    `vi.mock('./env', ...)` workaround for the happy-dom `isBrowser` quirk) cover every negative/
+    zero/excessive-value rejection, the unknown-rate-card-key throw, and the missing-fallback
+    default. `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2401 passed) are
+    clean.
 
 ## Phase 1 — Pure domain contracts
 
