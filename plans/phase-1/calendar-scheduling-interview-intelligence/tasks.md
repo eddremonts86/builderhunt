@@ -543,7 +543,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     resolving to its own plan, the illegal `confirmed → completed` jump, and cancel-vs-delete
     semantics. `pnpm tsc --noEmit`, `pnpm eslint`, and the existing 18 permissions tests are clean.
 
-- [ ] **Implement recurrence materialization worker**
+- [x] **Implement recurrence materialization worker**
   - Files: `src/lib/calendar/recurrence-worker.ts` (new),
     `src/lib/calendar/recurrence-worker.test.ts` (new),
     `src/shared/lib/repositories/calendar-worker.ts` (new),
@@ -555,6 +555,32 @@ src/shared/lib/repositories/scheduling.test.ts`.
     existing workers using worker scope rather than a global tenant transaction.
   - Verify: repeated/concurrent runs produce identical occurrence sets; one tenant failure does not
     affect another; unauthorized route fails; run against local DB and inspect rows.
+  - **Evidence (2026-07-26)**: Wrote `repositories/calendar-worker.ts` (its own copy of the
+    `listWorkerOrganizationIds`/`withWorkerOrganization` pair, matching the precedent every other
+    worker repository follows) plus `lib/calendar/recurrence-worker.ts` and the
+    `/api/admin/calendar/run-worker` route (cron-principal-or-platform-admin auth, same shape as
+    `alerts/run-worker`; also refuses to run when `CALENDAR_ENABLED=false`, so the kill switch
+    gates background writes and not just the UI).
+    Idempotency is structural: expansion is a pure function of `(rrule, dtstart, timezone,
+    horizon)` and the write is an upsert on the `(org, event, recurrence_id)` identity. Each
+    organization gets its own `withWorkerOrganization` transaction, so one tenant's failure rolls
+    back only that tenant's batch and the loop continues; the recorded `errorCode` stays a short
+    redacted slug because these `job_runs` rows are projected into a user-visible calendar feed.
+    Pruning is deliberately bounded to `>= now`, so shrinking a rule never deletes an occurrence in
+    the past that a user may already have acted on.
+    **Found and fixed a real runtime bug**: `<> all(${array})` made drizzle expand the JS array
+    into a parameter *tuple* rather than binding a Postgres array, so every prune failed with a
+    syntax error and the worker silently wrote nothing while reporting only a redacted
+    `materialization_failed`. Caught because the tests assert on actual occurrence rows rather than
+    on the worker's own return value. Replaced with `notInArray`/`inArray` in both places that had
+    the pattern. 11 disposable-DB tests: weekly expansion within the horizon, a second run
+    converging on the identical set, two **concurrent** runs producing no duplicates, pruning a
+    shortened series, past occurrences surviving a shrink, a cancelled event losing its whole
+    materialization, `recurrenceUntil` narrowing the window, non-recurring events ignored, per-tenant
+    isolation of written rows, job-run counters with a bounded error code, and a
+    Europe/Copenhagen DST transition keeping 09:00 local (08:00Z → 07:00Z).
+    `pnpm tsc --noEmit`, `pnpm eslint`, `node scripts/check-route-coverage.mjs`, and the full
+    `pnpm vitest run` (2926 passed) are clean.
 
 - [ ] **Implement reminder and participant-notification delivery**
   - Files: `src/lib/calendar/reminder-worker.ts` (new),
