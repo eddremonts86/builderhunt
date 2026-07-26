@@ -260,6 +260,10 @@
     "0064_profile_removal_grants": {
       "sql": "21fd552e8f59e9711338a66f5525782dd4f1d6074ed8e7878c74956c1b0e8098",
       "snapshot": "ad93330891a0cb97484b3f331709bc155e590bd9e4d8244159e2d03c9bae1519"
+    },
+    "0065_awesome_lorna_dane": {
+      "sql": "898eae3e3514184c642fc909d14a481de1838c028035d0990e953b7bf6448b9f",
+      "snapshot": "440bb6f419cb61a75979b89b91f7a16d35c634c49a58458e08fe7bfc4b21080f"
     }
   }
 }

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
@@ -1796,5 +1796,410 @@ export const profileSuppressions = pgTable(
       .where(sql`${table.revokedAt} is null`),
     index('profile_suppressions_source_source_id_idx').on(table.source, table.sourceId),
     check('profile_suppressions_reason_check', sql`${table.reason} in ('verified-removal', 'legal', 'abuse')`),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// Calendar, Scheduling, and Interview Intelligence
+// (plans/phase-1/calendar-scheduling-interview-intelligence/spec.md §Data model)
+//
+// Conventions from that spec's "Normative persistence contract": uuid PK with
+// `gen_random_uuid()`, `organization_id text not null`, created/updated timestamptz, every
+// tenant parent exposing `unique (organization_id,id)` and every tenant child referencing that
+// pair via a composite FK. State/type values are `text` plus named checks, never PG enums.
+// Durations and counters are non-negative integers. Authorization never lives in JSONB.
+// ---------------------------------------------------------------------------
+
+export const userCalendars = pgTable(
+  'user_calendars',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    timezone: text('timezone').notNull(),
+    isDefault: boolean('is_default').notNull().default(false),
+    color: text('color'),
+    defaultReminderOffsets: integer('default_reminder_offsets').array().notNull().default(sql`'{}'::integer[]`),
+    defaultReminderChannels: text('default_reminder_channels').array().notNull().default(sql`'{}'::text[]`),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_calendars_organization_id_id_unique').on(table.organizationId, table.id),
+    // "unique default per (organization_id, owner_user_id)" — partial, so a user may keep many
+    // non-default calendars but never two defaults.
+    uniqueIndex('user_calendars_default_unique')
+      .on(table.organizationId, table.ownerUserId)
+      .where(sql`${table.isDefault}`),
+    index('user_calendars_owner_idx').on(table.organizationId, table.ownerUserId),
+  ],
+)
+
+export const calendarEvents = pgTable(
+  'calendar_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    calendarId: uuid('calendar_id').notNull(),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    status: text('status').notNull(),
+    title: text('title').notNull(),
+    description: text('description'),
+    location: text('location'),
+    meetingUrl: text('meeting_url'),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    timezone: text('timezone').notNull(),
+    allDay: boolean('all_day').notNull().default(false),
+    busy: boolean('busy').notNull().default(true),
+    visibility: text('visibility').notNull().default('private'),
+    rrule: text('rrule'),
+    recurrenceUntil: timestamp('recurrence_until', { withTimezone: true }),
+    version: integer('version').notNull().default(1),
+    sourceType: text('source_type'),
+    sourceId: text('source_id'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('calendar_events_organization_id_id_unique').on(table.organizationId, table.id),
+    foreignKey({
+      columns: [table.organizationId, table.calendarId],
+      foreignColumns: [userCalendars.organizationId, userCalendars.id],
+      name: 'calendar_events_organization_calendar_fk',
+    }).onDelete('cascade'),
+    index('calendar_events_owner_range_idx').on(table.organizationId, table.ownerUserId, table.startsAt, table.endsAt),
+    index('calendar_events_status_idx').on(table.organizationId, table.status),
+    check('calendar_events_range_check', sql`${table.endsAt} > ${table.startsAt}`),
+    check('calendar_events_visibility_check', sql`${table.visibility} = 'private'`),
+    check('calendar_events_type_check', sql`${table.type} in ('personal', 'interview')`),
+    check('calendar_events_status_check', sql`${table.status} in ('scheduled', 'confirmed', 'in_progress', 'completed', 'cancelled', 'rescheduled', 'no_show')`),
+    check('calendar_events_version_check', sql`${table.version} >= 1`),
+    check('calendar_events_source_pair_check', sql`(${table.sourceType} is null) = (${table.sourceId} is null)`),
+  ],
+)
+
+export const calendarEventOccurrences = pgTable(
+  'calendar_event_occurrences',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    recurrenceId: text('recurrence_id').notNull(),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true }).notNull(),
+    status: text('status').notNull().default('active'),
+    materializationVersion: integer('materialization_version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('calendar_event_occurrences_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('calendar_event_occurrences_identity_unique').on(table.organizationId, table.eventId, table.recurrenceId),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'calendar_event_occurrences_organization_event_fk',
+    }).onDelete('cascade'),
+    index('calendar_event_occurrences_range_idx').on(table.organizationId, table.startsAt, table.endsAt),
+    check('calendar_event_occurrences_range_check', sql`${table.endsAt} > ${table.startsAt}`),
+    check('calendar_event_occurrences_status_check', sql`${table.status} in ('active', 'cancelled')`),
+    check('calendar_event_occurrences_materialization_check', sql`${table.materializationVersion} >= 1`),
+  ],
+)
+
+export const eventParticipants = pgTable(
+  'event_participants',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    userId: text('user_id').references(() => authUsers.id, { onDelete: 'cascade' }),
+    externalEmail: text('external_email'),
+    displayName: text('display_name'),
+    role: text('role').notNull(),
+    response: text('response').notNull().default('needs_action'),
+    accessGranted: boolean('access_granted').notNull().default(false),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('event_participants_organization_id_id_unique').on(table.organizationId, table.id),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'event_participants_organization_event_fk',
+    }).onDelete('cascade'),
+    // "unique participant identity per event" — one row per internal user and per external email.
+    uniqueIndex('event_participants_internal_identity_unique')
+      .on(table.organizationId, table.eventId, table.userId)
+      .where(sql`${table.userId} is not null`),
+    uniqueIndex('event_participants_external_identity_unique')
+      .on(table.organizationId, table.eventId, table.externalEmail)
+      .where(sql`${table.externalEmail} is not null`),
+    index('event_participants_user_idx').on(table.organizationId, table.userId),
+    check('event_participants_identity_check', sql`(${table.userId} is null) != (${table.externalEmail} is null)`),
+    check('event_participants_role_check', sql`${table.role} in ('organizer', 'attendee')`),
+    check('event_participants_response_check', sql`${table.response} in ('needs_action', 'accepted', 'declined', 'tentative')`),
+  ],
+)
+
+export const calendarEventReminders = pgTable(
+  'calendar_event_reminders',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    participantId: uuid('participant_id'),
+    channel: text('channel').notNull(),
+    offsetMinutes: integer('offset_minutes').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    nextFireAt: timestamp('next_fire_at', { withTimezone: true }),
+    state: text('state').notNull().default('pending'),
+    attempts: integer('attempts').notNull().default(0),
+    lastErrorCode: text('last_error_code'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('calendar_event_reminders_organization_id_id_unique').on(table.organizationId, table.id),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'calendar_event_reminders_organization_event_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organizationId, table.participantId],
+      foreignColumns: [eventParticipants.organizationId, eventParticipants.id],
+      name: 'calendar_event_reminders_organization_participant_fk',
+    }).onDelete('cascade'),
+    // NULL participantId means "the event owner" — two NULLs never collide in a plain unique
+    // index, so this pair of partial indexes is what actually enforces the spec's
+    // "unique event/participant/channel/offset".
+    uniqueIndex('calendar_event_reminders_participant_delivery_unique')
+      .on(table.organizationId, table.eventId, table.participantId, table.channel, table.offsetMinutes)
+      .where(sql`${table.participantId} is not null`),
+    uniqueIndex('calendar_event_reminders_owner_delivery_unique')
+      .on(table.organizationId, table.eventId, table.channel, table.offsetMinutes)
+      .where(sql`${table.participantId} is null`),
+    index('calendar_event_reminders_next_fire_idx').on(table.state, table.nextFireAt),
+    check('calendar_event_reminders_channel_check', sql`${table.channel} in ('email', 'in_app')`),
+    check('calendar_event_reminders_offset_check', sql`${table.offsetMinutes} in (0, 5, 10, 15, 30, 60, 1440, 10080)`),
+    check('calendar_event_reminders_state_check', sql`${table.state} in ('pending', 'sent', 'failed', 'cancelled')`),
+    check('calendar_event_reminders_attempts_check', sql`${table.attempts} >= 0`),
+  ],
+)
+
+export const calendarNotificationDeliveries = pgTable(
+  'calendar_notification_deliveries',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    reminderId: uuid('reminder_id'),
+    kind: text('kind').notNull(),
+    recipientUserId: text('recipient_user_id').references(() => authUsers.id, { onDelete: 'cascade' }),
+    externalRecipientHash: text('external_recipient_hash'),
+    idempotencyKey: text('idempotency_key').notNull(),
+    providerReference: text('provider_reference'),
+    state: text('state').notNull().default('pending'),
+    attemptedAt: timestamp('attempted_at', { withTimezone: true }),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    errorCode: text('error_code'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('calendar_notification_deliveries_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('calendar_notification_deliveries_idempotency_key_unique').on(table.idempotencyKey),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'calendar_notification_deliveries_organization_event_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organizationId, table.reminderId],
+      foreignColumns: [calendarEventReminders.organizationId, calendarEventReminders.id],
+      name: 'calendar_notification_deliveries_organization_reminder_fk',
+    }).onDelete('set null'),
+    index('calendar_notification_deliveries_recipient_idx').on(table.organizationId, table.recipientUserId, table.readAt),
+    check('calendar_notification_deliveries_kind_check', sql`${table.kind} in ('reminder', 'invitation', 'reschedule', 'cancellation')`),
+    check('calendar_notification_deliveries_state_check', sql`${table.state} in ('pending', 'sent', 'failed')`),
+    check('calendar_notification_deliveries_recipient_check', sql`(${table.recipientUserId} is null) != (${table.externalRecipientHash} is null)`),
+  ],
+)
+
+export const availabilityRules = pgTable(
+  'availability_rules',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    timezone: text('timezone').notNull(),
+    weekdays: integer('weekdays').array().notNull(),
+    localStart: time('local_start').notNull(),
+    localEnd: time('local_end').notNull(),
+    effectiveFrom: date('effective_from'),
+    effectiveUntil: date('effective_until'),
+    slotMinutes: integer('slot_minutes').notNull(),
+    bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+    bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
+    minNoticeMinutes: integer('min_notice_minutes').notNull().default(0),
+    horizonDays: integer('horizon_days').notNull(),
+    enabled: boolean('enabled').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('availability_rules_organization_id_id_unique').on(table.organizationId, table.id),
+    index('availability_rules_owner_idx').on(table.organizationId, table.ownerUserId, table.enabled),
+    // "no overnight rule" — a rule must open and close on the same local day.
+    check('availability_rules_local_range_check', sql`${table.localEnd} > ${table.localStart}`),
+    check('availability_rules_bounds_check', sql`${table.slotMinutes} > 0 and ${table.bufferBeforeMinutes} >= 0 and ${table.bufferAfterMinutes} >= 0 and ${table.minNoticeMinutes} >= 0 and ${table.horizonDays} > 0`),
+    check('availability_rules_effective_range_check', sql`${table.effectiveUntil} is null or ${table.effectiveFrom} is null or ${table.effectiveUntil} >= ${table.effectiveFrom}`),
+  ],
+)
+
+export const availabilityOverrides = pgTable(
+  'availability_overrides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    localDate: date('local_date').notNull(),
+    localStart: time('local_start'),
+    localEnd: time('local_end'),
+    kind: text('kind').notNull(),
+    timezone: text('timezone').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('availability_overrides_organization_id_id_unique').on(table.organizationId, table.id),
+    index('availability_overrides_owner_date_idx').on(table.organizationId, table.ownerUserId, table.localDate),
+    check('availability_overrides_kind_check', sql`${table.kind} in ('available', 'blocked')`),
+    // "blocked-day rows have null times, available rows require valid times"
+    check(
+      'availability_overrides_times_check',
+      sql`(${table.kind} = 'blocked' and ${table.localStart} is null and ${table.localEnd} is null) or (${table.kind} = 'available' and ${table.localStart} is not null and ${table.localEnd} is not null and ${table.localEnd} > ${table.localStart})`,
+    ),
+  ],
+)
+
+export const schedulingInvitations = pgTable(
+  'scheduling_invitations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    organizationBuilderId: text('organization_builder_id'),
+    roleTitle: text('role_title').notNull(),
+    roleContext: text('role_context').notNull(),
+    durationMinutes: integer('duration_minutes').notNull(),
+    timezone: text('timezone').notNull(),
+    modality: text('modality').notNull(),
+    meetingUrl: text('meeting_url'),
+    location: text('location'),
+    status: text('status').notNull().default('draft'),
+    capabilityHash: text('capability_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    openedAt: timestamp('opened_at', { withTimezone: true }),
+    bookedAt: timestamp('booked_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    bookedEventId: uuid('booked_event_id'),
+    rescheduleCount: integer('reschedule_count').notNull().default(0),
+    policyVersion: text('policy_version').notNull(),
+    version: integer('version').notNull().default(1),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('scheduling_invitations_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('scheduling_invitations_capability_hash_unique').on(table.capabilityHash),
+    foreignKey({
+      columns: [table.organizationId, table.organizationBuilderId],
+      foreignColumns: [organizationBuilders.organizationId, organizationBuilders.id],
+      name: 'scheduling_invitations_organization_builder_fk',
+    }).onDelete('set null'),
+    foreignKey({
+      columns: [table.organizationId, table.bookedEventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'scheduling_invitations_organization_booked_event_fk',
+    }).onDelete('set null'),
+    index('scheduling_invitations_owner_status_idx').on(table.organizationId, table.ownerUserId, table.status),
+    index('scheduling_invitations_expiry_idx').on(table.status, table.expiresAt),
+    check('scheduling_invitations_status_check', sql`${table.status} in ('draft', 'sent', 'opened', 'booked', 'declined', 'expired', 'revoked')`),
+    check('scheduling_invitations_modality_check', sql`${table.modality} in ('in_person', 'remote_call')`),
+    check('scheduling_invitations_duration_check', sql`${table.durationMinutes} > 0 and ${table.durationMinutes} <= 480`),
+    check('scheduling_invitations_counters_check', sql`${table.rescheduleCount} >= 0 and ${table.version} >= 1`),
+  ],
+)
+
+export const candidateSubmissions = pgTable(
+  'candidate_submissions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    invitationId: uuid('invitation_id').notNull(),
+    displayName: text('display_name').notNull(),
+    emailNormalized: text('email_normalized').notNull(),
+    notes: text('notes'),
+    submittedAt: timestamp('submitted_at', { withTimezone: true }),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('candidate_submissions_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('candidate_submissions_invitation_id_unique').on(table.invitationId),
+    foreignKey({
+      columns: [table.organizationId, table.invitationId],
+      foreignColumns: [schedulingInvitations.organizationId, schedulingInvitations.id],
+      name: 'candidate_submissions_organization_invitation_fk',
+    }).onDelete('cascade'),
+    index('candidate_submissions_retention_idx').on(table.retentionExpiresAt),
+  ],
+)
+
+export const candidateLinks = pgTable(
+  'candidate_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    submissionId: uuid('submission_id').notNull(),
+    url: text('url').notNull(),
+    normalizedUrl: text('normalized_url').notNull(),
+    sourceType: text('source_type').notNull(),
+    acquisitionMode: text('acquisition_mode').notNull(),
+    authorizationNoticeVersion: text('authorization_notice_version'),
+    authorizationAttestedAt: timestamp('authorization_attested_at', { withTimezone: true }),
+    policyDecision: text('policy_decision').notNull().default('not_importable'),
+    importState: text('import_state').notNull().default('not_requested'),
+    label: text('label'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('candidate_links_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('candidate_links_submission_normalized_url_unique').on(table.organizationId, table.submissionId, table.normalizedUrl),
+    foreignKey({
+      columns: [table.organizationId, table.submissionId],
+      foreignColumns: [candidateSubmissions.organizationId, candidateSubmissions.id],
+      name: 'candidate_links_organization_submission_fk',
+    }).onDelete('cascade'),
+    index('candidate_links_import_state_idx').on(table.organizationId, table.importState),
+    check('candidate_links_acquisition_mode_check', sql`${table.acquisitionMode} in ('official_api', 'authorized_crawl', 'user_submitted')`),
+    check('candidate_links_policy_decision_check', sql`${table.policyDecision} in ('official_api', 'authorized_crawl', 'user_submitted', 'not_importable')`),
+    check('candidate_links_import_state_check', sql`${table.importState} in ('not_requested', 'queued', 'running', 'succeeded', 'failed', 'not_importable')`),
+    // An `authorized_crawl` decision requires the candidate's versioned attestation on file.
+    check(
+      'candidate_links_attestation_check',
+      sql`${table.policyDecision} != 'authorized_crawl' or (${table.authorizationNoticeVersion} is not null and ${table.authorizationAttestedAt} is not null)`,
+    ),
   ],
 )

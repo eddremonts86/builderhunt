@@ -323,7 +323,7 @@ src/shared/lib/calendar.test.ts`.
 
 ## Phase 2 — Calendar persistence and RLS
 
-- [ ] **Add calendar and scheduling schema**
+- [x] **Add calendar and scheduling schema**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `docs/architecture/data-classification.md`
   - Do: Add the exact `spec.md` columns/checks for `user_calendars`, `calendar_events`,
     `calendar_event_occurrences`, `event_participants`, `calendar_event_reminders`,
@@ -334,6 +334,35 @@ src/shared/lib/calendar.test.ts`.
     partial unique, occurrence identity unique, and indexes for owner/range/status/expiry scans.
   - Verify: `pnpm db:generate`; inspect generated SQL for no unexplained drop/rewrite; `pnpm exec
 drizzle-kit check && pnpm test:migrations:local`.
+  - **Evidence (2026-07-26)**: Added all 11 tables to `schema.ts` following the spec's "Normative
+    persistence contract" — `uuid` PK with `gen_random_uuid()`, `organization_id text not null`,
+    created/updated `timestamptz`, a `(organization_id, id)` unique index on every table, and every
+    child referencing that pair via a composite FK (never a bare `id` FK, so a row can never point
+    at a parent in a different tenant). 32 check constraints total, including
+    `calendar_events`'s `ends_at > starts_at`, `visibility = 'private'`, `version >= 1`, and
+    "source pair null together"; `availability_rules`'s no-overnight `local_end > local_start`;
+    `availability_overrides`'s blocked-has-null-times / available-requires-valid-times rule;
+    `event_participants`'s exactly-one-of user_id/external_email; and `candidate_links`'s
+    "authorized_crawl requires a versioned attestation on file". Partial unique indexes enforce one
+    default calendar per (org, owner), the occurrence `(org, event, recurrence_id)` identity, and
+    the reminder delivery key — the reminder one needed *two* partial indexes because a NULL
+    `participant_id` (meaning "the event owner") never collides in a plain unique index, so a single
+    index would silently allow duplicate owner reminders. Generated `drizzle/0065_awesome_lorna_dane.sql`
+    via `pnpm drizzle-kit generate`: 11 CREATE TABLEs, **zero** DROP/ALTER COLUMN statements
+    (verified by grep — purely additive). **Found and fixed a real generator bug**: drizzle emitted
+    the composite `ADD CONSTRAINT ... FOREIGN KEY (organization_id, x) REFERENCES <new table>` block
+    *before* the `CREATE UNIQUE INDEX ..._organization_id_id_unique` statements those FKs depend on,
+    so the first migration run failed with `42830 there is no unique constraint matching given keys
+    for referenced table "calendar_events"`. Reordered the 11 unique-index statements ahead of the
+    first `ALTER TABLE` in the generated file. `pnpm exec drizzle-kit check` reports "Everything's
+    fine"; `pnpm test:migrations:local` against a fresh disposable
+    `builderhunt_security_test_*` database returns `{"firstRun":"ok","secondRun":"ok","applied":66}`
+    (idempotent re-run). Applied to the local dev database and verified against live Postgres with a
+    transactional `DO` block that all 11 tables exist and that public visibility, a zero-length time
+    range, a half-populated source pair, a second default calendar, and a non-allowlisted reminder
+    offset are each rejected by the real constraint. `migration-hashes.json` regenerated (66
+    migrations). `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2836 passed)
+    are clean.
 
 - [ ] **Add operational schedule and run schema**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `docs/architecture/data-classification.md`
