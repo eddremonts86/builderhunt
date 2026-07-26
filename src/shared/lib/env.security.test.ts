@@ -197,3 +197,93 @@ describe('abuse-and-usage-integrity environment (plan: abuse-and-usage-integrity
     expect(parseEnvironment({ ...productionEnvironment, ABUSE_ENFORCEMENT_MODE: 'enforce' }).ABUSE_ENFORCEMENT_MODE).toBe('enforce')
   })
 })
+
+describe('calendar-scheduling-interview-intelligence environment (plan: calendar-scheduling-interview-intelligence)', () => {
+  const VALID_R2 = {
+    CANDIDATE_UPLOADS_ENABLED: 'true',
+    INTERVIEW_R2_ENDPOINT: 'https://accountid.eu.r2.cloudflarestorage.com',
+    INTERVIEW_R2_ACCOUNT_ID: 'accountid',
+    INTERVIEW_R2_BUCKET: 'interview-uploads',
+    INTERVIEW_R2_ACCESS_KEY_ID: 'r2-access-key',
+    INTERVIEW_R2_SECRET_ACCESS_KEY: 'r2-secret-key',
+    INTERVIEW_CLAMAV_HOST: 'clamav.internal',
+  }
+  const VALID_DEEPGRAM = {
+    INTERVIEW_TRANSCRIPTION_ENABLED: 'true',
+    DEEPGRAM_API_KEY: 'deepgram-key',
+  }
+  const VALID_AZURE = {
+    SENSITIVE_AI_ENABLED: 'true',
+    AZURE_OPENAI_ENDPOINT: 'https://my-deployment.westeurope.api.cognitive.microsoft.com',
+    AZURE_OPENAI_API_KEY: 'azure-key',
+    AZURE_OPENAI_DEPLOYMENT: 'gpt-eu-deployment',
+    AZURE_OPENAI_API_VERSION: '2024-08-01-preview',
+  }
+
+  it('boots with every calendar-scheduling flag disabled and no provider config set (default-safe)', () => {
+    const parsed = parseEnvironment(productionEnvironment)
+    expect(parsed).toMatchObject({
+      CALENDAR_ENABLED: 'false',
+      SCHEDULING_ENABLED: 'false',
+      CANDIDATE_UPLOADS_ENABLED: 'false',
+      CANDIDATE_WEB_IMPORT_ENABLED: 'false',
+      SENSITIVE_AI_ENABLED: 'false',
+      INTERVIEW_TRANSCRIPTION_ENABLED: 'false',
+      INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: 'false',
+      CALENDAR_OPERATIONAL_LAYERS_ENABLED: 'false',
+      INTERVIEW_R2_JURISDICTION: 'eu',
+      DEEPGRAM_BASE_URL: 'https://api.eu.deepgram.com',
+      INTERVIEW_TRANSCRIPT_RETENTION_DAYS: 90,
+      INTERVIEW_DOCUMENT_RETENTION_DAYS: 180,
+      INTERVIEW_CONSENT_RETENTION_MONTHS: 24,
+    })
+  })
+
+  it('accepts a fully valid enabled configuration for each dependency', () => {
+    const parsed = parseEnvironment({ ...productionEnvironment, ...VALID_R2, ...VALID_DEEPGRAM, ...VALID_AZURE })
+    expect(parsed.CANDIDATE_UPLOADS_ENABLED).toBe('true')
+    expect(parsed.INTERVIEW_TRANSCRIPTION_ENABLED).toBe('true')
+    expect(parsed.SENSITIVE_AI_ENABLED).toBe('true')
+  })
+
+  it.each([
+    ['R2 endpoint missing when uploads enabled', { ...VALID_R2, INTERVIEW_R2_ENDPOINT: undefined }],
+    ['R2 endpoint outside the EU jurisdiction', { ...VALID_R2, INTERVIEW_R2_ENDPOINT: 'https://accountid.r2.cloudflarestorage.com' }],
+    ['R2 account id missing when uploads enabled', { ...VALID_R2, INTERVIEW_R2_ACCOUNT_ID: undefined }],
+    ['R2 bucket missing when uploads enabled', { ...VALID_R2, INTERVIEW_R2_BUCKET: undefined }],
+    ['R2 access key missing when uploads enabled', { ...VALID_R2, INTERVIEW_R2_ACCESS_KEY_ID: undefined }],
+    ['R2 secret key missing when uploads enabled', { ...VALID_R2, INTERVIEW_R2_SECRET_ACCESS_KEY: undefined }],
+    ['ClamAV host missing when uploads enabled', { ...VALID_R2, INTERVIEW_CLAMAV_HOST: undefined }],
+    ['Deepgram key missing when transcription enabled', { ...VALID_DEEPGRAM, DEEPGRAM_API_KEY: undefined }],
+    ['Deepgram base URL overridden to a non-EU endpoint', { ...VALID_DEEPGRAM, DEEPGRAM_BASE_URL: 'https://api.deepgram.com' }],
+    ['Azure endpoint missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_ENDPOINT: undefined }],
+    ['Azure endpoint outside an EU region', { ...VALID_AZURE, AZURE_OPENAI_ENDPOINT: 'https://my-deployment.eastus.api.cognitive.microsoft.com' }],
+    ['Azure key missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_API_KEY: undefined }],
+    ['Azure deployment missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_DEPLOYMENT: undefined }],
+    ['Azure API version missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_API_VERSION: undefined }],
+    ['malformed transcript retention (exceeds 90-day ceiling)', { INTERVIEW_TRANSCRIPT_RETENTION_DAYS: '91' }],
+    ['malformed document retention (exceeds 180-day ceiling)', { INTERVIEW_DOCUMENT_RETENTION_DAYS: '181' }],
+    ['malformed consent retention (exceeds 24-month ceiling)', { INTERVIEW_CONSENT_RETENTION_MONTHS: '25' }],
+  ])('rejects %s (fails closed)', (_label, override) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
+  })
+
+  it.each([
+    ['INTERVIEW_R2_ACCESS_KEY_ID', 'leaked-r2-key'],
+    ['INTERVIEW_R2_SECRET_ACCESS_KEY', 'leaked-r2-secret'],
+    ['INTERVIEW_CLAMAV_HOST', 'leaked-clamav-host'],
+    ['DEEPGRAM_API_KEY', 'leaked-deepgram-key'],
+    ['AZURE_OPENAI_API_KEY', 'leaked-azure-key'],
+  ])('rejects a stray VITE_-prefixed copy of %s (client-secret leakage)', (key, value) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, [`VITE_${key}`]: value })).toThrow()
+  })
+
+  it('does not require provider config outside production (dependency checks are production-only, like enrichment)', () => {
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      NODE_ENV: 'development',
+      CANDIDATE_UPLOADS_ENABLED: 'true',
+      // no R2/ClamAV config set
+    })).not.toThrow()
+  })
+})

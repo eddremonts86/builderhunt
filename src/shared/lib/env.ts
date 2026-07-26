@@ -188,6 +188,47 @@ const zodEnv = z.object({
   CREDIT_REFUND_FARMING_WINDOW_HOURS: z.coerce.number().int().positive().default(720),
   CREDIT_REFUND_FARMING_RATIO_THRESHOLD: z.coerce.number().min(0).max(1).default(0.5),
   CREDIT_REFUND_FARMING_MIN_SETTLED_UNITS: z.coerce.number().int().positive().default(100),
+  // Plan: calendar-scheduling-interview-intelligence. Eight independently-togglable release
+  // flags (plan.md "Release flags") — all off by default. Turning one off blocks new actions
+  // but preserves authorized read/export/delete access; it never removes saved data.
+  CALENDAR_ENABLED: z.enum(['true', 'false']).default('false'),
+  SCHEDULING_ENABLED: z.enum(['true', 'false']).default('false'),
+  CANDIDATE_UPLOADS_ENABLED: z.enum(['true', 'false']).default('false'),
+  CANDIDATE_WEB_IMPORT_ENABLED: z.enum(['true', 'false']).default('false'),
+  SENSITIVE_AI_ENABLED: z.enum(['true', 'false']).default('false'),
+  INTERVIEW_TRANSCRIPTION_ENABLED: z.enum(['true', 'false']).default('false'),
+  INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: z.enum(['true', 'false']).default('false'),
+  CALENDAR_OPERATIONAL_LAYERS_ENABLED: z.enum(['true', 'false']).default('false'),
+  // Cloudflare R2 (spec.md: "private Standard bucket, EU jurisdiction") — required in production
+  // when CANDIDATE_UPLOADS_ENABLED=true. `INTERVIEW_R2_JURISDICTION` is fixed to 'eu'; the schema
+  // rejects any other value rather than silently accepting a non-EU bucket.
+  INTERVIEW_R2_ENDPOINT: z.string().optional(),
+  INTERVIEW_R2_ACCOUNT_ID: z.string().optional(),
+  INTERVIEW_R2_BUCKET: z.string().optional(),
+  INTERVIEW_R2_ACCESS_KEY_ID: z.string().optional(),
+  INTERVIEW_R2_SECRET_ACCESS_KEY: z.string().optional(),
+  INTERVIEW_R2_JURISDICTION: z.enum(['eu']).default('eu'),
+  // ClamAV (spec.md: "Stream every object through ClamAV before moving/copying to the clean
+  // private prefix") — required in production when CANDIDATE_UPLOADS_ENABLED=true.
+  INTERVIEW_CLAMAV_HOST: z.string().optional(),
+  INTERVIEW_CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
+  // Deepgram EU endpoint (spec.md: "Speech-to-text: Deepgram EU first") — required in production
+  // when INTERVIEW_TRANSCRIPTION_ENABLED=true. Default base URL is already the EU endpoint so an
+  // operator cannot accidentally point at the global one by simply omitting the var.
+  DEEPGRAM_API_KEY: z.string().optional(),
+  DEEPGRAM_BASE_URL: z.string().default('https://api.eu.deepgram.com'),
+  // Azure OpenAI regional EU deployment (spec.md: "Sensitive text AI: Azure OpenAI regional EU
+  // deployment. Never silently fall back to MiniMax.") — required in production when
+  // SENSITIVE_AI_ENABLED=true.
+  AZURE_OPENAI_ENDPOINT: z.string().optional(),
+  AZURE_OPENAI_API_KEY: z.string().optional(),
+  AZURE_OPENAI_DEPLOYMENT: z.string().optional(),
+  AZURE_OPENAI_API_VERSION: z.string().optional(),
+  // Retention defaults (spec.md "Consent, privacy, and retention" → "Defaults"). Organizations
+  // may select shorter periods; these are the operator-wide ceiling the retention worker enforces.
+  INTERVIEW_TRANSCRIPT_RETENTION_DAYS: z.coerce.number().int().positive().max(90).default(90),
+  INTERVIEW_DOCUMENT_RETENTION_DAYS: z.coerce.number().int().positive().max(180).default(180),
+  INTERVIEW_CONSENT_RETENTION_MONTHS: z.coerce.number().int().positive().max(24).default(24),
 }).superRefine((data, context) => {
   if (!data.BETTER_AUTH_SECRET) {
     context.addIssue({
@@ -336,9 +377,60 @@ const zodEnv = z.object({
       context.addIssue({ code: 'custom', path: ['ENRICHMENT_RAW_RETENTION_DAYS'], message: 'Enrichment retention windows exceed policy bounds' })
     }
   }
+
+  if (data.CANDIDATE_UPLOADS_ENABLED === 'true') {
+    if (!data.INTERVIEW_R2_ENDPOINT || !/\.eu\.r2\.cloudflarestorage\.com$/i.test(new URL(data.INTERVIEW_R2_ENDPOINT.startsWith('http') ? data.INTERVIEW_R2_ENDPOINT : `https://${data.INTERVIEW_R2_ENDPOINT}`).hostname)) {
+      context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_ENDPOINT'], message: 'INTERVIEW_R2_ENDPOINT must be a *.eu.r2.cloudflarestorage.com EU-jurisdiction endpoint when CANDIDATE_UPLOADS_ENABLED=true' })
+    }
+    if (!data.INTERVIEW_R2_ACCOUNT_ID) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_ACCOUNT_ID'], message: 'INTERVIEW_R2_ACCOUNT_ID is required when CANDIDATE_UPLOADS_ENABLED=true' })
+    if (!data.INTERVIEW_R2_BUCKET) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_BUCKET'], message: 'INTERVIEW_R2_BUCKET is required when CANDIDATE_UPLOADS_ENABLED=true' })
+    if (!data.INTERVIEW_R2_ACCESS_KEY_ID) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_ACCESS_KEY_ID'], message: 'INTERVIEW_R2_ACCESS_KEY_ID is required when CANDIDATE_UPLOADS_ENABLED=true' })
+    if (!data.INTERVIEW_R2_SECRET_ACCESS_KEY) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_SECRET_ACCESS_KEY'], message: 'INTERVIEW_R2_SECRET_ACCESS_KEY is required when CANDIDATE_UPLOADS_ENABLED=true' })
+    if (!data.INTERVIEW_CLAMAV_HOST) context.addIssue({ code: 'custom', path: ['INTERVIEW_CLAMAV_HOST'], message: 'INTERVIEW_CLAMAV_HOST is required when CANDIDATE_UPLOADS_ENABLED=true' })
+  }
+
+  if (data.INTERVIEW_TRANSCRIPTION_ENABLED === 'true') {
+    if (!data.DEEPGRAM_API_KEY) {
+      context.addIssue({ code: 'custom', path: ['DEEPGRAM_API_KEY'], message: 'DEEPGRAM_API_KEY is required when INTERVIEW_TRANSCRIPTION_ENABLED=true' })
+    }
+    if (!/^https:\/\/api\.eu\.deepgram\.com/i.test(data.DEEPGRAM_BASE_URL)) {
+      context.addIssue({ code: 'custom', path: ['DEEPGRAM_BASE_URL'], message: 'DEEPGRAM_BASE_URL must be the EU endpoint (api.eu.deepgram.com) when INTERVIEW_TRANSCRIPTION_ENABLED=true' })
+    }
+  }
+
+  if (data.SENSITIVE_AI_ENABLED === 'true') {
+    const EU_AZURE_REGIONS = ['westeurope', 'northeurope', 'francecentral', 'germanywestcentral', 'swedencentral', 'switzerlandnorth']
+    const endpointHost = (() => {
+      try {
+        return new URL(data.AZURE_OPENAI_ENDPOINT ?? '').hostname.toLowerCase()
+      } catch {
+        return ''
+      }
+    })()
+    if (!data.AZURE_OPENAI_ENDPOINT || !EU_AZURE_REGIONS.some((region) => endpointHost.includes(region))) {
+      context.addIssue({ code: 'custom', path: ['AZURE_OPENAI_ENDPOINT'], message: 'AZURE_OPENAI_ENDPOINT must be a regional EU Azure OpenAI deployment when SENSITIVE_AI_ENABLED=true' })
+    }
+    if (!data.AZURE_OPENAI_API_KEY) context.addIssue({ code: 'custom', path: ['AZURE_OPENAI_API_KEY'], message: 'AZURE_OPENAI_API_KEY is required when SENSITIVE_AI_ENABLED=true' })
+    if (!data.AZURE_OPENAI_DEPLOYMENT) context.addIssue({ code: 'custom', path: ['AZURE_OPENAI_DEPLOYMENT'], message: 'AZURE_OPENAI_DEPLOYMENT is required when SENSITIVE_AI_ENABLED=true' })
+    if (!data.AZURE_OPENAI_API_VERSION) context.addIssue({ code: 'custom', path: ['AZURE_OPENAI_API_VERSION'], message: 'AZURE_OPENAI_API_VERSION is required when SENSITIVE_AI_ENABLED=true' })
+  }
 })
 
+// Plan: calendar-scheduling-interview-intelligence. These provider secrets must never leak to
+// the client via a stray VITE_-prefixed copy — checked against the raw input in every
+// environment, not just production, since it's a static shape mistake rather than a runtime
+// dependency check.
+const INTERVIEW_SECRET_KEYS = [
+  'INTERVIEW_R2_ACCESS_KEY_ID', 'INTERVIEW_R2_SECRET_ACCESS_KEY',
+  'INTERVIEW_CLAMAV_HOST', 'DEEPGRAM_API_KEY', 'AZURE_OPENAI_API_KEY',
+]
+
 export function parseEnvironment(input: Record<string, unknown>) {
+  for (const key of INTERVIEW_SECRET_KEYS) {
+    if (typeof input[`VITE_${key}`] !== 'undefined') {
+      throw new Error(`VITE_${key} must never be set — this is a server-only secret`)
+    }
+  }
   return zodEnv.parse(input)
 }
 
