@@ -477,6 +477,20 @@
       "when": 1785067130064,
       "tag": "0067_operational_schedule_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 68,
+      "version": "7",
+      "when": 1785067581135,
+      "tag": "0068_special_tigra",
+      "breakpoints": true
+    },
+    {
+      "idx": 69,
+      "version": "7",
+      "when": 1785067600847,
+      "tag": "0069_calendar_scheduling_rls_grants",
+      "breakpoints": true
     }
   ]
 }

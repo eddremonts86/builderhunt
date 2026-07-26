@@ -121,6 +121,52 @@ try {
       ('usage-b', 'org-b', 'user-b', '2026-01-01', 'searches', 1, 0)
     on conflict (id) do nothing
   `
+  // calendar-scheduling-interview-intelligence: org-a's owner (user-a) owns a calendar, an
+  // event, and an invitation. user-c is an org-a member who is an access-granted participant on
+  // that event; user-d is an org-a admin with no participation at all — the verifier asserts the
+  // admin still sees nothing, which is this plan's strictest requirement.
+  await owner`
+    insert into auth_users (id, name, email, email_verified, created_at, updated_at)
+    values
+      ('user-c', 'C', 'c@test.invalid', true, now(), now()),
+      ('user-d', 'D', 'd@test.invalid', true, now(), now())
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into organization_members (id, organization_id, user_id, role, created_at)
+    values ('member-c', 'org-a', 'user-c', 'member', now()), ('member-d', 'org-a', 'user-d', 'admin', now())
+    on conflict (organization_id, user_id) do nothing
+  `
+  await owner`
+    insert into user_calendars (id, organization_id, owner_user_id, name, timezone, is_default)
+    values
+      ('aaaaaaaa-0000-4000-8000-00000000000a', 'org-a', 'user-a', 'Cal A', 'Europe/Copenhagen', true),
+      ('aaaaaaaa-0000-4000-8000-00000000000b', 'org-b', 'user-b', 'Cal B', 'UTC', true)
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into calendar_events (id, organization_id, calendar_id, owner_user_id, type, status, title, starts_at, ends_at, timezone)
+    values
+      ('bbbbbbbb-0000-4000-8000-00000000000a', 'org-a', 'aaaaaaaa-0000-4000-8000-00000000000a', 'user-a', 'interview', 'scheduled', 'Event A', now(), now() + interval '1 hour', 'Europe/Copenhagen'),
+      ('bbbbbbbb-0000-4000-8000-00000000000b', 'org-b', 'aaaaaaaa-0000-4000-8000-00000000000b', 'user-b', 'personal', 'scheduled', 'Event B', now(), now() + interval '1 hour', 'UTC')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into event_participants (id, organization_id, event_id, event_owner_user_id, user_id, role, access_granted)
+    values ('cccccccc-0000-4000-8000-00000000000a', 'org-a', 'bbbbbbbb-0000-4000-8000-00000000000a', 'user-a', 'user-c', 'attendee', true)
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into scheduling_invitations (id, organization_id, owner_user_id, role_title, role_context, duration_minutes, timezone, modality, capability_hash, policy_version)
+    values ('dddddddd-0000-4000-8000-00000000000a', 'org-a', 'user-a', 'Engineer', 'context', 60, 'Europe/Copenhagen', 'remote_call', 'capability-hash-a', 'v1')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into candidate_submissions (id, organization_id, invitation_id, display_name, email_normalized, retention_expires_at)
+    values ('eeeeeeee-0000-4000-8000-00000000000a', 'org-a', 'dddddddd-0000-4000-8000-00000000000a', 'Candidate', 'cand@test.invalid', now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+
   // `roles`/`urls` tell the caller which login roles to use for the verifier
   // (`scripts/db/verify-rls-local.mjs` reads RLS_TEST_*_URL): the base roles
   // themselves in CI, per-run dedicated members everywhere else.

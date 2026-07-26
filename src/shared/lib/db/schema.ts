@@ -1866,6 +1866,9 @@ export const calendarEvents = pgTable(
   },
   (table) => [
     uniqueIndex('calendar_events_organization_id_id_unique').on(table.organizationId, table.id),
+    // Referenced by `event_participants`'s FK-guaranteed denormalized owner column — see the
+    // comment on that table for why the owner is copied down rather than joined at policy time.
+    uniqueIndex('calendar_events_organization_id_owner_unique').on(table.organizationId, table.id, table.ownerUserId),
     foreignKey({
       columns: [table.organizationId, table.calendarId],
       foreignColumns: [userCalendars.organizationId, userCalendars.id],
@@ -1911,12 +1914,21 @@ export const calendarEventOccurrences = pgTable(
   ],
 )
 
+/**
+ * `eventOwnerUserId` is a deliberate denormalization of `calendar_events.owner_user_id`, kept
+ * honest by a composite FK against `(organization_id, id, owner_user_id)` so it can never drift.
+ * It exists for RLS: the calendar_events participant-read policy has to consult this table, so if
+ * this table's own owner policy joined back to calendar_events, Postgres would reject every query
+ * with "infinite recursion detected in policy". Copying the owner down breaks that cycle — this
+ * table's policies read only its own columns.
+ */
 export const eventParticipants = pgTable(
   'event_participants',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     eventId: uuid('event_id').notNull(),
+    eventOwnerUserId: text('event_owner_user_id').notNull(),
     userId: text('user_id').references(() => authUsers.id, { onDelete: 'cascade' }),
     externalEmail: text('external_email'),
     displayName: text('display_name'),
@@ -1929,9 +1941,11 @@ export const eventParticipants = pgTable(
   },
   (table) => [
     uniqueIndex('event_participants_organization_id_id_unique').on(table.organizationId, table.id),
+    // Carries `eventOwnerUserId` so the FK itself guarantees the denormalized owner matches the
+    // real event owner — an inconsistent copy is not representable.
     foreignKey({
-      columns: [table.organizationId, table.eventId],
-      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      columns: [table.organizationId, table.eventId, table.eventOwnerUserId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id, calendarEvents.ownerUserId],
       name: 'event_participants_organization_event_fk',
     }).onDelete('cascade'),
     // "unique participant identity per event" — one row per internal user and per external email.

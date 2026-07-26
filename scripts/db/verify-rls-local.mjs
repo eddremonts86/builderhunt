@@ -385,6 +385,94 @@ try {
     throw new Error('Atomic personal organization bootstrap failed')
   }
 
+  // calendar-scheduling-interview-intelligence: private-user RLS. The org filter alone is not
+  // enough here — an event is visible only to its owner or an access-granted participant, so an
+  // ordinary member and even an org ADMIN who is not on the event must see nothing.
+  const calendarOwner = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select id from calendar_events order by id`
+  })
+  assertIds(calendarOwner, ['bbbbbbbb-0000-4000-8000-00000000000a'], 'calendar owner read')
+
+  const calendarParticipant = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    return transaction`select id from calendar_events order by id`
+  })
+  assertIds(calendarParticipant, ['bbbbbbbb-0000-4000-8000-00000000000a'], 'calendar participant read')
+
+  // The participant may read but never mutate the owner's event.
+  const participantUpdate = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    const rows = await transaction`update calendar_events set title = 'hijacked' where id = 'bbbbbbbb-0000-4000-8000-00000000000a' returning id`
+    return rows.length
+  })
+  if (participantUpdate !== 0) throw new Error('participant was able to update the owner event')
+
+  const calendarAdmin = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-d', true)`
+    await transaction`select set_config('app.organization_role', 'admin', true)`
+    const events = await transaction`select id from calendar_events`
+    const candidates = await transaction`select id from candidate_submissions`
+    return { events: events.length, candidates: candidates.length }
+  })
+  if (calendarAdmin.events !== 0 || calendarAdmin.candidates !== 0) {
+    throw new Error(`org admin without participation saw private calendar data: ${JSON.stringify(calendarAdmin)}`)
+  }
+
+  // A participant gets the event but never the candidate data hanging off the invitation.
+  const participantCandidates = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    const rows = await transaction`select id from candidate_submissions`
+    return rows.length
+  })
+  if (participantCandidates !== 0) throw new Error('participant saw candidate submissions')
+
+  const calendarSpoofedUser = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a-attacker', true)`
+    const rows = await transaction`select id from calendar_events`
+    return rows.length
+  })
+  if (calendarSpoofedUser !== 0) throw new Error('spoofed user id saw calendar rows')
+
+  let calendarCrossTenantInsert = 'allowed'
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.user_id', 'user-a', true)`
+      await transaction`
+        insert into calendar_events (organization_id, calendar_id, owner_user_id, type, status, title, starts_at, ends_at, timezone)
+        values ('org-b', 'aaaaaaaa-0000-4000-8000-00000000000b', 'user-a', 'personal', 'scheduled', 'X', now(), now() + interval '1 hour', 'UTC')
+      `
+    })
+  } catch {
+    calendarCrossTenantInsert = 'denied'
+  }
+  if (calendarCrossTenantInsert !== 'denied') throw new Error('cross-tenant calendar insert was allowed')
+
+  // The worker is org-scoped with no session user, and has no write path into candidate data.
+  const workerCalendar = await worker.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select id from calendar_events order by id`
+  })
+  assertIds(workerCalendar, ['bbbbbbbb-0000-4000-8000-00000000000a'], 'worker calendar scope')
+
+  let workerCandidateWrite = 'allowed'
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update candidate_submissions set display_name = 'x' where organization_id = 'org-a'`
+    })
+  } catch {
+    workerCandidateWrite = 'denied'
+  }
+  if (workerCandidateWrite !== 'denied') throw new Error('worker was able to rewrite candidate data')
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
@@ -423,6 +511,15 @@ try {
     appAbuseSignalsAccess: 'denied',
     workerAbuseSignals: workerAbuseSignals.map((row) => row.id),
     platformAbuseSignals: platformAbuseSignals.map((row) => row.id),
+    calendarOwnerRead: calendarOwner.map((row) => row.id),
+    calendarParticipantRead: calendarParticipant.map((row) => row.id),
+    calendarParticipantUpdate: 'denied',
+    calendarAdminWithoutParticipation: 'denied',
+    calendarParticipantCandidateAccess: 'denied',
+    calendarSpoofedUser: 'denied',
+    calendarCrossTenantInsert: 'denied',
+    workerCalendarScope: workerCalendar.map((row) => row.id),
+    workerCandidateWrite: 'denied',
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end()])

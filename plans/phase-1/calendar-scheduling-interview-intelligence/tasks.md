@@ -400,7 +400,7 @@ drizzle-kit check && pnpm test:migrations:local`.
     genuinely *cannot* register a new schedule (that's the platform role's job), which the grant
     design intends. `pnpm tsc --noEmit` and the full `pnpm vitest run` (2836 passed) are clean.
 
-- [ ] **Add strict private-user RLS policies**
+- [x] **Add strict private-user RLS policies**
   - Files: `drizzle/`, `src/shared/lib/security/rls-policy.test.ts`,
     `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
   - Do: Enable/force RLS on every new tenant table. Calendar/availability/invitation owner can
@@ -410,6 +410,39 @@ drizzle-kit check && pnpm test:migrations:local`.
   - Verify: direct SQL covers owner, participant, unrelated member, admin without participation,
     tenant B, missing context, spoofed context, cross-tenant FK, and worker scope; `pnpm
 test:rls:local`.
+  - **Evidence (2026-07-26)**: `drizzle/0069_calendar_scheduling_rls_grants.sql` enables and
+    FORCEs RLS on all 11 tenant tables. Unlike the ordinary org-scoped pattern used by billing,
+    these policies compose **two** conditions — `organization_id` AND
+    (`owner_user_id = app.user_id` OR an access-granted participant) — because the org filter
+    alone would let any member, including an admin, read another user's private calendar. There is
+    deliberately **no `app.organization_role = 'admin'` escape hatch anywhere**. Owner access and
+    participant read are separate policies rather than one `FOR ALL`, since Postgres ORs permissive
+    policies of the same command and a combined policy would also grant participants UPDATE/DELETE.
+    **Found and fixed a real design bug through testing**: the first version failed every query with
+    `infinite recursion detected in policy for relation "calendar_events"` — the calendar_events
+    participant policy read `event_participants`, whose owner policy read back into
+    `calendar_events`. `SECURITY DEFINER` was rejected as the fix because it depends on the table
+    owner holding BYPASSRLS, which differs between local (`postgres`, superuser) and production
+    (`migration_operator`) — it would have silently behaved differently in prod. Broke the cycle
+    structurally instead (`drizzle/0068_special_tigra.sql`): `event_participants` now carries an
+    `event_owner_user_id` column held honest by a composite FK against
+    `calendar_events(organization_id, id, owner_user_id)`, so an inconsistent copy is not
+    representable and this table's policies read only its own columns. Also reordered that
+    migration's `CREATE UNIQUE INDEX` ahead of the FK that references it (same drizzle emission-order
+    problem as 0065). `builderhunt_platform` intentionally receives **no grant at all** on these
+    tables — spec.md gives candidate/private-calendar data no operator read path. Verified against
+    live Postgres with a 9-scenario transactional script covering owner, participant (reads but
+    `UPDATE 0`), unrelated member (0), **admin without participation (0 events, 0 candidates)**,
+    tenant B, missing context, spoofed user id, cross-tenant insert (rejected by RLS), and worker
+    scope (org-scoped reads, can materialize occurrences, `permission denied` on candidate writes).
+    Extended `scripts/db/prepare-rls-fixture.mjs` (adds user-c as a participant and user-d as a
+    non-participating admin) and `scripts/db/verify-rls-local.mjs` with 9 new assertions, so
+    `pnpm test:rls:local` now covers these tables in CI — full suite passes (`EXIT=0`).
+    **Confirmed the new assertions are load-bearing** by temporarily adding an org-wide admin SELECT
+    policy and re-running: the suite failed with "org admin without participation saw private
+    calendar data: {events:1}", then passed again once removed.
+    `pnpm test:migrations:local` returns `{"firstRun":"ok","secondRun":"ok","applied":70}`.
+    `pnpm tsc --noEmit` and the full `pnpm vitest run` (2836 passed) are clean.
 
 - [ ] **Implement calendar repository**
   - Files: `src/shared/lib/repositories/calendar.ts` (new),

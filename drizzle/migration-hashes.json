@@ -272,6 +272,14 @@
     "0067_operational_schedule_grants": {
       "sql": "7240b52a4b36c45c2f9862cb9df6a84fd02d4395099e846ab99725bd9778b2c1",
       "snapshot": "21f50162cab5f301ee8914f3acd8bf3c8937fea1a18c9721bd93a91b585aaed5"
+    },
+    "0068_special_tigra": {
+      "sql": "03fa880c5aad2612c63b9e06fa4901b46bd42bba960939d18fc848e06a9c2378",
+      "snapshot": "65c928101c34d5085a3b59b9f340366b4c028cc19930046ba26cd6a5aa1cacc6"
+    },
+    "0069_calendar_scheduling_rls_grants": {
+      "sql": "dbf50d75a3608e5e10a024d94e73a904c30bb37b18e0fcf6e2e48182b6fbce88",
+      "snapshot": "b2f9fa04e19d4f23d8accbb0a54133c4354f23cc6110ee269ace19d0fe51a9b3"
     }
   }
 }
