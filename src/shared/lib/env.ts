@@ -379,8 +379,38 @@ const zodEnv = z.object({
   }
 
   if (data.CANDIDATE_UPLOADS_ENABLED === 'true') {
-    if (!data.INTERVIEW_R2_ENDPOINT || !/\.eu\.r2\.cloudflarestorage\.com$/i.test(new URL(data.INTERVIEW_R2_ENDPOINT.startsWith('http') ? data.INTERVIEW_R2_ENDPOINT : `https://${data.INTERVIEW_R2_ENDPOINT}`).hostname)) {
-      context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_ENDPOINT'], message: 'INTERVIEW_R2_ENDPOINT must be a *.eu.r2.cloudflarestorage.com EU-jurisdiction endpoint when CANDIDATE_UPLOADS_ENABLED=true' })
+    // Two acceptable object stores (docs/operations/interview-provider-register.md):
+    //   1. Self-hosted MinIO on the internal network — the chosen default. No third party is
+    //      involved at all, so there is no jurisdiction to police; what matters is that the
+    //      endpoint is NOT a public host, which `isPrivateStorageHost` checks.
+    //   2. Cloudflare R2, EU jurisdiction only — `*.eu.r2.cloudflarestorage.com`.
+    // Anything else (a non-EU R2 bucket, some other public S3 endpoint) is rejected: candidate
+    // CVs are personal data and must not land in an unreviewed third country by a typo.
+    const storageHost = (() => {
+      if (!data.INTERVIEW_R2_ENDPOINT) return null
+      try {
+        const raw = data.INTERVIEW_R2_ENDPOINT
+        return new URL(raw.startsWith('http') ? raw : `https://${raw}`).hostname.toLowerCase()
+      } catch {
+        return null
+      }
+    })()
+    const isEuR2Host = storageHost !== null && /\.eu\.r2\.cloudflarestorage\.com$/i.test(storageHost)
+    // Internal Docker/Coolify service name (no dot), localhost, or a private IPv4 range.
+    const isPrivateStorageHost = storageHost !== null && (
+      !storageHost.includes('.')
+      || storageHost === 'localhost'
+      || /^127\./.test(storageHost)
+      || /^10\./.test(storageHost)
+      || /^192\.168\./.test(storageHost)
+      || /^172\.(1[6-9]|2\d|3[01])\./.test(storageHost)
+    )
+    if (!isEuR2Host && !isPrivateStorageHost) {
+      context.addIssue({
+        code: 'custom',
+        path: ['INTERVIEW_R2_ENDPOINT'],
+        message: 'INTERVIEW_R2_ENDPOINT must be either a self-hosted private endpoint (MinIO) or a *.eu.r2.cloudflarestorage.com EU-jurisdiction bucket when CANDIDATE_UPLOADS_ENABLED=true',
+      })
     }
     if (!data.INTERVIEW_R2_ACCOUNT_ID) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_ACCOUNT_ID'], message: 'INTERVIEW_R2_ACCOUNT_ID is required when CANDIDATE_UPLOADS_ENABLED=true' })
     if (!data.INTERVIEW_R2_BUCKET) context.addIssue({ code: 'custom', path: ['INTERVIEW_R2_BUCKET'], message: 'INTERVIEW_R2_BUCKET is required when CANDIDATE_UPLOADS_ENABLED=true' })

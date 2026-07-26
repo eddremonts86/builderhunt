@@ -199,6 +199,15 @@ describe('abuse-and-usage-integrity environment (plan: abuse-and-usage-integrity
 })
 
 describe('calendar-scheduling-interview-intelligence environment (plan: calendar-scheduling-interview-intelligence)', () => {
+  const VALID_MINIO = {
+    CANDIDATE_UPLOADS_ENABLED: 'true',
+    INTERVIEW_R2_ENDPOINT: 'http://minio:9000',
+    INTERVIEW_R2_ACCOUNT_ID: 'minio',
+    INTERVIEW_R2_BUCKET: 'builderhunt-interview-documents',
+    INTERVIEW_R2_ACCESS_KEY_ID: 'minio-key',
+    INTERVIEW_R2_SECRET_ACCESS_KEY: 'minio-secret',
+    INTERVIEW_CLAMAV_HOST: 'clamav',
+  }
   const VALID_R2 = {
     CANDIDATE_UPLOADS_ENABLED: 'true',
     INTERVIEW_R2_ENDPOINT: 'https://accountid.eu.r2.cloudflarestorage.com',
@@ -237,6 +246,30 @@ describe('calendar-scheduling-interview-intelligence environment (plan: calendar
       INTERVIEW_DOCUMENT_RETENTION_DAYS: 180,
       INTERVIEW_CONSENT_RETENTION_MONTHS: 24,
     })
+  })
+
+  it('accepts a self-hosted MinIO endpoint — the chosen default, no third party involved', () => {
+    // docs/operations/interview-provider-register.md: storage is self-hosted; there is no
+    // jurisdiction to police because no third party receives the data.
+    expect(() => parseEnvironment({ ...productionEnvironment, ...VALID_MINIO })).not.toThrow()
+  })
+
+  it.each([
+    ['a bare docker service name', 'http://minio:9000'],
+    ['localhost', 'http://localhost:9000'],
+    ['a 10.x private address', 'http://10.0.0.5:9000'],
+    ['a 192.168.x private address', 'http://192.168.1.20:9000'],
+    ['a 172.16-31.x private address', 'http://172.20.0.4:9000'],
+  ])('accepts %s as a self-hosted storage endpoint', (_label, endpoint) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...VALID_MINIO, INTERVIEW_R2_ENDPOINT: endpoint })).not.toThrow()
+  })
+
+  it.each([
+    ['a non-EU R2 bucket', 'https://accountid.r2.cloudflarestorage.com'],
+    ['some other public S3 host', 'https://s3.us-east-1.amazonaws.com'],
+    ['a public domain pretending to be internal', 'https://minio.example.com'],
+  ])('still rejects %s — a typo must not send candidate CVs to an unreviewed third country', (_label, endpoint) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, ...VALID_MINIO, INTERVIEW_R2_ENDPOINT: endpoint })).toThrow()
   })
 
   it('accepts a fully valid enabled configuration for each dependency', () => {
