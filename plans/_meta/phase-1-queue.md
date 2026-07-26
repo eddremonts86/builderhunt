@@ -17,9 +17,8 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 
 | # | Plan | Open | Why this position |
 |---|------|-----:|-------------------|
-| 1 | `audit-conversion` | 14 | Funnel changes touching landing + pricing + onboarding together. |
-| 2 | `solutions-intelligence` | 30 | Large new domain. |
-| 3 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
+| 1 | `solutions-intelligence` | 30 | Large new domain. |
+| 2 | `calendar-scheduling-interview-intelligence` | 81 | Largest by far; new integrations + scheduling domain. |
 
 ## A1. Done this session (2026-07-26) — see each plan's tasks.md for full evidence
 
@@ -32,6 +31,7 @@ than a 9-task schema+worker+UI plan. The ordering below is adjusted for real sco
 | `design-modernization` | Verified every Wave 1/2 task against real source (they were already done — the tasks.md checkboxes had just never been updated) and fixed one real drift: `BrandLogoMark.tsx` had a cyan dot at a hardcoded hex that had silently drifted from the actual `--color-bh-cyan` token. Routed through CSS vars, pixel-verified identical output. | Nothing pending — plan fully closed. |
 | `portfolio-builder` | Verified-owner public portfolio pages at `/portfolio/$claimId` (theme, headline, intro, up to 6 selected projects), fail-closed public API, owner draft/publish/unpublish UX, cache invalidation on revoke. Two real bugs found+fixed live: publish didn't save in-progress draft edits first; the public route was missing `<ThemeProvider>` so it always rendered light. | AI-persona/timeline integrations left as honest `false` stubs (both genuinely optional); e2e task out of scope this session. |
 | `unified-timeline` | Per-builder "Recent activity" section on the profile page — live, read-through-cached (6h TTL) fetch from github/hn/devto/gitlab/stackoverflow's own public APIs, all 4 phases including the optional AI summary. Real bug found+fixed live: GitHub's public events feed never includes a PR's title/html_url (confirmed against the real API) — every PR event rendered blank; fixed by building the title/URL from the event's own `number` + repo name. | Nothing pending — plan fully closed. |
+| `audit-conversion` | Full first-party consent-aware conversion-event pipeline (closed schema, privacy-minimized table, ingestion route, 30-day retention, admin aggregate reporting w/ Wilson-score CIs), hero guest-value CTA + tertiary "how it works" demotion, accurate source-count copy, fixed `/search`→`/explore` SearchAction JSON-LD. Two real bugs found+fixed live: `/explore`'s `next` param was silently dropped by `SignUpPage.tsx` (every guest-search signup lost its query); root JSON-LD SearchAction pointed at the authenticated-only `/search`. Live-verified full guest→signup→onboarding-skip→restored-search flow end to end. | **Pending, needs your input**: real baseline collection (needs ≥14 real days/1,000 sessions once `CONVERSION_EVENTS_ENABLED=true` is deployed), the `test:conversion` Playwright script + CI workflow gate (blocked by the same two standing rules as `audit-performance-qa`'s deferred item), and the staged 10%/50%/100% rollout decision (depends on the baseline). Tell me if/when to turn collection on. |
 
 ## B. Blocked by another plan (do not start)
 
