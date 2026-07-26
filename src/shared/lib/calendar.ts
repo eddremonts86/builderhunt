@@ -9,10 +9,17 @@
  * columns directly.").
  */
 import { z } from 'zod'
-// `rrule` ships CommonJS. A named import resolves under vitest but throws
-// "Named export 'RRule' not found" in Vite's SSR runtime, so the page 500s while tests pass —
-// import the default and destructure.
-import rrulePkg from 'rrule'
+// `rrule` ships CommonJS, and the two runtimes disagree about how to reach into it:
+//   - vitest resolves a NAMED import fine.
+//   - Vite's SSR runtime throws "Named export 'RRule' not found", so a default import is needed.
+//   - Vite's BROWSER bundle throws "does not provide an export named 'default'", so a default
+//     import is NOT enough either.
+// A namespace import plus an interop unwrap satisfies all three. Each of the two previous attempts
+// passed every test and broke a real page, which is why this is spelled out rather than tidied:
+// `pnpm test` cannot tell you which of these three loaders you are about to ship to.
+import * as rruleNamespace from 'rrule'
+
+const rrulePkg = (rruleNamespace as unknown as { default?: typeof rruleNamespace }).default ?? rruleNamespace
 
 const { RRule } = rrulePkg
 

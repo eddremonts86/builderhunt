@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Loader2, Plus, X } from 'lucide-react'
+import { CalendarDays, Loader2, Lock, Plus, X } from 'lucide-react'
 import { Button, Input, Label } from '~/components/ui'
 import { REMINDER_OFFSET_MINUTES } from '~/shared/lib/calendar'
+import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
+import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
  * components").
  *
- * Renders a month grid and a create form against the real `/api/calendar/events` endpoints. It
- * deliberately does NOT mount FullCalendar yet: the drag/resize interactions FullCalendar exists
- * for depend on the occurrence-materialization and reminder-rescheduling paths, so wiring it
- * before those are finished would produce a surface that looks interactive but silently drops
- * edits. This grid is honest about what currently works — read, create, cancel, delete.
+ * Renders a month grid and a create form over `/api/calendar/feed`, which merges the caller's own
+ * events with read-only projections of background jobs and alerts (Phase 4 "Add calendar layer UI").
+ *
+ * It deliberately does NOT mount FullCalendar: the drag/resize interactions FullCalendar exists for
+ * depend on the occurrence-materialization and reminder-rescheduling paths, so wiring it before
+ * those are finished would produce a surface that looks interactive but silently drops edits. This
+ * grid is honest about what currently works — read, create, cancel, delete.
+ *
+ * The editable/read-only split is carried by the DTO, not by this component's judgement: only
+ * `kind === 'event'` items get a delete control, and every other kind renders with a dashed border
+ * plus a lock icon. Shape and icon rather than colour alone, because the distinction is "you can
+ * change this" versus "you cannot", which must survive greyscale and high-contrast rendering.
  */
 
 interface CalendarEventDto {
+  kind: 'event'
+  editable: true
   id: string
   title: string
   startsAt: string
@@ -29,20 +40,47 @@ interface CalendarEventDto {
   description: string | null
 }
 
+type CalendarFeedItemDto = CalendarEventDto | (ProjectionItem & { editable: false })
+
+interface CalendarFeedDto {
+  items: CalendarFeedItemDto[]
+  staleSources: string[]
+}
+
+function isEventItem(item: CalendarFeedItemDto): item is CalendarEventDto {
+  return item.kind === 'event'
+}
+
+/** Projections carry no row id, so their React key is the source identity the feed already made unique. */
+function itemKey(item: CalendarFeedItemDto): string {
+  return isEventItem(item) ? item.id : `${item.kind}:${item.sourceId}`
+}
+
 export interface CalendarPageProps {
   /** Injected in tests; defaults to the real endpoints. */
-  fetchEvents?: (range: { from: string; to: string }) => Promise<CalendarEventDto[]>
+  fetchFeed?: (range: { from: string; to: string }, layers: CalendarLayerKey[]) => Promise<CalendarFeedDto>
   createEvent?: (body: unknown) => Promise<{ ok: boolean; error?: string }>
   deleteEvent?: (id: string, version: number) => Promise<{ ok: boolean; error?: string }>
   /** Fixed "today" so the grid is deterministic under test. */
   today?: Date
 }
 
-async function defaultFetchEvents(range: { from: string; to: string }) {
-  const response = await fetch(`/api/calendar/events?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`)
+async function defaultFetchFeed(range: { from: string; to: string }, layers: CalendarLayerKey[]): Promise<CalendarFeedDto> {
+  // No layers selected means no query at all rather than a fetch that returns nothing — the server
+  // would do the work and the user asked for none of it.
+  if (layers.length === 0) return { items: [], staleSources: [] }
+  const params = new URLSearchParams({
+    from: range.from,
+    to: range.to,
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  })
+  // Repeated params, matching the contract's array type; a comma-joined string would let an invalid
+  // layer through the client and only fail server-side.
+  for (const layer of layers) params.append('layers', layer)
+  const response = await fetch(`/api/calendar/feed?${params.toString()}`)
   if (!response.ok) throw new Error('load_failed')
   const body = await response.json()
-  return (body.events ?? []) as CalendarEventDto[]
+  return { items: (body.items ?? []) as CalendarFeedItemDto[], staleSources: (body.staleSources ?? []) as string[] }
 }
 
 async function defaultCreateEvent(body: unknown) {
@@ -94,13 +132,16 @@ function isoDay(date: Date) {
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 export function CalendarPage(props: CalendarPageProps = {}) {
-  const fetchEvents = props.fetchEvents ?? defaultFetchEvents
+  const fetchFeed = props.fetchFeed ?? defaultFetchFeed
   const createEventFn = props.createEvent ?? defaultCreateEvent
   const deleteEventFn = props.deleteEvent ?? defaultDeleteEvent
   const today = useMemo(() => props.today ?? new Date(), [props.today])
 
   const [monthStart, setMonthStart] = useState(() => startOfMonth(today))
-  const [events, setEvents] = useState<CalendarEventDto[]>([])
+  const [items, setItems] = useState<CalendarFeedItemDto[]>([])
+  const [staleSources, setStaleSources] = useState<string[]>([])
+  const [layers, setLayers] = useState<CalendarLayerKey[]>(['events', 'jobs', 'alerts'])
+  const [selectedProjection, setSelectedProjection] = useState<ProjectionItem | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
@@ -126,29 +167,33 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   // synchronous one would cascade an extra render on mount (react-hooks/set-state-in-effect).
   const load = useCallback(async () => {
     try {
-      const rows = await fetchEvents({ from: rangeFrom.toISOString(), to: rangeTo.toISOString() })
-      setEvents(rows)
+      const feed = await fetchFeed({ from: rangeFrom.toISOString(), to: rangeTo.toISOString() }, layers)
+      setItems(feed.items)
+      setStaleSources(feed.staleSources)
       setLoadError(null)
     } catch {
       setLoadError('We could not load your calendar. Try again in a moment.')
-      setEvents([])
+      setItems([])
+      setStaleSources([])
     } finally {
       setLoading(false)
     }
-  }, [fetchEvents, rangeFrom, rangeTo])
+  }, [fetchFeed, rangeFrom, rangeTo, layers])
 
   useEffect(() => {
     let cancelled = false
-    void fetchEvents({ from: rangeFrom.toISOString(), to: rangeTo.toISOString() })
-      .then((rows) => {
+    void fetchFeed({ from: rangeFrom.toISOString(), to: rangeTo.toISOString() }, layers)
+      .then((feed) => {
         if (cancelled) return
-        setEvents(rows)
+        setItems(feed.items)
+        setStaleSources(feed.staleSources)
         setLoadError(null)
       })
       .catch(() => {
         if (cancelled) return
         setLoadError('We could not load your calendar. Try again in a moment.')
-        setEvents([])
+        setItems([])
+        setStaleSources([])
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -156,16 +201,23 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     return () => {
       cancelled = true
     }
-  }, [fetchEvents, rangeFrom, rangeTo])
+  }, [fetchFeed, rangeFrom, rangeTo, layers])
 
-  const eventsByDay = useMemo(() => {
-    const map = new Map<string, CalendarEventDto[]>()
-    for (const event of events) {
-      const key = event.startsAt.slice(0, 10)
-      map.set(key, [...(map.get(key) ?? []), event])
+  const itemsByDay = useMemo(() => {
+    const map = new Map<string, CalendarFeedItemDto[]>()
+    for (const item of items) {
+      const key = item.startsAt.slice(0, 10)
+      map.set(key, [...(map.get(key) ?? []), item])
     }
     return map
-  }, [events])
+  }, [items])
+
+  function toggleLayer(key: CalendarLayerKey) {
+    // Closing the detail panel on a layer change avoids showing details for an item that the new
+    // filter no longer includes — a panel describing something not on screen reads as a bug.
+    setSelectedProjection(null)
+    setLayers((current) => (current.includes(key) ? current.filter((entry) => entry !== key) : [...current, key]))
+  }
 
   async function handleCreate(formEvent: React.FormEvent) {
     formEvent.preventDefault()
@@ -285,6 +337,12 @@ export function CalendarPage(props: CalendarPageProps = {}) {
         </form>
       )}
 
+      <CalendarLayers active={layers} onToggle={toggleLayer} staleSources={staleSources} />
+
+      {selectedProjection && (
+        <ProjectionDetails item={selectedProjection} onClose={() => setSelectedProjection(null)} />
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <Button variant="secondary" size="sm" onClick={() => setMonthStart((m) => addMonths(m, -1))} data-testid="calendar-prev-month">Previous</Button>
         <h2 className="text-lg font-medium" data-testid="calendar-month-label">{monthLabel}</h2>
@@ -309,7 +367,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           <div className="grid grid-cols-7 gap-px bg-bh-border">
             {days.map((day) => {
               const key = isoDay(day)
-              const dayEvents = eventsByDay.get(key) ?? []
+              const dayItems = itemsByDay.get(key) ?? []
               const inMonth = day.getUTCMonth() === monthStart.getUTCMonth()
               return (
                 <div
@@ -320,25 +378,46 @@ export function CalendarPage(props: CalendarPageProps = {}) {
                 >
                   <div className="mb-1 text-xs font-medium text-bh-text-muted">{day.getUTCDate()}</div>
                   <ul className="space-y-1">
-                    {dayEvents.map((event) => (
-                      <li key={event.id}>
-                        <div
-                          className={`group flex items-start justify-between gap-1 rounded px-1.5 py-1 text-xs ${
-                            event.status === 'cancelled' ? 'bg-bh-surface-muted line-through opacity-60' : 'bg-bh-accent-subtle'
-                          }`}
-                          data-testid={`calendar-event-${event.id}`}
-                        >
-                          <span className="min-w-0 flex-1 truncate">{event.title}</span>
+                    {dayItems.map((item) => (
+                      <li key={itemKey(item)}>
+                        {isEventItem(item) ? (
+                          <div
+                            className={`group flex items-start justify-between gap-1 rounded border border-transparent px-1.5 py-1 text-xs ${
+                              item.status === 'cancelled' ? 'bg-bh-surface-2 line-through opacity-60' : 'bg-bh-accent-soft'
+                            }`}
+                            data-testid={`calendar-event-${item.id}`}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                            <button
+                              type="button"
+                              aria-label={`Delete ${item.title}`}
+                              onClick={() => handleDelete(item)}
+                              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                              data-testid={`calendar-delete-${item.id}`}
+                            >
+                              <X className="size-3" aria-hidden />
+                            </button>
+                          </div>
+                        ) : (
                           <button
                             type="button"
-                            aria-label={`Delete ${event.title}`}
-                            onClick={() => handleDelete(event)}
-                            className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                            data-testid={`calendar-delete-${event.id}`}
+                            onClick={() => setSelectedProjection(item)}
+                            // Dashed border + lock icon, not a colour swap: the difference being
+                            // encoded is "you can move this" versus "you cannot", which has to
+                            // survive greyscale and high-contrast rendering.
+                            className="flex w-full items-start gap-1 rounded border border-dashed border-bh-border-strong bg-bh-surface-2 px-1.5 py-1 text-left text-xs text-bh-text-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-bh-accent"
+                            data-testid={`calendar-projection-${item.kind}`}
+                            aria-label={`${item.title} — read-only, managed by the system`}
                           >
-                            <X className="size-3" aria-hidden />
+                            <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
+                            <span className="min-w-0 flex-1 truncate">
+                              {item.title}
+                              {/* Spelled out rather than implied by styling, so the constraint is
+                                  readable by a screen reader and in a printout. */}
+                              {item.estimateOnly ? ' (estimate)' : ''}
+                            </span>
                           </button>
-                        </div>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -349,9 +428,13 @@ export function CalendarPage(props: CalendarPageProps = {}) {
         </div>
       )}
 
-      {!loading && events.length === 0 && !loadError && (
+      {!loading && items.length === 0 && !loadError && (
         <p className="mt-6 text-center text-sm text-bh-text-muted" data-testid="calendar-empty">
-          Nothing scheduled this month yet. Create your first event to get started.
+          {layers.length === 0
+            // Distinguishing these matters: "nothing scheduled" when the user has simply switched
+            // every layer off would look like their data disappeared.
+            ? 'No layers selected. Turn one on to see your calendar.'
+            : 'Nothing scheduled this month yet. Create your first event to get started.'}
         </p>
       )}
     </div>

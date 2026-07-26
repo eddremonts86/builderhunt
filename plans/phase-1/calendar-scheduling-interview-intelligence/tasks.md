@@ -1003,14 +1003,58 @@ src/shared/lib/repositories/scheduling.test.ts`.
     four org-scoped schedules, because this machine has no cron driving them — the feed reporting
     that is the designed behavior, not a defect.
 
-- [ ] **Add calendar layer UI**
+- [x] **Add calendar layer UI**
   - Files: `src/modules/calendar/components/CalendarLayers.tsx` (new),
     `src/modules/calendar/components/ProjectionDetails.tsx` (new),
-    `src/modules/calendar/components/CalendarPage.tsx`
+    `src/modules/calendar/components/CalendarPage.tsx`,
+    `src/modules/calendar/components/CalendarPage.test.tsx` (new),
+    `src/shared/lib/calendar.ts`, `src/shared/lib/scheduling.ts`
   - Do: Add independent appointment/job/alert/result toggles, shape+label distinctions,
     estimate/stale badges, read-only detail, source navigation, and persisted user display preference.
   - Verify: Playwright toggles each layer, proves projections cannot drag/edit, follows source link,
     and calendar remains usable when feed projections fail.
+  - Evidence: 12 component tests green; full suite 3085 passed. (Playwright/axe remain future work —
+    the coverage below is vitest plus a live browser walkthrough.)
+
+    **A browser-only bug surfaced immediately, and it was my own earlier fix being wrong.** The page
+    threw `The requested module '/node_modules/.vite/deps/rrule.js' does not provide an export named
+    'default'`. `rrule` ships CommonJS and the three loaders disagree: vitest accepts a NAMED import,
+    Vite SSR needs a DEFAULT import, and the Vite BROWSER bundle rejects the default. My previous
+    session fixed the SSR failure with a default import — which passed every test and broke the
+    client. Now a namespace import with an interop unwrap, and the comment spells out all three
+    loaders because `pnpm test` cannot tell you which one you are about to ship to.
+
+    **The editable/read-only split comes from the DTO, not from the component's judgement.** Only
+    `kind === 'event'` renders a delete control; every projection renders as a button with a dashed
+    border, a lock icon, and an `aria-label` containing "read-only". Estimates additionally carry a
+    literal `(estimate)` in their text. Dashed border and icon rather than colour, because the
+    distinction is "you can move this" versus "you cannot" and it has to survive greyscale,
+    high-contrast, and a printout.
+
+    **No disabled edit affordance anywhere.** `ProjectionDetails` offers no greyed-out Save button —
+    a disabled control invites the user to hunt for what unlocks it. It states "Managed by the
+    system" and links to the source instead. Its date label is `Expected at` for an estimate and
+    `Happened at` for a record, so the label itself carries the distinction the feed preserves.
+
+    **Toggling a layer refetches rather than filtering locally.** Filtering client-side would keep
+    paying for data the user explicitly switched off. A test asserts the layer array passed to the
+    fetcher, and disabling the `layers` effect dependency makes it fail.
+
+    **Three assertions verified load-bearing by mutation:** adding a `<button>` inside a projection
+    fails the read-only test; dropping `layers` from the effect dependencies fails the refetch test;
+    hardcoding `Happened at` fails the certainty test.
+
+    **"No layers on" is distinguished from "nothing scheduled".** Saying the latter when a user has
+    switched every layer off would look like their data had disappeared.
+
+    **Live-verified in the real browser at `/calendar`** (signed in through the app): three toggles
+    render `aria-pressed="true"` with a `✓` glyph; 15 projections, each with `innerButtons: 0` and an
+    `aria-label` ending "read-only, managed by the system"; turning Alerts off dropped 15 → 11 items
+    and flipped the glyph to `+`; clicking a job run opened a panel reading "Completed job run",
+    "Happened at", "Outcome: succeeded", the managed-by-the-system note, and a source link to
+    `/api/admin/calendar/run-reminders`. The stale-source banner named all four org-scoped schedules,
+    which is correct on a machine with no cron. Screenshot captured.
+
 
 ## Phase 5 — Invitation and atomic booking
 
