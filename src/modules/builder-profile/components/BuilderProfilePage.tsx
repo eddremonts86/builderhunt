@@ -8,6 +8,7 @@ import { TeamFitCard } from '~/modules/builder-profile/components/TeamFitCard'
 import { WorkSamplePanel } from '~/modules/builder-profile/components/WorkSamplePanel'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
+import { BuilderTimeline } from '~/modules/builder-profile/components/BuilderTimeline'
 import { Button, LinkButton, Textarea } from '~/components/ui'
 
 const CLAIM_ERROR_MESSAGES: Record<string, string> = {
@@ -307,6 +308,7 @@ export function BuilderProfilePage() {
               codeStyleFingerprint: (builder as { codeStyleFingerprint?: unknown }).codeStyleFingerprint,
             }}
           />
+          <BuilderTimeline builderId={builder.id} source={builder.source} />
         </div>
 
         {/* Right Column: Persona Card, Outreach Copilot, Action Bar & Notes */}

@@ -144,6 +144,7 @@ import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
+import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
 import { Route as ApiBuildersBuilderIdHygieneRouteImport } from './routes/api/builders/$builderId/hygiene'
@@ -884,6 +885,12 @@ const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
   path: '/api/builders/claim/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBuildersBuilderIdTimelineRoute =
+  ApiBuildersBuilderIdTimelineRouteImport.update({
+    id: '/timeline',
+    path: '/timeline',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdSynergyRoute =
   ApiBuildersBuilderIdSynergyRouteImport.update({
     id: '/synergy',
@@ -1309,6 +1316,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
+  '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1491,6 +1499,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
+  '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1678,6 +1687,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/hygiene': typeof ApiBuildersBuilderIdHygieneRoute
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
+  '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
@@ -1864,6 +1874,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
+    | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -2046,6 +2057,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
+    | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -2232,6 +2244,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/hygiene'
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
+    | '/api/builders/$builderId/timeline'
     | '/api/builders/claim/verify'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
@@ -3343,6 +3356,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersClaimVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/builders/$builderId/timeline': {
+      id: '/api/builders/$builderId/timeline'
+      path: '/timeline'
+      fullPath: '/api/builders/$builderId/timeline'
+      preLoaderRoute: typeof ApiBuildersBuilderIdTimelineRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/synergy': {
       id: '/api/builders/$builderId/synergy'
       path: '/synergy'
@@ -3877,6 +3897,7 @@ interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdHygieneRoute: typeof ApiBuildersBuilderIdHygieneRoute
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
   ApiBuildersBuilderIdSynergyRoute: typeof ApiBuildersBuilderIdSynergyRoute
+  ApiBuildersBuilderIdTimelineRoute: typeof ApiBuildersBuilderIdTimelineRoute
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   ApiBuildersBuilderIdEvidenceIndexRoute: typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
@@ -3890,6 +3911,7 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdHygieneRoute: ApiBuildersBuilderIdHygieneRoute,
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
   ApiBuildersBuilderIdSynergyRoute: ApiBuildersBuilderIdSynergyRoute,
+  ApiBuildersBuilderIdTimelineRoute: ApiBuildersBuilderIdTimelineRoute,
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute:
     ApiBuildersBuilderIdEvidenceEvidenceIdRoute,
   ApiBuildersBuilderIdEvidenceIndexRoute:
