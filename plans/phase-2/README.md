@@ -1,9 +1,10 @@
 # Fase 2 — feature backlog
 
-Ten plans derived from [`../new-plans.md`](../new-plans.md) on 2026-07-24. Each is the usual
-trio: `spec.md` (WHAT/WHY), `plan.md` (HOW, phases + risks + rollback), `tasks.md` (executable
-checklist). All ten are `pending` with zero implementation — the trios are implementation-ready,
-not implemented.
+Ten feature plans derived from [`../new-plans.md`](../new-plans.md) on 2026-07-24, plus one
+infrastructure plan ([`postgres-18-upgrade`](./postgres-18-upgrade/spec.md), added 2026-07-26).
+Each is the usual trio: `spec.md` (WHAT/WHY), `plan.md` (HOW, phases + risks + rollback),
+`tasks.md` (executable checklist). All eleven are `pending` with zero implementation — the trios
+are implementation-ready, not implemented.
 
 These live one directory deeper than the phase-1 plans, so cross-plan links are
 `../../<plan>/spec.md` for phase-1 and `../<plan>/spec.md` for a fase-2 sibling.
@@ -29,7 +30,15 @@ duplicated between a tested-but-unused module and an untested copy that actually
 2026-07-24, see `server/security.mjs`), and `findSimilarBuilderEmbeddings` never uses the HNSW
 index it is named after (open, tracked as a background task; two fase-2 plans depend on the fix).
 
-## The ten plans
+**`postgres-18-upgrade` is verified to a different standard, stated here so nobody assumes
+otherwise.** Every claim in it was checked against the working tree by grep (images, roles, RLS
+force flags, `serial`/trigger/FTS/`COPY`/`AT TIME ZONE` absence, the six `uuid` defaults, the
+`conversion_events` indexes) and the target image tag was confirmed to exist on Docker Hub on
+2026-07-26. It has **not** been through the same second-pass adversarial review the ten feature
+plans got, and — by design — its Phase 0 exists to *reproduce* its own three most dangerous
+claims against a live PG18 cluster before anything touches production.
+
+## The ten feature plans
 
 | Plan | What it is | New tables | New AI tasks | New env vars |
 | ---- | ---------- | ---------- | ------------ | ------------ |
@@ -43,6 +52,23 @@ index it is named after (open, tracked as a background task; two fase-2 plans de
 | [`ats-integrations`](./ats-integrations/spec.md) | Greenhouse / Ashby / Lever export + status write-back | 4 | 0 | 8 |
 | [`browser-extension-overlay`](./browser-extension-overlay/spec.md) | BuilderHunt card on GitHub profiles | 3 | 0 | 3 |
 | [`talent-market-intelligence`](./talent-market-intelligence/spec.md) | Public market reports + monthly digest | 2 | 1 | 2 |
+
+## The infrastructure plan
+
+Added 2026-07-26 from a direct request, **not** derived from `new-plans.md`. It is not a feature and
+does not appear in the dependency graph or build order below, because it is ordered against
+*everything*: it moves the database major version, and its Phase 4 is the gate any plan must cite
+before writing PG18-only SQL.
+
+| Plan | What it is | New tables | New AI tasks | New env vars |
+| ---- | ---------- | ---------- | ------------ | ------------ |
+| [`postgres-18-upgrade`](./postgres-18-upgrade/spec.md) | PostgreSQL 16 → 18 across dev/CI/prod, then the four PG18 capabilities that touch existing code | 0 | 0 | 0 (one ops-only `process.env` escape hatch) |
+
+It also fixes four pre-existing gaps found while it was written: the daily backup
+(`--no-owner --no-acl`) is not a valid upgrade vehicle, `FORCE ROW LEVEL SECURITY` makes a
+data-only restore silently insert nothing unless the restoring role is a superuser,
+`drizzle.__drizzle_migrations` collides on such a restore, and nothing anywhere asserts the
+server's major version — so dev, CI and production can disagree silently.
 
 ## Dependency graph
 

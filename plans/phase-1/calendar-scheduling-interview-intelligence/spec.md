@@ -170,7 +170,15 @@ flowchart LR
 
 - Private storage: Cloudflare R2, private Standard bucket, EU jurisdiction, S3-compatible adapter.
 - Speech-to-text: Deepgram EU first, AssemblyAI-compatible contract later.
-- Sensitive text AI: Azure OpenAI regional EU deployment. Never silently fall back to MiniMax.
+- Sensitive text AI: an **EU-processed provider behind `SensitiveAIProvider`**, selected by
+  `SENSITIVE_AI_PROVIDER`. Primary is **Mistral (La Plateforme, France)** with a pinned dated
+  model; the previously specified Azure OpenAI EU deployment is retained as the fallback.
+  Never silently fall back to MiniMax.
+  Provisioning changed this on 2026-07-26: with Azure, EU-ness is a per-deployment property
+  `env.ts` cannot see, so a Global Standard deployment passes validation while processing
+  outside the EU. Mistral makes EU the default and the US endpoint an explicit opt-in, so the
+  guard can be exact rather than a hostname heuristic. Rationale, cost comparison and the
+  counter-arguments: `docs/operations/interview-provider-register.md` §4.
 - Billing dependency: [`stripe-billing-platform`](../stripe-billing-platform/spec.md) owns Stripe,
   subscriptions, packs, ledger, tax, refunds, disputes, and reconciliation.
 - Calendar UI: FullCalendar Standard with day-grid, time-grid, list, interaction, and RRule plugins.
@@ -692,7 +700,7 @@ leave marketing promises without server enforcement.
 
 - R2 down: booking works; upload remains retryable and never appears complete.
 - ClamAV down: file remains quarantined; extraction/AI do not run.
-- Azure down/disabled: deterministic editable brief/report template.
+- Sensitive-AI provider down/disabled (either provider): deterministic editable brief/report template.
 - Deepgram down: manual notes continue; unused credits release.
 - Unsupported shared audio: explicit remote manual-only state; in-person microphone mode remains
   available.
@@ -779,7 +787,8 @@ leave marketing promises without server enforcement.
 - [Cloudflare R2 EU jurisdiction](https://developers.cloudflare.com/r2/reference/data-location/)
 - [Cloudflare R2 pricing](https://developers.cloudflare.com/r2/pricing/)
 - [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)
-- [Azure AI data privacy](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
+- [Mistral data protection & retention](https://docs.mistral.ai/) — primary sensitive-AI provider
+- [Azure AI data privacy](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy) — retained fallback
 - [Stripe Checkout subscriptions](https://docs.stripe.com/payments/checkout/build-subscriptions)
 - [Stripe automatic tax in Checkout](https://docs.stripe.com/tax/checkout)
 - [Stripe Tax operating responsibilities](https://docs.stripe.com/tax/how-tax-works)
