@@ -286,10 +286,38 @@ builderhunt/
 │   │   │                          #   status, db (schema + client)
 │   │   └── components/           # Cross-app UI (topbar, tooltips, dialogs)
 │   └── components/ui/            # Design-system primitives (Button, Dialog, …)
-├── content/posts/               # Markdown blog posts
-├── scripts/db/                  # Migration bootstrap, seeding, backups
+├── content/posts/               # Markdown blog posts (read from disk at request time)
+├── content/changelog/           # Changelog entries — pushed into Postgres by content:sync
+├── content/roadmap/             # Roadmap items — pushed into Postgres by content:sync
+├── scripts/db/                  # Migration bootstrap, seeding, backups, content sync
 └── public/                      # Brand assets, screenshots, favicons
 ```
+
+### Public content is versioned
+
+`/blog` reads `content/posts/` off disk. `/changelog` and `/roadmap` read Postgres — so
+their content also lives in `content/`, and one idempotent command reconciles the two.
+`pnpm deploy:db` runs it on every deploy, which is what makes an entry appear on the live
+site. `/admin/content` is the one place to see all three.
+
+```bash
+pnpm content:sync          # content/ -> database (idempotent; --prune, --dry-run)
+pnpm content:export        # database -> content/, to commit something drafted in the admin UI
+pnpm content:screenshots   # re-shoot public/images/blog/* against a running dev server
+```
+
+Rows the sync owns have deterministic ids (`content-changelog-<slug>`); anything created in
+the admin UI is left alone and marked accordingly in `/admin/content`.
+
+### Search indexing is a runtime setting
+
+`/blog`, `/changelog` and `/roadmap` each carry their own `noindex` / `nofollow` switch,
+editable in `/admin/content` with no deploy. All three currently ship **hidden**. A switch
+drives three things at once — the page's `robots` and `googlebot` meta tags (server-rendered,
+which is the only placement a crawler honours), the surface's line in `robots.txt`, and
+whether its URLs appear in `sitemap.xml`. The registry is
+`src/shared/lib/seo/surfaces.ts`; a missing row or a failed lookup falls back to hidden,
+because an un-indexed page is recoverable and an indexed one takes weeks to walk back.
 
 <br />
 

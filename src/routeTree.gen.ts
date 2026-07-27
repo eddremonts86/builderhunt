@@ -123,6 +123,7 @@ import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashbo
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
+import { Route as DashboardAdminContentRouteImport } from './routes/_dashboard/admin/content'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
@@ -140,6 +141,7 @@ import { Route as ApiCalendarAvailabilityIndexRouteImport } from './routes/api/c
 import { Route as ApiBuildersRecentIndexRouteImport } from './routes/api/builders/recent/index'
 import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/triggers/index'
 import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
+import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
 import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admin/plan-requests/index'
 import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
@@ -806,6 +808,11 @@ const DashboardAdminDisputesRoute = DashboardAdminDisputesRouteImport.update({
   path: '/admin/disputes',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardAdminContentRoute = DashboardAdminContentRouteImport.update({
+  id: '/admin/content',
+  path: '/admin/content',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
   id: '/admin/changelog',
   path: '/admin/changelog',
@@ -892,6 +899,11 @@ const ApiAlertsTriggersIndexRoute = ApiAlertsTriggersIndexRouteImport.update({
 const ApiAdminUsersIndexRoute = ApiAdminUsersIndexRouteImport.update({
   id: '/api/admin/users/',
   path: '/api/admin/users/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdminSeoIndexRoute = ApiAdminSeoIndexRouteImport.update({
+  id: '/api/admin/seo/',
+  path: '/api/admin/seo/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAdminRoadmapIndexRoute = ApiAdminRoadmapIndexRouteImport.update({
@@ -1431,6 +1443,7 @@ export interface FileRoutesByFullPath {
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/content': typeof DashboardAdminContentRoute
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -1583,6 +1596,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
@@ -1649,6 +1663,7 @@ export interface FileRoutesByTo {
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/content': typeof DashboardAdminContentRoute
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -1800,6 +1815,7 @@ export interface FileRoutesByTo {
   '/api/admin/metrics': typeof ApiAdminMetricsIndexRoute
   '/api/admin/plan-requests': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/seo': typeof ApiAdminSeoIndexRoute
   '/api/admin/users': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent': typeof ApiBuildersRecentIndexRoute
@@ -1870,6 +1886,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/_dashboard/admin/content': typeof DashboardAdminContentRoute
   '/_dashboard/admin/disputes': typeof DashboardAdminDisputesRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
@@ -2022,6 +2039,7 @@ export interface FileRoutesById {
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
+  '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
   '/api/alerts/triggers/': typeof ApiAlertsTriggersIndexRoute
   '/api/builders/recent/': typeof ApiBuildersRecentIndexRoute
@@ -2091,6 +2109,7 @@ export interface FileRouteTypes {
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/content'
     | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -2243,6 +2262,7 @@ export interface FileRouteTypes {
     | '/api/admin/metrics/'
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
+    | '/api/admin/seo/'
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
@@ -2309,6 +2329,7 @@ export interface FileRouteTypes {
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/content'
     | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
@@ -2460,6 +2481,7 @@ export interface FileRouteTypes {
     | '/api/admin/metrics'
     | '/api/admin/plan-requests'
     | '/api/admin/roadmap'
+    | '/api/admin/seo'
     | '/api/admin/users'
     | '/api/alerts/triggers'
     | '/api/builders/recent'
@@ -2529,6 +2551,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/billing'
     | '/_dashboard/admin/changelog'
+    | '/_dashboard/admin/content'
     | '/_dashboard/admin/disputes'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
@@ -2681,6 +2704,7 @@ export interface FileRouteTypes {
     | '/api/admin/metrics/'
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
+    | '/api/admin/seo/'
     | '/api/admin/users/'
     | '/api/alerts/triggers/'
     | '/api/builders/recent/'
@@ -2839,6 +2863,7 @@ export interface RootRouteChildren {
   ApiAdminMetricsIndexRoute: typeof ApiAdminMetricsIndexRoute
   ApiAdminPlanRequestsIndexRoute: typeof ApiAdminPlanRequestsIndexRoute
   ApiAdminRoadmapIndexRoute: typeof ApiAdminRoadmapIndexRoute
+  ApiAdminSeoIndexRoute: typeof ApiAdminSeoIndexRoute
   ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
   ApiAlertsTriggersIndexRoute: typeof ApiAlertsTriggersIndexRoute
   ApiBuildersRecentIndexRoute: typeof ApiBuildersRecentIndexRoute
@@ -3667,6 +3692,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminDisputesRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/content': {
+      id: '/_dashboard/admin/content'
+      path: '/admin/content'
+      fullPath: '/admin/content'
+      preLoaderRoute: typeof DashboardAdminContentRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/changelog': {
       id: '/_dashboard/admin/changelog'
       path: '/admin/changelog'
@@ -3784,6 +3816,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/users'
       fullPath: '/api/admin/users/'
       preLoaderRoute: typeof ApiAdminUsersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/seo/': {
+      id: '/api/admin/seo/'
+      path: '/api/admin/seo'
+      fullPath: '/api/admin/seo/'
+      preLoaderRoute: typeof ApiAdminSeoIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/roadmap/': {
@@ -4426,6 +4465,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminAbuseRoute: typeof DashboardAdminAbuseRoute
   DashboardAdminBillingRoute: typeof DashboardAdminBillingRoute
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
+  DashboardAdminContentRoute: typeof DashboardAdminContentRoute
   DashboardAdminDisputesRoute: typeof DashboardAdminDisputesRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
@@ -4454,6 +4494,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminAbuseRoute: DashboardAdminAbuseRoute,
   DashboardAdminBillingRoute: DashboardAdminBillingRoute,
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
+  DashboardAdminContentRoute: DashboardAdminContentRoute,
   DashboardAdminDisputesRoute: DashboardAdminDisputesRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
@@ -4859,6 +4900,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminMetricsIndexRoute: ApiAdminMetricsIndexRoute,
   ApiAdminPlanRequestsIndexRoute: ApiAdminPlanRequestsIndexRoute,
   ApiAdminRoadmapIndexRoute: ApiAdminRoadmapIndexRoute,
+  ApiAdminSeoIndexRoute: ApiAdminSeoIndexRoute,
   ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
   ApiAlertsTriggersIndexRoute: ApiAlertsTriggersIndexRoute,
   ApiBuildersRecentIndexRoute: ApiBuildersRecentIndexRoute,

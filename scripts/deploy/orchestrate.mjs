@@ -51,6 +51,7 @@ import postgres from 'postgres'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..')
 const DRY_RUN = process.argv.includes('--dry-run')
 const SKIP_SEED = process.argv.includes('--skip-seed')
+const SKIP_CONTENT = process.argv.includes('--skip-content')
 
 // Only these roles are ever password-provisioned by this script. Anything else
 // (postgres, migration_operator, builderhunt_owner) is deliberately left alone
@@ -323,6 +324,30 @@ function seedAdmin() {
   }
 }
 
+function syncPlatformContent() {
+  step('Syncing public content from content/ (scripts/db/sync-platform-content.ts)')
+  if (SKIP_CONTENT) {
+    info('--skip-content set — skipping')
+    return
+  }
+  if (DRY_RUN) {
+    info('would run: tsx scripts/db/sync-platform-content.ts (idempotent upsert)')
+    return
+  }
+  try {
+    runBin('tsx', ['scripts/db/sync-platform-content.ts'])
+    ok('public changelog + roadmap match content/')
+  } catch (err) {
+    // Same best-effort contract as the admin seed: migrations and roles have
+    // already succeeded, so the app is serving. Stale marketing content is a
+    // re-runnable annoyance, not a reason to fail a healthy deploy.
+    warn('content sync failed — the deploy is otherwise healthy.')
+    warn('  → the public /changelog and /roadmap keep whatever rows they already had.')
+    warn('    Re-run `pnpm content:sync` (or --skip-content to ignore).')
+    info(`reason: ${err instanceof Error ? err.message : String(err)}`)
+  }
+}
+
 // ── main ─────────────────────────────────────────────────────────────────────
 async function main() {
   log('━━━ builderhunt deploy orchestrator ━━━')
@@ -346,6 +371,7 @@ async function main() {
   const provisioned = await provisionRolePasswords(migrationUrl, migrationRole)
   await verifyRoleLogins(provisioned)
   seedAdmin()
+  syncPlatformContent()
 
   log('\n━━━ deploy orchestration complete ✓ ━━━')
   if (DRY_RUN) log('(dry-run — re-run without --dry-run to apply)')

@@ -2,13 +2,15 @@ import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Calendar, Clock, ArrowRight, BookOpen, Tag as TagIcon } from 'lucide-react'
 import { getBlogPosts } from '~/shared/lib/blog-data'
+import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
+import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
 
 export const Route = createFileRoute('/_landing/blog/')({
   loader: async () => {
-    const posts = await getBlogPosts()
-    return { posts }
+    const [posts, robots] = await Promise.all([getBlogPosts(), getSurfaceRobotsFn({ data: 'blog' })])
+    return { posts, robots }
   },
-  head: () => ({
+  head: ({ loaderData }) => ({
     meta: [
       { title: 'Blog — BuilderHunt' },
       {
@@ -18,6 +20,9 @@ export const Route = createFileRoute('/_landing/blog/')({
       { property: 'og:title', content: 'BuilderHunt Blog' },
       { property: 'og:description', content: 'Founder stories, technical deep-dives, and practical guides.' },
       { property: 'og:type', content: 'website' },
+      // Admin-controlled per surface (/admin/content). Defaults applied when the
+      // loader did not run, so a head built without loader data still fails closed.
+      ...robotsMetaTag(loaderData?.robots ?? DEFAULT_DIRECTIVES),
     ],
   }),
   component: BlogListPage,

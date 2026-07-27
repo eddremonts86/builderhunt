@@ -575,6 +575,20 @@
       "when": 1785167485828,
       "tag": "0081_wakeful_butterfly",
       "breakpoints": true
+    },
+    {
+      "idx": 82,
+      "version": "7",
+      "when": 1785176434238,
+      "tag": "0082_ordinary_whiplash",
+      "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1785176455559,
+      "tag": "0083_public_surface_indexing_grants",
+      "breakpoints": true
     }
   ]
 }

@@ -4,15 +4,24 @@ import { ArrowLeft, Calendar, Clock, Tag as TagIcon, ArrowRight } from 'lucide-r
 import { getBlogPostPage } from '~/shared/lib/blog-data'
 import { LinkButton } from '~/components/ui/link'
 import { SITE_URL } from '~/shared/lib/site-url'
+import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
+import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
 
 export const Route = createFileRoute('/_landing/blog/$slug')({
   loader: async ({ params }) => {
-    const page = await getBlogPostPage({ data: params.slug })
+    const [page, robots] = await Promise.all([
+      getBlogPostPage({ data: params.slug }),
+      getSurfaceRobotsFn({ data: 'blog' }),
+    ])
     if (!page) throw notFound()
-    return page
+    return { ...page, robots }
   },
   head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: 'Post not found — BuilderHunt' }] }
+    // A post page with no loader data is the not-found branch — keep it out of
+    // the index unconditionally rather than reasoning about the surface.
+    if (!loaderData) {
+      return { meta: [{ title: 'Post not found — BuilderHunt' }, ...robotsMetaTag(DEFAULT_DIRECTIVES)] }
+    }
     const { post } = loaderData
     const title = `${post.title} — BuilderHunt Blog`
     const url = `${SITE_URL}/blog/${post.slug}`
@@ -32,6 +41,9 @@ export const Route = createFileRoute('/_landing/blog/$slug')({
         { name: 'twitter:title', content: post.title },
         { name: 'twitter:description', content: post.description },
         { name: 'twitter:image', content: ogImage },
+        // Inherited from the `blog` surface — one switch covers the index, every
+        // post, and the feed, so a post can never outlive the list's setting.
+        ...robotsMetaTag(loaderData.robots),
       ],
     }
   },

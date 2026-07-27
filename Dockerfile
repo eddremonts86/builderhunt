@@ -52,6 +52,14 @@ COPY drizzle.config.ts ./drizzle.config.ts
 COPY tsconfig.json ./tsconfig.json
 COPY scripts ./scripts
 
+# Editorial content, read from disk at REQUEST time, not bundled at build time:
+# `src/shared/lib/blog.ts` does `readdir(join(process.cwd(), 'content', 'posts'))`
+# and `scripts/db/sync-platform-content.ts` reads content/changelog + content/roadmap.yml.
+# Without this line the directory does not exist in the runtime stage, `readdir`
+# throws, the catch returns [], and /blog + /blog/atom.xml are permanently empty
+# in production while looking perfectly healthy locally.
+COPY content ./content
+
 EXPOSE 3000
 
 # Let Coolify/Docker know when the app is actually serving. The endpoint is

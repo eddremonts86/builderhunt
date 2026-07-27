@@ -2,11 +2,15 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { ArrowLeft, Calendar, Tag } from 'lucide-react'
 import { LinkButton } from '~/components/ui/link'
+import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
+import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
 
 interface ChangelogEntry {
   id: string
   title: string
   content: string
+  /** Server-rendered markdown. Absent only if the API predates it. */
+  html?: string
   slug: string
   tags: string[]
   publishedAt: string
@@ -20,6 +24,12 @@ const TAG_COLORS: Record<string, string> = {
 }
 
 export const Route = createFileRoute('/_landing/changelog/$slug')({
+  // The entry is fetched client-side (see the effect below); the loader is here
+  // only to put the robots directive in the server-rendered head.
+  loader: async () => ({ robots: await getSurfaceRobotsFn({ data: 'changelog' }) }),
+  head: ({ loaderData }) => ({
+    meta: [...robotsMetaTag(loaderData?.robots ?? DEFAULT_DIRECTIVES)],
+  }),
   component: ChangelogDetail,
 })
 
@@ -30,15 +40,28 @@ function ChangelogDetail() {
   const [notFound, setNotFound] = React.useState(false)
 
   React.useEffect(() => {
-    fetch(`/api/changelog`)
-      .then((r) => r.ok ? r.json() : [])
-      .then((list: ChangelogEntry[]) => {
-        const found = list.find((e) => e.slug === slug)
-        if (found) setEntry(found)
-        else setNotFound(true)
-        setLoading(false)
+    // Fetch the one entry, not the whole list. The list endpoint returns up to
+    // 50 fully-rendered entries; asking for all of them to display one was
+    // downloading the entire changelog on every deep link.
+    let cancelled = false
+    fetch(`/api/changelog/${encodeURIComponent(slug)}`)
+      .then(async (r) => {
+        if (cancelled) return
+        if (!r.ok) {
+          setNotFound(true)
+          return
+        }
+        setEntry((await r.json()) as ChangelogEntry)
       })
-      .catch(() => setNotFound(true))
+      .catch(() => {
+        if (!cancelled) setNotFound(true)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [slug])
 
   if (loading) {
@@ -86,9 +109,24 @@ function ChangelogDetail() {
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight">{entry.title}</h1>
       </header>
 
-      <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed whitespace-pre-wrap">
-        {entry.content}
-      </div>
+      {/* `content` is markdown, and this used to render it verbatim inside
+          `whitespace-pre-wrap` — so a table came out as rows of pipes and a
+          link as literal [text](href). The API renders it server-side now; the
+          plain-text branch stays as the fallback for an older response shape. */}
+      {entry.html ? (
+        <div
+          className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed"
+          data-testid="changelog-body"
+          dangerouslySetInnerHTML={{ __html: entry.html }}
+        />
+      ) : (
+        <div
+          className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed whitespace-pre-wrap"
+          data-testid="changelog-body"
+        >
+          {entry.content}
+        </div>
+      )}
     </article>
   )
 }

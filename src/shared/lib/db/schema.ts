@@ -555,6 +555,31 @@ export const statusChecks = pgTable(
   ],
 )
 
+/**
+ * Per-surface search-engine indexing directives, editable by a platform admin
+ * at any time without a deploy.
+ *
+ * System-operational, no owning subject — a platform setting, not tenant or user
+ * data, so no RLS is possible or needed here (same reasoning as `status_checks`).
+ * Access is controlled entirely by GRANT: `builderhunt_app` reads it on every
+ * public render of an affected page, `builderhunt_platform` writes it.
+ *
+ * `surface` deliberately carries no CHECK constraint: the set of surfaces lives
+ * in `src/shared/lib/seo/surfaces.ts`, which validates writes and ignores
+ * unknown rows on read, so adding one is a code change and a row rather than a
+ * migration.
+ */
+export const publicSurfaceIndexing = pgTable('public_surface_indexing', {
+  surface: text('surface').primaryKey(),
+  /** `noindex` — keep the page out of the index. */
+  noindex: boolean('noindex').notNull().default(true),
+  /** `nofollow` — do not follow links out of the page. */
+  nofollow: boolean('nofollow').notNull().default(true),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  /** Platform admin who last changed it. Never a tenant user. */
+  updatedBy: text('updated_by'),
+})
+
 // ---------------------------------------------------------------------------
 // Legal & Compliance (Plan: legal-and-compliance)
 // ---------------------------------------------------------------------------

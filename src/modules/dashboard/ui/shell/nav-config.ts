@@ -14,8 +14,8 @@
 
 import {
   Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Compass, CreditCard,
-  Download, Gauge, Inbox, LayoutDashboard, Lightbulb, Mail, Map, Plus, RotateCcw, Search,
-  Shield, ShieldAlert, ShieldCheck, Siren, Users,
+  Download, Gauge, Inbox, Layers, LayoutDashboard, Lightbulb, Mail, Map, Plus, RotateCcw,
+  Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
 } from 'lucide-react'
 
 type IconComponent = React.ComponentType<{ className?: string }>
@@ -134,6 +134,10 @@ export const NAV_AREAS: readonly NavArea[] = [
       { to: '/admin/billing', label: 'Billing ops', icon: Gauge, group: 'Money' },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw, group: 'Money' },
       { to: '/admin/disputes', label: 'Disputes', icon: ShieldAlert, group: 'Money' },
+      // Content is the hub over all three public surfaces; Changelog and
+      // Roadmap stay listed because they are the two people navigate to
+      // directly, and both render the same components the hub's tabs do.
+      { to: '/admin/content', label: 'Content', icon: Layers, group: 'Public', exact: true },
       { to: '/admin/changelog', label: 'Changelog', icon: BookOpen, group: 'Public' },
       { to: '/admin/roadmap', label: 'Roadmap', icon: Map, group: 'Public' },
     ],

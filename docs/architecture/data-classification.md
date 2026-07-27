@@ -34,6 +34,7 @@ an explicitly reviewed view or command is listed.
 | changelog | global-public | platform | reviewed published entry | permanent |
 | roadmap_items | global-public | platform | reviewed roadmap DTO | permanent |
 | roadmap_votes | account-subject | `user_id` | aggregate only | account/item lifetime |
+| public_surface_indexing | system-operational | platform | none directly; its effect is the public robots meta / robots.txt / sitemap | permanent config, one row per surface |
 | user_consents | account-subject | `user_id` | none | legal retention schedule |
 | data_export_requests | account-subject | `user_id` | own status only; payload never public | payload expires promptly |
 | deletion_requests | account-subject | `user_id` | own status only | legal/audit schedule |

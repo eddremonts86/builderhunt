@@ -51,9 +51,26 @@ every deploy; it never drops, resets, or `push`es — existing data is preserved
 | 5 provision roles | `ALTER ROLE builderhunt_* … PASSWORD` from each set `DATABASE_*_URL` | fatal |
 | 6 verify logins | connects as each provisioned role, `SELECT 1` | fatal (catches password/env mismatch before users do) |
 | 7 seed admin | `scripts/db/seed-admin.ts` (idempotent upsert) | **soft** — warns; deploy stays healthy |
+| 8 sync content | `scripts/db/sync-platform-content.ts` — upserts `content/changelog/*.md` and `content/roadmap/*.md` into the `changelog` / `roadmap_items` tables | **soft** — warns; the public pages keep the rows they already had |
 
-Flags: `--dry-run` (print the plan, no mutations, no connections), `--skip-seed`.
-Secrets (role passwords) are never printed.
+Flags: `--dry-run` (print the plan, no mutations, no connections), `--skip-seed`,
+`--skip-content`. Secrets (role passwords) are never printed.
+
+Step 8 exists because the public `/changelog` and `/roadmap` read the database, and the
+database is not in git — an entry typed into the admin panel lived in exactly one
+environment and did not survive a restore onto a fresh volume. The files under `content/`
+are the committed copy and this step is what makes a deploy publish them. It connects as
+`DATABASE_PLATFORM_URL` when set (the role migration `0012` grants write access on those
+two tables) and falls back to `DATABASE_URL`.
+
+It only ever owns the rows its files define — ids are `content-changelog-<slug>` /
+`content-roadmap-<slug>` — so entries created in the admin UI are never touched, including
+by the opt-in `--prune`. The reverse direction is `pnpm content:export`, which writes the
+current rows back out as files so something drafted in the admin UI can be committed.
+
+**This step needs `content/` inside the runtime image.** The Dockerfile copies it
+(`COPY content ./content`); without that line this step is a no-op and `/blog` is
+permanently empty in production while looking healthy locally.
 
 Preview what a deploy would do, safely:
 

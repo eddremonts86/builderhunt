@@ -13,6 +13,13 @@ export interface BlogPost {
   content: string
   html: string
   readingTime: number
+  /**
+   * Filename inside `content/posts/`. Reported because the admin content
+   * library has to tell an editor which file to open — the slug comes from
+   * frontmatter, so it is not guaranteed to match the filename even though
+   * the house rule says it should.
+   */
+  file: string
 }
 
 export interface BlogPostSummary {
@@ -23,6 +30,7 @@ export interface BlogPostSummary {
   tags: string[]
   author: string
   readingTime: number
+  file: string
 }
 
 async function loadPosts(): Promise<BlogPost[]> {
@@ -74,6 +82,7 @@ async function loadPosts(): Promise<BlogPost[]> {
         content,
         html,
         readingTime,
+        file,
       }
     }),
   )
@@ -100,6 +109,7 @@ export async function getAllPosts(): Promise<BlogPostSummary[]> {
     tags: p.tags,
     author: p.author,
     readingTime: p.readingTime,
+    file: p.file,
   }))
 }
 

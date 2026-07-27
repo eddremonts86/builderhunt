@@ -2,6 +2,8 @@ import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { CheckCircle2, Circle, Loader2, ArrowUp, Calendar } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { getSurfaceRobotsFn } from '~/shared/lib/seo/robots-data'
+import { DEFAULT_DIRECTIVES, robotsMetaTag } from '~/shared/lib/seo/surfaces'
 
 interface RoadmapItem {
   id: string
@@ -21,6 +23,16 @@ const COLUMNS: Array<{ key: RoadmapItem['status']; label: string; icon: typeof C
 ]
 
 export const Route = createFileRoute('/_landing/roadmap')({
+  // Items and votes are fetched client-side; the loader exists so the robots
+  // directive lands in the server-rendered head.
+  loader: async () => ({ robots: await getSurfaceRobotsFn({ data: 'roadmap' }) }),
+  head: ({ loaderData }) => ({
+    meta: [
+      { title: 'Roadmap — BuilderHunt' },
+      { name: 'description', content: 'What we are building, what is in progress, and what already shipped. Vote on what matters most to you.' },
+      ...robotsMetaTag(loaderData?.robots ?? DEFAULT_DIRECTIVES),
+    ],
+  }),
   component: RoadmapPage,
 })
 

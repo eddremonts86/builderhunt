@@ -45,6 +45,14 @@ plans
 *.md
 !README.md
 
+# …but content/ IS needed at runtime: blog posts, changelog entries and the
+# roadmap are markdown/YAML read from disk by the running server and by
+# `pnpm content:sync`. The `*.md` rule above is root-anchored so it never
+# matched these, but the re-include is explicit so a future `**/*.md` cannot
+# silently empty /blog in production.
+!content
+!content/**
+
 # Backups / scratch
 package.json.bak
 *.tgz

@@ -328,6 +328,14 @@
     "0081_wakeful_butterfly": {
       "sql": "8bf0be1d075094f4b86a66c49be157157c070cef0bc51dee13883c1c1740b080",
       "snapshot": "6597232fd8585a164316ba453297ec0a0ad8fc502c7580fb705887d221efc481"
+    },
+    "0082_ordinary_whiplash": {
+      "sql": "f88ee103e1cd8f50dc85c2fd4941f090ac231b3b03396ad5a1a76e6c743c0b22",
+      "snapshot": "bf3cea70b2f6f8a7277d0c413a9daf5e2d95f0d107541445c8a0dec3711a074e"
+    },
+    "0083_public_surface_indexing_grants": {
+      "sql": "2ad42a01f8af48ab814b8c4b1960c3d399e0d6b4823aa06f9100fa10de670ff1",
+      "snapshot": "e811371058d6e1cb4534569f087ed58d0159a459330171da0ab607b208554681"
     }
   }
 }

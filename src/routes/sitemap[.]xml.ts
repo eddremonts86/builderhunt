@@ -81,13 +81,22 @@ export const Route = createFileRoute('/sitemap.xml')({
     handlers: {
       GET: async () => {
         const today = new Date().toISOString().slice(0, 10)
+        // A sitemap that lists a noindex URL is a contradictory instruction, and
+        // Search Console reports it as an error. Surfaces the admin panel has
+        // hidden are omitted entirely — index and children alike.
+        const { getSurfaceDirectives } = await import('~/shared/lib/repositories/public-surface-indexing')
+        const { isHiddenFromSitemap } = await import('~/shared/lib/seo/surfaces')
+        const surfaces = await getSurfaceDirectives()
+        const listed = {
+          blog: !isHiddenFromSitemap(surfaces.blog),
+          changelog: !isHiddenFromSitemap(surfaces.changelog),
+          roadmap: !isHiddenFromSitemap(surfaces.roadmap),
+        }
+
         const entries: UrlEntry[] = [
           { loc: `${SITE}/`, lastmod: today, changefreq: 'weekly', priority: 1.0 },
           { loc: `${SITE}/explore`, lastmod: today, changefreq: 'weekly', priority: 0.9 },
           { loc: `${SITE}/pricing`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
-          { loc: `${SITE}/blog`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
-          { loc: `${SITE}/changelog`, lastmod: today, changefreq: 'weekly', priority: 0.8 },
-          { loc: `${SITE}/roadmap`, lastmod: today, changefreq: 'weekly', priority: 0.7 },
           { loc: `${SITE}/status`, lastmod: today, changefreq: 'daily', priority: 0.6 },
           { loc: `${SITE}/legal/terms`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
           { loc: `${SITE}/legal/privacy`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
@@ -95,14 +104,20 @@ export const Route = createFileRoute('/sitemap.xml')({
           { loc: `${SITE}/legal/imprint`, lastmod: today, changefreq: 'monthly', priority: 0.3 },
         ]
 
-        const posts = await getAllPosts()
-        for (const p of posts) {
-          entries.push({
-            loc: `${SITE}/blog/${p.slug}`,
-            lastmod: p.date,
-            changefreq: 'monthly',
-            priority: 0.7,
-          })
+        if (listed.blog) entries.push({ loc: `${SITE}/blog`, lastmod: today, changefreq: 'weekly', priority: 0.8 })
+        if (listed.changelog) entries.push({ loc: `${SITE}/changelog`, lastmod: today, changefreq: 'weekly', priority: 0.8 })
+        if (listed.roadmap) entries.push({ loc: `${SITE}/roadmap`, lastmod: today, changefreq: 'weekly', priority: 0.7 })
+
+        if (listed.blog) {
+          const posts = await getAllPosts()
+          for (const p of posts) {
+            entries.push({
+              loc: `${SITE}/blog/${p.slug}`,
+              lastmod: p.date,
+              changefreq: 'monthly',
+              priority: 0.7,
+            })
+          }
         }
 
         const { listAllPublicRadarSlugs } = await import('~/shared/lib/repositories/public-radars')

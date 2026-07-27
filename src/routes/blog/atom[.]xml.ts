@@ -22,6 +22,12 @@ export const Route = createFileRoute('/blog/atom.xml')({
       GET: async () => {
         const posts = await getAllPosts()
         const now = new Date().toISOString()
+        // XML carries no <meta>, so the blog surface's directive has to travel as
+        // a header. `X-Robots-Tag` is the documented equivalent and is what keeps
+        // the feed out of the index while the blog itself is hidden.
+        const { getSurfaceRobots } = await import('~/shared/lib/repositories/public-surface-indexing')
+        const { robotsMetaContent } = await import('~/shared/lib/seo/surfaces')
+        const robots = robotsMetaContent(await getSurfaceRobots('blog'))
         const entries = posts
           .map((p) => {
             const url = `${SITE}/blog/${p.slug}`
@@ -53,6 +59,7 @@ ${entries}
           headers: {
             'Content-Type': 'application/atom+xml; charset=utf-8',
             'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            ...(robots ? { 'X-Robots-Tag': robots } : {}),
           },
         })
       },
