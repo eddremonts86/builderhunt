@@ -7,6 +7,25 @@
       "runtimeArgs": ["exec", "vite", "dev"],
       "port": 3010,
       "autoPort": true
+    },
+    {
+      "name": "builderhunt-scheduling",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "SCHEDULING_ENABLED=true",
+        "CALENDAR_ENABLED=true",
+        "E2E_MODE=true",
+        "REDIS_URL=redis://127.0.0.1:6379",
+        "E2E_REDIS_PREFIX=manual-scheduling-check",
+        "APP_URL=http://localhost:3011",
+        "VITE_APP_URL=http://localhost:3011",
+        "pnpm",
+        "exec",
+        "vite",
+        "dev"
+      ],
+      "port": 3011,
+      "autoPort": true
     }
   ]
 }
