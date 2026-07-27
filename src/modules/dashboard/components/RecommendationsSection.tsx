@@ -58,7 +58,7 @@ const SOURCE_LABELS: Record<string, string> = {
  * searches, before they ask. Top 8 by overlap score (multi-query match
  * ranks highest), recency-filtered.
  */
-export function RecommendationsSection() {
+export function RecommendationsSection({ limit = 8 }: { limit?: number } = {}) {
   const [data, setData] = React.useState<RecommendationsResponse | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [dismissed, setDismissed] = React.useState<Set<string>>(new Set())
@@ -87,10 +87,19 @@ export function RecommendationsSection() {
 
   const visibleRecs = data?.recommendations.filter((r) => !dismissed.has(r.builder.id)) ?? []
 
+  // A dashboard tile is a glance, not a page. Eight rich cards made this tile
+  // 1216px tall, which stretched its whole bento row and left the widget beside
+  // it as a mostly empty column. The footer link is where "all of them" lives.
+  const shown = visibleRecs.slice(0, limit)
+
   return (
+    /* No `card` class here: `BentoTile` paints the bubble, and a card inside a
+       card was painting a border inside a border. The grids below use container
+       variants (`@lg:`, `@3xl:`) rather than viewport ones, because the usable
+       width is the tile's, not the screen's. */
     <section
       aria-labelledby="for-you-heading"
-      className="card p-5 md:p-6"
+      className="flex min-w-0 flex-1 flex-col"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">
@@ -105,7 +114,9 @@ export function RecommendationsSection() {
             {data?.meta?.reason === 'error' && 'Could not load recommendations. Try again later.'}
             {!data?.meta?.reason && data?.meta?.basedOnSearches != null && data.meta.basedOnSearches > 0 && (
               <>
-                <span className="font-medium text-bh-text">{visibleRecs.length}</span> picks based on your{' '}
+                <span className="font-medium text-bh-text">
+                  {shown.length < visibleRecs.length ? `${shown.length} of ${visibleRecs.length}` : visibleRecs.length}
+                </span>{' '}picks based on your{' '}
                 <span className="font-medium text-bh-text">{data.meta.basedOnSearches}</span> saved{' '}
                 {data.meta.basedOnSearches === 1 ? 'search' : 'searches'}
               </>
@@ -132,7 +143,7 @@ export function RecommendationsSection() {
 
       {/* Loading skeleton */}
       {loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 @lg:grid-cols-2 @4xl:grid-cols-3 gap-3">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="card animate-pulse h-32 bg-bh-surface/40" />
           ))}
@@ -174,8 +185,8 @@ export function RecommendationsSection() {
 
       {/* Populated */}
       {!loading && visibleRecs.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {visibleRecs.slice(0, 8).map((rec) => (
+        <div className="grid grid-cols-1 @lg:grid-cols-2 @4xl:grid-cols-3 gap-3">
+          {shown.map((rec) => (
             <RecommendationCard
               key={rec.builder.id}
               rec={rec}
@@ -264,7 +275,7 @@ function RecommendationCard({
           </div>
         </div>
 
-        <p className="text-xs text-bh-text-muted line-clamp-2 leading-relaxed h-8">
+        <p className="text-xs text-bh-text-muted line-clamp-2 leading-relaxed">
           {builder.bio || <span className="italic text-bh-text-dim">No bio yet.</span>}
         </p>
 
