@@ -62,24 +62,27 @@
   - Not built by this plan: `quality.yml`'s accessibility gate already stands up a production
     preview against real roles, and `tests/e2e/harness/` provides the browser-side fixtures.
 
-- [ ] **Cover critical public and authenticated paths**
-  - Files: `tests/e2e/*.spec.ts`, `.github/workflows/quality.yml`
-  - Reality: 19 spec files and 192 tests already cover public content, feeds/OG, consent, auth and
-    sessions, dashboard navigation, onboarding and semantic search — but CI runs only
-    `team-accounts.spec.ts` (10 tests). The work here is enabling what exists, not writing it.
-  - Verify: CI executes the enabled specs and the job's duration stays defensible.
+- [x] **Cover critical public and authenticated paths** — done (2026-07-27)
+  - Files: `.github/workflows/quality.yml`, `scripts/ci/local-quality.sh`
+  - The specs already existed; CI ran one file of nineteen. `pnpm test:e2e --workers=1` now runs
+    all of them. Enabling them immediately caught three shipped regressions — see the
+    `fix: three defects the unrun e2e specs were already catching` commit.
+  - Verify: full suite green locally at `--workers=1`, 4.7 minutes.
 
-- [ ] **Enforce Lighthouse budgets**
-  - Files: `.lighthouserc.cjs`, `package.json`, `pnpm-lock.yaml`
-  - Do: Run three mobile-throttled production-preview audits for `/`; assert performance ≥0.90, accessibility ≥0.95, LCP ≤2.5 s, CLS ≤0.10, TBT ≤200 ms, and transfer ≤900 KiB.
-  - Verify: `pnpm test:lighthouse` passes three consecutive CI runs; lowering any assertion below the measured result makes the command fail.
+- [x] **Enforce Lighthouse budgets** — done (2026-07-27)
+  - Files: `.lighthouserc.cjs`, `package.json`, `pnpm-lock.yaml`, `.github/workflows/quality.yml`
+  - Three mobile-throttled audits of `/` against the production preview the accessibility gate
+    already stands up — same build, same least-privilege roles, never `vite dev`.
+  - Verify (measured medians, local preview): performance 1.00 (budget ≥0.90), accessibility 0.96
+    (≥0.95), LCP 1135 ms (≤2500), CLS 0 (≤0.10), TBT 0 ms (≤200), transfer 496 KiB (≤900).
+    **Accessibility has only 0.01 of headroom** — the first regression there will fail the gate,
+    which is the point, but expect it to be the one that trips first.
 
-- [ ] **Gate pull requests and deployment**
-  - Files: `.github/workflows/quality.yml`, `.github/workflows/deploy.yml`
-  - Do: Make the e2e and Lighthouse steps required, so a regression blocks the deploy rather than
-    reporting after it. `deploy.yml` already runs only on a successful `Quality` `workflow_run`, so
-    this is about which steps `Quality` contains.
-  - Note: this appeared twice in the plan as two separate open items; the duplicate is folded in here.
+- [x] **Gate pull requests and deployment** — done (2026-07-27)
+  - Both e2e and Lighthouse are ordinary steps of the `Quality` job, so a failure blocks it, and
+    `deploy.yml` already runs only on a successful `Quality` `workflow_run` — a regression now
+    stops the deploy instead of being reported after it.
+  - Note: this appeared twice in the plan as two separate open items; the duplicate is folded in.
 
 - [ ] **Add read-only production smoke and record the baseline**
   - Files: `.github/workflows/quality.yml`, `docs/operations/`

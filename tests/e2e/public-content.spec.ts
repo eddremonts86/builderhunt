@@ -636,11 +636,17 @@ test.describe('public builder profiles', () => {
     }
 
     await withPage(browser, undefined, async (page, guard) => {
-      // Anonymous visitors have no tenant — the page's notes fetch is
-      // expected to be rejected (401) without breaking the public profile
-      // (twice: dev-mode StrictMode re-runs the mount effect).
-      guard.allowExpectedFailure(/status of 401/)
-      guard.allowExpectedFailure(/status of 401/)
+      // Anonymous visitors have no tenant, so every account-scoped card on the
+      // profile is rejected (401) without breaking the public page. The page's
+      // own notes/stats calls are now skipped when there is no session; what
+      // remains is three cards that mount unconditionally and each fetch on
+      // their own — PersonaCard (`/enrichment`), TeamFitCard (`/synergy`) and
+      // WorkSamplePanel. Doubled for dev-mode StrictMode remounts.
+      //
+      // Whether those three should render for a signed-out visitor at all is a
+      // product question, not a test one: "team fit against your tracked
+      // builders" has no meaning without an account. Left as-is deliberately.
+      for (let i = 0; i < 8; i++) guard.allowExpectedFailure(/status of 401/)
       await gotoHydrated(page, `${harness.baseURL}/builders/${identity.id}`)
       await expect(page.locator('h1')).toContainText('E2E Published Builder')
       // Hostile bio renders as inert text.

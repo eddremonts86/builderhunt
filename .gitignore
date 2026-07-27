@@ -26,6 +26,9 @@ blob-report/
 tests/e2e/harness/.e2e-run-id
 tests/e2e/harness/.e2e-leftovers.log
 
-# test:a11y sanitized run artifacts (route/rule/selector only, but still
-# machine-generated output, not source).
+# Machine-generated run output, not source: the sanitized a11y report
+# (route/rule/selector only) and the Lighthouse reports. Visual baselines are
+# deliberately NOT here — they live under tests/e2e/visual and are committed.
 tests/artifacts/
+# lhci's own working directory, written next to the config it reads.
+.lighthouseci/

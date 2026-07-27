@@ -40,12 +40,17 @@
 > Treat the remaining tasks as writing test matrices on an existing substrate, not as building one.
 > Paths below that say `e2e/...` mean `tests/e2e/...`.
 
-- [ ] **Add the repeatability script the harness still lacks**
-  - Files: `package.json`
-  - Do: `test:e2e:repeat` runs the full suite twice back-to-back and fails on any divergence in
-    passed/failed counts between the two runs.
-  - Verify: two consecutive clean runs produce identical counts; introducing an order-dependent
-    test makes the command fail.
+- [x] **Add the repeatability script the harness still lacks** — done (2026-07-27)
+  - Files: `package.json`, `scripts/ci/e2e-repeat.mjs`
+  - `pnpm test:e2e:repeat` runs the suite twice and compares per-test outcomes, failing on any
+    divergence in either direction — a test that starts passing on the second run is as much a bug
+    as one that starts failing. Arguments are forwarded, so it can narrow both runs the same way.
+  - **Known flake this immediately matters for**: `sign-in via the UI lands on the dashboard and
+    the session survives a reload` failed once in a full-suite run with one `403` beyond the two
+    `/api/admin/incidents` probes it allows, and passed both in isolation and with its own file
+    run whole (instrumented: exactly the two expected 403s). Cross-file order dependence, not a
+    product defect. CI's `retries: 1` will absorb it, which is precisely why it needs chasing
+    rather than leaving to the retry.
 
 - [x] **Build the E2E harness: disposable database, deterministic fake provider seam, email outbox, signed-webhook signer, and role factories** — already existed (verified 2026-07-27, see the table above)
   - Files: `tests/e2e/harness/**` (not `e2e/_harness/**` as written below)

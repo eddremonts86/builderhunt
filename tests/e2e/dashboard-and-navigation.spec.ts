@@ -781,6 +781,10 @@ test('a member removed from their active organization degrades gracefully and re
     // The degraded mount 403s every tenant-scoped fetch — each one is a
     // handled rejection Chrome still logs. The recovered second document
     // must not add any beyond the ever-present admin probe.
+    //
+    // Keep this in step with what the dashboard actually requests: the bento
+    // rewrite added the sprints, alerts, plan-usage and unread-count widgets,
+    // and this list silently went stale because CI never ran this spec.
     assertStrictClean(sp, [
       /\/api\/dashboard\/stats/,
       /\/api\/queries/,
@@ -788,6 +792,9 @@ test('a member removed from their active organization degrades gracefully and re
       /\/api\/recommendations/,
       /\/api\/onboarding\/status/,
       /\/api\/organizations\/invitations\/mine/,
+      /\/api\/sprints/,
+      /\/api\/alerts\/triggers/,
+      /\/api\/plans\/me/,
     ])
   } finally {
     await closeStrictPage(sp)

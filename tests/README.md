@@ -6,8 +6,21 @@ Every test in the project lives here, grouped by what it actually exercises.
 |---|---|---|---|
 | `unit/` | Vitest suites, mirroring the `src/` tree one-for-one. `unit/security/` holds the tenant-isolation suites, which provision a real disposable Postgres. | Vitest | `pnpm test:unit` |
 | `e2e/` | Playwright specs plus the `harness/` that boots a server, seeds roles and fakes outbound services. | Playwright | `pnpm test:e2e` |
+| `e2e/visual/` | Screenshot baselines for the public surfaces. Opt-in, not part of the default e2e run — see below. | Playwright | `pnpm test:visual` |
 | `regression/` | Standalone Node scripts that check one shipped feature end to end against a running app. Each is self-contained and prints its own pass/fail. | `node` | `node tests/regression/<name>.mjs` |
-| `artifacts/` | Output written by a run (currently the sanitized a11y report). Git-ignored. | — | — |
+| `artifacts/` | Output written by a run — the sanitized a11y report and the Lighthouse reports. Git-ignored. | — | — |
+
+## Visual baselines
+
+Playwright names snapshot files per project *and* per operating system, so the
+files generated on macOS are not the files Linux CI compares against. The visual
+suite therefore lives in its own pair of projects and is excluded from
+`pnpm test:e2e`: a baseline that does not exist for the current platform would
+otherwise fail every unrelated change.
+
+Regenerate after a deliberate design change with
+`pnpm test:visual --update-snapshots`, and commit the resulting files. Wiring
+this into CI needs Linux baselines generated in the CI environment first.
 
 ## Conventions
 

@@ -22,13 +22,16 @@
 > the hardest parts of a stable screenshot baseline — are therefore already solved. The dependency
 > note above is stale too: `audit-performance-qa`'s harness tasks are closed.
 
-- [ ] **Capture a deterministic visual inventory and baseline**
-  - Files: `tests/e2e/visual/*.spec.ts` (new), `playwright.config.ts`
-  - Do: Pin screenshots across the route matrix at desktop and mobile, with time frozen via the
-    harness's `installFixedBrowserClock`, fonts loaded before capture, and motion disabled. Tune
-    `maxDiffPixelRatio` to the smallest value that survives repeated local runs.
-  - Verify: two consecutive runs on an unchanged tree produce no diff; changing a design token
-    produces one.
+- [x] **Capture a deterministic visual inventory and baseline** — done (2026-07-27)
+  - Files: `tests/e2e/visual/public-surfaces.spec.ts`, `tests/e2e/visual/*-snapshots/`,
+    `playwright.config.ts`, `package.json`
+  - Eight public routes at desktop and mobile, 16 baselines. Determinism comes from three pins:
+    the harness's `installFixedBrowserClock`, `prefers-reduced-motion` emulation plus zeroed
+    animation/transition durations, and `document.fonts.ready` before every capture.
+    `maxDiffPixelRatio` is 0.01. Public routes only, deliberately — no session means no seeded
+    fixtures, so a diff means the design changed rather than the data did.
+  - Verify (2026-07-27): generated with `--update-snapshots`, then a second bare
+    `pnpm test:visual` run produced 16/16 passes and no diff.
 
 - [x] **Define the semantic token contract without forced overrides**
   - Files: `docs/visual-system.md` (new)
@@ -112,9 +115,13 @@
 
 - [ ] **Make visual and structural checks required in CI**
   - Files: `.github/workflows/quality.yml`
-  - Do: Run the visual suite against the production preview the accessibility gate already starts,
-    and upload the diff on failure the same way `a11y-results` is uploaded today.
-  - Verify: a deliberate token change fails the job and attaches the diff.
+  - Do: Run the visual suite in CI and upload the diff on failure the way `a11y-results` is today.
+  - **Blocked on one concrete thing**: Playwright names snapshots per operating system, so the 16
+    committed baselines are `*-darwin.png` and Linux CI has none to compare against. A missing
+    baseline is written and the test fails, so wiring this in now would fail every job until the
+    Linux files exist. Generate them once in the CI environment (or the matching Playwright
+    container), commit the `*-linux.png` files, then add the step. Until then the suite is opt-in
+    via `pnpm test:visual` and excluded from the default run by its own projects.
 
 - [ ] **Verify production and close the audit**
   - Files: `docs/visual-system.md`

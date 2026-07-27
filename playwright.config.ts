@@ -63,14 +63,41 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
+  // Screenshot baselines are per-OS: the files a developer generates on macOS
+  // are not the files Linux CI compares against. Until Linux baselines exist,
+  // the visual suite is opt-in via its own projects (`pnpm test:visual`) so a
+  // missing baseline cannot fail CI on a change that has nothing to do with it.
+  //
+  // `testIgnore` on the two default projects is only half of that: a bare
+  // `playwright test` runs EVERY project, so `test:e2e` names the two it wants
+  // explicitly. Dropping that filter silently puts the visual suite back in CI.
   projects: [
     // The full sequential release-matrix journey only needs to run once.
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, grepInvert: /@mobile-only/ },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      grepInvert: /@mobile-only/,
+      testIgnore: /visual\//,
+    },
     // Chromium-based mobile emulation (viewport + touch + UA), not WebKit —
     // keeps CI to a single browser engine install. This is checking
     // responsive layout/touch operability, not iOS Safari-specific
     // behavior, and only runs tests tagged `@mobile-only`.
-    { name: 'mobile', use: { ...devices['Pixel 7'] }, grep: /@mobile-only/ },
+    { name: 'mobile', use: { ...devices['Pixel 7'] }, grep: /@mobile-only/, testIgnore: /visual\// },
+    // Opt-in: `pnpm test:visual`. Same two viewports, but only the screenshot
+    // baselines, so a deliberate design change regenerates exactly those files.
+    {
+      name: 'visual-desktop',
+      testDir: './tests/e2e/visual',
+      use: { ...devices['Desktop Chrome'] },
+      grepInvert: /@mobile-only/,
+    },
+    {
+      name: 'visual-mobile',
+      testDir: './tests/e2e/visual',
+      use: { ...devices['Pixel 7'] },
+      grep: /@mobile-only/,
+    },
   ],
   webServer: {
     command: `pnpm exec vite dev --port ${PORT}`,
