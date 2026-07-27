@@ -1,0 +1,1 @@
+ALTER TABLE "scheduling_invitations" ADD COLUMN "candidate_email_normalized" text;

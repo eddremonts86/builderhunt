@@ -33,6 +33,7 @@ import { Route as LandingStatusRouteImport } from './routes/_landing/status'
 import { Route as LandingSecurityRouteImport } from './routes/_landing/security'
 import { Route as LandingRoadmapRouteImport } from './routes/_landing/roadmap'
 import { Route as LandingPricingRouteImport } from './routes/_landing/pricing'
+import { Route as LandingCrawlerRouteImport } from './routes/_landing/crawler'
 import { Route as LandingChangelogRouteImport } from './routes/_landing/changelog'
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
@@ -124,6 +125,7 @@ import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
+import { Route as ApiSchedulingInvitationsIndexRouteImport } from './routes/api/scheduling/invitations/index'
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
@@ -147,6 +149,7 @@ import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_das
 import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
+import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
 import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
@@ -203,6 +206,8 @@ import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
+import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
@@ -330,6 +335,11 @@ const LandingRoadmapRoute = LandingRoadmapRouteImport.update({
 const LandingPricingRoute = LandingPricingRouteImport.update({
   id: '/pricing',
   path: '/pricing',
+  getParentRoute: () => LandingRouteRoute,
+} as any)
+const LandingCrawlerRoute = LandingCrawlerRouteImport.update({
+  id: '/crawler',
+  path: '/crawler',
   getParentRoute: () => LandingRouteRoute,
 } as any)
 const LandingChangelogRoute = LandingChangelogRouteImport.update({
@@ -796,6 +806,12 @@ const DashboardAdminAbuseRoute = DashboardAdminAbuseRouteImport.update({
   path: '/admin/abuse',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const ApiSchedulingInvitationsIndexRoute =
+  ApiSchedulingInvitationsIndexRouteImport.update({
+    id: '/api/scheduling/invitations/',
+    path: '/api/scheduling/invitations/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOrganizationsInvitationsIndexRoute =
   ApiOrganizationsInvitationsIndexRouteImport.update({
     id: '/api/organizations/invitations/',
@@ -917,6 +933,12 @@ const ApiSprintsSprintIdResultsRoute =
     id: '/results',
     path: '/results',
     getParentRoute: () => ApiSprintsSprintIdRoute,
+  } as any)
+const ApiSchedulingInvitationsInvitationIdRoute =
+  ApiSchedulingInvitationsInvitationIdRouteImport.update({
+    id: '/api/scheduling/invitations/$invitationId',
+    path: '/api/scheduling/invitations/$invitationId',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
   id: '/api/queries/$id/share',
@@ -1237,6 +1259,18 @@ const ApiBuildersBuilderIdEvidenceIndexRoute =
     path: '/evidence/',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiSchedulingInvitationsInvitationIdSendRoute =
+  ApiSchedulingInvitationsInvitationIdSendRouteImport.update({
+    id: '/send',
+    path: '/send',
+    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
+  } as any)
+const ApiSchedulingInvitationsInvitationIdRevokeRoute =
+  ApiSchedulingInvitationsInvitationIdRevokeRouteImport.update({
+    id: '/revoke',
+    path: '/revoke',
+    getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
+  } as any)
 const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
   ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
     id: '/accept',
@@ -1306,6 +1340,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/alerts': typeof DashboardAlertsRoute
   '/changelog': typeof LandingChangelogRouteWithChildren
+  '/crawler': typeof LandingCrawlerRoute
   '/pricing': typeof LandingPricingRoute
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
@@ -1467,6 +1502,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/settings/billing/': typeof DashboardSettingsBillingIndexRoute
@@ -1490,6 +1526,7 @@ export interface FileRoutesByFullPath {
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
@@ -1497,6 +1534,8 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
+  '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -1509,6 +1548,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/alerts': typeof DashboardAlertsRoute
+  '/crawler': typeof LandingCrawlerRoute
   '/pricing': typeof LandingPricingRoute
   '/roadmap': typeof LandingRoadmapRoute
   '/security': typeof LandingSecurityRoute
@@ -1669,6 +1709,7 @@ export interface FileRoutesByTo {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/settings/billing': typeof DashboardSettingsBillingIndexRoute
@@ -1692,6 +1733,7 @@ export interface FileRoutesByTo {
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
@@ -1699,6 +1741,8 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
+  '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -1714,6 +1758,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_dashboard/alerts': typeof DashboardAlertsRoute
   '/_landing/changelog': typeof LandingChangelogRouteWithChildren
+  '/_landing/crawler': typeof LandingCrawlerRoute
   '/_landing/pricing': typeof LandingPricingRoute
   '/_landing/roadmap': typeof LandingRoadmapRoute
   '/_landing/security': typeof LandingSecurityRoute
@@ -1876,6 +1921,7 @@ export interface FileRoutesById {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/_dashboard/settings/billing/': typeof DashboardSettingsBillingIndexRoute
@@ -1899,6 +1945,7 @@ export interface FileRoutesById {
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
+  '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
@@ -1906,6 +1953,8 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
+  '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -1921,6 +1970,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/alerts'
     | '/changelog'
+    | '/crawler'
     | '/pricing'
     | '/roadmap'
     | '/security'
@@ -2082,6 +2132,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
     | '/settings/billing/'
@@ -2105,6 +2156,7 @@ export interface FileRouteTypes {
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
+    | '/api/scheduling/invitations/'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
@@ -2112,6 +2164,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/scheduling/invitations/$invitationId/revoke'
+    | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2124,6 +2178,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/alerts'
+    | '/crawler'
     | '/pricing'
     | '/roadmap'
     | '/security'
@@ -2284,6 +2339,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
     | '/settings/billing'
@@ -2307,6 +2363,7 @@ export interface FileRouteTypes {
     | '/api/me/sessions'
     | '/api/me/stepup'
     | '/api/organizations/invitations'
+    | '/api/scheduling/invitations'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
@@ -2314,6 +2371,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/scheduling/invitations/$invitationId/revoke'
+    | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2328,6 +2387,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/_dashboard/alerts'
     | '/_landing/changelog'
+    | '/_landing/crawler'
     | '/_landing/pricing'
     | '/_landing/roadmap'
     | '/_landing/security'
@@ -2490,6 +2550,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
     | '/_dashboard/settings/billing/'
@@ -2513,6 +2574,7 @@ export interface FileRouteTypes {
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
+    | '/api/scheduling/invitations/'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
@@ -2520,6 +2582,8 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/scheduling/invitations/$invitationId/revoke'
+    | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2638,6 +2702,7 @@ export interface RootRouteChildren {
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
   ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
+  ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
@@ -2657,6 +2722,7 @@ export interface RootRouteChildren {
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
+  ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   ApiMeBuilderClaimsClaimIdPortfolioRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
@@ -2830,6 +2896,13 @@ declare module '@tanstack/react-router' {
       path: '/pricing'
       fullPath: '/pricing'
       preLoaderRoute: typeof LandingPricingRouteImport
+      parentRoute: typeof LandingRouteRoute
+    }
+    '/_landing/crawler': {
+      id: '/_landing/crawler'
+      path: '/crawler'
+      fullPath: '/crawler'
+      preLoaderRoute: typeof LandingCrawlerRouteImport
       parentRoute: typeof LandingRouteRoute
     }
     '/_landing/changelog': {
@@ -3469,6 +3542,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminAbuseRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/api/scheduling/invitations/': {
+      id: '/api/scheduling/invitations/'
+      path: '/api/scheduling/invitations'
+      fullPath: '/api/scheduling/invitations/'
+      preLoaderRoute: typeof ApiSchedulingInvitationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/organizations/invitations/': {
       id: '/api/organizations/invitations/'
       path: '/api/organizations/invitations'
@@ -3629,6 +3709,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sprints/$sprintId/results'
       preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
       parentRoute: typeof ApiSprintsSprintIdRoute
+    }
+    '/api/scheduling/invitations/$invitationId': {
+      id: '/api/scheduling/invitations/$invitationId'
+      path: '/api/scheduling/invitations/$invitationId'
+      fullPath: '/api/scheduling/invitations/$invitationId'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/queries/$id/share': {
       id: '/api/queries/$id/share'
@@ -4022,6 +4109,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/scheduling/invitations/$invitationId/send': {
+      id: '/api/scheduling/invitations/$invitationId/send'
+      path: '/send'
+      fullPath: '/api/scheduling/invitations/$invitationId/send'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdSendRouteImport
+      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
+    }
+    '/api/scheduling/invitations/$invitationId/revoke': {
+      id: '/api/scheduling/invitations/$invitationId/revoke'
+      path: '/revoke'
+      fullPath: '/api/scheduling/invitations/$invitationId/revoke'
+      preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRevokeRouteImport
+      parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
+    }
     '/api/organizations/invitations/$invitationId/accept': {
       id: '/api/organizations/invitations/$invitationId/accept'
       path: '/accept'
@@ -4186,6 +4287,7 @@ const LandingChangelogRouteWithChildren =
 
 interface LandingRouteRouteChildren {
   LandingChangelogRoute: typeof LandingChangelogRouteWithChildren
+  LandingCrawlerRoute: typeof LandingCrawlerRoute
   LandingPricingRoute: typeof LandingPricingRoute
   LandingRoadmapRoute: typeof LandingRoadmapRoute
   LandingSecurityRoute: typeof LandingSecurityRoute
@@ -4203,6 +4305,7 @@ interface LandingRouteRouteChildren {
 
 const LandingRouteRouteChildren: LandingRouteRouteChildren = {
   LandingChangelogRoute: LandingChangelogRouteWithChildren,
+  LandingCrawlerRoute: LandingCrawlerRoute,
   LandingPricingRoute: LandingPricingRoute,
   LandingRoadmapRoute: LandingRoadmapRoute,
   LandingSecurityRoute: LandingSecurityRoute,
@@ -4387,6 +4490,24 @@ const ApiOrganizationsInvitationsInvitationIdRouteWithChildren =
     ApiOrganizationsInvitationsInvitationIdRouteChildren,
   )
 
+interface ApiSchedulingInvitationsInvitationIdRouteChildren {
+  ApiSchedulingInvitationsInvitationIdRevokeRoute: typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
+  ApiSchedulingInvitationsInvitationIdSendRoute: typeof ApiSchedulingInvitationsInvitationIdSendRoute
+}
+
+const ApiSchedulingInvitationsInvitationIdRouteChildren: ApiSchedulingInvitationsInvitationIdRouteChildren =
+  {
+    ApiSchedulingInvitationsInvitationIdRevokeRoute:
+      ApiSchedulingInvitationsInvitationIdRevokeRoute,
+    ApiSchedulingInvitationsInvitationIdSendRoute:
+      ApiSchedulingInvitationsInvitationIdSendRoute,
+  }
+
+const ApiSchedulingInvitationsInvitationIdRouteWithChildren =
+  ApiSchedulingInvitationsInvitationIdRoute._addFileChildren(
+    ApiSchedulingInvitationsInvitationIdRouteChildren,
+  )
+
 interface ApiMeBuilderClaimsClaimIdPortfolioRouteChildren {
   ApiMeBuilderClaimsClaimIdPortfolioPublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -4520,6 +4641,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
   ApiQueriesIdShareRoute: ApiQueriesIdShareRoute,
+  ApiSchedulingInvitationsInvitationIdRoute:
+    ApiSchedulingInvitationsInvitationIdRouteWithChildren,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
@@ -4539,6 +4662,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
+  ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
   ApiAdminBuilderClaimsClaimIdRevokeRoute:
     ApiAdminBuilderClaimsClaimIdRevokeRoute,
   ApiMeBuilderClaimsClaimIdPortfolioRoute:

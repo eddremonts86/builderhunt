@@ -112,6 +112,8 @@ const MAX_ROLE_TITLE = 200
 const MAX_ROLE_CONTEXT = 4000
 
 export interface CreateInvitationInput {
+  /** Where the invitation will be sent, when it has no tracked builder to resolve a recipient from. */
+  candidateEmail?: string | null
   roleTitle: string
   roleContext: string
   durationMinutes: number
@@ -178,6 +180,16 @@ function isAcceptableTimeZone(timezone: unknown): boolean {
     && isValidIanaTimeZone(timezone)
 }
 
+/**
+ * Lowercased and trimmed, matching `candidate_submissions.email_normalized` and the consent
+ * ledger's subject hashing. Three places deriving a subject key from the same address have to agree
+ * on what counts as the same address, or a candidate's records silently split.
+ */
+function normalizeCandidateEmail(email: string | null | undefined): string | null {
+  const normalized = email?.trim().toLowerCase()
+  return normalized && normalized.length > 0 ? normalized : null
+}
+
 export async function createInvitation(
   transaction: TenantTransaction,
   principal: TenantPrincipal,
@@ -197,6 +209,7 @@ export async function createInvitation(
     organizationId: principal.organizationId,
     ownerUserId: principal.userId,
     organizationBuilderId: input.organizationBuilderId ?? null,
+    candidateEmailNormalized: normalizeCandidateEmail(input.candidateEmail),
     roleTitle: input.roleTitle.trim(),
     roleContext: input.roleContext,
     durationMinutes: input.durationMinutes,

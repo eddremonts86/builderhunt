@@ -177,6 +177,7 @@ const invitationColumns = {
   organizationId: schedulingInvitations.organizationId,
   ownerUserId: schedulingInvitations.ownerUserId,
   organizationBuilderId: schedulingInvitations.organizationBuilderId,
+  candidateEmailNormalized: schedulingInvitations.candidateEmailNormalized,
   roleTitle: schedulingInvitations.roleTitle,
   roleContext: schedulingInvitations.roleContext,
   durationMinutes: schedulingInvitations.durationMinutes,
@@ -229,6 +230,7 @@ export async function insertInvitation(
     organizationId: string
     ownerUserId: string
     organizationBuilderId?: string | null
+    candidateEmailNormalized?: string | null
     roleTitle: string
     roleContext: string
     durationMinutes: number
@@ -247,6 +249,7 @@ export async function insertInvitation(
       organizationId: input.organizationId,
       ownerUserId: input.ownerUserId,
       organizationBuilderId: input.organizationBuilderId ?? null,
+      candidateEmailNormalized: input.candidateEmailNormalized ?? null,
       roleTitle: input.roleTitle,
       roleContext: input.roleContext,
       durationMinutes: input.durationMinutes,

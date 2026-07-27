@@ -2160,6 +2160,17 @@ export const schedulingInvitations = pgTable(
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
     organizationBuilderId: text('organization_builder_id'),
+    /**
+     * Where the invitation is sent. Not in spec.md's column list for this table, but the API
+     * contract requires it: `POST /api/scheduling/invitations` accepts a candidate email and
+     * `POST .../send` carries only a version and an idempotency key, so the address has to survive
+     * between the two calls and the invitation is the only row that exists in that window.
+     *
+     * Nullable, because an invitation for a tracked builder resolves its recipient from
+     * `organization_builders` instead, and duplicating the address there would give the same person
+     * two records that can disagree.
+     */
+    candidateEmailNormalized: text('candidate_email_normalized'),
     roleTitle: text('role_title').notNull(),
     roleContext: text('role_context').notNull(),
     durationMinutes: integer('duration_minutes').notNull(),
