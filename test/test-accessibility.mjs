@@ -39,6 +39,13 @@ const PUBLIC_ROUTES = [
   '/auth/sign-in',
   '/auth/sign-up',
   '/auth/forgot',
+  // The scheduling portal — the feature's only unauthenticated surface, and until now the only public
+  // route with no coverage here. A fixed nonexistent id needs no fixture and is not a weaker test than
+  // a real invitation would be: it renders the "no longer open" terminal state, which is what anyone
+  // opening an expired, revoked or already-booked link actually receives, and is therefore the state
+  // most visitors of a stale link will ever see. The page must be as readable in that state as in the
+  // booking one, and a candidate reading it has no account here to fall back on.
+  '/schedule/00000000-0000-4000-8000-000000000000',
 ]
 
 const AUTH_ROUTES = [
