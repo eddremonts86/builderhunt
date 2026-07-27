@@ -118,15 +118,26 @@ jobs:
         run: |
           pnpm exec drizzle-kit migrate
           pnpm db:seed:admin
+      # `pnpm preview --port 3000 &` on its own loses the server the moment the step ends: the
+      # background process inherits the step's stdout pipe, the runner closes that pipe at the step
+      # boundary, and the next write earns an EPIPE. `/api/health` is a static 200 that touches neither
+      # the DB nor Redis, so a health timeout here never meant "the app is unhealthy" — it meant the
+      # server was already dead. Redirecting to a file (which is also what scripts/ci/local-quality.sh
+      # does, and why the same gate passed locally while failing here) keeps it alive, and printing
+      # that file on failure means the next timeout arrives with the server's own reason attached
+      # instead of six words and a dead end.
       - name: Start production preview
-        run: pnpm preview --port 3000 &
+        run: |
+          nohup pnpm preview --port 3000 > /tmp/preview.log 2>&1 &
+          disown
       - name: Wait for /api/health
         run: |
           for i in $(seq 1 30); do
             curl -sf http://localhost:3000/api/health && exit 0
             sleep 2
           done
-          echo "Preview server never became healthy" >&2
+          echo "Preview server never became healthy; its output follows." >&2
+          cat /tmp/preview.log >&2 || echo "(no /tmp/preview.log was written)" >&2
           exit 1
       - name: Accessibility gate (axe-core, public + authenticated route matrix)
         run: pnpm test:a11y

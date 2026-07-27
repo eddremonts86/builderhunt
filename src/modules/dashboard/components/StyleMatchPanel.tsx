@@ -81,7 +81,15 @@ export function StyleMatchPanel() {
         <p className="text-xs text-bh-text-dim" data-testid="style-match-locked">
           Analyze the real code of at least {DENSITY_THRESHOLD} tracked builders to unlock style
           matching — {eligibleCount} of {DENSITY_THRESHOLD} so far. Use “Analyze real code” on a{' '}
-          <Link to="/search" className="text-bh-accent hover:underline">GitHub builder's profile</Link>{' '}
+          {/*
+            Underlined at rest, not only on hover. This link sits inside a sentence, and against the
+            surrounding `text-bh-text-dim` the accent colour measures 1.26:1 — far under the 3:1 that
+            WCAG 1.4.1 requires before colour alone may carry the distinction. Hover does not help a
+            reader who never hovers, and nothing helps one who cannot perceive the hue. Standalone
+            accent links elsewhere are fine and deliberately left as they are: axe flags only links in
+            a text block, because those are the ones a reader has to pick out of running prose.
+          */}
+          <Link to="/search" className="text-bh-accent underline">GitHub builder&apos;s profile</Link>{' '}
           to add one.
         </p>
       ) : (

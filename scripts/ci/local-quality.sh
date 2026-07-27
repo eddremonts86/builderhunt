@@ -182,6 +182,23 @@ with open(f'/tmp/ci-local-roles-{run}.sh', 'w') as fh:
 print('per-run roles prepared:', ', '.join(d['roles'].values()))
 PY
 }
+# The throwaway database is created empty by this script, and `migrations-local` is what fills it.
+# Under `--from` that check is skipped, so the schema has to be applied anyway — otherwise the fixture
+# has no tables to grant on and every later step fails for a reason that has nothing to do with the
+# step being investigated. Conditional on the schema actually being absent, so a full run still lets
+# `migrations-local` prove that migrations apply to a genuinely fresh database.
+ensure_schema() {
+  local has_tables
+  has_tables="$(psql "${PG_BASE}/${DB}" -Atc "select to_regclass('public.alerts') is not null" 2>/dev/null)"
+  if [ "$has_tables" = "t" ]; then
+    echo "schema already present (migrations-local ran)"
+    return 0
+  fi
+  echo "applying schema (migrations-local was skipped by --from)"
+  pnpm exec drizzle-kit migrate >/dev/null
+}
+setup_step schema ensure_schema
+
 setup_step rls-fixture prepare_fixture
 
 if [ -f "/tmp/ci-local-roles-${RUN_ID}.sh" ]; then
@@ -238,7 +255,7 @@ else
   accessibility_gate() {
     pnpm exec drizzle-kit migrate >/dev/null || return 1
     pnpm db:seed:admin >/dev/null || return 1
-    pnpm exec vite preview --port "$PREVIEW_PORT" >/tmp/ci-local-preview-"$RUN_ID".log 2>&1 &
+    pnpm preview --port "$PREVIEW_PORT" >/tmp/ci-local-preview-"$RUN_ID".log 2>&1 &
     PREVIEW_PID=$!
     for _ in $(seq 1 30); do
       curl -sf "$APP_URL/api/health" >/dev/null 2>&1 && break
