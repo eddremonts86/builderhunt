@@ -67,7 +67,7 @@ at it; there is no automatic scheduler otherwise.
 
 ## Verifying tenant isolation locally
 
-1. `pnpm test:security` (or `pnpm test test/security`) — route-level isolation and cache-isolation
+1. `pnpm test:security` (or `pnpm test tests/unit/security`) — route-level isolation and cache-isolation
    checks (a client can never select another org's id; a real `useQuery` consumer never renders
    stale data across an org switch).
 2. `pnpm test:rls:local` — exact runtime roles against a disposable database (see

@@ -26,7 +26,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       # Required by the E2E harness, not optional. `playwright.config.ts` defaults REDIS_URL to
-      # redis://localhost:6379 and `e2e/harness/cache.ts` refuses to run without it — E2E deliberately
+      # redis://localhost:6379 and `tests/e2e/harness/cache.ts` refuses to run without it — E2E deliberately
       # exercises the real cache path, because the in-memory rate-limit fallback is forbidden under
       # E2E_MODE. Without this service every spec failed with "Connection is closed" against a port
       # nothing was listening on. Same image and port as the `redis` service in docker-compose.yml, so
@@ -111,7 +111,7 @@ jobs:
         # `--workers=1` because playwright.config.ts sets a default of 2 and its own comment says this
         # spec "still shares fixtures" and needs serialized state. Running it at the default was
         # inviting flake that would have looked like a product bug.
-        run: pnpm test:e2e e2e/team-accounts.spec.ts --workers=1
+        run: pnpm test:e2e tests/e2e/team-accounts.spec.ts --workers=1
       - run: pnpm security:dependencies
       - run: pnpm build
       - name: Migrate + seed admin for the production-preview accessibility gate
@@ -164,7 +164,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: a11y-results
-          path: test/artifacts/a11y/
+          path: tests/artifacts/a11y/
           retention-days: 14
 
   # Optional, additive certification of the real Stripe-backed BillingProvider

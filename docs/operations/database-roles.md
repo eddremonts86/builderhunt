@@ -26,7 +26,7 @@ role sees no rows at all, verified), so it is an unusable database rather than a
 tempting incident-time "fix" of disabling RLS or granting `BYPASSRLS` would make it one.
 
 `scripts/db/roles.sql` recreates these roles without passwords for exactly this case, and
-`test/security/restore-roles-bootstrap.test.ts` fails if it drifts from the migrations above.
+`tests/unit/security/restore-roles-bootstrap.test.ts` fails if it drifts from the migrations above.
 Procedure and drills: [`database-restore.md`](./database-restore.md).
 
 The auth broker exists because Better Auth must resolve sessions and memberships before a product
@@ -60,7 +60,7 @@ triggered by a webhook or synchronously by a user's own request. `builderhunt_ap
 `billing_ledger_entries` additionally never receives an UPDATE grant for ANY role — it is append-only;
 compensating entries are inserted, never mutations of an existing row.
 
-`test/security/billing-tenant-isolation.test.ts` statically asserts these invariants against the
+`tests/unit/security/billing-tenant-isolation.test.ts` statically asserts these invariants against the
 migration file text (safe to run in every `pnpm vitest run`, no live database needed).
 `scripts/db/verify-rls-local.mjs` (under `pnpm test:rls:local`) additionally proves the live-role
 behavior: tenant A/B isolation, cross-tenant insert/update denial, a spoofed-organization checkout

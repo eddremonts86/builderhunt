@@ -89,12 +89,12 @@ real `sk_test_...` key, never `sk_live_...`) in the repo's Actions secrets to tu
 
 The following are still open, deliberately not attempted in this pass:
 
-- **`e2e/stripe-billing.spec.ts`, `test/security/stripe-billing-isolation.test.ts`,
+- **`tests/e2e/stripe-billing.spec.ts`, `tests/unit/security/stripe-billing-isolation.test.ts`,
   `test/fixtures/stripe/`** (this task's remaining originally-scoped files) — a real browser-driven
   Checkout redirect flow through Stripe's own hosted payment page, and signed webhook
   duplicate/reordering fixtures replayed against the real adapter. This repo currently has a
   separate, actively in-progress local-e2e effort (`plans/exhaustive-local-e2e-design/`,
-  `e2e/harness/`, `scripts/e2e/` — all present as untracked work at the time of writing) that owns
+  `tests/e2e/harness/`, `scripts/e2e/` — all present as untracked work at the time of writing) that owns
   the Playwright/e2e surface, and that plan's own scope explicitly defers "optional sandbox contract
   checks against the real Stripe test account" as a "additive CI job, not a replacement" for its
   fake-provider coverage — which is exactly what the `stripe-sandbox-certification` CI job above
@@ -107,7 +107,7 @@ The following are still open, deliberately not attempted in this pass:
   test in this codebase yet drives a Stripe Test Clock forward to exercise these transitions against
   the real adapter.
 - **RLS/tenant isolation specifically for real-adapter-originated data** — the existing
-  `test/security/billing-tenant-isolation.test.ts` (§2) already covers RLS at the schema/role level
+  `tests/unit/security/billing-tenant-isolation.test.ts` (§2) already covers RLS at the schema/role level
   independent of which provider wrote the data, so this is lower-priority than the items above, but
   is not separately re-verified against real-adapter-sourced rows here.
 

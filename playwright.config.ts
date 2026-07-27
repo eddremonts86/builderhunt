@@ -51,7 +51,7 @@ process.env.E2E_RUN_ID ??= e2eRunId
 const defaultWorkers = Number(process.env.E2E_WORKERS ?? '2')
 
 export default defineConfig({
-  testDir: './e2e',
+  testDir: './tests/e2e',
   fullyParallel: false, // team-accounts specs share one local DB — no cross-test isolation between orgs otherwise
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

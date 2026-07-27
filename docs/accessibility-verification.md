@@ -72,14 +72,14 @@ note) is announced without an unexpected focus jump.
   hardcoded `bg-bh-accent text-white` instead of the token (`SearchPage.tsx`'s notification-count
   badge, `RecommendationsSection.tsx`'s topic badge) were routed through the token too.
 - **Exceptions removed**: the two `accent-contrast`/`bg-bh-accent` entries in
-  `test/test-accessibility.mjs`'s `EXPECTED_EXCEPTIONS`, and the corresponding "known, documented
+  `tests/regression/test-accessibility.mjs`'s `EXPECTED_EXCEPTIONS`, and the corresponding "known, documented
   exception" test in `src/shared/lib/accessibility.test.ts` (now asserts the pairing passes
   instead of pinning the failure).
 - **Verify**: `pnpm test -- src/shared/lib/accessibility.test.ts` and `pnpm test:a11y` — re-run
   after this change to confirm no other `color-contrast` regression.
 - **Still open from 2026-07-24**: the decorative-numeral exception, the ThemeToggle glass/blur
   exception, and the "Recent builders" list exception all remain (different, unrelated root
-  causes — see `test/test-accessibility.mjs` for each). VoiceOver/manual AT pass and 200% zoom are
+  causes — see `tests/regression/test-accessibility.mjs` for each). VoiceOver/manual AT pass and 200% zoom are
   still not done.
 - **Owner**: unassigned — VoiceOver pass and 200% zoom still need a human.
 
@@ -92,11 +92,11 @@ note) is announced without an unexpected focus jump.
   intentionally blank because that testing has not happened. Do not treat this entry as a
   substitute for a real manual pass.
 - **What was actually run**: `pnpm test:a11y` (axe-core via Playwright) against a local dev build,
-  across the public + authenticated route matrix defined in `test/test-accessibility.mjs`, at
+  across the public + authenticated route matrix defined in `tests/regression/test-accessibility.mjs`, at
   mobile (390×844) and desktop (1280×800) viewports, signed in as the seeded local admin
   (`edd_admin@local.com`).
 - **Result**: all routes clean for `critical`/`serious` axe violations except three documented,
-  dated exceptions in `test/test-accessibility.mjs` (`EXPECTED_EXCEPTIONS`) — all three are the
+  dated exceptions in `tests/regression/test-accessibility.mjs` (`EXPECTED_EXCEPTIONS`) — all three are the
   same root cause (white text on the solid accent-orange fill measures 3.14:1, short of 4.5:1) plus
   one confirmed-decorative low-opacity numeral. See that file for the exact reasoning; the
   accent-contrast pairing is a **real, unresolved finding** that needs a deliberate design decision
@@ -112,7 +112,7 @@ note) is announced without an unexpected focus jump.
 - **VoiceOver / manual AT pass**: **not done**. Needs a real macOS + Safari/Chrome + VoiceOver
   session (or equivalent screen reader) walking both journeys above. This is the primary gap this
   entry exists to name — automated tooling is necessary but not sufficient for a real release gate.
-- **Exceptions**: see `EXPECTED_EXCEPTIONS` in `test/test-accessibility.mjs` — three entries, all
+- **Exceptions**: see `EXPECTED_EXCEPTIONS` in `tests/regression/test-accessibility.mjs` — three entries, all
   dated 2026-07-24, all tracing to the same accent-contrast root cause. No expiry set; they expire
   when someone makes the accent-color/button-text design call and re-verifies.
 - **Owner**: unassigned — needs a human to claim the accent-contrast decision and the VoiceOver

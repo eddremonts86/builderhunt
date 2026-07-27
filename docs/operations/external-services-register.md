@@ -554,7 +554,7 @@ DB leg is the price of the cheaper, more suitable target.
   | --- | --- |
   | [`docs/operations/database-restore.md`](database-restore.md) | the procedure — the roles rule, full disaster recovery onto a new host, drills, and the "don't disable RLS" instruction |
   | `scripts/db/roles.sql` | idempotent, **password-free** recreation of the six cluster roles. Primary recovery path: in-repo, so it works with backups taken before any of this existed |
-  | `test/security/restore-roles-bootstrap.test.ts` | fails the ordinary `pnpm test` run if `roles.sql` drifts from the role migrations, or if any role ever gains `SUPERUSER`/`BYPASSRLS` |
+  | `tests/unit/security/restore-roles-bootstrap.test.ts` | fails the ordinary `pnpm test` run if `roles.sql` drifts from the role migrations, or if any role ever gains `SUPERUSER`/`BYPASSRLS` |
   | `scripts/db/restore.ts` (`pnpm db:restore`) | rewritten: auto-detects all three archive formats **including Coolify's custom format** (the old script only handled `backup.ts`'s gzipped plain SQL, so it could not have restored a production backup at all), creates roles first, and verifies |
   | `scripts/db/restore-drill.ts` (`pnpm db:restore-drill`) | throwaway-cluster drill, the repeatable form of this test. `--skip-roles` reproduces the defect on demand |
   | `scripts/ops/builderhunt-backup-sync.sh` | the VPS sync script, now version-controlled and with a nightly `pg_dumpall --roles-only --no-role-passwords` capture added |

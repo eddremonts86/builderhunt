@@ -53,7 +53,7 @@ Create a shared Playwright fixture package responsible for:
 - Browser helpers for hydration-safe navigation, overlay handling, downloads, multiple contexts, and stable assertions.
 - Test cleanup that removes only data owned by the current test or drops its disposable database.
 
-Existing helper logic in `e2e/team-accounts.spec.ts` must move into reusable fixtures instead of being copied.
+Existing helper logic in `tests/e2e/team-accounts.spec.ts` must move into reusable fixtures instead of being copied.
 
 ### 2. Browser E2E suites
 

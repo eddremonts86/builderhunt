@@ -107,7 +107,7 @@ A clean run ends with:
 Two independent sources, in this order of preference:
 
 1. **`scripts/db/roles.sql`** (in-repo, the default). Idempotent, password-free, and
-   `test/security/restore-roles-bootstrap.test.ts` fails the ordinary test run if it drifts
+   `tests/unit/security/restore-roles-bootstrap.test.ts` fails the ordinary test run if it drifts
    from the `CREATE ROLE`/`ALTER ROLE` statements in `drizzle/0002_database_roles.sql`,
    `0007_auth_broker.sql` and `0012_platform_role.sql`. Works with *any* backup, including
    ones taken before the roles dump existed.

@@ -19,7 +19,7 @@ process.env.BETTER_AUTH_SECRET = process.env.BETTER_AUTH_SECRET ?? 'test-secret-
 export default defineConfig({
   test: {
     environment: 'happy-dom',
-    include: ['src/**/*.{test,spec}.{ts,tsx}', 'test/**/*.{test,spec}.{ts,tsx}'],
+    include: ['tests/unit/**/*.{test,spec}.{ts,tsx}'],
     exclude: ['node_modules', 'dist', '.vinxi', '.output'],
     // ~30 test files provision a real disposable Postgres database in
     // beforeAll, and a cluster-wide advisory lock serializes their
