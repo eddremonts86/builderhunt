@@ -1,4 +1,28 @@
+/**
+ * Legacy token claim verification — retired path, kept only until the last emailed link expires.
+ *
+ * No claim created by the current code can ever be verified here: `POST /api/builders/:builderId/claim`
+ * writes `verificationSecretHash: null`, the flow having moved to a public challenge the claimant
+ * publishes on the account itself, and `verifyPendingBuilderClaim` matches the hash with SQL equality,
+ * which never matches NULL.
+ *
+ * It is still reachable because rows from the old flow can still be live. Production ran the token
+ * flow from the 2026-07-21 deploy until the 2026-07-27 10:05 UTC deploy — the first one containing the
+ * cutover — so a claim minted in that window carries a real hash and a link someone may still have in
+ * their inbox. Every version of the old creation path set a 24-hour expiry (unchanged across
+ * 2026-07-16, -17 and -20), and `verifyPendingBuilderClaim` enforces `expires_at > now()`, so the last
+ * possible unexpired legacy claim dies at **2026-07-28 10:05 UTC**.
+ *
+ * After that timestamp no row can satisfy the predicate and this file, `hashClaimSecret` (whose only
+ * caller it is), and `verifyPendingBuilderClaim` can all go. The warn below is how to check rather than
+ * assume: no `legacy_claim_verify_used` line after the sunset means nobody arrived, and deleting it
+ * breaks nothing.
+ *
+ * Judging this by commit dates rather than deploy dates gives the wrong answer by a full day — the
+ * cutover was committed 2026-07-26 but did not reach production until 2026-07-27.
+ */
 import { createFileRoute } from '@tanstack/react-router'
+import { log } from '~/shared/lib/log'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import {
@@ -14,6 +38,9 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
       GET: async ({ request }) => {
         const token = new URL(request.url).searchParams.get('token')
         if (!token) return errorResponse('Missing token')
+        // Never the token itself — it is the credential. Whether anyone reached this route at all is
+        // the only fact the sunset decision needs.
+        log.warn('legacy_claim_verify_used', { hasToken: true })
         try {
           const principal = await requireTenantPrincipal(request)
           const claim = await withTenantContext(principal, (tx) => verifyPendingBuilderClaim(tx, {
