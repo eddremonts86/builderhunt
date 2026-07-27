@@ -2,9 +2,11 @@ import { createHash } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '../db/create-disposable-test-database'
-import { authUsers, organizations } from '../db/schema'
+import { authUsers, organizations, privacyConsents } from '../db/schema'
 import {
+  appendConsentDecision,
   deleteSubmission,
+  findConsentsByIds,
   findInvitationByCapabilityHash,
   findInvitationForOwner,
   findInvitationTenantByCapabilityHash,
@@ -12,6 +14,7 @@ import {
   insertInvitation,
   listAvailabilityOverrides,
   listAvailabilityRules,
+  listConsentsForInvitation,
   listExpiredInvitations,
   listExpiredSubmissions,
   listInvitationsForOwner,
@@ -23,6 +26,7 @@ import {
   updateLinkImportState,
   upsertLink,
   upsertSubmission,
+  withdrawConsent,
 } from './scheduling'
 
 let db: PostgresJsDatabase
@@ -345,5 +349,120 @@ describe('worker retention sweeps', () => {
   it('a sweep in one tenant never sees another tenant rows', async () => {
     const expired = await db.transaction((tx) => listExpiredInvitations(tx, ORG_B, new Date(), 50))
     expect(expired).toHaveLength(0)
+  })
+})
+
+describe('consent ledger', () => {
+  function decision(invitationId: string, overrides: Partial<Parameters<typeof appendConsentDecision>[1]> = {}) {
+    return {
+      organizationId: ORG_A,
+      invitationId,
+      subjectEmailHash: hashOf('candidate@test.invalid'),
+      purpose: 'terms_and_privacy',
+      noticeVersion: '2026-07-01',
+      decision: 'accepted',
+      requestEvidenceHash: hashOf('request-evidence'),
+      ...overrides,
+    }
+  }
+
+  it('appends a decision and returns it without the evidence hash', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const row = await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id)))
+    expect(row).not.toBeNull()
+    expect(row?.purpose).toBe('terms_and_privacy')
+    expect(row?.withdrawnAt).toBeNull()
+    // The audit witness stays in the table; it is not part of any DTO.
+    expect(row).not.toHaveProperty('requestEvidenceHash')
+  })
+
+  it('is idempotent: the same act of consent submitted twice yields one row', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const first = await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id)))
+    const second = await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id)))
+    expect(second?.id).toBe(first?.id)
+    const all = await db.transaction((tx) => listConsentsForInvitation(tx, ORG_A, invitation.id))
+    expect(all).toHaveLength(1)
+  })
+
+  it('records a changed decision as a new row rather than editing the old one', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const declined = await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id, {
+      purpose: 'live_audio_transcription',
+      decision: 'declined',
+    })))
+    const accepted = await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id, {
+      purpose: 'live_audio_transcription',
+      decision: 'accepted',
+      supersedesId: declined?.id,
+    })))
+
+    const all = await db.transaction((tx) => listConsentsForInvitation(tx, ORG_A, invitation.id))
+    expect(all).toHaveLength(2)
+    // The superseded decline is still on file: it is evidence of what the candidate was asked and
+    // answered at that moment, not a draft.
+    expect(all.find((row) => row.id === declined?.id)?.decision).toBe('declined')
+    expect(all.find((row) => row.id === accepted?.id)?.supersedesId).toBe(declined?.id)
+  })
+
+  it('finds receipts by id only within their own invitation', async () => {
+    const mine = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const other = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const receipt = await db.transaction((tx) => appendConsentDecision(tx, decision(mine.id)))
+
+    const found = await db.transaction((tx) => findConsentsByIds(tx, ORG_A, mine.id, [receipt!.id]))
+    expect(found).toHaveLength(1)
+
+    // A receipt legitimately earned under one invitation must not satisfy another one.
+    const replayed = await db.transaction((tx) => findConsentsByIds(tx, ORG_A, other.id, [receipt!.id]))
+    expect(replayed).toHaveLength(0)
+  })
+
+  it('withdraws a live grant once and reports nothing to withdraw the second time', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id, { purpose: 'ai_interview_assistance' })))
+
+    const withdrawnAt = new Date('2026-08-01T10:00:00.000Z')
+    const first = await db.transaction((tx) => withdrawConsent(tx, ORG_A, invitation.id, 'ai_interview_assistance', withdrawnAt))
+    expect(first?.withdrawnAt?.toISOString()).toBe(withdrawnAt.toISOString())
+
+    const second = await db.transaction((tx) => withdrawConsent(tx, ORG_A, invitation.id, 'ai_interview_assistance', new Date()))
+    expect(second).toBeNull()
+  })
+
+  it('will not withdraw a purpose that was declined rather than granted', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id, {
+      purpose: 'public_web_import',
+      decision: 'declined',
+    })))
+    expect(await db.transaction((tx) => withdrawConsent(tx, ORG_A, invitation.id, 'public_web_import', new Date()))).toBeNull()
+  })
+
+  it('rejects a withdrawal timestamp on a declined decision at the database level', async () => {
+    // The guard is a table check, not service logic: a declined purpose was never granted, so a
+    // `withdrawn_at` on it would read back as "accepted, then revoked" and invert the record.
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    const rejection = await db.insert(privacyConsents).values({
+      organizationId: ORG_A,
+      invitationId: invitation.id,
+      subjectEmailHash: hashOf('candidate@test.invalid'),
+      purpose: 'public_web_import',
+      noticeVersion: '2026-07-01',
+      decision: 'declined',
+      withdrawnAt: new Date(),
+      requestEvidenceHash: hashOf('evidence'),
+    }).then(() => null, (error: unknown) => error)
+
+    // drizzle wraps the driver error, so the constraint name is on the cause, not the message.
+    expect(rejection).not.toBeNull()
+    expect((rejection as { cause?: { constraint_name?: string } }).cause?.constraint_name)
+      .toBe('privacy_consents_withdrawal_check')
+  })
+
+  it('never returns another tenant consent rows', async () => {
+    const invitation = await db.transaction((tx) => insertInvitation(tx, invitationInput()))
+    await db.transaction((tx) => appendConsentDecision(tx, decision(invitation.id)))
+    expect(await db.transaction((tx) => listConsentsForInvitation(tx, ORG_B, invitation.id))).toHaveLength(0)
   })
 })

@@ -519,6 +519,20 @@
       "when": 1785077695067,
       "tag": "0073_alert_evaluation_timing_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 74,
+      "version": "7",
+      "when": 1785133871154,
+      "tag": "0074_privacy_consents",
+      "breakpoints": true
+    },
+    {
+      "idx": 75,
+      "version": "7",
+      "when": 1785133878154,
+      "tag": "0075_privacy_consents_rls",
+      "breakpoints": true
     }
   ]
 }

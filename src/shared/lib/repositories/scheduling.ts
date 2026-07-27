@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, lt, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   availabilityOverrides,
@@ -6,6 +6,7 @@ import {
   availabilityRules,
   candidateLinks,
   candidateSubmissions,
+  privacyConsents,
   schedulingInvitations,
 } from '../db/schema'
 
@@ -562,5 +563,158 @@ export async function updateLinkImportState(
       eq(candidateLinks.id, linkId),
     ))
     .returning(linkColumns)
+  return row ?? null
+}
+
+// ── Consent ledger (privacy_consents, drizzle/0074-0075) ────────────────────────────────────────
+
+/**
+ * `requestEvidenceHash` is deliberately absent. It is the integrity witness over the request that
+ * produced the decision, kept for audit; nothing in the product reads it back, and shipping it in a
+ * DTO would only widen what a leak exposes.
+ */
+const consentColumns = {
+  id: privacyConsents.id,
+  invitationId: privacyConsents.invitationId,
+  sessionId: privacyConsents.sessionId,
+  subjectEmailHash: privacyConsents.subjectEmailHash,
+  purpose: privacyConsents.purpose,
+  noticeVersion: privacyConsents.noticeVersion,
+  decision: privacyConsents.decision,
+  decidedAt: privacyConsents.decidedAt,
+  withdrawnAt: privacyConsents.withdrawnAt,
+  supersedesId: privacyConsents.supersedesId,
+} as const
+
+export interface ConsentDecisionInput {
+  organizationId: string
+  invitationId: string
+  sessionId?: string | null
+  subjectEmailHash: string
+  purpose: string
+  noticeVersion: string
+  decision: string
+  requestEvidenceHash: string
+  supersedesId?: string | null
+  decidedAt?: Date
+}
+
+/**
+ * Appends a decision, or returns the existing row when the same act of consent is submitted twice.
+ *
+ * The retry case is not an error: a candidate double-tapping `Confirm` on a phone, or a mobile
+ * browser replaying a request it thinks failed, performed one act of consent and must end up with
+ * one row. `onConflictDoNothing` against the spec's idempotency key makes that outcome the same
+ * whether the second request arrives before or after the first commits, which a
+ * read-then-insert cannot promise.
+ */
+export async function appendConsentDecision(transaction: TenantTransaction, input: ConsentDecisionInput) {
+  const [inserted] = await transaction
+    .insert(privacyConsents)
+    .values({
+      organizationId: input.organizationId,
+      invitationId: input.invitationId,
+      sessionId: input.sessionId ?? null,
+      subjectEmailHash: input.subjectEmailHash,
+      purpose: input.purpose,
+      noticeVersion: input.noticeVersion,
+      decision: input.decision,
+      requestEvidenceHash: input.requestEvidenceHash,
+      supersedesId: input.supersedesId ?? null,
+      ...(input.decidedAt ? { decidedAt: input.decidedAt } : {}),
+    })
+    .onConflictDoNothing({
+      target: [
+        privacyConsents.organizationId,
+        privacyConsents.invitationId,
+        privacyConsents.subjectEmailHash,
+        privacyConsents.purpose,
+        privacyConsents.noticeVersion,
+        privacyConsents.decision,
+      ],
+    })
+    .returning(consentColumns)
+  if (inserted) return inserted
+
+  const [existing] = await transaction
+    .select(consentColumns)
+    .from(privacyConsents)
+    .where(and(
+      eq(privacyConsents.organizationId, input.organizationId),
+      eq(privacyConsents.invitationId, input.invitationId),
+      eq(privacyConsents.subjectEmailHash, input.subjectEmailHash),
+      eq(privacyConsents.purpose, input.purpose),
+      eq(privacyConsents.noticeVersion, input.noticeVersion),
+      eq(privacyConsents.decision, input.decision),
+    ))
+    .limit(1)
+  return existing ?? null
+}
+
+export async function listConsentsForInvitation(
+  transaction: TenantTransaction,
+  organizationId: string,
+  invitationId: string,
+) {
+  return transaction
+    .select(consentColumns)
+    .from(privacyConsents)
+    .where(and(
+      eq(privacyConsents.organizationId, organizationId),
+      eq(privacyConsents.invitationId, invitationId),
+    ))
+    .orderBy(asc(privacyConsents.decidedAt), asc(privacyConsents.id))
+}
+
+/**
+ * The receipts a booking request presents, fetched by id and re-scoped to the invitation.
+ *
+ * Scoping by `invitationId` here rather than trusting the ids is the point: a candidate who has
+ * legitimately consented under one invitation must not be able to satisfy a second invitation's
+ * consent requirement by replaying the first one's receipt ids.
+ */
+export async function findConsentsByIds(
+  transaction: TenantTransaction,
+  organizationId: string,
+  invitationId: string,
+  consentIds: readonly string[],
+) {
+  if (consentIds.length === 0) return []
+  return transaction
+    .select(consentColumns)
+    .from(privacyConsents)
+    .where(and(
+      eq(privacyConsents.organizationId, organizationId),
+      eq(privacyConsents.invitationId, invitationId),
+      inArray(privacyConsents.id, [...consentIds]),
+    ))
+}
+
+/**
+ * Stamps a withdrawal. Returns null when there was no live grant to withdraw, so an already-
+ * withdrawn purpose is not reported as a fresh withdrawal.
+ *
+ * `isNull(withdrawnAt)` in the predicate makes this idempotent under concurrency without a lock:
+ * two simultaneous withdrawal requests both target the same row, one updates it, the other matches
+ * nothing.
+ */
+export async function withdrawConsent(
+  transaction: TenantTransaction,
+  organizationId: string,
+  invitationId: string,
+  purpose: string,
+  withdrawnAt: Date,
+) {
+  const [row] = await transaction
+    .update(privacyConsents)
+    .set({ withdrawnAt })
+    .where(and(
+      eq(privacyConsents.organizationId, organizationId),
+      eq(privacyConsents.invitationId, invitationId),
+      eq(privacyConsents.purpose, purpose),
+      eq(privacyConsents.decision, 'accepted'),
+      isNull(privacyConsents.withdrawnAt),
+    ))
+    .returning(consentColumns)
   return row ?? null
 }

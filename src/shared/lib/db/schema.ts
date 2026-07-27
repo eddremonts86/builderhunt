@@ -2267,6 +2267,74 @@ export const candidateLinks = pgTable(
 )
 
 /**
+ * Append-only consent ledger (spec.md §Data model `privacy_consents`, §"Consent, privacy, and
+ * retention").
+ *
+ * Brought forward from Phase 6 because atomic booking cannot be built without it: booking must
+ * "verify current individual consent receipts for every required purpose" and return
+ * `422 consent_required` otherwise, so the receipts have to exist first. Only this table is pulled
+ * forward — the candidate-document tables stay in Phase 6 where they belong.
+ *
+ * Append-only is the whole point. A withdrawal does not delete or rewrite the grant it revokes: it
+ * stamps `withdrawn_at` on the row, so the record of "this person did consent, on this notice
+ * version, at this instant" survives. A changed decision inserts a new row pointing at the old one
+ * through `supersedes_id`. Consent is the lawful basis for processing that already happened; a
+ * ledger that can be edited is not evidence of anything.
+ *
+ * `subject_email_hash` rather than the address: the ledger is queried by subject, never used to
+ * contact them, so it does not need to hold the identifier in the clear.
+ */
+export const privacyConsents = pgTable(
+  'privacy_consents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    invitationId: uuid('invitation_id').notNull(),
+    sessionId: uuid('session_id'),
+    subjectEmailHash: text('subject_email_hash').notNull(),
+    purpose: text('purpose').notNull(),
+    noticeVersion: text('notice_version').notNull(),
+    decision: text('decision').notNull(),
+    decidedAt: timestamp('decided_at', { withTimezone: true }).defaultNow().notNull(),
+    withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
+    requestEvidenceHash: text('request_evidence_hash').notNull(),
+    supersedesId: uuid('supersedes_id'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('privacy_consents_organization_id_id_unique').on(table.organizationId, table.id),
+    /**
+     * The idempotency key from spec.md. A double-submitted booking form must not append a second
+     * identical grant: same subject, same purpose, same notice version, same decision is the same
+     * act of consent, so the retry conflicts instead of inflating the ledger.
+     */
+    uniqueIndex('privacy_consents_subject_purpose_notice_decision_unique')
+      .on(table.organizationId, table.invitationId, table.subjectEmailHash, table.purpose, table.noticeVersion, table.decision),
+    foreignKey({
+      columns: [table.organizationId, table.invitationId],
+      foreignColumns: [schedulingInvitations.organizationId, schedulingInvitations.id],
+      name: 'privacy_consents_organization_invitation_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.organizationId, table.supersedesId],
+      foreignColumns: [table.organizationId, table.id],
+      name: 'privacy_consents_organization_supersedes_fk',
+    }).onDelete('set null'),
+    index('privacy_consents_invitation_purpose_idx').on(table.organizationId, table.invitationId, table.purpose),
+    index('privacy_consents_subject_idx').on(table.organizationId, table.subjectEmailHash),
+    check('privacy_consents_purpose_check', sql`${table.purpose} in ('terms_and_privacy', 'candidate_document_processing', 'public_web_import', 'ai_interview_assistance', 'live_audio_transcription')`),
+    check('privacy_consents_decision_check', sql`${table.decision} in ('accepted', 'declined')`),
+    /**
+     * A declined purpose was never granted, so there is nothing to withdraw. Without this check a
+     * `declined` row could be stamped `withdrawn_at` and read back as "was accepted, then revoked",
+     * which inverts the record.
+     */
+    check('privacy_consents_withdrawal_check', sql`${table.withdrawnAt} is null or ${table.decision} = 'accepted'`),
+    check('privacy_consents_supersedes_self_check', sql`${table.supersedesId} is null or ${table.supersedesId} != ${table.id}`),
+  ],
+)
+
+/**
  * System-operational scheduling and run history (spec.md §Data model → "Operations and usage").
  * These are NOT tenant tables: a job identity is stable and platform-owned, not owned by any one
  * organization, so they carry no `organization_id` and get no RLS — access is controlled entirely
