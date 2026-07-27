@@ -12,15 +12,23 @@
 > not attempted this session. `docs/visual-system.md` documents the current token contract as an
 > interim substitute for the automated `check-visual-contract.mjs` this plan also names.
 
+> **Reality check (2026-07-27)**: confirmed genuinely not started — no `toHaveScreenshot` anywhere
+> in the repository and no `-snapshots` directory, so there is no baseline to regress against, and
+> `scripts/check-visual-contract.mjs` does not exist. What has changed since this plan was written
+> is the ground it builds on: Playwright specs now live in `tests/e2e/`, the harness at
+> `tests/e2e/harness/` already provides a fixed clock (`clock.ts`, `installFixedBrowserClock`) and
+> hydration helpers (`browser.ts`, `gotoHydrated`), and `quality.yml` already stands up a
+> production preview for the accessibility gate. Freezing time and waiting for hydration — two of
+> the hardest parts of a stable screenshot baseline — are therefore already solved. The dependency
+> note above is stale too: `audit-performance-qa`'s harness tasks are closed.
+
 - [ ] **Capture a deterministic visual inventory and baseline**
-  - Files: none — not started
-  - **Not done this session.** A real Playwright screenshot-baseline suite (synthetic fixtures,
-    frozen time/fonts/motion, `maxDiffPixelRatio` tuning) is a substantial, separate testing-
-    infrastructure investment. This session covered three other plans (design-modernization,
-    responsive-mobile-design, audit-accessibility) first and ran out of reasonable scope to also
-    build this from scratch carefully. `docs/visual-system.md` documents the current token contract
-    as a stopgap, but it is not a substitute for pinned visual regression screenshots.
-  - Verify: not run.
+  - Files: `tests/e2e/visual/*.spec.ts` (new), `playwright.config.ts`
+  - Do: Pin screenshots across the route matrix at desktop and mobile, with time frozen via the
+    harness's `installFixedBrowserClock`, fonts loaded before capture, and motion disabled. Tune
+    `maxDiffPixelRatio` to the smallest value that survives repeated local runs.
+  - Verify: two consecutive runs on an unchanged tree produce no diff; changing a design token
+    produces one.
 
 - [x] **Define the semantic token contract without forced overrides**
   - Files: `docs/visual-system.md` (new)
@@ -103,14 +111,11 @@
     not performed.
 
 - [ ] **Make visual and structural checks required in CI**
-  - Files: none — not started (depends on the visual-baseline task above, which wasn't built)
-  - **Not done this session** — there is no visual-regression suite yet to wire into CI. The
-    accessibility gate (`pnpm test:a11y`) *is* now wired into `.github/workflows/quality.yml` (see
-    `plans/audit-accessibility`), which is a related but distinct CI addition.
-  - Verify: not run.
+  - Files: `.github/workflows/quality.yml`
+  - Do: Run the visual suite against the production preview the accessibility gate already starts,
+    and upload the diff on failure the same way `a11y-results` is uploaded today.
+  - Verify: a deliberate token change fails the job and attaches the diff.
 
 - [ ] **Verify production and close the audit**
-  - Files: none
-  - **Not done this session** — requires a real production/staging deployment, out of scope for a
-    local session, and depends on the visual-baseline/CI tasks above.
-  - Verify: not run.
+  - Files: `docs/visual-system.md`
+  - Do: Compare the deployed app against the baseline once, record the result, and close the audit.

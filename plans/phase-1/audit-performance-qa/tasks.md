@@ -36,14 +36,38 @@
 - [x] **Self-host the existing fonts** — already done on arrival (2026-07-26)
   - Verify: `rg fonts.googleapis fonts.gstatic src/routes/__root.tsx src/shared/styles/globals.css` — no matches. `globals.css` already has self-hosted `@font-face` blocks for Inter and JetBrains Mono with `font-display: swap`.
 
-- [ ] **Wire deterministic QA commands and dependencies** — partially done
-  - Do: `assets:build`/`assets:check` scripts added to `package.json`; `sharp` pinned as a devDependency. `@lhci/cli`, `@fontsource-variable/inter`, `@fontsource/jetbrains-mono`, `test:e2e`, `test:lighthouse`, and an aggregate `qa` script were **not** added — they depend entirely on the Playwright/Lighthouse harness below, which this session doesn't build.
+> **Reality check (2026-07-27)**: every "not attempted" reason below was a *session rule*, not a
+> technical blocker — `playwright.config.ts` being a reserved file, and CI/CD edits needing the
+> maintainer's confirmation. Both were lifted on 2026-07-27. Contrasting the remaining tasks
+> against the repository also found that most of the infrastructure they describe already exists:
+>
+> - **The production-preview harness is already in CI.** `.github/workflows/quality.yml` builds,
+>   runs `drizzle-kit migrate`, seeds the admin, starts `vite preview` under the four real
+>   least-privilege roles, waits on `/api/health`, and runs a gate against it. It was built for the
+>   accessibility gate; Lighthouse only needs to hang off it.
+> - **The Playwright harness exists** at `tests/e2e/harness/` (auth, browser, cache, clock,
+>   database, env, fakes, fixtures, ids, roles, server), with 83 tests covering the harness itself.
+> - **The dependencies are installed**: `playwright`, `@axe-core/playwright`, `sharp`,
+>   `@fontsource-variable/inter`, `@fontsource-variable/jetbrains-mono` (the plan looked for
+>   `@fontsource/jetbrains-mono`, a different package name).
+>
+> Genuinely missing: `@lhci/cli`, `.lighthouserc.cjs`, and a `test:lighthouse` script.
 
-- [ ] **Create the production-preview browser harness** — not attempted
-  - Reason: `playwright.config.ts` is a reserved file for this session; `e2e/fixtures/*` are new e2e infrastructure. Both forbidden.
+- [x] **Wire deterministic QA commands and dependencies** — done (2026-07-27)
+  - `assets:build`/`assets:check` and `sharp` were already in place; `test:e2e` and both font
+    packages turned out to be installed too. `@lhci/cli` and `test:lighthouse` land with the
+    Lighthouse task below, which is where they belong.
 
-- [ ] **Cover critical public and authenticated paths** — not attempted
-  - Reason: `e2e/critical-paths.spec.ts` and `e2e/dashboard.smoke.spec.ts` are new Playwright spec files. Forbidden this session.
+- [x] **Create the production-preview browser harness** — already existed (2026-07-27)
+  - Not built by this plan: `quality.yml`'s accessibility gate already stands up a production
+    preview against real roles, and `tests/e2e/harness/` provides the browser-side fixtures.
+
+- [ ] **Cover critical public and authenticated paths**
+  - Files: `tests/e2e/*.spec.ts`, `.github/workflows/quality.yml`
+  - Reality: 19 spec files and 192 tests already cover public content, feeds/OG, consent, auth and
+    sessions, dashboard navigation, onboarding and semantic search — but CI runs only
+    `team-accounts.spec.ts` (10 tests). The work here is enabling what exists, not writing it.
+  - Verify: CI executes the enabled specs and the job's duration stays defensible.
 
 - [ ] **Enforce Lighthouse budgets**
   - Files: `.lighthouserc.cjs`, `package.json`, `pnpm-lock.yaml`
@@ -52,16 +76,15 @@
 
 - [ ] **Gate pull requests and deployment**
   - Files: `.github/workflows/quality.yml`, `.github/workflows/deploy.yml`
-  - Reason: needs the Playwright harness above and production-preview infrastructure; not attempted.
+  - Do: Make the e2e and Lighthouse steps required, so a regression blocks the deploy rather than
+    reporting after it. `deploy.yml` already runs only on a successful `Quality` `workflow_run`, so
+    this is about which steps `Quality` contains.
+  - Note: this appeared twice in the plan as two separate open items; the duplicate is folded in here.
 
-- [ ] **Gate pull requests and deployment** — not attempted
-  - Reason: `.github/workflows/quality.yml`/`deploy.yml` are CI/CD pipeline files. Modifying CI/CD
-    pipelines is an explicit hard-to-reverse action this session's safety rules require
-    confirming with the user before doing — not something to do unilaterally, and it depends on
-    the e2e/Lighthouse jobs above regardless.
-
-- [ ] **Add read-only production smoke and record the baseline** — not attempted
-  - Reason: same CI/CD-file and dependency concern as above.
+- [ ] **Add read-only production smoke and record the baseline**
+  - Files: `.github/workflows/quality.yml`, `docs/operations/`
+  - Do: Run the read-only smoke against the deployed app after a release and record the first
+    measured numbers as the baseline the budgets are held against.
 
 ## Summary for this pass (2026-07-26)
 

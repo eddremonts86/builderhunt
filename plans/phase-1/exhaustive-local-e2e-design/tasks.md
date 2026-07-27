@@ -17,8 +17,38 @@
 
 ---
 
-- [ ] **Build the E2E harness: disposable database, deterministic fake provider seam, email outbox, signed-webhook signer, and role factories**
-  - Files: `e2e/_harness/database.ts` (new), `e2e/_harness/roles.ts` (new), `e2e/_harness/email.ts` (new), `e2e/_harness/billing.ts` (new), `e2e/_harness/webhooks.ts` (new), `e2e/_harness/http.ts` (new), `e2e/_harness/console.ts` (new), `e2e/_harness/index.ts` (new), `src/shared/lib/db/create-disposable-test-database.ts` (create if missing), `playwright.config.ts`, `package.json`
+> **Reality check (2026-07-27)**: this plan writes as though the harness does not exist and places
+> it at `e2e/_harness/`. It exists at **`tests/e2e/harness/`** and has for some time, with 83 tests
+> covering the harness itself. Contrasting task 1's shopping list against the actual exports, every
+> item but one is already built:
+>
+> | Task 1 asks for | Already exists as |
+> |---|---|
+> | `withDisposableDatabase()` | `acquireWorkerDatabase` / `dropWorkerDatabase` (`harness/database.ts`) |
+> | `seedPersonalUser` / `seedOrganization` / role factories | `harness/auth.ts` (`signUp`, `signIn`, `createOrganizationViaApi`, `setActiveOrganization`, `captureStorageState`, `sessionFromStorageState`) + `harness/roles.ts` |
+> | `FakeBillingProvider` installer | `harness/fakes/billing.ts` (`setBillingScenario`, scenarios in `_scenarios.ts`) |
+> | `emailOutbox()` | `harness/fakes/email.ts` (`installEmailFake`, `resetEmailFake`) |
+> | `signStripeWebhook` / `postRawWebhook` | `harness/fakes/webhook.ts` (`signStripeWebhook`, `postWebhook`, `postUnsignedWebhook`, `stripeEventFixture`) |
+> | `withStrictConsole(page)` | `harness/browser.ts` (`expectStrictBrowser`) |
+> | `http.ts` | `harness/auth.ts` (`newApiContext`) |
+> | `pnpm test:e2e:repeat` | **missing — the only genuine gap in task 1** |
+>
+> The harness also carries pieces this plan never asked for: a fixed clock (`harness/clock.ts`), a
+> Redis namespace per worker (`harness/cache.ts`), an egress guard that fails a test on any
+> unexpected outbound request (`harness/fakes/egress.ts`), and AI/discovery fakes.
+>
+> Treat the remaining tasks as writing test matrices on an existing substrate, not as building one.
+> Paths below that say `e2e/...` mean `tests/e2e/...`.
+
+- [ ] **Add the repeatability script the harness still lacks**
+  - Files: `package.json`
+  - Do: `test:e2e:repeat` runs the full suite twice back-to-back and fails on any divergence in
+    passed/failed counts between the two runs.
+  - Verify: two consecutive clean runs produce identical counts; introducing an order-dependent
+    test makes the command fail.
+
+- [x] **Build the E2E harness: disposable database, deterministic fake provider seam, email outbox, signed-webhook signer, and role factories** — already existed (verified 2026-07-27, see the table above)
+  - Files: `tests/e2e/harness/**` (not `e2e/_harness/**` as written below)
   - Do: Provide a `withDisposableDatabase()` fixture that builds a Postgres role+database from a CI-provided `WORKER_DATABASE_URL` (the role has `CREATEDB`), runs `drizzle-kit migrate` to current head, returns a Drizzle client, and tears the database down in `afterEach`. Extend `playwright.config.ts` with a `webServer` env var that injects the disposable `DATABASE_URL` for the lifetime of one test (the harness echoes the same `E2E_PORT`/`baseURL` already configured). Provide a `seedPersonalUser({ withVerifiedEmail?: boolean, withActiveOrg?: boolean })`, `seedOrganization({ owner, members, tier, seatLimit })`, `seedPlatformAdmin()`, and `seedOrganizationWithConfirmedInvitation(...)` factory; every factory returns `{ contexts: { owner, admin, member, anonymous, platformAdmin }, ids: {...} }` so API tests can talk to a real in-process session via `request.post('/api/...', { headers: { cookie: sessionCookie }})` without going through the UI. Build a `FakeBillingProvider` installer that runs in the same Vite dev server process via `getBillingProvider`'s already-supported override seam (confirm `getBillingProvider` accepts an injected provider in `src/shared/lib/billing/stripe-provider.ts`; if not, add the override and a `getBillingProviderForTesting()` export as part of this task — the function must be only loaded by `import.meta.vitest` or `process.env.E2E_FAKE_BILLING === '1'` to prevent accidental production use). Build an `emailOutbox()` that monkey-patches `sendOrganizationInvitationEmail`/`sendResetPasswordEmail`/`sendExportReadyEmail`/`sendDeletionScheduledEmail` in `src/shared/lib/email.ts` to a per-test array; expose the same array on `globalThis.__emailOutbox` for the test to assert against. Build a `signStripeWebhook({ payload, secret, timestamp })` helper that produces a real `Stripe-Signature` header over the raw bytes, and a `postRawWebhook({ rawBody, signature })` that POSTs to `/api/webhooks/stripe` and asserts the response shape. Build a `withStrictConsole(page)` that hooks `page.on('console', ...)` and `page.on('pageerror', ...)` to fail on any uncaught error or `console.error`/`console.warn` unless the test calls `allowConsoleMessage(matchPattern)` once. Add a `pnpm test:e2e:repeat` script that runs the full `e2e/` suite twice back-to-back and fails on any divergence between the two runs.
   - Verify (RED): `pnpm test:e2e e2e/_harness/index.spec.ts` — a one-test spec that (a) opens a disposable database, (b) seeds a personal user, (c) issues `POST /api/auth/sign-in/email` against the real app, (d) confirms `auth_sessions` has a row, (e) installs the fake provider, (f) creates a checkout session, (g) calls `signStripeWebhook` and posts a `checkout.session.completed` event, (h) confirms the outbox received one item — fails RED on a fresh checkout with harness helpers stubbed out, GREEN only after the helper module is built. Then `pnpm test:e2e:repeat` runs the whole suite twice and must produce identical `passed/failed` counts.
   - Independent boundary: this task owns **only** `e2e/_harness/**` and the `playwright.config.ts`/`package.json` changes. Every later task depends on it but does not modify it.
