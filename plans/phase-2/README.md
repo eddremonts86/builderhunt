@@ -1,13 +1,18 @@
 # Fase 2 — feature backlog
 
-Ten feature plans derived from [`../new-plans.md`](../new-plans.md) on 2026-07-24, plus one
-infrastructure plan ([`postgres-18-upgrade`](./postgres-18-upgrade/spec.md), added 2026-07-26).
+Thirteen feature plans: ten derived from [`new-plans.md`](./new-plans.md) on 2026-07-24 and
+three candidate-side career plans added by direct request on 2026-07-27; plus one infrastructure
+plan ([`postgres-18-upgrade`](./postgres-18-upgrade/spec.md), added 2026-07-26).
 Each is the usual trio: `spec.md` (WHAT/WHY), `plan.md` (HOW, phases + risks + rollback),
-`tasks.md` (executable checklist). All eleven are `pending` with zero implementation — the trios
+`tasks.md` (executable checklist). All fourteen are `pending` with zero implementation — the trios
 are implementation-ready, not implemented.
 
+The three career plans are written in Spanish by direct user request/continuation so they can be
+shared with the Spanish-speaking team. Code, schemas, task IDs, commits and runtime logs remain
+English.
+
 These live one directory deeper than the phase-1 plans, so cross-plan links are
-`../../<plan>/spec.md` for phase-1 and `../<plan>/spec.md` for a fase-2 sibling.
+`../../phase-1/<plan>/spec.md` for phase-1 and `../<plan>/spec.md` for a fase-2 sibling.
 
 Read [`../_meta/app-reality.md`](../_meta/app-reality.md),
 [`../_meta/security-policy.md`](../_meta/security-policy.md),
@@ -16,13 +21,13 @@ Read [`../_meta/app-reality.md`](../_meta/app-reality.md),
 
 ## Verification status
 
-All ten passed a mechanical gate (header/link/task-format shape, no stale tech, no path cited
+The original ten passed a mechanical gate (header/link/task-format shape, no stale tech, no path cited
 without `(new)` that doesn't exist) and an adversarial review against the real codebase — not a
 read-through, but grep/EXPLAIN/type-check verification of the load-bearing claims in each trio.
 That review found **5 blockers**, all some variant of "this write happens under a database role
 that holds no grant for it" or "this labels client-supplied data as server-measured" — the two
 failure classes [`_meta/app-reality.md`](../_meta/app-reality.md) constraint 7 and
-[`project-hygiene`](../../project-hygiene/spec.md) exist to catch. Every blocker was fixed with a
+[`project-hygiene`](../phase-1/project-hygiene/spec.md) exist to catch. Every blocker was fixed with a
 real design decision, not a patch — see "Known cross-plan collisions" below and each plan's Risks
 table for the resolution and reasoning. Two findings turned out to be pre-existing defects in
 *shipped* code, not in these plans, and are tracked separately: the security-header/CSRF logic was
@@ -38,7 +43,12 @@ force flags, `serial`/trigger/FTS/`COPY`/`AT TIME ZONE` absence, the six `uuid` 
 plans got, and — by design — its Phase 0 exists to *reproduce* its own three most dangerous
 claims against a live PG18 cluster before anything touches production.
 
-## The ten feature plans
+The three career plans were reconciled against the current schema, AI task registry, billing
+ledger, source-policy crawler, document-processing plan and tenant authorization model. They passed
+the same mechanical header/link/task-shape gate. Their explicit Phase 0 work still requires privacy,
+source-policy, truthfulness and autonomy approval before implementation.
+
+## The thirteen feature plans
 
 | Plan | What it is | New tables | New AI tasks | New env vars |
 | ---- | ---------- | ---------- | ------------ | ------------ |
@@ -52,6 +62,9 @@ claims against a live PG18 cluster before anything touches production.
 | [`ats-integrations`](./ats-integrations/spec.md) | Greenhouse / Ashby / Lever export + status write-back | 4 | 0 | 8 |
 | [`browser-extension-overlay`](./browser-extension-overlay/spec.md) | BuilderHunt card on GitHub profiles | 3 | 0 | 3 |
 | [`talent-market-intelligence`](./talent-market-intelligence/spec.md) | Public market reports + monthly digest | 2 | 1 | 2 |
+| [`job-opportunities-workspace`](./job-opportunities-workspace/spec.md) | Private manual/URL/CSV/batch workspace for job opportunities | 4 | 1 | 0 |
+| [`ai-cv-generation-and-tailoring`](./ai-cv-generation-and-tailoring/spec.md) | Truth-linked base CVs and per-job variants, including batches | 8 | 5 | 0 |
+| [`delegated-job-applications`](./delegated-job-applications/spec.md) | Discover, score and prepare applications with per-application human approval | 7 | 2 | 0 |
 
 ## The infrastructure plan
 
@@ -72,12 +85,15 @@ server's major version — so dev, CI and production can disagree silently.
 
 ## Dependency graph
 
-Only two edges are internal to fase 2. Everything else depends on already-shipped phase-1 work.
+Five hard edges are internal to fase 2. The career plans form their own ordered chain.
 
 ```mermaid
 flowchart LR
   PIPELINE["Hiring pipeline kanban"] --> ATS["ATS integrations"]
   EVIDENCE["Match evidence panel"] -. "reuses the panel" .-> JD["Paste-a-JD matching"]
+  JOBS["Job opportunities workspace"] --> CVS["AI CV generation and tailoring"]
+  JOBS --> APPS["Delegated job applications"]
+  CVS --> APPS
 
   SEMANTIC["semantic-search (shipped)"] --> JD
   SEMANTIC --> LOOKALIKE["Look-alike sourcing"]
@@ -118,6 +134,12 @@ ethically-heaviest plans behind a deliberate decision rather than in the first w
    compatibility contract matters more than the UI.
 10. **`talent-market-intelligence`** — ships its named-list content type disabled; the metric
     methodology is the deliverable, not the pages.
+11. **`job-opportunities-workspace`** — foundation for candidate-side workflows; ship manual CRUD
+    before URL extraction or batches.
+12. **`ai-cv-generation-and-tailoring`** — depends on the job workspace and the private-document
+    foundation; ship manual fact-linked CVs before AI tailoring and batch.
+13. **`delegated-job-applications`** — ethically highest-risk candidate-side plan; starts as a
+    manual tracker, then adds scoring and preparation. The MVP never submits externally.
 
 ## Known cross-plan collisions
 
@@ -147,6 +169,22 @@ Recorded because no single plan can see them:
   reimplements `scoreBuilders` on top of it, wire format unchanged) and read by
   `browser-extension-overlay`. Land the refactor first.
 - **`src/shared/lib/ai/tasks.ts`** gains 5 task ids across 4 plans; all verified distinct.
+- **The three career plans share private ownership semantics.** Every career/job/application table
+  carries both `organization_id` and `owner_user_id`; organization admins do not gain access to
+  another member's job search. Implement these permissions once consistently and add negative
+  org-admin tests to every plan.
+- **The career plans add eight AI task IDs**:
+  `job-description-extract`, `career-facts-extract`, `resume-base-compose`,
+  `resume-job-fit-analyze`, `resume-tailor`, `resume-quality-review`, `candidate-job-fit`, and
+  `application-cover-letter`. They share `src/shared/lib/ai/tasks.ts`, billing rate cards and
+  provider budgets; expect merge conflicts and keep every ID unique.
+- **Document storage must not fork.** `ai-cv-generation-and-tailoring` reuses the PDF/DOCX/TXT,
+  quarantine, ClamAV and private R2 foundation specified by
+  `calendar-scheduling-interview-intelligence`. If that foundation is not implemented, manual
+  career facts may ship but upload/import remains blocked.
+- **Candidate-side and employer-side pipelines are separate.** `job_applications` never writes to
+  `pipeline_*`, `candidate_submissions` or ATS integrations. They have different subjects,
+  permissions, consent and disclosure.
 - **`builder_identities.discovered_by`** is introduced by `collaboration-graph` (additive, nullable,
   `NULL` = tenant-tracked, `'collaboration_crawl'` = crawler-discovered), because its crawler
   becomes a second writer of `builder_identities` and `first_seen_at` is `.defaultNow().notNull()`.
@@ -186,7 +224,7 @@ Recorded because no single plan can see them:
 
 ## A note on the source document
 
-[`../new-plans.md`](../new-plans.md) proposed each feature with a "Cómo" implementation sketch.
+[`new-plans.md`](./new-plans.md) proposed each feature with a "Cómo" implementation sketch.
 Several of those sketches turned out to be wrong about the current codebase, and the specs
 document the correction rather than inheriting it. The three biggest:
 
