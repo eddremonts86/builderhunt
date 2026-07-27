@@ -2179,7 +2179,15 @@ export const schedulingInvitations = pgTable(
     meetingUrl: text('meeting_url'),
     location: text('location'),
     status: text('status').notNull().default('draft'),
-    capabilityHash: text('capability_hash').notNull(),
+    /**
+     * SHA-256 of the candidate's link secret, or NULL while the invitation is still a draft.
+     *
+     * Nullable on purpose: the secret is minted at send, not at create, so that it exists only
+     * while the invitation email is being composed and nothing can reproduce it afterwards. A
+     * draft has no candidate-facing link, so it has no hash either — see the header of
+     * lib/scheduling/invitation-service.ts.
+     */
+    capabilityHash: text('capability_hash'),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     openedAt: timestamp('opened_at', { withTimezone: true }),
     bookedAt: timestamp('booked_at', { withTimezone: true }),
@@ -2194,6 +2202,13 @@ export const schedulingInvitations = pgTable(
   (table) => [
     uniqueIndex('scheduling_invitations_organization_id_id_unique').on(table.organizationId, table.id),
     uniqueIndex('scheduling_invitations_capability_hash_unique').on(table.capabilityHash),
+    // A row a candidate could have acted on must carry a capability. Only a draft, or a terminal
+    // state a draft reached without ever being sent, may have none — so this cannot be expressed as
+    // "draft xor hash".
+    check(
+      'scheduling_invitations_capability_presence_check',
+      sql`${table.capabilityHash} is not null or ${table.status} in ('draft', 'revoked', 'expired')`,
+    ),
     foreignKey({
       columns: [table.organizationId, table.organizationBuilderId],
       foreignColumns: [organizationBuilders.organizationId, organizationBuilders.id],

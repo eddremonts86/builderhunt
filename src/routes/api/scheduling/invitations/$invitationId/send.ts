@@ -41,16 +41,16 @@ export const Route = createFileRoute('/api/scheduling/invitations/$invitationId/
             actorUserId: principal.userId,
             action: 'scheduling.invitation.sent',
             targetType: 'scheduling_invitation',
-            targetId: result.value.id,
+            targetId: result.value.invitation.id,
             result: 'allowed',
             requestId: principal.requestId,
-            details: invitationAuditDetails(result.value),
+            details: invitationAuditDetails(result.value.invitation),
           }, consoleSecurityAuditSink)
 
           return Response.json({
-            invitationId: result.value.id,
-            status: result.value.status,
-            version: result.value.version,
+            invitationId: result.value.invitation.id,
+            status: result.value.invitation.status,
+            version: result.value.invitation.version,
           })
         } catch (error) {
           if (error instanceof TenantAuthorizationError) {

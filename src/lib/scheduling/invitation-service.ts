@@ -10,10 +10,21 @@
  *    mirrors the RLS policies in `drizzle/0069_calendar_scheduling_rls_grants.sql`. An organization
  *    admin who is not the organizer gets the same answer as a stranger. That is deliberate: the
  *    invitation is the doorway to candidate personal data.
- * 2. **One live capability per invitation.** The secret is issued once, at create, and never
- *    re-issued. `send` does not mint a new one, so forwarding an old email still works and a
- *    resend cannot silently orphan a link the candidate already has. Revocation is the only way to
- *    kill a capability, and it is terminal.
+ * 2. **One live capability per invitation, minted at send and never stored in the clear.** The
+ *    secret exists for exactly as long as it takes to compose the invitation email: `send` mints
+ *    it, hands it to the caller for the outbox message, and only its hash reaches a column.
+ *    Nothing can reproduce it afterwards — not this service, not a database dump, not a backup.
+ *
+ *    That is why it is minted here and not at create. Create cannot mint it, because a draft is
+ *    not emailed, so the secret would have to survive between the two calls, and the only places
+ *    it could survive are the database or the organizer's browser. Both defeat the point.
+ *
+ *    The direct consequence is that **there is no resend.** A second send cannot re-emit a secret
+ *    nobody kept, and minting a fresh one would silently orphan the link already in the
+ *    candidate's inbox. `markInvitationSent` therefore refuses a second send and says so; the
+ *    organizer revokes and issues a new invitation, which is what the portal's own expired-link
+ *    copy already tells candidates to ask for. Revocation is the only way to kill a capability,
+ *    and it is terminal.
  * 3. **The role context is snapshotted, not referenced.** `roleTitle`/`roleContext` are copied onto
  *    the invitation row at create time. If the tracked builder record later changes or is deleted,
  *    what the candidate was actually told stays intact — needed for the consent record to mean
@@ -52,6 +63,8 @@ export type InvitationServiceError =
   | 'invalid_transition'
   | 'version_conflict'
   | 'invalid_input'
+  // A second send. The secret was never stored, so there is nothing to re-emit; see the header.
+  | 'already_sent'
 
 export interface InvitationServiceFailure {
   ok: false
@@ -127,9 +140,14 @@ export interface CreateInvitationInput {
 
 export interface CreatedInvitation {
   invitation: Awaited<ReturnType<typeof insertInvitation>>
+}
+
+export interface SentInvitation {
+  invitation: NonNullable<Awaited<ReturnType<typeof updateInvitationStateWithVersion>>>
   /**
    * The only time this value exists outside the candidate's URL. The caller must put it in a link
-   * fragment and drop it — it is deliberately absent from every read path.
+   * fragment and drop it — it is deliberately absent from every read path, and no column, dump or
+   * backup can reproduce it.
    */
   capabilitySecret: string
 }
@@ -204,7 +222,8 @@ export async function createInvitation(
   const invalid = validateCreateInput(input)
   if (invalid) return invalid
 
-  const { secret, hash } = issueCapability()
+  // No capability yet. A draft has no candidate-facing link, and minting one here would mean
+  // storing it until `send` needs it — see the module header.
   const invitation = await insertInvitation(transaction, {
     organizationId: principal.organizationId,
     ownerUserId: principal.userId,
@@ -217,12 +236,12 @@ export async function createInvitation(
     modality: input.modality,
     meetingUrl: input.meetingUrl?.trim() || null,
     location: input.location?.trim() || null,
-    capabilityHash: hash,
+    capabilityHash: null,
     policyVersion,
     expiresAt: input.expiresAt ?? null,
   })
 
-  return { ok: true, value: { invitation, capabilitySecret: secret } }
+  return { ok: true, value: { invitation } }
 }
 
 export async function listInvitations(transaction: TenantTransaction, principal: TenantPrincipal) {
@@ -283,9 +302,12 @@ async function transition(
 }
 
 /**
- * Marks an invitation as sent. Does **not** deliver the email — the caller writes an outbox
- * message inside the same transaction so a committed `sent` status and a queued email cannot
- * disagree. A send from `sent` is allowed (resend) and reuses the existing capability.
+ * Mints the capability and marks the invitation sent, returning the secret so the caller can write
+ * the outbox message inside the same transaction — a committed `sent` status and a queued email
+ * cannot then disagree. This is the only moment the secret exists; see the module header.
+ *
+ * A second send fails with `already_sent`. It cannot re-emit a secret nobody kept, and minting a
+ * fresh one would orphan the link already in the candidate's inbox without telling them.
  */
 export async function markInvitationSent(
   transaction: TenantTransaction,
@@ -293,10 +315,29 @@ export async function markInvitationSent(
   invitationId: string,
   expectedVersion: number,
   expiresAt?: Date | null,
-) {
-  return transition(transaction, principal, invitationId, expectedVersion, 'sent', {
-    patch: expiresAt === undefined ? undefined : { expiresAt },
+): Promise<InvitationServiceResult<SentInvitation>> {
+  const current = await getInvitation(transaction, principal, invitationId)
+  if (!current.ok) return current
+  const status = current.value.status as InvitationStatus
+
+  // The shared graph speaks first, so a revoked or expired invitation still reports
+  // `invalid_transition` — calling that "already sent" would be a lie about which door is shut.
+  // Once the graph is satisfied, the only non-draft case left is `sent -> sent`, a real resend.
+  const illegal = checkTransition(status, 'sent')
+  if (illegal) return illegal
+  if (status !== 'draft') {
+    return fail(
+      'already_sent',
+      'This invitation has already been sent. Its link cannot be sent again — revoke it and create a new invitation.',
+    )
+  }
+
+  const { secret, hash } = issueCapability()
+  const result = await transition(transaction, principal, invitationId, expectedVersion, 'sent', {
+    patch: { capabilityHash: hash, ...(expiresAt === undefined ? {} : { expiresAt }) },
   })
+  if (!result.ok) return result
+  return { ok: true, value: { invitation: result.value, capabilitySecret: secret } }
 }
 
 export async function revokeInvitation(

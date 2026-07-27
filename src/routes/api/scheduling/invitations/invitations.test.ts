@@ -315,18 +315,25 @@ describe('POST .../send', () => {
     expect(Object.keys(sent).sort()).toEqual(['invitationId', 'status', 'version'])
   })
 
-  it('a resend succeeds and keeps the same invitation', async () => {
+  it('refuses a resend, because the secret was never kept', async () => {
     const { body } = await createInvitationViaApi()
     const first = await (await send(body.invitationId, body.version)).json()
-    // Reissuing a capability here would silently break the link already in the candidate's inbox.
+    expect(first.status).toBe('sent')
+
+    // The capability is minted at send and only its hash is stored, so a second send has no link to
+    // deliver. Minting a replacement would silently break the one already in the candidate's inbox,
+    // so the organizer is told to revoke and re-invite instead.
     const second = await send(body.invitationId, first.version)
-    expect(second.status).toBe(200)
-    expect((await second.json()).status).toBe('sent')
+    expect(second.status).toBe(409)
+    expect((await second.json()).error).toBe('already_sent')
   })
 
   it('answers 409 when the version is stale', async () => {
     const { body } = await createInvitationViaApi()
     await send(body.invitationId, body.version)
+    // Both facts are true here — the caller's version is stale *and* the invitation is already
+    // sent — and both are conflicts, so both answer 409. The body distinguishes them; the status
+    // deliberately does not, because the caller's next move is the same either way: reload.
     const stale = await send(body.invitationId, body.version)
     expect(stale.status).toBe(409)
   })

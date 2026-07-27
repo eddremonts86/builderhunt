@@ -554,6 +554,13 @@
       "when": 1785134693666,
       "tag": "0078_capability_role",
       "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1785154495942,
+      "tag": "0079_capability_minted_at_send",
+      "breakpoints": true
     }
   ]
 }

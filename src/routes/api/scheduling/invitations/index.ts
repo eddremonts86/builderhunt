@@ -42,7 +42,9 @@ export function invitationFailureResponse(failure: { error: string; message: str
     ? 404
     : failure.error === 'forbidden'
       ? 403
-      : failure.error === 'version_conflict' || failure.error === 'invalid_transition'
+      // `already_sent` joins the conflicts: the request is well-formed and the caller is allowed,
+      // the invitation is simply not in a state that can accept it.
+      : failure.error === 'version_conflict' || failure.error === 'invalid_transition' || failure.error === 'already_sent'
         ? 409
         : 400
   return Response.json({ error: failure.error, message: failure.message }, { status })

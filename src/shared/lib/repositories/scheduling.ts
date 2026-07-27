@@ -238,7 +238,8 @@ export async function insertInvitation(
     modality: string
     meetingUrl?: string | null
     location?: string | null
-    capabilityHash: string
+    /** NULL for a draft — the secret is minted at send, not here. */
+    capabilityHash: string | null
     policyVersion: string
     expiresAt?: Date | null
   },
@@ -274,6 +275,8 @@ export async function updateInvitationStateWithVersion(
   expectedVersion: number,
   patch: Partial<{
     status: string
+    /** Set exactly once, by the send transition that mints it. */
+    capabilityHash: string
     expiresAt: Date | null
     openedAt: Date | null
     bookedAt: Date | null

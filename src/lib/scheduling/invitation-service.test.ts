@@ -66,30 +66,23 @@ async function create(actor = OWNER, overrides: Partial<Parameters<typeof create
   return result.value
 }
 
+/** The secret exists only here — `create` never returns one. */
+async function send(invitation: { id: string; version: number }, actor = OWNER) {
+  const result = await db.transaction((tx) => markInvitationSent(tx, principal(actor), invitation.id, invitation.version))
+  if (!result.ok) throw new Error(`send failed: ${result.error} ${result.message}`)
+  return result.value
+}
+
 describe('invitation service (plan: calendar-scheduling-interview-intelligence, Phase 5)', () => {
   describe('create', () => {
-    it('creates a draft and returns a capability secret exactly once', async () => {
-      const { invitation, capabilitySecret } = await create()
-      expect(invitation.status).toBe('draft')
-      expect(invitation.version).toBe(1)
-      expect(capabilitySecret).toMatch(/^[A-Za-z0-9_-]{43}$/)
-
-      // The secret must never come back on a read path.
-      const read = await db.transaction((tx) => getInvitation(tx, principal(OWNER), invitation.id))
-      expect(read.ok).toBe(true)
-      expect(JSON.stringify(read)).not.toContain(capabilitySecret)
-    })
-
-    it('stores only the hash, and that hash resolves the invitation publicly', async () => {
-      const { invitation, capabilitySecret } = await create()
-      const row = await db.transaction((tx) => getInvitation(tx, principal(OWNER), invitation.id))
-      if (!row.ok) throw new Error('unreachable')
-      // Whatever the row carries, it is not the secret.
-      expect(JSON.stringify(row.value)).not.toContain(capabilitySecret)
-
-      const publicView = await db.transaction((tx) =>
-        findInvitationByCapabilityHash(tx, hashCapability(capabilitySecret), new Date()))
-      expect(publicView?.id).toBe(invitation.id)
+    it('creates a draft with no capability at all, and returns no secret', async () => {
+      const created = await create()
+      expect(created.invitation.status).toBe('draft')
+      expect(created.invitation.version).toBe(1)
+      // A draft is not emailed, so there is nothing to authenticate against it yet. If create ever
+      // starts minting again, the secret has to be stored between create and send — which is the
+      // whole thing this design refuses.
+      expect(created).not.toHaveProperty('capabilitySecret')
     })
 
     it('snapshots the role context rather than referencing it', async () => {
@@ -161,33 +154,53 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
   })
 
   describe('transitions', () => {
-    it('draft -> sent, and a resend is allowed without minting a new capability', async () => {
-      const { invitation, capabilitySecret } = await create()
-      const sent = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, invitation.version))
-      expect(sent.ok).toBe(true)
-      if (!sent.ok) throw new Error('unreachable')
-      expect(sent.value.status).toBe('sent')
+    it('draft -> sent mints the capability, and only the hash is persisted', async () => {
+      const { invitation } = await create()
+      const { invitation: sent, capabilitySecret } = await send(invitation)
+      expect(sent.status).toBe('sent')
+      expect(capabilitySecret).toMatch(/^[A-Za-z0-9_-]{43}$/)
 
-      const resent = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, sent.value.version))
-      expect(resent.ok).toBe(true)
+      // The minted secret opens exactly this invitation...
+      const publicView = await db.transaction((tx) =>
+        findInvitationByCapabilityHash(tx, hashCapability(capabilitySecret), new Date()))
+      expect(publicView?.id).toBe(invitation.id)
 
-      // The original link still opens it — forwarding an old email must keep working.
+      // ...and never comes back on an owner read path.
+      const read = await db.transaction((tx) => getInvitation(tx, principal(OWNER), invitation.id))
+      expect(read.ok).toBe(true)
+      expect(JSON.stringify(read)).not.toContain(capabilitySecret)
+    })
+
+    it('refuses a second send, because nobody kept the secret to re-emit', async () => {
+      const { invitation } = await create()
+      const { invitation: sent, capabilitySecret } = await send(invitation)
+
+      const resend = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, sent.version))
+      expect(resend.ok).toBe(false)
+      if (resend.ok) throw new Error('unreachable')
+      expect(resend.error).toBe('already_sent')
+
+      // And the refusal changed nothing: the link already in the candidate's inbox still works.
+      // Minting a replacement would have silently orphaned it, which is the reason for the refusal.
       const stillValid = await db.transaction((tx) =>
         findInvitationByCapabilityHash(tx, hashCapability(capabilitySecret), new Date()))
       expect(stillValid?.id).toBe(invitation.id)
     })
 
     it('revoke is terminal and kills the capability', async () => {
-      const { invitation, capabilitySecret } = await create()
-      const revoked = await db.transaction((tx) => revokeInvitation(tx, principal(OWNER), invitation.id, invitation.version))
+      const { invitation } = await create()
+      const { invitation: sent, capabilitySecret } = await send(invitation)
+      const revoked = await db.transaction((tx) => revokeInvitation(tx, principal(OWNER), invitation.id, sent.version))
       expect(revoked.ok).toBe(true)
+      if (!revoked.ok) throw new Error('unreachable')
 
       const afterRevoke = await db.transaction((tx) =>
         findInvitationByCapabilityHash(tx, hashCapability(capabilitySecret), new Date()))
       expect(afterRevoke).toBeNull()
 
-      // And nothing moves it back out of revoked.
-      const resend = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, invitation.version + 1))
+      // A revoked invitation reports the shut door it actually has. `already_sent` here would name
+      // the wrong one — the graph refuses revoked -> sent regardless of any capability.
+      const resend = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, revoked.value.version))
       expect(resend.ok).toBe(false)
       if (resend.ok) throw new Error('unreachable')
       expect(resend.error).toBe('invalid_transition')
@@ -206,10 +219,9 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
 
     it('expires a sent invitation, and refuses to expire it twice', async () => {
       const { invitation } = await create()
-      const sent = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, invitation.version))
-      if (!sent.ok) throw new Error('unreachable')
+      const { invitation: sent } = await send(invitation)
 
-      const first = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, sent.value.version))
+      const first = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, sent.version))
       expect(first.ok).toBe(true)
       if (!first.ok) throw new Error('unreachable')
       expect(first.value.status).toBe('expired')
@@ -241,7 +253,8 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
 
   describe('audit details', () => {
     it('carries the invitation identity and nothing about the candidate or the secret', async () => {
-      const { invitation, capabilitySecret } = await create()
+      const { invitation } = await create()
+      const { capabilitySecret } = await send(invitation)
       const details = invitationAuditDetails(invitation)
       const serialised = JSON.stringify(details)
       expect(details.invitationId).toBe(invitation.id)
@@ -254,7 +267,8 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
       // `invitationColumns` in repositories/scheduling.ts deliberately omits capability_hash, so
       // the hash cannot reach a DTO, a log line or an audit entry by accident. Asserted here
       // because it is a property of the data layer that this service depends on.
-      const { invitation, capabilitySecret } = await create()
+      const { invitation } = await create()
+      const { capabilitySecret } = await send(invitation)
       const hash = hashCapability(capabilitySecret)
       expect(JSON.stringify(invitation)).not.toContain(hash)
 

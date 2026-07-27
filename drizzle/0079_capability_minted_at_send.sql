@@ -1,0 +1,2 @@
+ALTER TABLE "scheduling_invitations" ALTER COLUMN "capability_hash" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "scheduling_invitations" ADD CONSTRAINT "scheduling_invitations_capability_presence_check" CHECK ("scheduling_invitations"."capability_hash" is not null or "scheduling_invitations"."status" in ('draft', 'revoked', 'expired'));

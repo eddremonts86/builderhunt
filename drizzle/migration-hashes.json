@@ -316,6 +316,10 @@
     "0078_capability_role": {
       "sql": "de8d20e42dbfd764eca3ed5ace3114f4fb4d383cac650777da1b501d9ba470bb",
       "snapshot": "660fffbe495e7c846b074aa82fb3e40efc8b3cca8c436f947950b32d0f65a535"
+    },
+    "0079_capability_minted_at_send": {
+      "sql": "80b3eb8a45904d26a556f0135f9a9fbfb6990968aec2a654f3b71f941bafc7bd",
+      "snapshot": "ea06d4fb46d7a02f6862cb6d7c2ca5dd8610b3d2196f5b42059931b6cfa3ea41"
     }
   }
 }
