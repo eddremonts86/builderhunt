@@ -13,10 +13,20 @@
  * 2026-07-16, -17 and -20), and `verifyPendingBuilderClaim` enforces `expires_at > now()`, so the last
  * possible unexpired legacy claim dies at **2026-07-28 10:05 UTC**.
  *
- * After that timestamp no row can satisfy the predicate and this file, `hashClaimSecret` (whose only
- * caller it is), and `verifyPendingBuilderClaim` can all go. The warn below is how to check rather than
- * assume: no `legacy_claim_verify_used` line after the sunset means nobody arrived, and deleting it
- * breaks nothing.
+ * After that timestamp no row can satisfy the predicate and this route can go. Removing it means four
+ * places, not one:
+ *   - this file
+ *   - `hashClaimSecret` and `verifyPendingBuilderClaim` in repositories/builder-claims.ts — verified
+ *     that this route is the only caller of both
+ *   - the `surfaces` entry in repositories/builder-claims.test.ts, which `readFile`s this path and
+ *     would fail with ENOENT rather than a useful message
+ *   - the generated route tree
+ * The comment in api/billing/contact/verify.ts citing this file as its redirect/callback pattern goes
+ * stale at the same moment and should point somewhere that still exists.
+ *
+ * The warn below is how to check rather than assume: no `legacy_claim_verify_used` line after the
+ * sunset means nobody arrived. That evidence only exists if this commit is deployed before the sunset —
+ * absence of the event proves nothing while the event itself is undeployed.
  *
  * Judging this by commit dates rather than deploy dates gives the wrong answer by a full day — the
  * cutover was committed 2026-07-26 but did not reach production until 2026-07-27.
