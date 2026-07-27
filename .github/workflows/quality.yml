@@ -123,23 +123,48 @@ jobs:
   # blocked. `continue-on-error: true` because it depends on a live third-party API — network
   # flakiness or a Stripe-side issue must never block a merge; see
   # docs/operations/stripe-sandbox-certification.md for what this does and doesn't certify.
+  #
+  # DO NOT gate this job with `if: ${{ secrets.X != '' }}`. The `secrets` context is NOT available in
+  # `jobs.<job_id>.if` (only `github`, `needs`, `vars`, and `inputs` are), and referencing an
+  # unavailable context there is a workflow *validation* error rather than a job error: GitHub
+  # rejects the whole file before creating a single job, so every run — including the `quality` job
+  # below, which has nothing to do with Stripe — dies in 0s with "This run likely failed because of a
+  # workflow file issue" and no logs or annotations to explain it. That is exactly what happened
+  # between 2026-07-24 and 2026-07-27, which also left `deploy.yml` permanently skipped because it
+  # keys off a successful Quality run.
+  #
+  # `secrets` IS available in `jobs.<job_id>.env`, and `env` IS available in a step-level `if`, so the
+  # presence check lives on the steps instead. Every step is gated, so with no key configured the job
+  # claims a runner, skips everything, and finishes in seconds.
   stripe-sandbox-certification:
     name: Stripe sandbox certification (optional, real test-mode API)
     runs-on: ubuntu-latest
-    if: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY != '' }}
     continue-on-error: true
     env:
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
       STRIPE_API_VERSION: '2026-06-24.dahlia'
       RUN_STRIPE_INTEGRATION_TESTS: '1'
     steps:
+      - name: Report whether a Stripe test-mode key is configured
+        # Named so the reason for a no-op job is visible in the run without opening a step.
+        run: |
+          if [ -n "$STRIPE_SECRET_KEY" ]; then
+            echo "Stripe test-mode key configured — running certification."
+          else
+            echo "No STRIPE_SANDBOX_SECRET_KEY configured — skipping certification (not a failure)."
+          fi
       - uses: actions/checkout@v7
+        if: env.STRIPE_SECRET_KEY != ''
       - uses: pnpm/action-setup@v6
+        if: env.STRIPE_SECRET_KEY != ''
         with:
           version: 10
       - uses: actions/setup-node@v7
+        if: env.STRIPE_SECRET_KEY != ''
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: env.STRIPE_SECRET_KEY != ''
       - run: pnpm vitest run src/shared/lib/billing/real-provider.test.ts
+        if: env.STRIPE_SECRET_KEY != ''

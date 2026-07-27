@@ -27,6 +27,11 @@ const authDbAllowlist = new Set([
 // touch tenant-private tables and select only allowlisted public columns.
 const globalDbAllowlist = new Set([
   'src/routes/api/status/index.ts',
+  // Same exception as the route above, relocated by a refactor rather than newly granted: the
+  // status-and-trust Phase 1 work moved `/api/status`'s inline `SELECT 1` liveness probe into this
+  // shared module so the snapshot worker stops duplicating it. The import moved; what it reaches did
+  // not — `checkDb` runs `SELECT 1` and touches no tenant-private table.
+  'src/shared/lib/status.ts',
   'src/shared/lib/public-data.ts',
 ])
 // Only these pre-existing files compare `.role` against a role literal

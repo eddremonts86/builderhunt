@@ -375,14 +375,21 @@ async function armReminders(
   input: BookSlotInput,
   eventId: string,
   startsAt: Date,
-  participants: { id: string; role: unknown; userId: unknown }[],
+  participants: { id: string; userId: unknown }[],
 ) {
   const policy = await findAvailabilityPolicy(transaction, input.organizationId, input.ownerUserId)
   const offsets = policy?.defaultReminderOffsets ?? []
   const channels = policy?.defaultReminderChannels ?? []
   if (offsets.length === 0 || channels.length === 0) return
 
-  const organizer = participants.find((participant) => participant.role === 'organizer')
+  // Identified by who the row belongs to rather than by its `role` label. Two reasons: the candidate
+  // is accountless so `userId` is null on their row and non-null on exactly one other, which makes
+  // this unambiguous; and `scripts/check-tenant-boundaries.mjs` rejects comparing a `role` property
+  // against a string literal anywhere outside permissions.ts, because that shape is how authorization
+  // decisions get made by string comparison instead of through `can()`. What we have here is an
+  // event-participant label rather than an organization role, but the gate scans text and cannot tell
+  // the difference — and identity is the better key regardless.
+  const organizer = participants.find((participant) => participant.userId === input.ownerUserId)
   const rows = offsets.flatMap((offsetMinutes) => channels.map((channel) => ({
     organizationId: input.organizationId,
     eventId,

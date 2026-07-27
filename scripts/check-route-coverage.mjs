@@ -35,6 +35,13 @@ const guardPatterns = [
   { name: 'platform-admin', pattern: /requirePlatformAdminPrincipal/ },
   { name: 'organization-lifecycle', pattern: /getOrganizationLifecycle/ },
   { name: 'session', pattern: /auth\.api\.getSession/ },
+  // The public scheduling routes authenticate an accountless candidate by capability, not by session.
+  // That IS a guard, and a strict one: `withCapabilityRequest` reads the secret from an invitation-
+  // scoped HttpOnly cookie, hashes it in application code, and resolves it against a stored hash
+  // through one narrowly privileged command before any tenant context is entered — see
+  // src/lib/scheduling/capability-context.ts and drizzle/0077-0078. Allowlisting these as "public"
+  // would be the wrong model: they are authenticated, just not by a user session.
+  { name: 'scheduling-capability', pattern: /withCapabilityRequest|withCapabilityContext/ },
 ]
 
 async function collectRouteFiles(dir) {
