@@ -6,6 +6,7 @@ import {
   availabilityRules,
   candidateLinks,
   candidateSubmissions,
+  organizations,
   privacyConsents,
   schedulingInvitations,
 } from '../db/schema'
@@ -171,6 +172,26 @@ export async function replaceAvailabilityPolicy(
 }
 
 // ── Invitations (organizer view) ─────────────────────────────────────────────────────────────
+
+/**
+ * The organization's display name, for the one place a candidate sees it: the invitation email.
+ *
+ * Here rather than in a general organizations repository because this is the only scheduling caller
+ * and the reason is specific — an email that carries a credential link and does not say who sent it
+ * reads exactly like phishing, which is the last impression this particular email can afford. Runs
+ * inside tenant context, so RLS scopes it without a WHERE on organization_id being load-bearing.
+ */
+export async function findOrganizationDisplayName(
+  transaction: TenantTransaction,
+  organizationId: string,
+): Promise<string | null> {
+  const [row] = await transaction
+    .select({ name: organizations.name })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1)
+  return row?.name ?? null
+}
 
 const invitationColumns = {
   id: schedulingInvitations.id,

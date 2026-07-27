@@ -126,6 +126,72 @@ export async function sendClaimEmail(to: string, link: string): Promise<SendResu
 }
 
 /**
+ * The interview invitation. This is the one email in the codebase that carries a credential, so it
+ * is deliberately unlike the others:
+ *
+ *  - **The secret lives in the URL fragment**, after `#`. A fragment is never sent to a server, so
+ *    it stays out of our access logs, out of any `Referer` header the portal's own outbound links
+ *    would leak, and out of proxy logs on the way. The portal exchanges it once for an HttpOnly
+ *    cookie (`POST /api/public/scheduling/:id/session`).
+ *  - **No tracking parameters, ever.** A click tracker would rewrite this URL through a third party,
+ *    handing the capability to whoever operates the redirector.
+ *  - **The dev branch logs the URL without its fragment.** `sendClaimEmail` above returns its whole
+ *    link as `devLink`, which is fine for a token that only verifies an email address. Here the
+ *    fragment *is* the credential, so it is replaced with a placeholder — a local console log is
+ *    still a log.
+ *  - **There is no resend.** The secret is minted at send and never stored, so this email cannot be
+ *    reproduced; see lib/scheduling/invitation-service.ts.
+ */
+export async function sendInterviewInvitationEmail(input: {
+  to: string
+  roleTitle: string
+  organizationName: string
+  durationMinutes: number
+  /** Already carries the `#secret` fragment. */
+  link: string
+  expiresAt?: Date | null
+}): Promise<SendResult> {
+  const subject = `Interview invitation: ${input.roleTitle}`
+  const html = interviewInvitationEmailHtml(input)
+  const redactedLink = `${input.link.split('#')[0]}#<capability-redacted>`
+
+  if (isE2EOutboxActive()) {
+    // The harness asserts on the real link, because the E2E flow has to open it. It never leaves
+    // the test process.
+    return dispatchEmail({ to: input.to, subject, html, devLink: input.link })
+  }
+  if (!env.RESEND_API_KEY) {
+    console.log('\n📧 [DEV] Interview invitation would be sent to:', input.to)
+    console.log('   Link:', redactedLink)
+    console.log('   (the fragment is the candidate credential and is deliberately not logged)\n')
+    return { ok: true }
+  }
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: 'BuilderHunt <noreply@builderhunt.dev>',
+        to: input.to,
+        subject,
+        html,
+      }),
+    })
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      return { ok: false, error: `Resend ${res.status}: ${body}` }
+    }
+    const data = (await res.json()) as { id: string }
+    return { ok: true, id: data.id }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
  * Send a "reset your password" email. Used by better-auth's
  * emailAndPassword.sendResetPassword callback, and by the claim-verify flow
  * (a claimed profile creates an account with an unknown auto-generated
@@ -1132,3 +1198,29 @@ function calendarEventEmailHtml(details: CalendarEventEmailDetails): string {
 function escapeHtml(value: string): string {
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
+
+function interviewInvitationEmailHtml(input: {
+  roleTitle: string
+  organizationName: string
+  durationMinutes: number
+  link: string
+  expiresAt?: Date | null
+}): string {
+  const expiry = input.expiresAt
+    ? `<p style="color:#6b7280;font-size:0.85rem;">This link stops working on ${escapeHtml(input.expiresAt.toUTCString())}.</p>`
+    : ''
+  return `<!doctype html>
+<html>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
+    <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Interview invitation: ${escapeHtml(input.roleTitle)}</h1>
+    <p>${escapeHtml(input.organizationName)} would like to talk to you about ${escapeHtml(input.roleTitle)}. Pick a time that suits you — it takes about ${input.durationMinutes} minutes.</p>
+    <p style="margin:1.5rem 0;">
+      <a href="${input.link}" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Choose a time</a>
+    </p>
+    <p style="color:#6b7280;font-size:0.85rem;">Keep this email. The same link is how you reschedule or cancel later, and it cannot be sent to you again — if you lose it, reply here and ask for a new invitation.</p>
+    ${expiry}
+    <p style="color:#9ca3af;font-size:0.8rem;">You do not need a BuilderHunt account. This link works only for this one interview.</p>
+  </body>
+</html>`
+}
+

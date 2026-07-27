@@ -320,6 +320,10 @@
     "0079_capability_minted_at_send": {
       "sql": "80b3eb8a45904d26a556f0135f9a9fbfb6990968aec2a654f3b71f941bafc7bd",
       "snapshot": "ea06d4fb46d7a02f6862cb6d7c2ca5dd8610b3d2196f5b42059931b6cfa3ea41"
+    },
+    "0080_invitation_delivery_anchor": {
+      "sql": "0a0b501cc1cbaaa0d2e6278603ccadbd88486943401bbfd56cc5b8e3a52819b6",
+      "snapshot": "fd2353c47921d1403710bfe740e48a741cff1d2d7181fb913a3a9667040c79fa"
     }
   }
 }

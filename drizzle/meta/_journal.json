@@ -561,6 +561,13 @@
       "when": 1785154495942,
       "tag": "0079_capability_minted_at_send",
       "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1785155153148,
+      "tag": "0080_invitation_delivery_anchor",
+      "breakpoints": true
     }
   ]
 }

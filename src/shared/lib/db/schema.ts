@@ -2030,7 +2030,14 @@ export const calendarNotificationDeliveries = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    eventId: uuid('event_id').notNull(),
+    /**
+     * Nullable, because not every delivery is about an event. The `kind` check has always allowed
+     * `'invitation'`, but an invitation email is sent before anything is booked and the event is
+     * created at booking — so requiring an event here made the one kind the column list already
+     * named impossible to store. Exactly one anchor is required by the check below.
+     */
+    eventId: uuid('event_id'),
+    invitationId: uuid('invitation_id'),
     reminderId: uuid('reminder_id'),
     kind: text('kind').notNull(),
     recipientUserId: text('recipient_user_id').references(() => authUsers.id, { onDelete: 'cascade' }),
@@ -2058,6 +2065,18 @@ export const calendarNotificationDeliveries = pgTable(
       foreignColumns: [calendarEventReminders.organizationId, calendarEventReminders.id],
       name: 'calendar_notification_deliveries_organization_reminder_fk',
     }).onDelete('set null'),
+    foreignKey({
+      columns: [table.organizationId, table.invitationId],
+      foreignColumns: [schedulingInvitations.organizationId, schedulingInvitations.id],
+      name: 'calendar_notification_deliveries_organization_invitation_fk',
+    }).onDelete('cascade'),
+    // A delivery has to be about something. Deliberately "at least one" rather than "exactly one":
+    // a booking confirmation belongs to both the event it created and the invitation it came from,
+    // and forcing a choice there would lose a link worth keeping.
+    check(
+      'calendar_notification_deliveries_anchor_check',
+      sql`${table.eventId} is not null or ${table.invitationId} is not null`,
+    ),
     index('calendar_notification_deliveries_recipient_idx').on(table.organizationId, table.recipientUserId, table.readAt),
     check('calendar_notification_deliveries_kind_check', sql`${table.kind} in ('reminder', 'invitation', 'reschedule', 'cancellation')`),
     check('calendar_notification_deliveries_state_check', sql`${table.state} in ('pending', 'sent', 'failed')`),

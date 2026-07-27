@@ -1,0 +1,4 @@
+ALTER TABLE "calendar_notification_deliveries" ALTER COLUMN "event_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "calendar_notification_deliveries" ADD COLUMN "invitation_id" uuid;--> statement-breakpoint
+ALTER TABLE "calendar_notification_deliveries" ADD CONSTRAINT "calendar_notification_deliveries_organization_invitation_fk" FOREIGN KEY ("organization_id","invitation_id") REFERENCES "public"."scheduling_invitations"("organization_id","id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "calendar_notification_deliveries" ADD CONSTRAINT "calendar_notification_deliveries_anchor_check" CHECK ("calendar_notification_deliveries"."event_id" is not null or "calendar_notification_deliveries"."invitation_id" is not null);

@@ -10,7 +10,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   sendAlertDigestEmail,
-  sendClaimEmail,
+  sendClaimEmail, sendInterviewInvitationEmail,
   sendDeletionCompletedEmail,
   sendDeletionScheduledEmail,
   sendExportReadyEmail,
@@ -121,5 +121,29 @@ describe('senders outside E2E_MODE', () => {
 
     expect(result.ok).toBe(true)
     expect(readOutbox()).toHaveLength(0)
+  })
+})
+
+describe('interview invitation email (the one that carries a credential)', () => {
+  it('keeps the capability fragment out of the dev-mode console', async () => {
+    vi.stubEnv('E2E_MODE', 'false')
+    const logged: string[] = []
+    vi.spyOn(console, 'log').mockImplementation((...args) => { logged.push(args.join(' ')) })
+
+    const result = await sendInterviewInvitationEmail({
+      to: 'candidate@example.com',
+      roleTitle: 'Senior Rust Engineer',
+      organizationName: 'Acme',
+      durationMinutes: 45,
+      link: 'https://app.test/schedule/11111111-1111-4111-8111-111111111111#s3cret-capability-value',
+    })
+
+    expect(result.ok).toBe(true)
+    const output = logged.join('\n')
+    // The whole point: a local console log is still a log, and this fragment is the credential.
+    expect(output).not.toContain('s3cret-capability-value')
+    expect(output).toContain('<capability-redacted>')
+    // The path survives, so the line stays useful for debugging.
+    expect(output).toContain('/schedule/11111111-1111-4111-8111-111111111111')
   })
 })
