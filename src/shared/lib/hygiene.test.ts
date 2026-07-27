@@ -147,10 +147,25 @@ describe('estimateRepoSignalsFromBuilder', () => {
     expect(second.map((r) => ({ ...r, pushedAt: 0 }))).toEqual(first.map((r) => ({ ...r, pushedAt: 0 })))
   })
 
-  it('different builders (or missing username) get different-shaped estimates deterministically too', () => {
-    const a = estimateRepoSignalsFromBuilder({ username: 'alice', followersCount: 100, topics: ['go'] })
-    const b = estimateRepoSignalsFromBuilder({ username: 'alice', followersCount: 100, topics: ['go'] })
-    expect(a).toEqual(b)
+  // `pushedAt` is `Date.now() - i * a week`, so comparing it across two calls asserts that both
+  // landed in the same millisecond. That is not determinism, it is a race the test loses whenever the
+  // clock ticks between the calls — it failed CI on 2026-07-27 with 1785148775836 against
+  // ...835 and took a deploy with it. Normalized here the way the sibling determinism test above
+  // already does.
+  //
+  // The name also promised something the body never did: both builders were 'alice', so "different
+  // builders get different-shaped estimates" was never exercised. Now it is.
+  it('different builders get different-shaped estimates, and each is deterministic', () => {
+    const withoutTime = (repos: ReturnType<typeof estimateRepoSignalsFromBuilder>) =>
+      repos.map((r) => ({ ...r, pushedAt: 0 }))
+
+    const alice = { username: 'alice', followersCount: 100, topics: ['go'] }
+    expect(withoutTime(estimateRepoSignalsFromBuilder(alice)))
+      .toEqual(withoutTime(estimateRepoSignalsFromBuilder(alice)))
+
+    const bob = { username: 'bob', followersCount: 4200, topics: ['rust', 'wasm', 'async'] }
+    expect(withoutTime(estimateRepoSignalsFromBuilder(bob)))
+      .not.toEqual(withoutTime(estimateRepoSignalsFromBuilder(alice)))
   })
 
   it('uses real repos from metadata when present', () => {
