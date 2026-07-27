@@ -5,6 +5,8 @@ configured (in the repo and in Coolify) so a deploy never leaves the app half-br
 
 Companion docs: [`database-migrations.md`](./database-migrations.md),
 [`database-roles.md`](./database-roles.md),
+[`database-restore.md`](./database-restore.md) (recovering from a backup — note that a restore
+does **not** bring role passwords with it; step 5 below is what provisions them),
 [`public-enrichment-source-register.md`](./public-enrichment-source-register.md).
 
 ---
@@ -184,6 +186,7 @@ IP ban of whichever host runs it. Before setting it `true` in production:
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | Every page 500s after deploy; health is OK | role password never provisioned | run `pnpm deploy:db` (make it the `post_deployment_command`) |
+| After a restore: `role "builderhunt_app" does not exist`, or pages load but every list is empty | the restore skipped the cluster-role step, so the dump's `CREATE POLICY` statements all failed — RLS is enabled with zero policies | **do not** disable RLS or grant BYPASSRLS. Drop the target DB and restore again with `pnpm db:restore`, which creates roles first and verifies. See [`database-restore.md`](./database-restore.md) |
 | Orchestrator step 6 fails "role X could not authenticate" | `DATABASE_*_URL` password ≠ DB role | fix the env var, redeploy (step 5 re-syncs it) |
 | Docker build fails on `pnpm install` | lockfile drift | run `pnpm deploy:preflight` locally; commit the updated `pnpm-lock.yaml` |
 | Container runs but native module errors | host `node_modules` leaked into image | ensure `.dockerignore` is present (it excludes `node_modules`) |

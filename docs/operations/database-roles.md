@@ -15,6 +15,20 @@ All named runtime roles are `NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREP
 NOBYPASSRLS`. Role migrations do not contain passwords. Provision and rotate credentials in the
 deployment secret manager.
 
+## These roles are cluster-level, which breaks naive restores
+
+Roles are **not** part of a `pg_dump` of a single database — they live in `pg_dumpall`. Because
+every RLS policy in this project is bound `TO builderhunt_app` / `_auth` / `_worker` /
+`_platform`, restoring a database dump into a cluster that lacks these roles fails every
+`CREATE POLICY` statement in it while the `ENABLE ROW LEVEL SECURITY` flags restore fine —
+leaving RLS forced on every tenant table with **zero policies**. That is fail-closed (a tenant
+role sees no rows at all, verified), so it is an unusable database rather than a leak, but the
+tempting incident-time "fix" of disabling RLS or granting `BYPASSRLS` would make it one.
+
+`scripts/db/roles.sql` recreates these roles without passwords for exactly this case, and
+`test/security/restore-roles-bootstrap.test.ts` fails if it drifts from the migrations above.
+Procedure and drills: [`database-restore.md`](./database-restore.md).
+
 The auth broker exists because Better Auth must resolve sessions and memberships before a product
 tenant transaction exists. It is intentionally unable to read `organization_builders`, notes,
 queries, alerts, entitlements, AI artifacts, or any other product tenant data. Product code importing
