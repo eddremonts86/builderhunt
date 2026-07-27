@@ -68,7 +68,67 @@ services:
       retries: 10
       start_period: 120s
 
+  # Candidate document storage and virus scanning, both self-hosted by decision
+  # (docs/operations/interview-provider-register.md §1 and §2) rather than paid
+  # vendors — which is also why there is no DPA or sub-processor entry for them.
+  #
+  # On the `interviews` profile, not `standalone`: ClamAV alone wants ~1.5 GB of
+  # RAM and several minutes on first boot to fetch its signature database, and
+  # nobody working on search or billing should pay that. Bring them up with
+  # `docker compose --profile interviews up -d`.
+  storage:
+    profiles: ['interviews']
+    image: minio/minio:latest
+    container_name: builderhunt-storage
+    command: server /data --console-address ":9001"
+    environment:
+      # Local development root credentials. Production uses a service account
+      # scoped to the one bucket, never these — see the register.
+      MINIO_ROOT_USER: builderhunt
+      MINIO_ROOT_PASSWORD: builderhunt-local-dev
+    ports:
+      # 9000 is the S3 API, 9001 the console. Bound to localhost only: candidate
+      # documents are personal data and the design has no public-read path.
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    volumes:
+      - builderhunt_storage_data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # ⚠️ amd64 only. No official `clamav/clamav` tag publishes an arm64 manifest —
+  # checked stable, stable_base, latest, 1.4 and 1.4_base, all amd64. This
+  # matters beyond a developer's Mac: the register targets a Hetzner CAX21,
+  # which is ARM, so that deployment would fail the same way. Resolving it means
+  # choosing between an emulated build (a signature database load under qemu on
+  # four shared cores), a third-party image on a security-critical path, an
+  # in-house build from source, or an amd64 host for this one service. That is a
+  # decision, not a default — see the register.
+  antivirus:
+    profiles: ['interviews']
+    image: clamav/clamav:stable
+    container_name: builderhunt-antivirus
+    ports:
+      - '127.0.0.1:3310:3310'
+    volumes:
+      - builderhunt_antivirus_data:/var/lib/clamav
+    healthcheck:
+      # First boot downloads the signature database and takes minutes. The
+      # scanner must not be pointed at until this passes — an unready clamd
+      # refuses connections, which is indistinguishable from a scan failure.
+      test: ['CMD-SHELL', 'clamdscan --ping 1 || exit 1']
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+
 volumes:
   builderhunt_postgres_data:
   builderhunt_redis_data:
   builderhunt_ollama_data:
+  builderhunt_storage_data:
+  builderhunt_antivirus_data:

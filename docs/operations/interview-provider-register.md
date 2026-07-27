@@ -136,6 +136,14 @@ invitation, 1,000 candidates is 25 GB. Monitor it.
 
 ### What to deploy
 
+> ⚠️ **Blocked on an architecture decision (found 2026-07-27).** No official `clamav/clamav` tag
+> publishes an arm64 manifest — `stable`, `stable_base`, `latest`, `1.4` and `1.4_base` are all
+> amd64 only. conductor-01 is a CAX21, which is ARM, so this section as written cannot be deployed
+> there. The options are an emulated run (a ~1 GB signature database loaded under qemu on four
+> shared cores), a third-party arm64 image on a path whose whole job is to be trustworthy, an
+> in-house build from ClamAV source, or putting this one service on an amd64 host. `docker-compose`
+> carries the service under the `interviews` profile so amd64 developer machines can use it today.
+
 A `clamav` service using `clamav/clamav:stable`, TCP port **3310** internal only, ~1.5 GB RAM
 (below that it OOMs while loading signature definitions). First boot downloads the database and
 takes several minutes — do not point the app at it until `clamdscan --ping` succeeds.
