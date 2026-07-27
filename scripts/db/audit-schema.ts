@@ -49,6 +49,49 @@ const classifications: Classification[] = [
   global('published_builder_profiles', ['builder_identity_id', 'display_name', 'bio', 'open_to_status', 'topics', 'published_at'], ['security-and-multitenancy', 'claimable-profiles']),
   operational('migration_backfill_runs', 'migration owner', ['security-and-multitenancy']),
   operational('migration_backfill_conflicts', 'migration run', ['security-and-multitenancy']),
+
+  // Calendar and scheduling (plans/phase-1/calendar-scheduling-interview-intelligence).
+  //
+  // Classified ahead of the rest of the unclassified set — roughly fifty tables across billing,
+  // enrichment, sprints and abuse still have no entry — because these ten already carry RLS and
+  // per-role grants (drizzle/0069, 0071, 0078), so what the manifest says about them is checkable
+  // today rather than a placeholder for the contract phase.
+  //
+  // All ten are tenant-private, including the two that read as delivery plumbing. `reminders` is a
+  // fire schedule with attempt counters and `notification_deliveries` is a per-recipient send log,
+  // which invites `operational()` — but the manifest derives its RLS column from the class, and
+  // `system-operational` renders as "not-applicable-or-role-restricted". Both tables have RLS enabled
+  // with owner, recipient, worker and capability policies, so calling them operational would make this
+  // manifest wrong about the one property a reader consults it for.
+  //
+  // `ownerKey` records the path a policy actually takes, and `organizationColumn` is set explicitly
+  // wherever that text is not the bare column name, since the tenant-private check reads the flag and
+  // not the prose.
+  tenant('user_calendars', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('calendar_events', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('calendar_event_occurrences', 'organization_id (via calendar_events)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  // `event_owner_user_id` is denormalized from calendar_events and held true by a composite FK, so
+  // this table's policies read only its own columns — see the schema comment for the policy-recursion
+  // reason. Rows may name an external candidate by address rather than by user id.
+  tenant('event_participants', 'organization_id (via calendar_events; event_owner_user_id denormalized)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('calendar_event_reminders', 'organization_id (via calendar_events)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  // Stores `external_recipient_hash` rather than an external address, so a delivery log for someone
+  // who never held an account does not accumulate their email.
+  tenant('calendar_notification_deliveries', 'organization_id (via calendar_events; recipient_user_id or external_recipient_hash)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('availability_policies', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('availability_rules', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  tenant('availability_overrides', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  // Retention is stated rather than defaulted. This row holds `capability_hash` — the only stored
+  // trace of the secret that authorizes an unauthenticated public route — and
+  // `candidate_email_normalized`, the address of someone who may never hold an account here. Neither
+  // has a reason to outlive the invitation. The spec gives `retention_expires_at` to the later
+  // content tables (submissions, documents, briefs, transcripts) and deliberately not to this one, and
+  // Phase 11 "Privacy, retention, export, and deletion" is what will enforce a window, so this string
+  // names the binding constraint instead of implying a purge already runs.
+  tenant('scheduling_invitations', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'bounded by invitation terminal state (booked/declined/expired/revoked) plus a support window; capability_hash and candidate_email_normalized must not outlive it — enforcement pending the Phase 11 retention worker',
+  }),
 ]
 
 const schemaSource = await readFile(new URL('../../src/shared/lib/db/schema.ts', import.meta.url), 'utf8')
@@ -109,14 +152,17 @@ function tenant(
   table: string,
   ownerKey: string,
   plans: string[],
-  options: Pick<Classification, 'tenantRoot' | 'organizationColumn' | 'transitionFinding'> = {},
+  options: Pick<Classification, 'tenantRoot' | 'organizationColumn' | 'transitionFinding' | 'retention'> = {},
 ): Classification {
   return {
     table,
     class: 'tenant-private',
     ownerKey,
     publicDtoFields: [],
-    retention: 'organization lifetime plus documented legal/operational window',
+    // Overridable, because the organization-lifetime default is a claim about ordinary tenant content
+    // and some tenant rows carry something narrower — a credential hash, a third party's address —
+    // whose window is set by what it holds rather than by how long the organization lives.
+    retention: options.retention ?? 'organization lifetime plus documented legal/operational window',
     plans,
     tenantRoot: options.tenantRoot,
     organizationColumn: options.organizationColumn ?? (options.tenantRoot || ownerKey === 'organization_id'),
