@@ -296,6 +296,26 @@
     "0073_alert_evaluation_timing_grant": {
       "sql": "5cc6131ccb301a5a3ee82a8186822b768c8f0fcd32a5f66750b22825aadfb868",
       "snapshot": "7bc9715bae76a6cccc22564114b89c51f4eb253a61830ecaef69152911a87d1f"
+    },
+    "0074_privacy_consents": {
+      "sql": "6fcdb1eaf87431373d3bb0c1cadb348826b1259248e098a2324ab082f58195e9",
+      "snapshot": "2c16ee4e2967165a34645a171e50b22981ccdd65b19a51cdb0dcf8690d0516d4"
+    },
+    "0075_privacy_consents_rls": {
+      "sql": "ddfbab185a561df0c1d83bfbaef3e929874984ae61adb75feb977c83eb1b2a82",
+      "snapshot": "729c45616ea0599c15aad23bea02fd41d6f6ae49aeb89e429ed3a011e2a7a437"
+    },
+    "0076_invitation_candidate_email": {
+      "sql": "72e3fb23ad3e1983c84ebc4a097b2e49d0ebdda00eee601c704da5950a6b0a04",
+      "snapshot": "22ef9e5f0e4b5695cce8eba94184622436bdcd12dc9bf34c85a5c1ce9653f31a"
+    },
+    "0077_scheduling_capability_resolver": {
+      "sql": "a69e1f32bac18eebf85038bf821b5f6d785161f492f944ce1100ba59dda23e8f",
+      "snapshot": "00abe022697d96c0bfb0de6ee07b3a6377c27c52f766a575ce04d80b396a0a49"
+    },
+    "0078_capability_role": {
+      "sql": "de8d20e42dbfd764eca3ed5ace3114f4fb4d383cac650777da1b501d9ba470bb",
+      "snapshot": "660fffbe495e7c846b074aa82fb3e40efc8b3cca8c436f947950b32d0f65a535"
     }
   }
 }
