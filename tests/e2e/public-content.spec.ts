@@ -360,7 +360,12 @@ test.describe('changelog', () => {
   })
 
   test('unknown changelog slug renders the not-found card with a way back', async ({ browser }) => {
-    await withPage(browser, undefined, async (page) => {
+    await withPage(browser, undefined, async (page, guard) => {
+      // The detail page fetches the single entry (`/api/changelog/$slug`) rather
+      // than downloading the whole list to find one, so an unknown slug now
+      // produces a real 404 and Chromium logs it. Same expectation the 404 tests
+      // above and the blog/feed tests below already declare.
+      guard.allowExpectedFailure(/status of 404/)
       await gotoHydrated(page, `${harness.baseURL}/changelog/no-such-slug`)
       await expect(page.getByText('Entry not found')).toBeVisible()
       await expect(page.getByRole('link', { name: 'Back to changelog' })).toHaveAttribute(
@@ -535,7 +540,14 @@ test.describe('status page', () => {
       await api.dispose()
     }
 
-    await withPage(browser, undefined, async (page) => {
+    await withPage(browser, undefined, async (page, guard) => {
+      // `/api/status` answers 503 whenever any component check fails, and its
+      // memory check trips at 1 GB RSS — which a `vite dev` app server routinely
+      // exceeds on a CI runner. That is the endpoint reporting honestly about a
+      // process that is not production, not a fault in what this test asserts:
+      // the db and redis rows below still read OK, and they only render at all
+      // because the page now reads the body on 503 too.
+      guard.allowExpectedFailure(/status of 503/)
       await gotoHydrated(page, `${harness.baseURL}/status`)
       await expect(page.getByTestId('status-page')).toBeVisible()
       await expect(page.getByTestId('status-overall')).toBeVisible()
@@ -637,16 +649,21 @@ test.describe('public builder profiles', () => {
 
     await withPage(browser, undefined, async (page, guard) => {
       // Anonymous visitors have no tenant, so every account-scoped card on the
-      // profile is rejected (401) without breaking the public page. The page's
-      // own notes/stats calls are now skipped when there is no session; what
-      // remains is three cards that mount unconditionally and each fetch on
-      // their own — PersonaCard (`/enrichment`), TeamFitCard (`/synergy`) and
+      // profile is rejected without breaking the public page. The page's own
+      // notes/stats calls are now skipped when there is no session; what remains
+      // is three cards that mount unconditionally and each fetch on their own —
+      // PersonaCard (`/enrichment`), TeamFitCard (`/synergy`) and
       // WorkSamplePanel. Doubled for dev-mode StrictMode remounts.
+      //
+      // 401 or 503 depending on the environment: with an AI provider configured
+      // the auth guard rejects first, without one `/enrichment` answers 503
+      // `ai_unconfigured` before it gets that far. CI has no provider, a
+      // developer machine usually does, and this test cares about neither.
       //
       // Whether those three should render for a signed-out visitor at all is a
       // product question, not a test one: "team fit against your tracked
       // builders" has no meaning without an account. Left as-is deliberately.
-      for (let i = 0; i < 8; i++) guard.allowExpectedFailure(/status of 401/)
+      for (let i = 0; i < 8; i++) guard.allowExpectedFailure(/status of (401|503)/)
       await gotoHydrated(page, `${harness.baseURL}/builders/${identity.id}`)
       await expect(page.locator('h1')).toContainText('E2E Published Builder')
       // Hostile bio renders as inert text.

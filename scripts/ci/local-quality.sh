@@ -248,7 +248,7 @@ if [ "$FAST" -eq 1 ]; then
   skip accessibility "--fast"
 else
   if [ "$REDIS_OK" -eq 1 ]; then
-    step e2e env -u APP_URL -u VITE_APP_URL E2E_MODE=true pnpm test:e2e --workers=1
+    step e2e env -u APP_URL -u VITE_APP_URL E2E_MODE=true pnpm test:e2e --workers=1 --grep-invert="@requires-embeddings"
   else
     skip e2e "no Redis on 6379"
   fi
