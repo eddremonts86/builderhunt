@@ -1,10 +1,10 @@
 # Look-alike Sourcing (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`semantic-search`](../../semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../proactive-discovery/spec.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
+> **Depends on**: [`semantic-search`](../../phase-1/semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../phase-1/proactive-discovery/spec.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
 > **Blocks**: nothing
-> **Reality check**: The vector substrate already ships: `builder_embeddings` (global, `unique(source, source_id)`, HNSW cosine index — `src/shared/lib/db/schema.ts:643`), `findSimilarBuilderEmbeddings(queryVector, limit)` (`src/shared/lib/repositories/public-builder-embeddings.ts`), the write-through indexer (`src/lib/semantic/index-writer.ts`), the embed worker (`src/routes/api/admin/embeddings/run-worker.ts`), and the query path (`src/lib/semantic/semantic-search.ts`, `src/routes/api/search/semantic.ts`). This plan adds **no table and no migration**: a second query mode over the same index (vector-as-seed instead of query-as-seed), a pure hybrid re-ranker, and an identity-collapse step.
-> **Pre-existing finding**: `findSimilarBuilderEmbeddings` sorts by ``desc(sql`1 - (${distance})`)`` (`public-builder-embeddings.ts:100`) — a derived, descending expression that `builder_embeddings_hnsw_idx` cannot serve. Its only current caller is `semanticSearch` (`src/lib/semantic/semantic-search.ts:133`), so **`/api/search/semantic` is sequentially scanning the whole index today**, not using HNSW. That is shipped behaviour this plan did not cause; see "The HNSW index is not actually being used today — RESOLVED".
+> **Reality check**: The vector substrate already ships: `builder_embeddings` (global, `unique(source, source_id)`, HNSW cosine index — `src/shared/lib/db/schema.ts` §"Semantic Search", `drizzle/0013_polite_night_thrasher.sql`), `findSimilarBuilderEmbeddings(queryVector, limit)` + the exported `similarBuilderEmbeddingsQuery(db, vector, limit)` builder (`src/shared/lib/repositories/public-builder-embeddings.ts`), the write-through indexer (`src/lib/semantic/index-writer.ts`), the embed worker (`src/routes/api/admin/embeddings/run-worker.ts`), and the query path (`src/lib/semantic/semantic-search.ts`, `src/routes/api/search/semantic.ts`). This plan adds **no table, no migration, no new env var, and no entry in `AI_TASKS`**: a second query mode over the same index (vector-as-seed instead of query-as-seed), a pure hybrid re-ranker, and an identity-collapse step.
+> **Inherited premise (verified at HEAD 2026-07-27)**: the HNSW ordering defect this plan used to own is **already fixed and landed** (commit `24a280b`). `similarBuilderEmbeddingsQuery` orders by `asc(distance)` with ``sql`1 - (${distance})` `` kept as a *selected* `similarity` column, and `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` EXPLAINs the emitted SQL under `enable_seqscan = off` to assert `Index Scan using builder_embeddings_hnsw_idx` (plus a negative control on the old derived-descending shape). This plan **asserts** that shape and does not re-apply it — see "The HNSW ordering fix already landed".
 
 ## Problem
 
@@ -30,14 +30,16 @@ profiles at the top, which reads as broken.
 
 - **No federated/keyword fallback.** "More like this" has no keyword form — the seed *is* a vector.
   Turning a whole profile into a keyword query is exactly what
-  [`ai-sourcing-sprints`](../../ai-sourcing-sprints/spec.md) already does, so the thin-index state
+  [`ai-sourcing-sprints`](../../phase-1/ai-sourcing-sprints/spec.md) already does, so the thin-index state
   links to "start a sprint" instead of inventing a worse second fallback. Deliberate, not an
   omission.
 - No URL, file, or résumé ingestion — pasted **text only**. Server-side URL fetching is an SSRF
   surface and already owned by `src/lib/enrichment/` (disabled by default).
 - No persistence of a pasted seed: not `builder_embeddings`, not a new table, not logs.
-- No new AI task in `src/shared/lib/ai/tasks.ts` — no LLM exists in this path, and no
-  LLM-generated explanations (see Explainability).
+- No new AI task in `src/shared/lib/ai/tasks.ts`'s `AI_TASKS` registry — no LLM exists in this
+  path, and no LLM-generated explanations (see Explainability). The `text` mode does call the
+  embedding provider, which is metered through an **inline pseudo-task** rather than a registry
+  entry; see "Metering the pasted-seed embed".
 - No new table, migration, re-embed, dimension change, or worker. No pagination (one fixed page of
   `LOOKALIKE_RESULT_LIMIT = 20`).
 - No identity resolution beyond the handle/display-name heuristic below; no commit-level or
@@ -95,6 +97,37 @@ tenant-supplied text about someone who never consented to a global index. Theref
 - no prompt exists on this path, so prompt injection does not apply — embedding a hostile string
   cannot execute instructions. Deterministic explanations keep it that way.
 
+### Metering the pasted-seed embed — RESOLVED
+
+`scripts/check-provider-metering.mjs` (run by `pnpm security:provider-metering`) is a hard CI gate:
+every `embedTexts(` call site in `src/` must be preceded, **inside the same top-level function**,
+by `checkAndConsumeBudget(` or `reserveCredits(`, unless the whole file is allowlisted with a
+justification. A per-organization `rateLimit` does not satisfy it, and this feature is a
+tenant-billed surface, so an allowlist entry would be dishonest.
+
+The precedent is `semantic-search.ts`'s `embedQueryCached` (`src/lib/semantic/semantic-search.ts`
+lines 71–102): it passes an **inline** task object rather than registering one, because
+`checkAndConsumeBudget` only needs `Pick<AITaskDefinition, 'id' | 'allowances'>`:
+
+```ts
+// src/lib/similar/lookalike.ts (new) — mirrors src/lib/semantic/semantic-search.ts:28,88-90
+const LOOKALIKE_SEED_EMBED_ALLOWANCES: Record<PlanTier, number> = { free: 0, pro: 40, team: 200 }
+// … inside the same function as the embedTexts call, after the Redis cache miss:
+const budget = await checkAndConsumeBudget(principal, entitlement, {
+  id: 'lookalike-seed-embed',
+  allowances: LOOKALIKE_SEED_EMBED_ALLOWANCES,
+})
+if (!budget.allowed) throw new LookAlikeBudgetError()
+const [vector] = await embedTexts([doc])
+```
+
+So `AI_TASKS` genuinely stays untouched (nothing to add to `AI_DISABLED_TASKS`, no output schema,
+no prompt), while the spend is counted per `(organizationId, userId, 'lookalike-seed-embed', UTC
+date)` exactly like every other provider call. This budget is the **per-user** ceiling; the
+per-organization product allowance is `LOOKALIKE_PASTE_LIMITS` below, and the two are deliberately
+distinct — the budget exists to satisfy the metering boundary and to bound one runaway user, the
+allowance is what the plan sells.
+
 ## What similarity actually measures — RESOLVED
 
 A `builder_embeddings` document is `buildEmbeddingDoc()` (`src/lib/semantic/embedding-doc.ts`):
@@ -104,7 +137,7 @@ bio and topic list state it. Pretending otherwise is the fastest way to lose the
 
 So the ranking is a **hybrid**: HNSW recall on the vector, then a deterministic re-rank over
 structured signals from the stored `profile` payload — pure, tested, weights in one constant
-(`src/lib/similar/lookalike-score.ts`):
+(`src/lib/similar/lookalike-score.ts` (new)):
 
 ```ts
 export interface LookAlikeSignals {
@@ -130,11 +163,15 @@ deliberate choice for a *comparison* signal, not a borrowed constant.)
 
 ### Two payload fields the re-ranker needs — and they are free
 
-`EmbeddedProfile` lacks both. **`kind`**: `builder_embeddings` mixes people and repositories —
-write-through indexes whatever flows through search, and
-`github.ts`/`npm.ts`/`gitlab.ts`/`codeberg.ts`/`huggingface.ts` all emit `kind: 'repo'`, and a
-repository in a look-alike list is broken output. **`lastActiveAt`**: `metadata.lastSeen` exists on
-`RawBuilder` (it is what `score.ts` reads) but `toEmbeddedProfile` drops it.
+`EmbeddedProfile` lacks both (verified at HEAD — `src/lib/semantic/embedding-doc.ts`).
+**`kind`**: `builder_embeddings` mixes people and repositories.
+`github.ts`/`npm.ts`/`gitlab.ts`/`codeberg.ts`/`huggingface.ts` all emit `kind: 'repo' as const`,
+`src/lib/search.ts` does not filter on `kind`, and `src/routes/api/search/builders.ts:92`
+write-throughs the *unfiltered* result array — so repo rows are in the index. (The discovery worker
+does filter: `src/lib/discovery/worker.ts:126` keeps `kind === 'person'` only, as does
+`src/lib/sprints/semantic-write-through.ts`.) A repository in a look-alike list is broken output.
+**`lastActiveAt`**: `metadata.lastSeen` exists on `RawBuilder` (it is what `src/lib/score.ts:39`
+reads) but `toEmbeddedProfile` drops it.
 
 Both become optional fields on `embeddedProfileSchema`, **deliberately not added to
 `buildEmbeddingDoc`**: a changed document invalidates every `contentHash` and re-embeds the whole
@@ -151,7 +188,7 @@ additive-optional and touches neither `buildEmbeddingDoc` nor `contentHashOf`.
 Per `semantic-search/spec.md`'s own resolved edge cases, the same human is distinct
 `(source, sourceId)` rows by design. So the nearest neighbour of a GitHub profile is very often
 that person's DEV.to or Hashnode profile, sometimes at ~0.98 similarity because the bio is
-copy-pasted. `collapseLookAlikes(seed, scored)` (`src/lib/similar/identity-collapse.ts`, pure +
+copy-pasted. `collapseLookAlikes(seed, scored)` (`src/lib/similar/identity-collapse.ts` (new), pure +
 tested) applies in order:
 
 1. drop the seed's own `(source, sourceId)`;
@@ -162,15 +199,29 @@ tested) applies in order:
 5. group survivors by `identityKey`, keep the highest-scoring representative, union topics, list
    the rest in `collapsedFrom` so the UI can say "also on DEV.to, Hashnode".
 
-**Reuse of `src/lib/dedup.ts`**: `deduplicateBuilders(builders: RawBuilder[])` cannot be called
-directly — candidates are `EmbeddedProfile`-shaped (no `id`/`kind`/`metadata`), so adapting them
-would be lossy. What is reused is its *rule*: `identityKey(username)` (lowercase, strip
-non-`[a-z0-9]`) is extracted from `dedup.ts` and imported by both so the two paths cannot drift.
-`deduplicateBuilders`' behaviour is unchanged.
+**Relationship to `src/lib/dedup.ts` — decided, not hedged**: `deduplicateBuilders(builders:
+RawBuilder[])` cannot be called directly — candidates are `EmbeddedProfile`-shaped (no
+`id`/`kind`/`metadata`), so adapting them would be lossy. `identityKey(username: string): string`
+(lowercase, strip non-`[a-z0-9]`) is **added as a new export in `src/lib/dedup.ts`** and imported
+by `identity-collapse.ts`, so the collapse rule has one home.
+
+`deduplicateBuilders` itself keeps its current, laxer key (`username.toLowerCase()` — `dedup.ts:6`)
+**unchanged**. Swapping it to `identityKey` would silently merge `foo-bar` and `foobar` in the live
+federated search path (`src/lib/search.ts:106`, the only caller), which is a user-visible
+result-set change this plan neither needs nor wants to own. The two keys therefore differ on
+purpose, and that difference is the point: collapse is allowed to over-merge because showing the
+seed back to the user is the worse failure; search is not. A test in `tests/unit/lib/dedup.test.ts`
+pins both — `identityKey('Edd-Remonts') === 'eddremonts'` **and** `deduplicateBuilders` still
+keeping `Edd-Remonts` and `eddremonts` as two entries.
+
+**Text-mode seed has no identity**: for `kind: 'text'` there is no `(source, sourceId)` and no
+username, so collapse steps 1, 3 and 4 are unconditional no-ops and only the repo filter (2) and
+the candidate-side grouping (5) apply. `collapseLookAlikes` takes the seed as
+`{ source, sourceId, username, displayName } | null` and must be tested with `null`.
 
 ## Result quality on a thin index — RESOLVED
 
-Constants (`src/lib/similar/lookalike.ts`): `LOOKALIKE_CANDIDATE_LIMIT = 60`,
+Constants (`src/lib/similar/lookalike.ts` (new)): `LOOKALIKE_CANDIDATE_LIMIT = 60`,
 `LOOKALIKE_SIMILARITY_FLOOR = 0.55`, `LOOKALIKE_MIN_RESULTS = 5`,
 `LOOKALIKE_MIN_INDEX_ROWS = 500`, `LOOKALIKE_RESULT_LIMIT = 20`.
 
@@ -187,71 +238,113 @@ who happen to be indexed".
 
 ## Architecture
 
+Every path below is `(new)` — none exists at HEAD:
+
 ```
 src/lib/similar/
-  lookalike-score.ts     # pure: signals, LOOKALIKE_WEIGHTS, scoreLookAlike, explainLookAlike
-  identity-collapse.ts   # pure: collapseLookAlikes, normalizeDisplayName
-  seed-doc.ts            # pure: buildSeedDocFromText (buildEmbeddingDoc's line grammar)
-  lookalike.ts           # orchestrator: seed resolution -> HNSW -> collapse -> rank
-src/routes/api/search/similar.ts        # POST, tenant principal, Pro gate, rate limits
-src/routes/_dashboard/similar.tsx + src/modules/similar/components/SimilarSourcingPage.tsx
-src/modules/builder-profile/components/SimilarBuildersCard.tsx
+  lookalike-score.ts     # (new) pure: signals, LOOKALIKE_WEIGHTS, scoreLookAlike, explainLookAlike
+  identity-collapse.ts   # (new) pure: collapseLookAlikes, normalizeDisplayName
+  seed-doc.ts            # (new) pure: buildSeedDocFromText (buildEmbeddingDoc's line grammar)
+  lookalike.ts           # (new) orchestrator: seed resolution -> HNSW -> collapse -> rank
+src/routes/api/search/similar.ts                        # (new) POST, tenant principal, Pro gate, rate limits
+src/routes/_dashboard/similar.tsx                       # (new)
+src/modules/similar/components/SimilarSourcingPage.tsx  # (new)
+src/modules/builder-profile/components/SimilarBuildersCard.tsx  # (new)
 ```
 
-Two additions to `src/shared/lib/repositories/public-builder-embeddings.ts`:
+Two additions to the existing `src/shared/lib/repositories/public-builder-embeddings.ts`:
 `findBuilderEmbeddingSeed(source, sourceId)` → `{ embedding, profile, embeddedAt } | null`, and
 `countEmbeddedBuilders()` (5-minute Redis cache).
 
-### The HNSW index is not actually being used today — RESOLVED
+### Writes and grants
+
+`builder_embeddings` is a **global, non-tenant** table: it has no `organization_id`, no RLS
+(`drizzle/0013_polite_night_thrasher.sql` enables none, and no later migration does), and is
+reached through `publicDb` only — never `withTenantContext`. The role that serves HTTP requests is
+`builderhunt_app`, and `drizzle/0025_public_tables_app_grants.sql:19` is the grant:
+
+```sql
+GRANT SELECT, INSERT, UPDATE ON TABLE builder_embeddings TO builderhunt_app;
+```
+
+That covers every database operation this plan performs:
+
+| Operation | SQL | Grant held? |
+| --- | --- | --- |
+| `findBuilderEmbeddingSeed` | `SELECT` on `builder_embeddings` | yes (`SELECT`) |
+| `countEmbeddedBuilders` | `SELECT count(*)` on `builder_embeddings` | yes (`SELECT`) |
+| `findSimilarBuilderEmbeddings` | `SELECT … ORDER BY <=>` | yes (`SELECT`) — already exercised by `/api/search/semantic` |
+| `upsertEmbeddingStubs` (pending-seed stub only) | `INSERT … ON CONFLICT DO UPDATE` | yes (`INSERT`, `UPDATE`) |
+| tracked annotation | `SELECT` on `builder_identities` under `withTenantContext` | yes — same call (`getTrackedBuilderIds`) `/api/search/semantic` already makes |
+
+No `DELETE` is performed and none is granted, which is consistent: this feature never removes an
+index row. `scripts/db/verify-api-isolation-local.mjs` runs against the non-owner `builderhunt_app`
+role, so Phase 6's check exercises the grants above rather than asserting them on paper.
+
+Also note `src/lib/similar/lookalike.ts` (new) must **not** import `~/shared/lib/db/index` — it reaches
+the table only through the repository. `scripts/check-tenant-boundaries.mjs` fails any
+non-allowlisted file that imports the global db directly (`pnpm security:boundaries`).
+
+### The HNSW ordering fix already landed — ASSERTED, NOT OWNED
 
 Two conditions must both hold for pgvector to use `builder_embeddings_hnsw_idx`
 (`drizzle/0013_polite_night_thrasher.sql:19`): the `ORDER BY` operand must be a
 parameter/constant, **and** the sort key must be the bare distance operator ascending. The shipped
-`findSimilarBuilderEmbeddings` satisfies the first and fails the second —
-``.orderBy(desc(sql`1 - (${distance})`))`` (`public-builder-embeddings.ts:100`) sorts by a derived
-expression, descending, which no HNSW index can serve. **`semanticSearch` calls that same
-function, so `/api/search/semantic` runs a sequential scan over the whole index today.** That is a
-pre-existing property of shipped code, not something this plan introduces, and it is recorded here
-rather than silently inherited.
-
-So `findSimilarBuilderEmbeddings` is **not** reused unchanged. It gets a one-line ordering change:
+code used to satisfy only the first (``.orderBy(desc(sql`1 - (${distance})`))``), so
+`/api/search/semantic` seq-scanned the whole table. **That was fixed outside phase 2** in commit
+`24a280b`. At HEAD the shipped shape is:
 
 ```ts
-// src/shared/lib/repositories/public-builder-embeddings.ts
-.orderBy(asc(distance))               // was: desc(sql`1 - (${distance})`)
-// `similarity: sql<number>`1 - (${distance})`` stays a returned column, not the sort key
+// src/shared/lib/repositories/public-builder-embeddings.ts:101-114 (already in master)
+export function similarBuilderEmbeddingsQuery(db: PostgresJsDatabase, queryVector: number[], limit: number) {
+  const distance = cosineDistance(builderEmbeddings.embedding, queryVector)
+  return db
+    .select({ source: …, sourceId: …, profile: …, similarity: sql<number>`1 - (${distance})` })
+    .from(builderEmbeddings)
+    .where(isNotNull(builderEmbeddings.embedding))
+    .orderBy(asc(distance))       // bare operator, ascending — index-eligible
+    .limit(limit)
+}
 ```
 
-Ascending cosine distance and descending `1 - distance` are the same total order, so **every
-caller's result ordering is mathematically identical** — this is why modifying the shared function
-is preferable to duplicating it: the alternative (a second, index-eligible copy for look-alikes)
-would leave the semantic-search path permanently on a seq scan while doubling the code that has to
-stay correct. The change is picked up automatically by `/api/search/semantic`, which is the one
-other caller (verified: `src/lib/semantic/semantic-search.ts:133`).
+Ascending cosine distance and descending `1 - distance` are the same total order, so every
+caller's ordering is mathematically identical. The query builder is exported separately from
+`findSimilarBuilderEmbeddings` precisely so a test can EXPLAIN the SQL the module actually emits;
+`tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` does exactly that against a
+disposable migrated database with `SET LOCAL enable_seqscan = off`, asserting
+`Index Scan using builder_embeddings_hnsw_idx`, `Order By: (embedding <=>`, no `Seq Scan`, no
+`Sort Key:` — plus a negative control proving the old derived-descending shape still cannot use the
+index. `tests/e2e/semantic-search.spec.ts` covers the route end to end.
 
-Two consequences must be handled, not assumed away:
+**This plan therefore writes no line of that function.** Its obligation is to keep depending on the
+shape: `findLookAlikes` calls `findSimilarBuilderEmbeddings(vector, LOOKALIKE_CANDIDATE_LIMIT)` and
+the existing EXPLAIN test is the regression guard for both callers. If that test is ever deleted or
+the ordering reverted, this plan's p95 target is void.
+
+Two properties to keep in mind, neither of which is an action item:
 
 - **Exact → approximate.** A seq scan returns exact KNN; HNSW returns approximate KNN. Recall
   quality is bounded by `hnsw.ef_search` (default 40) — raising it explores more candidates and
-  improves recall, at proportional cost.
-
-  Correction (measured, pgvector 0.8.5): an earlier draft of this spec claimed `ef_search` must be
+  improves recall, at proportional cost. An earlier draft of this spec claimed `ef_search` must be
   **≥ the requested `LIMIT`** or the query "silently returns fewer rows than asked for". That is
-  false. pgvector searches with `ef = max(hnsw.ef_search, limit)`, so the requested row count
+  **false**. pgvector searches with `ef = max(hnsw.ef_search, limit)`, so the requested row count
   always comes back. Verified by `EXPLAIN (ANALYZE)` on a 5k-row HNSW index with `ef_search = 40`
   and the index scan actually chosen: `LIMIT 50 → 50 rows`, `LIMIT 60 → 60 rows`,
-  `LIMIT 100 → 100 rows`. `SET LOCAL hnsw.ef_search = 100` is therefore a **recall-quality
-  tuning knob, not a correctness requirement** — this plan's `LIMIT 60` is safe without it. Keep it
-  if the extra recall is wanted; drop it if the cost isn't worth it. Either way, do not justify it
-  by an under-return that does not happen.
-- **Cross-plan touchpoint** (conventions rule 6): `findSimilarBuilderEmbeddings` is co-owned with
-  `semantic-search`. The ordering change has already landed and its before/after comparison already
-  ran — `POST /api/search/semantic` returned 30 identical builders in identical order with identical
-  `similarity`, no membership delta, because at the current corpus (352 embedded rows) the planner
-  still chooses the exact seq scan. What remains for *this* plan is the run that matters: once the
-  corpus is past the ~2k-row crossover the index actually engages and approximate recall can move
-  the tail, so repeat the comparison then rather than treating the existing zero-delta result as
-  proof for the indexed regime.
+  `LIMIT 100 → 100 rows`. `SET LOCAL hnsw.ef_search = 100` is therefore a **recall-quality tuning
+  knob, not a correctness requirement** — `LOOKALIKE_CANDIDATE_LIMIT = 60` is safe without it, and
+  this plan does not set it. Do not reintroduce it justified by an under-return that does not
+  happen. The repository's own doc comment now states the same thing.
+- **An indexable `ORDER BY` makes the index available, not mandatory.** The planner still costs it
+  against a seq scan; measured locally the crossover sits around ~2k embedded rows (352 rows → seq
+  scan at ~7 ms; 2k/5k/20k rows → index scan). Any acceptance check that asserts an index scan must
+  either set `enable_seqscan = off` or run against a corpus past that crossover, or it will fail on
+  a correct query.
+- **Cross-plan touchpoint** (conventions rule 6): `findSimilarBuilderEmbeddings` /
+  `similarBuilderEmbeddingsQuery` are co-owned with `semantic-search`. The before/after comparison
+  for the shipped ordering change already ran and showed zero delta — but only because at 352 rows
+  the planner still chose the exact seq scan. The run that would actually exercise approximate
+  recall is still open and belongs to whoever grows the corpus past ~2k rows; it is tracked as an
+  unchecked task in this plan's Phase 3 rather than hidden under the checked one.
 
 **Why the seed vector still round-trips through Node** rather than a self-joining SQL statement:
 the parameter/constant condition above. `ORDER BY e.embedding <=> seed.embedding` against a joined
@@ -260,7 +353,8 @@ the seed's ~12 KB of floats and binding them as a parameter is what makes the se
 index-eligible at all.
 
 ```ts
-// src/routes/api/search/similar.ts
+// src/routes/api/search/similar.ts  (new)
+// import { SOURCE_NAMES } from '~/lib/sources/types'   // 15 sources, `as const satisfies readonly SourceName[]`
 const SimilarBody = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('indexed'), source: z.enum(SOURCE_NAMES), sourceId: z.string().min(1).max(200) }),
   z.object({ kind: z.literal('tracked'), builderId: z.string().min(1).max(64) }),
@@ -290,6 +384,13 @@ interface LookAlikeResponse {
 }
 ```
 
+`findLookAlikes` takes `{ seed, principal, entitlement }` — `principal` and `entitlement` are
+needed even though `indexed`/`tracked` make no AI call, because the `text` branch's
+`checkAndConsumeBudget` requires both, and the metering check demands that call sit in the same
+function as `embedTexts` (see "Metering the pasted-seed embed"). They are the same
+`Pick<TenantPrincipal, 'organizationId' | 'userId'>` / `Pick<EntitlementPolicy, 'tier'>` narrow
+shapes `semanticSearch` already takes.
+
 Tracked annotation reuses `getTrackedBuilderIds` + `trackedKey` under `withTenantContext`, exactly
 as `src/routes/api/search/semantic.ts` does. Results are annotated, never filtered, so "you
 already track 3 of these" stays visible. `buildSeedDocFromText` emits `buildEmbeddingDoc`'s line
@@ -304,15 +405,24 @@ document, and a constant offset shared by every candidate, so it largely cancels
   `HygieneCard`/`CodeStyleCard`: posts `{ kind: 'tracked', builderId }`, top 5, "See all" →
   `/similar?builderId=…`.
 - **`src/modules/search/components/PersonResultCard.tsx`** (shared; used by
-  `_dashboard/sprints/*` and `_landing/explore`) gains an optional `similarHref?: string`, rendering
-  a "Similar" ghost link only when passed — `/explore` (anonymous) passes nothing, so the public
-  page is untouched. **`SearchPage.tsx` defines its own local `PersonResultCard`** (~line 1342) that
-  shadows the shared one; the same link goes there too. Verified — that is the card search results
-  actually render.
+  `src/routes/_dashboard/sprints/new.tsx`, `src/routes/_dashboard/sprints/$sprintId/index.tsx` and
+  `src/routes/_landing/explore/index.tsx`) gains an optional `similarHref?: string`, rendering a
+  "Similar" ghost link only when passed — `/explore` (anonymous) passes nothing, so the public page
+  is untouched. **`SearchPage.tsx` defines its own local `PersonResultCard`**
+  (`src/modules/search/components/SearchPage.tsx:1345`) that shadows the shared one; the same link
+  goes there too. Verified — that is the card search results actually render.
 - **`/similar`** hosts both modes: seed header when `?source=&sourceId=`/`?builderId=` is present,
   otherwise the paste box (textarea + optional topics/language) with "Used once to find matches.
-  Not stored." A `Look-alikes` pill is added to `NAV` in
-  `src/modules/dashboard/ui/shell/DashboardLayout.tsx`.
+  Not stored."
+- **Navigation** (updated 2026-07-27): the floating topbar `NAV` array in `DashboardLayout.tsx` no
+  longer exists — commit `1e2ac57` moved navigation into shell C's registry,
+  `src/modules/dashboard/ui/shell/nav-config.ts`, whose `NavItem` is
+  `{ to, label, icon, group?, badge?, exact? }` (no `end`). The entry goes in the **`discover`**
+  area: `{ to: '/similar', label: 'Look-alikes', icon: UsersRound, group: 'Discover' }`, **and**
+  `'/similar'` must be appended to that area's `routes` array. Both halves are required:
+  `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts`'s "keeps every destination inside an
+  area that owns its prefix" case fails if an item's `to` resolves to a different area, and without
+  the prefix `/similar` resolves to the `home` fallback.
 - Free tier: lock + "Pro" pill → `/pricing`, same treatment as the semantic toggle. The paste box
   additionally hides when the embedding provider is unconfigured; seed modes stay available.
 
@@ -331,20 +441,40 @@ be prompt-injected by a hostile bio.
 
 - `entitlement.tier === 'free'` → `403 { error: 'plan' }`, mirroring `/api/search/semantic`. Pro,
   Pro Max and Team allowed.
-- Paste mode has a per-organization daily allowance
-  `LOOKALIKE_PASTE_LIMITS: Record<PlanTier, number> = { free: 0, pro: 20, team: 100 }` in
-  `src/shared/lib/billing-shared.ts` (beside `SOURCING_SPRINT_LIMITS`), enforced by
-  `rateLimit('lookalike-paste', principal.organizationId, limit, 86400)` — org-scoped because the
-  entitlement is. `pro_max` resolves to the `team` row via `resolveLegacyPlanTier`
-  (`src/shared/lib/repositories/entitlements.ts`), the convention every other legacy
-  `Record<PlanTier, …>` table uses.
+- Paste mode has a per-organization daily allowance in `src/shared/lib/billing-shared.ts`, beside
+  `SOURCING_SPRINT_LIMITS`:
+
+  ```ts
+  export const LOOKALIKE_PASTE_LIMITS: Record<OrganizationTier, number> = {
+    free: 0, pro: 20, pro_max: 100, team: 100,
+  }
+  ```
+
+  **Keyed by `OrganizationTier`, indexed by `entitlement.tier` directly — no
+  `resolveLegacyPlanTier` on this path.** An earlier draft of this spec called
+  `Record<PlanTier, …>` + `resolveLegacyPlanTier` "the convention every other legacy table uses".
+  That is no longer true and was already a known defect: `SOURCING_SPRINT_LIMITS` was migrated to
+  `Record<OrganizationTier, number>` precisely because the `PlanTier` shape "left the advertised
+  allowance and the enforced one free to disagree — they did" (`src/shared/lib/billing-shared.ts`
+  lines 44–54), and `resolveLegacyPlanTier`'s own doc comment
+  (`src/shared/lib/repositories/entitlements.ts` lines 33–48) now says: "Do NOT reach for this when
+  the allowance is also *advertised* somewhere." Enforced by
+  `rateLimit('lookalike-paste', principal.organizationId, LOOKALIKE_PASTE_LIMITS[entitlement.tier], 86400)`
+  — org-scoped because the entitlement is. Bucket name verified unused (`rateLimit('…')` call sites
+  at HEAD: `search`, `search-builders`, `search-semantic`, `sprint-create`, … — neither
+  `search-similar` nor `lookalike-paste` is taken).
 - All modes: `rateLimit('search-similar', principal.userId, 30, 60)`.
-- No AI task registered → nothing in `tasks.ts` allowances, nothing for `AI_DISABLED_TASKS`.
+- Nothing is added to `AI_TASKS`, so nothing is added to its allowances table and nothing is
+  addressable by `AI_DISABLED_TASKS`. The embedding spend on the `text` path is still metered — see
+  "Metering the pasted-seed embed".
 - **With `STRIPE_BILLING_ENABLED=false` (today) the gate is not theoretical**:
   `organization_entitlements` is already populated by admin action (`setPlatformUserPlan`), so the
   403 and the allowance are live and testable. No Checkout, webhook, or credit ledger is touched.
-- `PLAN_PRICING.pro.features` gains `'Look-alike sourcing'` so promise and gate match
-  (conventions rule 8).
+- `PLAN_PRICING.pro.features` gains the plain string `'Look-alike sourcing'` so promise and gate
+  match (conventions rule 8). Deliberately **numberless**: the capability is what Pro buys, and
+  `pro.features` is built with `compactFeatures(...)`, whose derived-bullet helpers exist for
+  allowances that state a figure. Stating "20 pastes/day" there would recreate the exact copy/gate
+  drift `SOURCING_SPRINT_LIMITS` was migrated to prevent.
 
 ## Cost model
 
@@ -361,7 +491,9 @@ be prompt-injected by a hostile bio.
 
 - p95 < 150 ms for `indexed`/`tracked` on a warm index, with `EXPLAIN ANALYZE` on the emitted query
   confirming `Index Scan using builder_embeddings_hnsw_idx` — the number is only meaningful if the
-  index is actually in use (see the HNSW finding above).
+  index is actually in use, which below ~2k embedded rows requires `enable_seqscan = off` (see "The
+  HNSW ordering fix already landed"). The shape is already guarded permanently by
+  `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts`.
 - **Zero** responses whose top result is the seed person — asserted in `collapseLookAlikes` tests
   and counted in production via the `lookalike_query` log event's `selfHitsSuppressed`.
 - ≥ 30% of `/similar` result views end in a track (baseline: the current search→track rate).
@@ -372,7 +504,12 @@ be prompt-injected by a hostile bio.
 
 - **Seed not in the index**: upsert a stub via `upsertEmbeddingStubs` from the resolved public
   profile and return `pending`; the existing embed worker fills it on the next cron run. This is
-  the only write this feature performs, and only for data that is already public.
+  the only write this feature performs, and only for data that is already public — covered by
+  `GRANT … INSERT, UPDATE ON builder_embeddings TO builderhunt_app`
+  (`drizzle/0025_public_tables_app_grants.sql:19`), the same grant `/api/search/builders`'
+  write-through already relies on.
+- **Paste-mode embed budget exhausted**: `429 { error: 'seed_embed_budget' }` with `Retry-After`.
+  Distinct from the org allowance 429 so the two ceilings are distinguishable in support.
 - **Seed pending embed** (`embedding IS NULL`): `pending`, no write.
 - **Seed is a repo**: `400 { error: 'seed_not_a_person' }`.
 - **Paste under 120 chars**: `400 { error: 'seed_too_short' }` with copy explaining a one-liner

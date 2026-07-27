@@ -1,9 +1,9 @@
 # Co-Shipping Collaboration Graph (plan)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../team-synergy/spec.md) (neither is required).
+> **Depends on**: [`security-and-multitenancy`](../../phase-1/security-and-multitenancy/spec.md) (global-public data classification for a cross-tenant identity graph); [`production-infrastructure`](../../phase-1/production-infrastructure/spec.md) (cron authentication and monitoring for a new long-running worker). Enhanced by [`look-alike-sourcing`](../look-alike-sourcing/spec.md) and [`team-synergy`](../../phase-1/team-synergy/spec.md) (neither is required).
 > **Blocks**: nothing
-> **Reality check**: Builds on `src/shared/lib/db/schema.ts` (`builderIdentities`, deterministic `sha256(source \0 sourceId)` id), `drizzle/0017_enrichment_rls_policies.sql`'s `is_builder_processing_restricted(text)`, `src/lib/discovery/worker.ts` (global-table worker + cursor pattern), `src/routes/api/admin/alerts/run-worker.ts` (cron auth). Requires a **new** GitHub fetch path — `src/lib/sources/github.ts` fetches only `/search/users` and `/search/repositories`.
+> **Reality check** (re-verified against master HEAD, 2026-07-27): Builds on `src/shared/lib/db/schema.ts` (`builderIdentities` L139–162, deterministic `sha256(source \0 sourceId)` id minted in `organization-builders.ts` L278), `drizzle/0017_enrichment_rls_policies.sql`'s `is_builder_processing_restricted(text)`, `src/lib/discovery/worker.ts` (global-table worker + cursor pattern), `src/routes/api/admin/alerts/run-worker.ts` (cron auth + `withJobRun`), and `src/shared/lib/operational-schedules.ts` (the code-side schedule registry every worker must now appear in). Requires a **new** GitHub fetch path — `src/lib/sources/github.ts` fetches only `/search/users` and `/search/repositories`.
 
 ## Phases (dependency order — shippable after each)
 
@@ -13,29 +13,39 @@ Add `builderCollaborationEdges` and `collaborationGraphState` to `schema.ts` (sp
 `a_id < b_id` CHECK, the `(a, b, source)` unique index, and both single-endpoint strength indexes, plus
 the one additive nullable `builder_identities.discovered_by` provenance column (spec §Cross-plan
 touchpoint). `pnpm db:generate` for the tables, then a **separate** grants migration minted with
-`drizzle-kit generate --custom` — not a hand-created `.sql`, because
-`scripts/db/verify-migration-integrity.mjs` L12–15/27–30 requires a matching `_journal.json` entry, a
-`NNNN_snapshot.json`, and a regenerated `migration-hashes.json` (`0045` shipped without a snapshot and
-turned that test red). Grants mirror `drizzle/0025_public_tables_app_grants.sql`: no RLS (global
-public, no owning tenant), `SELECT/INSERT/UPDATE/DELETE` for `builderhunt_app`, `SELECT` for
+`pnpm exec drizzle-kit generate --custom` — not a hand-created `.sql`, because
+`scripts/db/verify-migration-integrity.mjs` L12–15 asserts the `drizzle/*.sql` set and the
+`meta/NNNN_snapshot.json` set both match `_journal.json` exactly, and L27–36 asserts
+`migration-hashes.json` matches (this is how `0045_user_devices_worker_read_grant` briefly turned
+that test red on 2026-07-24; it has had a snapshot since). **Never hardcode the next migration
+number** — read the real next index from `drizzle/meta/_journal.json` at implementation time (it held
+86 entries, head `0085_candidate_documents_rls_grants`, when this plan was last verified, and will
+have moved by the time anyone executes it).
+
+Grants mirror `drizzle/0025_public_tables_app_grants.sql`: no RLS (global public, no owning tenant),
+`SELECT/INSERT/UPDATE/DELETE` on the edge table for `builderhunt_app`, `SELECT` for
 `builderhunt_worker`, `SELECT/DELETE` for `builderhunt_platform` (the restriction cascade runs as
-`platformDb`). Add the five `COLLABORATION_*` env vars to `env.ts` + `.env.example`, all defaulting to
-off/conservative. Update `docs/architecture/data-classification.md`. Verification order is
-`db:migrate` → `test:rls:local` → `test:api-isolation:local`, never a permission assertion before the
-migration. App behaviour unchanged (two dead tables, one unread column).
+`platformDb`), nothing for `builderhunt_capability`. No new grant is needed on `builder_identities`
+— `drizzle/0011_builder_claim_policies.sql` L31 already grants `builderhunt_app` INSERT, and the
+table has no RLS. Add the five `COLLABORATION_*` env vars to `env.ts` + `.env.example`, all
+defaulting to off/conservative. Update `docs/architecture/data-classification.md`. Verification order
+is `db:migrate` → `test:migration-integrity` → `test:rls:local` → `test:api-isolation:local`, never a
+permission assertion before the migration. App behaviour unchanged (two dead tables, one unread
+column).
 
 ### Phase 2 — Pure strength and layout libraries
 
-`src/lib/collaboration/strength.ts` (`sizeDamping`, `artifactWeight`, `computeRawWeight`,
+`src/lib/collaboration/strength.ts` (new) — `sizeDamping`, `artifactWeight`, `computeRawWeight`,
 `computeNormalizedStrength`, `mergeObservations`, `canonicalPair`, `edgeId`,
-`COLLABORATION_HALF_LIFE_DAYS = 180`) and `src/lib/collaboration/layout.ts` (`layoutEgoGraph`), both
-with sibling `*.test.ts`. Reuses the `0.5 ** (age / halfLife)` mechanic from
-`src/shared/lib/abuse/risk.ts`. No I/O, no DB, no network — this is where the formula is proven
-before anything writes a row.
+`COLLABORATION_HALF_LIFE_DAYS = 180` — and `src/lib/collaboration/layout.ts` (new) — `layoutEgoGraph` — with
+tests under `tests/unit/lib/collaboration/` (there are **zero** co-located tests under `src/`;
+`vitest.config.ts` includes only `tests/unit/**`). Reuses the `0.5 ** (age / halfLife)` mechanic from
+`decayedWeight` in `src/shared/lib/abuse/risk.ts` L51. No I/O, no DB, no network — this is where the
+formula is proven before anything writes a row.
 
 ### Phase 3 — GitHub public-metadata crawl adapter
 
-`src/lib/collaboration/github-crawl.ts`: `listAnchorRepos(username, token)` (public events + owned
+`src/lib/collaboration/github-crawl.ts` (new): `listAnchorRepos(username, token)` (public events + owned
 repos, deduped, non-fork, most-recent first), `listRepoContributors(fullName, token)`,
 `isLikelyBotLogin()`, and a `RateLimitSnapshot` parsed from `x-ratelimit-remaining`/`-reset` on every
 response. Injectable `fetch` so tests run against recorded fixtures with zero network. Nothing calls
@@ -43,27 +53,33 @@ it yet.
 
 ### Phase 4 — Worker, cursor, restriction cascade
 
-`src/shared/lib/repositories/collaboration-graph.ts` (upsert edge, **insert-only** discovered identity,
-node totals, renormalize, delete-for-identity — all `publicDb`) and `src/lib/collaboration/worker.ts`
-(`runCollaborationWorker()`, spec §3). New `POST /api/admin/collaboration-graph/run-worker` cloning
-`src/routes/api/admin/alerts/run-worker.ts` exactly (`tryCronPrincipal ?? requirePlatformAdminPrincipal`,
-`auditPlatformAdminAction`). Extend `cascadeBuilderProcessingRestriction()` in
-`src/lib/enrichment/worker.ts` with the edge purge. Add the crontab line to the operations doc.
-Edges now accumulate; still no UI.
+`src/shared/lib/repositories/collaboration-graph.ts` (new) — upsert edge, **insert-only** discovered identity,
+node totals, renormalize, delete-for-identity, all `publicDb` except the platform-role delete — and
+`src/lib/collaboration/worker.ts` (new) with `runCollaborationWorker()`, spec §3. New `POST /api/admin/collaboration-graph/run-worker` cloning
+`src/routes/api/admin/alerts/run-worker.ts` exactly — `tryCronPrincipal ?? requirePlatformAdminPrincipal`,
+`withJobRun({ jobKey: 'collaboration.crawl' }, …)`, `auditPlatformAdminAction`. Register
+`collaboration.crawl` in `src/shared/lib/operational-schedules.ts` (spec §3 gives the exact entry) —
+that registry, not a crontab line in a doc, is what the operations calendar and `job_runs` read; the
+runbook row is documentation on top of it. Extend `cascadeBuilderProcessingRestriction()` in
+`src/lib/enrichment/worker.ts` with the edge purge. Edges now accumulate; still no UI.
 
 ### Phase 5 — Read API + entitlement gate
 
-`COLLABORATION_GRAPH_LIMITS` in `billing-shared.ts`, `listEgoGraph()` in the repository (single query,
+`COLLABORATION_GRAPH_LIMITS` in `billing-shared.ts` — keyed by `OrganizationTier`, **not**
+`PlanTier`, with a `collaborationGraphFeature()` formatter deriving the `/pricing` copy (spec
+§Tier gating explains why the original `Record<PlanTier, …>` + `resolveLegacyPlanTier` design is now
+a known defect) — `listEgoGraph()` in the repository (single query,
 `a_id = $ego OR b_id = $ego`, both-endpoint restriction filter, DTO allowlist),
-`src/lib/collaboration/enumeration.ts` (per-seat daily distinct-subject cap, spec §Enumeration — the
-control for the fact that identity ids are offline-derivable and therefore not capabilities), and
+`src/lib/collaboration/enumeration.ts` (new) — the per-seat daily distinct-subject cap, spec
+§Enumeration, which is the control for identity ids being offline-derivable and therefore not
+capabilities — and
 `GET /api/builders/$builderId/collaboration`. Free tier gets `{ locked: true, neighborCount }`.
 Extend `scripts/db/verify-api-isolation-local.mjs` with the restricted-identity, free-tier,
 ID-enumeration and identity-non-degradation cases.
 
 ### Phase 6 — Ego-graph UI (SVG + table equivalent + a11y)
 
-`src/modules/builder-profile/components/CollaborationGraphCard.tsx`: hand-written SVG from
+`src/modules/builder-profile/components/CollaborationGraphCard.tsx` (new): hand-written SVG from
 `layoutEgoGraph`, always-present `<table>` equivalent, "Graph / Table" toggle, min-strength/window/
 source filters applied client-side, cap notice, locked state, hidden-on-503. Mounted in
 `BuilderProfilePage.tsx` below `PersonaCard`. Reduced-motion, focus order, and non-colour strength
@@ -71,8 +87,8 @@ encoding are part of this phase, not a follow-up.
 
 ### Phase 7 — True co-authorship source + subject transparency + observability
 
-GraphQL `github_commit` edges (`src/lib/collaboration/github-coauthors.ts`, `rateLimit { cost
-remaining resetAt }` requested in every query and logged), `COLLABORATION_COAUTHOR_REPOS_PER_RUN`
+GraphQL `github_commit` edges — `src/lib/collaboration/github-coauthors.ts` (new), with
+`rateLimit { cost remaining resetAt }` requested in every query and logged — `COLLABORATION_COAUTHOR_REPOS_PER_RUN`
 budget inside the same worker run, `GET /api/me/builder/$builderId/collaboration` (verified-claimant
 subject read), and the quota/coverage counters surfaced on the admin metrics page.
 
@@ -80,12 +96,16 @@ subject read), and the quota/coverage counters surfaced on the admin metrics pag
 
 | Risk                                                                        | Likelihood | Impact   | Mitigation                                                                                                                                            |
 | --------------------------------------------------------------------------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| New GitHub fetch path starves interactive federated search of quota         | Medium     | High     | Separate buckets (`/search/*` vs core REST); `COLLABORATION_RATE_LIMIT_RESERVE=500` hard stop; per-run cap of ~56 core requests (≈4.5% of hourly budget) |
+| New GitHub fetch path starves interactive federated search of quota         | Medium     | High     | Separate buckets (`/search/*` 30 req/min vs core REST 5,000/h); `COLLABORATION_RATE_LIMIT_RESERVE=500` hard stop; per-run cap of exactly 56 core requests, 224/h = 4.48% of budget (arithmetic in spec §Quota budget) |
+| Contention with `enrichment.refresh`, the *other* `GITHUB_TOKEN` core-bucket consumer | Medium | Medium | Re-derived at HEAD: `discovery.crawl` is now `0 4 * * *` daily and never contends, so the original "stagger 5 min off discovery" rationale was stale. The real overlap is `enrichment.refresh` at `0 3 * * *`, one run per day, absorbed by the 500-request reserve. Cadence set to `5,20,35,50 * * * *` to stay off the `*/15` grid `alerts.evaluate` occupies |
+| Worker invisible to the operations calendar / `job_runs`                     | High if the registry step is skipped | Medium | The schedule registry (`operational-schedules.ts`) and `withJobRun` did not exist when this plan was written; both are now mandatory for a worker. Phase 4 adds the registry entry **and** the one-time `POST /api/admin/operations/sync-schedules` call, and registers the row `enabled: false` so `next_run_at` cannot go permanently stale while `COLLABORATION_ENABLED=false` |
+| Tier limit reintroduces the `SOURCING_SPRINT_LIMITS` advertise-vs-enforce drift | High if copied from the original draft | Medium | `COLLABORATION_GRAPH_LIMITS` is keyed by `OrganizationTier` and indexed by `policy.tier` directly; `/pricing` copy is derived by `collaborationGraphFeature()`, never hand-written. `entitlements.ts` L44–47 is the explicit prohibition this follows |
 | Privacy/legal objection to a relationship graph over named individuals       | Medium     | Critical | Public repo metadata only, no emails/messages, 4-place restriction cascade, subject read endpoint, `COLLABORATION_ENABLED=false` by default, UI states what an edge means |
 | Missing `GRANT` makes every write silently fail (the `0025` failure mode)    | Medium     | High     | Grants migration is its own Phase-1 task; `pnpm test:api-isolation:local` asserts a worker write and an ego read as the real non-owner roles            |
 | A Pro seat bulk-extracts the whole graph via offline-derivable identity ids  | High       | High     | Per-seat daily distinct-subject cap (200, Redis set, breadth-charged) on top of 60 req/min; `429 enumeration_cap` logged + on admin metrics; asserted in the isolation script |
 | Crawler zeroes `followers_count`/`language` on known identities             | High if reusing `trackOrganizationBuilder`'s upsert | High | Discovered-identity write is `onConflictDoNothing` only; isolation check asserts an existing identity is byte-identical after a crawl                    |
-| Grants-only migration breaks `test:migration-integrity` (no snapshot)       | High       | Medium   | Mint it with `drizzle-kit generate --custom` and regenerate `migration-hashes.json --write`; this is exactly how `0045` went red                        |
+| Grants-only migration breaks `test:migration-integrity` (no snapshot)       | High       | Medium   | Mint it with `pnpm exec drizzle-kit generate --custom` and regenerate the manifest with `node scripts/db/verify-migration-integrity.mjs --write`; this is exactly how `0045` went red on 2026-07-24 |
+| Plan hardcodes a migration number that has long since been taken            | Certain if copied | Medium | No task in this plan names a number. `drizzle/` moved 40 migrations between this plan being written and being verified; the next index is read from `drizzle/meta/_journal.json` at execution time |
 | Hub/bot accounts dominate every graph                                       | High       | Medium   | `sizeDamping` + Salton degree normalization + `isLikelyBotLogin()` + `COLLABORATION_MAX_PARTICIPANTS=50` repo skip, all unit-tested                     |
 | `(A,B)` and `(B,A)` duplicate edges                                         | Certain    | Medium   | `canonicalPair()` in JS before insert, plus the `a_id < b_id` CHECK as a loud backstop                                                                  |
 | Quadratic pair explosion on a 500-contributor repo                          | Medium     | High     | Repo skipped above 50 participants; anchor-only pairing available as a further clamp if pair counts still grow                                          |
@@ -103,7 +123,9 @@ subject read), and the quota/coverage counters surfaced on the admin metrics pag
   column is a contract step, and every non-crawler row is `NULL` anyway) and insert-only rows, which
   are identifiable by `discovered_by = 'collaboration_crawl'` and removable with a single
   `DELETE … WHERE discovered_by = 'collaboration_crawl'` once the edge table is gone. No existing
-  identity row was ever updated, so nothing needs restoring.
+  identity row was ever updated, so nothing needs restoring. Also remove the `collaboration.crawl`
+  entry from `operational-schedules.ts` and re-run `POST /api/admin/operations/sync-schedules`, or
+  the operations calendar keeps advertising a job whose route no longer exists.
 - **Phase 5** — remove the route, or set `COLLABORATION_GRAPH_LIMITS` to `{ free: 0, pro: 0, team: 0 }`
   so every tier is locked while the data stays.
 - **Phase 6** — the card is a leaf component; removing its one mount in `BuilderProfilePage.tsx`

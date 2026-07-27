@@ -1,9 +1,9 @@
 # Hiring Pipeline Kanban (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal); [`team-accounts`](../../team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../activity-feed/spec.md) (stage-change events; not required).
+> **Depends on**: [`security-and-multitenancy`](../../phase-1/security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal — all shipped; that plan stays `in_progress` only for the legacy-column contraction, which this one does not touch, so nothing here waits on it); [`team-accounts`](../../phase-1/team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../phase-1/activity-feed/spec.md) (stage-change events; not required).
 > **Blocks**: [`ats-integrations`](../ats-integrations/spec.md) (hard — the ATS sync maps its external status back onto this plan's stage model)
-> **Reality check**: `organization_builders` (`src/shared/lib/db/schema.ts:178`) is the live tenant-private tracking store, read through `src/shared/lib/repositories/organization-builders.ts` under `withTenantContext`. Tenant-scoped notes already exist (`builder_notes` + `listOrganizationBuilderNotes`/`createOrganizationBuilderNote`, served by `src/routes/api/builders/$builderId/notes.ts`) — reuse them, do not build a second notes table. There is **no** `/me/builders` page: `GET /api/me/builders` (`src/routes/api/me/builders/index.ts`) is an unpaginated JSON endpoint whose only consumer is `src/modules/dashboard/components/ExportsPage.tsx` (`/exports`).
+> **Reality check**: `organization_builders` (`src/shared/lib/db/schema.ts:179`) is the live tenant-private tracking store, read through `src/shared/lib/repositories/organization-builders.ts` under `withTenantContext`; its `status` check constraint (`'tracked' | 'shortlisted' | 'archived'`) is dead — a repo-wide grep for `'shortlisted'` outside `schema.ts`/`drizzle/` returns nothing. Tenant-scoped notes already exist (`builder_notes` + `listOrganizationBuilderNotes`/`createOrganizationBuilderNote`, served by `src/routes/api/builders/$builderId/notes.ts`) — reuse them, do not build a second notes table. There is **no** `/me/builders` page: `GET /api/me/builders` (`src/routes/api/me/builders/index.ts`) is an unpaginated JSON endpoint whose only consumer is `src/modules/dashboard/components/ExportsPage.tsx` (`/exports`). Dashboard navigation is **no longer** a flat `NAV` array in `DashboardLayout.tsx`: it is the two-level `NAV_AREAS` registry in `src/modules/dashboard/ui/shell/nav-config.ts`, which already owns an area with `id: 'pipeline'` (Sprints + Calendar) — this feature joins that area rather than creating a new one.
 
 ## Problem
 
@@ -121,14 +121,28 @@ needs no per-card lateral join. Growth is bounded by human behavior (~5–20 eve
 
 ### Per-stage notes reuse `builder_notes` — RESOLVED
 
-`builder_notes` is **not** legacy per-user: it carries `organization_id`, a composite
+`builder_notes` is **not** legacy per-user: it carries `organization_id` (`NOT NULL` since
+`drizzle/0081_wakeful_butterfly.sql`, the canonical tenant cutover), a composite
 `(organization_id, builder_id) → builders(organization_id, id)` FK, forced RLS
 (`drizzle/0008_tenant_rls.sql`), and its only live path is the tenant-scoped
 `listOrganizationBuilderNotes`/`createOrganizationBuilderNote` pair behind
-`/api/builders/$builderId/notes`. So per-stage notes are **one nullable typed column** on that
-table — `pipeline_stage_key` with a composite FK to the stage table — plus an optional
-`stageKey` field on the existing POST body that defaults to the card's current stage when the
-request comes from the board. No new table, no new route, no JSONB.
+`/api/builders/$builderId/notes`.
+
+One detail the stage-key default depends on, verified rather than assumed: `builder_notes.builder_id`
+references the **legacy `builders`** table, but `trackOrganizationBuilder` dual-writes both tables
+with the *same* primary key, so a note's `builder_id` is byte-identical to the
+`organization_builders.id` of the same card. That is what `resolveOrganizationBuilderId`'s doc
+comment states ("the id `builders`/`builderNotes` rows are actually keyed on") and what
+`createOrganizationBuilderNote` already relies on when it validates the id through
+`findOrganizationBuilder`. So the card's current stage is a plain
+`findOrganizationBuilder(tx, orgId, builderId)` away — no extra join, no id translation.
+
+Per-stage notes are therefore **one nullable typed column** on that table — `pipeline_stage_key`
+with a composite FK to the stage table — plus an optional `stageKey` field on the existing POST
+body that defaults to the card's current stage when the request comes from the board. No new table,
+no new route, no JSONB. `builderhunt_app` already holds table-level
+`SELECT, INSERT, UPDATE, DELETE` on `builder_notes` (`drizzle/0008_tenant_rls.sql:110-116`) and a
+table-level grant covers columns added later, so the new column needs no new grant.
 
 ### Scale: stage-paginated, not board-paginated — RESOLVED
 
@@ -167,13 +181,29 @@ dead on arrival: **every tier gets all 5 default stages, drag, assign, filters, 
 and history.** The paid axis is customization and the digest.
 
 ```ts
-// src/shared/lib/billing-shared.ts — beside SOURCING_SPRINT_LIMITS
-export const PIPELINE_STAGE_LIMITS: Record<PlanTier, number> = { free: 5, pro: 8, team: 12 }
+// src/shared/lib/billing-shared.ts — beside SOURCING_SPRINT_LIMITS.
+//
+// Keyed by OrganizationTier, NOT PlanTier. This is not a style choice: the comment
+// above SOURCING_SPRINT_LIMITS (billing-shared.ts:44-53) records that keying an
+// *advertised* allowance by PlanTier forced every enforcement site through
+// resolveLegacyPlanTier and let the pricing page and the routes drift apart by 7
+// sprints before anyone noticed. The stage cap is advertised — the free-tier board
+// renders a "Pro" pill linking to /pricing — so it gets its own explicit pro_max row
+// and is indexed by `entitlement.tier` directly.
+export const PIPELINE_STAGE_LIMITS: Record<OrganizationTier, number> = {
+  free: 5,
+  pro: 8,
+  pro_max: 12,
+  team: 12,
+}
 
 // src/shared/lib/pipeline/entitlement.ts
+// `EntitlementPolicy` / `resolveEntitlementPolicy` come from
+// src/shared/lib/repositories/entitlements.ts (the policy interface is declared at :25,
+// the pure resolver at :53).
 export function pipelineCapabilities(entitlement: EntitlementPolicy) {
   return {
-    maxStages: PIPELINE_STAGE_LIMITS[resolveLegacyPlanTier(entitlement.tier)],
+    maxStages: PIPELINE_STAGE_LIMITS[entitlement.tier],
     // Reads/moves are never gated; only structural changes are.
     canCustomizeStages: entitlement.tier !== 'free' && entitlement.paidActionsAllowed,
     // Deliberately the RAW tier, not resolveLegacyPlanTier: SLA + digest are multi-seat
@@ -186,6 +216,11 @@ export function pipelineCapabilities(entitlement: EntitlementPolicy) {
 }
 ```
 
+Note the consequence of the `OrganizationTier` keying: `pro_max` gets 12 stages (the Team number),
+which is what a top-tier plan should get and what the `/pricing` copy will state, whereas the
+previous `Record<PlanTier, …>` shape had no `pro_max` row at all and only produced 12 by laundering
+Pro Max through `resolveLegacyPlanTier`.
+
 A past-due org keeps reading its custom stages (`paidActionsAllowed` false only blocks writes),
 and a downgrade never deletes stages — it blocks adding new ones. Grants come from
 `setPlatformUserPlan` today, exactly like `SOURCING_SPRINT_LIMITS`.
@@ -193,6 +228,10 @@ and a downgrade never deletes stages — it blocks adding new ones. Grants come 
 ## Architecture
 
 ### Schema (Drizzle, `src/shared/lib/db/schema.ts`)
+
+`primaryKey` is not in that file's `drizzle-orm/pg-core` import list today and no composite
+`primaryKey({ columns: … })` exists anywhere in it yet — `organization_pipeline_stages` is the
+schema's first, so the import needs extending and there is no in-repo precedent to copy from.
 
 ```ts
 // Data class: tenant-private (organization_id). Composite PK IS the tenant-preserving key.
@@ -243,9 +282,13 @@ export const organizationBuilderStageEvents = pgTable('organization_builder_stag
 Additive columns on existing tables:
 
 ```ts
-// organization_builders (+3) — pipelineStage nullable: NULL means "the org's position-0 stage",
-// which keeps the composite FK satisfiable and makes NOT NULL contraction a later, separate step
-// (same posture as organization_id itself, app-reality.md constraint 1).
+// organization_builders (+3) — pipelineStage stays nullable permanently: NULL means "the org's
+// position-0 stage". This is not an expand-phase placeholder awaiting contraction (the way
+// organization_id once was, before drizzle/0081 made it NOT NULL on the last seven tables). It is
+// the design: trackOrganizationBuilder is on the hot search path and is deliberately left
+// untouched, so every newly tracked card arrives with NULL, and resolveStageForCard maps NULL to
+// position 0. A NOT NULL default would force either a track-path change or a per-org default
+// lookup on insert; neither buys anything the coalesce in the board query does not.
 pipelineStage: text('pipeline_stage'),
 pipelineStageChangedAt: timestamp('pipeline_stage_changed_at', { withTimezone: true }),
 pipelineOwnerUserId: text('pipeline_owner_user_id').references(() => authUsers.id, { onDelete: 'restrict' }),
@@ -277,13 +320,18 @@ Untrack/delete keeps using today's stricter `'resource:delete'` path, unchanged.
 
 ### Repositories and pure lib
 
-Pure and tested in `src/shared/lib/pipeline/`: `stages.ts` (`DEFAULT_PIPELINE_STAGES`,
+Pure logic in `src/shared/lib/pipeline/` (**all new**): `stages.ts` (`DEFAULT_PIPELINE_STAGES`,
 `normalizeStageKey`, `validateStageSet`, `reorderStages`, `resolveStageForCard` — NULL →
 position-0), `staleness.ts` (`daysInStage`, `isStale`), `entitlement.ts`
-(`pipelineCapabilities`). Tenant data access in `src/shared/lib/repositories/pipeline.ts` and
-`pipeline-worker.ts` (worker reads via `withWorkerOrganization`, cloned from
-`repositories/alerts-worker.ts`) — every function takes `TenantTransaction` first and the modules
-never import the global `db`. Full function list in `tasks.md` Phase 3.
+(`pipelineCapabilities`). Their specs live in `tests/unit/shared/lib/pipeline/` (**new**) — this
+repo has no co-located tests under `src/`; `vitest.config.ts` includes only `tests/unit/**`.
+
+Tenant data access in `src/shared/lib/repositories/pipeline.ts` (**new**) and
+`src/shared/lib/repositories/pipeline-worker.ts` (**new**, worker reads via
+`withWorkerOrganization`, cloned from `repositories/alerts-worker.ts:10-27`) — every function takes
+`TenantTransaction` first and the modules never import the global `db`, which
+`pnpm security:boundaries` enforces. The digest itself is `src/lib/pipeline/worker.ts` (**new**),
+beside the existing `src/lib/alerts/worker.ts`. Full function list in `tasks.md` Phase 3.
 
 `ensureDefaultPipelineStages` is idempotent (`onConflictDoNothing`) and called lazily at the top
 of `loadBoard` and the stage-mutation routes, so organizations created after the migration seed
@@ -291,15 +339,28 @@ themselves without touching `better-auth.ts`'s bootstrap hook.
 
 ### API surface
 
-| Route | Method | Auth / gate |
+| Route (file under `src/routes/api/pipeline/`, all new) | Method | Auth / gate |
 | --- | --- | --- |
-| `/api/pipeline/board` | GET | tenant principal; `?stage=`, `?owner=`, `?cursor=` |
-| `/api/pipeline/builders/$builderId` | PATCH | `can('pipeline:move')`; body `{ stage?, ownerUserId?, expectedStage? }` |
-| `/api/pipeline/builders/$builderId/events` | GET | tenant principal |
-| `/api/pipeline/stages` | GET, POST | GET tenant principal; POST `can('pipeline:configure')` + `maxStages` |
-| `/api/pipeline/stages/$stageKey` | PATCH, DELETE | `can('pipeline:configure')`; DELETE needs `reassignTo` |
-| `/api/pipeline/stages/reorder` | POST | `can('pipeline:configure')` |
-| `/api/admin/pipeline/run-worker` | POST | `tryCronPrincipal ?? requirePlatformAdminPrincipal` |
+| `/api/pipeline/board` (`board.ts`) | GET | tenant principal; `?stage=`, `?owner=`, `?cursor=` |
+| `/api/pipeline/builders/$builderId` (`builders/$builderId.ts`) | PATCH | `can('pipeline:move')`; body `{ stage?, ownerUserId?, expectedStage? }` |
+| `/api/pipeline/builders/$builderId/events` (`builders/$builderId/events.ts`) | GET | tenant principal |
+| `/api/pipeline/stages` (`stages/index.ts`) | GET, POST | GET tenant principal; POST `can('pipeline:configure')` + `maxStages` |
+| `/api/pipeline/stages/$stageKey` (`stages/$stageKey.ts`) | PATCH, DELETE | `can('pipeline:configure')`; DELETE needs `reassignTo` |
+| `/api/pipeline/stages/reorder` (`stages/reorder.ts`) | POST | `can('pipeline:configure')` |
+| `/api/pipeline/stale` (`stale.ts`) | GET | tenant principal + `staleDigest` |
+| `/api/admin/pipeline/run-worker` (`admin/pipeline/run-worker.ts`) | POST | `tryCronPrincipal ?? requirePlatformAdminPrincipal` |
+
+The `stages.ts` + `stages/` file pair is deliberately written as `stages/index.ts` + `stages/*.ts`,
+matching `src/routes/api/alerts/index.ts` + `alerts/$id.ts`. A sibling `$builderId.ts` next to a
+`$builderId/` directory is also an existing pattern (`src/routes/api/builders/`), so the two
+`builders/` entries above are conventional.
+
+Every one of these routes uses `requireTenantPrincipal`/`withTenantContext` or
+`requirePlatformAdminPrincipal`, which is what `pnpm security:route-coverage`
+(`scripts/check-route-coverage.mjs`) requires of anything under `src/routes/api/**` that is not on
+its public allowlist. None of them may compare `principal.role` against a role literal —
+`pnpm security:boundaries` (`scripts/check-tenant-boundaries.mjs`) fails the build on that, which is
+why `pipeline:move`/`pipeline:configure` exist at all.
 
 `expectedStage` is the concurrency guard: if the row's current stage differs, respond
 `409 { error: 'stage_conflict', currentStage }` and the UI re-fetches instead of silently
@@ -308,41 +369,107 @@ overwriting a colleague's move. `PATCH` writes the row, the `changed_at` cache, 
 
 ### Background work (no queue)
 
-`POST /api/admin/pipeline/run-worker` clones `src/routes/api/admin/alerts/run-worker.ts` exactly
-(`tryCronPrincipal ?? requirePlatformAdminPrincipal`, `auditPlatformAdminAction`). Per
-organization, in its own worker transaction: skip unless `pipelineCapabilities(...).staleDigest`;
-collect cards whose stage has `stale_after_days` and whose `pipeline_stage_changed_at` is older
-than that; email each card's **assigned owner** via a new `sendPipelineStaleDigestEmail` in
-`src/shared/lib/email.ts`, modelled on `sendAlertDigestEmail`. Unassigned stale cards are counted
-but emailed to nobody — an owner fallback would require `organization_members` access the worker
-role does not have, and the board already shows staleness visually. Idempotent: a run is skipped
-for an org whose newest event is younger than 20 h, so a double cron hit does not double-email.
-Cron cadence: daily. No new env vars — it degrades to a no-op when `RESEND_API_KEY` is unset.
+`POST /api/admin/pipeline/run-worker` clones `src/routes/api/admin/alerts/run-worker.ts`. That
+route has three moving parts today, all of which the clone must carry — the alerts route was
+extended after this plan was first written and a two-part clone would now be wrong:
+
+1. `tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)`.
+2. `withJobRun({ jobKey: 'pipeline.stale-digest' }, …)`, which opens and closes exactly one
+   `job_runs` row per scheduled run and maps the worker's counters onto
+   `{ processedCount, failedCount, payload }`. `builderhunt_worker` holds
+   `SELECT, INSERT, UPDATE` on `job_runs` and `SELECT, UPDATE` on `operational_schedules`
+   (`drizzle/0067_operational_schedule_grants.sql:22-23`), so no new grant is needed —
+   but the job key **must** be registered in `OPERATIONAL_SCHEDULES`
+   (`src/shared/lib/operational-schedules.ts`) or the run gets a null `schedule_id` and never
+   appears on the operations calendar. `pipeline.stale-digest` is unclaimed; the registry's
+   `assertRegistryIsSafe` requires the `sourceRoute` to start with `/api/admin/`, which it does.
+3. `auditPlatformAdminAction(principal, { action: 'admin.worker.run', targetType: 'worker', targetId: 'pipeline', result: 'allowed' })`
+   — note the principal is the **first positional argument**, and `targetType`/`result` are
+   required alongside `action`/`targetId`.
+
+Per organization, in its own worker transaction: skip unless
+`pipelineCapabilities(...).staleDigest`; collect cards whose stage has `stale_after_days` and whose
+`pipeline_stage_changed_at` is older than that; email each card's **assigned owner** via a new
+`sendPipelineStaleDigestEmail` in `src/shared/lib/email.ts`, modelled on `sendAlertDigestEmail`
+(`src/shared/lib/email.ts:249`). That model has three branches in this order and the clone must
+keep all three: the `isE2EOutboxActive()` short-circuit into `dispatchEmail` (the E2E outbox seam —
+`dispatchEmail` **throws** outside `E2E_MODE=true`, so it can never be the only branch), the
+`!env.RESEND_API_KEY` dev-mode console preview, then the real Resend `fetch`.
+
+Unassigned stale cards are counted but emailed to nobody — an owner fallback would require
+`organization_members`, which `builderhunt_worker` has no grant on at all. Resolving an owner's
+address uses the `GRANT SELECT (id, email) ON auth_users` the worker already has
+(`drizzle/0010_worker_alert_policies.sql:29`), the same read `alerts-worker.ts`'s
+`findWorkerUserEmail` performs. Idempotent: a run is skipped for an org whose newest digest event is
+younger than 20 h, so a double cron hit does not double-email. Cron cadence: daily. No new env
+vars — it degrades to a no-op when `RESEND_API_KEY` is unset.
+
+Reading the cards themselves needs no new grant either: `drizzle/0018_enrichment_worker_target_access.sql:6-12`
+already gives `builderhunt_worker` an org-scoped SELECT policy **and** a table-level
+`GRANT SELECT ON organization_builders`, and a table-level grant covers the three columns this plan
+adds. Only the two new pipeline tables need worker SELECT policies and grants of their own.
 
 The worker resolves the tier through a narrow `getWorkerEntitlementPolicy` (three columns of
-`organization_entitlements` + the pure `resolveEntitlementPolicy`), **not**
-`getOrganizationEntitlement` — that helper also reads `billing_subscriptions`, which no migration
-grants to `builderhunt_worker`. The one column-scoped worker grant this needs ships in the same
+`organization_entitlements` fed to the pure `resolveEntitlementPolicy`,
+`src/shared/lib/repositories/entitlements.ts:53`), **not** `getOrganizationEntitlement`
+(`entitlements.ts:78-100`).
+
+The reason is `organization_entitlements`, and only that. Every `GRANT … TO builderhunt_worker` in
+`drizzle/*.sql` was re-enumerated at HEAD, multi-line statements included, and
+`organization_entitlements` appears in none of them: `drizzle/0008_tenant_rls.sql:45,108` gives it
+an app-only policy and an app-only grant, `0010` (the full worker grant set) omits it, and nothing
+since has added it. So `getOrganizationEntitlement` fails with `42501` on its *first* query when run
+as `builderhunt_worker`.
+
+An earlier draft of this plan also claimed `billing_subscriptions` has no worker grant. **That is
+false** — `drizzle/0028_billing_rls_grants.sql:294-298` grants `builderhunt_worker`
+`SELECT, INSERT, UPDATE` on it (inside a multi-line table list, which is how the original audit
+missed it), backed by org-scoped worker policies at `:166-174`. Its second query is fine.
+
+The narrow helper therefore stays, but as a least-privilege choice rather than a necessity: with the
+column-scoped `organization_entitlements` grant in place, `getOrganizationEntitlement` *would* work
+as the worker. It is still the wrong call here — `pipelineCapabilities(...).staleDigest` reads only
+`tier`, so pulling a subscription row to compute a `paymentBlocked` flag that never reaches a
+predicate is a second table read and a second failure mode for nothing. `paymentBlocked` is passed
+as a hard-coded `false`. The one column-scoped worker grant this does need ships in the same
 RLS/grants migration as the two new tables.
 
 ## UX integration
 
-- New nav entry `{ to: '/pipeline', icon: KanbanSquare, label: 'Pipeline', end: false }` in the
-  existing `NAV` const of `src/modules/dashboard/ui/shell/DashboardLayout.tsx:22-28`, between
-  Search and Sprints (`MOBILE_NAV_ITEMS` at `:31` derives from it, so mobile follows for free).
-  New route `src/routes/_dashboard/pipeline/index.tsx`.
-- `src/modules/pipeline/components/`: `PipelineBoard.tsx` (columns, filters, stage settings
-  entry), `StageColumn.tsx` (header with label + count + SLA dot, "Load more"), `PipelineCard.tsx`
-  (avatar, name, source, owner chip, "Nd in stage", stale badge), `CardDetailDrawer.tsx`
-  (stage history from `/events` + the existing notes endpoints), `StageSettingsDialog.tsx`.
-  Built from existing `src/components/ui` primitives (`Button`, `Input`, `Select`, `dialog`).
+- Navigation goes into `src/modules/dashboard/ui/shell/nav-config.ts`, **not** into
+  `DashboardLayout.tsx`. The flat `NAV`/`MOBILE_NAV_ITEMS` arrays this plan was written against are
+  gone; Shell C derives the rail, the level-2 panel, the breadcrumb and the mobile drawer from the
+  single `NAV_AREAS` array, and `DashboardLayout.tsx` only composes the regions.
+  There is already an area with `id: 'pipeline'`, `label: 'Pipeline'`, owning
+  `routes: ['/sprints', '/calendar']`. The board joins that area — it does not get a new one:
+  - append `'/pipeline'` to that area's `routes` (prefix ownership is what lights the rail;
+    without it `resolveActiveArea('/pipeline')` silently falls back to Home);
+  - append `{ to: '/pipeline', label: 'Board', icon: KanbanSquare, group: 'Pipeline', exact: true }`
+    to its `items`. `KanbanSquare` is exported by the installed `lucide-react`.
+  An item may only be listed under an area that owns its prefix — `nav-config.test.ts` asserts this,
+  because an item under the wrong area swaps the rail out from under the user on click. Label
+  "Board" rather than "Pipeline" so `breadcrumbFor` renders `Pipeline › Board` instead of
+  collapsing to a single crumb.
+  New route `src/routes/_dashboard/pipeline/index.tsx` (**new**), mirroring
+  `src/routes/_dashboard/sprints/index.tsx`.
+- `src/modules/pipeline/components/` (**all new**): `PipelineBoard.tsx` (columns, filters, stage
+  settings entry), `StageColumn.tsx` (header with label + count + SLA dot, "Load more"),
+  `PipelineCard.tsx` (avatar, name, source, owner chip, "Nd in stage", stale badge),
+  `CardDetailDrawer.tsx` (stage history from `/events` + the existing notes endpoints),
+  `StageSettingsDialog.tsx`.
+  Built from existing `src/components/ui` primitives — verified present: `button.tsx`, `input.tsx`,
+  `select.tsx`, `dialog.tsx`, `label.tsx`.
 - **Accessibility is not an afterthought**: HTML5 drag-and-drop (no new dependency) is the mouse
   affordance, and every card also has a keyboard/screen-reader "Move to…" `Select` that hits the
   same PATCH. Column changes announce via an `aria-live` region.
 - Free tier: "Add stage" and the SLA field render locked with a Pro/Team pill linking to
   `/pricing`; everything else is fully enabled.
 - `/exports`: `GET /api/me/builders` and `GET /api/export/builders` gain `pipelineStage`,
-  `pipelineStageChangedAt`, and `pipelineOwner` — the CSV is where this feature's "why" started.
+  `pipelineStageChangedAt`, and `pipelineOwnerUserId` — the CSV is where this feature's "why"
+  started. Both routes build their rows from `listOrganizationBuilders`, whose column list is the
+  shared `privateBuilderFields` object (`repositories/organization-builders.ts:31-47`); the three
+  columns are added there once and both consumers pick them up. `/api/export/builders` additionally
+  passes its rows through `filterSuppressed` — leave that in place.
 
 ## Success metrics
 
@@ -371,6 +498,41 @@ RLS/grants migration as the two new tables.
   `system-deleted-user` as actor (see the RESOLVED section above).
 - **Stage filter + owner filter together**: both are indexed predicates on the same composite
   scan; combining them narrows, never fans out.
-- **`ats-integrations` handoff**: external status maps to a stage key and writes through
-  `moveBuilderStage(..., { source: 'ats' })`. It must never write `pipeline_stage` directly —
-  that is the contract this plan owes its blocked consumer.
+- **`ats-integrations` handoff**: see the published contract below.
+
+## Published stage-model contract
+
+`ats-integrations` is build-order item 8 and is hard-blocked on this plan (item 3) because it maps
+each external ATS status onto this stage model. The stage model is therefore a **published
+contract**, not an internal detail. These six clauses are what a downstream plan may rely on; a
+change to any of them is a breaking change that must be coordinated with every consumer.
+
+1. **A stage is identified by `(organization_id, key)`.** `key` is an immutable
+   `^[a-z0-9_]{1,32}$` slug and is the composite primary key of `organization_pipeline_stages`.
+   `label` is display-only and may be renamed at any time; nothing may key off it. `position` is
+   presentation order and is renumbered by `reorderStages`; nothing may key off it either.
+2. **The default set is exactly five keys, in this order**: `new`, `reviewed`, `contacted`,
+   `in_conversation`, `hired` (`hired` is the only `is_terminal` default). They exist for every
+   organization — seeded by the Phase 1 data migration for organizations that predate it, and
+   lazily by `ensureDefaultPipelineStages` for every organization created after. A consumer that
+   only ever maps onto these five keys never has to handle a missing stage.
+3. **A card's stage is nullable and NULL is not "no stage"** — it means "the organization's
+   `position = 0` stage". Every reader must resolve it with `resolveStageForCard`, never treat NULL
+   as absent. New cards from `trackOrganizationBuilder` always start NULL.
+4. **The only sanctioned write path is `moveBuilderStage(tx, orgId, builderId, { toStage, actorUserId, expectedStage?, source })`.**
+   A consumer must never `UPDATE organization_builders SET pipeline_stage`: the function writes the
+   column, the `pipeline_stage_changed_at` cache and the `organization_builder_stage_events` audit
+   row in one transaction, and a direct update silently desynchronizes all three.
+5. **`source` is a closed set**, enforced by a check constraint:
+   `'ui' | 'automation' | 'ats' | 'import' | 'backfill'`. ATS write-back uses `'ats'`; the
+   deferred `pipeline-automation-rules` plan uses `'automation'`. Adding a sixth value is a
+   migration, not a code change.
+6. **Stage history is append-only and survives stage deletion.** `from_stage`/`to_stage` are
+   deliberately un-FK'd text so an audit row outlives the stage it names; consumers reading history
+   must tolerate a `to_stage` that no longer exists in `organization_pipeline_stages`. Events
+   cascade only when the card itself is untracked.
+
+Unresolvable external statuses are the consumer's problem, not this plan's: `ats-integrations` maps
+an unknown external status to *no* move and surfaces it, rather than inventing a stage. Creating
+stages is `pipeline:configure` + `canCustomizeStages` + `maxStages`, and a background sync holds
+none of those.

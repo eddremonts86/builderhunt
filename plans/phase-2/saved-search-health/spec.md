@@ -1,9 +1,9 @@
 # Saved Search Health (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`smart-alerts`](../../smart-alerts/spec.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../ai-sourcing-sprints/spec.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
+> **Depends on**: [`smart-alerts`](../../phase-1/smart-alerts/spec.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/ai-sourcing-sprints/spec.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
 > **Blocks**: nothing
-> **Reality check**: `saved_queries`, `alerts`, `alert_triggers`, `sourcing_sprints`, `sprint_results` all exist in `src/shared/lib/db/schema.ts`; saved searches are created/listed/deleted by `src/routes/api/queries/index.ts` and rendered as a Bento card (`SavedSearchRow`) inside `src/modules/dashboard/components/DashboardPage.tsx`. **There is no `/saved-searches` route** — `src/routes/_dashboard/` contains `alerts.tsx`, `search/`, `sprints/`, `exports/`, `dashboard/`, `me/`, `settings/`, `admin/` only. `/alerts` (`src/routes/_dashboard/alerts.tsx`) already owns alert configuration + the trigger inbox and must not be duplicated.
+> **Reality check**: `saved_queries`, `alerts`, `alert_triggers`, `sourcing_sprints`, `sprint_results`, `public_radars` all exist in `src/shared/lib/db/schema.ts`; saved searches are created/listed/deleted by `src/routes/api/queries/index.ts` and rendered as a Bento card (`SavedSearchRow`) inside `src/modules/dashboard/components/DashboardPage.tsx`. **There is no `/saved-searches` route** — `src/routes/_dashboard/` contains `route.tsx`, `alerts.tsx`, `admin/`, `builder/`, `calendar/`, `dashboard/`, `exports/`, `me/`, `search/`, `settings/`, `solutions/`, `sprints/`. `/alerts` (`src/routes/_dashboard/alerts.tsx`) already owns alert configuration + the trigger inbox and must not be duplicated.
 
 ## Problem
 
@@ -26,7 +26,7 @@ two "cannot judge yet" states (`unmonitored`, `too-new`). A weekly two-minute tr
 - **No LLM verdict.** The verdict is a pure function. AI appears only as an optional,
   additive "suggested keyword rewrite" rung that never changes the verdict.
 - **No cross-member roll-up.** An owner/admin does not get to see a colleague's saved-search
-  health; org-visible saved searches are owned by [`shared-resources`](../../shared-resources/spec.md)
+  health; org-visible saved searches are owned by [`shared-resources`](../../phase-1/shared-resources/spec.md)
   (`blocked`).
 - **No automatic deletion**, no auto-pausing of alerts. Every destructive action stays a click.
 - **No backfill** of the attribution columns Phase 0 starts populating. Pre-existing alerts and
@@ -35,56 +35,99 @@ two "cannot judge yet" states (`unmonitored`, `too-new`). A weekly two-minute tr
 
 ## The "cero schema nuevo" claim — RESOLVED: it is false, but only barely
 
-Verified against `src/shared/lib/db/schema.ts`, `src/shared/lib/repositories/organization-alerts.ts`,
-`src/shared/lib/repositories/saved-queries.ts`, `src/lib/alerts/worker.ts` and
-`src/lib/sprints/service.ts`:
+Re-verified at HEAD (2026-07-27) against `src/shared/lib/db/schema.ts`,
+`src/shared/lib/repositories/organization-alerts.ts`, `src/shared/lib/repositories/saved-queries.ts`,
+`src/lib/alerts/worker.ts` and `src/lib/sprints/service.ts`:
 
 | Claimed input                       | Reality today                                                                                                                                                                            | Verdict                                            |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| "alerts fired" per saved search      | `alerts.query_id` exists (+ composite tenant FK `alerts_organization_query_fk`) but **is written by nothing**: `CreateBody` in `src/routes/api/alerts/index.ts` has no `queryId`, and `CreateOrganizationAlertInput` has no `queryId` field. Grep for `queryId` outside `schema.ts` returns zero hits. | Dead column. Needs **wiring, no new column**.        |
+| "alerts fired" per saved search      | `alerts.query_id` exists (`schema.ts:322`) plus the composite tenant FK `alerts_organization_query_fk` (`schema.ts:362`) but **is written by nothing**: `CreateBody` in `src/routes/api/alerts/index.ts` has no `queryId`, `UpdateBody` in `src/routes/api/alerts/$id.ts` has no `queryId`, and `CreateOrganizationAlertInput` / `UpdateOrganizationAlertInput` have no `queryId` field. `grep -rn queryId src/ \| grep -v 'savedQueryId\|firstQueryId'` returns exactly two hits, both in `schema.ts`. | Dead column. Needs **wiring, no new column**.        |
 | "alerts you opened"                  | `alert_triggers.read_at` exists **and is written** — `PATCH /api/alerts/triggers/$id` → `markOrganizationTriggerRead`, driven by the "Mark as read" button in `src/routes/_dashboard/alerts.tsx`.                                                                                                     | Available, but it means *acknowledged*, not opened. |
-| "% of results you interacted with"   | `organization_builders` has no reference to the search that surfaced the builder. `alert_triggers.builder_id` is `NULL` for every keyword alert (the common case — `worker.ts` passes `builderId: null`), but `payload.source` / `payload.sourceId` **are** always written.                            | Computable via a join, with a stated caveat.        |
-| sprint results as evidence           | `sourcing_sprints` has `criteria` / `variants` (derived from a pasted job description) and **no `saved_query_id`**. Sprints are created by `createSprint` in `src/lib/sprints/service.ts` from `createSprintSchema`.                                                                                    | Needs **one new nullable column**.                  |
+| "% of results you interacted with"   | `organization_builders` has no reference to the search that surfaced the builder. `alert_triggers.builder_id` is `NULL` for every keyword alert (the common case — `worker.ts:174` passes `builderId: null`), but `payload.source` / `payload.sourceId` / `payload.name` **are** always written (`worker.ts:153-167`).                            | Computable via a join, with a stated caveat.        |
+| sprint results as evidence           | `sourcing_sprints` has `criteria` / `variants` (derived from a pasted job description) and **no `saved_query_id`**. Sprints are created by `createSprint` in `src/lib/sprints/service.ts` from `createSprintSchema` (which is `.strict()`).                                                                                    | Needs **one new nullable column**.                  |
 
 **Minimum honest addition (all expand-only, zero new tables):**
 
-1. Wire the existing `alerts.query_id`: add `queryId?: string` to `CreateBody` and to
-   `CreateOrganizationAlertInput`, plus `PATCH /api/alerts` to attach/detach an existing alert.
+1. Wire the existing `alerts.query_id`: add `queryId?: string | null` to `CreateBody`
+   (`POST /api/alerts`), to `UpdateBody` on the **already-existing** `PATCH /api/alerts/$id`, and
+   to `CreateOrganizationAlertInput` / `UpdateOrganizationAlertInput`. No new route is needed —
+   `src/routes/api/alerts/$id.ts` already exists and already calls `updateOrganizationAlert`.
 2. **Latent bug this activates**: both FKs on `alerts.query_id`
-   (`alerts_query_id_saved_queries_id_fk` from `drizzle/0000`, `alerts_organization_query_fk` from
-   `drizzle/0003`) are `ON DELETE NO ACTION`. Today that is harmless because the column is always
-   `NULL`; the moment it is populated, `deleteSavedQuery` starts failing with an FK violation
-   (a 500 from `DELETE /api/queries`). Phase 0 must re-create both as `ON DELETE SET NULL`, the
-   composite one with an explicit column list (`ON DELETE SET NULL (query_id)`) so the delete does
-   **not** also null out `organization_id`. Requires PostgreSQL ≥ 15; production runs
-   `pgvector/pgvector:pg16`. The action itself goes into `schema.ts` (drizzle-orm 0.45.2's
-   `UpdateDeleteAction` includes `'set null'`); the **column list cannot be expressed in Drizzle**,
-   so that one detail stays a documented, commented divergence between the snapshot and the
-   database — see the migration task in tasks.md.
+   (`alerts_query_id_saved_queries_id_fk`, `drizzle/0000_tranquil_hemingway.sql:261`;
+   `alerts_organization_query_fk`, `drizzle/0003_tenant_expand.sql:17`) are `ON DELETE no action`,
+   and no later migration alters them (`grep -rn alerts_organization_query_fk drizzle/*.sql`
+   matches only those two files). Today that is harmless because the column is always `NULL`; the
+   moment it is populated, `deleteSavedQuery` starts failing with an FK violation (a 500 from
+   `DELETE /api/queries`). Phase 0 must re-create both as `ON DELETE SET NULL`, the composite one
+   with an explicit column list (`ON DELETE SET NULL (query_id)`) so the delete does **not** also
+   null out `organization_id`. Requires PostgreSQL ≥ 15; every environment runs
+   `pgvector/pgvector:pg16` (`docker-compose.yml:8`, `.github/workflows/quality.yml:16`). The
+   action itself goes into `schema.ts` (drizzle-orm 0.45.2's `UpdateDeleteAction` in
+   `node_modules/drizzle-orm/pg-core/foreign-keys.d.ts:4` includes `'set null'`); the **column list
+   cannot be expressed in Drizzle**, so it ships as a separate `--custom` migration and a
+   documented divergence between the snapshot and the database — see the migration tasks in
+   tasks.md.
+   *Partially mitigated elsewhere, not fixed*: `hardDeleteAccountSubject`
+   (`src/shared/lib/repositories/account-privacy.ts`) already deletes `alerts` before
+   `saved_queries` to dodge exactly this FK (see `plans/phase-1/legal-and-compliance/tasks.md`,
+   "Purge cascade covers the new data"). That covers account deletion only. The
+   `DELETE /api/queries` path — the one this plan's `kill` action uses — is still unprotected.
 3. New nullable `sourcing_sprints.saved_query_id text` + composite tenant FK
    `(organization_id, saved_query_id) → saved_queries(organization_id, id) ON DELETE SET NULL
    (saved_query_id)` + index `(organization_id, saved_query_id)`. Populated by one entry point:
    "Run a sourcing sprint from this search" on the health page.
-4. Supporting index `alert_triggers (organization_id, alert_id, matched_at DESC)` —
-   `alert_triggers` has only `(organization_id, id)` today, and the aggregate filters on
-   `alert_id` + `matched_at`.
+4. Supporting index `alert_triggers (organization_id, alert_id, matched_at)` —
+   `alert_triggers` has only `alert_triggers_organization_id_id_unique`
+   (`drizzle/0003_tenant_expand.sql:7`) today, and the aggregate filters on `alert_id` +
+   `matched_at`.
 
 Data classes are unchanged: `saved_queries` / `alerts` / `alert_triggers` / `sourcing_sprints` /
-`sprint_results` are all **tenant private** (`organization_id`) and already carry RLS + FORCE RLS
-(`drizzle/0008_tenant_rls.sql`, `drizzle/0024_sourcing_sprints_grants.sql`). Grants are table-level
-(`GRANT … ON TABLE`), so the new column inherits them — no new policy or grant migration is needed,
-but the isolation suite must still prove it (see "Multi-tenancy").
+`sprint_results` are all **tenant private** (`organization_id`, `NOT NULL` on all of them since
+`drizzle/0081`) and already carry RLS + FORCE RLS (`drizzle/0008_tenant_rls.sql`,
+`drizzle/0024_sourcing_sprints_grants.sql`).
+
+**Grant check (per [`security-policy.md`](../../_meta/security-policy.md) §4 and
+[`app-reality.md`](../../_meta/app-reality.md) constraint #7).** Every statement this plan issues,
+against the real `GRANT` that authorises it:
+
+| Statement | Role | Authorising GRANT |
+| --- | --- | --- |
+| `SELECT` on `saved_queries`, `alerts`, `alert_triggers`, `organization_builders` | `builderhunt_app` | `drizzle/0008_tenant_rls.sql:110-118` (`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE …`) |
+| `UPDATE alerts SET query_id = …` (attach/detach) | `builderhunt_app` | same statement — table-level, so the column inherits; RLS `alerts_app_update` policy created by the `DO $$` loop at `drizzle/0008_tenant_rls.sql:56-90` |
+| `INSERT INTO sourcing_sprints (… saved_query_id)` | `builderhunt_app` | `drizzle/0024_sourcing_sprints_grants.sql:55` — table-level, new column inherits |
+| `SELECT` on `sprint_results` | `builderhunt_app` | `drizzle/0024_sourcing_sprints_grants.sql:56` |
+| `SELECT` on `builder_identities` | `builderhunt_app` | `drizzle/0011_builder_claim_policies.sql:31` |
+| `SELECT` on `public_radars` | `builderhunt_app` | `drizzle/0054_public_radars_grants.sql:9` (table has deliberately no RLS — see the `publicRadars` comment in `schema.ts`; the aggregate filters `organization_id` explicitly) |
+| `DELETE FROM saved_queries` (the `kill` action) | `builderhunt_app` | `drizzle/0008_tenant_rls.sql:110-118` + the loop's `saved_queries_app_delete` policy |
+
+No new policy or grant migration is needed. The FK's `SET NULL` action itself runs as a PostgreSQL
+referential-integrity trigger, which bypasses RLS and the caller's privileges by design — but that
+is exactly the kind of assumption this repo has been burned by, so Phase 0's verification deletes a
+linked saved query **as `builderhunt_app`**, not as the owner.
 
 ## What is not measurable — stated, not faked
 
-- **Alert email opens / click-throughs**: no tracking pixel, no click wrapper in
-  `src/shared/lib/email.ts`. Not reported at all.
-- **"Alerts you opened"**: `read_at` is a manual in-app acknowledgement and `Mark all as read` in
-  `alerts.tsx` bulk-sets it. Ships labelled **"acknowledged"** with that caveat in the tooltip;
-  the word "opened" never appears in the UI.
-- **RSS consumption**: `/api/feeds/$searchId.xml` records nothing (`public-feeds.ts` has no write
-  path), so an RSS-only search looks dead. The card shows "RSS activity not tracked" when a feed
-  token exists. A counter is out of scope.
+- **Alert email opens / click-throughs**: no tracking pixel and no click wrapper in
+  `src/shared/lib/email.ts` — the file states the rule outright ("No tracking parameters, ever",
+  `email.ts:136`). Not reported at all.
+- **"Alerts you opened"**: `read_at` is a manual in-app acknowledgement, and `Mark all as read` in
+  `alerts.tsx:212-226` fires one `PATCH /api/alerts/triggers/$id` per unread trigger in parallel —
+  a genuine bulk set. Ships labelled **"acknowledged"** with that caveat in the tooltip; the word
+  "opened" never appears in the UI.
+- **RSS consumption**: `src/routes/api/feeds/$searchId.ts` (URL `/api/feeds/:searchId.xml`) records
+  nothing — `src/shared/lib/repositories/public-feeds.ts` contains a single read function and no
+  write path. A counter is out of scope.
+- **"Which searches even have a feed"**: **not a question with an answer.** `GET /api/queries`
+  mints `feedToken: createFeedCapability(...)` for *every* saved query it returns
+  (`src/routes/api/queries/index.ts:43-47`), and `createFeedCapability`
+  (`src/shared/lib/security/feed-capability.ts`) is a stateless HMAC — nothing is persisted, no
+  token is revocable, no row records that a feed was ever handed out. A `hasFeed` flag would
+  therefore be `true` for 100 % of rows and carry zero information. The RSS caveat is a single
+  page-level footnote instead of a per-row badge. What *is* per-row and real is
+  `public_radars` — a persisted public share of one saved query
+  (`schema.ts:305-316`, `drizzle/0054_public_radars_grants.sql`), created from `SavedSearchRow`'s
+  Share action. That is surfaced as `hasPublicRadar`, because publicly sharing a search is a
+  strong reason not to silently `kill` it.
 - **Causality**: a surfaced builder may have been found elsewhere. The metric is a time-ordered
   co-occurrence, labelled exactly that: *"surfaced, then tracked"*.
 
@@ -94,7 +137,8 @@ but the isolation suite must still prove it (see "Multi-tenancy").
 
 Window: `WINDOW_DAYS = 30`, ending `now`.
 
-- `linkedAlertCount` / `enabledAlertCount` — `alerts` where `query_id = savedQuery.id`.
+- `linkedAlertCount` / `enabledAlertCount` — `alerts` where `query_id = savedQuery.id`
+  (`enabled` is nullable, so the enabled counter uses `FILTER (WHERE enabled IS TRUE)`).
 - `triggersFired` — `alert_triggers` of those alerts, `matched_at` in window;
   `triggersAcknowledged` — of those, `read_at IS NOT NULL`; `lastTriggerAt` — all-time max.
 - `surfacedIdentities` — distinct `(source, sourceId)` surfaced in window by either evidence
@@ -103,13 +147,23 @@ Window: `WINDOW_DAYS = 30`, ending `now`.
 - `usefulMatches` — of those, the ones joining an `organization_builders` row (via
   `builder_identities` on `(source, source_id)`) with `status IN ('tracked','shortlisted')` and
   `created_at >= surfaced_at - INTERVAL '1 day'` (grace for worker/clock ordering).
+  `organization_builders.status` is constrained to `('tracked','shortlisted','archived')` by
+  `organization_builders_status_check`, so the two-value filter is exhaustive of "kept".
   `lastUsefulMatchAt` — same join, **all-time**, max tracked-at.
 - `conversionRate` = `usefulMatches / surfacedIdentities` (null when nothing was surfaced) — the
   honest version of "% of results you interacted with".
 
+**Nullable-timestamp hazard.** `saved_queries.created_at` and `alerts.created_at` are both
+`timestamp('created_at').defaultNow()` with **no** `.notNull()` (`schema.ts:287`, `schema.ts:346`),
+so both can be `NULL` in principle. `ageDays` therefore reads
+`coalesce(sq.created_at, now())` / `coalesce(min(a.created_at), now())`, which yields `ageDays = 0`
+and the `too-new` verdict — a refusal to judge, never a `kill` produced by a missing timestamp.
+`alert_triggers.matched_at`, `sprint_results.created_at` and `organization_builders.created_at`
+are all `.notNull()` and need no such guard.
+
 ### 2. The verdict — pure, deterministic, tested
 
-`src/shared/lib/saved-search-health.ts` (no I/O, no imports from `db/`):
+`src/shared/lib/saved-search-health.ts` (new; no I/O, no imports from `db/`):
 
 ```ts
 export type SavedSearchVerdict = "unmonitored" | "too-new" | "healthy" | "tune-query" | "kill";
@@ -192,17 +246,24 @@ Cost proof for the worst realistic tenant (50 saved searches, 5 000 lifetime tri
 | Step                                       | Access path                                                                               | Rows touched  |
 | ------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------- |
 | saved searches                             | `saved_queries_organization_id_id_unique` prefix scan on `organization_id`                 | 50            |
-| alerts grouped by `query_id`               | `alerts_organization_id_id_unique` prefix scan                                            | ≤ 200         |
-| triggers of linked alerts                  | **new** `alert_triggers (organization_id, alert_id, matched_at DESC)`                      | ≤ 5 000       |
+| alerts grouped by `query_id`               | `alerts_organization_id_id_unique` prefix scan, then filter on `query_id`                  | ≤ 200         |
+| triggers of linked alerts                  | **new** `alert_triggers (organization_id, alert_id, matched_at)`                           | ≤ 5 000       |
 | sprint results of linked sprints           | `sprint_results_sprint_created_idx` + **new** `sourcing_sprints (organization_id, saved_query_id)` | ≤ 2 000 |
 | identity resolution                        | `builder_identities_source_source_id_unique` index probe, one per surfaced pair            | ≤ 7 000 probes |
 | tracking resolution                        | `organization_builders_org_identity_unique` index probe                                   | ≤ 7 000 probes |
+| public-radar flag                          | `public_radars` PK (`saved_query_id`) probe, one per saved search                          | ≤ 50 probes   |
+
+All index names above were verified to exist in `src/shared/lib/db/schema.ts` at HEAD except the
+two marked **new**. There is deliberately no index on `alerts (organization_id, query_id)`: an
+organization is capped at 200 alerts by `PLAN_LIMITS`-adjacent reality, so the prefix scan is
+cheaper than a fourth index to maintain on the worker's hot write path.
 
 ≈ 14 k index probes, well under 250 ms uncached; cached 600 s at
-`ssh:v1:{organizationId}:{userId}` via `getRedis()` (same pattern as `src/lib/search.ts`), Redis
-absence tolerated. Flip trigger, recorded in plan.md's risks: p95 > 500 ms or > 200 saved searches
-in one organization ⇒ revisit with a snapshot table. Staleness shows as `computedAt`
-("updated 4 min ago") with a Refresh button that busts the key.
+`ssh:v1:{organizationId}:{userId}` via `getRedis()` from `~/shared/lib/redis` (same
+`get` / `set(..., 'EX', n)` shape as `src/lib/search.ts:58-116`), Redis absence tolerated. Flip
+trigger, recorded in plan.md's risks: p95 > 500 ms or > 200 saved searches in one organization ⇒
+revisit with a snapshot table. Staleness shows as `computedAt` ("updated 4 min ago") with a Refresh
+button that busts the key.
 
 ### 4. Read surface
 
@@ -214,8 +275,8 @@ interface SavedSearchHealthRow {
   name: string;
   keywords: string[];
   sources: string[];
-  createdAt: string;
-  hasFeed: boolean; // RSS exists -> "RSS activity not tracked" note
+  createdAt: string | null; // saved_queries.created_at is nullable
+  hasPublicRadar: boolean; // a public_radars row exists -> do not suggest deleting lightly
   metrics: {
     linkedAlertCount: number; enabledAlertCount: number;
     triggersFired: number; triggersAcknowledged: number;
@@ -227,48 +288,67 @@ interface SavedSearchHealthRow {
 }
 ```
 
-DTO allowlist only (no ORM rows, no trigger payloads, no builder identities) per
-`security-policy.md` §10.
+DTO allowlist only (no ORM rows, no `userId`, no trigger payloads, no builder identities) per
+[`security-policy.md`](../../_meta/security-policy.md) §10.
 
 ### 5. Optional AI rung — `saved-search-tune` (additive, never the verdict)
 
-Shown only on `tune-query` / `kill` rows, behind an explicit "Suggest a rewrite" button.
+Shown only on `tune-query` / `kill` rows, behind an explicit "Suggest a rewrite" button. The task
+id is unclaimed at HEAD: `AI_TASKS` in `src/shared/lib/ai/tasks.ts` registers exactly `ping`,
+`query-translate`, `outreach-draft`, `profile-enrich`, `jd-parse`, `criteria-decompose`,
+`filter-refine`, `synergy-analysis`, `alert-digest-summary`, `work-sample-analyze`,
+`fingerprint-v2`, `timeline-summary`.
 
 - **Tier**: `local-first` — interactive, ephemeral, this-user-only, nothing persisted
-  (`ai-policy.md` decision rule). Chrome AI first, `/api/ai/complete` (MiniMax M3) fallback.
+  ([`ai-policy.md`](../../_meta/ai-policy.md) decision rule). Chrome AI first,
+  `/api/ai/complete` (MiniMax M3) fallback.
 - **Input** `z.object({ name, keywords: z.array(z.string()).min(1).max(12), sources: z.array(z.string()), language: z.string().nullable(), country: z.string().nullable(), reason: z.enum(HEALTH_REASONS), triggersFired: z.number().int(), usefulMatches: z.number().int(), sampleTitles: z.array(z.string().max(200)).max(5) })`.
-  `sampleTitles` come from `alert_triggers.payload.name` — **external content**, wrapped in
-  `wrapUntrusted(...)` inside `buildPrompt`.
+  `sampleTitles` come from `alert_triggers.payload.name` (always written by `worker.ts:154`) —
+  **external content**, wrapped in `wrapUntrusted(...)` (`tasks.ts:740`) inside `buildPrompt`.
 - **Output** `z.object({ keywords: z.array(z.string().min(1)).min(1).max(8), remove: z.array(z.string()).max(8), rationale: z.string().min(1).max(240) })`.
 - `cacheTtlSeconds: 86400`, `allowances: { free: 0, pro: 50, team: 200 }`, `maxOutputTokens: 500`
-  (MiniMax M3 emits a `<think>` block — see the `ping` task's comment in `tasks.ts`).
+  (MiniMax M3 emits a `<think>` block — see the comment on `pingTask.maxOutputTokens` in
+  `tasks.ts:81-85`).
 - **Degradation ladder**: Chrome AI → MiniMax proxy → the static `REASON_GUIDANCE[reason]` string
   (always rendered anyway) → button hidden entirely when `/api/ai/config` reports disabled.
   The verdict, the metrics and the guidance text never depend on AI.
 
 ## UX integration
 
-- **New route** `src/routes/_dashboard/saved-searches/index.tsx` + component
-  `src/modules/dashboard/components/SavedSearchHealthPage.tsx`; new nav item ("Saved searches",
-  `Bookmark`) in `src/modules/dashboard/ui/shell/DashboardLayout.tsx` between Search and Sprints.
+- **New route** `src/routes/_dashboard/saved-searches/index.tsx` (new) + component
+  `src/modules/dashboard/components/SavedSearchHealthPage.tsx` (new).
+- **Navigation is registry-driven, not a flat array.** The dashboard shell reads
+  `NAV_AREAS` from `src/modules/dashboard/ui/shell/nav-config.ts` — a two-level rail (areas) +
+  panel (destinations) structure. `DashboardLayout.tsx` contains no nav literals. A destination
+  must be added as a `NavItem` (`{ to, label, icon, group?, badge?, exact? }` — there is no `end`
+  field) **and** its path prefix must be added to the owning area's `routes`, or
+  `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts` ("keeps every destination inside an
+  area that owns its prefix") fails. `/saved-searches` joins the **Discover** area, next to
+  `/search` and `/solutions`.
 - One card per search, ordered by `sortByHealth`: name + keywords, verdict pill (`kill` danger /
   `tune-query` warning / `healthy` success / `unmonitored`+`too-new` neutral), the four counters
-  with caveat tooltips, the guidance line.
+  with caveat tooltips, the guidance line, and a "Shared publicly" marker when `hasPublicRadar`.
 - Per-verdict primary action: `kill` → Delete (`DELETE /api/queries`, confirm dialog);
   `tune-query` → Suggest a rewrite (AI rung) + Run a sprint from this search (`POST /api/sprints`
-  with `savedQueryId`); `unmonitored` → Attach an alert (`PATCH /api/alerts`, or an upgrade hint on
-  free — alerts need `entitlement.paidActionsAllowed`); `healthy` → Run search.
-- `DashboardPage.tsx`'s saved-searches card gets a "N need attention" pill linking here. `/alerts`
-  is untouched and deep-linked for the trigger inbox.
+  with `savedQueryId`); `unmonitored` → Attach an alert (`PATCH /api/alerts/$id` with `queryId`,
+  or an upgrade hint on free — alerts need `entitlement.paidActionsAllowed`); `healthy` → Run
+  search (`/search?q=<keywords joined by space>`, exactly the `runUrl` `SavedSearchRow` builds
+  today at `DashboardPage.tsx:536`).
+- **Deleting a `kill` row cascades the public radar.** `public_radars_organization_query_fk` is
+  `ON DELETE cascade`, so removing a shared search silently kills its public `/r/$slug` page. The
+  confirm dialog must say so when `hasPublicRadar`.
+- `DashboardPage.tsx`'s saved-searches card gets a "N need attention" pill in its existing
+  `BentoTileHeader` `action` slot, linking here. `/alerts` is untouched and deep-linked for the
+  trigger inbox.
 
 ## Tier / billing gating
 
 The page and the verdict are **free for every tier** — telling a free user their search is dead is
 retention, not a paid feature. Only the AI rung is gated (`allowances.free = 0` + upgrade hint).
-No checkout or credit path is involved: entitlements resolve exactly as `POST /api/sprints` does
-(`getOrganizationEntitlement` + `resolveLegacyPlanTier`), so with `STRIPE_BILLING_ENABLED=false`
-the page behaves identically — free users just see `unmonitored` everywhere until they upgrade and
-can create an alert.
+No checkout or credit path is involved: entitlements resolve exactly as `POST /api/queries` does
+(`getOrganizationEntitlement` + `resolveLegacyPlanTier`, `src/routes/api/queries/index.ts:83-86`),
+so with `STRIPE_BILLING_ENABLED=false` (the `env.ts:141` default) the page behaves identically —
+free users just see `unmonitored` everywhere until they upgrade and can create an alert.
 
 ## Cost model (AI rung only)
 
@@ -279,22 +359,28 @@ MiniMax absorbs the rest at ~600 prompt + ≤ 500 output tokens. Free tier: zero
 ## Multi-tenancy
 
 - **Scope**: `WHERE organization_id = principal.organizationId AND user_id = principal.userId`.
-  `saved_queries` has **no `visibility` column**, so `can(principal, 'resource:read',
-  { creatorUserId: row.userId })` in `src/shared/lib/authorization/permissions.ts` can only ever
-  return true for the creator — an owner/admin gains nothing, deliberately. The route calls `can()`
-  per row before emitting a DTO rather than inferring from the query.
-- **Deliberately stricter than `/api/queries`**: that route runs `executeTenantRead(modes.read, …)`
-  where `legacy` filters `(userId, organizationId)` and `canonical` filters `organizationId` only,
-  and `TENANT_READ_MODE` defaults to `legacy`. Health always uses the `(organizationId, userId)`
-  filter — the strictest of the two — so it can never show a colleague's searches in either mode.
-  Widening it is `shared-resources`' job.
+  `saved_queries` has **no `visibility` column** (unlike `organization_builders`, which does), so
+  `can(principal, 'resource:read', { creatorUserId: row.userId })` in
+  `src/shared/lib/authorization/permissions.ts:81-84` can only ever return true for the creator —
+  an owner/admin gains nothing, deliberately. The route calls `can()` per row before emitting a
+  DTO rather than inferring from the query.
+- **Deliberately stricter than `/api/queries`**: that route calls
+  `resolveTenantReadMode(env, { canonicalReady: env.TENANT_CANONICAL_READY })` from
+  `src/shared/lib/migration/tenant-flags.ts` and then picks `listSavedQueries` (organization only)
+  or `listLegacySavedQueries` (`userId` **and** `organizationId`); `TENANT_READ_MODE` defaults to
+  `legacy` (`env.ts:36`, `.env.example:33`) and `canonical` additionally requires
+  `TENANT_CANONICAL_READY=true`. Health always uses the `(organizationId, userId)` filter — the
+  strictest of the two — so it can never show a colleague's searches in either mode. Widening it
+  is `shared-resources`' job.
 - Every query runs inside `withTenantContext(principal, tx => …)` from a repository module
-  (`src/shared/lib/repositories/saved-search-health.ts`) that never imports the global `db`.
+  (`src/shared/lib/repositories/saved-search-health.ts`, new) that never imports the global `db`.
+  `pnpm security:boundaries` (`scripts/check-tenant-boundaries.mjs`) enforces this mechanically:
+  any file under `/repositories/` importing `~/shared/lib/db/index` is a hard failure.
 - Threat cases proven by extending `scripts/db/verify-api-isolation-local.mjs`
   (`pnpm test:api-isolation:local`): unauthenticated; no active organization; A's session vs B's
-  saved-query id in the `?savedQueryId=` selector (404, no existence leak); B's triggers absent
-  from A's counters; B's sprint results absent from A's `usefulMatches`; attaching A's alert to B's
-  saved query rejected; `builderhunt_app` direct SQL without RLS context returns zero rows.
+  saved-query id (404, no existence leak); B's triggers absent from A's counters; B's sprint
+  results absent from A's `usefulMatches`; attaching A's alert to B's saved query rejected;
+  `builderhunt_app` direct SQL without RLS context returns zero rows.
 
 ## Success metrics
 
@@ -307,19 +393,25 @@ MiniMax absorbs the rest at ~600 prompt + ≤ 500 output tokens. Free tier: zero
 
 ## Resolved edge cases
 
-- **Free tier**: cannot create alerts (`paidActionsAllowed`), so every search is `unmonitored`.
-  The card shows "Alerts are a Pro feature" instead of the attach action — never a `kill` verdict
-  a free user cannot act on.
+- **Free tier**: cannot create alerts (`paidActionsAllowed` is false unless
+  `active && tier !== 'free' && !paymentBlocked`, `entitlements.ts:72`), so every search is
+  `unmonitored`. The card shows "Smart alerts are a Pro feature" instead of the attach action —
+  never a `kill` verdict a free user cannot act on.
 - **Alert attached today, search 6 months old**: `linkedAlertCount > 0` but `ageDays >= 60` with
   no history. Rule 3 would say `kill`. Mitigation: `ageDays` is
   `min(daysSince(savedQuery.createdAt), daysSince(oldest linked alert.createdAt))` — the
   observation window cannot precede the first alert. Stated in the pure function's contract and
   unit-tested.
+- **Missing `created_at`**: both timestamps are nullable; `coalesce(..., now())` yields
+  `ageDays = 0` → `too-new`. A missing timestamp can never manufacture a `kill`.
 - **Search deleted while an alert points at it**: fixed by the `ON DELETE SET NULL (query_id)`
   migration; the alert survives, orphaned, and shows up on `/alerts` unchanged.
+- **Search deleted while a public radar points at it**: `public_radars` cascades and the public
+  page 404s. Surfaced in the confirm dialog, not prevented.
 - **Trigger payload missing `source`/`sourceId`** (hand-made rows via
-  `POST /api/alerts/test-trigger`, which takes a free-form payload): those triggers count toward
-  `triggersFired` but contribute no `surfacedIdentities`. Nulls are filtered in SQL, never coerced.
+  `POST /api/alerts/test-trigger`, whose body takes a free-form
+  `event.payload: z.record(z.string(), z.unknown())`): those triggers count toward `triggersFired`
+  but contribute no `surfacedIdentities`. Nulls are filtered in SQL, never coerced.
 - **Same identity surfaced by two searches**: counted for both. Attribution is intentionally
   non-exclusive; the metric answers "did this search surface something useful", not "who gets credit".
 - **Sprint linked to a search after the fact**: only `sprint_results` rows already stored count,

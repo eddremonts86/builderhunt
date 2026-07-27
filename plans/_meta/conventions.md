@@ -45,7 +45,27 @@ Every plan directory contains exactly three files:
    it names the key it owns (e.g. `metadata.aiEnrichment`) and lists other plans sharing
    that surface. Shared surfaces so far: `builders.metadata` (namespaced keys),
    `PLAN_LIMITS`/`PLAN_PRICING` (billing-shared.ts), the search pipeline (`src/lib/search.ts`),
-   the AI task registry (`src/shared/lib/ai/tasks.ts`), the HTTP-cron worker pattern.
+   the AI task registry (`src/shared/lib/ai/tasks.ts`), the HTTP-cron worker pattern,
+   the dashboard nav registry `NAV_AREAS` (`src/modules/dashboard/ui/shell/nav-config.ts`) —
+   adding a destination means editing BOTH the area's `items` and its `routes` prefix list, or
+   `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts` fails on registry integrity,
+   and `src/lib/sources/types.ts`'s `SOURCE_NAMES` (any plan enumerating connectors by hand
+   goes stale the moment a source ships — type the enumeration as `Record<SourceName, …>` so
+   `pnpm type-check` catches it instead of a reviewer),
+   `OPERATIONAL_SCHEDULES` (`src/shared/lib/operational-schedules.ts`) — `jobKey` is globally
+   unique and every new worker registers there, wrapped in `withJobRun({ jobKey })`,
+   and `SEO_SURFACES` (`src/shared/lib/seo/surfaces.ts`) — a governed registry whose
+   `DEFAULT_DIRECTIVES` fail closed to `noindex`, so a plan adding a public page that does not
+   register a surface ships that page silently unindexed.
+
+   **Allowance tables have a specific hazard.** An allowance that is also *advertised* (on
+   `/pricing`, in `PLAN_PRICING.features`) must be keyed `Record<OrganizationTier, number>` and
+   read from `entitlement.tier` directly. Do NOT key it `Record<PlanTier, number>` and launder it
+   through `resolveLegacyPlanTier`, which lossily collapses `pro_max` into `team`: that is the
+   exact shape that let `/pricing` and the enforcing route disagree for seven sprints
+   (post-mortem in `src/shared/lib/billing-shared.ts` above `SOURCING_SPRINT_LIMITS`).
+   `PLAN_SEAT_LIMITS` remains `Record<PlanTier, number>` legitimately, so the presence of that
+   type is not itself the bug — an advertised allowance using it is.
 7. **Background work** uses the idempotent HTTP-triggered worker pattern
    (`/api/admin/*/run-worker` hit by VPS cron) — no new queue systems.
 8. **Plan-tier gating**: features promised in `PLAN_PRICING` must map to a limit or gate in

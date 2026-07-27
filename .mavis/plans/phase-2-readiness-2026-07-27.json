@@ -1,0 +1,68 @@
+{
+  "id": "phase-2-readiness-2026-07-27",
+  "goal": "Bring all 14 plans/phase-2 trios (spec.md/plan.md/tasks.md) to genuine implementation-ready state against master HEAD, so a developer can execute any tasks.md top-to-bottom tomorrow without discovering that the plan describes a codebase that no longer exists. No feature implementation — only plan documents change.",
+  "created": "2026-07-27",
+  "orchestrator": "claude-opus-5",
+  "preconditions_verified_by_orchestrator": [
+    "drizzle head is 0085 (86 journal entries), not 0045 as the phase-2 README claims",
+    "0084/0085 are untracked working-tree WIP: candidate_documents + document_extractions + their RLS/grants",
+    "zero co-located tests remain in src/; vitest.config.ts includes ONLY tests/unit/**",
+    "105 cross-plan links in phase-2 use ../../<plan>/ instead of ../../phase-1/<plan>/ and are broken",
+    "119 task file-paths in phase-2 name src/**/*.test.ts, a location vitest will never run",
+    "builderhunt_capability role exists (41 grants) and postdates the 10 original plans",
+    "security-and-multitenancy closed 2026-07-27; organization_id is NOT NULL on all seven tenant-private tables (drizzle/0081)",
+    "candidate_documents.submission_id is NOT NULL with a composite FK to candidate_submissions, and storage is private MinIO not R2 — so ai-cv-generation-and-tailoring cannot reuse that table as claimed"
+  ],
+  "orchestrator_owned_work": [
+    "S1: rewrite all ../../<plan>/ links to ../../phase-1/<plan>/ across phase-2 (mechanical, done before dispatch so minions inherit it)",
+    "S2: rewrite all src/**/*.test.ts task paths to their tests/unit/** equivalents (mechanical, done before dispatch)",
+    "S3: rewrite plans/phase-2/README.md after synthesis (shared file, never touched by a minion)"
+  ],
+  "budget": {
+    "max_workers": 14,
+    "fan_out_shape": "two parallel waves, no cross-worker dependency",
+    "model_tier": "inherit orchestrator tier — verification rigor is the deliverable",
+    "retry_cap_per_worker": 2
+  },
+  "workers": [
+    {
+      "id": "W01", "wave": "A", "plan": "match-evidence-panel",
+      "role": "Re-verify and repair one phase-2 plan trio against master HEAD",
+      "scope": "Bring plans/phase-2/match-evidence-panel/{spec,plan,tasks}.md to implementation-ready against HEAD.",
+      "artifact": "edited trio in place + a findings report (stale claims found, fixes applied, residual blockers)",
+      "acceptance": ["every cited src/ path exists or is marked (new)", "every cited table/column/function/grant verified against schema.ts or drizzle/", "no hardcoded next-migration number", "no src/**/*.test.ts paths", "all links resolve", "each task has Files/Do/Verify with a real command"]
+    },
+    { "id": "W02", "wave": "A", "plan": "saved-search-health" },
+    { "id": "W03", "wave": "A", "plan": "hiring-pipeline-kanban" },
+    { "id": "W04", "wave": "A", "plan": "look-alike-sourcing" },
+    { "id": "W05", "wave": "A", "plan": "jd-to-candidates-matching" },
+    { "id": "W06", "wave": "A", "plan": "collaboration-graph" },
+    { "id": "W07", "wave": "A", "plan": "availability-signals" },
+    { "id": "W08", "wave": "A", "plan": "ats-integrations" },
+    { "id": "W09", "wave": "A", "plan": "browser-extension-overlay" },
+    { "id": "W10", "wave": "A", "plan": "talent-market-intelligence" },
+    { "id": "W11", "wave": "A", "plan": "postgres-18-upgrade", "note": "different standard: its own Phase 0 reproduces its dangerous claims against a live PG18 cluster; verify the claims are still true of HEAD, do not soften the Phase 0 gate" },
+    {
+      "id": "W12", "wave": "B", "plan": "job-opportunities-workspace",
+      "role": "Rewrite a thin career-side plan trio to executable depth",
+      "scope": "Rewrite plans/phase-2/job-opportunities-workspace/{spec,plan,tasks}.md from summary-level to executable depth matching hiring-pipeline-kanban.",
+      "acceptance": ["every new table has full column list, checks, indexes, composite FKs and per-role grants inline", "RLS predicate written out", "each task is one reviewable unit of work with a runnable Verify", "task count proportional to surface (>=28 for 4 tables + worker + billing + UI)"]
+    },
+    { "id": "W13", "wave": "B", "plan": "ai-cv-generation-and-tailoring", "note": "must resolve the candidate_documents reuse blocker the orchestrator found" },
+    { "id": "W14", "wave": "B", "plan": "delegated-job-applications", "note": "highest ethical risk; MVP must never submit externally" }
+  ],
+  "verification_strategy": {
+    "mechanical_gate": "orchestrator re-runs the link resolver, the src/**.test.ts scan, the hardcoded-migration-number scan, and the Files/Do/Verify shape check across all 14 trios after the wave returns",
+    "judgement_gate": "orchestrator reads each findings report and spot-checks the two highest-risk claims per plan against the codebase",
+    "failure_policy": "redispatch the same scope with the specific failing check named; hard cap 2 retries; after that report the gap rather than hide it"
+  },
+  "invariants_respected": {
+    "1_orchestrator_plans_minions_execute": "no minion spawns another",
+    "2_clean_context": "each prompt carries a verbatim ground-truth block; no orchestrator history",
+    "3_one_artifact": "edited trio + structured findings report",
+    "4_no_worker_chatter": "career-plan shared contract is pasted verbatim into all three wave-B prompts instead of letting them reconcile",
+    "5_verification_gate": "mechanical scans, not a vibes check",
+    "6_capped_fanout": "14, declared here before dispatch",
+    "7_plan_is_an_artifact": "this file"
+  }
+}

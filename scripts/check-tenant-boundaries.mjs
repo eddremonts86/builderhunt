@@ -10,6 +10,19 @@ const authDbAllowlist = new Set([
   'src/shared/lib/auth/personal-organization.ts',
   'src/shared/lib/auth/tenant-principal.ts',
   'src/shared/lib/db/auth-db.ts',
+  // The organization lifecycle itself: `organizations`, `organization_members`,
+  // `organization_invitations` and `organization_deletion_requests` are
+  // auth-broker-owned and RLS-forced by `organization_id`, and this module holds
+  // the reads that *discover* those ids (`listMyOrganizations`) plus the seat-limit
+  // `for update` lock that must span member and invitation counts in one
+  // transaction — neither can run under `withTenantContext`/`builderhunt_app`,
+  // which has no grant on those tables post auth-broker (drizzle/0007_auth_broker.sql).
+  // It is also the single chokepoint the rest of the app funnels through:
+  // `organizations/deletion.ts` calls `hardDeleteOrganization` here precisely so it
+  // never opens the broker itself (see that function's doc comment, which already
+  // assumed this entry existed). Entitlement reads inside it still go through
+  // `withTenantContext` — the split is deliberate, not an oversight.
+  'src/shared/lib/auth/organization-lifecycle.ts',
   // Both need narrow, specific reads/deletes against auth_users/auth_accounts/etc.
   // (account-subject export/deletion; digest-email address lookup) that
   // builderhunt_app/builderhunt_worker have no grant for post auth-broker
@@ -49,12 +62,32 @@ const roleLiteralCheckAllowlist = new Set([
   'src/shared/lib/organizations/contracts.ts',
   'src/routes/api/builders/$builderId/evidence/$evidenceId.ts',
 ])
-const roleLiteralCheckPattern = /\.role\s*(===|!==)\s*['"]/
+// A role decision has three equivalent spellings — `membership.role === 'owner'`,
+// a destructured `const { role } = membership; role === 'owner'`, and the
+// Yoda-style `'owner' === membership.role`. Matching only the first would make
+// this rule a suggestion rather than a boundary, the same way the auth-broker
+// rule below was one until it learned to read dynamic imports.
+const roleReadPattern = String.raw`(?:[\w$.?]*\.role\b|\[['"]role['"]\]|(?<![\w$.])role\b)`
+const roleLiteralCheckPattern = new RegExp(
+  `(?:${roleReadPattern}\\s*(?:===|!==)\\s*['"]|['"][^'"\\n]*['"]\\s*(?:===|!==)\\s*${roleReadPattern})`,
+)
 
 const files = await sourceFiles(sourceRoot)
 const actualLegacy = new Set()
 const findings = []
-const globalDbImportPattern = /(?:from\s+['"]~\/shared\/lib\/db\/index['"]|import\(\s*['"]~\/shared\/lib\/db\/index['"]\s*\))/
+// `from '<specifier>'` and `await import('<specifier>')` reach exactly the same
+// module, so every import rule here must match both forms. The auth-broker rule
+// matched only the static one until 2026-07-27, which is how
+// `auth/organization-lifecycle.ts`'s ten dynamic `import('../db/auth-db')` call
+// sites used the privileged connection while this gate reported clean.
+function importPattern(specifier) {
+  return new RegExp(String.raw`(?:from\s+|import\s*\(\s*)['"](?:${specifier})(?:\.[jt]sx?)?['"]`)
+}
+// Relative and aliased spellings resolve to the same barrel, and so does the bare
+// directory (`~/shared/lib/db` → `db/index.ts`) — pinning the rule to one literal
+// specifier would leave three ways around it.
+const globalDbImportPattern = importPattern(String.raw`[^'"]*\/db\/index|[^'"]*\/db`)
+const authDbImportPattern = importPattern(String.raw`[^'"]*auth-db`)
 
 for (const absolutePath of files) {
   const path = relative(root, absolutePath)
@@ -65,8 +98,8 @@ for (const absolutePath of files) {
     if (!legacyDirectDbImports.has(path)) findings.push(`${path}: new global db import (static or dynamic)`)
     if (path.includes('/repositories/')) findings.push(`${path}: tenant repository imports global db`)
   }
-  if (/from\s+['"][^'"]*auth-db['"]/.test(source) && !authDbAllowlist.has(path)) {
-    findings.push(`${path}: auth broker import is not allowlisted`)
+  if (authDbImportPattern.test(source) && !authDbAllowlist.has(path)) {
+    findings.push(`${path}: auth broker import (static or dynamic) is not allowlisted`)
   }
   if (roleLiteralCheckPattern.test(source) && !roleLiteralCheckAllowlist.has(path)) {
     findings.push(`${path}: role literal comparison outside permissions.ts — use can() instead`)

@@ -1,9 +1,13 @@
 # ATS Integrations (Greenhouse, Lever, Ashby) (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../security-and-multitenancy/spec.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../stripe-billing-platform/spec.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../legal-and-compliance/spec.md) (candidate data leaving the product to a third-party processor).
+> **Depends on**: [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md) (hard — the pipeline stage model this plan maps external ATS status onto); [`security-and-multitenancy`](../../phase-1/security-and-multitenancy/spec.md) (per-organization third-party credentials, RLS, tenant-scoped sync state); [`stripe-billing-platform`](../../phase-1/stripe-billing-platform/spec.md) (the Team-tier gate this feature sells into does not bill anyone yet); [`legal-and-compliance`](../../phase-1/legal-and-compliance/spec.md) (candidate data leaving the product to a third-party processor).
 > **Blocks**: nothing
-> **Reality check**: No ATS code, no per-tenant third-party credential storage, and no general-purpose secret encryption exist. The only encryption helper in the repo is `src/shared/lib/crypto/webhook-payload.ts`, whose own doc comment says "this is not a general-purpose encryption utility" and which is keyed on `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` (only required when `STRIPE_BILLING_ENABLED=true`). The reusable foundations are real: the provider-contract + deterministic-fake + shared-contract-suite pattern in `src/shared/lib/billing/{provider.ts,fake-provider.ts,provider-contract-suite.ts}`, the connector registry in `src/lib/enrichment/registry.ts`, the lease/backoff worker in `src/lib/enrichment/worker.ts` + `src/shared/lib/repositories/enrichment-worker.ts`, the cross-org worker sweep in `src/shared/lib/repositories/billing-worker.ts`, and the notification-dedup idea in `src/shared/lib/billing/notifications.ts`.
+> **Reality check**: No ATS code, no per-tenant third-party credential storage, and no general-purpose secret encryption exist. The only encryption helper in the repo is `src/shared/lib/crypto/webhook-payload.ts`, whose own doc comment says "this is not a general-purpose encryption utility" and which is keyed on `WEBHOOK_PAYLOAD_ENCRYPTION_KEY` (only required when `STRIPE_BILLING_ENABLED=true`). The reusable foundations are real: the provider-contract + deterministic-fake + shared-contract-suite pattern in `src/shared/lib/billing/{provider.ts,fake-provider.ts,provider-contract-suite.ts}`, the connector registry in `src/lib/enrichment/registry.ts`, the lease/backoff worker in `src/lib/enrichment/worker.ts` + `src/shared/lib/repositories/enrichment-worker.ts`, the cross-org worker sweep in `src/shared/lib/repositories/billing-worker.ts`, and the notification-dedup idea in `src/shared/lib/billing/notifications.ts`. Re-verified against
+`master` on 2026-07-27: still no `src/lib/ats/`, no `secret-box.ts`, no `integration:*` permission,
+no `ATS_*` env var. Two surfaces moved since the first draft — dashboard navigation now lives in
+`src/modules/dashboard/ui/shell/nav-config.ts` (not `UserMenu.tsx`), and the tracked-builder list is
+`/exports` (`ExportsPage.tsx`), not a `/me/builders` route, which never existed.
 
 ## Problem
 
@@ -15,7 +19,7 @@ pipeline, and `src/lib/score.ts` has **zero outcome labels** to be evaluated aga
 
 ## Goal
 
-1. Push a selected set of tracked builders (from `/me/builders`, the pipeline board, or a sprint's
+1. Push a selected set of tracked builders (from `/exports`, the pipeline board, or a sprint's
    results) into the organization's own ATS as candidates, deduplicated against candidates that
    already exist there.
 2. Poll status back and reflect it on the pipeline stage model that
@@ -31,7 +35,7 @@ pipeline, and `src/lib/score.ts` has **zero outcome labels** to be evaluated aga
 - **Not an ATS.** No job/req creation, offers, scorecards, interview kits, feedback, EEO or
   demographic data, approvals, or job-board publishing.
 - **Not a two-way source of truth for interview scheduling.**
-  [`calendar-scheduling-interview-intelligence`](../../calendar-scheduling-interview-intelligence/spec.md)
+  [`calendar-scheduling-interview-intelligence`](../../phase-1/calendar-scheduling-interview-intelligence/spec.md)
   owns availability, booking, transcription and interview reports, and lists "a general ATS" as its
   own non-goal. Boundary: **this plan never reads or writes interview events, times, attendees,
   transcripts, or reports in either direction.** The only thing that crosses is the candidate's
@@ -92,7 +96,7 @@ There is no general-purpose encryption in the repo. This plan must build one bef
 - **Write-only rule**: no route, DTO, log line, error message, or admin surface returns
   `credential_ciphertext`. Enforced by (a) a source-scanning boundary test that allowlists the exact
   files permitted to reference the column (repository + crypto module only), modelled on
-  `src/shared/lib/client-route-boundary.test.ts`; (b) adding `credential` to the `sensitiveKey`
+  `tests/unit/shared/lib/client-route-boundary.test.ts`; (b) adding `credential` to the `sensitiveKey`
   regex in `src/shared/lib/log.ts`; (c) column-level `GRANT` so `builderhunt_platform` physically
   cannot `SELECT` the ciphertext column.
 
@@ -112,8 +116,9 @@ export const atsConnections = pgTable('ats_connections', {
   actingUserReference: text('acting_user_reference'),            // Greenhouse On-Behalf-Of / Lever perform_as user id
   stageMappings: jsonb('stage_mappings').$type<AtsStageMappingRule[]>().default([]).notNull(),
   stageMappingsVersion: integer('stage_mappings_version').notNull().default(1),
-  transmitBio: boolean('transmit_bio').notNull().default(false),      // opt-in, see §6
+  transmitBio: boolean('transmit_bio').notNull().default(false),      // opt-in, see §7
   transmitLocation: boolean('transmit_location').notNull().default(false),
+  transmitTopics: boolean('transmit_topics').notNull().default(false), // opt-in — app-reality.md constraint 8, see §7
   disclosureVersion: text('disclosure_version').notNull(),
   disclosureAcknowledgedAt: timestamp('disclosure_acknowledged_at', { withTimezone: true }).notNull(),
   status: text('status').notNull().default('active'),            // active | invalid_credentials | revoked | disabled
@@ -146,6 +151,22 @@ export const atsCandidateLinksConstraints = (t) => [
   index('ats_candidate_links_conflict_idx').on(t.organizationId, t.conflictState),
 ]
 ```
+
+**Every `auth_users` reference these tables add must be taught to `hardDeleteAccountSubject`.**
+`ats_connections.createdByUserId`, `ats_candidate_links.createdByUserId` and
+`ats_export_events.actorUserId` are all `onDelete: 'restrict'` — deliberately, because these are
+organization-owned audit records that must not vanish when the operator who made them leaves. But
+`hardDeleteAccountSubject` (`src/shared/lib/repositories/account-privacy.ts`) does **not** discover
+`restrict` references generically: it carries an explicit list and reassigns
+`organization_builders.creator_user_id` / `sourcing_sprints.creator_user_id` to the permanent
+`system-deleted-user` sentinel (`DELETED_USER_SENTINEL_ID`, `drizzle/0026_deleted_user_sentinel.sql`).
+Adding a `restrict` reference without extending that list reintroduces exactly the bug 0026 exists to
+fix — every account that ever configured a connection or ran an export becomes permanently
+undeletable, failing silently in a swallowed worker log. This is
+[`app-reality`](../../_meta/app-reality.md) constraint 6, and the fix is one `UPDATE … SET
+… = DELETED_USER_SENTINEL_ID` per column inside the existing per-membership tenant transaction.
+`scripts/db/verify-api-isolation-local.mjs`'s `checkLegalRunWorker` is what caught the original and
+is where the regression check belongs.
 
 **Untracking a builder — why there is no FK to `organization_builders`.** An earlier draft of this
 table carried a composite FK `(organizationId, builderIdentityId) → organizationBuilders`. That is
@@ -208,7 +229,14 @@ operator-edited configuration with worker-owned operational state. Split, the gr
 - `builderhunt_platform` — **no grant of any kind on `credential_ciphertext`**: `SELECT` is granted
   column-by-column over the non-secret columns only, so a platform admin can diagnose a connection's
   status and never read its key. `SELECT` on `ats_export_events` for abuse/support investigation.
-- `builderhunt_auth` — nothing. No `PUBLIC`, `TRUNCATE`, or `REFERENCES` privileges anywhere.
+- `builderhunt_auth` and `builderhunt_capability` — nothing on any of the four tables.
+  `builderhunt_capability` (`drizzle/0078_capability_role.sql`) exists only to resolve an
+  accountless candidate's scheduling capability and must never reach an integration credential.
+- `builderhunt_readonly` — nothing. No `PUBLIC`, `TRUNCATE`, or `REFERENCES` privileges anywhere.
+
+Two further grants this plan needs live on *another plan's* tables and are covered in §5, not here:
+`INSERT` on `organization_builder_stage_events` and column-scoped `UPDATE` on
+`organization_builders`, both for `builderhunt_worker`.
 
 ### 3. One provider contract, three adapters
 
@@ -226,9 +254,9 @@ export interface AtsCredential { apiKey: string; actingUserReference?: string }
 export interface AtsCandidatePayload {
   fullName: string
   sourceProfileUrl: string
-  topics: string[]
   primaryLanguage?: string
   email?: string       // ONLY when an operator typed it in the export dialog (§4)
+  topics?: string[]    // opt-in per connection — synthesized on several sources, see §7
   bio?: string         // opt-in per connection
   location?: string    // opt-in per connection
 }
@@ -282,9 +310,14 @@ properly for customers means an OAuth app: redirect URIs, refresh-token storage,
 ### 4. Deduplication — both directions
 
 BuilderHunt's ground truth: `RawBuilder` (`src/lib/sources/types.ts`) and `builder_identities`
-(`schema.ts`) carry **no email field at all** — username, displayName, avatarUrl, bio, profileUrl,
-followersCount, language, country, topics. Enrichment evidence adds headline/organization/role/
-location, still no email. So email cannot be the primary match key.
+(`schema.ts`) carry **no email field at all**. `builder_identities`' full column set is `source`,
+`sourceId`, `username`, `displayName`, `avatarUrl`, `bio`, `profileUrl`, `followersCount`,
+`language`, `country` plus timestamps — note that **`topics` is not on it**: for a tracked builder,
+topics live in `organization_builders.private_metadata.topics`, which is what
+`GET /api/me/builders` and `GET /api/export/builders` already read (see `readStringArray` in
+`src/routes/api/me/builders/index.ts` and `privateTopics` in `src/routes/api/export/builders.ts`).
+Enrichment evidence adds headline/organization/role/location, still no email. So email cannot be the
+primary match key.
 
 **Match ladder, first hit wins:**
 
@@ -353,31 +386,57 @@ buries the single most valuable datum (the real outcome) behind a click nobody m
 the system of record for hiring decisions, which is the entire premise of the feature. The bound on
 that authority is what makes it safe:
 
-- the worker writes `pipeline_stage` **only** when the external stage resolves to a known local
-  stage key and differs from the current value;
-- when it does not resolve, the worker writes **nothing** to `pipeline_stage`, stores the raw label
-  in `ats_candidate_links.externalStatus`, and sets `conflictState = 'unmapped_external_stage'` for
-  the UI to surface (story 4). Never guess;
-- every worker-written stage carries provenance (`mappedStage`, `lastSyncedAt`) so the pipeline UI
-  renders `Offer · from Greenhouse · 6 min ago` rather than an unexplained jump;
-- `pipeline_owner_user_id` and stage notes are **never** touched by the worker — it owns exactly
-  `pipeline_stage` + `pipeline_stage_changed_at`;
+- the worker moves the card **only** when the external stage resolves to a known local stage key and
+  differs from the current value;
+- when it does not resolve, the worker writes **nothing** to the pipeline, stores the raw label in
+  `ats_candidate_links.externalStatus`, and sets `conflictState = 'unmapped_external_stage'` for the
+  UI to surface (story 4). Never guess;
+- every worker-written stage carries provenance (`mappedStage`, `lastSyncedAt` on the link, plus
+  `source = 'ats'` on the stage event) so the pipeline UI renders `Offer · from Greenhouse · 6 min
+  ago` rather than an unexplained jump;
+- `pipeline_owner_user_id`, `status`, `visibility`, `private_metadata` and stage notes are **never**
+  touched by the worker;
 - a link whose tracking row has been untracked writes no stage at all (§2).
 
-**The worker is not currently permitted to write that column, and this plan must fix it.**
-`builderhunt_worker` holds only `GRANT SELECT ON TABLE organization_builders` with a single
-`organization_builders_worker_select` policy
-(`drizzle/0018_enrichment_worker_target_access.sql`), and no later migration widens it — including
-[`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md)'s own RLS migration, which grants the
-worker `SELECT` only on its two new tables. Without a change, write-back cannot execute at all. This
-is exactly the failure class [`app-reality`](../../_meta/app-reality.md) constraint 7 exists for, so
-it is proven against the real non-owner role, not the DB owner.
+**Write path — `moveBuilderStage`, never a direct column write.**
+[`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md) models stage history as an append-only
+`organization_builder_stage_events` table whose `source` check constraint already enumerates
+`'ats'`, with `organization_builders.pipeline_stage_changed_at` as a *denormalized cache* of the
+latest event. That plan states the contract it owes this one explicitly: ATS write-back goes through
+`moveBuilderStage(tx, organizationId, organizationBuilderId, { toStage, actorUserId, expectedStage, source: 'ats' })`
+(`src/shared/lib/repositories/pipeline.ts`), which updates the row, the cache, and inserts exactly
+one event in one transaction. A direct `UPDATE organization_builders SET pipeline_stage = …` would
+leave the history table silently missing every ATS-driven transition — the exact transitions this
+feature exists to capture. Two consequences for this plan:
 
-Resolution — **a column-scoped grant plus a dedicated `FOR UPDATE` policy**, shipped as this plan's
-own hand-written migration in Phase 4 (it must run after the sibling plan's column migration, since
-the columns do not exist before then):
+- **`expectedStage` is free concurrency safety.** The worker passes the stage it read at the top of
+  the transaction; a recruiter who dragged the card in the meantime causes `{ ok: false,
+  currentStage }`, and the worker records `conflictState` and retries on the next run instead of
+  clobbering the human.
+- **`actorUserId` is `NOT NULL` and FK-restricted.** A cron worker has no session. Use
+  `ats_connections.created_by_user_id` — the real operator who configured that connection, already
+  stored, already in the organization, and already reassigned to `system-deleted-user` by §2's
+  account-deletion fix if that person is later hard-deleted. Do **not** invent a second sentinel.
+- `moveBuilderStage` is typed against `TenantTransaction`; the ATS worker runs on the worker
+  connection inside `withWorkerOrganization`. Widen that parameter to the shared transaction type
+  rather than duplicating the write — a second implementation is how the event table drifts.
+
+**The worker is not currently permitted to make either write, and this plan must fix both.**
+`builderhunt_worker` holds only `GRANT SELECT ON TABLE organization_builders` with a single
+`organization_builders_worker_select` policy (`drizzle/0018_enrichment_worker_target_access.sql`),
+and no later migration widens it — verified at HEAD: `grep builderhunt_worker drizzle/*.sql | grep
+organization_builders` returns that one `GRANT SELECT` line and nothing else. The sibling plan's own
+RLS migration grants the worker `SELECT` only on `organization_pipeline_stages` and
+`organization_builder_stage_events` — not `INSERT`. Without both changes, write-back cannot execute
+at all. This is exactly the failure class [`app-reality`](../../_meta/app-reality.md) constraint 7
+exists for, so it is proven against the real non-owner role, not the DB owner.
+
+Resolution — **two column/verb-scoped grants plus their policies**, shipped as this plan's own
+hand-written migration in Phase 4 (it must run after the sibling plan's column and table migrations,
+since neither exists before then):
 
 ```sql
+-- 1. The card move itself: exactly three columns, org-scoped.
 CREATE POLICY organization_builders_worker_update ON organization_builders
   FOR UPDATE TO builderhunt_worker
   USING      (organization_id = nullif(current_setting('app.organization_id', true), ''))
@@ -385,11 +444,26 @@ CREATE POLICY organization_builders_worker_update ON organization_builders
 
 GRANT UPDATE (pipeline_stage, pipeline_stage_changed_at, updated_at)
   ON organization_builders TO builderhunt_worker;
+
+-- 2. The history row moveBuilderStage writes alongside it. INSERT only — the table is
+--    append-only, so no UPDATE or DELETE for any role, worker included.
+CREATE POLICY organization_builder_stage_events_worker_insert ON organization_builder_stage_events
+  FOR INSERT TO builderhunt_worker
+  WITH CHECK (organization_id = nullif(current_setting('app.organization_id', true), ''));
+
+GRANT INSERT ON TABLE organization_builder_stage_events TO builderhunt_worker;
 ```
+
+No grant is needed on `organization_pipeline_stages` — the sibling plan already gives the worker
+org-scoped `SELECT` there, which is all `listLocalStageKeys` needs. And because
+`organization_builders.pipeline_stage` carries a composite FK to
+`organization_pipeline_stages(organization_id, key)` with `ON DELETE RESTRICT`, an unmapped or stale
+stage key cannot be written even if the resolver were wrong: the database is the third layer under
+the resolver and the FK.
 
 Alternatives rejected: a **table-wide** `GRANT UPDATE` would let a buggy worker rewrite `status`,
 `visibility`, `private_metadata` or `pipeline_owner_user_id`; a **SECURITY DEFINER function** (the
-`setPlatformUserPlan` pattern) bypasses RLS entirely and is the far heavier hammer for a two-column
+`setPlatformUserPlan` pattern) bypasses RLS entirely and is the far heavier hammer for a three-column
 write; running write-back **under the app role** is impossible — a cron-triggered worker has no user
 session to resolve a `TenantPrincipal` from. Column-level `UPDATE` is the least privilege Postgres
 can express here, and it mirrors the same column-level worker grant this plan already uses on
@@ -419,26 +493,53 @@ Order: operator rule → provider default table (`Offer→offer`, `Hired→hired
 deleted resolves to `unmapped { reason: 'stale_local_stage' }` — not an error, not a write. That is
 the tolerance requirement in both directions.
 
+`resolveExternalStage` is deliberately pure and takes `knownLocalStageKeys` as plain input, so
+Phases 1–3 (export only) carry **no dependency on the sibling plan at all** and ship independently.
+
 `src/lib/ats/stage-source.ts` is the **single** coupling point to
 [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md): one function
-`listLocalStageKeys(tx, organizationId): Promise<string[]>` reading that plan's per-organization
-custom-stage configuration through whatever read surface it exposes. This plan does **not** create,
-migrate, or re-specify `pipeline_stage` / `pipeline_stage_changed_at` / `pipeline_owner_user_id` or
-the stage-config table. If the custom-stage config is not there yet, `listLocalStageKeys` falls back
-to the frozen default ladder (`new, reviewed, contacted, in_conversation, hired`) so Phases 1–3
-(export only) ship independently; Phase 4 (write-back) is hard-blocked on the columns existing.
+`listLocalStageKeys(tx, organizationId): Promise<string[]>` selecting `key` from
+`organization_pipeline_stages` ordered by `position` (composite PK `(organization_id, key)`,
+tenant-private, worker-readable). It ships in **Phase 4**, not earlier — before the sibling plan
+lands, the table is not in `schema.ts` and the function cannot type-check. An earlier draft hedged
+with a "frozen default ladder" fallback (`new, reviewed, contacted, in_conversation, hired`); that
+is now dead weight and a source of drift, because the sibling plan seeds its own
+`DEFAULT_PIPELINE_STAGES` via `ensureDefaultPipelineStages` and enforces the key set with an FK. An
+organization with zero stage rows yields `[]`, every external stage resolves to `unmapped`, and
+nothing is written — which is the correct behaviour, not a fallback. This plan does **not** create,
+migrate, or re-specify `pipeline_stage` / `pipeline_stage_changed_at` / `pipeline_owner_user_id`,
+`organization_pipeline_stages`, or `organization_builder_stage_events`.
 
 ### 7. Processing disclosure, exclusions, audit
 
 **Transmitted by default (minimum necessary):** `fullName` (`builder_identities.display_name` ??
-`username`), `sourceProfileUrl` (`profile_url`), `topics`, `primaryLanguage`.
-**Opt-in per connection:** `bio` (a scraped bio is the field most likely to contain something the
-subject would not want in a permanent hiring file), `location` (inferred and often wrong, and a
-wrong location in a hiring record is a real harm).
+`username`), `sourceProfileUrl` (`profile_url`), `primaryLanguage` (`builder_identities.language`).
+That is all.
+**Opt-in per connection:** `bio`, `location`, and — new in this revision — `topics`.
+`bio` is the field most likely to contain something the subject would not want in a permanent hiring
+file; `location` is inferred and often wrong, and a wrong location in a hiring record is a real harm.
+`topics` moved out of the default set because
+[`app-reality`](../../_meta/app-reality.md) constraint 8 documents that it is **synthesized, not
+measured**, on several sources: `hn.ts` sets `topics` to the operator's own query keywords, which
+would arrive in a customer's ATS looking like an assessment of the candidate. Sending a fabricated
+skill list to a third-party hiring system is a worse failure than sending a stale bio, and the field
+is not worth a default. It is also not on `builder_identities` at all — the payload builder reads
+`organization_builders.private_metadata.topics`, the same key `GET /api/export/builders` already
+emits.
 **Per-row, operator-typed only:** `email`.
-**Never transmitted:** notes, `privateMetadata`, AI enrichment output, scores, enrichment evidence,
-`builder_source_snapshots` payloads, alert history, claimant account emails, anything belonging to
-another organization.
+**Never transmitted:** notes, any `private_metadata` key other than `topics`, AI enrichment output,
+scores, enrichment evidence, `builder_source_snapshots` payloads, alert history, claimant account
+emails, anything belonging to another organization.
+
+**Suppression gate — the same one every other export honours.** `src/shared/lib/profile-suppression.ts`
+names exports as a mandatory enforcement surface, and `GET /api/export/builders` already calls
+`filterSuppressed` before writing a row of CSV. Pushing a candidate into a third party's permanent
+hiring record is strictly worse than putting them in a CSV, so the ATS export path runs
+`filterSuppressed` (preview and export) and the sync worker checks `isSuppressed` before refreshing a
+link. A suppressed identity is reported to the operator exactly like a restricted one and audited as
+`skipped_restricted`. This is separate from, and additional to, the restriction gate below:
+suppression is a global `(source, sourceId)` removal request, restriction is a per-identity
+processing objection.
 
 **Restriction gate.** Before any `findCandidates`/`createCandidate` call and before any link write,
 an `active` row in `builder_processing_restrictions` for that `builderIdentityId` excludes the
@@ -454,7 +555,7 @@ acknowledge a versioned disclosure listing the exact field allowlist and stating
 vendor becomes an independent controller under the customer's own agreement with that vendor.
 Recorded as `disclosureVersion` + `disclosureAcknowledgedAt` on `ats_connections` (per organization
 per provider — not `user_consents`, which is account-subject scoped).
-[`legal-and-compliance`](../../legal-and-compliance/spec.md)'s privacy-policy processor list gains
+[`legal-and-compliance`](../../phase-1/legal-and-compliance/spec.md)'s privacy-policy processor list gains
 "customer-configured ATS (Greenhouse / Lever / Ashby) — recipient of candidate data you choose to
 export".
 
@@ -462,13 +563,20 @@ export".
 
 - **`/settings/integrations`** (new route `src/routes/_dashboard/settings/integrations.tsx` +
   `src/modules/dashboard/components/AtsIntegrationsPage.tsx`, modelled on
-  `settings/team.tsx` → `TeamSettingsPage`; link added to `UserMenu.tsx`'s settings list). Per
-  connection: provider, label, `••••last4` + fingerprint, status badge, `lastVerifiedAt`,
-  `lastSyncedAt`, link count, unmapped-stage count with an inline mapping editor, transmit-field
-  toggles, "Test connection", "Disconnect".
+  `settings/team.tsx` → `TeamSettingsPage`). Per connection: provider, label, `••••last4` +
+  fingerprint, status badge, `lastVerifiedAt`, `lastSyncedAt`, link count, unmapped-stage count with
+  an inline mapping editor, transmit-field toggles, "Test connection", "Disconnect".
+  **Navigation lives in `src/modules/dashboard/ui/shell/nav-config.ts`, not `UserMenu.tsx`.** The
+  dashboard shell owns navigation now; `UserMenu.tsx` renders exactly two entries (Account, Sign out)
+  and has no settings list to add to. The new item goes in the `workspace` area's `items`, whose
+  `routes` array already claims the `/settings` prefix — `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts`
+  fails any destination placed under an area that does not own its prefix.
 - **Export dialog** — one shared component (`AtsExportDialog`) fed a list of `builderIdentityId`s, so
-  `/me/builders`, the pipeline board, and a sprint's results all use identical logic. Shows the field
-  allowlist, restriction exclusions, and duplicate candidates with per-row Link / Create / Skip.
+  every surface uses identical logic. The surfaces are `/exports`
+  (`src/modules/dashboard/components/ExportsPage.tsx` — the tracked-builder list that already offers
+  "Download CSV"; there is no `/me/builders` route, an earlier draft's error), the pipeline board,
+  and a sprint's results. Shows the field allowlist, restriction and suppression exclusions, and
+  duplicate candidates with per-row Link / Create / Skip.
 - **Pipeline row** — external stage chip with provenance, or an "unmapped stage" affordance, or
   "no longer in Greenhouse" for `conflictState = 'external_missing'`.
 - **Failure notification** — one email per failure instance via a new
@@ -552,8 +660,24 @@ inside one request, no queue needed; larger selections are batched client-side).
   re-tracking later reuses the same link row instead of creating a second ATS candidate.
 - **The worker lacks permission to write the pipeline stage** — resolved in §5 by a column-scoped
   `GRANT UPDATE (pipeline_stage, pipeline_stage_changed_at, updated_at)` plus an org-scoped
-  `FOR UPDATE` policy, proven by `pnpm test:api-isolation:local` against `builderhunt_worker`
-  itself.
+  `FOR UPDATE` policy, **and** an `INSERT`-only grant + policy on
+  `organization_builder_stage_events` (the sibling plan grants the worker `SELECT` there, not
+  `INSERT`), proven by `pnpm test:api-isolation:local` against `builderhunt_worker` itself.
+- **A recruiter drags the card while the worker is mid-run** — the worker passes the stage it read
+  as `expectedStage` to `moveBuilderStage`, gets `{ ok: false, currentStage }`, writes no stage,
+  records the divergence on the link, and reconciles on the next run. The human is never clobbered
+  silently (§5).
+- **The operator who configured the connection deletes their account** — every `auth_users`
+  reference this plan adds is `onDelete: 'restrict'`, so `hardDeleteAccountSubject` must reassign
+  it to `system-deleted-user` alongside `organization_builders.creator_user_id` (§2). Without that,
+  the account becomes permanently undeletable and the failure is swallowed by a worker log — the
+  exact bug `drizzle/0026_deleted_user_sentinel.sql` exists to fix.
+- **A builder files a global profile-removal request after being exported** — `filterSuppressed`
+  blocks any further export and `isSuppressed` stops the worker refreshing that link (§7). As with a
+  restriction, no deletion is attempted inside the customer's ATS.
+- **`topics` on a Hacker News-sourced builder is just the operator's search keywords** —
+  `app-reality.md` constraint 8. `topics` is opt-in per connection rather than default, and the
+  disclosure names its provenance (§7).
 - **Restriction filed after export** — sync stops for that link, no deletion attempted in the
   customer's ATS, disclosed to the subject (§7).
 - **Organization deleted** — `organization_id` cascades all four tables; no ATS-side action (we

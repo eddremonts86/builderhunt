@@ -1,10 +1,20 @@
 # Paste-a-JD Candidate Matching (spec)
 
 > **Status**: `pending`
-> **Depends on**: [`semantic-search`](../../semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW query path — already shipped); [`ai-expansion`](../../ai-expansion/spec.md) (task registry, budgets, zod validation, kill switches — already shipped); [`stripe-billing-platform`](../../stripe-billing-platform/spec.md) (the Pro Max tier this feature is gated on does not bill anyone yet). Enhanced by [`match-evidence-panel`](../match-evidence-panel/spec.md) (per-match evidence rendering) and [`availability-signals`](../availability-signals/spec.md) (ranking boost; neither is required).
+> **Depends on**: [`semantic-search`](../../phase-1/semantic-search/spec.md) (global `builder_embeddings` + pgvector HNSW query path — already shipped); [`ai-expansion`](../../phase-1/ai-expansion/spec.md) (task registry, budgets, zod validation, kill switches — already shipped); [`stripe-billing-platform`](../../phase-1/stripe-billing-platform/spec.md) (the Pro Max tier this feature is gated on does not bill anyone yet). Enhanced by [`match-evidence-panel`](../match-evidence-panel/spec.md) and [`availability-signals`](../availability-signals/spec.md) — **dashed, never blocking** (see "Optional enhancers" below).
 > **Blocks**: nothing
-> **Reality check**: The retrieval half exists — `src/lib/semantic/semantic-search.ts` (the `SEMANTIC_MIN_LOCAL_MATCHES` hybrid ladder), `src/shared/lib/repositories/public-builder-embeddings.ts#findSimilarBuilderEmbeddings`, `src/lib/semantic/embedding-doc.ts` (the exact profile template we must match), `src/shared/lib/ai/embeddings.ts#embedTexts`. The AI half plugs into `src/shared/lib/ai/tasks.ts` (7 tasks today, including `jd-parse`). The paid half plugs into the shipped `src/shared/lib/billing/rate-cards.ts` + `feature-authorization.ts#checkEntitlement`/`reserveCredits`. Nothing here re-implements search, embeddings, credits, or RLS.
-> **Pre-existing defect — NOW FIXED, shipped outside fase 2 (kept here for context)**: `findSimilarBuilderEmbeddings` (`public-builder-embeddings.ts:89-102`) orders by `desc(sql\`1 - (${distance})\`)` — a *derived, descending* expression. pgvector's HNSW index can only serve `ORDER BY embedding <=> $vec ASC`, so the shipped query measurably planned as `Limit → Sort → Seq Scan` and **`/api/search/semantic` was doing a sequential scan plus full sort of `builder_embeddings`, not an HNSW lookup**. That was shipped-code behaviour, not something this plan introduced. It has since been corrected in place: the sort key is now the bare operator ascending and `similarity` is a selected column, exported as `similarBuilderEmbeddingsQuery` and covered by an EXPLAIN-based regression test with a negative control. **Phase 3 therefore no longer owns this change — it reuses the corrected shared function and asserts the shape.**
+> **Optional enhancers — exactly what is borrowed**: `match-evidence-panel` ships
+> `src/modules/search/components/MatchEvidencePanel.tsx` (new in that plan), a presentational
+> component that renders *score provenance* — the per-source breakdown behind `src/lib/score.ts`'s
+> single integer. If it has landed, `MatchCandidateCard` renders it in a collapsed "why this score"
+> disclosure **below** the JD evidence rows. If it has not, `MatchCandidateCard` renders only the JD
+> evidence rows and no score-provenance disclosure, and nothing else changes: this plan's evidence
+> is entirely its own (rerank `citation`s verified against the candidate's own `builder_embeddings`
+> `document`/`profile`), computed by `src/lib/match/citations.ts` (new), which imports nothing from
+> `src/lib/evidence/`. `availability-signals` would add a ranking boost; absent it, RRF order is
+> unmodified. **Neither is on the critical path and no task below waits on either.**
+> **Reality check (re-verified against HEAD 2026-07-27)**: The retrieval half exists — `src/lib/semantic/semantic-search.ts` (`SEMANTIC_MIN_LOCAL_MATCHES = 10`, `SEMANTIC_SIMILARITY_THRESHOLD = 0.6`), `src/shared/lib/repositories/public-builder-embeddings.ts#findSimilarBuilderEmbeddings`, `src/lib/semantic/embedding-doc.ts` (the exact profile template we must match), `src/shared/lib/ai/embeddings.ts#embedTexts` (`BATCH_SIZE = 64`). The AI half plugs into `src/shared/lib/ai/tasks.ts` — **12 registered tasks today** (`ping`, `query-translate`, `outreach-draft`, `profile-enrich`, `jd-parse`, `criteria-decompose`, `filter-refine`, `synergy-analysis`, `alert-digest-summary`, `work-sample-analyze`, `fingerprint-v2`, `timeline-summary`); `match-jd-requirements` and `match-jd-rerank` are both unclaimed. The paid half plugs into the shipped `src/shared/lib/billing/rate-cards.ts` (3 cards today: `ai_sourcing_sprint`, `semantic_search_query`, `builder_work_sample_analysis` — `jd_match` unclaimed) + `feature-authorization.ts#checkEntitlement`/`reserveCredits`/`settleReservation`/`releaseReservation`. Nothing here re-implements search, embeddings, credits, or RLS.
+> **Inherited premise — VERIFIED STILL TRUE AT HEAD**: the HNSW ordering fix this plan used to own has landed. `src/shared/lib/repositories/public-builder-embeddings.ts` now exports `similarBuilderEmbeddingsQuery(db, queryVector, limit)`, which builds `.orderBy(asc(cosineDistance(embedding, $vec)))` with ``sql`1 - (${distance})` `` kept only as a *selected* `similarity` column; `findSimilarBuilderEmbeddings` is a thin wrapper over it. `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` EXPLAINs the drizzle-emitted SQL under `set local enable_seqscan = off` and asserts `Index Scan using builder_embeddings_hnsw_idx`, with a negative control on the old derived-descending shape. **This plan asserts that shape and does not re-apply it.** If a future change reverts `orderBy(asc(distance))` to a derived descending expression, this plan's stage-1 latency budget is void and the change is a blocker, not a refactor.
 
 ## Problem
 
@@ -28,7 +38,7 @@ public profile text. Runs are saved so the answer can be re-read without paying 
 - **Not `solutions-intelligence`.** That plan turns a *structured `SolutionBrief`* into up to
   three Human/AI/Hybrid **solution routes** over a capability catalog, typed compatibility edges
   and versioned `agent`/`model`/`mcp_server`/`tool`/`service` components
-  ([`solutions-intelligence`](../../solutions-intelligence/spec.md)). This plan turns
+  ([`solutions-intelligence`](../../phase-1/solutions-intelligence/spec.md)). This plan turns
   *unstructured pasted prose* into **people, ranked**. No catalog, no compatibility graph, no
   route composition, no `SolutionBrief`, no non-human components, no clarification dialogue, no
   `solutions.*` credit operation, and **no changes to `builder_identities` / the canonical-human
@@ -118,20 +128,15 @@ this is the house convention, not a local invention.
 | Latency | K ≤ 6 HNSW queries, p95 < 300 ms **once the ordering defect below is fixed** | ~10–20 s |
 | Failure | falls back to federated search | falls back to stage-1 ordering |
 
-**The ordering defect — RESOLVED by fixing the shared function, not by forking it.** Cosine
-*distance ascending* and cosine *similarity descending* are the same ordering, so switching the
-sort key from the derived `1 - (embedding <=> $vec)` DESC to the bare operator
-`embedding <=> $vec` ASC — and returning `1 - (embedding <=> $vec)` as an ordinary select column
-instead of the sort key — is **behaviour-preserving for every caller while turning a seq-scan +
-sort into an HNSW index scan**. This correction has **already landed** in
-`findSimilarBuilderEmbeddings` rather than leaving a slow shared function beside a fast private
-copy. The blast radius was exactly one other consumer, `/api/search/semantic` via
-`semantic-search.ts#semanticSearch`, and it was verified to return identically-ordered rows: 30
-builders, same order, same `similarity`, before and after, through the real route. It shipped with
-an `EXPLAIN` check on the SQL Drizzle actually emits (not a hand-written equivalent) plus a
-regression test carrying a negative control.
+**The ordering defect — RESOLVED in shipped code; this plan only asserts it.** Cosine *distance
+ascending* and cosine *similarity descending* are the same ordering, so the sort key is the bare
+operator `embedding <=> $vec` ASC and `1 - (embedding <=> $vec)` is an ordinary select column —
+behaviour-preserving for every caller while turning a seq-scan + sort into an HNSW index scan. That
+correction is present at HEAD in `similarBuilderEmbeddingsQuery`, with an `EXPLAIN` regression test
+carrying a negative control at
+`tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts`.
 [`look-alike-sourcing`](../look-alike-sourcing/spec.md) depends on the same function; **both plans
-now assert the shape rather than owning the change.**
+assert the shape rather than owning the change.**
 
 Two caveats survive the fix and matter for this plan's stage-1 budget: (1) an indexable
 `ORDER BY` makes the index *available*, not mandatory — below ~2k embedded rows the planner still
@@ -144,10 +149,35 @@ Stage 1, in order: (1) K HNSW queries, top 60 each, via a new
 ASC-on-bare-operator ordering — a separate function because the existing one does not return
 `document`, which evidence grounding requires; (2) union + dedupe by `source:sourceId`, drop
 below `SEMANTIC_SIMILARITY_THRESHOLD` (0.6, imported from `semantic-search.ts`, not redefined);
-(3) **subject-rights filter** — one batched lookup joining `builder_identities` →
-`builder_processing_restrictions` (`status = 'active'`) applied as a *post-filter*, not a join
-inside the vector query, so the HNSW index path survives; (4) hard filters only where the JD
+(3) **subject-rights filter** (see below); (4) hard filters only where the JD
 states them (language/country); (5) RRF fusion → truncate to `MATCH_POOL_SIZE = 50`.
+
+**Subject-rights filter — the `builderhunt_app` role may NOT read
+`builder_processing_restrictions`.** `drizzle/0017_enrichment_rls_policies.sql:57-62` revokes
+everything from `PUBLIC` and grants that table only to `builderhunt_platform`; its own comment is
+explicit — *"The app and worker roles never read `builder_processing_restrictions` rows
+directly"*. A repository that joins the table would be `permission denied for table
+builder_processing_restrictions` the first time it ran as the real runtime role. The sanctioned
+path already exists and is the one this plan uses: the `SECURITY DEFINER` function
+`is_builder_processing_restricted(text)` created in the same migration at line 70, with
+`GRANT EXECUTE … TO builderhunt_app, builderhunt_worker` at line 82 — the same call
+`src/shared/lib/repositories/enrichment.ts:187` and
+`src/shared/lib/repositories/enrichment-worker.ts:263` already make. One batched, index-friendly
+statement covers the whole pool:
+
+```sql
+-- grants used: SELECT on builder_identities → builderhunt_app (drizzle/0011_builder_claim_policies.sql:31)
+--              EXECUTE on is_builder_processing_restricted → builderhunt_app (drizzle/0017:82)
+SELECT bi.source, bi.source_id
+FROM builder_identities bi
+WHERE (bi.source, bi.source_id) IN (…pool pairs…)
+  AND is_builder_processing_restricted(bi.id);
+```
+
+It runs as a *post-filter* over the already-retrieved pool, never as a join inside the vector
+query, so the HNSW index path survives. A pool member with no `builder_identities` row is simply
+unrestricted — `builder_embeddings` and `builder_identities` are populated by different writers
+and neither is a subset of the other.
 
 **Cold index — reuse, do not reinvent.** If the pool holds fewer than
 `SEMANTIC_MIN_LOCAL_MATCHES` (10, imported from `semantic-search.ts`) rows, take the ladder that
@@ -217,9 +247,33 @@ export const matchJdRerankOutputSchema = z
 platform's shared `getCached`/`setCached` (keyed `ai:cache:{taskId}:{hash(input)}` only). It uses
 `tenantAiCacheKey({ organizationId, artifact: 'match-jd-requirements', input: fingerprint })`
 from `src/shared/lib/ai/cache.ts` — a helper that already exists with the org-id assertion baked
-in and currently has **zero callers**; this plan is its first consumer, satisfying
+in and, at HEAD, has **zero production callers** (only `tests/unit/shared/lib/ai/cache.test.ts`);
+this plan is its first consumer, satisfying
 [`security-policy`](../../_meta/security-policy.md) ("cache keys … include the server-resolved
 organization ID"). `organizationId` comes from `requireTenantPrincipal`, never the body.
+
+**`tenantAiCacheKey` is a key builder only — there is no tenant-scoped get/set pair.** `cache.ts`
+exports `getCached`/`setCached`, but both hard-code `cacheKeyFor(task.id, input)`, so neither can
+be pointed at a tenant key. This plan therefore adds the missing pair *next to the existing ones*
+in `src/shared/lib/ai/cache.ts` rather than reaching for `getRedis()` inside the match service:
+
+```ts
+export async function getTenantCached<O>(key: string): Promise<O | null>   // null on miss/Redis-down/parse error
+export async function setTenantCached(key: string, output: unknown, ttlSeconds: number): Promise<void> // no-op when Redis is down
+```
+
+Same failure semantics as `getCached`/`setCached`: a cache miss always degrades to "call the
+provider", never to an error.
+
+**The metering-bypass gate is a hard CI step.** `scripts/check-provider-metering.mjs`
+(`pnpm security:provider-metering`, a non-soft step in `scripts/ci/local-quality.sh`) requires that
+every `minimaxChat(` and `embedTexts(` call site have a `checkAndConsumeBudget(` or
+`reserveCredits(` call **inside the same top-level function**, tracked by brace depth. This plan has
+three provider call sites — extraction, `embedTexts`, rerank — and `reserveCredits` happens in the
+route, not the service. Each of the three must therefore sit in a top-level function of
+`src/lib/match/match-service.ts` that also calls `checkAndConsumeBudget` for the relevant task.
+`embedTexts` is metered against `match-jd-requirements` (embedding is that step's continuation and
+has no task id of its own; the same allowance already bounds it).
 
 **Prompt-injection posture.** The pasted JD is untrusted third-party text and so is every
 candidate bio; both go through `wrapUntrusted()`. Each candidate block is wrapped *individually*
@@ -271,7 +325,10 @@ export const jdMatchRuns = pgTable(
     jdFingerprint: text('jd_fingerprint').notNull(),        // sha256 of normalized JD — idempotency without retention
     jdText: text('jd_text'),                                // NULL unless the user opted in
     requirements: jsonb('requirements').$type<JdRequirementSet>().notNull(),
-    results: jsonb('results').$type<JdMatchResult[]>().notNull(), // versioned artifact, never authorization data
+    results: jsonb('results').$type<JdMatchResult[]>().notNull(), // artifact, never authorization data
+    // security-policy rule 8 admits JSONB only for "validated, versioned snapshots or artifacts".
+    // A typed column, not a key inside the blob, so a reader can filter on it without parsing.
+    artifactVersion: integer('artifact_version').notNull().default(1),
     mode: text('mode').notNull(),                           // 'ranked' | 'hybrid' | 'deterministic'
     poolSize: integer('pool_size').notNull(),
     droppedEvidence: integer('dropped_evidence').notNull().default(0),
@@ -298,8 +355,21 @@ export const jdMatchRuns = pgTable(
 rrfScore, bestProbeSimilarity }` — **not** the candidate's display profile. That is global-public
 data in `builder_embeddings`, re-read at view time (a missing row renders a "no longer indexed"
 stub), honouring "search results are ephemeral; durable things write through" rather than forking
-a stale tenant-side copy of public data. Retention: 90 days, purged by extending the existing
-`POST /api/admin/legal/run-worker` — no new cron.
+a stale tenant-side copy of public data.
+
+Retention: 90 days, purged by extending the existing `POST /api/admin/legal/run-worker` — no new
+cron, no new endpoint. **The purge runs as `builderhunt_worker`, not `builderhunt_app`**: the
+worker sweeps every organization, and the app role's RLS policy only ever sees the one org in
+`app.organization_id`, so an app-role purge would be a silent no-op (exactly the
+"RLS-silent-no-op" defect class app-reality constraint 7 records). The established shape is
+`listWorkerOrganizationIds()` + `withWorkerOrganization(orgId, tx => …)` from
+`src/shared/lib/repositories/alerts-worker.ts`, which already holds `builderhunt_worker`'s
+`SELECT (id)` grant on `organizations` (`drizzle/0010_worker_alert_policies.sql:25`) and sets
+`app.organization_id` per batch — satisfying security-policy's "workers … execute each tenant
+batch in its own database transaction/context". Consequence for the repository: the purge function
+takes a `WorkerTransaction`, not a `TenantTransaction`, and lives in its own
+`jd-match-runs-worker.ts` module beside the tenant repository, mirroring the
+`alerts.ts` / `alerts-worker.ts` split.
 
 ### 6. Privacy and the external-processing disclosure
 
@@ -309,11 +379,17 @@ Chrome's context window, and the artifact is persisted and shared inside the org
 ai-policy classifies as server-only regardless. Required consequences: the `/match` composer
 states, above the textarea and before the first run, that the job description is sent to an
 external AI provider and is not stored unless the user ticks "save this job description with the
-run"; the privacy policy's processor list (`src/routes/_landing/legal/privacy.tsx`, kept accurate
-by [`legal-and-compliance`](../../legal-and-compliance/spec.md)) gains an explicit line for
-job-description text; `jdText` defaults to NULL and the fingerprint gives idempotency without
-retention; logs carry task id, provider, latency, token counters, status and a redacted
-org/request correlation only — never the JD, a prompt, or a model response.
+run"; `jdText` defaults to NULL and the fingerprint gives idempotency without retention; logs carry
+task id, provider, latency, token counters, status and a redacted org/request correlation only —
+never the JD, a prompt, or a model response.
+
+**The privacy page needs less than this plan originally assumed.**
+`src/routes/_landing/legal/privacy.tsx` §3 "Subprocessors" (kept accurate by
+[`legal-and-compliance`](../../phase-1/legal-and-compliance/spec.md)) already names MiniMax M3 and
+already says *"we only send public profile data and your own submitted inputs (e.g. a job
+description)"*. What is genuinely missing is the **retention** half, which is this plan's own
+invention: that JD text is discarded by default and kept only on explicit opt-in, for at most 90
+days. So the change is one added clause, not a new subprocessor entry.
 
 ### 7. Tier gating — exactly what happens today
 
@@ -324,7 +400,10 @@ org/request correlation only — never the JD, a prompt, or a model response.
    `feature-authorization.ts` — the only sanctioned surface — before any provider call.
    Settlement: **10 units** for `ranked`, **3** for `hybrid`/`deterministic`, **release (0)** when
    no usable result was produced. Mirrors `solutions-intelligence`'s 10/3 convention so the two
-   premium features price consistently.
+   premium features price consistently. Note `settlementGraceSeconds` is declarative only today:
+   `feature-authorization.ts#settleReservation` passes a hard-coded `settlementGraceSeconds: 60`
+   and never reads the card's field. 60 is what this card declares, so the two agree — do not
+   pick a different number expecting it to take effect.
 2. **Second layer (volume).** `AITaskDefinition.allowances` is `Record<PlanTier, number>` =
    `free | pro | team`, and `resolveLegacyPlanTier` (`repositories/entitlements.ts`) maps
    `pro_max → team`. So `{ free: 0, pro: 0, team: 30 }` is the *only* way to express a
@@ -358,8 +437,16 @@ no concept of Pro Max, so reuse means editing an already-shipped gate.
 
 **Decision**: new `src/routes/_dashboard/match/index.tsx` (composer + run history) and
 `match/$runId.tsx` (a saved run), with `src/modules/match/components/`. Discovery costs one
-low-risk line in `SearchPage`'s no-results state ("Hiring for a specific role? Paste the job
-description →") plus a `/match` nav pill in `DashboardLayout.tsx`'s `NAV`.
+low-risk line in `SearchPage`'s `NoResults` block (`SearchPage.tsx:1258`) — "Hiring for a specific
+role? Paste the job description →" — plus a nav entry.
+
+**Navigation lives in `nav-config.ts`, not in `DashboardLayout.tsx`.** The dashboard moved to the
+two-level "Shell C" rail: `src/modules/dashboard/ui/shell/nav-config.ts` exports `NAV_AREAS`, and
+`DashboardLayout.tsx` only composes the regions — it contains no `NAV` array and no
+`MOBILE_NAV_ITEMS`. Adding `/match` means **two** edits to the `discover` area, not one: append
+`{ to: '/match', label: 'Match', icon: Target, group: 'Discover' }` to its `items`, **and** add
+`'/match'` to its `routes` prefix list. Omitting the second makes the rail swap area on click —
+a failure `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts` already asserts against.
 
 ## Cost model
 
@@ -417,9 +504,10 @@ run makes re-reading free.
   3 credits. This is the ai-policy-required non-AI final rung.
 - **Embedding endpoint down** (`AIEmbeddingUnavailableError`) → federated fallback on the
   extracted keywords if extraction succeeded, else `503` + release.
-- **Restricted subject** (`builder_processing_restrictions.status = 'active'`) → excluded from the
-  pool and, because display profiles are re-read at view time, retroactively removed from saved
-  runs too.
+- **Restricted subject** (`is_builder_processing_restricted(builder_identities.id)` returns true)
+  → excluded from the pool and, because display profiles are re-read at view time, retroactively
+  removed from saved runs too. Never by reading `builder_processing_restrictions` directly —
+  `builderhunt_app` has no grant on it (§2).
 - **Fewer than 20 candidates exist** → return the honest count. Never padded.
 - **Tenant isolation** → a `runId` belonging to organization B returns **404, not 403**, for
   organization A (no existence leak); proven in `pnpm test:api-isolation:local`.

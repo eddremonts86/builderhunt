@@ -2,7 +2,7 @@
 
 This policy is binding for every BuilderHunt plan, route, repository, background worker, and
 migration. The implementation program lives in
-[`security-and-multitenancy`](../security-and-multitenancy/spec.md).
+[`security-and-multitenancy`](../phase-1/security-and-multitenancy/spec.md).
 
 ## Default rules
 

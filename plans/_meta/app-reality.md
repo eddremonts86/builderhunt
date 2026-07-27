@@ -29,8 +29,11 @@ contradicts this document, the plan is wrong.
 
 - **Framework**: TanStack Start (React 19, file-based routes in `src/routes/`, API routes
   as server route files under `src/routes/api/`). Router tree generated in `src/routeTree.gen.ts`.
-- **DB**: PostgreSQL via Drizzle ORM (`src/shared/lib/db/schema.ts`, **46 migrations** in
-  `drizzle/`, **68 tables** — verified 2026-07-24). pgvector extension enabled (`builder_embeddings.embedding`, HNSW
+- **DB**: PostgreSQL via Drizzle ORM (`src/shared/lib/db/schema.ts`, **86 migrations** in
+  `drizzle/`, **95 tables** — verified 2026-07-27; two of those migrations, `0084`/`0085`, are
+  still untracked working-tree WIP, so a clean checkout sees 84 and 92. These counts drift
+  weekly: re-derive with `ls drizzle/*.sql | wc -l` and `grep -c 'pgTable(' src/shared/lib/db/schema.ts`
+  rather than trusting this line). pgvector extension enabled (`builder_embeddings.embedding`, HNSW
   index). Multi-tenant: Better Auth Organizations, tenant-scoped RLS on every private table,
   non-owner runtime/auth/worker/platform database roles
   (`DATABASE_URL`/`DATABASE_AUTH_URL`/`DATABASE_WORKER_URL`/`DATABASE_PLATFORM_URL`), and a
@@ -61,12 +64,20 @@ contradicts this document, the plan is wrong.
 - **Validation**: zod everywhere; `src/shared/lib/env.ts` is the canonical env schema (fails
   closed on production misconfiguration, and — for Stripe billing specifically — on
   misconfiguration in every environment, not just production).
-- **Tests**: vitest; pure-logic modules in `src/shared/lib/*.ts` have sibling `*.test.ts`.
-  **1898 tests across 184 files, all green** (`pnpm test` at commit `5f7beb4`, 2026-07-24:
-  1888 pass, 10 skipped, 0 failing).
-  Earlier the same day the suite had one failure — `migration-integrity.test.ts`, because
+- **Tests**: vitest. **Tests are NOT co-located.** As of 2026-07-27 there are zero `*.test.ts`
+  files under `src/`, and `vitest.config.ts` includes ONLY `tests/unit/**/*.{test,spec}.{ts,tsx}`.
+  The tree is `tests/{unit,e2e,regression}`, with `tests/unit` mirroring `src/` path-for-path:
+  `src/lib/score.ts` → `tests/unit/lib/score.test.ts`;
+  `src/shared/lib/ai/tasks.ts` → `tests/unit/shared/lib/ai/tasks.test.ts`.
+  Playwright specs live in `tests/e2e/*.spec.ts` (23 files); `tests/regression` holds the
+  standalone `.mjs` harnesses (`pnpm test:a11y`). 258 unit test files.
+  **This bullet previously said "pure-logic modules in `src/shared/lib/*.ts` have sibling
+  `*.test.ts`", and that instruction is why plans across the backlog specify test paths vitest
+  will never run** — a test written at the old path passes by not existing. If you are executing
+  a plan written before 2026-07-27, translate its test paths before you create the file.
+  Earlier on 2026-07-24 the suite had one failure — the migration-integrity check, because
   `drizzle/meta/0045_snapshot.json` was missing while `_journal.json` had 46 entries. It was
-  fixed within the hour; all 46 migrations now have a matching snapshot. Two things are worth
+  fixed within the hour; every migration has a matching snapshot. Two things are worth
   keeping from that episode: grants-only migrations DO get a snapshot (`0044_snapshot.json`
   exists), so omitting one is a bug rather than a convention; and migration release gate 1 in
   `security-policy.md` ("migration files and Drizzle journal/snapshots agree") is enforced by
@@ -140,7 +151,8 @@ tracking + private metadata, unique `(organizationId, builderIdentityId)`), `bui
 
 **Tenant-private, org-scoped, and LIVE** (previously misfiled above as "legacy per-user"):
 `saved_queries`, `alerts`, `alert_triggers`, `builder_notes`. All four carry `organization_id`
-(nullable, pending the canonical cutover) and have RLS enabled + FORCED (`drizzle/0008_tenant_rls.sql`).
+(`NOT NULL` since `drizzle/0081_wakeful_butterfly.sql`) and have RLS enabled + FORCED
+(`drizzle/0008_tenant_rls.sql`).
 `builder_notes` specifically is the live tenant notes path via `listOrganizationBuilderNotes`
 in `src/shared/lib/repositories/organization-builders.ts`, with a composite tenant FK
 `builder_notes_organization_builder_fk`. **Caveat that matters for new work**: its
@@ -205,9 +217,9 @@ the canonical tracking store. `organization_builders` is. New features should re
 **Security reality**: RLS is enabled and FORCED on every tenant-private table, with explicit
 per-role (`builderhunt_app`/`builderhunt_worker`/`builderhunt_platform`/`builderhunt_auth`)
 policies — verified against the exact non-owner roles via `pnpm test:rls:local` and
-`pnpm test:api-isolation:local` (86/86 as of 2026-07-23). `organization_id` is still nullable on
-most tenant tables pending the canonical cutover (task 17/18 of `security-and-multitenancy`,
-blocked on a real 24h zero-mismatch production observation window). Five real,
+`pnpm test:api-isolation:local` (86/86 as of 2026-07-23). `organization_id` is `NOT NULL` on all
+seven tenant-private tables since `drizzle/0081_wakeful_butterfly.sql`; the read path is a
+separate switch and still defaults to `legacy` — see constraint 1 below. Five real,
 previously-undiscovered permission/logic bugs were found and fixed this way in the 2026-07-23
 session alone (see `security-and-multitenancy/tasks.md` task 15's progress notes) — a
 reasonable prior for treating any *newly-exercised* code path as suspect until proven
@@ -416,20 +428,36 @@ Read directly from `process.env`, NOT part of the validated `env` schema: `ADMIN
 
 ## Known structural constraints every plan must respect
 
-1. `organization_id` is nullable on most tenant tables and both tenant migration modes default
-   to `legacy` in `.env.example` — canonical-mode cutover requires a real 24h zero-mismatch
-   production observation window (`security-and-multitenancy` tasks 17/18, correctly blocked).
-   Do not assume canonical mode is live.
+1. `organization_id` is `NOT NULL` on all seven tenant-private tables — `alert_triggers`,
+   `alerts`, `builder_notes`, `builders`, `onboarding_progress`, `onboarding_selected_builders`,
+   `saved_queries` — since `drizzle/0081_wakeful_butterfly.sql`, which adopted leftover rows
+   itself so a forgotten backfill could not take a release down. The schema half of the canonical
+   cutover is DONE; only the legacy-column contraction remains open.
+   **But the read path is a separate switch and is still legacy**: `TENANT_READ_MODE` defaults to
+   `legacy` and `TENANT_CANONICAL_READY` to `false` (`src/shared/lib/env.ts:36-38`,
+   `.env.example:33-34`), and `canonical` additionally requires `TENANT_CANONICAL_READY=true`
+   (`resolveTenantReadMode` in `src/shared/lib/migration/tenant-flags.ts`). So a column being
+   `NOT NULL` does not mean reads resolve canonically. Do not assume canonical read mode is live.
+   (Updated 2026-07-27. The earlier text here said `organization_id` was "nullable, pending the
+   canonical cutover" and that the cutover was blocked on a 24h zero-mismatch production window.
+   Both are obsolete: the cutover shipped, and that readiness gate was itself removed because it
+   could never be satisfied. Every plan written before this date inherited the stale hedge.)
 2. `builders` (legacy, per-user) still exists and is still dual-written by
    `trackOrganizationBuilder` — but `organization_builders` (tenant-private, keyed by
    `(organizationId, builderIdentityId)`) is the canonical tracking store. New features read/
    write `organization_builders` under `withTenantContext`, never `builders` directly.
-3. No background job runner exists. All **seven** workers — alerts, discovery, sprints,
-   embeddings, enrichment, legal, billing — run via an admin-triggered HTTP endpoint under
-   `/api/admin/*/run-worker`, designed to be hit by an external cron (Coolify/VPS cron).
-   Cron authentication now exists as a shared helper (`CRON_SECRET`,
-   `src/shared/lib/auth/cron.ts`). New background work should follow this same pattern, NOT
+3. No background job runner exists. All **ten** workers run via an admin-triggered HTTP endpoint
+   under `/api/admin/*/run-worker`, designed to be hit by an external cron (Coolify/VPS cron):
+   `alerts.evaluate`, `sprints.execute`, `enrichment.refresh`, `discovery.crawl`,
+   `embeddings.backfill`, `legal.retention`, `billing.reconcile`,
+   `calendar.recurrence-materialization`, `calendar.reminder-delivery`, `status.snapshot`.
+   Cron authentication is a shared helper (`CRON_SECRET`, `src/shared/lib/auth/cron.ts`).
+   **Cadence is no longer a doc-comment**: workers are registered in `OPERATIONAL_SCHEDULES`
+   (`src/shared/lib/operational-schedules.ts`) and wrapped in `withJobRun({ jobKey })`, which
+   writes one `job_runs` row per run. `jobKey` is globally unique — two plans claiming the same
+   key collide. New background work follows this pattern and registers itself; it does NOT
    invent a queue system.
+   (Updated 2026-07-27: was "seven workers" listing only the first seven.)
 4. Search results are ephemeral (cache TTL) — anything needing durable profiles must write
    through to `organization_builders`/`builder_identities` or a new global table.
 5. The legacy manual billing system (`plans`, `plan_requests`) and the canonical
