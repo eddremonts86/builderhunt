@@ -126,7 +126,25 @@ jobs:
       # does, and why the same gate passed locally while failing here) keeps it alive, and printing
       # that file on failure means the next timeout arrives with the server's own reason attached
       # instead of six words and a dead end.
+      # `vite preview` serves the production build with NODE_ENV=production, which switches on the
+      # production half of the env contract (src/shared/lib/env.ts: `if (data.NODE_ENV !== 'production')
+      # return`). The job-level env points every role URL at the postgres superuser, and production
+      # rightly refuses that: the runtime role must not be an owner, and the migration, auth, worker and
+      # product identities must all be distinct. Left unset, the server accepted the connection, then
+      # threw a ZodError on the first request and answered 500 — so `curl -sf` saw an unhealthy server
+      # for sixty seconds while the process itself was perfectly alive.
+      #
+      # Giving it the four real roles is not a workaround: the accessibility gate is the only step that
+      # exercises the app as production assembles it, so it should hold the role separation production
+      # requires. The passwords are the fixture's CI values (scripts/db/prepare-rls-fixture.mjs), which
+      # this job already applied to the shared roles because CI=true.
       - name: Start production preview
+        env:
+          DATABASE_URL: postgres://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_AUTH_URL: postgres://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_WORKER_URL: postgres://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_PLATFORM_URL: postgres://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci
+          DATABASE_MIGRATION_URL: postgres://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci
         run: |
           nohup pnpm preview --port 3000 > /tmp/preview.log 2>&1 &
           disown

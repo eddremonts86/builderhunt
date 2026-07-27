@@ -88,7 +88,6 @@ fi
 # ── The job's environment, from the workflow rather than from .env ───────────────────────────────
 
 export TZ=UTC
-export NODE_ENV=test
 export APP_URL="http://localhost:${PREVIEW_PORT}"
 export VITE_APP_URL="$APP_URL"
 export BETTER_AUTH_SECRET=ci-only-secret-with-more-than-thirty-two-characters
@@ -255,6 +254,10 @@ else
   accessibility_gate() {
     pnpm exec drizzle-kit migrate >/dev/null || return 1
     pnpm db:seed:admin >/dev/null || return 1
+    # vite preview runs the build as production, which turns on the production env rules: the runtime
+    # role may not be an owner and must differ from the migration identity. The per-run fixture roles
+    # satisfy that; the owner URL stays on DATABASE_MIGRATION_URL.
+    DATABASE_URL="$(grep '^export DATABASE_URL=' "/tmp/ci-local-roles-${RUN_ID}.sh" | cut -d= -f2-)" \
     pnpm preview --port "$PREVIEW_PORT" >/tmp/ci-local-preview-"$RUN_ID".log 2>&1 &
     PREVIEW_PID=$!
     for _ in $(seq 1 30); do
