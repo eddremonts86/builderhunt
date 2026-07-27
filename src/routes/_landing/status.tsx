@@ -48,7 +48,12 @@ function StatusPage() {
         fetch('/api/status'),
         fetch('/api/incidents'),
       ])
-      if (sRes.ok) {
+      // `/api/status` answers 503 when any component check fails, carrying the
+      // same body as a 200. Reading it only on `ok` meant the Components list
+      // collapsed to "Checking…" exactly when something was down — a status
+      // page that goes blank in an outage is backwards. Render the degraded
+      // state; the overall banner already distinguishes the two.
+      if (sRes.ok || sRes.status === 503) {
         const s = await sRes.json() as StatusResponse
         setStatus(s)
         setLastUpdated(s.timestamp)

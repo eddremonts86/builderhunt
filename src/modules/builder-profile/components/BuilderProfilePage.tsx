@@ -71,20 +71,49 @@ export function BuilderProfilePage() {
   const [claimError, setClaimError] = React.useState<string | null>(null)
   const [trackedBuildersCount, setTrackedBuildersCount] = React.useState(0)
 
+  // This page is public: anonymous visitors reach it from search engines and
+  // shared links. The tenant-scoped calls below (notes, dashboard stats) can
+  // only ever 401 for them, so the session is resolved first and they are
+  // issued only when there is one. Firing them unconditionally cost every
+  // anonymous profile view two rejected round trips and left a pair of console
+  // errors on a page that had rendered perfectly.
   React.useEffect(() => {
     if (!builderId) return
-    Promise.all([
-      fetch(`/api/builders/${builderId}`, { credentials: 'include' }).then(r => r.ok ? r.json() : null),
-      fetch(`/api/builders/${builderId}/notes`, { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
-      fetch('/api/auth/get-session', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
-      fetch('/api/dashboard/stats', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
-    ]).then(([b, n, session, stats]) => {
+    let cancelled = false
+
+    const loadPublic = fetch(`/api/builders/${builderId}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null)
+    const loadSession = fetch('/api/auth/get-session', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null)
+
+    Promise.all([loadPublic, loadSession]).then(async ([b, session]) => {
+      if (cancelled) return
+      const userId = session?.user?.id ?? null
       setBuilder(b)
+      setMeId(userId)
+
+      if (!userId) {
+        setNotes([])
+        setTrackedBuildersCount(0)
+        setLoading(false)
+        return
+      }
+
+      const [n, stats] = await Promise.all([
+        fetch(`/api/builders/${builderId}/notes`, { credentials: 'include' }).then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch('/api/dashboard/stats', { credentials: 'include' }).then(r => r.ok ? r.json() : null).catch(() => null),
+      ])
+      if (cancelled) return
       setNotes(Array.isArray(n) ? n : [])
-      setMeId(session?.user?.id ?? null)
       setTrackedBuildersCount(typeof stats?.totalBuilders === 'number' ? stats.totalBuilders : 0)
       setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(() => {
+      if (!cancelled) setLoading(false)
+    })
+
+    return () => { cancelled = true }
   }, [builderId])
 
   const handleSaveNote = async () => {

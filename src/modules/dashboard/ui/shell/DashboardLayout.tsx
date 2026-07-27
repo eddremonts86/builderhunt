@@ -39,11 +39,17 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   }, [])
 
   React.useEffect(() => {
+    // Signing out navigates away while this layout is still mounted, so the
+    // pathname change fires this effect one last time — just after the session
+    // was revoked. That request could only ever come back 401, and Chromium
+    // logs every one of them, so every sign-out left a console error behind.
+    // `signingOut` flips before `signOut()` is awaited, which is early enough.
+    if (signingOut) return
     fetch('/api/alerts/triggers/unread-count', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : { count: 0 }))
       .then((data) => setUnreadAlertsCount(data.count ?? 0))
       .catch(() => setUnreadAlertsCount(0))
-  }, [location.pathname])
+  }, [location.pathname, signingOut])
 
   // Admin-only counter, so it is never requested for tenant users — an
   // unconditional fetch would 403 on every navigation for most of the userbase.
