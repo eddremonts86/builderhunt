@@ -8,7 +8,16 @@ allowBuilds:
   sharp: false
   unrs-resolver: false
 overrides:
+  # Both entries pin js-yaml past a denial-of-service advisory reached only transitively, through
+  # @tanstack/react-start > start-plugin-core > xmlbuilder2. The 4.x pin is the older advisory; the
+  # 5.x one is GHSA "exponential parsing time in flow collections", which `pnpm audit --prod
+  # --audit-level high` fails on and which therefore blocks the release gate. Upstream has not bumped
+  # it, so the pin is the only route. Patch-level in both cases.
   'js-yaml@>=4.0.0 <4.3.0': '>=4.3.0'
+  # Scoped to the parent rather than to a version range: xmlbuilder2 is the only path that reaches a
+  # vulnerable js-yaml, and gray-matter's separate js-yaml@3 must not be dragged across two majors by
+  # a broad pin.
+  'xmlbuilder2>js-yaml': '>=5.2.2'
 onlyBuiltDependencies:
   - '@clerk/shared'
   - '@parcel/watcher'
