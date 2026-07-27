@@ -16,6 +16,7 @@ import { Route as AuthRouteRouteImport } from './routes/auth/route'
 import { Route as LandingRouteRouteImport } from './routes/_landing/route'
 import { Route as DashboardRouteRouteImport } from './routes/_dashboard/route'
 import { Route as LandingIndexRouteImport } from './routes/_landing/index'
+import { Route as ScheduleInvitationIdRouteImport } from './routes/schedule/$invitationId'
 import { Route as RSlugRouteImport } from './routes/r/$slug'
 import { Route as PortfolioClaimIdRouteImport } from './routes/portfolio/$claimId'
 import { Route as OnboardingWelcomeRouteImport } from './routes/onboarding/welcome'
@@ -260,6 +261,11 @@ const LandingIndexRoute = LandingIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => LandingRouteRoute,
+} as any)
+const ScheduleInvitationIdRoute = ScheduleInvitationIdRouteImport.update({
+  id: '/schedule/$invitationId',
+  path: '/schedule/$invitationId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const RSlugRoute = RSlugRouteImport.update({
   id: '/r/$slug',
@@ -1421,6 +1427,7 @@ export interface FileRoutesByFullPath {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
+  '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -1638,6 +1645,7 @@ export interface FileRoutesByTo {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
+  '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
@@ -1857,6 +1865,7 @@ export interface FileRoutesById {
   '/onboarding/welcome': typeof OnboardingWelcomeRoute
   '/portfolio/$claimId': typeof PortfolioClaimIdRoute
   '/r/$slug': typeof RSlugRoute
+  '/schedule/$invitationId': typeof ScheduleInvitationIdRoute
   '/_landing/': typeof LandingIndexRoute
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
@@ -2078,6 +2087,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/portfolio/$claimId'
     | '/r/$slug'
+    | '/schedule/$invitationId'
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
@@ -2295,6 +2305,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/portfolio/$claimId'
     | '/r/$slug'
+    | '/schedule/$invitationId'
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
@@ -2513,6 +2524,7 @@ export interface FileRouteTypes {
     | '/onboarding/welcome'
     | '/portfolio/$claimId'
     | '/r/$slug'
+    | '/schedule/$invitationId'
     | '/_landing/'
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/billing'
@@ -2719,6 +2731,7 @@ export interface RootRouteChildren {
   BuildersBuilderIdRoute: typeof BuildersBuilderIdRoute
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
+  ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
@@ -2904,6 +2917,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof LandingIndexRouteImport
       parentRoute: typeof LandingRouteRoute
+    }
+    '/schedule/$invitationId': {
+      id: '/schedule/$invitationId'
+      path: '/schedule/$invitationId'
+      fullPath: '/schedule/$invitationId'
+      preLoaderRoute: typeof ScheduleInvitationIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/r/$slug': {
       id: '/r/$slug'
@@ -4727,6 +4747,7 @@ const rootRouteChildren: RootRouteChildren = {
   BuildersBuilderIdRoute: BuildersBuilderIdRoute,
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
+  ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,

@@ -19,7 +19,7 @@ import { resolveRequiredConsentPurposes } from '~/shared/lib/scheduling'
 import { SITE_URL } from '~/shared/lib/site-url'
 import { readCapabilitySessionCookie } from './capability-session'
 import { withCapabilityContext, type CapabilityContextResult, type CapabilityTenant } from './capability-context'
-import type { WorkerTransaction } from '~/shared/lib/db/worker-db'
+import type { CapabilityTransaction } from '~/shared/lib/db/capability-db'
 
 /**
  * Every purpose is required to book.
@@ -121,7 +121,7 @@ export async function guardPublicRequest(request: Request, isMutation: boolean):
 }
 
 export interface CapabilityRequestContext {
-  transaction: WorkerTransaction
+  transaction: CapabilityTransaction
   tenant: CapabilityTenant
 }
 

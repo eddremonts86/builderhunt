@@ -19,7 +19,7 @@
 import { randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
-import { workerDb, type WorkerTransaction } from '~/shared/lib/db/worker-db'
+import { capabilityDb, type CapabilityTransaction } from '~/shared/lib/db/capability-db'
 import { hashCapability } from './capability'
 
 export interface CapabilityTenant {
@@ -46,13 +46,13 @@ export type CapabilityContextResult<T> =
  */
 export async function withCapabilityContext<T>(
   secret: string,
-  operation: (transaction: WorkerTransaction, tenant: CapabilityTenant) => Promise<T>,
-  options: { invitationId?: string; db?: PostgresJsDatabase | typeof workerDb } = {},
+  operation: (transaction: CapabilityTransaction, tenant: CapabilityTenant) => Promise<T>,
+  options: { invitationId?: string; db?: PostgresJsDatabase | typeof capabilityDb } = {},
 ): Promise<CapabilityContextResult<T>> {
   const capabilityHash = hashCapability(secret, { strict: true })
   if (!capabilityHash) return { ok: false, code: 'invitation_unavailable' }
 
-  const database = options.db ?? workerDb
+  const database = options.db ?? capabilityDb
   return database.transaction(async (transaction) => {
     const rows = await transaction.execute(sql`
       select organization_id, owner_user_id, invitation_id
@@ -83,11 +83,11 @@ export async function withCapabilityContext<T>(
     await transaction.execute(sql`
       select
         set_config('app.organization_id', ${tenant.organizationId}, true),
-        set_config('app.organization_role', 'worker', true),
+        set_config('app.organization_role', 'capability', true),
         set_config('app.request_id', ${randomUUID()}, true)
     `)
 
-    const value = await operation(transaction as WorkerTransaction, tenant)
+    const value = await operation(transaction as CapabilityTransaction, tenant)
     return { ok: true as const, value, tenant }
   }) as Promise<CapabilityContextResult<T>>
 }

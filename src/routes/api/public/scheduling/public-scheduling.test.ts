@@ -11,7 +11,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
  * Route tests for the public capability flow (plan:
  * calendar-scheduling-interview-intelligence, Phase 5 "Add public invitation and booking APIs").
  *
- * `workerDb` is redirected at a real disposable Postgres instead of stubbing the capability layer,
+ * `capabilityDb` is redirected at a real disposable Postgres instead of stubbing the capability layer,
  * so `scheduling_resolve_capability` (drizzle/0077) and the tenant-setting sequence in
  * `capability-context.ts` actually run. Those two are the security boundary for an unauthenticated
  * flow; a mock of them would test nothing that matters.
@@ -21,8 +21,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 const holder: { db: PostgresJsDatabase | null } = { db: null }
 
-vi.mock('~/shared/lib/db/worker-db', () => ({
-  get workerDb() {
+vi.mock('~/shared/lib/db/capability-db', () => ({
+  get capabilityDb() {
     if (!holder.db) throw new Error('disposable database not ready')
     return holder.db
   },

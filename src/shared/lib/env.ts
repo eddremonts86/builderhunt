@@ -14,6 +14,12 @@ const zodEnv = z.object({
   DATABASE_MIGRATION_URL: z.string().min(1).optional(),
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
+  /**
+   * The public-capability identity (drizzle/0078). Optional so a deployment that has not provisioned
+   * the credential yet still boots — the public scheduling flow then fails closed with a permission
+   * error, which is the right failure: it never silently runs with the worker's wider privileges.
+   */
+  DATABASE_CAPABILITY_URL: z.string().min(1).optional(),
   DATABASE_PLATFORM_URL: z.string().min(1).optional(),
   // Shared secret that lets a VPS crontab trigger the admin run-worker
   // endpoints unattended (see src/shared/lib/auth/cron.ts). Optional: when
@@ -217,9 +223,26 @@ const zodEnv = z.object({
   // operator cannot accidentally point at the global one by simply omitting the var.
   DEEPGRAM_API_KEY: z.string().optional(),
   DEEPGRAM_BASE_URL: z.string().default('https://api.eu.deepgram.com'),
-  // Azure OpenAI regional EU deployment (spec.md: "Sensitive text AI: Azure OpenAI regional EU
-  // deployment. Never silently fall back to MiniMax.") — required in production when
-  // SENSITIVE_AI_ENABLED=true.
+  // Sensitive-text AI provider. spec.md's rule is unchanged — "Never silently fall back to
+  // MiniMax" — but the vendor is now selectable, because provisioning proved the residency
+  // guarantee is a property of the *provider*, not of our config. See
+  // docs/operations/interview-provider-register.md §4.
+  //
+  // `mistral` is primary: EU processing is its default and there is no per-deployment switch that
+  // can silently move processing outside the EU. `azure` is the retained fallback.
+  SENSITIVE_AI_PROVIDER: z.enum(['mistral', 'azure']).default('mistral'),
+  // Mistral La Plateforme. The base URL default is the EU endpoint, and the check below pins it
+  // exactly rather than pattern-matching, because Mistral's US endpoint is an opt-in and the only
+  // safe posture is to reject anything that is not the known-EU host.
+  MISTRAL_API_KEY: z.string().optional(),
+  MISTRAL_BASE_URL: z.string().default('https://api.mistral.ai'),
+  // Pin an explicit dated model id (e.g. `mistral-medium-2604`), never a floating alias like
+  // `mistral-medium-latest`: these models write candidate-evaluation material, and an unannounced
+  // model change that shifts how candidates are assessed is a fairness and auditability problem,
+  // not just a quality one. `SensitiveAICompletionResult.model` records what actually ran.
+  MISTRAL_MODEL: z.string().optional(),
+  // Azure OpenAI regional EU deployment — retained fallback, required when
+  // SENSITIVE_AI_PROVIDER=azure.
   AZURE_OPENAI_ENDPOINT: z.string().optional(),
   AZURE_OPENAI_API_KEY: z.string().optional(),
   AZURE_OPENAI_DEPLOYMENT: z.string().optional(),
@@ -343,6 +366,23 @@ const zodEnv = z.object({
     })
   }
   if (
+    data.DATABASE_CAPABILITY_URL
+    && (
+      data.DATABASE_CAPABILITY_URL === data.DATABASE_URL
+      || data.DATABASE_CAPABILITY_URL === data.DATABASE_AUTH_URL
+      || data.DATABASE_CAPABILITY_URL === data.DATABASE_WORKER_URL
+      || data.DATABASE_CAPABILITY_URL === data.DATABASE_MIGRATION_URL
+    )
+  ) {
+    context.addIssue({
+      code: 'custom',
+      path: ['DATABASE_CAPABILITY_URL'],
+      // Sharing an identity with any other role would silently hand the public flow that role's
+      // grants, which is the entire thing drizzle/0078 exists to prevent.
+      message: 'Capability, worker, auth, migration, and product database identities must be different',
+    })
+  }
+  if (
     data.DATABASE_PLATFORM_URL
     && (
       data.DATABASE_PLATFORM_URL === data.DATABASE_URL
@@ -428,7 +468,28 @@ const zodEnv = z.object({
     }
   }
 
-  if (data.SENSITIVE_AI_ENABLED === 'true') {
+  if (data.SENSITIVE_AI_ENABLED === 'true' && data.SENSITIVE_AI_PROVIDER === 'mistral') {
+    if (!data.MISTRAL_API_KEY) {
+      context.addIssue({ code: 'custom', path: ['MISTRAL_API_KEY'], message: 'MISTRAL_API_KEY is required when SENSITIVE_AI_ENABLED=true and SENSITIVE_AI_PROVIDER=mistral' })
+    }
+    // Exact match, not a substring or suffix test. Mistral's EU platform is this one host; its US
+    // endpoint is an explicit opt-in. Pinning the value means a typo, a proxy or a deliberate
+    // redirection all fail closed instead of quietly moving candidate data out of the EU. This is
+    // the check the Azure equivalent could not express: there, EU-ness was a per-deployment
+    // property the env could not see (interview-provider-register.md §4).
+    if (data.MISTRAL_BASE_URL.replace(/\/+$/, '') !== 'https://api.mistral.ai') {
+      context.addIssue({ code: 'custom', path: ['MISTRAL_BASE_URL'], message: 'MISTRAL_BASE_URL must be exactly https://api.mistral.ai (the EU platform) when SENSITIVE_AI_ENABLED=true' })
+    }
+    // Reject floating aliases: candidate-facing evaluation output must be attributable to a known
+    // model version. `mistral-medium-latest` silently changes what assessed a candidate.
+    if (!data.MISTRAL_MODEL) {
+      context.addIssue({ code: 'custom', path: ['MISTRAL_MODEL'], message: 'MISTRAL_MODEL is required when SENSITIVE_AI_ENABLED=true and SENSITIVE_AI_PROVIDER=mistral' })
+    } else if (/latest$/i.test(data.MISTRAL_MODEL)) {
+      context.addIssue({ code: 'custom', path: ['MISTRAL_MODEL'], message: 'MISTRAL_MODEL must pin an explicit dated model id (e.g. mistral-medium-2604), not a floating *-latest alias' })
+    }
+  }
+
+  if (data.SENSITIVE_AI_ENABLED === 'true' && data.SENSITIVE_AI_PROVIDER === 'azure') {
     const EU_AZURE_REGIONS = ['westeurope', 'northeurope', 'francecentral', 'germanywestcentral', 'swedencentral', 'switzerlandnorth']
     const endpointHost = (() => {
       try {
@@ -437,6 +498,10 @@ const zodEnv = z.object({
         return ''
       }
     })()
+    // NOTE: this remains a substring test on the hostname, which is weaker than it looks — it can
+    // be satisfied by resource naming alone and cannot see the deployment type, so a Global
+    // Standard deployment (processing outside the EU) passes. Tracked for replacement with an
+    // explicit AZURE_OPENAI_REGION var; see interview-provider-register.md §4b.
     if (!data.AZURE_OPENAI_ENDPOINT || !EU_AZURE_REGIONS.some((region) => endpointHost.includes(region))) {
       context.addIssue({ code: 'custom', path: ['AZURE_OPENAI_ENDPOINT'], message: 'AZURE_OPENAI_ENDPOINT must be a regional EU Azure OpenAI deployment when SENSITIVE_AI_ENABLED=true' })
     }
@@ -453,6 +518,7 @@ const zodEnv = z.object({
 const INTERVIEW_SECRET_KEYS = [
   'INTERVIEW_R2_ACCESS_KEY_ID', 'INTERVIEW_R2_SECRET_ACCESS_KEY',
   'INTERVIEW_CLAMAV_HOST', 'DEEPGRAM_API_KEY', 'AZURE_OPENAI_API_KEY',
+  'MISTRAL_API_KEY',
 ]
 
 export function parseEnvironment(input: Record<string, unknown>) {
