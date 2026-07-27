@@ -53,6 +53,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'builderhunt_platform') THEN
     CREATE ROLE builderhunt_platform LOGIN;
   END IF;
+  -- The accountless candidate portal's own role (drizzle/0078_capability_role.sql).
+  -- It carries 19 policies of its own, so omitting it here would lose exactly as much
+  -- tenant isolation on restore as the missing roles this file was written for.
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'builderhunt_capability') THEN
+    CREATE ROLE builderhunt_capability LOGIN;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'builderhunt_readonly') THEN
     CREATE ROLE builderhunt_readonly LOGIN;
   END IF;
@@ -66,5 +72,6 @@ ALTER ROLE builderhunt_owner    NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOIN
 ALTER ROLE builderhunt_app      LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE builderhunt_auth     LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE builderhunt_worker   LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
-ALTER ROLE builderhunt_platform LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+ALTER ROLE builderhunt_platform   LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
+ALTER ROLE builderhunt_capability LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
 ALTER ROLE builderhunt_readonly LOGIN   NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOREPLICATION NOBYPASSRLS;
