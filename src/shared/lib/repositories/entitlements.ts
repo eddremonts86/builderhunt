@@ -1,5 +1,5 @@
 import { and, eq, isNull } from 'drizzle-orm'
-import type { PlanStatus, PlanTier } from '../billing-shared'
+import type { OrganizationTier, PlanStatus, PlanTier } from '../billing-shared'
 import type { TenantTransaction } from '../db/client'
 import { billingSubscriptions, organizationEntitlements } from '../db/schema'
 
@@ -10,15 +10,17 @@ interface EntitlementInput {
 }
 
 /**
- * `PlanTier` plus Pro Max — the Stripe-native tier `subscriptions.ts` can now
+ * `PlanTier` plus Pro Max — the Stripe-native tier `subscriptions.ts` can
  * project into `organization_entitlements` (plans/stripe-billing-platform/tasks.md
- * §7 "Project paid subscription and monthly renewal state"). Kept distinct
- * from `PlanTier` itself rather than widening that type globally: `PlanTier`
- * also drives the legacy manual per-user plan system (`billing-shared.ts`'s
- * `PLAN_LIMITS`/`PLAN_PRICING`/etc., admin-grantable via `setPlatformUserPlan`),
- * which cannot manually grant Pro Max — only a real Stripe subscription can.
+ * §7 "Project paid subscription and monthly renewal state").
+ *
+ * Declared in the client-safe `billing-shared.ts` as `OrganizationTier` and
+ * re-exported here under the name every server call site already uses. It lives
+ * there so a per-tier allowance can be keyed by it and read by both the pricing
+ * page and the route that enforces it; see that declaration for why it is not a
+ * widening of `PlanTier`.
  */
-export type EntitlementTier = PlanTier | 'pro_max'
+export type EntitlementTier = OrganizationTier
 
 export interface EntitlementPolicy {
   tier: EntitlementTier
@@ -31,13 +33,18 @@ export interface EntitlementPolicy {
 }
 
 /**
- * Every legacy `Record<PlanTier, ...>` table (saved-search/sprint limits, AI
- * call allowances, the manual-billing UI card) predates Pro Max and has no
- * dedicated entry for it yet — a product decision, not a technical one.
- * Until that entry exists, a Pro Max organization is treated as Team for
- * these legacy lookups: Team sits at the top of every one of those tables
- * today, so this never under-serves a paying Pro Max customer while a
- * Pro-Max-specific row is designed.
+ * The remaining `Record<PlanTier, ...>` tables — `PLAN_LIMITS` (saved searches,
+ * saved builders, RSS), the AI task allowances in `ai/tasks.ts`, and the
+ * manual-billing UI card — predate Pro Max and have no dedicated entry for it,
+ * a product decision rather than a technical one. Until they get one, a Pro Max
+ * organization reads Team's row: Team sits at the top of each of those tables,
+ * so this never under-serves a paying Pro Max customer.
+ *
+ * Do NOT reach for this when the allowance is also *advertised* somewhere. An
+ * allowance the pricing page states must be keyed by `OrganizationTier` and
+ * indexed by `entitlement.tier` directly, so copy and enforcement read the same
+ * row — `SOURCING_SPRINT_LIMITS` used to come through here and drifted by 7
+ * sprints (advertised 3 for Pro Max, enforced 10) before anyone noticed.
  */
 export function resolveLegacyPlanTier(tier: EntitlementTier): PlanTier {
   return tier === 'pro_max' ? 'team' : tier

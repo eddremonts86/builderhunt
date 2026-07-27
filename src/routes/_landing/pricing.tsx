@@ -9,6 +9,7 @@ import {
   type PackCatalogDto,
   type SubscriptionCatalogDto,
 } from '~/shared/lib/billing/catalog'
+import { sourcingSprintAllowanceLabel } from '~/shared/lib/billing-shared'
 import { Button, Checkbox, Input, Label, LinkButton } from '~/components/ui'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { getAppOrganizationPlan } from '~/shared/lib/billing-session'
@@ -356,12 +357,24 @@ function PricingPage() {
                 <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
                 <td className="text-center py-3 px-2"><Check className="w-4 h-4 text-bh-success inline" /></td>
               </tr>
+              {/* Derived from SOURCING_SPRINT_LIMITS, the map /api/sprints
+                  enforces — hand-typed, this row said "—" for Pro and "Up to 3"
+                  for Pro Max while the routes allowed 3 and 10. Column order
+                  follows TIERS, which matches the header above. */}
               <tr className="border-b border-bh-border/40">
                 <td className="py-3 px-2">AI sourcing sprints</td>
-                <td className="text-center py-3 px-2"><X className="w-4 h-4 text-bh-text-dim inline" /></td>
-                <td className="text-center py-3 px-2">—</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">Up to 3</td>
-                <td className="text-center py-3 px-2 text-bh-text font-semibold">Up to 10</td>
+                {TIERS.map((tier) => {
+                  const allowance = sourcingSprintAllowanceLabel(tier)
+                  return (
+                    <td
+                      key={tier}
+                      className={`text-center py-3 px-2${allowance ? ' text-bh-text font-semibold' : ''}`}
+                      data-testid={`pricing-sprints-${tier}`}
+                    >
+                      {allowance ?? <X className="w-4 h-4 text-bh-text-dim inline" />}
+                    </td>
+                  )
+                })}
               </tr>
               <tr className="border-b border-bh-border/40">
                 <td className="py-3 px-2">Work-sample analysis</td>

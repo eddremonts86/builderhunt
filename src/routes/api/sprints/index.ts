@@ -3,7 +3,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { SOURCING_SPRINT_LIMITS } from '~/shared/lib/billing-shared'
-import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
+import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import { createSprintSchema } from '~/shared/lib/sprints-shared'
 import { countActiveSprints, createSprint, listSprints } from '~/lib/sprints/service'
 
@@ -36,7 +36,9 @@ export const Route = createFileRoute('/api/sprints/')({
           }
           const created = await withTenantContext(principal, async (tx) => {
             const entitlement = await getOrganizationEntitlement(tx, principal.organizationId)
-            const limit = SOURCING_SPRINT_LIMITS[resolveLegacyPlanTier(entitlement.tier)]
+            // Indexed by the entitlement tier itself — Pro Max has its own row,
+            // so this is the same number /pricing advertises.
+            const limit = SOURCING_SPRINT_LIMITS[entitlement.tier]
             const current = await countActiveSprints(tx, principal.organizationId)
             if (current >= limit) return { sprint: null, current, limit, plan: entitlement.tier }
             const sprint = await createSprint(tx, principal.organizationId, principal.userId, parsed.data)

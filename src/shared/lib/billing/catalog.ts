@@ -16,7 +16,19 @@
  * everything else from this file.
  */
 
+import { compactFeatures, sourcingSprintFeature, type OrganizationTier } from '../billing-shared'
+
+/**
+ * Structurally the same tier set as `OrganizationTier` (and its server-side
+ * alias `EntitlementTier`) — the assignment below fails to compile if the two
+ * ever diverge, which is what lets `TIER_PRESENTATION` read a tier-keyed
+ * allowance the entitlement path enforces.
+ */
 export type CatalogTier = 'free' | 'pro' | 'pro_max' | 'team'
+const _tierSetsAgree: CatalogTier extends OrganizationTier
+  ? OrganizationTier extends CatalogTier ? true : never
+  : never = true
+void _tierSetsAgree
 export type CatalogInterval = 'monthly' | 'annual'
 
 export type SubscriptionCatalogKey =
@@ -124,22 +136,27 @@ export interface TierPresentation {
   features: string[]
 }
 
+// The sprint bullet is GENERATED from the allowance the routes enforce, never
+// typed out. Written by hand it drifted: Pro Max advertised "up to 3" while
+// `/api/sprints` allowed 10, and Pro's 3 were enforced but never advertised.
+// `sourcing-sprint-allowance.test.ts` asserts the two still agree; deriving
+// makes agreement the only representable state.
 export const TIER_PRESENTATION: Record<CatalogTier, TierPresentation> = {
   free: {
     label: 'Free', icon: 'sparkles',
-    features: ['3 saved searches', '50 saved builders', 'Basic RSS feeds', 'Public /explore', 'Public /blog'],
+    features: compactFeatures('3 saved searches', '50 saved builders', 'Basic RSS feeds', 'Public /explore', 'Public /blog', sourcingSprintFeature('free')),
   },
   pro: {
     label: 'Pro', icon: 'zap',
-    features: ['50 saved searches', 'Unlimited saved builders', 'Smart alerts', 'Semantic search', '140 credits/month', 'Priority support'],
+    features: compactFeatures('50 saved searches', 'Unlimited saved builders', 'Smart alerts', 'Semantic search', '140 credits/month', sourcingSprintFeature('pro'), 'Priority support'),
   },
   pro_max: {
     label: 'Pro Max', icon: 'rocket',
-    features: ['Everything in Pro', '700 credits/month', 'AI sourcing sprints (up to 3)', 'Work-sample analysis', 'Priority support'],
+    features: compactFeatures('Everything in Pro', '700 credits/month', sourcingSprintFeature('pro_max'), 'Work-sample analysis', 'Priority support'),
   },
   team: {
     label: 'Team', icon: 'users',
-    features: ['Everything in Pro Max', 'Up to 10 team seats', '2,100 pooled credits/month', 'Shared saved searches', 'Shared builder lists', 'Activity feed', 'AI sourcing sprints (up to 10)'],
+    features: compactFeatures('Everything in Pro Max', 'Up to 10 team seats', '2,100 pooled credits/month', 'Shared saved searches', 'Shared builder lists', 'Activity feed', sourcingSprintFeature('team')),
   },
 }
 
