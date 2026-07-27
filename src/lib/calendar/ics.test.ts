@@ -46,6 +46,21 @@ describe('buildEventIcs — REQUEST', () => {
     expect(event.status).toBe('CONFIRMED')
   })
 
+  it('emits instants in UTC, so the server timezone cannot shift the appointment', () => {
+    // This is the assertion the previous version of this file lacked. The round-trip check above
+    // compares parsed instants, and `node-ical` resolves a bare `TZID=` label using the *process's*
+    // timezone — so on a machine already in Europe/Copenhagen a wrong `DTSTART` and a wrong
+    // interpretation cancelled out and the test passed. It failed only in CI, under TZ=UTC, after
+    // three days of the workflow being unable to run at all.
+    //
+    // Pinning the wire format instead of the round-trip removes the coincidence: `...Z` is correct
+    // under every `TZ`, and needs no `VTIMEZONE` block for a client to resolve.
+    const text = buildEventIcs(BASE, 'REQUEST')
+    expect(text).toContain('DTSTART:20270504T090000Z')
+    expect(text).toContain('DTEND:20270504T093000Z')
+    expect(text).not.toContain('TZID=')
+  })
+
   it('carries METHOD:REQUEST so a client treats it as a scheduling request', () => {
     expect(buildEventIcs(BASE, 'REQUEST')).toContain('METHOD:REQUEST')
   })
