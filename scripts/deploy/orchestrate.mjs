@@ -64,6 +64,15 @@ const ROLE_ENV_VARS = [
   { env: 'DATABASE_AUTH_URL', label: 'auth', required: false },
   { env: 'DATABASE_WORKER_URL', label: 'worker', required: false },
   { env: 'DATABASE_PLATFORM_URL', label: 'platform', required: false },
+  // The accountless candidate portal's role (drizzle/0078_capability_role.sql).
+  // Like every other role here it is created by the migration without a password,
+  // so without this entry setting DATABASE_CAPABILITY_URL in Coolify would appear
+  // to configure the portal while step 5 never synced the password onto the role
+  // and the login kept failing. `required: false` keeps it inert until the
+  // variable is actually set — the app falls back to the worker URL and the
+  // public flow fails closed on a permission error, which is the intended
+  // pre-rollout state.
+  { env: 'DATABASE_CAPABILITY_URL', label: 'capability', required: false },
 ]
 
 const WAIT_ATTEMPTS = Number.parseInt(process.env.DEPLOY_DB_WAIT_ATTEMPTS ?? '30', 10)
