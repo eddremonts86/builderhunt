@@ -67,8 +67,12 @@ try {
     insert into alerts (
       id, organization_id, user_id, name, keywords, enabled, trigger_conditions, delivery_channel, created_at
     ) values
-      ('alert-a', 'org-a', 'user-a', 'A', '{}', true, '{"eventType":"any_activity"}', 'dashboard', now()),
-      ('alert-b', 'org-b', 'user-b', 'B', '{}', true, '{"eventType":"any_activity"}', 'dashboard', now())
+      -- keywords is jsonb declared string[]; '[]' not '{}'. An empty *object* has no length property,
+      -- so it slipped past the alerts worker's "no keywords, skip" check and died inside the search
+      -- cache key on .sort. These rows exist for the RLS checks to look at, but the worker reads them
+      -- too, and a fixture that stores a shape the column does not allow tests the wrong thing.
+      ('alert-a', 'org-a', 'user-a', 'A', '[]', true, '{"eventType":"any_activity"}', 'dashboard', now()),
+      ('alert-b', 'org-b', 'user-b', 'B', '[]', true, '{"eventType":"any_activity"}', 'dashboard', now())
     on conflict (id) do nothing
   `
   await owner`

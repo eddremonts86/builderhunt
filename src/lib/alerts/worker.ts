@@ -105,7 +105,19 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
           continue
         }
 
-        const keywords = (conditions.keywords?.length ? conditions.keywords : alert.keywords) ?? []
+        // `keywords` is a jsonb column, so its declared `string[]` binds writers, not readers: a
+        // legacy row, a hand-repaired record, or one bad writer can leave a non-array behind, and
+        // `.length === 0` waves anything without a `length` straight through. That is how an empty
+        // object reached `searchBuilders` and died on `.sort` inside the cache key — an error naming
+        // the symptom and not the row. Failing the alert here keeps the outcome it already had
+        // (recorded error, backoff honored) and says which alert holds the bad value.
+        const rawKeywords = conditions.keywords?.length ? conditions.keywords : alert.keywords
+        if (rawKeywords != null && !Array.isArray(rawKeywords)) {
+          throw new Error(
+            `alert ${alert.id} has a non-array keywords value (${typeof rawKeywords}); expected string[]`,
+          )
+        }
+        const keywords = rawKeywords ?? []
         if (keywords.length === 0) continue
         const [searchResults, alreadySeen] = await Promise.all([
           searchBuilders({ keywords, perPage: 20 }),
