@@ -1,70 +1,64 @@
 # Phase 1 — implementation queue
 
 A dated snapshot of every `plans/phase-1/*` plan, ordered easiest → hardest, so a
-session can pick up work without re-reading 52 `tasks.md` files.
+session can pick up work without re-reading 53 `tasks.md` files.
 
-**Snapshot: 2026-07-25.** Counts are `- [ ]` / `- [x]` lines in each plan's `tasks.md`.
-Regenerate with:
+**Snapshot: 2026-07-27.** 53 plans, 749 tasks, 581 done (78%), 168 open, 26 plans fully closed.
+Counts are `- [ ]` / `- [x]` lines in each plan's checklist. Regenerate with:
 
 ```bash
-for f in plans/phase-1/*/tasks.md; do p=$(basename $(dirname "$f")); o=$(grep -c "^- \[ \]" "$f"; true); d=$(grep -c "^- \[x\]" "$f"; true); printf "%3s|%3s|%s\n" "${o:-0}" "${d:-0}" "$p"; done | sort -t'|' -k1 -n
+for f in plans/phase-1/*/tasks.md plans/phase-1/stealth-scraping/task.md; do
+  p=$(basename $(dirname "$f"))
+  o=$(grep -c "^- \[ \]" "$f" || true); d=$(grep -c "^- \[x\]" "$f" || true)
+  printf "%3s|%3s|%s\n" "${o:-0}" "${d:-0}" "$p"
+done | sort -t'|' -k1 -rn
 ```
+
+Note `stealth-scraping` uses `task.md` (singular) and `implementation_plan.md` instead of the
+`spec.md`/`plan.md`/`tasks.md` trio every other plan follows. The previous snapshot's one-liner
+globbed only `tasks.md`, so that plan's 9 open items were invisible in every count. The command
+above includes it explicitly; renaming the file is the real fix.
 
 Open counts are a rough difficulty proxy only — a 9-task writing plan is far cheaper
 than a 9-task schema+worker+UI plan. The ordering below is adjusted for real scope.
 
 ## A. Actionable queue (work these in order)
 
-*(empty — see A2 below: both remaining plans are blocked on an unresolved dependency, not just large)*
+| Plan | Open | Why it is workable now |
+|------|-----:|------------------------|
+| `audit-visual-system` | 3 | Needs new e2e infra and a production check — **unblocked 2026-07-27** when the maintainer green-lit Playwright and CI-workflow edits. |
+| `audit-performance-qa` | 7 | Lighthouse/Playwright harness plus a CI quality gate. Same green light. |
+| `exhaustive-local-e2e-design` | 12 | Design waves 4+5 of the e2e suite. Same green light. Largest of the three but entirely additive. |
+| `calendar-scheduling-interview-intelligence` | 47 | **Unblocked 2026-07-27**: its Phase 0 dependency (`security-and-multitenancy`'s canonical tenant/RLS cutover) is now closed. Phases 5–12 remain: private documents, live transcription, sensitive AI, retention, rollout. Still the largest plan in the backlog. |
+| `solutions-intelligence` | 30 | Tenant dependency also cleared, but see section B — it retains two dependencies of its own. |
 
-## A1. Done this session (2026-07-26) — see each plan's tasks.md for full evidence
+## A1. Recently closed
 
-| Plan | What shipped | What's left, and why |
-|------|-------------|----------------------|
-| `content-marketing` | Post template, 2 new posts, real regression tests, `@tailwindcss/typography` install (real bug: every post's headings/code blocks rendered unstyled). | Phase 2/3 (cross-posting, ongoing cadence) is manual founder GTM work, not code — left for the user. |
-| `claimable-profiles` | Replaced email-only claim "proof" with real source-bound verification (bio-challenge checked against the live GitHub/GitLab/Codeberg/DEV.to API). Admin revocation route. Live-verified against the real GitHub API. | Profile-view analytics (separate net-new feature) not built. |
-| `audit-performance-qa` | Responsive AVIF/WebP hero images + budget checker script; confirmed tsc/eslint/fonts were already clean (stale plan text). | **Pending, needs your input**: Playwright/Lighthouse harness + CI quality-gate workflow. Blocked by two standing rules: no new e2e/Playwright files this session, and CI/CD pipeline edits (`.github/workflows/*`) need your explicit go-ahead before I touch them autonomously. Tell me if you want me to proceed on either. |
-| `audit-trust` | Full plan now closed. Removed 6 real fabricated trust claims (fake 4.8★ rating, invented "420M+ profiles" stats, a fabricated testimonial, a hardcoded fake live-signal chip, a dead "Join Alerts" form, false user-PAT copy). Then, in a dedicated follow-up pass: the entire profile-removal/global-suppression subsystem — two new GRANT-only tables, rotating HMAC keys, source-proof adapters (github/gitlab/codeberg/devto), the request/verify service (256-bit challenges, enumeration-resistant, cross-org `builders` deletion on verify), a read-time suppression filter wired into search/track/public-profile/recent/exports (recommendations/feeds/alerts covered transitively via `searchBuilders`), two public API routes, and real `/security` + `/privacy/remove` pages. Live-verified end-to-end against the real GitHub API. | Nothing pending except two items that only make sense after a maintainer decides to turn `PROFILE_REMOVAL_ENABLED` on in production (a runtime readiness gate + staged rollout) — the flag itself, off by default, is the safety net until then. |
-| `design-modernization` | Verified every Wave 1/2 task against real source (they were already done — the tasks.md checkboxes had just never been updated) and fixed one real drift: `BrandLogoMark.tsx` had a cyan dot at a hardcoded hex that had silently drifted from the actual `--color-bh-cyan` token. Routed through CSS vars, pixel-verified identical output. | Nothing pending — plan fully closed. |
-| `portfolio-builder` | Verified-owner public portfolio pages at `/portfolio/$claimId` (theme, headline, intro, up to 6 selected projects), fail-closed public API, owner draft/publish/unpublish UX, cache invalidation on revoke. Two real bugs found+fixed live: publish didn't save in-progress draft edits first; the public route was missing `<ThemeProvider>` so it always rendered light. | AI-persona/timeline integrations left as honest `false` stubs (both genuinely optional); e2e task out of scope this session. |
-| `unified-timeline` | Per-builder "Recent activity" section on the profile page — live, read-through-cached (6h TTL) fetch from github/hn/devto/gitlab/stackoverflow's own public APIs, all 4 phases including the optional AI summary. Real bug found+fixed live: GitHub's public events feed never includes a PR's title/html_url (confirmed against the real API) — every PR event rendered blank; fixed by building the title/URL from the event's own `number` + repo name. | Nothing pending — plan fully closed. |
-| `audit-conversion` | Full first-party consent-aware conversion-event pipeline (closed schema, privacy-minimized table, ingestion route, 30-day retention, admin aggregate reporting w/ Wilson-score CIs), hero guest-value CTA + tertiary "how it works" demotion, accurate source-count copy, fixed `/search`→`/explore` SearchAction JSON-LD. Two real bugs found+fixed live: `/explore`'s `next` param was silently dropped by `SignUpPage.tsx` (every guest-search signup lost its query); root JSON-LD SearchAction pointed at the authenticated-only `/search`. Live-verified full guest→signup→onboarding-skip→restored-search flow end to end. | **Pending, needs your input**: real baseline collection (needs ≥14 real days/1,000 sessions once `CONVERSION_EVENTS_ENABLED=true` is deployed), the `test:conversion` Playwright script + CI workflow gate (blocked by the same two standing rules as `audit-performance-qa`'s deferred item), and the staged 10%/50%/100% rollout decision (depends on the baseline). Tell me if/when to turn collection on. |
-
-## A2. Blocked, needs your decision (2026-07-26) — the entire remaining actionable queue
-
-Both plans below explicitly hard-depend on `security-and-multitenancy`'s **completed, certified**
-canonical tenant/RLS cutover ("for completed canonical tenant cutover/RLS" — their own words).
-That plan sits in section C with 2 open items already flagged as **needing maintainer approval** —
-i.e. this isn't a stale reality-check, the block is real and current. Both are also each a
-multi-week, money-and-identity-critical platform build (new credit-ledger charges, cross-source
-human-identity merging, a new calendar/audio/transcription pipeline) — exactly the kind of thing
-where a shallow autonomous pass would do more harm than good (charging real credits for a fake
-feature, merging the wrong people's identities). Recommend resolving `security-and-multitenancy`'s
-2 approval-gated items first, or explicitly telling me to proceed despite the stated dependency.
-
-| Plan | Open | Blocked on |
-|------|-----:|-----------|
-| `solutions-intelligence` | 30 | `security-and-multitenancy` (completed canonical tenant/RLS gates — not yet certified) + `stealth-scraping` (itself dark/inactive, `ENRICHMENT_ENABLED=false`) + a 60-brief gold-set quality bar before any of it can be trusted. |
-| `calendar-scheduling-interview-intelligence` | 81 | `security-and-multitenancy` (completed canonical tenant cutover/RLS) — largest plan in the whole backlog by a wide margin. |
+| Plan | What shipped |
+|------|-------------|
+| `security-and-multitenancy` (2026-07-27) | Canonical tenant cutover. `organization_id` is now `NOT NULL` on all seven tenant-private tables (`drizzle/0081`), with the migration adopting leftover rows itself so a forgotten backfill cannot take a release down. Fixed three real defects on the way: the resource backfill had never been run; `classifyResourceRow` flagged every team-owned row as a conflict; the readiness gate demanded a 24h zero-mismatch shadow window that could never be satisfied. Only the legacy-column contraction remains. |
+| Test layout (2026-07-27) | All tests unified under `tests/{unit,e2e,regression}`. Not a plan item, but it moves the ground under `exhaustive-local-e2e-design` and `audit-performance-qa` — both write new Playwright files, which now belong in `tests/e2e`. |
 
 ## B. Blocked by another plan (do not start)
 
 | Plan | Open | Blocked on |
 |------|-----:|-----------|
-| `shared-resources` | 10 | `security-and-multitenancy` (canonical tenant context) + `team-accounts`. Its own header says "do not implement until…". |
-| `activity-feed` | 7 | `security-and-multitenancy` + `team-accounts` + `shared-resources`. |
+| `shared-resources` | 10 | `team-accounts` (done) + its own header's "do not implement until…" note. The tenant-context half of its dependency is now satisfied; re-read the header before starting. |
+| `activity-feed` | 7 | `shared-resources`. |
+| `solutions-intelligence` | 30 | `stealth-scraping` (itself dark/inactive, `ENRICHMENT_ENABLED=false`) plus a 60-brief gold-set quality bar before any of it can be trusted. |
 
-## C. Non-actionable for an autonomous coding session
+## C. Needs a decision, credential, or elapsed time — not more code
 
-| Plan | Open | Reason |
-|------|-----:|--------|
-| `waitlist-launch` | 9 | Manual go-to-market (Show HN, social, Search Console). Founder's runbook, not code. |
-| `exhaustive-local-e2e-design` | 12 | Building new e2e/Playwright files is out of scope for this session series. |
-| `audit-visual-system` | 3 | Remaining items need new e2e infra or a production deploy. |
-| `security-and-multitenancy` | 2 | Final items flagged as needing maintainer approval. |
-| `stripe-billing-platform` | 2 | Same — final items need maintainer approval. |
-| `production-infrastructure` | 2 | Remaining items need production host / DB-role access. |
-| `indiehackers-integration` | 2 | Closed — skipped by decision. |
+| Plan | Open | What it is waiting on |
+|------|-----:|-----------------------|
+| `waitlist-launch` | 9 | Manual go-to-market (Show HN, social, Search Console). Founder's runbook. |
+| `stealth-scraping` | 9 | Deploy dark → seven-day canary → approval. Code complete. |
+| `audit-conversion` | 3 | ≥14 real days and 1,000 sessions with `CONVERSION_EVENTS_ENABLED=true`, then a rollout decision. |
+| `audit-trust` | 2 | Only meaningful once a maintainer turns `PROFILE_REMOVAL_ENABLED` on. |
+| `production-infrastructure` | 2 | Backup cron and off-site copy need production SSH. |
+| `stripe-billing-platform` | 2 | Sandbox/Test Clock certification and the Denmark canary. |
+| `security-and-multitenancy` | 1 | Legacy-column contraction: needs the compatibility window plus production actually running in canonical read mode. |
+| `indiehackers-integration` | 2 | Closed by decision; the two remaining boxes are explicitly-optional follow-ups and inflate the count. |
 
 ## D. Single leftover task, each already investigated and parked
 
@@ -83,15 +77,77 @@ them without new information.
 | `ai-sourcing-sprints` | Phase 6's dedicated item — see plan header. |
 | `abuse-and-usage-integrity` | Enforcement rollout closed out at "warn" by user decision. |
 
-## E. Complete (no open tasks)
+## E. Partially implemented, but no open tasks
 
-`code-fingerprinting` (all 4 phases shipped 2026-07-25 — see its tasks.md for what is
-verified vs. blocked on credentials),
+These report a non-`implemented` status with zero unchecked boxes — the status line is
+stale rather than the work being incomplete. Worth a reality check before trusting either.
+
+`responsive-mobile-design`, `lobsters-integration`.
+
+## F. Complete (no open tasks)
 
 `ai-expansion`, `ai-profile-enrichment`, `audit-accessibility`, `bluesky-integration`,
-`codeberg-integration`, `devpost-integration`, `gitlab-integration`,
-`legal-and-compliance`, `lobsters-integration`, `npm-registry-integration`,
-`onboarding-flow`, `outreach-generator`, `pricing-and-billing` (superseded),
-`proactive-discovery`, `producthunt-integration`, `project-hygiene`,
-`public-landing-pages`, `responsive-mobile-design`, `rss-feeds`, `semantic-search`,
-`stack-overflow-integration`, `team-accounts`, `technical-sandbox` (superseded).
+`code-fingerprinting`, `codeberg-integration`, `design-modernization`, `devpost-integration`,
+`gitlab-integration`, `legal-and-compliance`, `npm-registry-integration`, `onboarding-flow`,
+`outreach-generator`, `pricing-and-billing` (superseded), `proactive-discovery`,
+`producthunt-integration`, `project-hygiene`, `public-landing-pages`, `rss-feeds`,
+`semantic-search`, `stack-overflow-integration`, `team-accounts`,
+`technical-sandbox` (superseded), `unified-timeline`.
+
+## Full count
+
+| Open | Done | Plan |
+|-----:|-----:|------|
+| 47 | 32 | `calendar-scheduling-interview-intelligence` |
+| 30 | 0 | `solutions-intelligence` |
+| 12 | 0 | `exhaustive-local-e2e-design` |
+| 10 | 0 | `shared-resources` |
+| 9 | 30 | `stealth-scraping` |
+| 9 | 0 | `waitlist-launch` |
+| 7 | 4 | `audit-performance-qa` |
+| 7 | 0 | `activity-feed` |
+| 6 | 11 | `content-marketing` |
+| 5 | 8 | `portfolio-builder` |
+| 3 | 13 | `audit-conversion` |
+| 3 | 7 | `audit-visual-system` |
+| 2 | 49 | `stripe-billing-platform` |
+| 2 | 17 | `production-infrastructure` |
+| 2 | 12 | `claimable-profiles` |
+| 2 | 8 | `audit-trust` |
+| 2 | 1 | `indiehackers-integration` |
+| 1 | 32 | `abuse-and-usage-integrity` |
+| 1 | 22 | `ai-sourcing-sprints` |
+| 1 | 18 | `security-and-multitenancy` |
+| 1 | 15 | `status-and-trust` |
+| 1 | 13 | `smart-alerts` |
+| 1 | 8 | `work-sample` |
+| 1 | 8 | `hashnode-integration` |
+| 1 | 7 | `sourcehut-integration` |
+| 1 | 7 | `huggingface-integration` |
+| 1 | 6 | `team-synergy` |
+| 0 | 19 | `ai-expansion` |
+| 0 | 17 | `legal-and-compliance` |
+| 0 | 17 | `design-modernization` |
+| 0 | 16 | `semantic-search` |
+| 0 | 14 | `audit-accessibility` |
+| 0 | 13 | `unified-timeline` |
+| 0 | 13 | `public-landing-pages` |
+| 0 | 13 | `onboarding-flow` |
+| 0 | 11 | `code-fingerprinting` |
+| 0 | 10 | `stack-overflow-integration` |
+| 0 | 10 | `responsive-mobile-design` |
+| 0 | 10 | `proactive-discovery` |
+| 0 | 9 | `team-accounts` |
+| 0 | 9 | `outreach-generator` |
+| 0 | 9 | `gitlab-integration` |
+| 0 | 8 | `project-hygiene` |
+| 0 | 8 | `npm-registry-integration` |
+| 0 | 8 | `codeberg-integration` |
+| 0 | 8 | `ai-profile-enrichment` |
+| 0 | 7 | `rss-feeds` |
+| 0 | 6 | `producthunt-integration` |
+| 0 | 6 | `lobsters-integration` |
+| 0 | 6 | `bluesky-integration` |
+| 0 | 3 | `pricing-and-billing` |
+| 0 | 3 | `devpost-integration` |
+| 0 | 0 | `technical-sandbox` |
