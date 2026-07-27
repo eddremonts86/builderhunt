@@ -84,12 +84,17 @@ async function backfillSurface(table: string, cursorColumn: string) {
       const batchCounts = { migrated: 0, skipped: 0, conflict: 0, orphan: 0 }
       for (const row of rows) {
         const expectedOrganizationId = personalOrganizationId(row.user_id)
+        // Only the organization that decides this row's disposition is looked
+        // up: the one already assigned, or the creator's personal one when the
+        // row still has none. Keeps this to a single query per row.
+        const lookupId = row.organization_id ?? expectedOrganizationId
         const [organization] = await transaction<{ id: string }[]>`
-          select id from organizations where id = ${expectedOrganizationId} limit 1
+          select id from organizations where id = ${lookupId} limit 1
         `
         const disposition = classifyResourceRow({
           organizationId: row.organization_id,
-          personalOrganizationId: organization?.id ?? null,
+          personalOrganizationId: row.organization_id ? null : organization?.id ?? null,
+          assignedOrganizationExists: row.organization_id ? Boolean(organization) : undefined,
         })
         batchCounts[disposition] += 1
 
@@ -181,7 +186,7 @@ function addCounts(target: ReconciliationCounts, source: Omit<ReconciliationCoun
 }
 
 function conflictReason(disposition: ResourceBackfillDisposition) {
-  return disposition === 'orphan' ? 'personal-organization-missing' : 'organization-mismatch'
+  return disposition === 'orphan' ? 'personal-organization-missing' : 'organization-not-found'
 }
 
 function conflictChecksum(table: string, sourceId: string, reason: string) {

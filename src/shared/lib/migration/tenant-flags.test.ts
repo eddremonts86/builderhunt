@@ -1,29 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { resolveTenantMigrationModes } from './tenant-flags'
+import { resolveTenantReadMode } from './tenant-flags'
 
 describe('tenant migration flags', () => {
-  it('defaults safely to legacy reads and writes', () => {
-    expect(resolveTenantMigrationModes({}, { canonicalReady: false })).toEqual({
-      read: 'legacy',
-      write: 'legacy',
-    })
+  it('defaults safely to legacy reads', () => {
+    expect(resolveTenantReadMode({}, { canonicalReady: false })).toBe('legacy')
   })
 
-  it('allows dual writes and shadow reads before cutover', () => {
-    expect(resolveTenantMigrationModes({
-      TENANT_WRITE_MODE: 'dual',
-      TENANT_READ_MODE: 'shadow',
-    }, { canonicalReady: false })).toEqual({ read: 'shadow', write: 'dual' })
+  it('folds the retired shadow mode into legacy instead of failing to boot', () => {
+    // Shadow returned the legacy rows and only logged a comparison, so an
+    // environment still set to it keeps its exact previous behaviour.
+    expect(resolveTenantReadMode({ TENANT_READ_MODE: 'shadow' }, { canonicalReady: false })).toBe('legacy')
   })
 
   it('rejects canonical mode until every readiness artifact is present', () => {
-    expect(() => resolveTenantMigrationModes({ TENANT_READ_MODE: 'canonical' }, { canonicalReady: false }))
-      .toThrow('Canonical tenant mode is not ready')
-    expect(() => resolveTenantMigrationModes({ TENANT_WRITE_MODE: 'canonical' }, { canonicalReady: false }))
+    expect(() => resolveTenantReadMode({ TENANT_READ_MODE: 'canonical' }, { canonicalReady: false }))
       .toThrow('Canonical tenant mode is not ready')
   })
 
+  it('allows canonical mode once readiness is certified', () => {
+    expect(resolveTenantReadMode({ TENANT_READ_MODE: 'canonical' }, { canonicalReady: true })).toBe('canonical')
+  })
+
   it('rejects unknown modes instead of silently weakening behavior', () => {
-    expect(() => resolveTenantMigrationModes({ TENANT_READ_MODE: 'on' }, { canonicalReady: true })).toThrow()
+    expect(() => resolveTenantReadMode({ TENANT_READ_MODE: 'on' }, { canonicalReady: true })).toThrow()
   })
 })

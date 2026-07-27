@@ -4,9 +4,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
-import { recordMigrationMismatch } from '~/shared/lib/migration/migration-metrics'
-import { executeTenantRead } from '~/shared/lib/migration/shadow-read'
-import { resolveTenantMigrationModes } from '~/shared/lib/migration/tenant-flags'
+import { resolveTenantReadMode } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { createFeedCapability } from '~/shared/lib/security/feed-capability'
 import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
@@ -29,14 +27,15 @@ export const Route = createFileRoute('/api/queries/')({
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          const modes = resolveTenantMigrationModes(env, { canonicalReady: env.TENANT_CANONICAL_READY })
-          const queries = await withTenantContext(principal, (tx) => executeTenantRead(modes.read, {
-            surface: 'saved-queries',
-            requestId: principal.requestId,
-            legacy: () => listLegacySavedQueries(tx, principal.userId, principal.organizationId),
-            canonical: () => listSavedQueries(tx, principal.organizationId),
-            recordMismatch: recordMigrationMismatch,
-          }))
+          // `legacy` shows only what this member saved; `canonical` shows the
+          // whole organization's saved searches. The switch stays so the
+          // runbook's rollback (flip back to `legacy`) remains available.
+          const readMode = resolveTenantReadMode(env, { canonicalReady: env.TENANT_CANONICAL_READY })
+          const queries = await withTenantContext(principal, (tx) => (
+            readMode === 'canonical'
+              ? listSavedQueries(tx, principal.organizationId)
+              : listLegacySavedQueries(tx, principal.userId, principal.organizationId)
+          ))
           const { listPublicRadarSlugsForSavedQueryIds } = await import('~/shared/lib/repositories/public-radars')
           const radarSlugs = await listPublicRadarSlugsForSavedQueryIds(queries.map((query) => query.id))
           return Response.json(queries.map((query) => ({

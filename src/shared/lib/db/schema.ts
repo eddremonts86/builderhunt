@@ -240,7 +240,7 @@ export const builders = pgTable(
   'builders',
   {
     id: text('id').primaryKey(),
-    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => authUsers.id),
     source: text('source').notNull(), // github | reddit | hn | devto
     sourceId: text('source_id').notNull(),
@@ -277,7 +277,7 @@ export const savedQueries = pgTable(
   'saved_queries',
   {
     id: text('id').primaryKey(),
-    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => authUsers.id),
     name: text('name').notNull(),
     keywords: jsonb('keywords').$type<string[]>().notNull(),
@@ -317,7 +317,7 @@ export const publicRadars = pgTable('public_radars', {
 
 export const alerts = pgTable('alerts', {
   id: text('id').primaryKey(),
-  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
   queryId: text('query_id').references(() => savedQueries.id),
   name: text('name').notNull(),
@@ -370,7 +370,7 @@ export const alerts = pgTable('alerts', {
 
 export const alertTriggers = pgTable('alert_triggers', {
   id: text('id').primaryKey(),
-  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   alertId: text('alert_id').notNull().references(() => alerts.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
   builderId: text('builder_id').references(() => builders.id, { onDelete: 'set null' }),
@@ -394,7 +394,7 @@ export const alertTriggers = pgTable('alert_triggers', {
 
 export const builderNotes = pgTable('builder_notes', {
   id: text('id').primaryKey(),
-  organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+  organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
   builderId: text('builder_id').notNull().references(() => builders.id),
   content: text('content').notNull(),
@@ -443,7 +443,7 @@ export const onboardingProgress = pgTable(
   'onboarding_progress',
   {
     userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
-    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     step: integer('step').notNull().default(0), // 0..3
     completed: boolean('completed').notNull().default(false),
     skipped: boolean('skipped').notNull().default(false),
@@ -467,7 +467,7 @@ export const onboardingSelectedBuilders = pgTable(
   'onboarding_selected_builders',
   {
     id: text('id').primaryKey(),
-    organizationId: text('organization_id').references(() => organizations.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     userId: text('user_id').notNull().references(() => onboardingProgress.userId, { onDelete: 'cascade' }),
     builderRef: text('builder_ref').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

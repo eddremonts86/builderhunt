@@ -11,9 +11,11 @@
  * Modes:
  *   --once   run one pass, print results, exit non-zero on any failure
  *   (default) loop continuously until --hours elapses, sleeping --interval-ms
- *             between passes — used to generate the >=24h shadow-read
- *             observation window tenant-readiness.ts requires, since there
- *             are no real users yet to generate that traffic organically.
+ *             between passes — a soak that keeps the least-privilege roles
+ *             under sustained traffic, since there are no real users yet to
+ *             generate it organically. It no longer feeds a readiness gate:
+ *             the shadow-read observation window it was built for is retired
+ *             (see the note at the top of tenant-readiness.ts).
  *
  * Env: SMOKE_BASE_URL, SMOKE_EMAIL, SMOKE_PASSWORD
  */

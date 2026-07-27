@@ -19,7 +19,6 @@ describe('production environment security', () => {
     expect(parsed.DATABASE_WORKER_URL).toContain('builderhunt_worker')
     expect(parsed).toMatchObject({
       TENANT_READ_MODE: 'legacy',
-      TENANT_WRITE_MODE: 'legacy',
       TENANT_CANONICAL_READY: false,
     })
   })
@@ -28,6 +27,13 @@ describe('production environment security', () => {
     expect(parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'true' }).TENANT_CANONICAL_READY).toBe(true)
     expect(() => parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'yes' })).toThrow()
     expect(() => parseEnvironment({ ...productionEnvironment, TENANT_READ_MODE: 'on' })).toThrow()
+  })
+
+  it('keeps booting an environment still set to the retired shadow read mode', () => {
+    // Deployed environments may still carry `TENANT_READ_MODE=shadow`. Narrowing
+    // the enum without this would crash-loop them on the next release.
+    expect(parseEnvironment({ ...productionEnvironment, TENANT_READ_MODE: 'shadow' }).TENANT_READ_MODE)
+      .toBe('legacy')
   })
 
   it.each([

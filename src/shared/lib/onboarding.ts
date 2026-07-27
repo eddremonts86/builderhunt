@@ -45,14 +45,17 @@ export async function getOnboardingStatus(
       skippedCount: 0,
       firstQueryId: null,
       firstBuilderIds: [],
-      eligible: await isEligibleForOnboarding(transaction, userId, null),
+      eligible: await isEligibleForOnboarding(transaction, organizationId, userId, null),
     }
   }
 
   const selectedBuilders = await transaction
     .select({ builderRef: onboardingSelectedBuilders.builderRef })
     .from(onboardingSelectedBuilders)
-    .where(eq(onboardingSelectedBuilders.userId, userId))
+    .where(and(
+      eq(onboardingSelectedBuilders.userId, userId),
+      eq(onboardingSelectedBuilders.organizationId, organizationId),
+    ))
 
   return {
     step: row.step,
@@ -61,12 +64,13 @@ export async function getOnboardingStatus(
     skippedCount: row.skippedCount,
     firstQueryId: row.firstQueryId,
     firstBuilderIds: selectedBuilders.map((selection) => selection.builderRef),
-    eligible: await isEligibleForOnboarding(transaction, userId, row),
+    eligible: await isEligibleForOnboarding(transaction, organizationId, userId, row),
   }
 }
 
 async function isEligibleForOnboarding(
   transaction: TenantTransaction,
+  organizationId: string,
   userId: string,
   row: { completed: boolean; skippedCount: number; createdAt: Date } | null,
 ): Promise<boolean> {
@@ -77,14 +81,18 @@ async function isEligibleForOnboarding(
     if (Date.now() - row.createdAt.getTime() > windowMs) return false
   }
 
+  // Eligibility asks "is this member new *in this workspace*", so both counts
+  // are scoped to the active organization as well as the user. RLS already
+  // constrains them under the app role, but these also run under the migration
+  // and platform roles, which bypass it.
   const [{ count: searches }] = await transaction
     .select({ count: sql<number>`count(*)::int` })
     .from(savedQueries)
-    .where(eq(savedQueries.userId, userId))
+    .where(and(eq(savedQueries.userId, userId), eq(savedQueries.organizationId, organizationId)))
   const [{ count: saved }] = await transaction
     .select({ count: sql<number>`count(*)::int` })
     .from(builders)
-    .where(eq(builders.userId, userId))
+    .where(and(eq(builders.userId, userId), eq(builders.organizationId, organizationId)))
 
   if (searches > 0 || saved >= 5) {
     return false

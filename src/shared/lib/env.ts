@@ -25,8 +25,16 @@ const zodEnv = z.object({
   // endpoints unattended (see src/shared/lib/auth/cron.ts). Optional: when
   // unset, only a platform-admin session can run the workers.
   CRON_SECRET: z.string().optional(),
-  TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy'),
-  TENANT_WRITE_MODE: z.enum(['legacy', 'dual', 'canonical']).default('legacy'),
+  /**
+   * `shadow` is retired and accepted only so an already-deployed environment
+   * still boots. It compared a legacy read against a canonical one and returned
+   * the legacy rows, so folding it into `legacy` preserves the exact behaviour.
+   * `TENANT_WRITE_MODE` is gone entirely: every insert has written
+   * `organization_id` for a long time, so it never selected anything. Zod
+   * strips it if a deployment still sets it.
+   */
+  TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy')
+    .transform((value) => (value === 'shadow' ? 'legacy' as const : value)),
   TENANT_CANONICAL_READY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   // BETTER_AUTH_SECRET is the canonical name
   BETTER_AUTH_SECRET: z.string().optional(),
