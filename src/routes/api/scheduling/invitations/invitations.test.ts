@@ -186,7 +186,7 @@ describe('POST /api/scheduling/invitations', () => {
   })
 
   it('answers 401 without a principal', async () => {
-    mocks.requireTenantPrincipal.mockRejectedValue(new TenantAuthorizationError('nope'))
+    mocks.requireTenantPrincipal.mockRejectedValue(new TenantAuthorizationError('nope', 401))
     const response = await handlerOf(CollectionRoute, 'POST')({
       request: jsonRequest('https://app.test/api/scheduling/invitations', 'POST', createBody()),
       params: {},
@@ -284,7 +284,7 @@ describe('GET /api/scheduling/invitations/:id', () => {
   })
 
   it('answers 401 without a principal', async () => {
-    mocks.requireTenantPrincipal.mockRejectedValue(new TenantAuthorizationError('nope'))
+    mocks.requireTenantPrincipal.mockRejectedValue(new TenantAuthorizationError('nope', 401))
     const response = await handlerOf(DetailRoute, 'GET')({
       request: jsonRequest('https://app.test/api/scheduling/invitations/x', 'GET'),
       params: { invitationId: '00000000-0000-0000-0000-000000000000' },
