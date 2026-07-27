@@ -48,10 +48,20 @@ async function checkRedis(): Promise<CheckResult> {
     const RedisMod = await import(/* @vite-ignore */ 'ioredis')
     const Redis = RedisMod.default ?? RedisMod
     const client = new Redis(url, { lazyConnect: true, maxRetriesPerRequest: 1 })
-    await client.connect()
-    await client.ping()
-    await client.quit()
-    return { name: 'redis', ok: true }
+    // ioredis emits 'error' on an EventEmitter with no listener, which node reports as
+    // "[ioredis] Unhandled error event" and, depending on flags, can take the process down. The
+    // catch below handles the rejected promise but never the event. A health check is the one thing
+    // that must stay standing while the thing it checks is broken, so it gets a listener that does
+    // nothing: the `catch` already turns the failure into `{ ok: false }`.
+    client.on('error', () => {})
+    try {
+      await client.connect()
+      await client.ping()
+      return { name: 'redis', ok: true }
+    } finally {
+      // Always released, so a failed ping cannot leak a socket on every /api/status hit.
+      client.disconnect()
+    }
   } catch (err) {
     console.error('status redis check failed:', err)
     return { name: 'redis', ok: false, message: 'unavailable' }
