@@ -25,12 +25,20 @@ import { expect, test } from 'playwright/test'
 import { installFixedBrowserClock } from '../harness/clock'
 import { gotoHydrated } from '../harness/browser'
 
-/** Routes that render fully for an anonymous visitor. */
+/**
+ * Routes that render fully for an anonymous visitor.
+ *
+ * `/changelog` and `/roadmap` are deliberately absent: both are being reworked
+ * to read editorial content from `content/` at request time, so their rendered
+ * output is a moving target. A baseline pinned mid-rewrite fails on every run
+ * for a reason that has nothing to do with the design system. Add them back
+ * once that work lands, and generate their baselines from committed state —
+ * a baseline captured against uncommitted changes does not match what anyone
+ * else checks out.
+ */
 const PUBLIC_ROUTES = [
   { path: '/', name: 'landing' },
   { path: '/pricing', name: 'pricing' },
-  { path: '/roadmap', name: 'roadmap' },
-  { path: '/changelog', name: 'changelog' },
   { path: '/legal/terms', name: 'legal-terms' },
   { path: '/legal/privacy', name: 'legal-privacy' },
   { path: '/auth/sign-in', name: 'sign-in' },
