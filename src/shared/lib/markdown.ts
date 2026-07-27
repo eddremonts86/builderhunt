@@ -24,6 +24,11 @@
 const SAFE_URL = /^(https?:\/\/|mailto:|\/(?!\/)|#|\.\/)/i
 
 /** Whitespace and C0/C1 control characters, which browsers strip from URLs. */
+// Matching control characters is the entire purpose here: browsers silently
+// drop them from a URL, so a crafted `java\x00script:` reaches the parser as
+// `javascript:` unless stripped first. `no-control-regex` exists to catch them
+// appearing by accident, which is not this.
+// eslint-disable-next-line no-control-regex
 const URL_NOISE = /[\s\u0000-\u001f\u007f-\u009f]/g
 
 function escapeHtml(value: string): string {
