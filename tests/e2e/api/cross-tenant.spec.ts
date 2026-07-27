@@ -57,6 +57,8 @@ interface Tenant {
   alertId: string
   /** A sourcing sprint owned by this tenant. */
   sprintId: string
+  /** A data-export request owned by this tenant's *user* (account-subject, not tenant). */
+  exportId: string
 }
 
 interface Harness {
@@ -84,6 +86,7 @@ async function seedTenant(sql: Sql, ctx: FixtureContext, label: string): Promise
   const builderId = uniqueId(`b-${label}`)
   const alertId = uniqueId(`a-${label}`)
   const sprintId = uniqueId(`s-${label}`)
+  const exportId = uniqueId(`e-${label}`)
 
   await sql`
     insert into saved_queries (id, organization_id, user_id, name, keywords, sources, created_at)
@@ -126,7 +129,15 @@ async function seedTenant(sql: Sql, ctx: FixtureContext, label: string): Promise
             ${builderId}, ${`${label} note`}, now(), now())
   `
 
-  return { principal, organization, queryId, builderId, alertId, sprintId }
+  // Account-subject, not tenant-scoped: `/api/me/data-export/$id` keys off the
+  // session's user id. The boundary it must hold is between *users*, which is a
+  // different axis from the organization one and just as worth probing.
+  await sql`
+    insert into data_export_requests (id, user_id)
+    values (${exportId}, ${principal.userId!})
+  `
+
+  return { principal, organization, queryId, builderId, alertId, sprintId, exportId }
 }
 
 test.beforeAll(async () => {
@@ -240,6 +251,7 @@ async function probe(api: APIRequestContext, path: string): Promise<Probe> {
 const ROUTES = [
   { name: 'sprint', path: (t: Tenant) => `/api/sprints/${t.sprintId}` },
   { name: 'builder notes', path: (t: Tenant) => `/api/builders/${t.builderId}/notes` },
+  { name: 'data export', path: (t: Tenant) => `/api/me/data-export/${t.exportId}` },
 ] as const
 
 test.describe('cross-tenant identifiers are indistinguishable from absent ones', () => {
@@ -259,6 +271,7 @@ test.describe('cross-tenant identifiers are indistinguishable from absent ones',
         builderId: absentLike(b.builderId),
         queryId: absentLike(b.queryId),
         sprintId: absentLike(b.sprintId),
+        exportId: absentLike(b.exportId),
       }
 
       const [own, cross, absent] = await Promise.all([
@@ -306,6 +319,40 @@ test.describe('routes that ignore client-supplied tenancy', () => {
     expect(plain.status()).toBe(200)
     expect(spoofed.status()).toBe(200)
     expect(await spoofed.text()).toBe(await plain.text())
+  })
+
+  test('changing a member role cannot reach into another organization', async () => {
+    const { a, b } = harness
+    // `params.memberId` is a *user* id and the organization comes from the
+    // session, so A patching B's user id can only ever address "that user's
+    // membership in A's organization" — which does not exist. This is the
+    // severe case: a read that crosses the boundary leaks, a write that
+    // crosses it demotes the owner of another organization.
+    const before = await harness.sql<{ role: string }[]>`
+      select role from organization_members
+      where organization_id = ${b.organization.organizationId} and user_id = ${b.principal.userId!}
+    `
+    expect(before[0]?.role, 'B owns their own organization before A touches anything').toBe('owner')
+
+    const crossTenant = await a.principal.api!.patch(
+      `/api/organizations/members/${b.principal.userId!}`,
+      { data: { role: 'member' } },
+    )
+    const nonexistent = await a.principal.api!.patch(
+      `/api/organizations/members/${absentLike(b.principal.userId!)}`,
+      { data: { role: 'member' } },
+    )
+
+    // Same answer for "a real user in another organization" and "no such user".
+    expect(crossTenant.status()).toBe(nonexistent.status())
+    expect(await crossTenant.text()).toBe(await nonexistent.text())
+    expect(crossTenant.status(), 'the write must not be accepted').toBeGreaterThanOrEqual(400)
+
+    const after = await harness.sql<{ role: string }[]>`
+      select role from organization_members
+      where organization_id = ${b.organization.organizationId} and user_id = ${b.principal.userId!}
+    `
+    expect(after[0]?.role, "B's role in B's own organization is untouched").toBe('owner')
   })
 
   test('creating an invitation ignores an organizationId in the body', async () => {
