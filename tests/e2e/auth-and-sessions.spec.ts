@@ -209,12 +209,16 @@ function allowIncidentsProbe(guard: StrictBrowserGuard, mounts = 1): void {
  * DashboardPage settles three data fetches after mount and logs
  * "Dashboard load error" if one dies mid-flight — which is exactly what a
  * reload or sign-out issued while they are still pending looks like
- * (navigation aborts the fetch). The stats section only renders once
- * loading finished, so waiting for it means no dashboard fetch is left to
+ * (navigation aborts the fetch). `data-dashboard-state` flips to `ready` only
+ * once loading finished, so waiting for it means no dashboard fetch is left to
  * abort. Call before triggering any further navigation from /dashboard.
+ *
+ * This waited on `#stats-heading` until 2026-07-27, when the bento rewrite
+ * removed that heading and silently broke every test that lands on the
+ * dashboard. Keyed to an explicit attribute now, not to incidental markup.
  */
 async function waitForDashboardSettled(page: Page): Promise<void> {
-  await page.locator('#stats-heading').waitFor({ state: 'attached' })
+  await page.locator('[data-dashboard-state="ready"]').waitFor({ state: 'attached' })
 }
 
 /** Accepts a Principal directly (whose fields are nullable) — authenticated fixtures always carry credentials. */

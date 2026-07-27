@@ -29,12 +29,12 @@ const PORT = new URL(baseURL).port || '80'
 // repo's docker-compose.yml's `redis` service publishes it).
 const redisURL = process.env.REDIS_URL ?? `redis://localhost:${process.env.REDIS_PORT ?? '6379'}`
 // Wave 1 Task 1 — single global prefix for this run is the baseline;
-// per-worker prefixes are derived inside `e2e/harness/cache.ts` and
+// per-worker prefixes are derived inside `tests/e2e/harness/cache.ts` and
 // written into the test process's process.env.E2E_REDIS_PREFIX by the
 // test's own beforeAll hook.
 const e2eRunId = process.env.E2E_RUN_ID ?? `run-${randomBytes(4).toString('hex')}`
 
-// The harness (`e2e/harness/env.ts`) runs inside the *test-runner* process,
+// The harness (`tests/e2e/harness/env.ts`) runs inside the *test-runner* process,
 // which does not inherit `webServer.env` below. This config file is loaded
 // by that same runner process, so mirroring the E2E seam vars here makes a
 // bare `pnpm test:e2e` work without exporting anything in the shell.
@@ -44,7 +44,7 @@ process.env.E2E_RUN_ID ??= e2eRunId
 
 // Parallelism: the Wave 1 Task 1 isolation spec MUST run with --workers=2
 // to prove isolation. Configured here as the default so a bare `pnpm
-// exec playwright test e2e/harness/isolation.spec.ts` exercises the
+// exec playwright test tests/e2e/harness/isolation.spec.ts` exercises the
 // concurrency path the spec requires. Other suites can override via
 // --workers=1 when they need serialized state — e.g. the existing
 // team-accounts spec, which still shares fixtures.

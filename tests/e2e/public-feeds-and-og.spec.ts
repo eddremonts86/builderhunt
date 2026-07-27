@@ -242,6 +242,22 @@ function keywordTag(label: string): string {
 // robots.txt / sitemap.xml / blog Atom feed
 // ---------------------------------------------------------------------------
 
+/**
+ * The canonical origin these surfaces emit is `SITE_URL`, resolved from the
+ * app's own `APP_URL` and deliberately never hardcoded (see
+ * `src/shared/lib/site-url.ts`). `playwright.config.ts` hands the e2e server
+ * `APP_URL: baseURL`, so under test that origin *is* the harness base URL.
+ *
+ * These three assertions used to pin `https://builderhunt.dev` literally, which
+ * meant they could only pass against one deployment and failed everywhere else
+ * — including CI, which sets `APP_URL: http://localhost:3000`. Deriving the
+ * origin keeps what actually matters: the URLs are absolute and all sit on the
+ * one configured canonical host.
+ */
+function canonicalOrigin(): string {
+  return harness.baseURL.replace(/\/+$/, '')
+}
+
 test.describe('crawler surfaces', () => {
   test('robots.txt allows public content, blocks private surfaces, and points at the sitemap', async () => {
     const api = await newApiContext(harness.baseURL)
@@ -256,7 +272,7 @@ test.describe('crawler surfaces', () => {
       expect(body).toContain('Disallow: /api/')
       expect(body).toContain('Disallow: /dashboard/')
       expect(body).toContain('User-agent: GPTBot')
-      expect(body).toContain('Sitemap: https://builderhunt.dev/sitemap.xml')
+      expect(body).toContain(`Sitemap: ${canonicalOrigin()}/sitemap.xml`)
     } finally {
       await api.dispose()
     }
@@ -271,7 +287,7 @@ test.describe('crawler surfaces', () => {
       const body = await response.text()
       expect(body).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
       for (const path of ['/', '/explore', '/changelog', '/roadmap', '/status', '/legal/terms']) {
-        expect(body).toContain(`<loc>https://builderhunt.dev${path === '/' ? '/' : path}</loc>`)
+        expect(body).toContain(`<loc>${canonicalOrigin()}${path === '/' ? '/' : path}</loc>`)
       }
       // Curated explore queries are URL-encoded entries.
       expect(body).toContain('/explore?q=rust%20async%20runtime')
@@ -291,10 +307,10 @@ test.describe('crawler surfaces', () => {
       expect(response.headers()['content-type']).toContain('application/atom+xml')
       const body = await response.text()
       expect(body).toContain('<feed xmlns="http://www.w3.org/2005/Atom">')
-      expect(body).toContain('<link href="https://builderhunt.dev/blog/atom.xml" rel="self" />')
+      expect(body).toContain(`<link href="${canonicalOrigin()}/blog/atom.xml" rel="self" />`)
       atomEntryCount = (body.match(/<entry>/g) ?? []).length
       expect(atomEntryCount).toBeGreaterThanOrEqual(3)
-      expect(body).toContain('https://builderhunt.dev/blog/why-i-built-builderhunt')
+      expect(body).toContain(`${canonicalOrigin()}/blog/why-i-built-builderhunt`)
     } finally {
       await api.dispose()
     }

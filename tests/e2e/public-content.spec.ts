@@ -581,7 +581,7 @@ async function seedIdentity(
 
 test.describe('public builder profiles', () => {
   test('a published profile is visible to anonymous visitors with only public fields (redaction)', async ({ browser }) => {
-    const { sql, owner } = harness
+    const { sql, owner, organization } = harness
     const username = `e2e-pub-${uniqueId('u').slice(-8)}`
     const hostileBio = '<script>window.__builderXss=1</script> Rust maintainer'
     const identity = await seedIdentity(sql, {
@@ -595,9 +595,11 @@ test.describe('public builder profiles', () => {
               '["consulting"]'::jsonb, '["rust","async"]'::jsonb)
     `
     // Legacy `builders` row with the same id feeds the route's SSR head/meta.
+    // `organization_id` became NOT NULL in drizzle/0081, so the row needs the
+    // owner's tenant even though this test only reads it anonymously.
     await sql`
-      insert into builders (id, user_id, source, source_id, username, display_name, bio, profile_url)
-      values (${identity.id}, ${owner.userId!}, 'github', ${identity.id}, ${username},
+      insert into builders (id, user_id, organization_id, source, source_id, username, display_name, bio, profile_url)
+      values (${identity.id}, ${owner.userId!}, ${organization.organizationId}, 'github', ${identity.id}, ${username},
               'E2E Published Builder', 'meta bio', ${`https://e2e.test/github/${username}`})
     `
 

@@ -407,7 +407,7 @@ export function DashboardPage() {
 
   if (loading) {
     return (
-      <div>
+      <div data-dashboard-state="loading">
         <div className="animate-pulse space-y-6">
           <div className="h-8 w-48 bg-bh-surface rounded" />
           <div className="h-4 w-72 bg-bh-surface rounded" />
@@ -422,7 +422,14 @@ export function DashboardPage() {
   }
 
   return (
+    // `data-dashboard-state` is the settle signal the e2e suite waits on before
+    // navigating away: the three post-mount fetches are done, so nothing is left
+    // to abort. It used to key off `#stats-heading`, an accessibility heading
+    // that the bento rewrite legitimately removed — every dashboard test then
+    // timed out, unnoticed, because CI ran only one spec. An explicit attribute
+    // cannot be refactored away by accident the way incidental markup can.
     <motion.div
+      data-dashboard-state="ready"
       initial={reduceMotion ? false : fadeInUp.initial}
       animate={fadeInUp.animate}
       transition={fadeInUp.transition}
