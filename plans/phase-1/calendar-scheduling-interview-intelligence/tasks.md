@@ -37,15 +37,30 @@
     do not duplicate it. Complete a DPIA before production voice enablement. Store no secret values.
   - Verify: security/privacy reviewer signs the register; each regional endpoint is confirmed from a
     test response/console and every provider can be disabled independently.
-  - **Evidence (2026-07-26, PARTIAL — register written, accounts NOT provisioned)**: Wrote
-    `docs/operations/interview-provider-register.md` with the exact provisioning steps, the EU
-    constraints `env.ts` already enforces at boot, the env var names, and a per-provider "Recorded"
-    block to fill in. It stores no secret values. Flagged two things that need a human decision
-    rather than a workaround: (a) Deepgram's EU endpoint may be plan-gated, and the code
-    deliberately cannot fall back to the global endpoint; (b) Azure OpenAI access is an
-    application with a review queue, so it should be started first. **This task is NOT complete**:
-    no account exists, no DPA is signed, no DPIA is done, and no reviewer has signed the register —
-    all of which require a human. The register is the prerequisite artifact, not the sign-off.
+  - ⚠️ **The task text above is stale in two places.** The provider set changed on 2026-07-26,
+    after it was written: storage is **MinIO, self-hosted** — not Cloudflare R2 (commit `cb642d5`,
+    which also widened `env.ts` to accept a private endpoint) — and sensitive AI is **Mistral (La
+    Plateforme)**, not Azure. Azure was provisioned, hit a zero-quota wall, and was found to have a
+    residency hole `env.ts` structurally cannot close: it validates the resource region but cannot
+    see the *deployment type*, so a Global Standard deployment passes validation while processing
+    outside the EU. Mistral processes in the EU by default, which is not a switch anyone can set
+    wrong. The Azure resource is retained as a documented fallback.
+  - **Evidence, superseding the 2026-07-26 morning note that said "accounts NOT provisioned"**
+    (re-checked 2026-07-27 against `.env` and the register):
+    - **Deepgram**: account provisioned 2026-07-26, and the EU endpoint verified *against that
+      account* rather than the vendor blog — `nova-3` returns 200 on `api.eu.deepgram.com`,
+      `diarize` accepted, `multichannel` returns two separate channels (the spec's hard requirement
+      for remote interviews). `DEEPGRAM_API_KEY` and the EU base URL are configured.
+    - **Mistral**: `MISTRAL_API_KEY`, `MISTRAL_BASE_URL=https://api.mistral.ai`,
+      `MISTRAL_MODEL=mistral-medium-2604` and `SENSITIVE_AI_PROVIDER=mistral` configured.
+    - **Stripe**: secret key and webhook secret configured.
+    - **MinIO / ClamAV**: self-hosted, so there is no account, DPA or sub-processor entry to obtain.
+  - **What actually remains**, and it is wiring rather than credentials: MinIO and ClamAV are not in
+    `docker-compose` and the register has no deployment target recorded; `SENSITIVE_AI_ENABLED`,
+    `CANDIDATE_UPLOADS_ENABLED` and `INTERVIEW_TRANSCRIPTION_ENABLED` are all unset, so every path
+    is dark despite the credentials being present; the register flags a **missing bucket backup
+    target before real candidate data lands**; and the DPIA plus the reviewer signature are human
+    steps nobody can do for you.
 
 - [ ] **Verify the billing platform certification dependency**
   - Files: `plans/stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
