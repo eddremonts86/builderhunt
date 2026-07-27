@@ -221,8 +221,16 @@ describe('calendar-scheduling-interview-intelligence environment (plan: calendar
     INTERVIEW_TRANSCRIPTION_ENABLED: 'true',
     DEEPGRAM_API_KEY: 'deepgram-key',
   }
+  // Mistral is the default sensitive-AI provider (interview-provider-register.md §4).
+  const VALID_MISTRAL = {
+    SENSITIVE_AI_ENABLED: 'true',
+    MISTRAL_API_KEY: 'mistral-key',
+    MISTRAL_MODEL: 'mistral-medium-2604',
+  }
+  // Azure is the retained fallback and only validated when explicitly selected.
   const VALID_AZURE = {
     SENSITIVE_AI_ENABLED: 'true',
+    SENSITIVE_AI_PROVIDER: 'azure',
     AZURE_OPENAI_ENDPOINT: 'https://my-deployment.westeurope.api.cognitive.microsoft.com',
     AZURE_OPENAI_API_KEY: 'azure-key',
     AZURE_OPENAI_DEPLOYMENT: 'gpt-eu-deployment',
@@ -273,10 +281,25 @@ describe('calendar-scheduling-interview-intelligence environment (plan: calendar
   })
 
   it('accepts a fully valid enabled configuration for each dependency', () => {
-    const parsed = parseEnvironment({ ...productionEnvironment, ...VALID_R2, ...VALID_DEEPGRAM, ...VALID_AZURE })
+    const parsed = parseEnvironment({ ...productionEnvironment, ...VALID_R2, ...VALID_DEEPGRAM, ...VALID_MISTRAL })
     expect(parsed.CANDIDATE_UPLOADS_ENABLED).toBe('true')
     expect(parsed.INTERVIEW_TRANSCRIPTION_ENABLED).toBe('true')
     expect(parsed.SENSITIVE_AI_ENABLED).toBe('true')
+    expect(parsed.SENSITIVE_AI_PROVIDER).toBe('mistral')
+    expect(parsed.MISTRAL_BASE_URL).toBe('https://api.mistral.ai')
+  })
+
+  it('accepts the retained Azure fallback when it is explicitly selected', () => {
+    const parsed = parseEnvironment({ ...productionEnvironment, ...VALID_AZURE })
+    expect(parsed.SENSITIVE_AI_PROVIDER).toBe('azure')
+    expect(parsed.SENSITIVE_AI_ENABLED).toBe('true')
+  })
+
+  it('does not require Azure config when the provider is Mistral, or vice versa', () => {
+    // The two providers must not leak requirements into each other: selecting one must not make the
+    // other's vars mandatory, otherwise the fallback is impossible to configure independently.
+    expect(() => parseEnvironment({ ...productionEnvironment, ...VALID_MISTRAL })).not.toThrow()
+    expect(() => parseEnvironment({ ...productionEnvironment, ...VALID_AZURE })).not.toThrow()
   })
 
   it.each([
@@ -289,6 +312,16 @@ describe('calendar-scheduling-interview-intelligence environment (plan: calendar
     ['ClamAV host missing when uploads enabled', { ...VALID_R2, INTERVIEW_CLAMAV_HOST: undefined }],
     ['Deepgram key missing when transcription enabled', { ...VALID_DEEPGRAM, DEEPGRAM_API_KEY: undefined }],
     ['Deepgram base URL overridden to a non-EU endpoint', { ...VALID_DEEPGRAM, DEEPGRAM_BASE_URL: 'https://api.deepgram.com' }],
+    ['Mistral key missing when sensitive AI enabled', { ...VALID_MISTRAL, MISTRAL_API_KEY: undefined }],
+    ['Mistral model missing when sensitive AI enabled', { ...VALID_MISTRAL, MISTRAL_MODEL: undefined }],
+    // The residency guard: anything that is not exactly the EU platform host must fail closed.
+    ['Mistral base URL pointed at the US endpoint', { ...VALID_MISTRAL, MISTRAL_BASE_URL: 'https://api.us.mistral.ai' }],
+    ['Mistral base URL pointed at an arbitrary proxy', { ...VALID_MISTRAL, MISTRAL_BASE_URL: 'https://proxy.example.com' }],
+    // A host that merely *contains* the EU host must not pass — this is the class of bug the Azure
+    // substring check has (interview-provider-register.md §4).
+    ['Mistral base URL on a lookalike host', { ...VALID_MISTRAL, MISTRAL_BASE_URL: 'https://api.mistral.ai.evil.example' }],
+    // Floating aliases are rejected: candidate-evaluation output must be attributable to a version.
+    ['Mistral model pinned to a floating alias', { ...VALID_MISTRAL, MISTRAL_MODEL: 'mistral-medium-latest' }],
     ['Azure endpoint missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_ENDPOINT: undefined }],
     ['Azure endpoint outside an EU region', { ...VALID_AZURE, AZURE_OPENAI_ENDPOINT: 'https://my-deployment.eastus.api.cognitive.microsoft.com' }],
     ['Azure key missing when sensitive AI enabled', { ...VALID_AZURE, AZURE_OPENAI_API_KEY: undefined }],
@@ -307,6 +340,7 @@ describe('calendar-scheduling-interview-intelligence environment (plan: calendar
     ['INTERVIEW_CLAMAV_HOST', 'leaked-clamav-host'],
     ['DEEPGRAM_API_KEY', 'leaked-deepgram-key'],
     ['AZURE_OPENAI_API_KEY', 'leaked-azure-key'],
+    ['MISTRAL_API_KEY', 'leaked-mistral-key'],
   ])('rejects a stray VITE_-prefixed copy of %s (client-secret leakage)', (key, value) => {
     expect(() => parseEnvironment({ ...productionEnvironment, [`VITE_${key}`]: value })).toThrow()
   })

@@ -1,5 +1,10 @@
 # Interview Intelligence — Provider Register & Cost Decision
 
+> **Scope**: the four providers this feature program needs, and the DPA/privacy record for each.
+> For the full list of every third-party account BuilderHunt requires — domain, mailbox, Resend,
+> MiniMax, backups, source tokens, extension stores — and the order to create them in, see
+> [`external-services-register.md`](external-services-register.md).
+>
 > Companion to [`src/shared/lib/env.ts`](../../src/shared/lib/env.ts) (the compile-time
 > enforcement point — production boot **fails closed** if a flag is on and its provider config is
 > missing or in the wrong region) and
@@ -163,13 +168,28 @@ quarantine prefix to the clean prefix. The document state machine has no transit
 1. A Deepgram account. Pay-As-You-Go: **no monthly fee, no minimum** — €0 in a month with no
    usage. Typically ships with ~$200 free credit.
 2. An API key.
-3. **Verify the EU endpoint is available on your plan before Phase 9 work starts.** The code
-   hard-codes `wss://api.eu.deepgram.com` and `env.ts` refuses to boot with any other base URL
-   when transcription is on. There is deliberately no fallback to the global endpoint. If the EU
-   endpoint turns out to be plan-gated, that is a product decision — pay for it, change provider,
-   or ship manual-notes-only — not something to quietly work around.
+3. ~~**Verify the EU endpoint is available on your plan.**~~ **Resolved 2026-07-26 — it is not
+   plan-gated.** Deepgram's GA announcement states there is "no waitlist, no activation step, and
+   no changes to billing or authentication" and "no additional pricing or activation requirements";
+   existing API keys work against `api.eu.deepgram.com` unchanged. So the hard-coded EU base URL in
+   `env.ts` (which refuses to boot with any other value when transcription is on, deliberately with
+   no global-endpoint fallback) is satisfiable on plain pay-as-you-go. Source:
+   <https://deepgram.com/learn/deepgram-eu-endpoint-now-generally-available>.
+   Still worth re-checking at provisioning time — a vendor can change packaging.
 4. Get written confirmation (support ticket or contract) that audio is **not retained** and **not
    used for training**. We tell the candidate exactly that; we need the provider standing behind it.
+   ⚠️ **This one cannot be shortcut.** Checked 2026-07-26: Deepgram's public
+   `trust-security/data-privacy-compliance` page covers certifications (SOC 2, GDPR, HIPAA, CCPA,
+   PCI) and regional residency but says **nothing** about retention or training use, and nothing
+   about pay-as-you-go versus enterprise differences. Do not infer a no-retention default from the
+   compliance badges — ask support and keep the reply.
+
+   Checked the console too (2026-07-26): **Deepgram exposes no retention or training setting at all**
+   — no toggles on the project page, and `/project/<id>/settings` redirects to the project root.
+   Unlike Mistral, where the opt-out is a real org-level switch, here there is nothing to configure.
+   That means a UI check can neither confirm nor satisfy this requirement: it is contractual only,
+   and the written reply from support is the sole artifact. Do not let a green-looking dashboard
+   stand in for it.
 
 ```
 DEEPGRAM_API_KEY=<key>
@@ -178,18 +198,173 @@ DEEPGRAM_BASE_URL=https://api.eu.deepgram.com   # already the default; do not ov
 
 ### Recorded
 
-- **Account owner**: _(not yet provisioned)_
-- **Plan / EU endpoint confirmed**: _(not yet provisioned)_ ⚠️ verify before Phase 9
+- **Account owner**: `eduardo.inerarte@gmail.com's Project`, provisioned 2026-07-26. No card on file.
+- **Plan / EU endpoint confirmed**: ✅ **verified against this account, not just the vendor blog.**
+  - `POST https://api.eu.deepgram.com/v1/listen?model=nova-3` → **200**, so the EU endpoint serves
+    inference on plain pay-as-you-go with the standard key. No plan gate.
+  - `diarize=true` (the in-person path) → accepted.
+  - `multichannel=true` on 2-channel audio → **returns 2 separate channels**, which is the spec's
+    hard requirement for remote interviews (2 channels, down-mixing forbidden).
+  - Gotcha worth remembering: `https://api.eu.deepgram.com/v1/projects` returns **404** while the
+    global host returns 200. That is not a broken key or a broken region — the EU host serves the
+    *inference* APIs only, not the management ones. Do not use a management endpoint to health-check
+    EU access; use `/v1/listen`.
+- **API key**: `builderhunt-transcription-prod`, role **Default** (`usage:write` only — the narrowest
+  of the four; Member can already create and delete keys, Admin can read the balance, Owner can
+  change billing). Expiry deliberately **Never**: an expired key would fail mid-interview, a
+  user-visible break in a paid feature, and there is no rotation automation — the control is the
+  annual review date below, not an unwatched expiry.
+- **Synced to Coolify production** (app uuid resolved by name): `DEEPGRAM_API_KEY`,
+  `DEEPGRAM_BASE_URL`, verified by SHA-256 comparison without reading either value. No redeploy —
+  `INTERVIEW_TRANSCRIPTION_ENABLED` is still `false`.
 - **DPA signed**: _(not yet provisioned)_
-- **No-training / no-retention confirmation**: _(not yet provisioned)_ — attach the reference
+- **No-training / no-retention confirmation**: **accepted by the product owner 2026-07-26 without a
+  written vendor statement.** Recorded as a decision, not as evidence: nothing was obtained from
+  Deepgram, their public compliance page is silent on retention and training, and the console has no
+  setting that could stand in for it. A reviewer signing this register should know the claim we make
+  to candidates is currently unbacked. Reopen before production voice launch — `spec.md` lists
+  "verified EU endpoints/no-training" as a launch gate, and this is the half that is still missing.
 - **Model**: `nova-3` (multichannel for remote, streaming diarization for in-person)
 - **Billing**: pay-as-you-go, in arrears. Spend is capped in practice by our own credit
   reservations, which hard-stop at zero balance.
+- **Signup credit: $200, and it expires one year from signup — around 2027-07-26.** Credits
+  *purchased* later never expire; this promotional one does. Worth planning around rather than
+  treating as free money:
+  | | |
+  | --- | --- |
+  | Covers | ~434 in-person (mono, $0.46) or ~217 remote (2-channel, $0.92) 60-minute interviews |
+  | To consume it all before expiry | ~290 interviews, i.e. **~24/month** at a 50/50 mix |
+  | At 10 interviews/month | ~$83 used, **~$117 expires unused** |
+
+  The window shrinks with every month Phase 9 slips: start it 6 months from now and burning the
+  credit would need ~48 interviews/month instead of 24. So the credit is a reason to sequence Phase 9
+  earlier if transcription is wanted, not a subsidy that waits patiently. Source:
+  <https://deepgram.com/pricing>.
 - **Annual review date**: _(provisioning date + 1 year)_
 
 ---
 
-## 4. Azure OpenAI — brief and report generation *(pay-as-you-go SaaS)*
+## 4. Sensitive AI — brief and report generation
+
+> **Provider decision revised 2026-07-26: Mistral (La Plateforme) becomes primary; the provisioned
+> Azure resource stays as a fallback.** Product-owner decision after Azure provisioning hit a
+> zero-quota wall and a residency regression. Rationale below; the Azure section that follows is
+> retained in full because the resource exists and the quota request is still worth completing.
+
+### Why the switch
+
+Not cost. With Mistral Medium 3 the AI is **$0.058 of a $0.98 heavy interview** — Deepgram is 94% of
+the bill. Switching saves ~$0.33 per heavy interview (25%), and margins were already 85–94% either
+way. The real reasons:
+
+1. **EU processing is Mistral's default, not a per-deployment choice that can be set wrong.** This
+   directly closes the hole found while provisioning Azure: `env.ts` validates the resource region
+   but **cannot** see the deployment type, so an Azure *Global Standard* deployment passes validation
+   while processing candidate data outside the EU. With Mistral the US endpoint is an explicit
+   opt-in, so the failure mode does not exist.
+2. **A French entity removes a third-country transfer from the DPIA entirely** — only Deepgram would
+   remain. §5 previously listed both.
+3. **Self-serve.** No quota wall, no deprecated-model dead end.
+
+Honest counterweights, recorded so this is revisitable: Azure has the **best-documented** residency
+guarantee of the options reviewed ("the EU Data Zone confines processing to the EU Data Boundary"),
+its DPA and sub-processor transparency are mature, and it is already 90% provisioned. And **Mistral's
+output quality for structured candidate-evaluation reports is unverified** — that is the open risk,
+and the reason the Azure fallback is being kept alive rather than deleted.
+
+Retention parity: Mistral's Zero Data Retention is Scale-plan/request-gated (default is a 30-day
+abuse-monitoring window); Azure's Modified Abuse Monitoring is also an application. Neither is free.
+
+### ⚠️ The training opt-in is checked by default — verified in the UI, 2026-07-26
+
+On `admin.mistral.ai`'s **Activar PAYG** page there is a checkbox:
+
+> *"Permitir el uso de tus llamadas a la API para entrenar los modelos de IA de Mistral."*
+
+It arrives **checked**, confirmed by reading the DOM (`checked: true`) rather than by eye. Unchecked
+during setup. **Anyone who completes this flow without noticing has opted their candidate data into
+model training** — the single highest-consequence default encountered in this whole provisioning
+exercise, and it is two clicks from a compliance breach. Re-verify it after any billing or plan
+change, because plan transitions are exactly where such a flag gets silently reset.
+
+**And it did not persist.** Unchecking it in the PAYG signup flow was not enough: minutes later,
+`admin.mistral.ai` → **API → Privacidad** showed the org-level toggle *"Permite el uso de tus
+llamadas a la API para entrenar los modelos de IA de Mistral"* **switched on**. Turned off there and
+re-verified after a full page reload, so the org-level setting is the authoritative one — the signup
+checkbox is not. **Check API → Privacidad, not the signup form.**
+
+**Second trap on the same page — "Activación de modelos de Labs".** Its own text: enabling it means
+data may be used to train Mistral models *"independientemente de mi plan de suscripción o
+configuraciones de exclusión"* — it **overrides the training opt-out**. Currently off. It must stay
+off, and no one should enable a Labs model for this workload regardless of how good it looks.
+
+### Account state (2026-07-26)
+
+- **Pay-as-you-go: Active**, estimated cost €0. Note the confusing pair: *"Plan actual: Gratuito"*
+  refers to **Le Chat**, the consumer assistant — not the API. The API billing is the PAYG line.
+- Organization `Eduardo Inerarte`, org id `d895462e-bcd5-40de-b8a8-46e59197f65b`, 1 member.
+- **Rate limits are granted out of the box** — the sharpest contrast with Azure, which gave zero
+  quota in every region and needed support case `2607260050000678`. Mistral, immediately:
+  `mistral-medium-2505` **600,000 TPM**, `mistral-large-2512` 400,000, `ministral-8b-2512` 1,000,000.
+  That is 12× the 50,000 TPM being requested from Azure, available now, no ticket.
+- **Model IDs are date-versioned**: the real ids are `mistral-medium-2505` / `mistral-large-2512`,
+  not the "Medium 3"/"Large 3" marketing names the pricing research used. Confirm per-token price
+  against the exact id before trusting the cost table above.
+- **API key**: one exists (created 2026-07-26, type `Studio`, scope "shared only", **expiry:
+  never**). Mistral reveals a key's value only at creation, so if it was not saved at that moment a
+  replacement must be issued. A non-expiring production credential is a weaker posture than an
+  expiring one with rotation — revisit.
+- **Zero Data Retention**: _(pending)_ not self-serve in this panel; it is a support/sales request.
+
+### Wired up (2026-07-26)
+
+- **Model pinned: `mistral-medium-2604`** — the newest dated medium, verified live. Floating aliases
+  (`mistral-medium-latest`, `mistral-medium-3.5`) exist and are **rejected by `env.ts`**: this model
+  writes candidate-evaluation text, so an unannounced version change is a fairness and auditability
+  problem. `SensitiveAICompletionResult.model` records what actually ran.
+- **Verified end-to-end before writing any code**: key valid (61 models), and a real
+  `response_format: {type:'json_schema', strict:true}` call against both `mistral-medium-2604` and
+  `mistral-medium-2505` returned schema-valid JSON with `usage` token counts that map directly onto
+  `SensitiveAICompletionUsage`. So `completeStructured` is satisfiable — not assumed, executed.
+- **`env.ts` reworked**: new `SENSITIVE_AI_PROVIDER` (`mistral` | `azure`, default `mistral`).
+  Mistral's residency guard is an **exact match** on `https://api.mistral.ai`, not a substring test,
+  so a US endpoint, a proxy, or a lookalike host (`api.mistral.ai.evil.example`) all fail closed.
+  This is the check the Azure branch structurally cannot express. `MISTRAL_API_KEY` added to the
+  `VITE_`-leak guard. 12 new test cases; 83 tests green, typecheck clean.
+- **Synced to Coolify production** with the app uuid resolved by *name* from the live API:
+  `SENSITIVE_AI_PROVIDER`, `MISTRAL_API_KEY`, `MISTRAL_BASE_URL`, `MISTRAL_MODEL`, each verified by
+  comparing SHA-256 against the local value rather than reading either. **No redeploy triggered** —
+  `SENSITIVE_AI_ENABLED` is still `false` and nothing reads these yet, so they will be picked up by
+  the next deploy. Do not flip that flag until the Phase 8/10 provider implementation exists.
+- **One key was rotated** during this work: a `.env` file with no trailing newline caused an append
+  to concatenate onto the `MISTRAL_API_KEY` line, and inspecting the damage printed the value into a
+  session transcript. File repaired, trailing newline enforced, key rotated and the replacement
+  re-verified. Lesson worth keeping: check for a trailing newline before appending to a secrets file.
+
+### Cost per interview, recomputed
+
+| Provider | AI total | Light | Heavy |
+| --- | ---: | ---: | ---: |
+| **Mistral Medium 3** ($0.40/$2.00) | $0.058 | $0.48 | **$0.98** |
+| Mistral Large 3 ($2/$6) | $0.253 | $0.54 | $1.17 |
+| Azure `gpt-5.6-luna` ($1/$6) | $0.155 | $0.51 | $1.08 |
+| Azure `gpt-5.6-terra` ($2.50/$15) | $0.388 | $0.59 | $1.31 |
+| *GPT-4o, the original assumption* | $0.340 | $0.57 | $1.26 |
+
+Structured output is satisfied: Mistral supports `response_format: {type:'json_schema', strict:true}`,
+the same constrained-decoding concept `completeStructured` needs. Drop-in reuse of the installed
+`openai` SDK is **not** confirmed — verify at implementation time rather than assuming.
+
+### The bigger cost lever, noted not acted on
+
+Transcription is 94% of the per-interview cost. Azure's catalogue includes
+`gpt-4o-transcribe-diarize`. Evaluating that against Deepgram is worth more money than this entire
+provider decision — but `spec.md` fixes Deepgram and the EU base URL is hard-coded, so it is a
+separate decision with its own register entry, not a side effect of this one.
+
+---
+
+## 4b. Azure OpenAI — retained as fallback *(pay-as-you-go SaaS)*
 
 ### What to create
 
@@ -198,6 +373,22 @@ DEEPGRAM_BASE_URL=https://api.eu.deepgram.com   # already the default; do not ov
    not instant self-serve. Budget several business days.
 3. An Azure OpenAI resource in an **EU region**. `env.ts` accepts only: `westeurope`,
    `northeurope`, `francecentral`, `germanywestcentral`, `swedencentral`, `switzerlandnorth`.
+
+   ⚠️ **Read the check before creating the resource.** `env.ts:440` does
+   `EU_AZURE_REGIONS.some((region) => endpointHost.includes(region))` — a **substring match on the
+   endpoint hostname**. Azure's default endpoint for a new resource is
+   `https://<resource>.openai.azure.com`, which contains **no region** and therefore **fails**,
+   even though the resource is legitimately in the EU. Two ways through: use a regional endpoint
+   form that carries the region in the host, or **name the resource so it contains the region**
+   (e.g. `builderhunt-swedencentral`). The naming route is the least fragile without a code change.
+
+   Recommended region: **`swedencentral`**, `northeurope` second — better GPT-4o-class availability;
+   `westeurope` is frequently capacity-constrained. Confirm the model is deployable in the region
+   *before* creating the resource, or you will recreate it.
+
+   Note for whoever revisits this: the check validates a *string*, not a region. It can be satisfied
+   by naming alone and it rejects legitimate EU endpoints. Worth replacing with an explicit
+   `AZURE_OPENAI_REGION` var validated against the allow-list, rather than inferring from the host.
 4. A GPT-4-class model deployment. Note the *deployment name* — that is the env var value, not the
    model name.
 5. Optionally request **Modified Abuse Monitoring** (a separate Azure form) to opt out of human
@@ -225,10 +416,76 @@ route candidate data to the general-purpose MiniMax provider the rest of the app
 
 ### Recorded
 
-- **Subscription / tenant**: _(not yet provisioned)_
-- **Access application approved**: _(not yet provisioned)_ ⚠️ start early, review queue
-- **Region**: _(must be one of the six above)_
-- **Deployment name + model**: _(not yet provisioned)_
+- **Subscription / tenant**: `Azure subscription 1`, id `e6da3ee8-fcd1-4ecf-9d65-f88b60cc4e5f`,
+  plan **"Plan de Azure"** (Microsoft Azure Plan — pay-as-you-go, **not** the free trial, so there
+  is no 30-day credit cliff that would disable a live resource). Directory
+  `eduardoinerartegmail.onmicrosoft.com` (`3a8fc5ca-6de7-4756-b74b-7c3acd21e1dc`). Owner role.
+  Country **Denmark**, chosen as **personal use** to match the Stripe individual-seller KYC and the
+  fact that no VAT registration exists. Country cannot be changed later.
+  - Gotcha for next time: the portal opens in the consumer tenant `f8cdef31-…` where the
+    subscription list is empty. It is not missing — switch directory first.
+- **Access application approved**: **not needed.** Verified 2026-07-26: the *Crear Azure OpenAI*
+  blade is fully self-serve on a new pay-as-you-go subscription. No waitlist, no review queue. The
+  only prerequisite is registering the `Microsoft.CognitiveServices` provider, which the portal does
+  automatically.
+- **Region**: **`swedencentral`** — confirmed on the resource's Keys and Endpoint blade
+  (`Ubicación o región: swedencentral`), which is independent of the resource name.
+- **Resource**: `builderhunt-swedencentral`, resource group `builderhunt-ai`, tier Standard S0,
+  tag `project=builderhunt` for cost attribution, network **all networks** (see hardening note).
+- **Endpoint**: `https://builderhunt-swedencentral.openai.azure.com/` — **validated by running the
+  actual `env.ts` predicate against it**, not by eye. It passes only because the resource name
+  contains the region: `https://builderhunt.openai.azure.com/` and
+  `https://builderhunt-ai.openai.azure.com/` both fail. Renaming the resource breaks production boot.
+- **Deployment name + model**: ⛔ **BLOCKED ON QUOTA — 2026-07-26.** Two findings that change this
+  plan:
+
+  1. **`gpt-4.1` cannot be deployed at all.** Azure rejects it with
+     `ServiceModelDeprecating: The model 'Format.OpenAI,Name.gpt-4.1,Version.2025-04-14' is in
+     deprecating state and cannot be used for new deployments.` The whole GPT-4 chat family is out,
+     so the "GPT-4-class model" wording above and the GPT-4o-based cost table are obsolete.
+  2. **A new subscription has zero quota.** In the deploy dialog every location reads
+     `(Sin cuota)` — East US, North Europe, **Sweden Central**, West Europe, UK South, all of them.
+     The Quota blade confirms it: the categories (`Standard`, `DataZoneStandard`, `GlobalStandard`,
+     …) exist but hold no allocation. Nothing is deployable until a quota increase is granted.
+
+  **This is the review queue the register warned about** — it just shows up at the quota stage
+  rather than as an access application. Starting Azure early was the right call for exactly this
+  reason.
+
+  **Quota request filed 2026-07-26**: Azure support case **`2607260050000678`**, status `OPEN`,
+  severity C (minimal impact), contact by email. Asked for `gpt-5.6-terra`, **Data Zone Standard**,
+  Sweden Central, **50,000 TPM** — the figure Azure itself offered by default for `gpt-4.1`, so it is
+  a modest ask. Advanced diagnostic collection was declined: it grants Microsoft Support read access
+  to subscription resources, a quota request does not need it, and this subscription is intended to
+  process candidate data.
+
+  **Model decision (made, pending quota): `gpt-5.6-terra`.** Current tiers are Sol $5/$30, Terra
+  $2.50/$15, Luna $1/$6 per 1M tokens. Terra has the *same input price* as the GPT-4o figure the
+  cost table assumed, so a heavy interview moves $1.27 → **$1.31 (+3%)** and the margin table holds.
+  Sol would make it ~$1.70 (+34%) for agentic-reasoning strength this workload does not need; Luna
+  would save ~$0.20 but this output is candidate evaluation material in a hiring decision — the
+  wrong first place to economise.
+  Deployment name chosen: **`sensitive-ai`** — mirrors `SensitiveAIProvider` and stays stable when
+  the underlying model is upgraded, so `AZURE_OPENAI_DEPLOYMENT` never has to change.
+
+- **⚠️ Data-residency regression, and a gap in our own validation.** `gpt-4.1` offered a **regional
+  `Standard`** deployment ("Cumple las promesas de residencia de datos de Azure"), which would have
+  kept processing inside Sweden. `gpt-5.6-terra` offers only **Global Standard**, **Data Zone
+  Standard**, and the two provisioned (PTU) types. So:
+  - **Global Standard is disqualified**: its own description says data "se pueden procesar
+    globalmente, fuera de la geografía de Azure del recurso". That breaks the EU-processing promise
+    we make to candidates.
+  - The strongest achievable option is now **Data Zone Standard** — processing stays inside the EU
+    data zone, but not necessarily inside Sweden. Still no third-country transfer, so GDPR-workable,
+    but the DPIA wording must say "processed within the EU data zone", not "processed in Sweden".
+  - **`env.ts` does not check any of this.** It validates the *resource* region substring only. A
+    Global Standard deployment on an EU resource passes validation while violating the residency
+    promise. The fail-closed guard is weaker than it looks — see the note on the region check above;
+    both belong in the same fix.
+- **Hardening before real candidate data**: switch the resource's network from "all networks" to
+  selected networks limited to the VPS IP. Free, and meaningful for a resource that will process
+  CVs and transcripts. Deliberately left open now because Phase 8/10 development needs to call it
+  from laptops. Not Private Link — that has fixed cost.
 - **DPA**: Microsoft Products and Services DPA — record version and date
 - **Sub-processor list**: https://servicetrust.microsoft.com/
 - **No-training**: Azure OpenAI does not train on customer data by default — record the clause

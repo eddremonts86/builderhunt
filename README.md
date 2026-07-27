@@ -351,8 +351,7 @@ See [`.env.example`](.env.example) for the full annotated list. Summary:
 | Application | `NODE_ENV`, `PORT`, `APP_URL`, `VITE_APP_URL` | ✅ |
 | Database | `DATABASE_URL` | ✅ |
 | Auth | `AUTH_MODE`, `BETTER_AUTH_SECRET` | ✅ |
-| Observability | `VITE_SENTRY_DSN` | optional |
-| Email | `RESEND_API_KEY` | optional (RSS alerts work without it) |
+| Email | `RESEND_API_KEY` | required in production — unset means senders log a dev link and never send |
 | Source tokens | `GITHUB_TOKEN`, `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | optional (higher rate limits) |
 | Local admin seed | `DEFAULT_ADMIN_EMAIL`, `DEFAULT_ADMIN_PASSWORD` | for `db:seed:admin` |
 
