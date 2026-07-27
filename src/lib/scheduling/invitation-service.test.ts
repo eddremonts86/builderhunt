@@ -10,7 +10,6 @@ import {
   expireInvitation,
   getInvitation,
   invitationAuditDetails,
-  isKnownTimeZone,
   listInvitations,
   markInvitationSent,
   revokeInvitation,
@@ -194,13 +193,31 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
       expect(resend.error).toBe('invalid_transition')
     })
 
-    it('expire refuses to run twice', async () => {
+    it('a draft cannot expire — it is sent or revoked, never timed out', async () => {
+      // The shared contract's graph is `draft: ['sent', 'revoked']`. An invitation nobody was ever
+      // given cannot lapse; the organizer discards it. Asserted so a future edit to the graph has
+      // to face this case deliberately.
       const { invitation } = await create()
-      const first = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, invitation.version))
+      const result = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, invitation.version))
+      expect(result.ok).toBe(false)
+      if (result.ok) throw new Error('unreachable')
+      expect(result.error).toBe('invalid_transition')
+    })
+
+    it('expires a sent invitation, and refuses to expire it twice', async () => {
+      const { invitation } = await create()
+      const sent = await db.transaction((tx) => markInvitationSent(tx, principal(OWNER), invitation.id, invitation.version))
+      if (!sent.ok) throw new Error('unreachable')
+
+      const first = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, sent.value.version))
       expect(first.ok).toBe(true)
       if (!first.ok) throw new Error('unreachable')
+      expect(first.value.status).toBe('expired')
+
       const second = await db.transaction((tx) => expireInvitation(tx, principal(OWNER), invitation.id, first.value.version))
       expect(second.ok).toBe(false)
+      if (second.ok) throw new Error('unreachable')
+      expect(second.error).toBe('invalid_transition')
     })
 
     it('reports a version conflict rather than clobbering a concurrent change', async () => {
@@ -249,12 +266,16 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
     })
   })
 
-  describe('isKnownTimeZone', () => {
-    it.each(['Europe/Copenhagen', 'UTC', 'America/New_York', 'Asia/Tokyo'])('accepts %s', (tz) => {
-      expect(isKnownTimeZone(tz)).toBe(true)
+  describe('timezone acceptance', () => {
+    // Exercised through createInvitation rather than a direct export: the shared domain already
+    // owns `isValidIanaTimeZone`, and this service only adds a length bound on top of it.
+    it.each(['Europe/Copenhagen', 'UTC', 'America/New_York', 'Asia/Tokyo'])('accepts %s', async (tz) => {
+      const result = await db.transaction((tx) => createInvitation(tx, principal(OWNER), input({ timezone: tz }), 'policy-v1'))
+      expect(result.ok).toBe(true)
     })
-    it.each(['', 'Mars/Olympus_Mons', 'Europe/Nowhere', 'x'.repeat(101)])('rejects %s', (tz) => {
-      expect(isKnownTimeZone(tz)).toBe(false)
+    it.each(['', 'Mars/Olympus_Mons', 'x'.repeat(101)])('rejects %s', async (tz) => {
+      const result = await db.transaction((tx) => createInvitation(tx, principal(OWNER), input({ timezone: tz }), 'policy-v1'))
+      expect(result.ok).toBe(false)
     })
   })
 })

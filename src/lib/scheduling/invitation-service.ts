@@ -39,12 +39,12 @@ import {
   listInvitationsForOwner,
   updateInvitationStateWithVersion,
 } from '~/shared/lib/repositories/scheduling'
+import type { InvitationStatus, SchedulingModality } from '~/shared/lib/scheduling'
+import { assertValidInvitationStatusTransition, INVITATION_STATUSES, isValidIanaTimeZone, SchedulingError } from '~/shared/lib/scheduling'
 import { issueCapability } from './capability'
 
-/** Mirrors the `scheduling_invitations_status_check` constraint. */
-export type InvitationStatus = 'draft' | 'sent' | 'opened' | 'booked' | 'declined' | 'expired' | 'revoked'
-
-export type InvitationModality = 'in_person' | 'remote_call'
+export type { InvitationStatus } from '~/shared/lib/scheduling'
+export type InvitationModality = SchedulingModality
 
 export type InvitationServiceError =
   | 'not_found'
@@ -66,16 +66,43 @@ const fail = (error: InvitationServiceError, message: string): InvitationService
   ({ ok: false, error, message })
 
 /**
- * Which statuses each action may be applied from. Encoding this as data rather than a chain of
- * `if`s is what lets the tests assert the whole matrix, and makes an illegal transition a lookup
- * failure instead of a forgotten branch.
+ * The legal status graph lives in `shared/lib/scheduling.ts`
+ * (`assertValidInvitationStatusTransition`), built in Phase 1 as a pure domain contract. This
+ * service must not keep a second copy: an earlier draft of this file did, and it silently drifted
+ * more permissive than the contract — it allowed `sent -> sent` and `opened -> opened`.
+ *
+ * The reconciliation is that **a resend is not a transition**. Re-sending an invitation email, or
+ * a candidate opening a link twice, leaves the status where it was, so there is nothing for the
+ * transition validator to judge. Only an actual status change is validated, and it is validated
+ * by the shared contract.
  */
-const ALLOWED_FROM: Record<'send' | 'open' | 'decline' | 'revoke' | 'expire', readonly InvitationStatus[]> = {
-  send: ['draft', 'sent'],          // resend is idempotent-ish and allowed; see `send`
-  open: ['sent', 'opened'],         // re-opening a link is normal, not an error
-  decline: ['sent', 'opened'],
-  revoke: ['draft', 'sent', 'opened'],
-  expire: ['draft', 'sent', 'opened'],
+function checkTransition(from: InvitationStatus, to: InvitationStatus): InvitationServiceFailure | null {
+  // A same-status write is only benign while the invitation is still live. A *terminal* status
+  // accepts nothing, including itself — otherwise "expire an already-expired invitation" or
+  // "revoke a revoked one" would report success and bump the version for no reason. Terminality is
+  // read off the shared graph (terminal states have no outgoing transitions) rather than kept as a
+  // second list here.
+  if (from === to && !isTerminalStatus(from)) return null
+  try {
+    assertValidInvitationStatusTransition(from, to)
+    return null
+  } catch (error) {
+    const reason = error instanceof SchedulingError ? error.message : 'This invitation cannot change state that way.'
+    return fail('invalid_transition', reason)
+  }
+}
+
+/** A status with no legal move out of it, derived from the shared contract. */
+function isTerminalStatus(status: InvitationStatus): boolean {
+  return !INVITATION_STATUSES.some((candidate) => {
+    if (candidate === status) return false
+    try {
+      assertValidInvitationStatusTransition(status, candidate)
+      return true
+    } catch {
+      return false
+    }
+  })
 }
 
 /** Bounds that are the service's business, not the database's. */
@@ -122,7 +149,7 @@ function validateCreateInput(input: CreateInvitationInput): InvitationServiceFai
     || input.durationMinutes > MAX_DURATION_MINUTES) {
     return fail('invalid_input', `Duration must be a whole number of minutes between ${MIN_DURATION_MINUTES} and ${MAX_DURATION_MINUTES}.`)
   }
-  if (!isKnownTimeZone(input.timezone)) {
+  if (!isAcceptableTimeZone(input.timezone)) {
     return fail('invalid_input', 'Timezone must be a valid IANA timezone identifier.')
   }
   // A remote invitation with no way to join it is a support ticket waiting to happen, and the
@@ -139,15 +166,16 @@ function validateCreateInput(input: CreateInvitationInput): InvitationServiceFai
   return null
 }
 
-/** `Intl` is the only source of truth available at runtime for whether a zone name is real. */
-export function isKnownTimeZone(timezone: string): boolean {
-  if (typeof timezone !== 'string' || timezone.length === 0 || timezone.length > 100) return false
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: timezone })
-    return true
-  } catch {
-    return false
-  }
+/**
+ * Timezone validity is `isValidIanaTimeZone` from the shared domain — do not add a second
+ * `Intl`-based check here. The only thing this wrapper adds is a length bound, because the shared
+ * predicate accepts any string `Intl` tolerates and this value reaches a `text` column.
+ */
+function isAcceptableTimeZone(timezone: unknown): boolean {
+  return typeof timezone === 'string'
+    && timezone.length > 0
+    && timezone.length <= 100
+    && isValidIanaTimeZone(timezone)
 }
 
 export async function createInvitation(
@@ -217,7 +245,6 @@ async function transition(
   principal: TenantPrincipal,
   invitationId: string,
   expectedVersion: number,
-  action: keyof typeof ALLOWED_FROM,
   nextStatus: InvitationStatus,
   options: TransitionOptions = {},
 ) {
@@ -225,9 +252,8 @@ async function transition(
   if (!current.ok) return current
 
   const status = current.value.status as InvitationStatus
-  if (!ALLOWED_FROM[action].includes(status)) {
-    return fail('invalid_transition', `An invitation that is ${status} cannot be ${action === 'expire' ? 'expired' : `${action}d`}.`)
-  }
+  const illegal = checkTransition(status, nextStatus)
+  if (illegal) return illegal
 
   const row = await updateInvitationStateWithVersion(
     transaction,
@@ -255,7 +281,7 @@ export async function markInvitationSent(
   expectedVersion: number,
   expiresAt?: Date | null,
 ) {
-  return transition(transaction, principal, invitationId, expectedVersion, 'send', 'sent', {
+  return transition(transaction, principal, invitationId, expectedVersion, 'sent', {
     patch: expiresAt === undefined ? undefined : { expiresAt },
   })
 }
@@ -267,7 +293,7 @@ export async function revokeInvitation(
   expectedVersion: number,
   now: Date = new Date(),
 ) {
-  return transition(transaction, principal, invitationId, expectedVersion, 'revoke', 'revoked', {
+  return transition(transaction, principal, invitationId, expectedVersion, 'revoked', {
     patch: { revokedAt: now },
   })
 }
@@ -278,7 +304,7 @@ export async function expireInvitation(
   invitationId: string,
   expectedVersion: number,
 ) {
-  return transition(transaction, principal, invitationId, expectedVersion, 'expire', 'expired')
+  return transition(transaction, principal, invitationId, expectedVersion, 'expired')
 }
 
 /**
