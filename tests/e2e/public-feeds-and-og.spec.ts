@@ -265,7 +265,10 @@ test.describe('crawler surfaces', () => {
       const response = await api.get('/robots.txt')
       expect(response.status()).toBe(200)
       expect(response.headers()['content-type']).toContain('text/plain')
-      expect(response.headers()['cache-control']).toContain('max-age=3600')
+      // 60s, not the hour it used to be: per-surface indexing is now switched
+      // from the admin, and an hour of cache would leave a surface crawlable
+      // long after someone chose to pull it out of the index.
+      expect(response.headers()['cache-control']).toContain('max-age=60')
       const body = await response.text()
       expect(body).toContain('User-agent: *')
       expect(body).toContain('Allow: /explore')
@@ -286,8 +289,20 @@ test.describe('crawler surfaces', () => {
       expect(response.headers()['content-type']).toContain('application/xml')
       const body = await response.text()
       expect(body).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
-      for (const path of ['/', '/explore', '/changelog', '/roadmap', '/status', '/legal/terms']) {
+      // Always in the sitemap: these pages are not behind the indexing switch.
+      for (const path of ['/', '/explore', '/status', '/legal/terms']) {
         expect(body).toContain(`<loc>${canonicalOrigin()}${path === '/' ? '/' : path}</loc>`)
+      }
+      // Never in it while the switch sits at its default. `DEFAULT_DIRECTIVES`
+      // is `{noindex: true}` — it fails closed on purpose, because an
+      // un-indexed page is recoverable in a moment and an indexed one takes
+      // weeks to walk back. This disposable database has no
+      // `public_surface_indexing` rows, so the admin-gated surfaces must be
+      // absent; listing a noindex URL in a sitemap is a contradictory
+      // instruction to a crawler.
+      for (const path of ['/changelog', '/roadmap']) {
+        expect(body, `${path} is noindex by default and must not be advertised`)
+          .not.toContain(`<loc>${canonicalOrigin()}${path}</loc>`)
       }
       // Curated explore queries are URL-encoded entries.
       expect(body).toContain('/explore?q=rust%20async%20runtime')

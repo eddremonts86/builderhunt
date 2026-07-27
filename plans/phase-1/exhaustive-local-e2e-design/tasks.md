@@ -88,7 +88,25 @@
   - Verify (RED): `pnpm test:e2e e2e/api/billing-worker.spec.ts e2e/api/billing-replay.spec.ts` — fails RED on file absence. The worker's claim/lease race is the spec's mandatory "Critical concurrency suites pass repeated runs without retries" gate (spec §Verification gates #6); it must be repeatable across 10 consecutive runs with zero flakes.
   - Independent boundary: this task owns **only** the two named spec files. It depends on task 5 (the worker needs persisted rows to process) but does not modify task 5's spec.
 
-- [ ] **Cross-tenant security matrix: every tenant-scoped API rejects organization B's identifiers on session A**
+- [x] **Cross-tenant security matrix: every tenant-scoped API rejects organization B's identifiers on session A** — first pass done (2026-07-27)
+  - Files: `tests/e2e/api/cross-tenant.spec.ts`
+  - Asserts a stronger property than "denied": B's real id must be indistinguishable from a
+    fabricated one on status, error key **and body length**, because a route that 404s the absent
+    and 403s the other tenant has confirmed the id is real. Covers `/api/sprints/$sprintId` and
+    `/api/builders/$builderId/notes`, plus two routes that must ignore client-supplied tenancy
+    (`GET /api/organizations/team` with a spoofed query string, `POST /api/organizations/invitations`
+    with `organizationId` in the body — the invitation lands in A).
+  - Two negative controls guard against a vacuous pass, and both paid for themselves on the first
+    run: `/api/alerts/$id` and `/api/me/builder/$builderId` expose only PATCH, so the GETs fell
+    through to the SPA document and every id looked identical; and the notes route resolves through
+    `organization_builders`, not the legacy `builders` table, so the original fixture was invisible
+    to it. Both are recorded in the spec so the next person does not re-list those routes.
+  - Verify (2026-07-27): 4/4 pass; removing either negative control makes two of them pass
+    vacuously, which is how the two findings above surfaced.
+  - **Not covered yet**, and deliberately listed rather than implied: the billing routes
+    (`/api/billing/portal`, `/api/billing/checkout/subscription`), `PATCH
+    /api/organizations/members/$memberId`, `POST /api/organizations/transfer-ownership`, and
+    `GET /api/me/data-export/$id`. Each needs its own fixture; the probe helper generalises.
   - Files: `e2e/api/cross-tenant.spec.ts` (new); `src/shared/lib/auth/tenant-principal.ts` (no edits)
   - Do: For every tenant-scoped route identified by `scripts/check-tenant-boundaries.mjs` (the existing `node scripts/check-tenant-boundaries.mjs` already enforces the importer boundary; this task enforces the **runtime** boundary), seed two organizations A and B with real `organization_members` rows, then for each route issue a request as A's session with B's `organizationId`/`memberId`/`invitationId`/`userId`/`builderId`/`exportId`/`subscriptionId`/`customerId` in the path or body (where the body schema permits it — when the schema strips the field, assert that the body version and the path version both fall back to A's tenant context, matching `organization-lifecycle.ts`'s "never trust client-supplied org" invariant). Routes to cover: `GET /api/organizations/team` (always reads A's active org), `PATCH /api/organizations/members/$memberId` where the memberId belongs to B, `POST /api/organizations/invitations` with `{organizationId: 'B'}` in the body (the route's zod schema does not include `organizationId` — assert the response is identical with and without the field, matching the existing `team-invitations.test.ts` pattern), `POST /api/organizations/transfer-ownership` with `targetUserId` from B, `GET /api/me/data-export/$id` with B's export row id, `POST /api/me/builder/$builderId/notes` with B's builder id, `GET /api/queries/index.ts` with B's saved query id, `POST /api/search/semantic` with a tenant-keyed query that should resolve to A only, `GET /api/builders/$builderId` (the tenant-private builder view, if it exists), `POST /api/billing/portal` with B's `customerId` (the route accepts no `customerId` in the body — verify the response is A's portal URL, never B's), `POST /api/billing/checkout/subscription` with B's `customerId` (same — schema strips it, response is A's checkout). For every acceptance: assert the response body matches what the **same** A-session would get without the cross-tenant identifier (proving the identifier was structurally ignored or produced a same-shape 403/404). For every cross-tenant denied: assert the response does **not** leak B's data shape — status code, error key, and content length must match the "not found" case (no `error: 'B exists'`-style leakage).
   - Verify (RED): `pnpm test:e2e e2e/api/cross-tenant.spec.ts` — fails RED on file absence. The spec asserts every tenant-scoped route against the cross-tenant matrix in a single serial run; expected runtime ~90s.
