@@ -229,8 +229,23 @@ describe('invitation service (plan: calendar-scheduling-interview-intelligence, 
       const serialised = JSON.stringify(details)
       expect(details.invitationId).toBe(invitation.id)
       expect(serialised).not.toContain(capabilitySecret)
-      expect(serialised).not.toContain(invitation.capabilityHash)
+      expect(serialised).not.toContain(hashCapability(capabilitySecret))
       expect(serialised).not.toContain('Senior Rust Engineer')
+    })
+
+    it('the repository never returns the capability hash on any owner read path', async () => {
+      // `invitationColumns` in repositories/scheduling.ts deliberately omits capability_hash, so
+      // the hash cannot reach a DTO, a log line or an audit entry by accident. Asserted here
+      // because it is a property of the data layer that this service depends on.
+      const { invitation, capabilitySecret } = await create()
+      const hash = hashCapability(capabilitySecret)
+      expect(JSON.stringify(invitation)).not.toContain(hash)
+
+      const read = await db.transaction((tx) => getInvitation(tx, principal(OWNER), invitation.id))
+      expect(JSON.stringify(read)).not.toContain(hash)
+
+      const listed = await db.transaction((tx) => listInvitations(tx, principal(OWNER)))
+      expect(JSON.stringify(listed)).not.toContain(hash)
     })
   })
 
