@@ -61,6 +61,14 @@ export const Route = createFileRoute('/api/builders/$builderId')({
               const claim = await findVerifiedBuilderClaim(tenantBuilder.identityId)
               return Response.json({
                 id: tenantBuilder.identityId,
+                // The organization's own row id for this tracked builder, as distinct from the
+                // shared identity id above. Only on this branch, because only a tracked builder has
+                // one. Exposed so the profile can open an interview invitation against it —
+                // `scheduling_invitations.organization_builder_id` FKs to exactly this, and without
+                // it an invitation created from this page could not be linked back to the builder it
+                // is about. Scoped by RLS to the caller's organization, so it identifies nothing
+                // they cannot already see.
+                trackedId: tenantBuilder.id,
                 source: tenantBuilder.source,
                 username: tenantBuilder.username,
                 displayName: tenantBuilder.displayName,

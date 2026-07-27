@@ -6,6 +6,7 @@ import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
 import { TeamFitCard } from '~/modules/builder-profile/components/TeamFitCard'
 import { WorkSamplePanel } from '~/modules/builder-profile/components/WorkSamplePanel'
+import { InterviewInvitePanel } from '~/modules/scheduling/components/InterviewInvitePanel'
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
 import { BuilderTimeline } from '~/modules/builder-profile/components/BuilderTimeline'
@@ -23,6 +24,12 @@ const CLAIM_ERROR_MESSAGES: Record<string, string> = {
 
 interface Builder {
   id: string
+  /**
+   * `organization_builders.id` — the organization's own row for this builder, present only when they
+   * are tracked. Distinct from `id`, which is the shared identity. An interview invitation is
+   * recorded against this one, so the invite panel is disabled without it.
+   */
+  trackedId?: string | null
   source: string
   username: string
   displayName?: string
@@ -328,6 +335,11 @@ export function BuilderProfilePage() {
               profileUrl: builder.profileUrl,
               source: builder.source,
             }}
+          />
+
+          <InterviewInvitePanel
+            organizationBuilderId={builder.trackedId ?? null}
+            builderName={builder.displayName ?? builder.username}
           />
 
           <TeamFitCard builderId={builder.id} trackedBuildersCount={trackedBuildersCount} />
