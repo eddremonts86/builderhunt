@@ -178,6 +178,22 @@ try {
     on conflict (id) do nothing
   `
 
+  // Phase 6 document tables. Seeded here rather than in the verifier so the
+  // ownership chain the policies walk — document → submission → invitation →
+  // owner_user_id — exists before any role connects.
+  await owner`
+    insert into candidate_documents (id, organization_id, submission_id, object_key, original_name, declared_media_type, sha256, bytes, retention_expires_at)
+    values ('ffffffff-0000-4000-8000-00000000000a', 'org-a', 'eeeeeeee-0000-4000-8000-00000000000a',
+            'org-a/eeeeeeee/cv.pdf', 'cv.pdf', 'application/pdf', repeat('a', 64), 1024, now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into document_extractions (id, organization_id, document_id, parser, parser_version, content_sha256, retention_expires_at)
+    values ('ffffffff-0000-4000-8000-00000000000b', 'org-a', 'ffffffff-0000-4000-8000-00000000000a',
+            'pdf', 'v1', repeat('b', 64), now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+
   // `roles`/`urls` tell the caller which login roles to use for the verifier
   // (`scripts/db/verify-rls-local.mjs` reads RLS_TEST_*_URL): the base roles
   // themselves in CI, per-run dedicated members everywhere else.

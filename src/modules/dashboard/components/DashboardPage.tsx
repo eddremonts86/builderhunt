@@ -284,31 +284,46 @@ export function DashboardPage() {
   }, [])
 
   React.useEffect(() => {
+    // Aborted on unmount. A client-side navigation away from the dashboard —
+    // back/forward, or a link — cancels these three in flight, and the browser
+    // surfaces that as `TypeError: Failed to fetch`. Logging it as a dashboard
+    // failure was wrong twice over: it put an error in every user's console for
+    // the ordinary act of leaving a page, and it made three e2e specs flaky for
+    // a reason that was never a defect.
+    const controller = new AbortController()
+    const { signal } = controller
+
     Promise.all([
-      fetch('/api/dashboard/stats', { credentials: 'include' }).then(async (r) => {
+      fetch('/api/dashboard/stats', { credentials: 'include', signal }).then(async (r) => {
         if (!r.ok) throw new Error(`stats: ${r.status}`)
         return r.json()
       }),
-      fetch('/api/queries', { credentials: 'include' }).then(async (r) => {
+      fetch('/api/queries', { credentials: 'include', signal }).then(async (r) => {
         if (!r.ok) return []
         return r.json()
       }).catch(() => []),
-      fetch('/api/builders/recent', { credentials: 'include' }).then(async (r) => {
+      fetch('/api/builders/recent', { credentials: 'include', signal }).then(async (r) => {
         if (!r.ok) return []
         return r.json()
       }).catch(() => []),
     ])
       .then(([s, q, r]) => {
+        if (signal.aborted) return
         setStats(s)
         setQueries(Array.isArray(q) ? q : [])
         setRecent(Array.isArray(r) ? r : [])
         setLoading(false)
       })
       .catch((err) => {
+        // The component is gone; there is nobody to show an error to and
+        // nothing failed.
+        if (signal.aborted || (err instanceof Error && err.name === 'AbortError')) return
         console.error('Dashboard load error:', err)
         setError(err.message ?? 'Failed to load dashboard')
         setLoading(false)
       })
+
+    return () => controller.abort()
   }, [])
 
   // Memoised because it feeds `widgetContext`, which feeds the bento's layout

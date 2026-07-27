@@ -432,6 +432,50 @@ try {
   })
   if (participantCandidates !== 0) throw new Error('participant saw candidate submissions')
 
+  // candidate_documents / document_extractions (Phase 6): ownership is proven by walking back to
+  // the invitation's owner, so the interesting cases are the three principals who are *inside* the
+  // organization and must still see nothing — a participant, an org admin, and a colleague — plus
+  // tenant B, which must not even reach the join.
+  const documentsOwner = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    const docs = await transaction`select id from candidate_documents`
+    const extractions = await transaction`select id from document_extractions`
+    return { docs: docs.length, extractions: extractions.length }
+  })
+  if (documentsOwner.docs !== 1 || documentsOwner.extractions !== 1) {
+    throw new Error(`invitation owner could not read their own documents: ${JSON.stringify(documentsOwner)}`)
+  }
+
+  for (const [label, userId] of [['participant', 'user-c'], ['org admin', 'user-d']]) {
+    const seen = await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.user_id', ${userId}, true)`
+      await transaction`select set_config('app.organization_role', 'admin', true)`
+      const docs = await transaction`select id from candidate_documents`
+      const extractions = await transaction`select id from document_extractions`
+      return docs.length + extractions.length
+    })
+    if (seen !== 0) throw new Error(`${label} saw candidate documents they do not own (${seen} rows)`)
+  }
+
+  const documentsTenantB = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-b', true)`
+    await transaction`select set_config('app.user_id', 'user-b', true)`
+    const docs = await transaction`select id from candidate_documents`
+    const extractions = await transaction`select id from document_extractions`
+    return docs.length + extractions.length
+  })
+  if (documentsTenantB !== 0) throw new Error(`tenant B read tenant A's candidate documents (${documentsTenantB} rows)`)
+
+  // The scanner and the retention sweeper run as the worker and must see the row they are asked to
+  // act on — a policy that hides it would leave infected files unscanned and expired ones undeleted.
+  const documentsWorker = await worker.begin(async (transaction) => {
+    const rows = await transaction`select id from candidate_documents`
+    return rows.length
+  })
+  if (documentsWorker !== 1) throw new Error(`worker could not read candidate documents (${documentsWorker} rows)`)
+
   // availability_policies: owner-only, and specifically NOT readable by an org admin. This table
   // is where a policy's version and default reminder settings live, so a leak here would expose
   // when a colleague changed their working hours.

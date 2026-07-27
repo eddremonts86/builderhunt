@@ -336,6 +336,14 @@
     "0083_public_surface_indexing_grants": {
       "sql": "2ad42a01f8af48ab814b8c4b1960c3d399e0d6b4823aa06f9100fa10de670ff1",
       "snapshot": "e811371058d6e1cb4534569f087ed58d0159a459330171da0ab607b208554681"
+    },
+    "0084_flowery_gunslinger": {
+      "sql": "547be851d058206c4d5aadf94d23200bc7f87e7ddf399871093e06da3a569939",
+      "snapshot": "21733cbf204eefc5009b67bb072d24a80ed0805857cb8a980efcfbb40b6a363b"
+    },
+    "0085_candidate_documents_rls_grants": {
+      "sql": "114b7d2cbec34edde0b13adc399f8e4c7e8cf20be567f49be1233ca65978e400",
+      "snapshot": "13ca643921de7594900e853b6795e50cfd5dc9d76d95acd0ee143ae6f9256f44"
     }
   }
 }

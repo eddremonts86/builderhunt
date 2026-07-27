@@ -2337,6 +2337,156 @@ export const candidateLinks = pgTable(
 )
 
 /**
+ * Candidate-uploaded documents (spec.md §Data model `candidate_documents`).
+ *
+ * `objectKey` is generated server-side and is the ONLY handle to the bytes: there is deliberately
+ * no public URL column, because a URL that exists is a URL that leaks. Storage is private MinIO
+ * (see docs/operations/interview-provider-register.md), reached through a signed, short-lived
+ * request minted per download.
+ *
+ * `declaredMediaType` is what the browser claimed and `detectedMediaType` is what sniffing found;
+ * both are kept because a mismatch is itself a signal, and only the detected one may be trusted.
+ * Audio types are rejected outright — this table is for CVs and portfolios, and accepting audio
+ * here would route recordings around the consent gate that governs interview capture.
+ */
+export const candidateDocuments = pgTable(
+  'candidate_documents',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    submissionId: uuid('submission_id').notNull(),
+    objectKey: text('object_key').notNull(),
+    originalName: text('original_name').notNull(),
+    declaredMediaType: text('declared_media_type').notNull(),
+    detectedMediaType: text('detected_media_type'),
+    sha256: text('sha256').notNull(),
+    bytes: integer('bytes').notNull(),
+    scanStatus: text('scan_status').notNull().default('pending'),
+    extractionStatus: text('extraction_status').notNull().default('pending'),
+    rejectionCode: text('rejection_code'),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('candidate_documents_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('candidate_documents_object_key_unique').on(table.objectKey),
+    foreignKey({
+      columns: [table.organizationId, table.submissionId],
+      foreignColumns: [candidateSubmissions.organizationId, candidateSubmissions.id],
+      name: 'candidate_documents_organization_submission_fk',
+    }).onDelete('cascade'),
+    index('candidate_documents_submission_idx').on(table.organizationId, table.submissionId),
+    index('candidate_documents_scan_status_idx').on(table.scanStatus),
+    index('candidate_documents_retention_idx').on(table.retentionExpiresAt),
+    check('candidate_documents_scan_status_check', sql`${table.scanStatus} in ('pending', 'scanning', 'clean', 'infected', 'failed')`),
+    check('candidate_documents_extraction_status_check', sql`${table.extractionStatus} in ('pending', 'running', 'succeeded', 'failed', 'skipped')`),
+    check('candidate_documents_bytes_check', sql`${table.bytes} > 0`),
+    check('candidate_documents_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+    // No audio: recordings belong to the consent-gated interview capture path, never to an upload.
+    check('candidate_documents_no_audio_check', sql`${table.declaredMediaType} not like 'audio/%' and (${table.detectedMediaType} is null or ${table.detectedMediaType} not like 'audio/%')`),
+    // A rejection needs a reason, and a clean document must not carry one.
+    check('candidate_documents_rejection_check', sql`(${table.scanStatus} in ('infected', 'failed')) = (${table.rejectionCode} is not null)`),
+  ],
+)
+
+/**
+ * Parsed text extracted from a document (spec.md §Data model `document_extractions`).
+ *
+ * Keyed by (document, parser version, content hash) so re-running a newer parser over the same
+ * bytes adds a row rather than overwriting the text a brief may already cite. `evidenceMap` is the
+ * section/page index every generated claim has to point back at — without it a brief can assert
+ * something the document never said and nobody can tell.
+ */
+export const documentExtractions = pgTable(
+  'document_extractions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    documentId: uuid('document_id').notNull(),
+    parser: text('parser').notNull(),
+    parserVersion: text('parser_version').notNull(),
+    contentSha256: text('content_sha256').notNull(),
+    plainText: text('plain_text'),
+    evidenceMap: jsonb('evidence_map').$type<Record<string, unknown>>().notNull().default({}),
+    status: text('status').notNull().default('pending'),
+    errorCode: text('error_code'),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('document_extractions_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('document_extractions_document_parser_content_unique')
+      .on(table.organizationId, table.documentId, table.parserVersion, table.contentSha256),
+    foreignKey({
+      columns: [table.organizationId, table.documentId],
+      foreignColumns: [candidateDocuments.organizationId, candidateDocuments.id],
+      name: 'document_extractions_organization_document_fk',
+    }).onDelete('cascade'),
+    index('document_extractions_status_idx').on(table.status),
+    index('document_extractions_retention_idx').on(table.retentionExpiresAt),
+    check('document_extractions_status_check', sql`${table.status} in ('pending', 'running', 'succeeded', 'failed')`),
+    check('document_extractions_content_sha256_check', sql`${table.contentSha256} ~ '^[a-f0-9]{64}$'`),
+    // A failure carries a code and no text; a success carries text and no code.
+    check('document_extractions_outcome_check', sql`(${table.status} = 'failed') = (${table.errorCode} is not null)`),
+  ],
+)
+
+/**
+ * A fetched candidate link (spec.md §Data model `candidate_web_imports`).
+ *
+ * The response HTML is transient by design and has no column here: it is never rendered and never
+ * retained, so only the hashes, the bounded extracted text and the evidence map survive the fetch.
+ * `robotsResult` is stored rather than inferred because "we were allowed to fetch this" is a claim
+ * that has to be auditable after the fact, when robots.txt has since changed.
+ */
+export const candidateWebImports = pgTable(
+  'candidate_web_imports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    candidateLinkId: uuid('candidate_link_id').notNull(),
+    finalUrl: text('final_url').notNull(),
+    sourcePolicyVersion: text('source_policy_version').notNull(),
+    robotsResult: text('robots_result').notNull(),
+    fetchedAt: timestamp('fetched_at', { withTimezone: true }),
+    httpEtag: text('http_etag'),
+    httpLastModified: text('http_last_modified'),
+    responseSha256: text('response_sha256'),
+    contentSha256: text('content_sha256'),
+    mediaType: text('media_type'),
+    bytes: integer('bytes'),
+    extractionVersion: text('extraction_version'),
+    extractedText: text('extracted_text'),
+    evidenceMap: jsonb('evidence_map').$type<Record<string, unknown>>().notNull().default({}),
+    status: text('status').notNull().default('pending'),
+    errorCode: text('error_code'),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('candidate_web_imports_organization_id_id_unique').on(table.organizationId, table.id),
+    // One active import per link and content hash: a re-fetch that returns identical bytes must not
+    // create a second row a brief could cite twice.
+    uniqueIndex('candidate_web_imports_link_content_unique')
+      .on(table.organizationId, table.candidateLinkId, table.contentSha256),
+    foreignKey({
+      columns: [table.organizationId, table.candidateLinkId],
+      foreignColumns: [candidateLinks.organizationId, candidateLinks.id],
+      name: 'candidate_web_imports_organization_link_fk',
+    }).onDelete('cascade'),
+    index('candidate_web_imports_status_idx').on(table.status),
+    index('candidate_web_imports_retention_idx').on(table.retentionExpiresAt),
+    check('candidate_web_imports_status_check', sql`${table.status} in ('pending', 'running', 'succeeded', 'failed', 'blocked')`),
+    check('candidate_web_imports_robots_result_check', sql`${table.robotsResult} in ('allowed', 'disallowed', 'unavailable')`),
+    check('candidate_web_imports_outcome_check', sql`(${table.status} in ('failed', 'blocked')) = (${table.errorCode} is not null)`),
+    check('candidate_web_imports_bytes_check', sql`${table.bytes} is null or ${table.bytes} >= 0`),
+  ],
+)
+
+/**
  * Append-only consent ledger (spec.md §Data model `privacy_consents`, §"Consent, privacy, and
  * retention").
  *
