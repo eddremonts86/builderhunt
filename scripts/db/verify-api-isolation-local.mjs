@@ -515,6 +515,24 @@ async function checkEnrichmentAndEvidence() {
   record('evidence-refresh: A cannot enqueue a job for B\'s tracked identity (other id)', refreshOther.status === 404, `status=${refreshOther.status}`)
 }
 
+/**
+ * The claim flow, as it exists after `8befb8a` ("source-bound claimable-profile verification").
+ *
+ * That commit removed the email step deliberately: an app-session email matching text the user typed
+ * proves nothing about controlling the *external* GitHub account being claimed. Starting a claim now
+ * mints a public challenge string, and the proof step is `POST /api/builders/:id/claim/verify`, which
+ * checks the challenge is actually live in that account's bio.
+ *
+ * This block asserted the old contract (a `devLink` carrying a token, redeemed through
+ * `GET /api/builders/claim/verify?token=`) and had been failing since 2026-07-26 — invisibly, because
+ * the workflow itself was rejected before any job ran. Nothing was wrong with the product: new claims
+ * store `verificationSecretHash: null`, so that legacy GET can no longer match anything, by design.
+ *
+ * What is under test here is isolation, not the claim mechanics (those have their own tests). So the
+ * proof step's one unavoidable network call — a real request to api.github.com for an account that
+ * does not exist — is stubbed, and the assertions stay focused on subject boundaries: A can claim A's
+ * identity, B cannot redeem A's pending claim, A can complete their own.
+ */
 async function checkBuilderClaim() {
   const { Route: ClaimRoute } = await import('../../src/routes/api/builders/$builderId/claim.ts')
   const { POST } = ClaimRoute.options.server.handlers
@@ -522,29 +540,61 @@ async function checkBuilderClaim() {
   const claimResp = await POST({
     request: sessionRequest('iso-session-token-a', 'https://iso.test/api/builders/x/claim', {
       method: 'POST',
-      body: JSON.stringify({ email: 'iso-a@test.invalid' }),
+      body: JSON.stringify({}),
     }),
     params: { builderId: IDS.identityA },
   })
   const claimBody = await claimResp.json()
-  record('claim: A can start a claim using A\'s own session email', claimResp.status === 200 && claimBody.ok === true && typeof claimBody.devLink === 'string', JSON.stringify(claimBody))
+  record(
+    'claim: A can start a claim on A\'s own identity and gets a challenge to publish',
+    claimResp.status === 200 && claimBody.ok === true && typeof claimBody.challenge === 'string' && claimBody.challenge.length > 0,
+    JSON.stringify(claimBody),
+  )
 
-  const token = claimBody.devLink ? new URL(claimBody.devLink).searchParams.get('token') : null
+  const { Route: SourceVerifyRoute } = await import('../../src/routes/api/builders/$builderId/claim/verify.ts')
+  const { POST: verifyPOST } = SourceVerifyRoute.options.server.handlers
 
-  const { Route: VerifyRoute } = await import('../../src/routes/api/builders/claim/verify.ts')
-  const { GET: verifyGET } = VerifyRoute.options.server.handlers
-
-  const verifyByB = await verifyGET({
-    request: sessionRequest('iso-session-token-b', `https://iso.test/api/builders/claim/verify?token=${encodeURIComponent(token ?? '')}`),
+  // B holds no pending claim on A's identity, so there is nothing for B to complete. This is the
+  // isolation property the old "B cannot verify A's token" check was really about.
+  const verifyByB = await verifyPOST({
+    request: sessionRequest('iso-session-token-b', `https://iso.test/api/builders/${IDS.identityA}/claim/verify`, { method: 'POST' }),
+    params: { builderId: IDS.identityA },
   })
-  const verifyByBLocation = verifyByB.headers.get('Location') ?? ''
-  record('claim: B cannot verify A\'s claim token (wrong subject)', verifyByB.status === 302 && verifyByBLocation.includes('claimError'), `status=${verifyByB.status} location=${verifyByBLocation}`)
+  const verifyByBBody = await verifyByB.json()
+  record(
+    'claim: B cannot complete A\'s pending claim (no pending claim of B\'s own)',
+    verifyByB.status === 404 && verifyByBBody.error === 'no_pending_claim',
+    `status=${verifyByB.status} body=${JSON.stringify(verifyByBBody)}`,
+  )
 
-  const verifyByA = await verifyGET({
-    request: sessionRequest('iso-session-token-a', `https://iso.test/api/builders/claim/verify?token=${encodeURIComponent(token ?? '')}`),
-  })
-  const verifyByALocation = verifyByA.headers.get('Location') ?? ''
-  record('claim: A can verify A\'s own claim token', verifyByA.status === 302 && verifyByALocation.startsWith('/me?claimed=1'), `status=${verifyByA.status} location=${verifyByALocation}`)
+  // Stand in for the claimant having published the challenge in their bio. Scoped to the one
+  // api.github.com user lookup the adapter makes; everything else falls through to the real fetch,
+  // and it is restored immediately afterwards so no later check runs against a patched global.
+  const realFetch = globalThis.fetch
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input?.url ?? String(input)
+    if (url.startsWith('https://api.github.com/users/')) {
+      return new Response(JSON.stringify({ bio: `hello ${claimBody.challenge}` }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    }
+    return realFetch(input, init)
+  }
+  try {
+    const verifyByA = await verifyPOST({
+      request: sessionRequest('iso-session-token-a', `https://iso.test/api/builders/${IDS.identityA}/claim/verify`, { method: 'POST' }),
+      params: { builderId: IDS.identityA },
+    })
+    const verifyByABody = await verifyByA.json()
+    record(
+      'claim: A can complete A\'s own claim once the challenge is live on the source account',
+      verifyByA.status === 200 && verifyByABody.ok === true && verifyByABody.builderId === IDS.identityA,
+      `status=${verifyByA.status} body=${JSON.stringify(verifyByABody)}`,
+    )
+  } finally {
+    globalThis.fetch = realFetch
+  }
 }
 
 async function checkPlansAndPlanChanges() {
@@ -575,8 +625,13 @@ async function checkPlansAndPlanChanges() {
   const upgradeBody = await upgradeResp.json()
   record('plan request-upgrade: A can request an upgrade', upgradeResp.status === 200 && upgradeBody.ok === true, JSON.stringify(upgradeBody))
 
-  const [requestRow] = await owner`select user_id from plan_requests where id = ${upgradeBody.id}`
-  record('plan request-upgrade: stored request is owned by A, not B', requestRow?.user_id === IDS.userA, JSON.stringify(requestRow))
+  // Guarded: a missing `id` used to be interpolated straight into the query, so a failed upgrade
+  // aborted the whole run with an opaque `UNDEFINED_VALUE` from the driver instead of reporting which
+  // check failed. A harness should always be able to say what went wrong.
+  const requestRow = upgradeBody.id
+    ? (await owner`select user_id from plan_requests where id = ${upgradeBody.id}`)[0]
+    : null
+  record('plan request-upgrade: stored request is owned by A, not B', requestRow?.user_id === IDS.userA, JSON.stringify({ requestRow, upgradeId: upgradeBody.id ?? null }))
 }
 
 async function checkExportBuilders() {
