@@ -240,6 +240,16 @@ export const candidateSubmissionResponseSchema = z.object({
 
 export const bookSlotRequestSchema = z.object({
   slotId: z.string().min(1),
+  /**
+   * The chosen slot's start, echoed back from the slots response.
+   *
+   * Slot ids are opaque by design — they are a hash of owner, start, and end — so the server cannot
+   * read a start out of one. The booking service needs the organizer-local day *before* it recomputes,
+   * because that day is the advisory-lock key. This value only derives that key and bounds the
+   * recomputation window; the recomputed slot decides when the appointment actually is, so a request
+   * naming a start that no longer has a slot loses like any other stale pick.
+   */
+  slotStartsAt: z.string().datetime(),
   submissionVersion: z.number().int().positive(),
   consentReceiptIds: z.array(z.string().uuid()).min(1).max(CONSENT_PURPOSES.length),
   idempotencyKey: idempotencyKeySchema,

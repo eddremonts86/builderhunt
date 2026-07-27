@@ -540,6 +540,13 @@
       "when": 1785134683666,
       "tag": "0076_invitation_candidate_email",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1785134688666,
+      "tag": "0077_scheduling_capability_resolver",
+      "breakpoints": true
     }
   ]
 }

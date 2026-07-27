@@ -205,9 +205,18 @@ import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
+import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
 import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
+import { Route as ApiPublicSchedulingInvitationIdWithdrawRouteImport } from './routes/api/public/scheduling/$invitationId/withdraw'
+import { Route as ApiPublicSchedulingInvitationIdSubmissionRouteImport } from './routes/api/public/scheduling/$invitationId/submission'
+import { Route as ApiPublicSchedulingInvitationIdSlotsRouteImport } from './routes/api/public/scheduling/$invitationId/slots'
+import { Route as ApiPublicSchedulingInvitationIdSessionRouteImport } from './routes/api/public/scheduling/$invitationId/session'
+import { Route as ApiPublicSchedulingInvitationIdRescheduleRouteImport } from './routes/api/public/scheduling/$invitationId/reschedule'
+import { Route as ApiPublicSchedulingInvitationIdDeclineRouteImport } from './routes/api/public/scheduling/$invitationId/decline'
+import { Route as ApiPublicSchedulingInvitationIdCancelRouteImport } from './routes/api/public/scheduling/$invitationId/cancel'
+import { Route as ApiPublicSchedulingInvitationIdBookRouteImport } from './routes/api/public/scheduling/$invitationId/book'
 import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } from './routes/api/organizations/invitations/$invitationId/accept'
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
@@ -1253,6 +1262,12 @@ const DashboardSettingsBillingReturnRoute =
     path: '/return',
     getParentRoute: () => DashboardSettingsBillingRoute,
   } as any)
+const ApiPublicSchedulingInvitationIdIndexRoute =
+  ApiPublicSchedulingInvitationIdIndexRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/',
+    path: '/api/public/scheduling/$invitationId/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersBuilderIdEvidenceIndexRoute =
   ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
     id: '/evidence/',
@@ -1270,6 +1285,54 @@ const ApiSchedulingInvitationsInvitationIdRevokeRoute =
     id: '/revoke',
     path: '/revoke',
     getParentRoute: () => ApiSchedulingInvitationsInvitationIdRoute,
+  } as any)
+const ApiPublicSchedulingInvitationIdWithdrawRoute =
+  ApiPublicSchedulingInvitationIdWithdrawRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/withdraw',
+    path: '/api/public/scheduling/$invitationId/withdraw',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSubmissionRoute =
+  ApiPublicSchedulingInvitationIdSubmissionRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/submission',
+    path: '/api/public/scheduling/$invitationId/submission',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSlotsRoute =
+  ApiPublicSchedulingInvitationIdSlotsRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/slots',
+    path: '/api/public/scheduling/$invitationId/slots',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdSessionRoute =
+  ApiPublicSchedulingInvitationIdSessionRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/session',
+    path: '/api/public/scheduling/$invitationId/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdRescheduleRoute =
+  ApiPublicSchedulingInvitationIdRescheduleRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/reschedule',
+    path: '/api/public/scheduling/$invitationId/reschedule',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdDeclineRoute =
+  ApiPublicSchedulingInvitationIdDeclineRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/decline',
+    path: '/api/public/scheduling/$invitationId/decline',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdCancelRoute =
+  ApiPublicSchedulingInvitationIdCancelRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/cancel',
+    path: '/api/public/scheduling/$invitationId/cancel',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicSchedulingInvitationIdBookRoute =
+  ApiPublicSchedulingInvitationIdBookRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/book',
+    path: '/api/public/scheduling/$invitationId/book',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiOrganizationsInvitationsInvitationIdAcceptRoute =
   ApiOrganizationsInvitationsInvitationIdAcceptRouteImport.update({
@@ -1534,9 +1597,18 @@ export interface FileRoutesByFullPath {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
+  '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
+  '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
+  '/api/public/scheduling/$invitationId/reschedule': typeof ApiPublicSchedulingInvitationIdRescheduleRoute
+  '/api/public/scheduling/$invitationId/session': typeof ApiPublicSchedulingInvitationIdSessionRoute
+  '/api/public/scheduling/$invitationId/slots': typeof ApiPublicSchedulingInvitationIdSlotsRoute
+  '/api/public/scheduling/$invitationId/submission': typeof ApiPublicSchedulingInvitationIdSubmissionRoute
+  '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -1741,9 +1813,18 @@ export interface FileRoutesByTo {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
+  '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
+  '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
+  '/api/public/scheduling/$invitationId/reschedule': typeof ApiPublicSchedulingInvitationIdRescheduleRoute
+  '/api/public/scheduling/$invitationId/session': typeof ApiPublicSchedulingInvitationIdSessionRoute
+  '/api/public/scheduling/$invitationId/slots': typeof ApiPublicSchedulingInvitationIdSlotsRoute
+  '/api/public/scheduling/$invitationId/submission': typeof ApiPublicSchedulingInvitationIdSubmissionRoute
+  '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/public/scheduling/$invitationId': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -1953,9 +2034,18 @@ export interface FileRoutesById {
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
   '/api/organizations/invitations/$invitationId/accept': typeof ApiOrganizationsInvitationsInvitationIdAcceptRoute
+  '/api/public/scheduling/$invitationId/book': typeof ApiPublicSchedulingInvitationIdBookRoute
+  '/api/public/scheduling/$invitationId/cancel': typeof ApiPublicSchedulingInvitationIdCancelRoute
+  '/api/public/scheduling/$invitationId/decline': typeof ApiPublicSchedulingInvitationIdDeclineRoute
+  '/api/public/scheduling/$invitationId/reschedule': typeof ApiPublicSchedulingInvitationIdRescheduleRoute
+  '/api/public/scheduling/$invitationId/session': typeof ApiPublicSchedulingInvitationIdSessionRoute
+  '/api/public/scheduling/$invitationId/slots': typeof ApiPublicSchedulingInvitationIdSlotsRoute
+  '/api/public/scheduling/$invitationId/submission': typeof ApiPublicSchedulingInvitationIdSubmissionRoute
+  '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -2164,9 +2254,18 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/public/scheduling/$invitationId/book'
+    | '/api/public/scheduling/$invitationId/cancel'
+    | '/api/public/scheduling/$invitationId/decline'
+    | '/api/public/scheduling/$invitationId/reschedule'
+    | '/api/public/scheduling/$invitationId/session'
+    | '/api/public/scheduling/$invitationId/slots'
+    | '/api/public/scheduling/$invitationId/submission'
+    | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
+    | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -2371,9 +2470,18 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/public/scheduling/$invitationId/book'
+    | '/api/public/scheduling/$invitationId/cancel'
+    | '/api/public/scheduling/$invitationId/decline'
+    | '/api/public/scheduling/$invitationId/reschedule'
+    | '/api/public/scheduling/$invitationId/session'
+    | '/api/public/scheduling/$invitationId/slots'
+    | '/api/public/scheduling/$invitationId/submission'
+    | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence'
+    | '/api/public/scheduling/$invitationId'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -2582,9 +2690,18 @@ export interface FileRouteTypes {
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
     | '/api/organizations/invitations/$invitationId/accept'
+    | '/api/public/scheduling/$invitationId/book'
+    | '/api/public/scheduling/$invitationId/cancel'
+    | '/api/public/scheduling/$invitationId/decline'
+    | '/api/public/scheduling/$invitationId/reschedule'
+    | '/api/public/scheduling/$invitationId/session'
+    | '/api/public/scheduling/$invitationId/slots'
+    | '/api/public/scheduling/$invitationId/submission'
+    | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
+    | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
@@ -2725,6 +2842,15 @@ export interface RootRouteChildren {
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   ApiMeBuilderClaimsClaimIdPortfolioRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
+  ApiPublicSchedulingInvitationIdBookRoute: typeof ApiPublicSchedulingInvitationIdBookRoute
+  ApiPublicSchedulingInvitationIdCancelRoute: typeof ApiPublicSchedulingInvitationIdCancelRoute
+  ApiPublicSchedulingInvitationIdDeclineRoute: typeof ApiPublicSchedulingInvitationIdDeclineRoute
+  ApiPublicSchedulingInvitationIdRescheduleRoute: typeof ApiPublicSchedulingInvitationIdRescheduleRoute
+  ApiPublicSchedulingInvitationIdSessionRoute: typeof ApiPublicSchedulingInvitationIdSessionRoute
+  ApiPublicSchedulingInvitationIdSlotsRoute: typeof ApiPublicSchedulingInvitationIdSlotsRoute
+  ApiPublicSchedulingInvitationIdSubmissionRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRoute
+  ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
+  ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
 }
 
@@ -4102,6 +4228,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsBillingReturnRouteImport
       parentRoute: typeof DashboardSettingsBillingRoute
     }
+    '/api/public/scheduling/$invitationId/': {
+      id: '/api/public/scheduling/$invitationId/'
+      path: '/api/public/scheduling/$invitationId'
+      fullPath: '/api/public/scheduling/$invitationId/'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/$builderId/evidence/': {
       id: '/api/builders/$builderId/evidence/'
       path: '/evidence'
@@ -4122,6 +4255,62 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/scheduling/invitations/$invitationId/revoke'
       preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRevokeRouteImport
       parentRoute: typeof ApiSchedulingInvitationsInvitationIdRoute
+    }
+    '/api/public/scheduling/$invitationId/withdraw': {
+      id: '/api/public/scheduling/$invitationId/withdraw'
+      path: '/api/public/scheduling/$invitationId/withdraw'
+      fullPath: '/api/public/scheduling/$invitationId/withdraw'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/submission': {
+      id: '/api/public/scheduling/$invitationId/submission'
+      path: '/api/public/scheduling/$invitationId/submission'
+      fullPath: '/api/public/scheduling/$invitationId/submission'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/slots': {
+      id: '/api/public/scheduling/$invitationId/slots'
+      path: '/api/public/scheduling/$invitationId/slots'
+      fullPath: '/api/public/scheduling/$invitationId/slots'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSlotsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/session': {
+      id: '/api/public/scheduling/$invitationId/session'
+      path: '/api/public/scheduling/$invitationId/session'
+      fullPath: '/api/public/scheduling/$invitationId/session'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/reschedule': {
+      id: '/api/public/scheduling/$invitationId/reschedule'
+      path: '/api/public/scheduling/$invitationId/reschedule'
+      fullPath: '/api/public/scheduling/$invitationId/reschedule'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdRescheduleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/decline': {
+      id: '/api/public/scheduling/$invitationId/decline'
+      path: '/api/public/scheduling/$invitationId/decline'
+      fullPath: '/api/public/scheduling/$invitationId/decline'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdDeclineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/cancel': {
+      id: '/api/public/scheduling/$invitationId/cancel'
+      path: '/api/public/scheduling/$invitationId/cancel'
+      fullPath: '/api/public/scheduling/$invitationId/cancel'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdCancelRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/scheduling/$invitationId/book': {
+      id: '/api/public/scheduling/$invitationId/book'
+      path: '/api/public/scheduling/$invitationId/book'
+      fullPath: '/api/public/scheduling/$invitationId/book'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdBookRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/organizations/invitations/$invitationId/accept': {
       id: '/api/organizations/invitations/$invitationId/accept'
@@ -4667,6 +4856,24 @@ const rootRouteChildren: RootRouteChildren = {
     ApiAdminBuilderClaimsClaimIdRevokeRoute,
   ApiMeBuilderClaimsClaimIdPortfolioRoute:
     ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren,
+  ApiPublicSchedulingInvitationIdBookRoute:
+    ApiPublicSchedulingInvitationIdBookRoute,
+  ApiPublicSchedulingInvitationIdCancelRoute:
+    ApiPublicSchedulingInvitationIdCancelRoute,
+  ApiPublicSchedulingInvitationIdDeclineRoute:
+    ApiPublicSchedulingInvitationIdDeclineRoute,
+  ApiPublicSchedulingInvitationIdRescheduleRoute:
+    ApiPublicSchedulingInvitationIdRescheduleRoute,
+  ApiPublicSchedulingInvitationIdSessionRoute:
+    ApiPublicSchedulingInvitationIdSessionRoute,
+  ApiPublicSchedulingInvitationIdSlotsRoute:
+    ApiPublicSchedulingInvitationIdSlotsRoute,
+  ApiPublicSchedulingInvitationIdSubmissionRoute:
+    ApiPublicSchedulingInvitationIdSubmissionRoute,
+  ApiPublicSchedulingInvitationIdWithdrawRoute:
+    ApiPublicSchedulingInvitationIdWithdrawRoute,
+  ApiPublicSchedulingInvitationIdIndexRoute:
+    ApiPublicSchedulingInvitationIdIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,
 }
