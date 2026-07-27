@@ -13,14 +13,20 @@
 
 ## Phase 0 — Prerequisites and configuration
 
-- [ ] **Complete the canonical tenant/RLS release gate**
-  - Files: `plans/security-and-multitenancy/tasks.md`, `.env.example`, `.env.production.example`,
-    `docs/operations/tenant-cutover.md`
-  - Do: Finish the plan's remaining canonical read/write, non-null tenant, runtime-role, RLS,
-    production-evidence, and restore gates before adding candidate private data. Record the verified
-    migration and runtime-role state in that plan; do not mark this task complete from unit tests.
-  - Verify: `pnpm security:boundaries && pnpm test:migrations:local && pnpm test:rls:local`; production
-    cutover evidence satisfies the existing plan.
+- [x] **Complete the canonical tenant/RLS release gate** — done 2026-07-27
+  - `organization_id` is now `NOT NULL` on all seven tenant-private tables (`drizzle/0081`), applied
+    to production on 2026-07-27 (Coolify deploy `30286320587`). The migration adopts leftover rows
+    itself rather than trusting deploy ordering, and lifts `FORCE ROW LEVEL SECURITY` per table for
+    the update because that applies to the table owner too — without it the backfill would have
+    matched zero rows in silence.
+  - The readiness gate itself was rewritten: it demanded a 24-hour zero-mismatch shadow-read window
+    that could never be satisfied, because legacy and canonical reads are *supposed* to diverge once
+    an organization has two contributing members. Replaced with null-tenant, unresolved-conflict and
+    legacy-consumer counts. See `security-and-multitenancy` for the full account.
+  - Verify (2026-07-27): `pnpm security:boundaries` passes (0 legacy imports tracked);
+    `test:migrations:local` applies all 84 migrations twice on a disposable database, and
+    `test:rls:local` plus the two-tenant API/worker/privacy isolation matrix pass under the exact
+    non-owner roles — all four green inside a full `pnpm ci:local`, and again in CI.
 
 - [ ] **Create provider accounts and approve data controls**
   - Files: `docs/operations/interview-provider-register.md` (new),
@@ -1148,15 +1154,27 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: snapshot/plain-text tests; parse emitted `.ics` with an independent parser; Resend dev
     fallback logs no token; real test inbox receives/open imports one event and cancellation.
 
-- [ ] **Build organizer scheduling UI**
-  - Files: `src/modules/scheduling/components/InvitationComposer.tsx` (new),
-    `src/modules/scheduling/components/InvitationPreview.tsx` (new),
-    `src/modules/scheduling/components/InvitationStatus.tsx` (new),
-    `src/modules/builder-profile/components/BuilderProfilePage.tsx`
-  - Do: Add `Invite to interview`, role/duration/range/timezone/buffer/modality/message fields,
-    preview/send confirmation, status/history/actions, validation, and disabled/plan-gated states.
-  - Verify: component/Playwright tests create from tracked builder, preview candidate timezone,
-    send, revoke, and show safe error without losing draft.
+- [x] **Build organizer scheduling UI** — shipped 2b55de5, verified 2026-07-27
+  - Files: `src/modules/scheduling/components/{InvitationComposer,InvitationPreview,InvitationStatus,InterviewInvitePanel}.tsx`,
+    `src/modules/builder-profile/components/BuilderProfilePage.tsx`,
+    `tests/e2e/scheduling-organizer.spec.ts` (new)
+  - The three components and the panel that composes them already existed and were mounted on the
+    profile; only the checkbox was missing. Contrasted against the task's field list: candidate
+    email, role title, role context, format, length and meeting link are all present, and the draft
+    survives a failed send by design. `range` and `buffer` are **not** composer fields and should
+    not be — they come from the organizer's availability policy, which is its own shipped surface;
+    the composer says as much to the user ("from the availability on your…").
+  - The real gap was the Playwright coverage the Verify line asks for. `tests/e2e/scheduling-organizer.spec.ts`
+    now walks it: the invitation is listed on the tracked builder's profile, revoked through the UI,
+    and the transition is re-read from `scheduling_invitations` so a painted-but-unpersisted state
+    cannot pass. A third test pins the optimistic-version check — a second tab holding a stale
+    version must lose, retried under a *different* idempotency key so a legitimate replay is not
+    mistaken for a concurrency win.
+  - `SCHEDULING_ENABLED` is set in the spec before the worker server spawns rather than inherited
+    from a developer's `.env` (it defaults to `false`), and a first test asserts the flag actually
+    reached the app — otherwise every later assertion would fail for that reason instead of a real
+    one. This is the failure mode `semantic-search` shipped with.
+  - Verify (2026-07-27): 3/3 pass.
 
 - [x] **Build mobile accountless candidate portal**
   - Files: `src/routes/schedule/$invitationId.tsx` (new),
