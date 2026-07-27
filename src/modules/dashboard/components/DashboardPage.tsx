@@ -118,6 +118,8 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     ),
   },
 
+  // Widths only. Every tile is as tall as its content and the grid backfills, so
+  // the bands below describe how widths tile the field, not fixed heights.
   // Band 1 — four quarters. 4 x 3 = 12.
   ...(['builders', 'active', 'searches', 'notes'] as const).map((key, index) => ({
     id: `stat-${key}`,
@@ -129,46 +131,41 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     render: (ctx: HomeContext) => <MetricWidget {...ctx.statsData[index]} />,
   })),
 
-  // Band 2 — two halves, two rows each. 6x2 + 6x2 = 24.
+  // Band 2 — two halves. 6 + 6 = 12.
   {
     id: 'activity',
     span: 'half',
     minSpan: 'third',
-    rows: 2,
     render: (ctx) => <ActivityWidget points={ctx.stats?.dailyActivity ?? []} />,
   },
   {
     id: 'sprints',
     span: 'half',
     minSpan: 'third',
-    rows: 2,
     render: (ctx) => <SprintsWidget sprints={ctx.sprints} />,
   },
 
-  // Band 3 — the picks grid plus the alert feed beside it. 8x3 + 4x3 = 36.
+  // Band 3 — the picks grid plus the alert feed beside it. 8 + 4 = 12.
   {
     id: 'recommendations',
     // The widest widget on the page because it is the only one holding a card
     // grid. Below a half its cards cannot show a name and a bio at once.
     span: 'twoThirds',
     minSpan: 'half',
-    rows: 3,
     render: () => <RecommendationsSection limit={4} />,
   },
   {
     id: 'alerts',
     span: 'third',
     minSpan: 'quarter',
-    rows: 3,
     render: (ctx) => <AlertsWidget triggers={ctx.triggers} />,
   },
 
-  // Band 4 — saved searches need width for their four row actions. 8x2 + 4x2 = 24.
+  // Band 4 — saved searches need width for their four row actions. 8 + 4 = 12.
   {
     id: 'saved-searches',
     span: 'twoThirds',
     minSpan: 'half',
-    rows: 2,
     isEmpty: (ctx) => ctx.queries.length === 0,
     // The empty state is a short call to action, not a list, so it gives width
     // back. `minSpan` clamps the collapse.
@@ -211,7 +208,6 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     id: 'recent-builders',
     span: 'third',
     minSpan: 'third',
-    rows: 2,
     isEmpty: (ctx) => ctx.recent.length === 0,
     render: (ctx) => (
       <>
@@ -242,10 +238,11 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     ),
   },
 
-  // Band 5 — two halves. 6 + 6 = 12.
+  // Band 5 — thirds, so dense placement can slot them into the 4-column channel
+  // left beside an 8-column tile rather than starting a band of their own.
   {
     id: 'plan-usage',
-    span: 'half',
+    span: 'third',
     minSpan: 'quarter',
     // Hidden rather than shrunk: without a tier from /api/plans/me there is no
     // limit to measure against, and a usage meter with no limit says nothing.
@@ -255,7 +252,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   },
   {
     id: 'source-mix',
-    span: 'half',
+    span: 'third',
     minSpan: 'quarter',
     isEmpty: (ctx) => ctx.recent.length === 0,
     whenEmpty: 'hide',

@@ -60,7 +60,7 @@ export function MetricWidget({ label, value, hint, icon: Icon, tone, badge }: Me
         )}
       </p>
 
-      <p className="mt-auto hidden @min-[13rem]:block pt-2 text-xs text-bh-text-dim">{hint}</p>
+      <p className="hidden @min-[13rem]:block pt-2 text-xs text-bh-text-dim">{hint}</p>
     </>
   )
 }

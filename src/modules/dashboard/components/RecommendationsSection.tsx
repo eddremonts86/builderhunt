@@ -99,7 +99,7 @@ export function RecommendationsSection({ limit = 8 }: { limit?: number } = {}) {
        width is the tile's, not the screen's. */
     <section
       aria-labelledby="for-you-heading"
-      className="flex min-w-0 flex-1 flex-col"
+      className="flex min-w-0 flex-col"
       data-event="recommendation_view"
     >
       <div className="flex items-start justify-between gap-3 mb-4">

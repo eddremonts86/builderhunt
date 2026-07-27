@@ -21,22 +21,22 @@ function widget(overrides: Partial<BentoWidget<Ctx>> & { id: string }): BentoWid
 describe('resolveBentoLayout', () => {
   it('keeps declared spans in bento density', () => {
     const layout = resolveBentoLayout(
-      [widget({ id: 'a', span: 'twoThirds', rows: 2 }), widget({ id: 'b', span: 'quarter' })],
+      [widget({ id: 'a', span: 'twoThirds' }), widget({ id: 'b', span: 'quarter' })],
       ctx,
     )
-    expect(layout.map((r) => [r.members[0].widget.id, r.span, r.rows])).toEqual([
-      ['a', 'twoThirds', 2],
-      ['b', 'quarter', 1],
+    expect(layout.map((r) => [r.members[0].widget.id, r.span])).toEqual([
+      ['a', 'twoThirds'],
+      ['b', 'quarter'],
     ])
   })
 
-  it('forces every widget full-width and single-row in sections density', () => {
+  it('forces every widget full-width in sections density', () => {
     const layout = resolveBentoLayout(
-      [widget({ id: 'a', span: 'twoThirds', rows: 2 }), widget({ id: 'b', span: 'quarter' })],
+      [widget({ id: 'a', span: 'twoThirds' }), widget({ id: 'b', span: 'quarter' })],
       ctx,
       'sections',
     )
-    expect(layout.every((r) => r.span === 'full' && r.rows === 1)).toBe(true)
+    expect(layout.every((r) => r.span === 'full')).toBe(true)
   })
 
   it('drops widgets whose isVisible is false', () => {
@@ -86,13 +86,13 @@ describe('resolveBentoLayout', () => {
   // resolved *and then* skipped at render time, or the grid keeps its column.
   it('does not reserve columns for hidden or collapsed widgets', () => {
     const widgets = [
-      widget({ id: 'twoThirds', span: 'twoThirds', rows: 2 }),
+      widget({ id: 'twoThirds', span: 'twoThirds' }),
       widget({ id: 'a', span: 'quarter' }),
       widget({ id: 'b', span: 'quarter' }),
       widget({ id: 'ghost', span: 'twoThirds', isEmpty: () => true, whenEmpty: 'hide' }),
     ]
-    // twoThirds 8x2 + quarter 3 + quarter 3 = 22, and the hidden one adds nothing.
-    expect(xlColumnsUsed(resolveBentoLayout(widgets, ctx))).toBe(22)
+    // twoThirds 8 + quarter 3 + quarter 3 = 14, and the hidden one adds nothing.
+    expect(xlColumnsUsed(resolveBentoLayout(widgets, ctx))).toBe(14)
   })
 })
 
@@ -157,7 +157,7 @@ describe('sectionGroup merging', () => {
   it('merges a consecutive run into one full-width tile in sections density', () => {
     const layout = resolveBentoLayout(metrics, ctx, 'sections')
     expect(layout).toHaveLength(1)
-    expect(layout[0]).toMatchObject({ key: 'group:metrics', span: 'full', rows: 1 })
+    expect(layout[0]).toMatchObject({ key: 'group:metrics', span: 'full' })
     expect(layout[0].members.map((m) => m.widget.id)).toEqual(['a', 'b', 'c'])
   })
 

@@ -3,16 +3,18 @@ import type { ReactNode } from 'react'
 /**
  * Bento layout resolution — the pure half of the widget system.
  *
- * The grid is a 12-column modular field with a common row unit. Two decisions
- * make it read as a mosaic rather than a stack of bands:
+ * A widget declares **width only**. Height is whatever its content needs, and
+ * `Bento.tsx` measures it (see the masonry span there).
  *
- *  1. **Spans are divisors of 12 only.** A vocabulary of 3 / 4 / 6 / 8 / 12 means
- *     any combination of tiles lands on the same vertical rhythm. The earlier
- *     vocabulary included 2 and 5, so rows added up to 11 or 13 and left ragged
- *     gaps that no amount of reordering could close.
- *  2. **Placement is dense** (`grid-auto-flow: dense`, see `Bento.tsx`). A tile
- *     that does not fit the remaining space no longer pushes itself to a new row
- *     and leaves the hole behind; the next tile that *does* fit backfills it.
+ * That split is deliberate and was learned the hard way. An earlier version let
+ * widgets declare `rows: 2 | 3` against a `minmax(11rem, auto)` row unit, which
+ * padded every tile out to a multiple of 176px whether or not it had content to
+ * fill it. Worse, CSS Grid makes items in the same row share that row's height,
+ * so the reserved space could not be reclaimed by a neighbour either: the gaps
+ * were structural, not cosmetic.
+ *
+ * Widths are divisors of 12 only (3 / 4 / 6 / 8 / 12), so any combination of
+ * tiles tiles the field with no leftover column.
  *
  * Two display densities share one registry:
  *   - `bento`    — every widget at its declared size (the default)
@@ -28,9 +30,6 @@ import type { ReactNode } from 'react'
  * divides 12, which is what keeps the grid symmetric.
  */
 export type BentoSpan = 'quarter' | 'third' | 'half' | 'twoThirds' | 'full'
-
-/** Height in row units. The unit is set by `auto-rows-*` in `Bento.tsx`. */
-export type BentoRows = 1 | 2 | 3
 
 export type BentoDensity = 'bento' | 'sections'
 
@@ -59,7 +58,6 @@ export interface BentoWidget<Ctx> {
    * a widget below the width its content needs.
    */
   minSpan?: BentoSpan
-  rows?: BentoRows
   chrome?: BentoChrome
   /** Omitted from the page entirely when this returns false (e.g. admin-only). */
   isVisible?: (ctx: Ctx) => boolean
@@ -83,7 +81,6 @@ export interface ResolvedTile<Ctx> {
   /** React key — the single widget's id, or `group:<name>` for a merged run. */
   key: string
   span: BentoSpan
-  rows: BentoRows
   members: Array<{ widget: BentoWidget<Ctx>; isEmpty: boolean }>
 }
 
@@ -111,13 +108,6 @@ export const SPAN_CLASS: Record<BentoSpan, string> = {
   half: 'md:col-span-6 xl:col-span-6',
   twoThirds: 'md:col-span-6 xl:col-span-8',
   full: 'md:col-span-6 xl:col-span-12',
-}
-
-/** Row classes. Rows only apply from `md` up, where the field is multi-column. */
-export const ROWS_CLASS: Record<BentoRows, string> = {
-  1: '',
-  2: 'md:row-span-2',
-  3: 'md:row-span-3',
 }
 
 /** Narrow to wide. Used to clamp a span up to a widget's `minSpan`. */
@@ -166,7 +156,6 @@ export function resolveBentoLayout<Ctx>(
       tiles.push({
         key: `group:${widget.sectionGroup}`,
         span: 'full',
-        rows: 1,
         members: [{ widget, isEmpty }],
       })
       continue
@@ -175,7 +164,6 @@ export function resolveBentoLayout<Ctx>(
     tiles.push({
       key: widget.id,
       span: density === 'sections' ? 'full' : declared,
-      rows: density === 'sections' ? 1 : (widget.rows ?? 1),
       members: [{ widget, isEmpty }],
     })
   }
@@ -184,11 +172,11 @@ export function resolveBentoLayout<Ctx>(
 }
 
 /**
- * Total column-rows a resolved layout occupies at `xl`. With dense placement the
- * grid backfills holes, so this is no longer a correctness requirement — but a
- * total that is a multiple of 12 still means the field can tile with no leftover,
- * which is the difference between a mosaic and a mosaic with one notch missing.
+ * Total columns a resolved layout occupies at `xl`. Heights are decided by
+ * content (see the masonry span measurement in `Bento.tsx`), so this counts width
+ * only: a total that is a multiple of 12 means each band of widths tiles with no
+ * leftover column.
  */
 export function xlColumnsUsed<Ctx>(layout: ReadonlyArray<ResolvedTile<Ctx>>): number {
-  return layout.reduce((total, { span, rows }) => total + SPAN_COLUMNS[span] * rows, 0)
+  return layout.reduce((total, { span }) => total + SPAN_COLUMNS[span], 0)
 }

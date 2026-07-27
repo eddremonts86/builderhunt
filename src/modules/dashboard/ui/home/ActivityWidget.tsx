@@ -10,8 +10,8 @@ import { BentoTileHeader } from '~/modules/dashboard/ui/bento/Bento'
  *     no `card`, no border, no radius here.
  *  2. It takes plain data as props and owns no fetch of its own, so the same
  *     widget works in both densities and in tests without a network.
- *  3. It fills its tile: `flex-1` on the body, so a widget sharing a row with a
- *     taller neighbour doesn't leave a gap under itself.
+ *  3. It does NOT stretch to fill. Tile height follows content, so `flex-1` and
+ *     `mt-auto` only push a widget's own parts apart.
  *  4. It renders its own empty state. Whether that state gets a smaller tile is
  *     the registry's call via `whenEmpty` — not the widget's.
  *
@@ -46,7 +46,7 @@ export function ActivityWidget({ points }: { points: readonly DailyActivityPoint
       />
 
       {hasActivity ? (
-        <div className="flex flex-1 items-end justify-between gap-1 px-2 pt-4">
+        <div className="flex items-end justify-between gap-1 px-2 pt-4">
           {points.map((point, index) => {
             const isPeak = index === peakIndex
             // Floor of 6% so a day with one commit still paints a visible stub
@@ -76,7 +76,7 @@ export function ActivityWidget({ points }: { points: readonly DailyActivityPoint
           })}
         </div>
       ) : (
-        <div className="flex flex-1 flex-col justify-center py-8 text-center">
+        <div className="py-8 text-center">
           <p className="text-sm font-light text-bh-text-muted">
             No tracked builders have shipped in the last 7 days yet.
           </p>

@@ -2,48 +2,96 @@ import * as React from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { fadeInUpVariants, staggerContainer } from '~/shared/lib/motion/tokens'
 import {
-  ROWS_CLASS,
   SPAN_CLASS,
   resolveBentoLayout,
   type BentoDensity,
-  type BentoRows,
   type BentoWidget,
 } from './layout'
 
 /**
  * The bento grid and its bubble.
  *
- * The bubble is `.card` from globals.css — same 24px radius, border and
- * diffusion shadow the dashboard already uses. This file adds no new surface
- * treatment; it only decides how many bubbles there are and how wide each one
- * gets, from the sizes declared in a widget registry.
- *
- * See `layout.ts` for the sizing rules and the two densities.
+ * The bubble is `.card` from globals.css — same 24px radius, border and diffusion
+ * shadow the dashboard already uses. This file adds no new surface treatment; it
+ * decides how wide each bubble is and, crucially, lets each one be exactly as
+ * tall as its content.
  */
 
 /**
- * The modular field: 1 column on phones, 6 at `md`, 12 at `xl`.
+ * Vertical resolution of the masonry field, in pixels. Tiles span a whole number
+ * of these, so a smaller number means a tighter fit and more rows for the browser
+ * to lay out. 4px is under one line of leading, which is close enough to exact.
+ */
+const ROW_UNIT = 4
+
+/** Gutter between tiles, in pixels. Must match the `gap-4` used horizontally. */
+const GUTTER = 16
+
+/**
+ * Makes a tile span exactly as many row units as its content occupies.
  *
- * Two things make this a mosaic instead of a stack of bands:
+ * Plain CSS Grid cannot do this. Items sharing a grid row share that row's
+ * height, so a short tile beside a tall one is padded to match and the padding
+ * belongs to the row, not the item: no neighbour can move up into it. That is why
+ * the earlier `rows: 2 | 3` version reserved visible dead space inside almost
+ * every tile.
  *
- *  - `auto-rows-[minmax(11rem,auto)]` gives every tile the same base row height,
- *    so a 1-row tile beside a 2-row tile lines up instead of each row sizing
- *    itself to whatever happens to be in it.
- *  - `grid-flow-row-dense` backfills. Without it CSS Grid places sparsely: a
- *    tile too wide for the space left on the current row jumps to the next one
- *    and abandons the gap, which is exactly why the first version looked like
- *    rows of unrelated widths with holes at the end of each.
+ * The fix is the standard grid-masonry technique: rows of `ROW_UNIT` with no row
+ * gap, and each tile spanning `ceil((its height + gutter) / unit)` of them. The
+ * gutter is part of the span rather than a `row-gap`, because a row gap would be
+ * applied between every one of the hundreds of implicit rows.
  *
- * `dense` can place a tile earlier than its DOM position, so visual order and
- * tab order can differ. That is acceptable here because every tile is an
- * independent, separately-labelled region rather than a step in a sequence; it
- * would not be acceptable for a form or a wizard.
+ * `useLayoutEffect` writes the span before paint, so the first frame the user
+ * sees is already packed. Content that changes height afterwards (a list loading,
+ * a widget switching to its empty state, a font finishing swap) is picked up by
+ * the ResizeObserver.
+ */
+function useMasonrySpan<T extends HTMLElement>(ref: React.RefObject<T | null>) {
+  const [span, setSpan] = React.useState<number | null>(null)
+
+  React.useLayoutEffect(() => {
+    const element = ref.current
+    if (!element) return
+
+    const measure = () => {
+      // `getBoundingClientRect` rather than offsetHeight: the tile is inside a
+      // motion component whose enter animation writes a transform, and a
+      // transformed box still reports its untransformed layout height here only
+      // because scale is not animated. Height comes from the border box.
+      const height = element.getBoundingClientRect().height
+      if (height > 0) setSpan(Math.ceil((height + GUTTER) / ROW_UNIT))
+    }
+
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [ref])
+
+  return span
+}
+
+/**
+ * The field: 1 column on phones, 6 at `md`, 12 at `xl`.
+ *
+ * `grid-flow-row-dense` backfills. Without it, a tile too wide for the space left
+ * on the current row jumps past the gap and abandons it; with it, the next tile
+ * that fits moves up. Combined with content-sized heights, that is what makes the
+ * result a mosaic rather than a set of bands.
+ *
+ * `dense` can place a tile earlier than its DOM position, so visual order and tab
+ * order can differ. Acceptable here because every tile is an independent,
+ * separately-labelled region rather than a step in a sequence.
  */
 export function BentoGrid({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const reduceMotion = useReducedMotion()
   return (
     <motion.div
-      className={`grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 grid-flow-row-dense auto-rows-[minmax(11rem,auto)] gap-4 ${className}`}
+      className={`grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 grid-flow-row-dense gap-x-4 ${className}`}
+      // Row height and the absence of a row gap are the two halves of the
+      // masonry maths in `useMasonrySpan`; they belong together, and inline is
+      // the only place that stays next to the constants they mirror.
+      style={{ gridAutoRows: `${ROW_UNIT}px`, rowGap: 0 }}
       variants={staggerContainer()}
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
@@ -55,7 +103,6 @@ export function BentoGrid({ children, className = '' }: { children: React.ReactN
 
 interface BentoTileProps {
   span: keyof typeof SPAN_CLASS
-  rows?: BentoRows
   /** Adds the accent→cyan rim of `.card-glow`. One per screen, at most. */
   glow?: boolean
   /** Drops the bubble chrome — for tiles that embed a component bringing its own. */
@@ -67,32 +114,39 @@ interface BentoTileProps {
 }
 
 /**
- * One bubble, and a containment context.
+ * One bubble: a containment context, and its own height.
  *
- * `@container` is the load-bearing class here. A widget's usable width is set by
- * its span, not by the viewport, so viewport breakpoints cannot describe it: a
- * `wide` tile is 507px on a 1560px screen and a `section` tile is 736px on a
- * 768px one. Widgets therefore style themselves with container variants
- * (`@lg:`, `@4xl:`, `@min-[13rem]:`) and adapt to the tile they were given.
+ * `@container` is load-bearing. A widget's usable width is set by its span, not
+ * by the viewport, so viewport breakpoints cannot describe it: a `twoThirds` tile
+ * is 821px on a 1560px screen and a `full` tile is 736px on a 768px one. Widgets
+ * therefore use container variants and adapt to the tile they were given.
  *
- * Thresholds are content-box widths: a container query measures the container's
- * content box, so a tile with `p-6` queries 48px narrower than it looks.
- *
- * `flex flex-col` so a widget can push a footer down with `mt-auto` regardless
- * of how tall its neighbours make the row.
+ * Container-query thresholds are content-box widths. A tile with `p-6` queries
+ * 48px narrower than it looks, which is easy to get wrong by exactly one tile.
  */
 export function BentoTile({
-  span, rows = 1, glow = false, bare = false, className = '', children, widgetId,
+  span, glow = false, bare = false, className = '', children, widgetId,
 }: BentoTileProps) {
   const reduceMotion = useReducedMotion()
+  const innerRef = React.useRef<HTMLDivElement>(null)
+  const rowSpan = useMasonrySpan(innerRef)
   const surface = bare ? '' : glow ? 'card-glow p-6' : 'card card-hover'
+
   return (
     <motion.div
-      data-widget={widgetId}
       variants={reduceMotion ? undefined : fadeInUpVariants}
-      className={`@container ${SPAN_CLASS[span]} ${ROWS_CLASS[rows]} ${surface} flex flex-col min-w-0 ${className}`}
+      className={`${SPAN_CLASS[span]} min-w-0`}
+      // Until the first measurement lands the tile spans nothing, which would
+      // collapse it; `auto` lets the browser size it normally for that one frame.
+      style={{ gridRowEnd: rowSpan ? `span ${rowSpan}` : 'auto' }}
     >
-      {children}
+      <div
+        ref={innerRef}
+        data-widget={widgetId}
+        className={`@container ${surface} flex flex-col min-w-0 ${className}`}
+      >
+        {children}
+      </div>
     </motion.div>
   )
 }
@@ -141,8 +195,8 @@ export function BentoTileList({ children, className = '' }: { children: React.Re
 /**
  * Renders a widget registry.
  *
- * Every widget is resolved against `ctx` first (visibility, empty-collapse),
- * so a widget that hides itself costs nothing here and never leaves a gap.
+ * Every widget is resolved against `ctx` first (visibility, empty-collapse), so a
+ * widget that hides itself costs nothing here and never leaves a gap.
  */
 export function BentoRegion<Ctx>({
   widgets, ctx, density = 'bento', className = '', label,
@@ -163,22 +217,21 @@ export function BentoRegion<Ctx>({
     <section aria-label={label} className={className}>
       <BentoGrid>
         {layout.map((tile) => {
-          // A merged run (`sections` density + `sectionGroup`) becomes one
-          // bubble whose members sit side by side, separated by 1px rules rather
-          // than by their own borders — the alternative is a full-width bubble
-          // per metric, which is what this density exists to avoid.
+          // A merged run (`sections` density + `sectionGroup`) becomes one bubble
+          // whose members sit side by side, separated by 1px rules rather than by
+          // their own borders — the alternative is a full-width bubble per metric,
+          // which is what that density exists to avoid.
           if (tile.members.length > 1) {
             return (
-              <BentoTile key={tile.key} span={tile.span} rows={tile.rows}>
+              <BentoTile key={tile.key} span={tile.span}>
                 <div className="grid grid-cols-2 gap-y-6 md:flex md:gap-0">
                   {tile.members.map(({ widget }, index) => (
                     <div
                       key={widget.id}
                       data-widget={widget.id}
                       // Each member is its own containment context: the merged
-                      // tile is full-width, but a member inside it is only a
-                      // quarter of that, and its widget gates detail on its own
-                      // width.
+                      // tile is full-width, but a member inside it is a quarter of
+                      // that, and its widget gates detail on its own width.
                       className={`@container flex min-w-0 flex-1 flex-col px-0 md:px-6 ${
                         index > 0 ? 'md:border-l md:border-bh-border' : 'md:pl-0'
                       }`}
@@ -198,7 +251,6 @@ export function BentoRegion<Ctx>({
               key={tile.key}
               widgetId={widget.id}
               span={tile.span}
-              rows={tile.rows}
               glow={chrome === 'glow'}
               bare={chrome === 'bare'}
             >
