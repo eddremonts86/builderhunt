@@ -194,7 +194,12 @@ ensure_schema() {
     return 0
   fi
   echo "applying schema (migrations-local was skipped by --from)"
-  pnpm exec drizzle-kit migrate >/dev/null
+  # Reuses the sanctioned path rather than inventing one. `drizzle-kit migrate` reads its URL through
+  # dotenvx, which overrides the exported DATABASE_MIGRATION_URL with the *development* database from
+  # .env — so it migrated the wrong database and left the throwaway one empty, and every later step
+  # died on `relation "auth_users" does not exist`. `test:migrations:local` uses drizzle's programmatic
+  # migrator against TEST_MIGRATION_URL, which nothing can override, and is idempotent by design.
+  pnpm test:migrations:local >/dev/null
 }
 setup_step schema ensure_schema
 

@@ -135,10 +135,11 @@ export async function sendClaimEmail(to: string, link: string): Promise<SendResu
  *    cookie (`POST /api/public/scheduling/:id/session`).
  *  - **No tracking parameters, ever.** A click tracker would rewrite this URL through a third party,
  *    handing the capability to whoever operates the redirector.
- *  - **The dev branch logs the URL without its fragment.** `sendClaimEmail` above returns its whole
- *    link as `devLink`, which is fine for a token that only verifies an email address. Here the
- *    fragment *is* the credential, so it is replaced with a placeholder — a local console log is
- *    still a log.
+ *  - **The dev branch prints the whole link, like every sibling sender.** An earlier version redacted
+ *    the fragment here on the grounds that a local console log is still a log. That was wrong twice
+ *    over: this branch is only reached when `RESEND_API_KEY` is unset, which never happens in
+ *    production, so it protected nothing — and it left the flow impossible to exercise on a dev
+ *    machine, which pushed the work towards `E2E_MODE=true` just to read one URL.
  *  - **There is no resend.** The secret is minted at send and never stored, so this email cannot be
  *    reproduced; see lib/scheduling/invitation-service.ts.
  */
@@ -153,7 +154,6 @@ export async function sendInterviewInvitationEmail(input: {
 }): Promise<SendResult> {
   const subject = `Interview invitation: ${input.roleTitle}`
   const html = interviewInvitationEmailHtml(input)
-  const redactedLink = `${input.link.split('#')[0]}#<capability-redacted>`
 
   if (isE2EOutboxActive()) {
     // The harness asserts on the real link, because the E2E flow has to open it. It never leaves
@@ -161,10 +161,10 @@ export async function sendInterviewInvitationEmail(input: {
     return dispatchEmail({ to: input.to, subject, html, devLink: input.link })
   }
   if (!env.RESEND_API_KEY) {
+    // Dev mode — the link is the only way to open the portal, so it is printed and returned whole.
     console.log('\n📧 [DEV] Interview invitation would be sent to:', input.to)
-    console.log('   Link:', redactedLink)
-    console.log('   (the fragment is the candidate credential and is deliberately not logged)\n')
-    return { ok: true }
+    console.log('   Link:', input.link, '\n')
+    return { ok: true, devLink: input.link }
   }
   try {
     const res = await fetch('https://api.resend.com/emails', {

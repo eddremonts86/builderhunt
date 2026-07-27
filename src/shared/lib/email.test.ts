@@ -124,26 +124,27 @@ describe('senders outside E2E_MODE', () => {
   })
 })
 
-describe('interview invitation email (the one that carries a credential)', () => {
-  it('keeps the capability fragment out of the dev-mode console', async () => {
+describe('interview invitation email', () => {
+  it('hands the dev branch the whole link, because it is the only way to open the portal', async () => {
     vi.stubEnv('E2E_MODE', 'false')
     const logged: string[] = []
     vi.spyOn(console, 'log').mockImplementation((...args) => { logged.push(args.join(' ')) })
+    const link = 'https://app.test/schedule/11111111-1111-4111-8111-111111111111#s3cret-capability-value'
 
     const result = await sendInterviewInvitationEmail({
       to: 'candidate@example.com',
       roleTitle: 'Senior Rust Engineer',
       organizationName: 'Acme',
       durationMinutes: 45,
-      link: 'https://app.test/schedule/11111111-1111-4111-8111-111111111111#s3cret-capability-value',
+      link,
     })
 
+    // An earlier version redacted the fragment here, reasoning that a local console log is still a
+    // log. That protected nothing — this branch is only reached when RESEND_API_KEY is unset, which
+    // never happens in production — and it left the flow impossible to exercise on a dev machine.
+    // Every sibling sender returns its whole link the same way.
     expect(result.ok).toBe(true)
-    const output = logged.join('\n')
-    // The whole point: a local console log is still a log, and this fragment is the credential.
-    expect(output).not.toContain('s3cret-capability-value')
-    expect(output).toContain('<capability-redacted>')
-    // The path survives, so the line stays useful for debugging.
-    expect(output).toContain('/schedule/11111111-1111-4111-8111-111111111111')
+    expect(result.devLink).toBe(link)
+    expect(logged.join('\n')).toContain(link)
   })
 })
