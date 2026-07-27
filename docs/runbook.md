@@ -8,7 +8,10 @@ rather than duplicating.
 Companion docs: [`operations/deploy-runbook.md`](./operations/deploy-runbook.md) (deploy flow,
 Coolify setup, env var inventory, workers/cron table, rollback, troubleshooting — read this
 first for anything deploy-shaped), [`operations/database-migrations.md`](./operations/database-migrations.md),
-[`operations/database-roles.md`](./operations/database-roles.md).
+[`operations/database-roles.md`](./operations/database-roles.md),
+[`operations/external-services-register.md`](./operations/external-services-register.md) (every
+third-party account, token and subscription — what exists, what is still missing, and the order to
+provision it in).
 
 ---
 
@@ -22,36 +25,56 @@ never edited after shipping.
 
 ## 2. Backup + restore
 
-- **Daily backup** (`scripts/db/backup.ts`): `pg_dump --no-owner --no-acl --clean --if-exists`,
-  gzipped, written to `BACKUP_DIR` (default `/var/backups/builderhunt`), 30-day retention
-  (`BACKUP_KEEP`).
-- **Restore** (`scripts/db/restore.ts`, new): mirrors `backup.ts`'s conventions.
-  ```sh
-  # Restore the newest backup in BACKUP_DIR into a scratch DB (safe, no --force needed):
-  pnpm tsx scripts/db/restore.ts --target postgresql://user:pass@host/builderhunt_restore_test
+**Full restore procedure: [`operations/database-restore.md`](./operations/database-restore.md).**
+Read it before restoring anything — a `pg_dump` of one database contains no roles, so a naive
+`pg_restore` into a fresh cluster loses every RLS policy. That is a real defect this project hit
+on 2026-07-26, not a hypothetical.
 
-  # Restore a specific file:
-  pnpm tsx scripts/db/restore.ts --file /var/backups/builderhunt/builderhunt-20260101-....sql.gz --target <url>
+### What runs today, in order
 
-  # Restore over DATABASE_URL itself (destructive — requires explicit confirmation):
-  pnpm tsx scripts/db/restore.ts --force
-  ```
-  Prints row counts for `auth_users`/`builders`/`saved_queries` after restoring so a drill has
-  an immediate correctness signal. **Live-verified 2026-07-25**: backed up the local dev DB,
-  restored into a scratch database, row counts matched the source exactly (83/19/4). The
-  rehearsal also caught a real pre-existing duplicate-row data-integrity issue in the local
-  auth_accounts table (unrelated to this script) — worth remembering: a restore drill is a
-  legitimate way to discover latent data problems, not just a mechanism test.
-- **VPS backup cron** — not yet installed (requires SSH access to the production host; see
-  `docs/runbook.md`'s pending-decisions note at the bottom). Once access is confirmed, add:
-  ```
-  0 3 * * * cd /path/to/app && DATABASE_URL=$DATABASE_URL pnpm tsx scripts/db/backup.ts >> /var/log/builderhunt-backup.log 2>&1
-  ```
-  Verify the next morning: a dated `.sql.gz` < 24h old exists, the log shows success, and a
-  restore drill from that exact file passes (same command as above).
-- **Off-site copy** (Phase 5, fast-follow, not blocking): after a successful local dump, copy
-  it off-host (Hetzner Storage Box via rsync/sftp, or an S3-compatible bucket). Not implemented
-  yet — the local backup + 30-day retention is the current safety net.
+| Time (UTC) | What | Where |
+| --- | --- | --- |
+| 03:00 | Coolify's scheduled backup of `builderhunt-db` → `pg_dump` custom format into `/data/coolify/backups/`, 30 backups / 30 days / 10 GB cap | Coolify DB resource → Backups |
+| 03:30 | `scripts/ops/builderhunt-backup-sync.sh` — captures `pg_dumpall --roles-only --no-role-passwords`, then rsyncs `/data/coolify/backups/` to the Hetzner Storage Box sub-account `u640315-sub1` (no `--delete`) | VPS cron `30 3 * * *`, log `/var/log/builderhunt-backup-sync.log` |
+| 05:00 | Storage Box automated snapshot, max 10 | Hetzner Console |
+
+The DB is ~5.15 MB, so 30 dailies is ~155 MB. Details and the account record are in
+[`operations/external-services-register.md` §7](./operations/external-services-register.md#7-hetzner-storage-box--off-box-backup-4mo).
+
+`scripts/ops/builderhunt-backup-sync.sh` is the version-controlled copy of what is installed at
+`/usr/local/bin/builderhunt-backup-sync.sh`. Edit it here and copy it up; do not edit only on
+the box.
+
+### Restoring
+
+```sh
+# Restore into a scratch DB (safe — creates the cluster roles first, then verifies RLS):
+pnpm db:restore --file /path/to/backup.dmp --target postgresql://user:pass@host/builderhunt_restore
+
+# Restore over DATABASE_URL itself (destructive — requires explicit confirmation):
+pnpm db:restore --force
+```
+
+Auto-detects gzipped plain SQL (`scripts/db/backup.ts`), `pg_dump` custom format (Coolify), and
+gzipped custom format. Prints row counts, and **fails** if any table came back with RLS enabled
+but zero policies — the fingerprint of a roles-less restore.
+
+### Drills
+
+```sh
+pnpm db:restore-drill --file /path/to/backup.dmp    # throwaway fresh cluster, full verification
+```
+
+`pnpm db:restore-test` is a *different, weaker* check: it rehearses dump→restore between two
+databases on one server, where the cluster roles already exist. It cannot catch a missing-roles
+defect and did not. Use the drill for backup verification.
+
+### The local-disk backup script
+
+`scripts/db/backup.ts` (`pnpm db:backup`) writes a gzipped plain-SQL dump to `BACKUP_DIR`
+(default `/var/backups/builderhunt`), 30-day retention (`BACKUP_KEEP`). It is **not** what
+protects production today — Coolify's scheduled backup is. Keep it for local drills and as the
+fallback if Coolify's backup is ever reconfigured.
 
 ## 3. Consolidated cron / scheduled-job table
 
@@ -61,7 +84,9 @@ This table is just the operational cadence in one place:
 
 | Cadence | Command |
 |---|---|
-| Daily 03:00 | `pnpm tsx scripts/db/backup.ts` (see §2 — not yet cron'd on the VPS) |
+| Daily 03:00 | Coolify scheduled backup of `builderhunt-db` (see §2) |
+| Daily 03:30 | `/usr/local/bin/builderhunt-backup-sync.sh` — roles dump + rsync to the Storage Box |
+| Daily 05:00 | Hetzner Storage Box snapshot (Console, not cron) |
 | Every 5 min | `curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/status/snapshot` |
 | Hourly | `.../api/admin/devpost/run-worker` (dark in prod — see `plans/phase-1/devpost-integration`) |
 | Per-plan cadence | `.../api/admin/discovery/run-worker`, `.../api/admin/enrichment/run-worker`, `.../api/admin/embeddings/run-worker`, `.../api/admin/alerts/run-worker`, `.../api/admin/billing/run-worker`, `.../api/admin/legal/run-worker`, `.../api/admin/sprints/run-worker` |
@@ -147,9 +172,20 @@ unreachable.
 
 ## Pending decisions (require a human / production access this session doesn't have)
 
-- **VPS backup cron install** (§2) and **Docker log rotation** (§5) both require SSH access to
-  the production Hetzner host to execute, not just document — flagged here rather than
-  executed autonomously, since both are live changes to the shared production host, not a
-  code change reviewable in a PR.
+- **Ship the updated `builderhunt-backup-sync.sh` to the VPS** (§2). The roles-dump step exists
+  in `scripts/ops/builderhunt-backup-sync.sh` in this repo and is tested locally, but
+  `/usr/local/bin/builderhunt-backup-sync.sh` on `conductor-01` is still the older
+  rsync-only version — so **tonight's off-site copy still has no roles dump**. Recovery is
+  unaffected (`scripts/db/roles.sql` is the primary path and needs nothing from the box), but
+  copying the script up is a live change to the shared production host and is left for a human:
+  ```sh
+  scp scripts/ops/builderhunt-backup-sync.sh root@178.105.106.79:/usr/local/bin/builderhunt-backup-sync.sh
+  ssh root@178.105.106.79 'chmod +x /usr/local/bin/builderhunt-backup-sync.sh && /usr/local/bin/builderhunt-backup-sync.sh'
+  ```
+  Then confirm `builderhunt-roles-latest.sql` appears under
+  `./coolify-db-backups/builderhunt-roles/` on the Storage Box.
+- **Docker log rotation** (§5) requires SSH access to the production Hetzner host to execute,
+  not just document — flagged here rather than executed autonomously, since it is a live change
+  to the shared production host, not a code change reviewable in a PR.
 - **Real `MINIMAX_API_KEY`** (§6) — needs an actual MiniMax provider account and credential; a
   human must create and paste it into Coolify.
