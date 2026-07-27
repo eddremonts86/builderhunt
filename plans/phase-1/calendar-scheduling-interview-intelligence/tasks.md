@@ -1058,7 +1058,11 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 5 — Invitation and atomic booking
 
-- [ ] **Implement capability exchange and session validation**
+- [~] **Implement capability exchange and session validation** — capability module, session
+  exchange route, invitation-scoped cookie, and the narrowly-privileged tenant resolver
+  (drizzle/0077-0078) are done and verified in a browser. STILL OPEN: the named strict-CSP variant
+  in `server/security.mjs`. Public scheduling responses currently carry `Referrer-Policy:
+  no-referrer` and `no-store` per route, but they inherit the site-wide CSP rather than a tighter one.
   - Files: `src/lib/scheduling/capability.ts` (new),
     `src/lib/scheduling/capability.test.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/session.ts` (new),
@@ -1074,7 +1078,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: tests cover valid, wrong, expired, revoked, replayed, timing-safe mismatch, cookie flags,
     token absent from logs/referrer/history, and non-enumerating responses.
 
-- [ ] **Implement invitation service**
+- [x] **Implement invitation service**
   - Files: `src/lib/scheduling/invitation-service.ts` (new),
     `src/lib/scheduling/invitation-service.test.ts` (new),
     `src/shared/lib/security/audit.ts`
@@ -1083,7 +1087,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: service tests cover every transition, owner/participant/admin permissions, duplicate
     send, stale builder, expiry, and redacted audit details.
 
-- [ ] **Implement slot-query service**
+- [x] **Implement slot-query service**
   - Files: `src/lib/scheduling/slot-service.ts` (new),
     `src/lib/scheduling/slot-service.test.ts` (new)
   - Do: Load invitation policy, rules, overrides, busy occurrences, and booked appointments; derive
@@ -1092,7 +1096,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: tests cover DST, buffers, notice, horizon, recurrence, cancellation, reschedule, cache
     key/invalidation, and no conflict-source leakage; benchmark fixture under 750 ms p95.
 
-- [ ] **Implement atomic booking, cancellation, and rescheduling**
+- [x] **Implement atomic booking, cancellation, and rescheduling**
   - Files: `src/lib/scheduling/booking-service.ts` (new),
     `src/lib/scheduling/booking-service.test.ts` (new),
     `src/shared/lib/repositories/scheduling.ts`
@@ -1104,7 +1108,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: real PostgreSQL race test yields exactly one booking; rollback leaves no partial rows;
     stale/used/revoked/expired capability and invalid slot return safe errors.
 
-- [ ] **Add authenticated invitation APIs**
+- [x] **Add authenticated invitation APIs**
   - Files: `src/routes/api/scheduling/invitations/index.ts` (new),
     `src/routes/api/scheduling/invitations/$invitationId.ts` (new),
     `src/routes/api/scheduling/invitations/$invitationId/send.ts` (new),
@@ -1114,7 +1118,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: API tests cover 401, tenant B, unrelated member/admin denial, builder from other tenant,
     plan disabled, repeated send/revoke, and DTO minimization.
 
-- [ ] **Add public invitation and booking APIs**
+- [x] **Add public invitation and booking APIs**
   - Files: `src/routes/api/public/scheduling/$invitationId/index.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/slots.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/book.ts` (new),
@@ -1129,7 +1133,13 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: API tests cover missing/expired/revoked cookie, CSRF, enumeration, rate limit, wrong
     invitation, book race `409`, and successful cancel/reschedule.
 
-- [ ] **Add calendar invitation email and ICS generation**
+- [~] **Add calendar invitation email and ICS generation** — `src/lib/calendar/ics.ts` is done and
+  parser-verified. STILL OPEN: the invitation/confirmation/reschedule/cancel/expiry templates and
+  the send wiring. Blocked on one decision: only the capability *hash* is stored, so `send` cannot
+  reconstruct a link it issued at create time. A send must therefore ROTATE the capability, which
+  means a resend invalidates the link already in the candidate's inbox — the opposite of what
+  `invitation-service.ts` currently claims in its `markInvitationSent` comment. Resolve before
+  writing the templates.
   - Files: `src/shared/lib/email.ts`, `src/shared/lib/email.test.ts`,
     `src/lib/calendar/ics.ts` (new), `src/lib/calendar/ics.test.ts` (new)
   - Do: Add invitation/confirmation/reschedule/cancel/expiry templates; generate standards-compliant
@@ -1148,7 +1158,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Verify: component/Playwright tests create from tracked builder, preview candidate timezone,
     send, revoke, and show safe error without losing draft.
 
-- [ ] **Build mobile accountless candidate portal**
+- [x] **Build mobile accountless candidate portal**
   - Files: `src/routes/schedule/$invitationId.tsx` (new),
     `src/modules/scheduling/components/CandidatePortal.tsx` (new),
     `src/modules/scheduling/components/SlotPicker.tsx` (new),
