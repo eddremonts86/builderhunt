@@ -346,17 +346,33 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
    inside it, so the readable content width is `--page-max` minus two gutters.
    The floating topbar (`.topbar-shell`) is sized from the same two variables,
    which is what makes the pill's edges line up with the content underneath it
-   on both the landing and the dashboard. Change the width in one place here,
-   not per page.
+   on the landing. Change the width in one place here, not per page.
+
+   The signed-in dashboard no longer participates in that alignment. It moved
+   from a centred floating pill to a sidebar shell (`DashboardLayout`), so its
+   content box starts after a 272px pair of nav columns and cannot be centred on
+   the same axis as the landing's. Rather than leave that to chance — the
+   comment history here records a 176px and then a 40px silent drift — the
+   dashboard gets its own explicit width below.
    ============================================================================= */
 :root {
   --page-max: 1200px;
   --page-narrow: 800px;
   --page-gutter: 1.25rem;
+  /* Readable ceiling for dashboard content inside the sidebar shell. Wide
+     enough for a 12-column bento to keep 2-column tiles legible, narrow enough
+     that list rows don't stretch to an unreadable measure on a 27" display. */
+  --dashboard-max: 1320px;
 }
 
 .container { max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }
 .container-narrow { max-width: var(--page-narrow); margin-inline: auto; padding-inline: var(--page-gutter); }
+
+/* The dashboard's content box. Fluid inside whatever the sidebar leaves, up to
+   `--dashboard-max`, and left-aligned rather than centred: centring it would
+   pull content away from the sidebar it belongs to and open a gap that reads as
+   a broken column on wide screens. */
+.dashboard-canvas { width: 100%; max-width: var(--dashboard-max); }
 
 /*
  * The fixed pill shared by the landing Header and the dashboard shell.

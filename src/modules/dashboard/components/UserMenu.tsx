@@ -2,35 +2,11 @@ import * as React from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from '@tanstack/react-router'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import {
-  CircleUser, Users, CreditCard, Shield, ShieldCheck, Activity, Cog, Inbox, AlertTriangle,
-  BookOpen, Map, LogOut, RotateCcw, ShieldAlert, Gauge, Siren,
-} from 'lucide-react'
+import { CircleUser, LogOut } from 'lucide-react'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 import { FLOATING_UI_Z } from '~/shared/components/Tooltip'
 import { motionTokens } from '~/shared/lib/motion/tokens'
 import { clampRightAnchoredPanel } from '~/shared/lib/floatingPanel'
-
-const WORKSPACE_LINKS = [
-  { to: '/settings/team', icon: Users, label: 'Team' },
-  { to: '/settings/billing', icon: CreditCard, label: 'Billing' },
-  { to: '/settings/privacy', icon: Shield, label: 'Privacy' },
-  { to: '/settings/security', icon: ShieldCheck, label: 'Security' },
-  { to: '/status', icon: Activity, label: 'Status' },
-] as const
-
-const ADMIN_LINKS = [
-  { to: '/admin/metrics', icon: Activity, label: 'Metrics' },
-  { to: '/admin/users', icon: Users, label: 'Users' },
-  { to: '/admin/plan-requests', icon: Inbox, label: 'Plan requests' },
-  { to: '/admin/incidents', icon: AlertTriangle, label: 'Incidents' },
-  { to: '/admin/changelog', icon: BookOpen, label: 'Changelog' },
-  { to: '/admin/roadmap', icon: Map, label: 'Roadmap' },
-  { to: '/admin/refunds', icon: RotateCcw, label: 'Refunds' },
-  { to: '/admin/disputes', icon: ShieldAlert, label: 'Disputes' },
-  { to: '/admin/billing', icon: Gauge, label: 'Billing ops' },
-  { to: '/admin/abuse', icon: Siren, label: 'Abuse console' },
-] as const
 
 function MenuLink({ to, icon: Icon, label, active, onNavigate }: {
   to: string
@@ -58,18 +34,21 @@ function MenuLink({ to, icon: Icon, label, active, onNavigate }: {
 
 interface UserMenuProps {
   pathname: string
-  isAdmin: boolean
   signingOut: boolean
   onSignOut: () => void
 }
 
 /**
- * Consolidates what used to be three separate topbar controls (admin flyout,
- * account link, sign-out button) into one avatar-triggered menu — same
- * portal + fixed-position + reposition/outside-click/Escape pattern as the
- * admin flyout it replaces, so floating-panel behavior stays consistent.
+ * Account and sign-out, and nothing else.
+ *
+ * This menu used to carry the 5 workspace settings pages and the 10 admin
+ * destinations, because the old topbar had no room for them. The sidebar shell
+ * lists all of them now (see `nav-config.ts`), so keeping copies here would mean
+ * two competing navigations — the exact confusion the shell change set out to
+ * remove. Session-scoped actions stay, since they belong to the avatar and not
+ * to any area.
  */
-export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuProps) {
+export function UserMenu({ pathname, signingOut, onSignOut }: UserMenuProps) {
   const [open, setOpen] = React.useState(false)
   const [coords, setCoords] = React.useState({ top: 0, right: 0 })
   const [mounted, setMounted] = React.useState(false)
@@ -154,37 +133,6 @@ export function UserMenu({ pathname, isAdmin, signingOut, onSignOut }: UserMenuP
               <MenuLink to="/me" icon={CircleUser} label="Account" active={isAccountActive} onNavigate={closeMenu} />
 
               <div className="mt-1 pt-1 border-t border-bh-border/60">
-                {WORKSPACE_LINKS.map((item) => (
-                  <MenuLink
-                    key={item.to}
-                    to={item.to}
-                    icon={item.icon}
-                    label={item.label}
-                    active={pathname === item.to}
-                    onNavigate={closeMenu}
-                  />
-                ))}
-              </div>
-
-              {isAdmin && (
-                <div className="mt-1 pt-1 border-t border-bh-border/60">
-                  <p className="px-3 pt-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-bh-text-dim flex items-center gap-1.5">
-                    <Cog className="w-3 h-3" aria-hidden="true" /> Admin
-                  </p>
-                  {ADMIN_LINKS.map((item) => (
-                    <MenuLink
-                      key={item.to}
-                      to={item.to}
-                      icon={item.icon}
-                      label={item.label}
-                      active={pathname === item.to}
-                      onNavigate={closeMenu}
-                    />
-                  ))}
-                </div>
-              )}
-
-              <div className="pt-1 border-t border-bh-border/60">
                 <button
                   type="button"
                   onClick={onSignOut}

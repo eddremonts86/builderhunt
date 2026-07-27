@@ -298,12 +298,27 @@ async function seedSearchCache(key: string, builders: SeedBuilder[]): Promise<vo
   }
 }
 
+/**
+ * Metric tiles are bento widgets, addressed by their registry id rather than by
+ * a CSS class. (This helper used to filter `.glass-panel`, which only ever
+ * matched the floating dropdown panels — the stat tiles have always rendered
+ * `.card` — so it could not have matched anything.)
+ */
 function statCard(page: Page, label: string) {
-  return page.locator('.glass-panel').filter({ hasText: label }).first()
+  return page.locator('[data-widget^="stat-"]').filter({ hasText: label }).first()
 }
 
-function navLink(page: Page, name: string) {
-  return page.locator('header[aria-label="Main navigation"]').getByRole('link', { name, exact: true })
+/**
+ * Level 1 of the dashboard shell: the area rail. Clicking an area navigates to
+ * that area's first destination.
+ */
+function areaLink(page: Page, name: string) {
+  return page.getByRole('navigation', { name: 'Areas' }).getByRole('link', { name, exact: true })
+}
+
+/** Level 2: the destinations inside whichever area is currently open. */
+function sectionLink(page: Page, name: string) {
+  return page.locator('nav[aria-label^="Sections of"]').getByRole('link', { name, exact: true })
 }
 
 /** Run-unique fixtures for the owner's non-empty dashboard, seeded once. */
@@ -499,23 +514,25 @@ test('the main navigation pills reach every primary surface', async ({ browser }
     await go(page, '/dashboard')
     await dismissOverlays(page)
 
-    await navLink(page, 'Search').click()
+    // Home's level-2 panel carries shortcuts to Search and Sprints; Exports
+    // lives under Signals, so that hop goes through the rail first.
+    await sectionLink(page, 'Search builders').click()
     await page.waitForURL(/\/search/)
     await expect(page.getByRole('heading', { name: 'Search builders' })).toBeVisible()
 
-    await navLink(page, 'Sprints').click()
+    await areaLink(page, 'Pipeline').click()
     await page.waitForURL(/\/sprints/)
     await expect(page.getByTestId('sprints-page')).toBeVisible()
 
-    await navLink(page, 'Exports').click()
-    await page.waitForURL(/\/exports/)
-    await expect(page.getByRole('heading', { name: 'Exports' })).toBeVisible()
-
-    await navLink(page, 'Alerts').click()
+    await areaLink(page, 'Signals').click()
     await page.waitForURL(/\/alerts/)
     await expect(page.getByTestId('alerts-inbox-page')).toBeVisible()
 
-    await navLink(page, 'Dashboard').click()
+    await sectionLink(page, 'Exports').click()
+    await page.waitForURL(/\/exports/)
+    await expect(page.getByRole('heading', { name: 'Exports' })).toBeVisible()
+
+    await areaLink(page, 'Home').click()
     await page.waitForURL(/\/dashboard/)
     await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
     assertStrictClean(sp)
@@ -524,23 +541,25 @@ test('the main navigation pills reach every primary surface', async ({ browser }
   }
 })
 
-test('the account menu exposes workspace links, hides admin for tenants, and shows it for platform admins', async ({ browser }) => {
+test('workspace links live in the sidebar, admin is hidden from tenants and shown to platform admins', async ({ browser }) => {
   const ownerPage = await openStrictPage(browser, harness.owner)
   try {
     const { page, guard } = ownerPage
     await go(page, '/dashboard')
     await dismissOverlays(page)
 
+    // The avatar menu is session-scoped now: Account and Sign out only. The
+    // workspace settings pages and the admin console moved to the sidebar when
+    // the shell gained one, so asserting them here would assert a duplicate.
     await page.getByRole('button', { name: 'Account menu' }).click()
     const menu = page.getByRole('menu', { name: 'Account' })
     await expect(menu).toBeVisible()
-    for (const item of ['Account', 'Team', 'Billing', 'Privacy', 'Status', 'Sign out']) {
+    for (const item of ['Account', 'Sign out']) {
       await expect(menu.getByRole('menuitem', { name: item })).toBeVisible()
     }
-    // A tenant owner is not a platform admin — no admin section.
-    await expect(menu.getByText('Admin', { exact: true })).toHaveCount(0)
+    await expect(menu.getByRole('menuitem', { name: 'Team' })).toHaveCount(0)
 
-    // Escape closes the menu; reopening and picking a link navigates.
+    // Escape closes it; reopening and picking Account navigates.
     await page.keyboard.press('Escape')
     await expect(page.getByRole('menu', { name: 'Account' })).toHaveCount(0)
     await page.getByRole('button', { name: 'Account menu' }).click()
@@ -548,27 +567,34 @@ test('the account menu exposes workspace links, hides admin for tenants, and sho
     await page.waitForURL(/\/me/)
     await expect(page.getByRole('heading', { name: 'Your profile' })).toBeVisible()
 
-    await page.getByRole('button', { name: 'Account menu' }).click()
-    await page.getByRole('menuitem', { name: 'Team' }).click()
+    // Workspace destinations: the rail's area, then its level-2 panel.
+    await expect(page.getByRole('navigation', { name: 'Areas' })).toBeVisible()
+    await sectionLink(page, 'Team').click()
     await page.waitForURL(/\/settings\/team/)
     await expect(page.getByTestId('team-settings-page')).toBeVisible()
+
+    // A tenant owner is not a platform admin — the Admin area is absent from
+    // the rail entirely, not merely unlinked.
+    await expect(areaLink(page, 'Admin')).toHaveCount(0)
     assertStrictClean(ownerPage)
   } finally {
     await closeStrictPage(ownerPage)
   }
 
-  // The platform admin sees the allow-listed admin section.
+  // The platform admin sees the allow-listed admin area.
   const adminPage = await openStrictPage(browser, harness.platformAdmin)
   try {
     const { page, guard } = adminPage
     await go(page, '/dashboard')
     await dismissOverlays(page)
-    await page.getByRole('button', { name: 'Account menu' }).click()
-    const menu = page.getByRole('menu', { name: 'Account' })
-    await expect(menu).toBeVisible()
-    await expect(menu.getByText('Admin', { exact: true })).toBeVisible()
+
+    // The Admin area appears in the rail, and opening it lists the console's
+    // destinations in the level-2 panel — grouped, not in a dropdown.
+    await expect(areaLink(page, 'Admin')).toBeVisible()
+    await areaLink(page, 'Admin').click()
+    await page.waitForURL(/\/admin\/metrics/)
     for (const item of ['Metrics', 'Users', 'Incidents']) {
-      await expect(menu.getByRole('menuitem', { name: item })).toBeVisible()
+      await expect(sectionLink(page, item)).toBeVisible()
     }
     assertStrictClean(adminPage)
   } finally {
@@ -582,9 +608,9 @@ test('browser back/forward retrace client-side dashboard navigation', async ({ b
   try {
     await go(page, '/dashboard')
     await dismissOverlays(page)
-    await navLink(page, 'Search').click()
+    await sectionLink(page, 'Search builders').click()
     await page.waitForURL(/\/search/)
-    await navLink(page, 'Sprints').click()
+    await areaLink(page, 'Pipeline').click()
     await page.waitForURL(/\/sprints/)
 
     await page.goBack()
