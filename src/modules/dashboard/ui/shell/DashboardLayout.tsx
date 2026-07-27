@@ -212,7 +212,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         initial={{ opacity: 0, y: reduceMotion ? 0 : -16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: motionTokens.duration.normal, ease: motionTokens.easing.smooth }}
-        className="glass-topbar fixed top-4 inset-x-4 md:inset-x-6 lg:inset-x-10 z-40 flex items-center justify-between gap-3 rounded-full px-3 py-2 overflow-x-auto"
+        className="glass-topbar topbar-shell z-40 flex items-center justify-between gap-3 rounded-full px-3 py-2 overflow-x-auto"
         aria-label="Main navigation"
       >
         <Tooltip label="Back to home">
@@ -278,11 +278,14 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       {/* Main — one canonical content width for every dashboard page, so
           settings/sprints/search/admin all occupy the same horizontal
           space instead of each page picking its own max-w-*.
-          1200px deliberately matches `.container` (globals.css), the landing
-          side's width — signed-in and signed-out surfaces used to disagree by
-          176px, which read as the app "jumping narrower" after login. */}
-      <main className="pt-24 pb-8 px-4 lg:px-8">
-        <div className="max-w-[1200px] mx-auto w-full">
+          This is now literally `.container` (globals.css) rather than a
+          hand-rolled copy of its numbers: signed-in and signed-out surfaces
+          used to disagree by 176px, and then by a further 40px once the
+          hand-rolled version drifted from the real container's gutter. Both
+          the width and the gutter come from `--page-max`/`--page-gutter`, the
+          same two variables that size `.topbar-shell` above. */}
+      <main className="pt-24 pb-8">
+        <div className="container">
           {children}
         </div>
       </main>

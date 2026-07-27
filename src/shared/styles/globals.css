@@ -340,10 +340,45 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 }
 
 /* =============================================================================
-   Layout
+   Layout — one horizontal rhythm for every surface
+
+   `--page-max` is the outer content box and `--page-gutter` the breathing room
+   inside it, so the readable content width is `--page-max` minus two gutters.
+   The floating topbar (`.topbar-shell`) is sized from the same two variables,
+   which is what makes the pill's edges line up with the content underneath it
+   on both the landing and the dashboard. Change the width in one place here,
+   not per page.
    ============================================================================= */
-.container { max-width: 1200px; margin: 0 auto; padding: 0 1.25rem; }
-.container-narrow { max-width: 800px; margin: 0 auto; padding: 0 1.25rem; }
+:root {
+  --page-max: 1200px;
+  --page-narrow: 800px;
+  --page-gutter: 1.25rem;
+}
+
+.container { max-width: var(--page-max); margin-inline: auto; padding-inline: var(--page-gutter); }
+.container-narrow { max-width: var(--page-narrow); margin-inline: auto; padding-inline: var(--page-gutter); }
+
+/*
+ * The fixed pill shared by the landing Header and the dashboard shell.
+ *
+ * Centred with `inset-inline` + `margin-inline: auto` rather than
+ * `left: 50%; transform: translateX(-50%)` on purpose: a transform on a fixed
+ * element makes it the containing block for every fixed/absolute descendant,
+ * which would re-anchor the dropdown menus and the mobile nav sheet to the
+ * header instead of the viewport.
+ *
+ * The max-width subtracts two gutters so the pill's outer edge lands exactly on
+ * the content edge inside `.container`, not on the container's own box — the
+ * cards and headings line up with the pill, which is the visible thing.
+ */
+.topbar-shell {
+  position: fixed;
+  top: 1rem;
+  left: var(--page-gutter);
+  right: var(--page-gutter);
+  margin-inline: auto;
+  max-width: calc(var(--page-max) - (2 * var(--page-gutter)));
+}
 
 /* =============================================================================
    Card
@@ -689,9 +724,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 /* =============================================================================
    Spacing / typography (utility-style classes used across pages)
    ============================================================================= */
-.section { padding: 5rem 0; }
-.section-lg { padding: 7rem 0; }
-@media (max-width: 768px) { .section { padding: 3rem 0; } .section-lg { padding: 4rem 0; } }
+/*
+ * `padding-block`, never the `padding` shorthand. The hero is the one element
+ * that carries `container section-lg` together, and `padding: 7rem 0` was
+ * silently resetting `.container`'s horizontal padding to 0 — these rules sit
+ * later in the sheet, so the shorthand won. The result was the hero heading,
+ * paragraph and buttons sitting flush against the viewport edge while every
+ * other section was inset by a gutter.
+ */
+.section { padding-block: 5rem; }
+.section-lg { padding-block: 7rem; }
+@media (max-width: 768px) { .section { padding-block: 3rem; } .section-lg { padding-block: 4rem; } }
 
 .eyebrow {
   display: inline-flex;
