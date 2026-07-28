@@ -1,10 +1,19 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import type { WorkerTransaction } from '../db/worker-db'
-import { interviewBriefs, interviewSessions, interviewSuggestions, transcriptSegments } from '../db/schema'
+import {
+  interviewBriefs,
+  interviewReports,
+  interviewSessions,
+  interviewSuggestions,
+  transcriptSegments,
+} from '../db/schema'
 import {
   assertNoDanglingSourceReference,
+  assertReportContentIsClean,
   interviewBriefContentSchema,
+  interviewReportContentSchema,
+  type InterviewReportContent,
   sourceManifestEntrySchema,
   type InterviewBriefContent,
   type SourceManifestEntry,
@@ -741,4 +750,210 @@ export async function updateSuggestionState(
     .returning()
   const row = rows[0]
   return row ? toSuggestionRow(row as unknown as Record<string, unknown>) : null
+}
+
+// ── Interview reports (plan: calendar-scheduling-interview-intelligence, Phase 10) ────────────────
+
+export interface InterviewReportRow {
+  id: string
+  eventId: string
+  ownerUserId: string
+  version: number
+  status: string
+  content: InterviewReportContent
+  evidenceSegmentIds: string[]
+  provider: string | null
+  model: string | null
+  promptVersion: string | null
+  editedByUserId: string | null
+  finalizedAt: Date | null
+}
+
+function toReportRow(row: Record<string, unknown>): InterviewReportRow {
+  return {
+    id: String(row.id),
+    eventId: String(column(row, 'eventId', 'event_id')),
+    ownerUserId: String(column(row, 'ownerUserId', 'owner_user_id')),
+    version: Number(row.version),
+    status: String(row.status),
+    content: row.content as InterviewReportContent,
+    evidenceSegmentIds: (column(row, 'evidenceSegmentIds', 'evidence_segment_ids') ?? []) as string[],
+    provider: optionalText(row.provider),
+    model: optionalText(row.model),
+    promptVersion: optionalText(column(row, 'promptVersion', 'prompt_version')),
+    editedByUserId: optionalText(column(row, 'editedByUserId', 'edited_by_user_id')),
+    finalizedAt: column(row, 'finalizedAt', 'finalized_at')
+      ? new Date(column(row, 'finalizedAt', 'finalized_at') as string)
+      : null,
+  }
+}
+
+/**
+ * Appends a report version.
+ *
+ * The version is computed inside the INSERT for the same reason brief versions are: two clients finishing
+ * the same interview must not both read version 2 and both try to write version 3, which
+ * `interview_reports_event_version_unique` would reject with an error neither of them can interpret.
+ *
+ * The citation check runs before the write. A report whose statement points at a segment that is not in
+ * `evidenceSegmentIds` is a report with an unresolvable timestamp link, and letting it land means the
+ * problem surfaces weeks later to whoever is reviewing the hire.
+ */
+export async function insertReportVersion(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    eventId: string
+    ownerUserId: string
+    content: InterviewReportContent
+    evidenceSegmentIds: readonly string[]
+    provider: string | null
+    model: string | null
+    promptVersion: string | null
+    editedByUserId?: string | null
+    retentionExpiresAt: Date
+  },
+): Promise<InterviewReportRow> {
+  const parsed = interviewReportContentSchema.parse(params.content)
+  assertReportCitationsResolve(parsed, params.evidenceSegmentIds)
+  assertReportContentIsClean(parsed)
+
+  const rows = await transaction.execute(sql`
+    insert into interview_reports
+      (organization_id, event_id, owner_user_id, version, status, content, evidence_segment_ids,
+       provider, model, prompt_version, edited_by_user_id, retention_expires_at)
+    select
+      ${params.organizationId}, ${params.eventId}, ${params.ownerUserId},
+      coalesce(max(version), 0) + 1,
+      'draft',
+      ${JSON.stringify(parsed)}::jsonb,
+      ${JSON.stringify([...params.evidenceSegmentIds])}::jsonb,
+      ${params.provider}, ${params.model}, ${params.promptVersion},
+      ${params.editedByUserId ?? null}, ${params.retentionExpiresAt.toISOString()}
+    from interview_reports
+    where organization_id = ${params.organizationId} and event_id = ${params.eventId}
+    returning *
+  `)
+  const row = (rows as unknown as Record<string, unknown>[])[0]
+  if (!row) throw new InterviewBriefError('could not store the interview report', 'not_found')
+  return toReportRow(row)
+}
+
+/**
+ * Refuses a report citing a segment outside its own evidence list.
+ *
+ * Exported because it is the guarantee: a timestamp link that resolves to nothing is how an unsupported
+ * claim survives review, and the check has to hold for a *hand-edited* report as much as a generated one.
+ */
+export function assertReportCitationsResolve(
+  content: InterviewReportContent,
+  evidenceSegmentIds: readonly string[],
+): void {
+  const known = new Set(evidenceSegmentIds)
+  const cited = [
+    ...content.summary.flatMap((entry) => entry.segmentIds),
+    ...content.answersByTopic.flatMap((entry) => entry.segmentIds),
+    ...content.followUps.flatMap((entry) => entry.segmentIds),
+  ]
+  const dangling = cited.filter((id) => !known.has(id))
+  if (dangling.length > 0) {
+    throw new InterviewBriefError(
+      `report cites segments that are not in its evidence: ${[...new Set(dangling)].join(', ')}`,
+      'dangling_source',
+    )
+  }
+}
+
+export async function findLatestReport(
+  transaction: BriefTransaction,
+  params: { organizationId: string; eventId: string },
+): Promise<InterviewReportRow | null> {
+  const rows = await transaction
+    .select()
+    .from(interviewReports)
+    .where(and(
+      eq(interviewReports.organizationId, params.organizationId),
+      eq(interviewReports.eventId, params.eventId),
+    ))
+    .orderBy(desc(interviewReports.version))
+    .limit(1)
+  const row = rows[0]
+  return row ? toReportRow(row as unknown as Record<string, unknown>) : null
+}
+
+export async function findReportVersion(
+  transaction: BriefTransaction,
+  params: { organizationId: string; eventId: string; version: number },
+): Promise<InterviewReportRow | null> {
+  const rows = await transaction
+    .select()
+    .from(interviewReports)
+    .where(and(
+      eq(interviewReports.organizationId, params.organizationId),
+      eq(interviewReports.eventId, params.eventId),
+      eq(interviewReports.version, params.version),
+    ))
+    .limit(1)
+  const row = rows[0]
+  return row ? toReportRow(row as unknown as Record<string, unknown>) : null
+}
+
+/**
+ * Marks one version final.
+ *
+ * The version predicate is the optimistic guard, and `status = 'draft'` in the WHERE clause is the second
+ * half: a report already finalized must not be finalized again with a different timestamp, because
+ * `interview_reports_finalized_check` ties the status and the timestamp together and a second finalize
+ * would rewrite when the decision was recorded.
+ */
+export async function finalizeReport(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    eventId: string
+    version: number
+    finalizedAt: Date
+  },
+): Promise<InterviewReportRow> {
+  const rows = await transaction
+    .update(interviewReports)
+    .set({ status: 'final', finalizedAt: params.finalizedAt, updatedAt: new Date() })
+    .where(and(
+      eq(interviewReports.organizationId, params.organizationId),
+      eq(interviewReports.eventId, params.eventId),
+      eq(interviewReports.version, params.version),
+      eq(interviewReports.status, 'draft'),
+    ))
+    .returning()
+  const row = rows[0]
+  if (!row) {
+    throw new InterviewBriefError(
+      `report version ${params.version} is not a draft; it may already be final or another client moved it`,
+      'version_conflict',
+    )
+  }
+  return toReportRow(row as unknown as Record<string, unknown>)
+}
+
+/** Version metadata only — no content, so a version picker does not ship four assessments of a person. */
+export async function listReportVersions(
+  transaction: BriefTransaction,
+  params: { organizationId: string; eventId: string },
+) {
+  return transaction
+    .select({
+      version: interviewReports.version,
+      status: interviewReports.status,
+      provider: interviewReports.provider,
+      model: interviewReports.model,
+      editedByUserId: interviewReports.editedByUserId,
+      finalizedAt: interviewReports.finalizedAt,
+      createdAt: interviewReports.createdAt,
+    })
+    .from(interviewReports)
+    .where(and(
+      eq(interviewReports.organizationId, params.organizationId),
+      eq(interviewReports.eventId, params.eventId),
+    ))
+    .orderBy(desc(interviewReports.version))
 }

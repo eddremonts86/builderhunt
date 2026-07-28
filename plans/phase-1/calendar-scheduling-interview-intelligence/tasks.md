@@ -1994,15 +1994,39 @@ Not fixed here — it predates this program and deserves its own work.
     slow-provider collapse, and speaker labelling in both capture modes. Three plants proved the ephemeral
     guarantee, the switch-before-billing order, and the in-flight collapse are each load-bearing.
 
-- [ ] **Implement report generation and finalization service**
+- [x] **Implement report generation and finalization service** — done 2026-07-28 (`PENDING`), NOT yet
+  deployed
   - Files: `src/lib/interviews/report-service.ts` (new),
     `tests/unit/lib/interviews/report-service.test.ts` (new),
-    `src/shared/lib/repositories/interviews.ts`
-  - Do: On finish, reserve 5 credits, load final segments/notes, generate or template report,
-    validate evidence/prohibited content, save versioned review state, allow edits, prevent unresolved
-    references, finalize with optimistic version, and settle/refund.
-  - Verify: tests cover empty/partial transcript, provider failure, insufficient credit, invalid
-    evidence, prohibited output, edit conflict, finalize, retry idempotency, settle/refund.
+    `src/shared/lib/repositories/interviews.ts`, `src/shared/lib/interviews.ts`,
+    `tests/unit/shared/lib/interviews.test.ts`
+  - **A bug found on the way in: `buildFallbackReportTemplate` produced content its own schema rejected.**
+    `answer: ''` is below `min(1)`, so the deterministic fallback could not be persisted — it would have
+    failed at exactly the moment the provider did, which is the one moment it exists for. The test that
+    should have caught it was checking half of what its own name claimed: "passes the clean-content **and
+    schema** checks" only called `assertReportContentIsClean`. Fixed in its own commit (`1736105`).
+  - **A provider failure produces a template and charges nothing; a credit refusal does not.** The
+    distinction is deliberate. A template is useful — the interview happened and the organizer needs
+    somewhere to write it up — but silently handing them a blank form when their balance ran out would hide
+    the fact that they need to top up. `provider: null` is the template's marker.
+  - **An edit inherits its evidence list from the previous version and can never supply one.** A
+    hand-edited report is precisely where an unsupported claim gets introduced, so the citation check
+    matters *more* there. A plant removing it fails the test.
+  - **A second plant found a guard my tests could not reach.** `finalizeReport`'s `status = 'draft'`
+    predicate is the race guard — two clients both read `draft`, both pass the service's `already_final`
+    check, and only one UPDATE may win. Removing it left all 34 tests green because the service check runs
+    first. Added a test that reaches the repository directly and asserts the recorded `finalizedAt` is the
+    *first* one; it now fails under the plant.
+  - Topic ids are derived identically to `suggestion-service`, so a suggestion citing `topic:2` and a report
+    answering `topic:2` mean the same topic. Two independent numberings would silently disagree.
+  - The report window keeps the *tail* when a transcript overflows, unlike the brief: the closing minutes
+    are where commitments and follow-ups are made.
+  - Verify (2026-07-28): 35 tests over generation with provenance, five-credit settlement, owner-only,
+    no-transcript with neither a provider call nor a reservation, remote speaker labels and timestamp
+    rendering, notes isolation, four template reasons with the hold released, credit and tier refusals
+    *not* templating, a smuggled score, a dangling citation, edit versioning and conflict, edit-introduced
+    score and dangling reference, evidence-list immutability, finalize with timestamp, double finalize,
+    stale-version finalize, post-finalize edit refusal, and version metadata without content.
 
 - [ ] **Add suggestion/report APIs**
   - Files: `src/routes/api/interviews/$interviewId/suggestions.ts` (new),
