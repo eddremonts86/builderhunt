@@ -110,6 +110,22 @@ The variable names keep their `INTERVIEW_R2_*` prefix so switching to Cloudflare
 env-var change with no code edit. `env.ts` accepts either a `*.eu.r2.cloudflarestorage.com`
 endpoint **or** a self-hosted one — see the note in that file for exactly which forms pass.
 
+### Reproducing this on a developer machine
+
+`docker compose --profile interviews up -d storage`, plus a service account scoped to the bucket.
+The local `.env` mirrors production's bucket name, `INTERVIEW_R2_ACCOUNT_ID` and jurisdiction
+exactly; only the endpoint differs, because production resolves the container by its internal name
+while a laptop reaches the same image on loopback.
+
+The credentials are deliberately **not** production's. Copying a production storage credential onto
+a laptop is a real regression, and it would not authenticate against a different MinIO anyway. What
+is mirrored is the *shape* — a service account limited to the one bucket, never the root user —
+because that is what makes a permissions bug reproduce here instead of in production.
+
+Verified 2026-07-28 against the local instance: the scoped account can put, get and delete inside
+the bucket, cannot create another one, and `ListBuckets` returns only the bucket it is scoped to
+rather than every bucket on the instance.
+
 ### The one real trade-off
 
 MinIO on a single box has **no redundancy**. If that disk fails, candidate documents are gone;
@@ -134,10 +150,14 @@ invitation, 1,000 candidates is 25 GB. Monitor it.
 
 ### Recorded
 
-- **Deployment target**: _(not yet deployed)_
+- **Deployment target**: Coolify, container `builderhunt-minio`, reached by the app at
+  `http://builderhunt-minio:9000` on the internal network. Confirmed 2026-07-28 by reading the
+  `builderhunt` application's environment from the Coolify API — the six `INTERVIEW_R2_*` variables
+  are set there, with a 20/40-character service account rather than the root credentials.
 - **Image + digest**: _(pin on deployment)_
 - **Bucket**: `builderhunt-interview-documents`
-- **Backup target**: _(not yet configured)_ ⚠️ do this before real candidate data lands
+- **Backup target**: local disk via `pnpm db:backup:documents`, 14 daily snapshots — see §"The one
+  real trade-off". ⚠️ Still no **off-box** copy; that survives a deletion, not a dead disk.
 - **DPA / sub-processor**: **none — no third party involved.**
 - **Deletion API**: yes (S3 `DeleteObject`) — the retention worker uses it.
 
@@ -181,8 +201,12 @@ quarantine prefix to the clean prefix. The document state machine has no transit
 
 ### Recorded
 
-- **Deployment target**: _(not yet deployed)_
-- **Image + digest**: `clamav/clamav:stable` — _(pin on deployment)_
+- **Deployment target**: ⚠️ **NOT deployed.** Confirmed 2026-07-28 against the live Coolify
+  environment: `INTERVIEW_CLAMAV_HOST` is absent from the `builderhunt` application, and `env.ts`
+  refuses `CANDIDATE_UPLOADS_ENABLED=true` without it. MinIO is deployed and configured; this is the
+  single remaining thing between candidate uploads and production.
+- **Image + digest**: built from `docker/clamav/Dockerfile` (Alpine's clamav package — the upstream
+  image has no arm64 build; see the note above) — _(pin the digest on deployment)_
 - **Signature updates**: freshclam runs in-container
 - **DPA / sub-processor**: **none.**
 
