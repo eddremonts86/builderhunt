@@ -1482,30 +1482,79 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 7 — Consume the Stripe billing platform
 
-- [ ] **Register interview rate cards with the billing platform**
-  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/modules/interviews/billing.ts`, `tests/unit/modules/interviews/billing.test.ts`
-  - Do: Add versioned interview brief, live transcription, contextual-question, and final-report unit
-    rules plus maximum reservations/durations. Import the platform contracts; do not create Stripe,
-    catalog, grant, ledger, checkout, refund, auto-recharge, or reconciliation code here.
-  - Verify: contract tests assert exact estimates/maximums and a boundary test fails any interview
-    module that imports Stripe or billing tables directly.
+- [x] **Register interview rate cards with the billing platform** — done 2026-07-28 (`1432953`), NOT yet deployed
+  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/shared/lib/interview-config.ts`,
+    `tests/unit/shared/lib/interview-config.test.ts`, `tests/unit/modules/interviews/billing.test.ts`
+  - Four cards with the numbers spec.md fixes: `interview_brief` 5, `interview_live_transcription` 1
+    per provider-billed minute, `interview_contextual_question` 0 (included), `interview_final_report`
+    5. `minimumTier: 'pro'` on all four, per "Sensitive brief/transcription/report: Pro, Pro Max, and
+    Team plus sufficient credits".
+  - **This removed a second source of truth that could not have worked.** `INTERVIEW_RATE_CARD_KEYS`
+    declared its own operation names (`interview.brief.v1`) and its own copy of the unit counts, with a
+    comment saying they were "not registered with the billing platform's RATE_CARDS map yet". Since
+    `reserveCredits` resolves an operation through `getRateCard`, every one of those names would have
+    thrown `unknown_feature` — interview code could not have billed anything, and no test said so. The
+    keys now derive from the registry, and a test asserts each resolves to a real card with a matching
+    version.
+  - Transcription's card carries a three-hour *ceiling* in `maxUnits`, not a price, because the
+    reservation extends as the session runs. A test pins that the ceiling equals the per-minute unit
+    times the documented maximum length, so the one non-derived number cannot drift either.
+  - The boundary rule is a source scan over `src/modules/interviews`, `src/lib/scheduling` and
+    `src/modules/scheduling`: no Stripe SDK, no payment-lifecycle module, no billing table. Verified by
+    planting a forbidden import and confirming the scan names the offending file — a second ledger
+    passes every test and diverges from the real one only once money has moved through both.
 
-- [ ] **Wrap every interview provider boundary in reserve and settlement**
-  - Files: `src/modules/interviews/billing.ts`, `tests/unit/modules/interviews/billing.test.ts`, `src/shared/lib/billing/feature-authorization.ts`
-  - Do: Call entitlement check and reserve before brief/STT/question/report provider access; extend
-    long-running live work, settle actual use with provider references, and release/refund on failure.
-    Stop only paid provider capture at zero and preserve manual notes/interview controls.
-  - Verify: fake-provider tests cover insufficient entitlement/credits, duplicate/retry, disconnect,
-    extension denial, grant expiry during interview, provider failure, actual-vs-reserved settlement,
-    and prove no provider request starts before reservation.
+- [x] **Wrap every interview provider boundary in reserve and settlement** — done 2026-07-28 (`13e37a7`), NOT yet deployed
+  - Files: `src/modules/interviews/billing.ts`,
+    `tests/unit/modules/interviews/reserve-and-settle.test.ts` (new)
+  - `withInterviewCredits` is the wrapper; `authorizeContextualQuestion` handles the operation that
+    reserves nothing. The provider callbacks themselves arrive with Phases 8–10 — this is the contract
+    they plug into, and it is fully tested against the real platform now rather than later.
+  - **The ordering is the contract**: entitlement, reserve, *then* the provider, then settle the actual
+    amount. Proven by reading the reservation row from inside the provider callback (it is `reserved`
+    by then) and by asserting the provider is never invoked when tier or balance says no. A version
+    that reserved and called the provider concurrently would spend real provider money on a request
+    the balance was about to refuse.
+  - Settlement records what the provider billed, not what was held. A provider reporting more than the
+    reservation covered throws here rather than at the ledger, because that means the extension logic
+    did not keep up — a caller bug, and it should say so.
+  - `extend()` returns the new ceiling rather than a boolean, so a refusal throws and there is no falsy
+    branch a caller could ignore and keep spending against.
+  - **Two transaction boundaries, both correct, both pinned.** A caller that lets the provider error
+    escape rolls the reservation back wholesale — nothing to release. A caller that catches inside its
+    transaction gets the hold released. Which applies is the caller's choice of boundary, not the
+    wrapper's, and the module says so.
+  - Contextual questions are gated on two conditions: tier alone would let a Pro organization drive the
+    question endpoint as a free general-purpose model between interviews.
+  - The tests share no organization. They did at first, and a later "there are no credits" assertion
+    quietly spent an earlier test's leftover balance — passing by resolving successfully, the opposite
+    of what it claimed to prove.
+  - Verify (2026-07-28): 15 tests against a real disposable Postgres and the real billing platform,
+    with only the provider faked.
 
-- [ ] **Show platform-owned credit state in interview UX**
-  - Files: `src/modules/interviews/components/CreditBalance.tsx`, `tests/unit/modules/interviews/components/CreditBalance.test.tsx`, `src/routes/api/billing/summary.ts`
-  - Do: Render the role-minimized platform summary, 80/90/ten-minute/zero live warnings, and owner
-    links to billing/pack/auto-recharge settings. Do not expose payment mutations or duplicate the
-    general billing settings inside interview pages.
-  - Verify: owner/admin/member, active/grace/blocked, low/zero, and stale summary component tests pass
-    with accessible throttled announcements and no Stripe/provider object in the DTO.
+- [x] **Show platform-owned credit state in interview UX** — done 2026-07-28 (`17d00c7`), NOT yet deployed
+  - Files: `src/modules/interviews/components/CreditBalance.tsx` (new),
+    `tests/unit/modules/interviews/components/CreditBalance.test.tsx` (new)
+  - `src/routes/api/billing/summary.ts` needed **no change**: it already role-minimizes
+    (`OrganizationBillingSummaryDto` for owner/admin, `BillingAvailabilityDto` for a member) and already
+    carries `activeCreditGrants`, `grace` and `capabilities`.
+  - Renders what the platform gave it and derives no balance, expiry or entitlement of its own. Links
+    to billing settings rather than duplicating the pack picker — a test asserts no form and no button
+    exists in the output.
+  - A member's DTO has no grants, and the component neither shows a balance nor invents a zero from
+    their absence. A stale balance stays on screen with a caveat, because blanking it mid-interview
+    reads as "you have none".
+  - One polite live region, announced only when the *set* of active warnings changes. A session ticks
+    every few seconds; a region re-announcing "90% used" each time makes a screen reader unusable for
+    exactly the person who most needs to hear it once.
+  - **Writing the test exposed a real defect.** Severity was "the last element of
+    `resolveLowBalanceWarnings`", which is most-severe-last only by coincidence of that function's push
+    order. A 100-unit reservation at 90% consumed leaves exactly ten minutes, so all three warnings
+    fire together — now ranked explicitly.
+  - At zero the copy says transcription stopped and notes still work: spec.md stops only paid provider
+    capture, and "credits exhausted" alone reads as the interview being over.
+  - Verify (2026-07-28): 17 component tests across member/owner, active/blocked, loading/stale,
+    low/zero, and the announce-once property.
 
 ## Phase 8 — Sensitive AI and brief
 
