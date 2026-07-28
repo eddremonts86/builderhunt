@@ -2272,7 +2272,7 @@ Not fixed here — it predates this program and deserves its own work.
     legitimate work statement accepted, Spanish accepted and the Spanish-only gap documented. Plus four UI
     tests for the label, the limitations, and the template's different notice.
 
-- [x] **Implement provider usage reconciliation** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Implement provider usage reconciliation** — done 2026-07-28 (`7f92907`), NOT yet deployed
   - Files: `src/lib/interviews/usage-reconciliation.ts` (new),
     `tests/unit/lib/interviews/usage-reconciliation.test.ts` (new)
   - **It compares and requests; it never writes the ledger.** Every correction goes through the platform's
