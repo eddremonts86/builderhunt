@@ -1736,27 +1736,57 @@ Not fixed here — it predates this program and deserves its own work.
     four malformed-grant shapes, both mode configurations, speaker attribution in both modes, unknown
     speakers, and billed-duration rounding.
 
-- [ ] **Implement interview session service**
+- [x] **Implement interview session service** — done 2026-07-28 (`9d7447d`), NOT yet deployed
   - Files: `src/lib/interviews/session-service.ts` (new),
     `tests/unit/lib/interviews/session-service.test.ts` (new),
     `src/shared/lib/repositories/interviews.ts`
-  - Do: Start/ready/live/pause/resume/finish/fail/abandon transitions, participant permission,
-    stored per-purpose consent recheck, candidate withdrawal state polling/SSE and ten-second hard
-    stop, organizer verbal-reminder acknowledgement, initial/live credit reservation and extension,
-    heartbeat expiry, provider usage attach, final settlement, and redacted audit.
-  - Verify: tests cover every transition, no consent, withdrawal, insufficient/expiring credit,
-    participant/admin roles, stale heartbeat, provider failure, retry, and reservation lifecycle.
+  - **`withInterviewCredits` cannot hold this reservation.** It reserves, runs and settles inside one
+    call, and a live interview spans many requests. The service uses the primitives directly and derives
+    the reservation id from the session id — so a retried `goLive`, or a second tab racing the first,
+    replays the existing hold instead of taking a second 180 credits against one conversation.
+  - **Four guards that could not have failed, found by the tests.** The already-closed-reservation
+    tolerance caught `FeatureBillingError` while that layer only translates `insufficient_credits`, so a
+    retried finish threw and stranded the session in `live`. The version guard ran *after* the transition
+    machine, so a tab that lost a race was told it attempted `paused -> paused`. Consent read as "some row
+    says accepted" would transcribe a candidate who accepted at booking and declined afterwards. And
+    `transitionSession` silently dropped `heartbeatAt`, which an `as never` cast in the first draft hid.
+  - The consent sort is local rather than the shared query's `ORDER BY` — proved by reversing that
+    `ORDER BY` (54 tests still pass) and then removing the local sort (two fail, including the
+    declined-candidate case).
+  - A refused extension is *returned*, not thrown: spec.md stops only paid provider capture at zero, and
+    a thrown error here would become a 5xx that ended an interview which should keep taking notes.
+  - Verify (2026-07-28): 44 tests over every transition, both consent absences, supersession,
+    withdrawal mid-session and during a pause, insufficient credits, tier refusal, participant refusal on
+    each control, four staleness cases, release-vs-settle, extension refusal, and warning thresholds.
 
-- [ ] **Add session/token/segment APIs**
+- [x] **Add session/token/segment APIs** — done 2026-07-28 (`80fccc8`), NOT yet deployed
   - Files: `src/routes/api/interviews/$interviewId/session.ts` (new),
     `src/routes/api/interviews/$interviewId/transcription-token.ts` (new),
-    `src/routes/api/interviews/$interviewId/segments.ts` (new)
-  - Do: Add authenticated create/transition/heartbeat/token and bounded final-segment batch handlers
-    with session/participant/consent/credit/flag checks, stable idempotency, monotonic sequences,
-    rate limits, CSRF, explicit DTOs, and no audio content type/body accepted.
-  - Verify: API tests cover 401, tenant B, admin denial, no consent/credit, duplicate/reordered/
-    oversized segments, audio MIME/body rejection, token TTL, paused/finished session, and exactly-once
-    persistence.
+    `src/routes/api/interviews/$interviewId/segments.ts` (new),
+    `src/shared/lib/security/same-origin.ts` (new), `src/lib/interviews/brief-context.ts`,
+    `tests/unit/routes/api/interviews/session-routes.test.ts` (new)
+  - **CSRF did not exist anywhere in this codebase before now.** The session cookie is `SameSite=Lax`,
+    which does block a cross-site POST — but that is one line in the auth config, and changing it for an
+    embed or an OAuth flow would remove CSRF protection from every mutating endpoint at once with nothing
+    failing. `assertSameOrigin` prefers `Sec-Fetch-Site` (unforgeable by page script) and falls back to
+    `Origin`; neither present is a refusal.
+  - **The eight "refuses audio" tests were fake and a plant proved it.** They sent `RIFF…` bytes, so the
+    400 came from `request.json()` failing — the content-type guard could have been deleted and all eight
+    would still have passed. Rewritten to send a body the endpoint would otherwise *accept*; with
+    `assertJsonRequest` neutered, all eight now fail.
+  - happy-dom's `Request` silently drops `Sec-Fetch-Site` and `Origin` (forbidden header names), so the
+    tests reinstate them through the one accessor the guard uses. Node's undici keeps them and a server
+    reads them off the wire, so the route is right to require them — it is the test environment that
+    cannot express them.
+  - `GET` is a pure read. It reports `stopNow` for the withdrawal poll but does not stamp
+    `heartbeat_at`: a `GET` is reachable cross-site without the origin check, and a write wearing a read's
+    verb would let any page keep a dead session out of reclaim. The beat is `POST action: 'heartbeat'` —
+    and it carries no `expectedVersion`, because a beat must work for a client whose version has drifted.
+  - Verify (2026-07-28): 54 tests over 401/403, tenant B reading as absent, admin denial, missing
+    consent, 402 on short balance, withdrawal on both the poll and the beat, four audio content types on
+    two routes plus smuggled `audio`/`objectKey` fields, master-key absence and echo-refusal, token
+    refusal for participant/paused/finished/withdrawn, 429 on both buckets, reordered/repeated/oversized/
+    empty batches, exactly-once resend, and speaker correction attribution.
 
 - [ ] **Implement IndexedDB final-text outbox**
   - Files: `src/modules/interviews/lib/transcript-outbox.ts` (new),

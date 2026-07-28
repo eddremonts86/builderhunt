@@ -162,6 +162,9 @@ import { Route as ApiOrganizationsInvitationsInvitationIdRouteImport } from './r
 import { Route as ApiOrganizationsDeletionImmediateRouteImport } from './routes/api/organizations/deletion/immediate'
 import { Route as ApiMeDataExportIdRouteImport } from './routes/api/me/data-export/$id'
 import { Route as ApiMeBuilderBuilderIdRouteImport } from './routes/api/me/builder/$builderId'
+import { Route as ApiInterviewsInterviewIdTranscriptionTokenRouteImport } from './routes/api/interviews/$interviewId/transcription-token'
+import { Route as ApiInterviewsInterviewIdSessionRouteImport } from './routes/api/interviews/$interviewId/session'
+import { Route as ApiInterviewsInterviewIdSegmentsRouteImport } from './routes/api/interviews/$interviewId/segments'
 import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
 import { Route as ApiCalendarAvailabilityOverridesRouteImport } from './routes/api/calendar/availability/overrides'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
@@ -1027,6 +1030,24 @@ const ApiMeBuilderBuilderIdRoute = ApiMeBuilderBuilderIdRouteImport.update({
   path: '/api/me/builder/$builderId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInterviewsInterviewIdTranscriptionTokenRoute =
+  ApiInterviewsInterviewIdTranscriptionTokenRouteImport.update({
+    id: '/api/interviews/$interviewId/transcription-token',
+    path: '/api/interviews/$interviewId/transcription-token',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdSessionRoute =
+  ApiInterviewsInterviewIdSessionRouteImport.update({
+    id: '/api/interviews/$interviewId/session',
+    path: '/api/interviews/$interviewId/session',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdSegmentsRoute =
+  ApiInterviewsInterviewIdSegmentsRouteImport.update({
+    id: '/api/interviews/$interviewId/segments',
+    path: '/api/interviews/$interviewId/segments',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiCalendarEventsEventIdRoute =
   ApiCalendarEventsEventIdRouteImport.update({
     id: '/api/calendar/events/$eventId',
@@ -1644,6 +1665,9 @@ export interface FileRoutesByFullPath {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
+  '/api/interviews/$interviewId/segments': typeof ApiInterviewsInterviewIdSegmentsRoute
+  '/api/interviews/$interviewId/session': typeof ApiInterviewsInterviewIdSessionRoute
+  '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -1872,6 +1896,9 @@ export interface FileRoutesByTo {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
+  '/api/interviews/$interviewId/segments': typeof ApiInterviewsInterviewIdSegmentsRoute
+  '/api/interviews/$interviewId/session': typeof ApiInterviewsInterviewIdSessionRoute
+  '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -2105,6 +2132,9 @@ export interface FileRoutesById {
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
+  '/api/interviews/$interviewId/segments': typeof ApiInterviewsInterviewIdSegmentsRoute
+  '/api/interviews/$interviewId/session': typeof ApiInterviewsInterviewIdSessionRoute
+  '/api/interviews/$interviewId/transcription-token': typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   '/api/me/builder/$builderId': typeof ApiMeBuilderBuilderIdRouteWithChildren
   '/api/me/data-export/$id': typeof ApiMeDataExportIdRoute
   '/api/organizations/deletion/immediate': typeof ApiOrganizationsDeletionImmediateRoute
@@ -2337,6 +2367,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
+    | '/api/interviews/$interviewId/segments'
+    | '/api/interviews/$interviewId/session'
+    | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -2565,6 +2598,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
+    | '/api/interviews/$interviewId/segments'
+    | '/api/interviews/$interviewId/session'
+    | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -2797,6 +2833,9 @@ export interface FileRouteTypes {
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
+    | '/api/interviews/$interviewId/segments'
+    | '/api/interviews/$interviewId/session'
+    | '/api/interviews/$interviewId/transcription-token'
     | '/api/me/builder/$builderId'
     | '/api/me/data-export/$id'
     | '/api/organizations/deletion/immediate'
@@ -2971,6 +3010,9 @@ export interface RootRouteChildren {
   ApiBuildersClaimVerifyRoute: typeof ApiBuildersClaimVerifyRoute
   ApiCalendarAvailabilityOverridesRoute: typeof ApiCalendarAvailabilityOverridesRoute
   ApiCalendarEventsEventIdRoute: typeof ApiCalendarEventsEventIdRoute
+  ApiInterviewsInterviewIdSegmentsRoute: typeof ApiInterviewsInterviewIdSegmentsRoute
+  ApiInterviewsInterviewIdSessionRoute: typeof ApiInterviewsInterviewIdSessionRoute
+  ApiInterviewsInterviewIdTranscriptionTokenRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRoute
   ApiMeBuilderBuilderIdRoute: typeof ApiMeBuilderBuilderIdRouteWithChildren
   ApiMeDataExportIdRoute: typeof ApiMeDataExportIdRoute
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
@@ -4090,6 +4132,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeBuilderBuilderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/interviews/$interviewId/transcription-token': {
+      id: '/api/interviews/$interviewId/transcription-token'
+      path: '/api/interviews/$interviewId/transcription-token'
+      fullPath: '/api/interviews/$interviewId/transcription-token'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdTranscriptionTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/session': {
+      id: '/api/interviews/$interviewId/session'
+      path: '/api/interviews/$interviewId/session'
+      fullPath: '/api/interviews/$interviewId/session'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/$interviewId/segments': {
+      id: '/api/interviews/$interviewId/segments'
+      path: '/api/interviews/$interviewId/segments'
+      fullPath: '/api/interviews/$interviewId/segments'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdSegmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/calendar/events/$eventId': {
       id: '/api/calendar/events/$eventId'
       path: '/api/calendar/events/$eventId'
@@ -5096,6 +5159,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBuildersClaimVerifyRoute: ApiBuildersClaimVerifyRoute,
   ApiCalendarAvailabilityOverridesRoute: ApiCalendarAvailabilityOverridesRoute,
   ApiCalendarEventsEventIdRoute: ApiCalendarEventsEventIdRoute,
+  ApiInterviewsInterviewIdSegmentsRoute: ApiInterviewsInterviewIdSegmentsRoute,
+  ApiInterviewsInterviewIdSessionRoute: ApiInterviewsInterviewIdSessionRoute,
+  ApiInterviewsInterviewIdTranscriptionTokenRoute:
+    ApiInterviewsInterviewIdTranscriptionTokenRoute,
   ApiMeBuilderBuilderIdRoute: ApiMeBuilderBuilderIdRouteWithChildren,
   ApiMeDataExportIdRoute: ApiMeDataExportIdRoute,
   ApiOrganizationsInvitationsInvitationIdRoute:

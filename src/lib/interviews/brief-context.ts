@@ -28,6 +28,8 @@ export interface BriefContext {
   invitationId: string
   roleTitle: string
   roleContext: string
+  /** The booked modality, which decides the capture mode a live session may use. */
+  modality: string
 }
 
 export async function briefContextForEvent(
@@ -40,6 +42,7 @@ export async function briefContextForEvent(
       invitationId: schedulingInvitations.id,
       roleTitle: schedulingInvitations.roleTitle,
       roleContext: schedulingInvitations.roleContext,
+      modality: schedulingInvitations.modality,
     })
     .from(calendarEvents)
     .innerJoin(
