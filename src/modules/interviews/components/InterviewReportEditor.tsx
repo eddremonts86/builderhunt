@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, Loader2, Lock, Sparkles } from 'lucide-react'
 import { Button, Textarea } from '~/components/ui'
+import { AiDraftNotice } from './AiDraftNotice'
 import { TranscriptEvidence, TranscriptExcerpt, type EvidenceSegment } from './TranscriptEvidence'
 
 /**
@@ -139,6 +140,13 @@ export function InterviewReportEditor(props: InterviewReportEditorProps) {
           {props.report.editedByUserId ? ' · edited by hand' : ''}
         </p>
       </div>
+
+      <AiDraftNotice
+        provider={props.report.provider}
+        model={props.report.model}
+        kind="report"
+        editedByUserId={props.report.editedByUserId}
+      />
 
       {isFinal && (
         <Callout tone="neutral">

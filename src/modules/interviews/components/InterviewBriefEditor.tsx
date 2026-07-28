@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles } from 'lucide-react'
 import { Button, Textarea } from '~/components/ui'
+import { AiDraftNotice } from './AiDraftNotice'
 import { EvidenceDrawer, type EvidenceSource } from './EvidenceDrawer'
 
 /**
@@ -205,6 +206,13 @@ export function InterviewBriefEditor({
                 : ` · ${brief.provider}${brief.model ? ` (${brief.model})` : ''}`}
               {brief.editedByUserId !== null && ' · edited by hand'}
             </p>
+            {/* The Article 50 label, from one shared component so it cannot end up partly present. */}
+            <AiDraftNotice
+              provider={isFallback ? null : brief.provider}
+              model={brief.model}
+              kind="brief"
+              editedByUserId={brief.editedByUserId}
+            />
           </div>
           {canEdit && (
             <div className="flex flex-wrap gap-2">

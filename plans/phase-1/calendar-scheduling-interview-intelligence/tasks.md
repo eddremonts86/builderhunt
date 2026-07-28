@@ -2227,28 +2227,50 @@ Not fixed here — it predates this program and deserves its own work.
     seven terms obligations, and contiguous numbering. Three plants proved the derived version, the major
     bump, and the accept-all ban are each load-bearing.
 
-- [ ] **Complete EU AI Act classification and operational controls**
+- [~] **Complete EU AI Act classification and operational controls** — controls done 2026-07-28
+  (`PENDING`); **sign-off NOT obtained, launch stays behind `SENSITIVE_AI_ENABLED=false`**
   - Files: `docs/compliance/interview-ai-act-classification.md` (new),
     `docs/operations/interview-ai-human-oversight.md` (new),
     `docs/operations/interview-ai-post-market-monitoring.md` (new),
-    `tests/unit/shared/lib/ai/tasks.test.ts`, `tests/unit/shared/lib/interviews.test.ts`,
+    `src/modules/interviews/components/AiDraftNotice.tsx` (new),
     `src/modules/interviews/components/InterviewBriefEditor.tsx`,
     `src/modules/interviews/components/InterviewReportEditor.tsx`,
-    `src/routes/_landing/legal/privacy.tsx`
-  - Do: For each `interview-brief-generate`, `interview-followup-suggest`, and
-    `interview-report-generate` task, document intended purpose, Annex III employment context,
-    Article 6(3) material-influence/preparatory-task assessment, classification owner/version,
-    evidence, foreseeable misuse, supported languages/capture modes, accuracy/limitations, protected-
-    trait proxy and bias evaluation, traceability, human oversight, AI-literacy instructions,
-    candidate disclosure/contest path, incident response, and post-market thresholds. If the
-    preparatory exception is not supportable, block launch behind `SENSITIVE_AI_ENABLED` until the
-    full applicable high-risk provider/deployer controls are complete. Label every output `AI draft`;
-    prevent automatic rank/score/status/hire decisions in schema, API, UI, and analytics.
-  - Verify: legal/compliance sign-off is dated; test fixtures across Spanish/English and protected-
-    trait proxy prompts reject prohibited influence; UI requires human review and shows disclosure/
-    limitations; static tests prove no candidate-status write from AI paths; monitoring/incident
-    drill passes; release checklist tracks Article 50 from 2026-08-02 and the then-current employment
-    high-risk enforcement date.
+    `src/shared/lib/interviews.ts`,
+    `tests/unit/shared/lib/ai/no-automated-decision.test.ts` (new),
+    `tests/unit/modules/interviews/components/report-ui.test.tsx`
+  - **The prohibited-output filter did not catch protected-trait proxies at all.** It refused "score" and
+    "culture fit" and let "the gap was maternity leave, which suggests family commitments" straight through —
+    found by writing the test first and watching six of six proxy cases pass. Added maternity/paternity,
+    pregnancy, disability, religion, ethnicity, race, gender, sexual orientation, age-for-role, native
+    speaker, accent, marital and family status, childcare, health and mental health, political affiliation,
+    union membership, and a graduation-year-used-inferentially pattern. A proxy is how a protected
+    characteristic reaches a hiring file without being named, so the patterns cover the *inference*.
+  - **A test that forbade the truth.** "has no score, rating or recommendation control anywhere" asserted the
+    page text never contained the word "score" — which broke the moment the Article 50 disclosure said, in as
+    many words, that the draft does not score or recommend anything. Word-absence was a proxy for the real
+    property; it now checks *controls* and scopes the vocabulary check to the report content.
+  - `AiDraftNotice` is one shared component because a sentence copied into three surfaces drifts: one gets
+    reworded, one moves below the fold, one is dropped in a refactor. It names the specific failure modes —
+    misattributed speakers, mis-transcribed terms, false certainty — because "AI draft" alone says who wrote
+    it, not what to distrust. A template renders a different notice; calling it an AI draft would be the more
+    misleading error.
+  - **Three of my own assertions were wrong before they were right**, each caught by running them: a substring
+    check flagged the word "rating" inside a schema comment, a write-detection regex blamed
+    `throttleBySession.delete(sessionId)` on an in-memory Map, and the brief's system message was asserted to
+    forbid scoring when its prohibition is about protected traits.
+  - **The Article 6(3) preparatory-task reading is drafted with its weaknesses stated, not asserted.** A report
+    is what a hiring decision is argued from weeks later; "preparatory" is defensible about what it contains
+    and less comfortable about what it influences. The mitigations are what the argument rests on. Recorded
+    honestly, including that `PROHIBITED_OUTPUT_PATTERNS` is English-only and "Recomiendo contratarlo" passes
+    today — with a test asserting that *current* behaviour so it fails the day Spanish patterns are added.
+  - **No sign-off exists and the launch is blocked**, exactly as the task requires. `SENSITIVE_AI_ENABLED`
+    defaults to `false`; the classification document's sign-off table is empty and names what is missing.
+  - Verify (2026-07-28): 24 static and fixture tests — no candidate-status column anywhere in the interview
+    tables, `.strict()` refusing an added score key, every AI module writing only its own artifact tables
+    (proved by planting a `candidate_submissions` write), no repository import that could change a candidate,
+    all three tasks sensitive/server-only/uncached/free-gated, six protected-trait proxies refused, a
+    legitimate work statement accepted, Spanish accepted and the Spanish-only gap documented. Plus four UI
+    tests for the label, the limitations, and the template's different notice.
 
 - [ ] **Implement provider usage reconciliation**
   - Files: `src/lib/interviews/usage-reconciliation.ts` (new),

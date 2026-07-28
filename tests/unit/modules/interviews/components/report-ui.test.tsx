@@ -234,15 +234,49 @@ describe('the report editor', () => {
 
   it('has no score, rating or recommendation control anywhere', () => {
     editor()
-    const body = text().toLowerCase()
-    // Absent, not hidden. The schema has no field for one and the server rejects the vocabulary, so a
-    // control here would be a promise the API refuses.
-    for (const word of ['score', 'rating', 'rank', 'recommend', 'hire', 'reject', 'culture fit']) {
-      expect(body).not.toContain(word)
-    }
+    // Controls, not words. The first version of this test asserted the *page text* never contained "score" or
+    // "recommend" — which broke the moment the Article 50 disclosure was added, because that disclosure says
+    // in as many words that the draft does not score or recommend anything. Word-absence was a proxy for the
+    // real property, and the proxy forbade saying the true thing out loud.
     expect(container?.querySelector('input[type="range"]')).toBeNull()
     expect(container?.querySelector('input[type="number"]')).toBeNull()
     expect(container?.querySelector('select')).toBeNull()
+    expect(container?.querySelector('input[type="radio"]')).toBeNull()
+
+    const controlLabels = [...(container?.querySelectorAll('button, input, select, [role="slider"]') ?? [])]
+      .map((el) => `${el.getAttribute('aria-label') ?? ''} ${el.textContent ?? ''}`.toLowerCase())
+    for (const label of controlLabels) {
+      for (const word of ['score', 'rating', 'rank', 'recommend', 'hire', 'reject']) {
+        expect(label, `a control offers "${word}"`).not.toContain(word)
+      }
+    }
+  })
+
+  it('keeps the scoring vocabulary out of the report content itself', () => {
+    editor()
+    // The content is what a reader takes away, and the server already refuses these words in it. Scoped to
+    // the report's own text so the disclosure above can name what the draft will not do.
+    const sections = [...(container?.querySelectorAll('textarea, p.text-sm') ?? [])]
+      .map((el) => (el.textContent ?? (el as HTMLTextAreaElement).value ?? '').toLowerCase())
+      .join(' ')
+    for (const word of ['score', 'rank', 'recommend', 'culture fit']) {
+      expect(sections, `the report content contains "${word}"`).not.toContain(word)
+    }
+  })
+
+  it('labels the draft as AI-written and names its limitations', () => {
+    editor()
+    // Article 50: the reader has to know. And "AI draft" alone says who wrote it, not what to distrust.
+    expect(text()).toMatch(/AI draft/)
+    expect(text()).toMatch(/attribute a sentence to the wrong speaker/i)
+    expect(text()).toMatch(/does not score, rank, or recommend/i)
+  })
+
+  it('says plainly when a template produced it, rather than calling that an AI draft', () => {
+    editor({ report: report({ provider: null, model: null }) })
+    expect(text()).toMatch(/Written without AI/i)
+    expect(text()).toMatch(/no model produced it/i)
+    expect(text()).not.toMatch(/AI draft/)
   })
 
   it('says the record does not score or recommend, before generating one', () => {

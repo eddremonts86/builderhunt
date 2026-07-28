@@ -265,6 +265,7 @@ export function assertNoDanglingSourceReference(referencedSourceIds: readonly st
  * forces a human look at AI-generated interview content, which is the safe failure direction here.
  */
 const PROHIBITED_OUTPUT_PATTERNS: RegExp[] = [
+  // ── Assessment vocabulary: the system has nowhere to record a score, and this stops one arriving as prose.
   /\bscor(e|es|ed|ing)\b/i,
   /\brank(s|ed|ing)?\b/i,
   /\bpersonality\b/i,
@@ -274,6 +275,31 @@ const PROHIBITED_OUTPUT_PATTERNS: RegExp[] = [
   /\breject(ed|ion)?\b/i,
   /\brecommend(ation|ed)?\s+(to\s+)?(hire|reject)\b/i,
   /\bculture[\s-]?add\b/i,
+
+  // ── Protected traits and their proxies (EU AI Act Annex III employment context).
+  //
+  // These were absent until 2026-07-28, and their absence was the point of a test that failed: the filter
+  // caught "score" and "culture fit" and let "the gap was maternity leave, which suggests family
+  // commitments" straight through. A proxy is how a protected characteristic reaches a hiring file without
+  // ever being named — a graduation year for age, a language remark for nationality, a career gap for
+  // parenthood — so the patterns have to cover the *inference*, not just the word.
+  //
+  // `assertReportContentIsClean` rejects rather than redacts. A report with a sentence removed reads as
+  // complete; a refused draft sends the model back or hands the organizer a template they write themselves.
+  /\bpregnan(t|cy)\b/i,
+  /\bmaternity\b/i, /\bpaternity\b/i, /\bparental\s+leave\b/i,
+  /\bdisab(led|ility|ilities)\b/i,
+  /\breligio(n|us)\b/i, /\bethnic(ity)?\b/i, /\brace\b/i, /\bracial\b/i,
+  /\bgender\b/i, /\bsexual\s+orientation\b/i,
+  /\b(too\s+)?(old|young)\s+for\b/i, /\bage(d|ing)?\s+(too|out)\b/i,
+  /\bnative\s+speaker\b/i, /\baccent(ed)?\b/i,
+  /\bmarital\s+status\b/i, /\bfamily\s+(commitments?|status|situation)\b/i,
+  /\bchildcare\b/i, /\bhealth\s+(condition|issue|problem)s?\b/i,
+  /\bmental\s+health\b/i, /\bpolitical\b/i, /\bunion\s+member(ship)?\b/i,
+  // A graduation or birth year used to reason about someone. The year alone is legitimate — "graduated in
+  // 1998" is a fact from a CV — so the pattern requires it to be doing inferential work.
+  /\bgraduated\s+in\s+\d{4}[^.]*\b(so|therefore|which suggests|likely|probably)\b/i,
+  /\b(so|therefore|which suggests|likely|probably)\b[^.]*\bgraduated\s+in\s+\d{4}/i,
 ]
 
 export interface ProhibitedContentFinding {
