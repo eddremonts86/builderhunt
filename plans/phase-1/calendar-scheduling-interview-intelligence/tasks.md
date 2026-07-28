@@ -1994,7 +1994,7 @@ Not fixed here — it predates this program and deserves its own work.
     slow-provider collapse, and speaker labelling in both capture modes. Three plants proved the ephemeral
     guarantee, the switch-before-billing order, and the in-flight collapse are each load-bearing.
 
-- [x] **Implement report generation and finalization service** — done 2026-07-28 (`PENDING`), NOT yet
+- [x] **Implement report generation and finalization service** — done 2026-07-28 (`d60684d`), NOT yet
   deployed
   - Files: `src/lib/interviews/report-service.ts` (new),
     `tests/unit/lib/interviews/report-service.test.ts` (new),
