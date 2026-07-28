@@ -4,8 +4,22 @@
     {
       "name": "builderhunt-dev",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["exec", "vite", "dev"],
+      "runtimeArgs": [
+        "exec",
+        "vite",
+        "dev"
+      ],
       "port": 3010,
+      "autoPort": false
+    },
+    {
+      "name": "builderhunt-verify",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "set -a; . ./.env.verify; set +a; exec pnpm exec vite dev --port 3011"
+      ],
+      "port": 3011,
       "autoPort": false
     }
   ]
