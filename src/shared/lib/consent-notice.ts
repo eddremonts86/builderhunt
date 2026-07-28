@@ -1,3 +1,5 @@
+import { CURRENT_CONSENT_VERSIONS } from './legal-versions'
+
 /**
  * The versions of the documents a candidate consents to (spec.md §"Consent, privacy, and
  * retention": "The server records the rendered notice version").
@@ -18,7 +20,14 @@
  * privacy policy: it covers the four booking purposes, the transient-audio statement, and the
  * no-training statement, which the site-wide policy states in less specific terms.
  */
-export const CANDIDATE_NOTICE_VERSION = '2026-07-01'
+export const CANDIDATE_NOTICE_VERSION = '2026-07-28'
 
-/** The site-wide privacy policy, rendered at `/legal/privacy`. Keep in step with the version shown on that page. */
-export const PRIVACY_POLICY_VERSION = 'v1.1'
+/**
+ * The site-wide privacy policy, rendered at `/legal/privacy`.
+ *
+ * **Derived, not restated.** This was a second literal `'v1.1'` sitting beside `legal.ts`'s own
+ * `privacy: 'v1.1'`, with nothing tying them together — and a consent receipt is only evidence if the
+ * version it records is the version the reader saw. Bumping one and forgetting the other would leave every
+ * receipt pointing at text that was never rendered, and nothing in the suite would have noticed.
+ */
+export const PRIVACY_POLICY_VERSION = CURRENT_CONSENT_VERSIONS.privacy

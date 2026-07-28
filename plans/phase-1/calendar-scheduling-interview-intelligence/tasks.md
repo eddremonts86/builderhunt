@@ -2194,22 +2194,38 @@ Not fixed here — it predates this program and deserves its own work.
     four deletion cases. Three plants proved the transcript exclusion, the owner scoping, and the
     shorten-not-delete choice are each load-bearing. The 11 existing privacy tests stay green.
 
-- [ ] **Update legal notices and consent copy**
-  - Files: `src/routes/_landing/legal/privacy.tsx`,
-    `src/routes/_landing/legal/terms.tsx`, `src/shared/lib/legal.ts`,
-    `tests/unit/shared/lib/legal.test.ts`, `docs/operations/interview-provider-register.md`
-  - **Not gated on legal review** (product-owner decision 2026-07-28). The copy is drafted and
-    shipped describing what the system actually does; a lawyer's approval is a general-availability
-    step, not a precondition for writing accurate notices. Writing them first is also what gives the
-    review something concrete to react to — waiting produces neither copy nor a review.
-  - Do: describe controller, documents, approved public-web import, transient
-    audio capture, stored transcript, sensitive AI, four required purposes, legal basis, processors/
-    regions, retention, rights, withdrawal consequences, no training, no automated decision, and
-    credit billing. Version the exact independently accepted controls and preserve old versions.
-    Never describe booking consent as permission for unrelated future processing.
-  - Verify: legal snapshot/version tests pass; portal renders and records each exact notice version;
-    no `accept all` API field exists; consent receipt, withdrawal, and contact paths work; reviewer
-    sign-off is recorded.
+- [x] **Update legal notices and consent copy** — done 2026-07-28 (`PENDING`), NOT yet deployed
+  - Files: `src/routes/_landing/legal/privacy.tsx`, `src/routes/_landing/legal/terms.tsx`,
+    `src/shared/lib/legal-versions.ts` (new), `src/shared/lib/legal.ts`,
+    `src/shared/lib/consent-notice.ts`, `tests/unit/shared/lib/legal-interview-copy.test.ts` (new),
+    `tests/unit/shared/lib/legal.test.ts`, `tests/unit/shared/lib/billing/consent.test.ts`,
+    `docs/operations/interview-provider-register.md`
+  - **Not gated on legal review** (product-owner decision 2026-07-28), as recorded in the original task.
+  - **The privacy version existed in three places and nothing tied them together.** `legal.ts` had
+    `privacy: 'v1.1'`, `consent-notice.ts` restated `'v1.1'`, and the page displayed a hand-typed
+    `Version v1.1`. A consent receipt is only evidence if the version it records is the version the reader
+    saw — bumping one and forgetting another would have left every receipt pointing at text nobody rendered,
+    with nothing failing. Now one constant in `legal-versions.ts`, derived everywhere. The split exists
+    because `legal.ts` reaches the account repositories and a candidate-facing module cannot import it.
+  - **v2.0, not v1.2.** `isMaterialVersionChange` compares only the major, so a minor bump would have let
+    every existing acceptance carry. A first draft used v1.2 and its own comment claimed acceptances would not
+    carry; they would have. New categories of personal data need fresh consent.
+  - **That has a deploy-day consequence I had not traced:** `requireCurrentCommercialConsent` uses the same
+    rule, so on deploy every organization holding a v1.x acceptance hits a re-acceptance gate at checkout.
+    Found by a billing test failing, not by reasoning. Correct behaviour, recorded in the provider register
+    so it does not surprise whoever is on support.
+  - **A section-numbering test caught two section 12s** in the terms — inserting the interview section
+    renumbered the old 11 into a collision. The test now derives the expected sequence rather than listing it.
+  - The `accept all` assertion is against the API schemas, not the prose: the page's promise is worth what the
+    API enforces, and a single field granting every purpose would make each separate unticked box decorative.
+  - Verify (2026-07-28): 42 tests. Version single-sourcing in both directions, the rendered version deriving
+    from the constant, the major bump, the bumped candidate notice, 27 required privacy-policy claims
+    (controller/processor, documents, robots.txt, link-only platforms, audio never stored, transcript stored,
+    consent basis, never pre-ticked, booking is not agreement, ten-second stop, non-retroactive withdrawal,
+    all four processors with regions, no training, three retention periods, no automated decision, AI can be
+    wrong, human review, rights, contact, credit billing), a section for every recordable consent purpose,
+    seven terms obligations, and contiguous numbering. Three plants proved the derived version, the major
+    bump, and the accept-all ban are each load-bearing.
 
 - [ ] **Complete EU AI Act classification and operational controls**
   - Files: `docs/compliance/interview-ai-act-classification.md` (new),

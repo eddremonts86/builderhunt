@@ -49,7 +49,7 @@ import {
 describe('legal constants', () => {
   it('has current versions for all required documents', () => {
     expect(CURRENT_CONSENT_VERSIONS.tos).toBe('v1.0')
-    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v1.1')
+    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v2.0')
     expect(CURRENT_CONSENT_VERSIONS.cookies).toBe('v1.0')
   })
 
@@ -125,21 +125,39 @@ describe('getConsentStatus', () => {
   // existing user — and would have disagreed with the billing consent gate, which has always used
   // isMaterialVersionChange.
   it('keeps a minor-version acceptance valid instead of demanding re-acceptance', async () => {
+    // A minor bump on the *current* privacy version. Seeded as v2.0 because the privacy policy went to v2.0
+    // for interview intelligence, and a v1.x acceptance no longer carries — see the next test. The behaviour
+    // under examination here is unchanged: same major, no re-prompt.
     mocks.listAccountConsents.mockResolvedValue([
       { document: 'tos', version: 'v1.0' },
-      { document: 'privacy', version: 'v1.0' },
+      { document: 'privacy', version: 'v2.0' },
       { document: 'cookies', version: 'v1.0' },
     ])
     const status = await getConsentStatus('user-1')
-    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v1.1')
+    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v2.0')
     expect(status.needsAcceptance).toEqual([])
-    expect(status.consents.privacy).toBe('v1.0')
+  })
+
+  it('demands re-acceptance of the privacy policy from anyone who accepted a v1.x version', async () => {
+    // The point of the v2.0 bump. Candidate documents, live audio, stored transcripts and AI processing are
+    // categories no v1.x reader was shown, and `isMaterialVersionChange` comparing the major part is the only
+    // thing that re-prompts them. A v1.2 would have silently carried every acceptance forward.
+    mocks.listAccountConsents.mockResolvedValue([
+      { document: 'tos', version: 'v1.0' },
+      { document: 'privacy', version: 'v1.1' },
+      { document: 'cookies', version: 'v1.0' },
+    ])
+    const status = await getConsentStatus('user-1')
+    expect(status.needsAcceptance).toContain('privacy')
   })
 
   it('demands re-acceptance on a major bump', async () => {
+    // `privacy` is seeded at the current v2.0 so this test isolates the `tos` bump. It used to seed v1.0 and
+    // expect only `tos`, which stopped being true when privacy went to v2.0 — the assertion was measuring two
+    // major bumps and naming one.
     mocks.listAccountConsents.mockResolvedValue([
       { document: 'tos', version: 'v0.9' },
-      { document: 'privacy', version: 'v1.0' },
+      { document: 'privacy', version: 'v2.0' },
       { document: 'cookies', version: 'v1.0' },
     ])
     const status = await getConsentStatus('user-1')

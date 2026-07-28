@@ -154,14 +154,18 @@ describe('requireCurrentCommercialConsent', () => {
   it('a non-material (minor) version bump does not invalidate an existing consent', async () => {
     const principal = await freshPrincipal()
     const { createBillingTermsAcceptance } = await import('~/shared/lib/repositories/billing')
-    // Current tos/privacy version is v1.0 (same major, minor 0). Simulate an acceptance recorded
-    // against a different minor release of the same major version — must still satisfy the check.
+    // A different *minor* release of each document's current major. `privacy` went to v2.x on 2026-07-28 for
+    // interview intelligence, so a `v1.9` acceptance is no longer a minor bump — it is the material change
+    // that must invalidate, and this test is about the case that must not. Seeding from the constants keeps
+    // the two apart the next time either major moves.
+    const { CURRENT_CONSENT_VERSIONS } = await import('~/shared/lib/legal-versions')
+    const minorOf = (version: string) => `${version.split('.')[0]}.9`
     await db.transaction((tx) => createBillingTermsAcceptance(tx, {
       id: uniqueId('acceptance'),
       organizationId: principal.organizationId,
       actorUserId: principal.userId,
-      termsVersion: 'v1.5',
-      privacyVersion: 'v1.9',
+      termsVersion: minorOf(CURRENT_CONSENT_VERSIONS.tos),
+      privacyVersion: minorOf(CURRENT_CONSENT_VERSIONS.privacy),
       commercialAction: 'checkout_credits',
     }))
 

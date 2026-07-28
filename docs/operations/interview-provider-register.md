@@ -598,3 +598,28 @@ Because storage and scanning need no external account, **Phase 6 (candidate docu
 a developer machine exactly as they will in Coolify.
 
 Only Phases 8, 9 and 10 (18 tasks) still wait on Deepgram and Azure credentials.
+
+## Consent versions, and the deploy-day consequence
+
+Recorded 2026-07-28.
+
+| Constant | Value | Where it is shown |
+| --- | --- | --- |
+| `CURRENT_CONSENT_VERSIONS.privacy` | `v2.0` | `/legal/privacy`, rendered from the constant |
+| `CURRENT_CONSENT_VERSIONS.tos` | `v1.0` | `/legal/terms` |
+| `CANDIDATE_NOTICE_VERSION` | `2026-07-28` | the candidate booking portal |
+
+The privacy policy went to a **new major** because interview intelligence adds categories of personal data no
+v1.x reader was shown: uploaded documents, imported public pages, transient live audio, stored transcripts,
+and AI processing of all four. `isMaterialVersionChange` compares only the major part, so anything less would
+have let every existing acceptance carry forward — holding people to text about their CV and their recorded
+words they never saw.
+
+> **On deploy, every existing customer hits a re-acceptance gate at checkout.**
+> `requireCurrentCommercialConsent` uses the same rule, so an organization whose stored acceptance names a
+> v1.x privacy version cannot buy credits or change a subscription until someone re-accepts. This is the
+> correct behaviour for a material change and it will still surprise whoever is on support that day. Found by
+> `tests/unit/shared/lib/billing/consent.test.ts` failing, not by tracing the callers.
+
+Bumping `CANDIDATE_NOTICE_VERSION` likewise invalidates existing candidate consent by design — candidates are
+re-prompted rather than held to an older notice. Nothing is deployed yet, so no live receipt is affected.

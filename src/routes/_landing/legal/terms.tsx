@@ -54,11 +54,15 @@ const SECTIONS: Array<{ heading: string; body: string }> = [
     body: 'These Terms are governed by the laws of the State of Delaware, United States, without regard to its conflict of law principles. Any dispute arising from or relating to the Service shall be resolved exclusively in the state and federal courts located in Delaware. You agree to submit to the personal jurisdiction of such courts.',
   },
   {
-    heading: '11. Changes to these terms',
+    heading: '11. Interview features',
+    body: 'Interview scheduling, candidate document handling, live transcription, and AI-assisted briefs and records are available to paid plans and consume prepaid credits. You are the controller of any candidate data you process through them and are responsible for having a lawful basis: BuilderHunt collects each candidate consent separately and records the exact notice version, but it is your obligation to use the feature only where you are entitled to. You must not use transcription without the candidate having agreed to it in the portal, and you must not attempt to obtain candidate material from a source whose terms forbid it. AI output is a draft for a human to read: it does not score, rank, or recommend a hiring decision, and you must not present it as one or make a decision solely on it. Candidate audio is never stored. Retention periods are published in the Privacy Policy and enforced automatically.',
+  },
+  {
+    heading: '12. Changes to these terms',
     body: 'We may update these Terms from time to time. The "Last updated" date at the top reflects the current version. Material changes will be communicated via email or in-product notice. Continued use of the Service after changes constitutes acceptance.',
   },
   {
-    heading: '12. Contact',
+    heading: '13. Contact',
     body: 'Questions about these Terms? Email legal@builderhunt.dev. We aim to respond within 5 business days.',
   },
 ]

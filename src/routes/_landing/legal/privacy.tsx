@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Shield } from 'lucide-react'
+import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 
 export const Route = createFileRoute('/_landing/legal/privacy')({
   component: PrivacyPage,
@@ -11,6 +12,9 @@ export const Route = createFileRoute('/_landing/legal/privacy')({
     ],
   }),
 })
+
+/** Bumped with the version above. Displayed, so it is stated once rather than in two places. */
+const PRIVACY_LAST_UPDATED = '2026-07-28'
 
 const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
   {
@@ -24,6 +28,7 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
           <li><strong>Claim data:</strong> if you claim a builder profile, your email and a one-time token. We never store the token after use.</li>
           <li><strong>Usage data:</strong> server logs (IP address, user agent, page path, response code) for 30 days. We use these for abuse prevention and capacity planning.</li>
           <li><strong>Device recognition data:</strong> a one-way, salted hash of a random device identifier we set in a first-party cookie, combined with a coarse browser family (e.g. &quot;chrome&quot;, &quot;safari&quot;) — never your full browser/OS string, screen size, fonts, or any other device fingerprint, and never reversible back to the original values. We use this only to recognize when the same device signs in to multiple accounts or an unusual number of accounts sign up from it, as part of abuse prevention.</li>
+          <li><strong>Interview data (candidates):</strong> if someone using BuilderHunt invites you to an interview, we process what you submit and what happens in the interview. This is set out in full in section 9.</li>
           <li><strong>Cookies:</strong> see our <Link to="/legal/cookies" className="text-bh-accent underline">Cookie Policy</Link>.</li>
         </ul>
       </>
@@ -108,6 +113,129 @@ const SECTIONS: Array<{ heading: string; body: React.ReactNode }> = [
     heading: '12. Contact',
     body: 'Privacy questions: privacy@builderhunt.dev. You can also reach us at the address listed in our Imprint. We aim to respond within 5 business days.',
   },
+  {
+    heading: '9. Interviews: documents, public links, audio, and AI',
+    body: (
+      <>
+        <p>
+          This section is for <strong>candidates</strong>. It applies when a company using BuilderHunt invites
+          you to an interview. Everything here happens only if you agree to it, and each part is a separate
+          choice — there is no single &quot;accept all&quot;.
+        </p>
+
+        <h3 className="mt-4 font-semibold">Who is responsible for your data</h3>
+        <p>
+          The company interviewing you decides why your data is processed and is the <strong>controller</strong>.
+          BuilderHunt is their <strong>processor</strong>: we handle it on their instructions and for no purpose
+          of our own. Requests about your data are best directed to them; if you contact us we will pass them
+          on and tell you we did.
+        </p>
+
+        <h3 className="mt-4 font-semibold">What you can be asked to agree to</h3>
+        <ul className="list-disc pl-6 mt-2 space-y-1">
+          <li>
+            <strong>Documents you upload.</strong> A CV or portfolio you choose to send. We scan it for
+            malware, extract its text so the interviewer can read and search it, and store both.
+          </li>
+          <li>
+            <strong>Public links you submit.</strong> If you tick the separate box confirming you are entitled
+            to share it, we fetch a page you gave us and keep the text. We honour <code>robots.txt</code>, we
+            never sign in to anything, and we never bypass a paywall or a login. Platforms whose terms forbid
+            it — LinkedIn, X, Facebook, Instagram — are stored as a link only and never fetched.
+          </li>
+          <li>
+            <strong>Live transcription.</strong> During the interview your audio is streamed to a transcription
+            service in the EU and turned into text as it happens. <strong>The audio itself is never stored</strong>
+            — not by us and not by the provider. The <em>text</em> is stored.
+          </li>
+          <li>
+            <strong>AI assistance.</strong> A model reads the documents, the imported page text, and the
+            transcript, and produces a preparation brief, suggested follow-up questions, and a written record
+            of the interview.
+          </li>
+        </ul>
+
+        <h3 className="mt-4 font-semibold">Our legal basis</h3>
+        <p>
+          Your <strong>consent</strong>, for each of the four purposes above, recorded separately with the exact
+          version of the notice you were shown. Boxes are never pre-ticked. Booking a time is not agreement to
+          any of it: you can book an interview and decline all four.
+        </p>
+
+        <h3 className="mt-4 font-semibold">Withdrawing, and what happens then</h3>
+        <p>
+          You can withdraw any of them at any time from the same page you gave them on. Withdrawal is not
+          retroactive — it stops future processing and does not un-write what has already happened. Concretely:
+          withdrawing transcription <strong>stops the transcription within ten seconds</strong> and the
+          interview continues without it; withdrawing document processing stops any further use of your
+          documents. Already-stored text remains until its retention period ends, or sooner if you ask the
+          interviewing company to delete it.
+        </p>
+
+        <h3 className="mt-4 font-semibold">Who else sees it</h3>
+        <ul className="list-disc pl-6 mt-2 space-y-1">
+          <li><strong>Transcription:</strong> Deepgram, EU endpoint (<code>api.eu.deepgram.com</code>). Audio in, text out, nothing retained.</li>
+          <li><strong>AI:</strong> Mistral, EU (<code>api.mistral.ai</code>). Chosen for its region.</li>
+          <li><strong>Storage:</strong> Cloudflare R2, private buckets. No document is ever publicly reachable.</li>
+          <li><strong>Email:</strong> Resend, to send you the invitation.</li>
+        </ul>
+        <p className="mt-2">
+          <strong>Nothing you give us trains anyone&apos;s model.</strong> We do not train on your data and our
+          providers are engaged on terms that forbid training on it.
+        </p>
+
+        <h3 className="mt-4 font-semibold">How long it is kept</h3>
+        <ul className="list-disc pl-6 mt-2 space-y-1">
+          <li><strong>Documents and their extracted text:</strong> 180 days.</li>
+          <li><strong>Transcripts, briefs, and interview records:</strong> 90 days.</li>
+          <li><strong>Consent receipts:</strong> up to 24 months — longer than the data, because the receipt is the evidence that processing it was lawful.</li>
+          <li><strong>Audio:</strong> never stored, so there is nothing to delete.</li>
+        </ul>
+        <p className="mt-2">
+          An interviewing company may choose shorter periods. Deletion is automatic when the period ends.
+        </p>
+
+        <h3 className="mt-4 font-semibold">No automated decision about you</h3>
+        <p>
+          The AI writes drafts for a human to read. It does not score you, rank you against anyone, or
+          recommend hiring or rejecting you — the system has nowhere to record such a thing and refuses output
+          that attempts it. Every AI output is labelled as a draft and is editable by the interviewer, who
+          makes the decision. You are not subject to a decision based solely on automated processing.
+        </p>
+        <p className="mt-2">
+          AI output can be wrong. It can misattribute who said what, mis-transcribe a name or a technical term,
+          and miss things. If you believe a record about you is inaccurate, you can ask the interviewing company
+          to correct it, and you can ask for a human to review any conclusion drawn from it.
+        </p>
+
+        <h3 className="mt-4 font-semibold">Your rights</h3>
+        <p>
+          Access, correction, deletion, restriction, objection, and portability, plus the right to complain to
+          your data protection authority. Because the interviewing company is the controller, ask them first —
+          they can act directly. Reach us at{' '}
+          <a href="mailto:privacy@builderhunt.dev" className="text-bh-accent underline">privacy@builderhunt.dev</a>{' '}
+          and we will route it and confirm we have.
+        </p>
+      </>
+    ),
+  },
+  {
+    heading: '10. Interview credits (for companies)',
+    body: (
+      <>
+        <p>
+          Interview features consume prepaid credits: a preparation brief and a written record cost 5 credits
+          each, live transcription costs 1 credit per minute the provider bills, and follow-up suggestions are
+          included while transcription is running. Credits are reserved when work starts and settled against
+          what the provider actually billed, with the unused part returned.
+        </p>
+        <p className="mt-2">
+          Running out of credits stops paid transcription. It does not end an interview in progress, and notes
+          keep saving.
+        </p>
+      </>
+    ),
+  },
 ]
 
 function PrivacyPage() {
@@ -119,7 +247,12 @@ function PrivacyPage() {
             <Shield className="w-7 h-7 text-bh-accent" aria-hidden="true" />
             Privacy Policy
           </h1>
-          <p className="text-sm text-bh-text-muted">Version v1.1 · Last updated 2026-07-25</p>
+          {/* Derived, never typed. This line is the version a reader *sees*, and a consent receipt records
+              `CURRENT_CONSENT_VERSIONS.privacy` — if the two can differ, every receipt in the ledger is
+              evidence of nothing. It was a hand-written literal until 2026-07-28. */}
+          <p className="text-sm text-bh-text-muted">
+            Version {CURRENT_CONSENT_VERSIONS.privacy} · Last updated {PRIVACY_LAST_UPDATED}
+          </p>
         </header>
         <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
           {SECTIONS.map((s) => (
