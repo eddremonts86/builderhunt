@@ -1788,7 +1788,7 @@ Not fixed here — it predates this program and deserves its own work.
     refusal for participant/paused/finished/withdrawn, 429 on both buckets, reordered/repeated/oversized/
     empty batches, exactly-once resend, and speaker correction attribution.
 
-- [x] **Implement IndexedDB final-text outbox** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Implement IndexedDB final-text outbox** — done 2026-07-28 (`9399d64`), NOT yet deployed
   - Files: `src/modules/interviews/lib/transcript-outbox.ts` (new),
     `tests/unit/modules/interviews/lib/transcript-outbox.test.ts` (new), `package.json`
     (`fake-indexeddb` devDependency)
