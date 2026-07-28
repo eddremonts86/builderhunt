@@ -192,6 +192,7 @@ import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/inci
 import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
 import { Route as ApiAdminDocumentsRunWorkerRouteImport } from './routes/api/admin/documents/run-worker'
+import { Route as ApiAdminDocumentsRunWebImportsRouteImport } from './routes/api/admin/documents/run-web-imports'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
@@ -234,6 +235,7 @@ import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from '.
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
 import { Route as ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport } from './routes/api/scheduling/invitations/$invitationId/documents/$documentId/download'
 import { Route as ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport } from './routes/api/public/scheduling/$invitationId/uploads/$documentId/complete'
+import { Route as ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport } from './routes/api/public/scheduling/$invitationId/links/$linkId/import'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -1194,6 +1196,12 @@ const ApiAdminDocumentsRunWorkerRoute =
     path: '/api/admin/documents/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminDocumentsRunWebImportsRoute =
+  ApiAdminDocumentsRunWebImportsRouteImport.update({
+    id: '/api/admin/documents/run-web-imports',
+    path: '/api/admin/documents/run-web-imports',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminDiscoveryRunWorkerRoute =
   ApiAdminDiscoveryRunWorkerRouteImport.update({
     id: '/api/admin/discovery/run-worker',
@@ -1442,6 +1450,12 @@ const ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute =
     path: '/$documentId/complete',
     getParentRoute: () => ApiPublicSchedulingInvitationIdUploadsRoute,
   } as any)
+const ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute =
+  ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport.update({
+    id: '/api/public/scheduling/$invitationId/links/$linkId/import',
+    path: '/api/public/scheduling/$invitationId/links/$linkId/import',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LandingIndexRoute
@@ -1577,6 +1591,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-web-imports': typeof ApiAdminDocumentsRunWebImportsRoute
   '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -1665,6 +1680,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
+  '/api/public/scheduling/$invitationId/links/$linkId/import': typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
   '/api/public/scheduling/$invitationId/uploads/$documentId/complete': typeof ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute
   '/api/scheduling/invitations/$invitationId/documents/$documentId/download': typeof ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute
 }
@@ -1800,6 +1816,7 @@ export interface FileRoutesByTo {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-web-imports': typeof ApiAdminDocumentsRunWebImportsRoute
   '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -1888,6 +1905,7 @@ export interface FileRoutesByTo {
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
+  '/api/public/scheduling/$invitationId/links/$linkId/import': typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
   '/api/public/scheduling/$invitationId/uploads/$documentId/complete': typeof ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute
   '/api/scheduling/invitations/$invitationId/documents/$documentId/download': typeof ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute
 }
@@ -2028,6 +2046,7 @@ export interface FileRoutesById {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-web-imports': typeof ApiAdminDocumentsRunWebImportsRoute
   '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
@@ -2116,6 +2135,7 @@ export interface FileRoutesById {
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   '/api/me/builder-claims/$claimId/portfolio/unpublish': typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
+  '/api/public/scheduling/$invitationId/links/$linkId/import': typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
   '/api/public/scheduling/$invitationId/uploads/$documentId/complete': typeof ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRoute
   '/api/scheduling/invitations/$invitationId/documents/$documentId/download': typeof ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute
 }
@@ -2255,6 +2275,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-web-imports'
     | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -2343,6 +2364,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
+    | '/api/public/scheduling/$invitationId/links/$linkId/import'
     | '/api/public/scheduling/$invitationId/uploads/$documentId/complete'
     | '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
   fileRoutesByTo: FileRoutesByTo
@@ -2478,6 +2500,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-web-imports'
     | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -2566,6 +2589,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
+    | '/api/public/scheduling/$invitationId/links/$linkId/import'
     | '/api/public/scheduling/$invitationId/uploads/$documentId/complete'
     | '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
   id:
@@ -2705,6 +2729,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-web-imports'
     | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
@@ -2793,6 +2818,7 @@ export interface FileRouteTypes {
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
     | '/api/me/builder-claims/$claimId/portfolio/unpublish'
+    | '/api/public/scheduling/$invitationId/links/$linkId/import'
     | '/api/public/scheduling/$invitationId/uploads/$documentId/complete'
     | '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
   fileRoutesById: FileRoutesById
@@ -2883,6 +2909,7 @@ export interface RootRouteChildren {
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDevpostRunWorkerRoute: typeof ApiAdminDevpostRunWorkerRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
+  ApiAdminDocumentsRunWebImportsRoute: typeof ApiAdminDocumentsRunWebImportsRoute
   ApiAdminDocumentsRunWorkerRoute: typeof ApiAdminDocumentsRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
@@ -2946,6 +2973,7 @@ export interface RootRouteChildren {
   ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
+  ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -4231,6 +4259,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminDocumentsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/documents/run-web-imports': {
+      id: '/api/admin/documents/run-web-imports'
+      path: '/api/admin/documents/run-web-imports'
+      fullPath: '/api/admin/documents/run-web-imports'
+      preLoaderRoute: typeof ApiAdminDocumentsRunWebImportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/discovery/run-worker': {
       id: '/api/admin/discovery/run-worker'
       path: '/api/admin/discovery/run-worker'
@@ -4524,6 +4559,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/public/scheduling/$invitationId/uploads/$documentId/complete'
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdUploadsDocumentIdCompleteRouteImport
       parentRoute: typeof ApiPublicSchedulingInvitationIdUploadsRoute
+    }
+    '/api/public/scheduling/$invitationId/links/$linkId/import': {
+      id: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      path: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      fullPath: '/api/public/scheduling/$invitationId/links/$linkId/import'
+      preLoaderRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -4966,6 +5008,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDevpostRunWorkerRoute: ApiAdminDevpostRunWorkerRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
+  ApiAdminDocumentsRunWebImportsRoute: ApiAdminDocumentsRunWebImportsRoute,
   ApiAdminDocumentsRunWorkerRoute: ApiAdminDocumentsRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,
@@ -5044,6 +5087,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicSchedulingInvitationIdIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
     ApiAdminBillingEventsEventIdReplayRoute,
+  ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute:
+    ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

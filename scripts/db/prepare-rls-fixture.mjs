@@ -206,6 +206,22 @@ try {
             'org-a/eeeeeeee/cv.pdf', 'cv.pdf', 'application/pdf', repeat('a', 64), 1024, now() + interval '180 days')
     on conflict (id) do nothing
   `
+  // One link per candidate, so the invitation-scoped capability policy 0086 applied to
+  // `candidate_links` is measured rather than assumed. It had no fixture and no assertion at all
+  // until now, which meant the narrowing was shipped unverified.
+  await owner`
+    insert into candidate_links (id, organization_id, submission_id, url, normalized_url, source_type, acquisition_mode, policy_decision, import_state)
+    values ('cccccccc-0000-4000-8000-00000000000a', 'org-a', 'eeeeeeee-0000-4000-8000-00000000000a',
+            'https://cand-a.dev/', 'https://cand-a.dev/', 'personal_site', 'user_submitted', 'user_submitted', 'not_requested')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into candidate_links (id, organization_id, submission_id, url, normalized_url, source_type, acquisition_mode, policy_decision, import_state)
+    values ('cccccccc-0000-4000-8000-00000000000b', 'org-a', 'eeeeeeee-0000-4000-8000-00000000000b',
+            'https://cand-b.dev/', 'https://cand-b.dev/', 'personal_site', 'user_submitted', 'user_submitted', 'not_requested')
+    on conflict (id) do nothing
+  `
+
   // A second candidate's document, in the SAME organization. Without it the capability assertion
   // "saw exactly one document" holds whether the policy is scoped to the organization or to the
   // invitation, so it would certify an isolation it never tested — the same blind spot that hid the

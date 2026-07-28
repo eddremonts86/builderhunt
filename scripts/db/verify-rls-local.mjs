@@ -471,6 +471,12 @@ try {
       throw new Error(`capability read the wrong candidate's document: ${JSON.stringify(ownDocuments)}`)
     }
 
+    // Links, same shape. 0086 narrowed this policy too and nothing measured it until now.
+    const ownLinks = await asCandidateA((tx) => tx`select id, submission_id from candidate_links`)
+    if (ownLinks.length !== 1 || ownLinks[0].submission_id !== 'eeeeeeee-0000-4000-8000-00000000000a') {
+      throw new Error(`capability read the wrong candidate's links: ${JSON.stringify(ownLinks)}`)
+    }
+
     // Explicitly ask for the other candidate's rows by id. A policy that merely
     // filters a bare SELECT could still admit a targeted one.
     const targeted = await asCandidateA(async (tx) => {
@@ -478,7 +484,8 @@ try {
       const submissions = await tx`select id from candidate_submissions where invitation_id = ${INVITATION_B}`
       // Asked for by primary key, which is the request a filtering bug would still answer.
       const documents = await tx`select id from candidate_documents where id = 'ffffffff-0000-4000-8000-00000000000c'`
-      return invitations.length + submissions.length + documents.length
+      const links = await tx`select id from candidate_links where id = 'cccccccc-0000-4000-8000-00000000000b'`
+      return invitations.length + submissions.length + documents.length + links.length
     })
     if (targeted !== 0) throw new Error(`capability reached the other candidate by id (${targeted} rows)`)
 

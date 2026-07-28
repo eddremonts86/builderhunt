@@ -112,7 +112,6 @@ beforeAll(async () => {
     timezone: 'UTC',
     modality: 'remote_call',
     policyVersion: 'v1',
-    retentionExpiresAt: RETENTION,
   }))).returning({ id: schedulingInvitations.id, organizationId: schedulingInvitations.organizationId })
 
   const submissions = await db.insert(candidateSubmissions).values(invitations.map((invitation) => ({
