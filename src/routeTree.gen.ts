@@ -197,6 +197,7 @@ import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadma
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
+import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
@@ -1238,6 +1239,12 @@ const ApiAdminLegalRunWorkerRoute = ApiAdminLegalRunWorkerRouteImport.update({
   path: '/api/admin/legal/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminInterviewsRunRetentionRoute =
+  ApiAdminInterviewsRunRetentionRouteImport.update({
+    id: '/api/admin/interviews/run-retention',
+    path: '/api/admin/interviews/run-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminIncidentsIdRoute = ApiAdminIncidentsIdRouteImport.update({
   id: '/api/admin/incidents/$id',
   path: '/api/admin/incidents/$id',
@@ -1682,6 +1689,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
+  '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -1919,6 +1927,7 @@ export interface FileRoutesByTo {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
+  '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2161,6 +2170,7 @@ export interface FileRoutesById {
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
+  '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
@@ -2402,6 +2412,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
+    | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
     | '/api/admin/operations/sync-schedules'
@@ -2639,6 +2650,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
+    | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
     | '/api/admin/operations/sync-schedules'
@@ -2880,6 +2892,7 @@ export interface FileRouteTypes {
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
+    | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
     | '/api/admin/operations/sync-schedules'
@@ -3070,6 +3083,7 @@ export interface RootRouteChildren {
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
+  ApiAdminInterviewsRunRetentionRoute: typeof ApiAdminInterviewsRunRetentionRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
@@ -4458,6 +4472,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminLegalRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/interviews/run-retention': {
+      id: '/api/admin/interviews/run-retention'
+      path: '/api/admin/interviews/run-retention'
+      fullPath: '/api/admin/interviews/run-retention'
+      preLoaderRoute: typeof ApiAdminInterviewsRunRetentionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/incidents/$id': {
       id: '/api/admin/incidents/$id'
       path: '/api/admin/incidents/$id'
@@ -5270,6 +5291,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,
+  ApiAdminInterviewsRunRetentionRoute: ApiAdminInterviewsRunRetentionRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,

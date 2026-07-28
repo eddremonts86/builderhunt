@@ -2117,16 +2117,45 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 11 — Retention, privacy, reconciliation, and operations
 
-- [ ] **Implement retention and reservation cleanup worker**
+- [x] **Implement retention and reservation cleanup worker** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/lib/interviews/retention-worker.ts` (new),
     `tests/unit/lib/interviews/retention-worker.test.ts` (new),
     `src/shared/lib/repositories/interview-retention.ts` (new),
     `src/routes/api/admin/interviews/run-retention.ts` (new)
-  - Do: Lease expired resources per tenant, delete R2/provider/cache artifacts, then relational data
-    in safe dependency order, expire/release stale reservations, retain minimal consent/audit per
-    policy, retry partial failures, dry-run metrics, and write redacted job run.
-  - Verify: seeded 90/180-day boundaries, shorter org override, R2/provider failure/retry,
-    idempotency, tenant isolation, and unauthorized route; local runtime confirms objects/rows gone.
+  - **Objects before rows, and that ordering is the whole design.** Neither is atomic with the other, so the
+    choice is which way it breaks. Row-then-object leaves a candidate's CV in R2 forever with nothing left
+    that knows its key — a silent, permanent retention breach no later pass can find. Object-then-row leaves
+    a row pointing at a missing object, which 404s and is swept next pass. A failed object deletion therefore
+    *keeps* its row, because the row is the only thing that will make the retry happen.
+  - **Child-first deletion, because the FK cascades would otherwise hide the bug.** `transcript_segments` and
+    `interview_suggestions` cascade from `interview_sessions`. A parent-first sweep would *work* and would
+    quietly take a 90-day transcript because its session row expired first. Each table is deleted on its own
+    predicate, and a parent is only deleted once no child remains.
+  - **`candidate_links` has no retention column** — found by the query failing with `column
+    "retention_expires_at" does not exist`, not by reading the schema carefully enough first. A link's
+    retention is its submission's, inherited through the composite FK, so its predicate is the submission's
+    clock.
+  - **The sweep never recomputes an expiry.** Every row carries the deadline written under the policy in
+    force when it was created; recomputing from today's env would retroactively extend retention on data a
+    candidate was told would be deleted. A shorter organization policy therefore needs no schema and no
+    branch — whatever wrote the row writes a nearer expiry.
+  - **Consent outlives the data it covered**, on its own `INTERVIEW_CONSENT_RETENTION_MONTHS` clock. Deleting
+    it alongside would destroy the only evidence the processing was lawful — the one record a regulator asks
+    for after the data is gone.
+  - The route has **no feature flag**, unlike every other worker route. An operator who switches interviews
+    off still owes every candidate their deletion, and a sweep that stopped with the flag would retain
+    documents forever. Turning a feature off must not turn its obligations off.
+  - Stale reservations are closed through the platform's own `releaseReservation`, scoped to `interview_%`
+    operations. Reimplementing the release would be a second, quietly divergent billing path; sweeping every
+    operation would be a second billing worker wearing a retention hat.
+  - `dryRun` rehearses the real statements inside a rolled-back transaction, so its counts are the counts —
+    a preview computed differently would be worthless as a rehearsal, and a test asserts the two match.
+  - Verify (2026-07-28): 21 tests over end-to-end expiry, nothing inside its window, a transcript surviving
+    its session, the session going on the next pass, a submission held by a live document, object-before-row
+    ordering, a failed object keeping its row, the retry succeeding, no storage configured, tenant isolation
+    both ways, one tenant failing without stopping the sweep, three consent-window cases, dry-run parity, and
+    four reservation cases. Three plants proved the child-first order, the failed-object row retention, and
+    the separate consent clock are each load-bearing.
 
 - [ ] **Extend privacy export and deletion**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
