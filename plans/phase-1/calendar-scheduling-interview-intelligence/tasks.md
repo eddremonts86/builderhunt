@@ -2028,14 +2028,34 @@ Not fixed here — it predates this program and deserves its own work.
     score and dangling reference, evidence-list immutability, finalize with timestamp, double finalize,
     stale-version finalize, post-finalize edit refusal, and version metadata without content.
 
-- [ ] **Add suggestion/report APIs**
+- [x] **Add suggestion/report APIs** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/routes/api/interviews/$interviewId/suggestions.ts` (new),
     `src/routes/api/interviews/$interviewId/report.ts` (new),
-    `src/routes/api/interviews/$interviewId/finalize.ts` (new)
-  - Do: Add authorized bounded suggestion generation/action and report read/edit/generate/finalize
-    handlers with CSRF, rate/credit/flag gates, explicit DTOs, version checks, and safe errors.
-  - Verify: API tests cover paused/finished state, throttle, tenant B, admin denial, forged evidence,
-    stale version, insufficient credit, provider disabled, and successful finalization.
+    `src/routes/api/interviews/$interviewId/finalize.ts` (new),
+    `tests/unit/routes/api/interviews/report-routes.test.ts` (new)
+  - **A suggestion refusal is 200, always.** The service degrades to the prepared questions and the route
+    passes the `reason` through. An error status during a live interview surfaces as a failure banner on a
+    screen the candidate may be able to see, and the client got something usable either way. The UI decides
+    how loud to be.
+  - **A provider failure on a report is 201 with a template; a credit failure is 402.** The interview
+    happened and the organizer needs somewhere to write it up — but a blank form handed to someone whose
+    balance ran out would hide the reason they got it.
+  - **A dangling citation is 422, not 400.** The edit was well-formed and the problem is one specific
+    citation, which is nameable and fixable. Collapsing it into "invalid input" would leave the organizer
+    hunting through a report for something the server already knows.
+  - `finalize` is its own route because it is its own decision, and it requires `confirmFinal: true` — a
+    field a serialization bug could not set by accident on a `PATCH`. Its audit line is the most important
+    in the feature: when an assessment of a person became the record, and by whom.
+  - **One test could not fail and a plant would not have caught it.** "answers 503 when contextual questions
+    are switched off" asserted `[200, 503]`.contains(status). The env mock was a frozen spread, so the flag
+    could not be flipped; rewritten with a mutable hoisted mock, and it now fails when the gate is removed.
+  - Verify (2026-07-28): 37 tests over 401, credit confirmation required, generation with provenance,
+    participant `canEdit: false`, template-on-provider-failure at 201, 402 storing nothing, 409 with no
+    transcript, cross-site and audio content-type refusals, 429 with retry-after, version listing without
+    content, edit versioning and 409, 422 for a dangling citation, 400 for a score, `.strict()` refusing a
+    supplied evidence list, finalize confirmation, double finalize, stale finalize, post-finalize edit
+    refusal, paused-session fallback, ephemeral proposals writing nothing, action recording, and both
+    feature flags. Two plants proved the flag gate and the 422 mapping are load-bearing.
 
 - [ ] **Build contextual question and report UI**
   - Files: `src/modules/interviews/components/ContextualQuestions.tsx` (new),
