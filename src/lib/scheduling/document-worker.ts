@@ -63,7 +63,10 @@ import {
   type LeasedDocument,
 } from '~/shared/lib/repositories/interview-documents'
 
-export const DOCUMENT_JOB_KEY = 'interview-documents'
+// Namespaced like the other workers' keys (`calendar.recurrence-materialization`,
+// `calendar.reminder-delivery`). The key is what `operational_schedules` and the job-run feed join
+// on, so an off-convention name is a row nobody finds when they go looking by prefix.
+export const DOCUMENT_JOB_KEY = 'interviews.document-processing'
 
 /**
  * Three attempts, not more. Every retry re-streams the whole object through ClamAV, so a document

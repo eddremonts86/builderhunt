@@ -1319,17 +1319,49 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
     and exact hash twice over, per-page and per-heading offsets that address their own text, repeated
     headings mapping to ascending offsets, and that no markup escapes into the text.
 
-- [ ] **Implement document repository and worker**
+- [x] **Implement document repository and worker** — done 2026-07-28 (`f52f437`), NOT yet deployed
   - Files: `src/shared/lib/repositories/interview-documents.ts` (new),
-    `tests/unit/shared/lib/repositories/interview-documents.test.ts` (new),
-    `src/lib/scheduling/document-worker.ts` (new),
-    `tests/unit/lib/scheduling/document-worker.test.ts` (new),
-    `src/routes/api/admin/documents/run-worker.ts` (new)
-  - Do: Lease uploaded documents per tenant, mark scanning/extracting terminal states atomically,
-    download quarantine stream, scan, move clean, extract, store text/map, delete rejected objects,
-    retry transient failures with cap, and record redacted job run.
-  - Verify: repeated/concurrent worker is idempotent; tenant failure isolation; infected never moves;
-    transient retry and permanent failure behave; unauthorized worker route fails.
+    `src/lib/scheduling/document-worker.ts` (new), `src/lib/storage/object-keys.ts` (new),
+    `src/routes/api/admin/documents/run-worker.ts` (new), `drizzle/0087_romantic_karen_page.sql` (new),
+    `src/shared/lib/db/schema.ts`, and the three new test files
+  - **The status is the lease.** Claiming commits on its own, the scan and object moves run with no
+    transaction open, and each outcome is applied in its own short transaction. One transaction
+    around the whole thing would hold a tenant's rows locked for a ClamAV stream plus two S3 round
+    trips, on a pool shared with every live request. `reclaimStaleLeases` is the price of that
+    choice: a process killed mid-flight would otherwise strand a candidate's CV as "processing"
+    forever, which no amount of retrying would ever notice.
+  - **Move before mark**, because neither ordering is atomic and this one fails closed. An
+    unreferenced object under `clean/` is a retention problem; a row that says `clean` while
+    pointing at nothing is a document the UI promises and every download 404s.
+  - Two check constraints shaped the design more than the plan text did. `rejection_code` is bound
+    to a non-clean `scan_status`, so an extraction failure's code *cannot* live on the document — it
+    has to be a `document_extractions` row. And the content-hash check demands 64 hex characters
+    even on a failed row, so failure rows carry the source sha256, which reads correctly as "this
+    parser version could not read these bytes" and makes a same-parser retry collide rather than
+    duplicate.
+  - `0087` adds `scan_attempts`/`extraction_attempts`. Without a durable counter the retry path is
+    an infinite loop. A non-volatile default makes it catalogue-only in Postgres 11+, and 0085's
+    grants are table-level, so nothing else changes. Verified: 88 migrations apply twice clean.
+  - Object keys carry no candidate data — no filename, no email. Keys reach access logs, proxy logs
+    and signed URLs, every one a place `maria-gonzalez-cv-final.pdf` would leak a name and a job
+    search. `cleanKeyFor` substitutes the prefix rather than rebuilding the key: a rebuild
+    disagreeing by one character would move the object to a key the database does not record,
+    leaving the document scanned, intact and permanently unreachable.
+  - Also fixed a clock the worker accepted but the reclaim query ignored, using Postgres `now()`
+    instead — a test could set up a scenario the code then evaluated against a different timeline,
+    and it did.
+  - Verify (2026-07-28): 29 tests across the three files, against a real disposable Postgres with
+    fake storage/scanner. Clean promotion and extraction; infected marked, object deleted, extraction
+    `skipped`, never promoted; scanner down requeues and counts the attempt, then fails (never
+    cleans) at the cap; a row already at the cap is not re-leased; `status:'error'` rejects on the
+    first attempt rather than burning the cap; a move that fails after a clean verdict requeues
+    instead of marking clean; permanent vs transient extraction failure; one tenant failing leaves
+    another untouched; stale lease reclaimed, fresh lease left alone; two concurrent leases never
+    claim the same row; oldest-first ordering; quota counts in-flight bytes and excludes rejections.
+  - **Outstanding before this runs in production**: the job key `interviews.document-processing`
+    needs a cron entry on the server (the deployment has no OS-level cron in-app; an external
+    scheduler POSTs `/api/admin/documents/run-worker`). Nothing schedules it yet, so on deploy the
+    worker exists and is reachable but idle until that entry is added.
 
 - [ ] **Add candidate upload, completion, consent, and download APIs**
   - Files: `src/routes/api/public/scheduling/$invitationId/uploads.ts` (new),
