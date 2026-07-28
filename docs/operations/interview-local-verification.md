@@ -59,10 +59,17 @@ out with `rowsecurity = true` **and** `forcerowsecurity = true`, with 30 policie
 createdb builderhunt_verify
 node scripts/dev/make-verify-env.mjs --database builderhunt_verify --out .env.verify
 echo ".env.verify" >> .git/info/exclude
-set -a; . ./.env.verify; set +a
+set -a && . ./.env.verify && set +a || { echo "no .env.verify — refusing to start"; exit 1; }
 pnpm exec drizzle-kit migrate && pnpm exec tsx --env-file=.env scripts/db/seed-admin.ts
 pnpm exec vite dev --port 3011
 ```
+
+> **The `||` matters.** The first version of this recipe was `set -a; . ./.env.verify; set +a; pnpm exec
+> vite dev`, and semicolons do not stop on failure. When `.env.verify` was later deleted, the sourcing
+> failed, the server started anyway, dotenv loaded `.env`, and a process labelled "verify" was quietly
+> talking to the *real* development database with production defaults. Two servers whose names promised
+> different environments were reading the same one — which is worse than a difference, because you would
+> have no reason to check. Fail loudly instead.
 
 The script exists because `pnpm dev` reads `.env` through dotenv and that is **not** the same as sourcing
 it in a shell. Three differences, each of which produced a failure that looked like an application bug:
