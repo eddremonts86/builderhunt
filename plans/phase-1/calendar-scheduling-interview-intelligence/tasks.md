@@ -1925,7 +1925,7 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 10 — Contextual questions and reports
 
-- [x] **Register follow-up and report AI tasks** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Register follow-up and report AI tasks** — done 2026-07-28 (`419d15d`), NOT yet deployed
   - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - **The report cannot conclude anything, and that takes two independent guards.**
     `interviewReportContentSchema` has no rating field *and* `PROHIBITED_OUTPUT_PATTERNS` rejects the
