@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { editReport, generateReport, ReportServiceError } from '~/lib/interviews/report-service'
-import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { editReport, generateReport } from '~/lib/interviews/report-service'
+import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { interviewReportContentSchema } from '~/shared/lib/interviews'
 import { rateLimit } from '~/shared/lib/rate-limit'
@@ -10,11 +10,13 @@ import {
   findReportVersion,
   findSessionByEvent,
   listReportVersions,
-  type InterviewReportRow,
 } from '~/shared/lib/repositories/interviews'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
-import { assertJsonRequest, assertSameOrigin, CrossOriginError } from '~/shared/lib/security/same-origin'
+import { assertJsonRequest, assertSameOrigin } from '~/shared/lib/security/same-origin'
+// Outside `src/routes` on purpose — see the note in that file. Exporting these from here put the postgres
+// driver in the client bundle and killed every page.
+import { errorResponse, toReportDto } from '~/lib/interviews/report-http'
 
 /**
  * The interview report: read it, generate it, edit it (plan:
@@ -202,56 +204,3 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
     },
   },
 })
-
-/**
- * The report a client receives.
- *
- * `ownerUserId` and `retentionExpiresAt` are internal; `canEdit` above is the only thing that conveys
- * permission. A spread of the row would ship whatever column a future migration adds.
- */
-export function toReportDto(report: InterviewReportRow) {
-  return {
-    id: report.id,
-    eventId: report.eventId,
-    version: report.version,
-    status: report.status,
-    content: report.content,
-    // Needed by the client to render a timestamp link, and it is the list every citation must resolve
-    // against — so a reader can tell a resolvable citation from a broken one.
-    evidenceSegmentIds: report.evidenceSegmentIds,
-    provider: report.provider,
-    model: report.model,
-    promptVersion: report.promptVersion,
-    editedByUserId: report.editedByUserId,
-    finalizedAt: report.finalizedAt?.toISOString() ?? null,
-  }
-}
-
-/**
- * Maps a service failure to something the client can act on.
- *
- * `dangling_reference` gets its own 422 rather than a generic 400: the organizer's edit was well-formed and
- * the problem is one specific citation, which is a fixable and *nameable* thing rather than "invalid input".
- */
-export function errorResponse(error: unknown, context: string): Response {
-  if (error instanceof CrossOriginError) return Response.json({ error: 'bad_request' }, { status: 400 })
-  if (error instanceof TenantAuthorizationError) {
-    return Response.json({ error: 'forbidden' }, { status: error.status })
-  }
-  if (error instanceof ReportServiceError) {
-    const status = {
-      not_found: 404,
-      not_owner: 403,
-      no_transcript: 409,
-      insufficient_credits: 402,
-      not_entitled: 403,
-      version_conflict: 409,
-      invalid_content: 400,
-      dangling_reference: 422,
-      already_final: 409,
-    }[error.code]
-    return Response.json({ error: error.code }, { status })
-  }
-  console.error(`${context} error:`, (error as Error)?.name)
-  return Response.json({ error: 'failed' }, { status: 500 })
-}

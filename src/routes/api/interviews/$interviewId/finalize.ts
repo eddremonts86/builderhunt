@@ -8,7 +8,9 @@ import { findSessionByEvent } from '~/shared/lib/repositories/interviews'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
 import { assertJsonRequest, assertSameOrigin } from '~/shared/lib/security/same-origin'
-import { errorResponse, toReportDto } from './report'
+// Never from './report': a route module importing another route module keeps that module's exports
+// alive in the client bundle, which is how the postgres driver got there.
+import { errorResponse, toReportDto } from '~/lib/interviews/report-http'
 
 /**
  * Marks a report version final (plan:

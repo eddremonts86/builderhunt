@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Zap } from 'lucide-react'
 import { LinkComponent } from '~/components/ui'
-import { resolveLowBalanceWarnings, type LowBalanceWarningLevel } from '~/modules/interviews/billing'
+// `billing-shared`, never `billing`: the latter reaches `feature-authorization` and therefore the
+// `postgres` driver, which calls `Buffer.allocUnsafe` at module scope and kills the whole client bundle
+// before any app code runs. Same rule as `alerts-shared` in the dashboard.
+import { resolveLowBalanceWarnings, type LowBalanceWarningLevel } from '~/modules/interviews/billing-shared'
 
 /**
  * Credit state inside the interview UI (plan: calendar-scheduling-interview-intelligence, Phase 7

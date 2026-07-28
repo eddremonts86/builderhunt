@@ -235,6 +235,9 @@ step restore-rehearsal restore_rehearsal
 
 step security-boundaries pnpm security:boundaries
 step security-route-coverage pnpm security:route-coverage
+# Added 2026-07-28 after an exported route helper put the postgres driver in the client bundle and every
+# page threw "Buffer is not defined". Type-check, lint, 4236 tests and a production build all passed.
+step security-route-client-boundary pnpm security:route-client-boundary
 step security-provider-metering pnpm security:provider-metering
 step_soft schema-audit pnpm db:audit-schema
 step lint pnpm lint
