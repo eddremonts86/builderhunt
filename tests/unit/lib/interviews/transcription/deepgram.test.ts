@@ -84,12 +84,19 @@ describe('the token is short-lived, EU-scoped, and never the master key', () => 
   })
 
   it('reports a network failure without leaking the request', async () => {
-    const error = await createSessionToken({
-      fetchImpl: (async () => { throw new TypeError('fetch failed for https://x/?key=master-key-do-not-leak') }) as never,
-    }).catch((caught: unknown) => caught as Error)
+    // try/catch, not `.catch(fn)`: the latter types its result as the union of the resolved value and the
+    // handler's return, so `.message` does not exist on it.
+    let caught: Error | null = null
+    try {
+      await createSessionToken({
+        fetchImpl: (async () => { throw new TypeError('fetch failed for https://x/?key=master-key-do-not-leak') }) as never,
+      })
+    } catch (error) {
+      caught = error as Error
+    }
 
-    expect((error as { code?: string }).code).toBe('provider_unavailable')
-    expect(error.message).not.toContain('master-key-do-not-leak')
+    expect((caught as { code?: string } | null)?.code).toBe('provider_unavailable')
+    expect(caught?.message).not.toContain('master-key-do-not-leak')
   })
 
   it('refuses to mint anything without a configured key', async () => {
