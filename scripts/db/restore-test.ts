@@ -35,6 +35,15 @@ try {
         'billing_credit_grants', 'billing_credit_reservations', 'billing_credit_allocations',
         'billing_ledger_entries', 'billing_provider_usage', 'billing_auto_recharge_rules',
         'billing_refunds', 'billing_terms_acceptances',
+        // calendar-scheduling-interview-intelligence tables (drizzle/0080–0093). Every one is tenant-private
+        // with RLS forced, and the point of listing them here is that a restore which lost a policy would
+        // otherwise present a candidate's transcript to anyone with a connection — the failure a restore
+        // rehearsal exists to catch before an incident does.
+        'user_calendars', 'calendar_events', 'event_participants',
+        'scheduling_invitations', 'candidate_submissions', 'candidate_documents', 'document_extractions',
+        'candidate_links', 'candidate_web_imports', 'privacy_consents',
+        'interview_briefs', 'interview_sessions', 'transcript_segments', 'interview_suggestions',
+        'interview_reports',
       ])})
       and (not c.relrowsecurity or not c.relforcerowsecurity)
   `
@@ -48,10 +57,50 @@ try {
     throw new Error(`Restored billing ledger/grant/event checksum mismatch: source=${sourceChecksum} target=${targetChecksum}`)
   }
 
+  // ── No audio survives a restore, because none was ever stored ──────────────────────────────────
+  //
+  // Asserted against the restored database rather than trusted from the schema, because a restore is exactly
+  // where a column could arrive from an older dump: `pg_restore` recreates whatever the dump held, and a dump
+  // taken before an audio column was removed would bring it back. The interview feature's central promise is
+  // that audio is never stored, and a promise that is only true in the current migration is not a promise.
+  const [audioColumns] = await target<{ found: number; names: string | null }[]>`
+    select count(*)::int as found, string_agg(table_name || '.' || column_name, ', ') as names
+    from information_schema.columns
+    where table_schema = 'public'
+      and (table_name like 'interview%' or table_name like 'candidate%' or table_name like 'transcript%')
+      and (
+        column_name ~* '(audio|waveform|pcm|recording|mp3|wav|webm|opus|blob)'
+        or (column_name ~* 'media' and column_name !~* 'media_type')
+      )
+  `
+  if ((audioColumns?.found ?? 0) > 0) {
+    throw new Error(`Restored schema has audio-shaped columns: ${audioColumns?.names ?? 'unknown'}`)
+  }
+
+  // And no object key that looks like audio. A document row is metadata plus a key into private storage, so a
+  // key ending in an audio extension would mean the storage layer holds a recording whatever the schema says.
+  //
+  // **This is a backstop that cannot fire against a current schema**, and saying so is more useful than
+  // implying it is a proven guard: `candidate_documents_no_audio_check` already refuses an `audio/*` media
+  // type at insert time, so a live database can never hold such a row. The case it covers is the one a restore
+  // rehearsal exists for — a dump taken *before* that constraint existed, restored into a database that now
+  // has it. Verified by dropping the constraint in a source database and confirming this throws; without that
+  // step the assertion would report clean forever and nobody would know.
+  const [audioKeys] = await target<{ found: number }[]>`
+    select count(*)::int as found from candidate_documents
+    where object_key ~* '\.(mp3|wav|webm|ogg|opus|m4a|flac)$'
+       or declared_media_type ~* '^audio/'
+  `
+  if ((audioKeys?.found ?? 0) > 0) {
+    throw new Error(`Restored data has ${audioKeys?.found} document rows pointing at audio objects`)
+  }
+
   console.log(JSON.stringify({
     restored: true,
     migrations: migrations.count,
     rlsMissing: rls.missing,
+    audioColumns: audioColumns?.found ?? 0,
+    audioObjectKeys: audioKeys?.found ?? 0,
     billingChecksum: targetChecksum,
   }))
 } finally {

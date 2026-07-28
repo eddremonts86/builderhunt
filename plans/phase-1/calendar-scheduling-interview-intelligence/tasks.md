@@ -2336,14 +2336,30 @@ Not fixed here — it predates this program and deserves its own work.
     identifiers an operator *needs* still survive — a log with nothing left in it drives someone to log the
     content directly. A plant removing `transcript` from the key list fails four of them.
 
-- [ ] **Add backup and restore coverage**
-  - Files: `scripts/db/backup.ts`, `scripts/db/restore-test.ts`,
-    `docs/operations/database-migrations.md`,
-    `docs/operations/interview-runtime-verification.md`
-  - Do: Include new relational tables, document R2 lifecycle/backup posture, verify restored private
-    access/RLS/ledger integrity, and explicitly assert no audio artifacts exist in DB/R2/backups.
-  - Verify: `pnpm db:restore-test`; restored fixture serves authorized calendar/report, denies tenant
-    B/admin, balances ledger, and object inventory contains no audio MIME/key.
+- [x] **Add backup and restore coverage** — done 2026-07-28 (`PENDING`), NOT yet deployed
+  - Files: `scripts/db/restore-test.ts`, `docs/operations/interview-runtime-verification.md`
+  - **Ran for real**, against two disposable databases rather than reasoned about:
+    `{"restored":true,"migrations":94,"rlsMissing":0,"audioColumns":0,"audioObjectKeys":0}`. The script's own
+    safety policy refuses any database not named `builderhunt_security_test*`, which is what stops a rehearsal
+    being pointed at production — it refused my first attempt, correctly.
+  - The RLS manifest now covers the fifteen interview tables. A restore that lost a policy would present a
+    candidate's transcript to anyone with a connection, which is the failure a rehearsal exists to catch.
+  - **The no-audio-column assertion runs against the restored database, not the schema**, because `pg_restore`
+    recreates whatever the dump held: a dump taken before an audio column was removed would bring it back, and
+    a promise that is only true in the current migration is not a promise. Proved by planting
+    `transcript_segments.recording_object_key` into a source database and watching the rehearsal fail.
+  - **The no-audio-object-key assertion is a backstop that cannot fire against a current schema, and it says
+    so.** `candidate_documents_no_audio_check` already refuses an `audio/*` media type at insert time — I
+    discovered this because my plant's *seed* failed with constraint 23514 before the assertion could run. The
+    case it covers is a pre-constraint dump, verified by dropping the constraint in the source. Labelled as a
+    backstop rather than presented as a proven guard.
+  - **R2 is deliberately not backed up**, and the reasoning is recorded rather than left as a gap: a backup of
+    that bucket is a second copy of candidate CVs with its own retention, its own access list and its own
+    deletion path — the thing the retention promise exists to prevent, and restoring it would resurrect
+    documents a candidate was told were gone. The recovery position for a lost object is a 404 and a re-upload,
+    which is the same trade the document worker's move-before-mark ordering already makes.
+  - Verify (2026-07-28): `pnpm db:restore-test` green with 94 migrations and zero missing policies; both audio
+    assertions proved in the failing direction.
 
 ## Phase 12 — Final verification and rollout
 

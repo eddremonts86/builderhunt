@@ -185,3 +185,41 @@ inference:
 - [ ] Artifact inspection clean on both sessions.
 - [ ] Every refused row in the matrix showed the expected message *before* any permission prompt.
 - [ ] `MINIMUM_SUPPORTED_CHROME_MAJOR` matches current stable minus one on the day of sign-off.
+
+## Backup and restore posture
+
+Recorded 2026-07-28, from a real rehearsal against two disposable databases.
+
+`pnpm db:restore-test` now covers the fifteen interview tables in its RLS manifest, on top of the billing and
+workspace tables it already checked. A restore that lost a policy would otherwise present a candidate's
+transcript to anyone holding a connection — which is the failure a rehearsal exists to catch before an
+incident does.
+
+Two audio assertions were added, and they are honest about what they are:
+
+- **No audio-shaped column** in any `interview*`, `candidate*` or `transcript*` table of the *restored*
+  database. Asserted against the restore rather than the schema because `pg_restore` recreates whatever the
+  dump held: a dump taken before an audio column was removed would bring it back, and the feature's central
+  promise is not a promise if it is only true in the current migration. Proved by planting
+  `transcript_segments.recording_object_key` into a source database and confirming the rehearsal fails.
+- **No document row pointing at an audio object.** This one is a **backstop that cannot fire against a current
+  schema** — `candidate_documents_no_audio_check` refuses an `audio/*` media type at insert time, so the seed
+  for this test had to drop that constraint first. Kept because the case it covers is precisely a
+  pre-constraint dump; recorded as a backstop rather than presented as a proven guard.
+
+Measured result: `{"restored":true,"migrations":94,"rlsMissing":0,"audioColumns":0,"audioObjectKeys":0}`.
+
+### R2 lifecycle and backup posture
+
+Object storage is **not** covered by the database rehearsal and is not backed up as a snapshot. That is
+deliberate rather than an omission:
+
+- The only objects are candidate documents under `quarantine/` and `clean/`, and every one is deleted by the
+  retention sweep at 180 days.
+- A backup of that bucket would be a second copy of candidate CVs with its own retention, its own access list
+  and its own deletion path — the thing the retention promise exists to prevent. Restoring it would resurrect
+  documents a candidate was told were gone.
+- The recovery position for a lost object is therefore: the document row is retained, every download 404s, and
+  the candidate is asked to re-upload. That is a worse product day and a better privacy posture, and it is the
+  same trade the `document-worker`'s move-before-mark ordering already makes.
+- **No audio exists to back up.** There is no bucket, no key prefix and no code path that writes one.
