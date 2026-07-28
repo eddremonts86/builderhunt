@@ -2336,7 +2336,7 @@ Not fixed here — it predates this program and deserves its own work.
     identifiers an operator *needs* still survive — a log with nothing left in it drives someone to log the
     content directly. A plant removing `transcript` from the key list fails four of them.
 
-- [x] **Add backup and restore coverage** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Add backup and restore coverage** — done 2026-07-28 (`c5f208d`), NOT yet deployed
   - Files: `scripts/db/restore-test.ts`, `docs/operations/interview-runtime-verification.md`
   - **Ran for real**, against two disposable databases rather than reasoned about:
     `{"restored":true,"migrations":94,"rlsMissing":0,"audioColumns":0,"audioObjectKeys":0}`. The script's own
