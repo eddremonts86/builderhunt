@@ -4,6 +4,7 @@ import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { RECURRENCE_MUTATION_SCOPES } from '~/shared/lib/calendar'
+import { httpUrlSchema } from '~/shared/lib/url-safety'
 import { cancelEvent, deleteEvent, getEvent, updateEvent } from '~/lib/calendar/service'
 import { calendarErrorResponse } from './index'
 
@@ -20,7 +21,10 @@ const patchSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     description: z.string().max(5000).nullable().optional(),
     location: z.string().max(500).nullable().optional(),
-    meetingUrl: z.string().url().nullable().optional(),
+    // `httpUrlSchema` for the same reason as the create route: this value is rendered as an
+    // anchor, and `z.string().url()` accepts `javascript:`. Nullable stays — clearing a
+    // meeting URL is a legitimate edit.
+    meetingUrl: httpUrlSchema.nullable().optional(),
     startsAt: z.string().datetime().optional(),
     endsAt: z.string().datetime().optional(),
     timezone: z.string().min(1).max(64).optional(),
@@ -29,7 +33,18 @@ const patchSchema = z.object({
   }).strict().default({}),
 }).strict()
 
-const deleteSchema = z.object({ version: z.number().int().positive() }).strict()
+/**
+ * The scope fields are not optional decoration: spec.md requires `this|following|series` on
+ * DELETE, and `deleteEventRequestSchema` in the API register has always declared them. This
+ * schema used to be `.strict()` on `version` alone, so the register documented a capability the
+ * route rejected with `invalid_input` — found by the Phase 12 calendar e2e, which asked for a
+ * single-occurrence delete and got a 400.
+ */
+const deleteSchema = z.object({
+  version: z.number().int().positive(),
+  recurrenceScope: z.enum(RECURRENCE_MUTATION_SCOPES).optional(),
+  recurrenceId: z.string().min(1).max(100).optional(),
+}).strict()
 
 export const Route = createFileRoute('/api/calendar/events/$eventId')({
   component: () => null,
@@ -82,8 +97,15 @@ export const Route = createFileRoute('/api/calendar/events/$eventId')({
           const parsed = deleteSchema.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'invalid_input' }, { status: 400 })
 
-          await withTenantContext(principal, (tx) => deleteEvent(tx, principal, params.eventId, parsed.data.version))
-          return Response.json({ ok: true })
+          const result = await withTenantContext(principal, (tx) => deleteEvent(tx, principal, params.eventId, {
+            version: parsed.data.version,
+            recurrenceScope: parsed.data.recurrenceScope,
+            recurrenceId: parsed.data.recurrenceId,
+          }))
+          // The kind is returned because the three outcomes are not interchangeable to a client: a
+          // tombstoned event leaves the list, a removed occurrence leaves one cell, and a truncated
+          // series keeps every occurrence before the cut.
+          return Response.json({ ok: true, ...result })
         } catch (error) {
           return calendarErrorResponse(error)
         }

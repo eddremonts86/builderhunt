@@ -5,7 +5,7 @@ import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 import { can } from '~/shared/lib/authorization/permissions'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { authUsers, calendarEvents, organizations } from '~/shared/lib/db/schema'
-import { insertCalendar, insertParticipants, listRemindersForEvent } from '~/shared/lib/repositories/calendar'
+import { insertCalendar, insertParticipants, listEventExceptions, listRemindersForEvent } from '~/shared/lib/repositories/calendar'
 import {
   cancelEvent,
   CalendarServiceError,
@@ -287,22 +287,42 @@ describe('updateEvent', () => {
     ).rejects.toMatchObject({ code: 'invalid_input' })
   })
 
-  it('each recurrence scope resolves to its own plan', async () => {
+  /*
+   * This block replaces a test called "each recurrence scope resolves to its own plan", which
+   * asserted that `updateEvent` *returned* `{ kind: 'single_occurrence_exception' }` for scope
+   * `this` — and passed, while renaming every occurrence in the series. It measured the object the
+   * code had just computed, so it could not disagree with the code no matter what the code did.
+   *
+   * What matters is the effect on the rows: a scope of `this` or `following` must not rewrite the
+   * series, and today the only way to guarantee that is to refuse the request.
+   */
+  it('a series-scoped edit applies to the series', async () => {
     const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput({ rrule: 'FREQ=WEEKLY;COUNT=4' })))
-    const single = await db.transaction((tx) => updateEvent(tx, principal(OWNER), event.id, {
-      version: 1, recurrenceScope: 'this', recurrenceId: '2027-01-01', patch: { title: 'One' },
+    const result = await db.transaction((tx) => updateEvent(tx, principal(OWNER), event.id, {
+      version: 1, recurrenceScope: 'series', patch: { title: 'All' },
     }))
-    expect(single.recurrencePlan).toEqual({ kind: 'single_occurrence_exception', recurrenceId: '2027-01-01' })
+    expect(result.recurrencePlan).toEqual({ kind: 'rematerialize_series' })
+    expect(result.event.title).toBe('All')
+  })
 
-    const following = await db.transaction((tx) => updateEvent(tx, principal(OWNER), event.id, {
-      version: 2, recurrenceScope: 'following', recurrenceId: '2027-01-08', patch: { title: 'Rest' },
-    }))
-    expect(following.recurrencePlan).toEqual({ kind: 'truncate_and_link_successor', recurrenceId: '2027-01-08' })
+  it('a single-occurrence or following edit is refused rather than applied to the series', async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput({
+      rrule: 'FREQ=WEEKLY;COUNT=4', title: 'Untouched',
+    })))
+    const occurrenceInstant = event.startsAt.toISOString()
 
-    const series = await db.transaction((tx) => updateEvent(tx, principal(OWNER), event.id, {
-      version: 3, recurrenceScope: 'series', patch: { title: 'All' },
-    }))
-    expect(series.recurrencePlan).toEqual({ kind: 'rematerialize_series' })
+    for (const scope of ['this', 'following'] as const) {
+      await expect(
+        db.transaction((tx) => updateEvent(tx, principal(OWNER), event.id, {
+          version: 1, recurrenceScope: scope, recurrenceId: occurrenceInstant, patch: { title: `Renamed by ${scope}` },
+        })),
+      ).rejects.toMatchObject({ code: 'not_implemented' })
+    }
+
+    // The refusal has to leave the row alone. A `not_implemented` thrown *after* the write would
+    // be the same silent series rewrite with a better error message.
+    const [row] = await db.select({ title: calendarEvents.title }).from(calendarEvents).where(eq(calendarEvents.id, event.id))
+    expect(row?.title).toBe('Untouched')
   })
 
   it('an invitation-sourced event cannot be rescheduled through the ordinary edit path', async () => {
@@ -348,7 +368,7 @@ describe('status transitions, cancel, and delete', () => {
 
   it('delete removes the row entirely', async () => {
     const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput()))
-    await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, 1))
+    await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, { version: 1 }))
     expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).toBeNull()
   })
 
@@ -357,12 +377,130 @@ describe('status transitions, cancel, and delete', () => {
       participants: [{ userId: PARTICIPANT, role: 'attendee' }],
     })))
     await expect(db.transaction((tx) => cancelEvent(tx, principal(PARTICIPANT), event.id, 1))).rejects.toMatchObject({ code: 'forbidden' })
-    await expect(db.transaction((tx) => deleteEvent(tx, principal(PARTICIPANT), event.id, 1))).rejects.toMatchObject({ code: 'forbidden' })
+    await expect(db.transaction((tx) => deleteEvent(tx, principal(PARTICIPANT), event.id, { version: 1 }))).rejects.toMatchObject({ code: 'forbidden' })
   })
 
   it('delete refuses a stale version', async () => {
     const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput()))
-    await expect(db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, 99))).rejects.toMatchObject({ code: 'event_changed' })
+    await expect(db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, { version: 99 }))).rejects.toMatchObject({ code: 'event_changed' })
+  })
+})
+
+/**
+ * spec.md: "Editing/deleting a recurring occurrence always asks for `this occurrence`, `this and
+ * following`, or `entire series`."
+ *
+ * The DELETE route accepted no scope at all until the Phase 12 e2e asked for one, so these are the
+ * first assertions that the three outcomes differ. They read the rows rather than the returned
+ * `kind`, for the reason spelled out above the edit-scope tests.
+ */
+describe('recurrence-scoped delete', () => {
+  const RECURRING = { rrule: 'FREQ=WEEKLY;COUNT=4' } as const
+
+  it('refuses a recurring delete with no scope', async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    await expect(
+      db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, { version: 1 })),
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+    // Refused means untouched: the series is still readable.
+    expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).not.toBeNull()
+  })
+
+  it('a non-recurring delete needs no scope', async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput()))
+    const result = await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, { version: 1 }))
+    expect(result.kind).toBe('tombstoned')
+    expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).toBeNull()
+  })
+
+  it("'this' records an exception and leaves the series standing", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    const instant = event.startsAt.toISOString()
+
+    const result = await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, {
+      version: 1, recurrenceScope: 'this', recurrenceId: instant,
+    }))
+    expect(result).toEqual({ kind: 'occurrence_removed', eventId: event.id, recurrenceId: instant })
+
+    // The exception row is the durable part — the occurrence cache is rebuilt every worker pass.
+    const exceptions = await db.transaction((tx) => listEventExceptions(tx, ORG, event.id))
+    expect(exceptions.map((exception) => exception.recurrenceId)).toEqual([instant])
+
+    // And the event itself survives, because only one occurrence was removed.
+    expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).not.toBeNull()
+  })
+
+  it("'this' twice is the same exception, not two", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    const instant = event.startsAt.toISOString()
+    for (let i = 0; i < 2; i++) {
+      await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, {
+        version: 1, recurrenceScope: 'this', recurrenceId: instant,
+      }))
+    }
+    const exceptions = await db.transaction((tx) => listEventExceptions(tx, ORG, event.id))
+    // A retried request is the same fact. Two rows would make the worker deduplicate instants it
+    // should be able to pass straight through.
+    expect(exceptions).toHaveLength(1)
+  })
+
+  it("'following' truncates the rule to just before the named occurrence", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    const secondWeek = new Date(event.startsAt.getTime() + 7 * 24 * 60 * 60_000)
+
+    const result = await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, {
+      version: 1, recurrenceScope: 'following', recurrenceId: secondWeek.toISOString(),
+    }))
+    expect(result.kind).toBe('series_truncated')
+
+    const [row] = await db.select({ recurrenceUntil: calendarEvents.recurrenceUntil })
+      .from(calendarEvents).where(eq(calendarEvents.id, event.id))
+    // Strictly before the occurrence, so `UNTIL` excludes the one the user removed. Equal would
+    // keep it — an off-by-one that silently ignores the request.
+    expect(row?.recurrenceUntil?.getTime()).toBe(secondWeek.getTime() - 1)
+    expect(row?.recurrenceUntil!.getTime()).toBeLessThan(secondWeek.getTime())
+  })
+
+  it("'following' from the first occurrence is refused as a disguised series delete", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    await expect(
+      db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, {
+        version: 1, recurrenceScope: 'following', recurrenceId: event.startsAt.toISOString(),
+      })),
+    ).rejects.toMatchObject({ code: 'invalid_input' })
+    // Otherwise the result is a recurring event with no occurrences that still appears in lists.
+    expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).not.toBeNull()
+  })
+
+  it("'series' removes the event outright", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    const result = await db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, {
+      version: 1, recurrenceScope: 'series',
+    }))
+    expect(result.kind).toBe('tombstoned')
+    expect(await db.transaction((tx) => getEvent(tx, principal(OWNER), event.id))).toBeNull()
+  })
+
+  it("'this' and 'following' require a recurrenceId", async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput(RECURRING)))
+    for (const scope of ['this', 'following'] as const) {
+      await expect(
+        db.transaction((tx) => deleteEvent(tx, principal(OWNER), event.id, { version: 1, recurrenceScope: scope })),
+      ).rejects.toMatchObject({ code: 'invalid_input' })
+    }
+  })
+
+  it('a participant cannot delete one occurrence either', async () => {
+    const { event } = await db.transaction((tx) => createEvent(tx, principal(OWNER), eventInput({
+      ...RECURRING, participants: [{ userId: PARTICIPANT, role: 'attendee' }],
+    })))
+    await expect(
+      db.transaction((tx) => deleteEvent(tx, principal(PARTICIPANT), event.id, {
+        version: 1, recurrenceScope: 'this', recurrenceId: event.startsAt.toISOString(),
+      })),
+    ).rejects.toMatchObject({ code: 'forbidden' })
+    // Removing one occurrence is still an edit, so it must not be a hole in `calendar:mutate`.
+    expect(await db.transaction((tx) => listEventExceptions(tx, ORG, event.id))).toHaveLength(0)
   })
 })
 

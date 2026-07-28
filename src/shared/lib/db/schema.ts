@@ -1957,6 +1957,45 @@ export const calendarEventOccurrences = pgTable(
 )
 
 /**
+ * The durable record that one occurrence of a series was removed (spec.md: "`this` creates an
+ * exception/override").
+ *
+ * ## Why this cannot live in `calendar_event_occurrences`
+ *
+ * Marking the occurrence row `status = 'cancelled'` looks like the obvious answer and does not
+ * survive the next worker pass: `upsertOccurrences` writes `status: 'active'` on conflict, so the
+ * cancellation is overwritten within minutes. Materialized rows are a *cache* of a pure expansion —
+ * anything that must outlive a rematerialization belongs outside them. The expander already accepts
+ * `exceptionInstants`; this table is what finally supplies them, instead of the hardcoded `[]` the
+ * worker shipped with.
+ *
+ * `recurrenceId` is the occurrence's identity in the expansion (its UTC instant), the same value the
+ * occurrences table keys on, so an exception and the row it suppresses are joinable without storing
+ * a second timestamp that could disagree.
+ */
+export const calendarEventExceptions = pgTable(
+  'calendar_event_exceptions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    recurrenceId: text('recurrence_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('calendar_event_exceptions_organization_id_id_unique').on(table.organizationId, table.id),
+    // Removing the same occurrence twice is the same fact, not a second one — an idempotent retry
+    // must not accumulate rows the worker then has to deduplicate.
+    uniqueIndex('calendar_event_exceptions_identity_unique').on(table.organizationId, table.eventId, table.recurrenceId),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'calendar_event_exceptions_organization_event_fk',
+    }).onDelete('cascade'),
+  ],
+)
+
+/**
  * `eventOwnerUserId` is a deliberate denormalization of `calendar_events.owner_user_id`, kept
  * honest by a composite FK against `(organization_id, id, owner_user_id)` so it can never drift.
  * It exists for RLS: the calendar_events participant-read policy has to consult this table, so if

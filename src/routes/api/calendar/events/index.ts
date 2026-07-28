@@ -5,6 +5,8 @@ import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { httpStatusForApiErrorCode, type ApiErrorCode } from '~/shared/lib/api-errors'
 import { REMINDER_OFFSET_MINUTES } from '~/shared/lib/calendar'
+import { MAX_RANGE_SPAN_DAYS } from '~/shared/lib/interview-api'
+import { httpUrlSchema } from '~/shared/lib/url-safety'
 import { createEvent, listRange, search } from '~/lib/calendar/service'
 import { findDefaultCalendar, insertCalendar } from '~/shared/lib/repositories/calendar'
 
@@ -17,20 +19,38 @@ import { findDefaultCalendar, insertCalendar } from '~/shared/lib/repositories/c
  * provider message, stack, or another user's data.
  */
 
+/**
+ * The span cap matches `MAX_RANGE_SPAN_DAYS` for the same reason the feed has one: this
+ * read loads every event in the range before the response is built, so the span is the
+ * caller-controlled dimension of the query. Local rather than reusing
+ * `withBoundedRange` because this schema also drives the search filters and is parsed
+ * from a query string where the range is optional in neither branch.
+ */
 const rangeQuerySchema = z.object({
   from: z.string().datetime(),
   to: z.string().datetime(),
   title: z.string().max(200).optional(),
   participant: z.string().max(200).optional(),
   eventType: z.enum(['personal', 'interview']).optional(),
-})
+}).refine((query) => new Date(query.to) > new Date(query.from), {
+  message: 'to must be after from', path: ['to'],
+}).refine(
+  (query) => new Date(query.to).getTime() - new Date(query.from).getTime()
+    <= MAX_RANGE_SPAN_DAYS * 24 * 60 * 60 * 1000,
+  { message: `the range must not span more than ${MAX_RANGE_SPAN_DAYS} days`, path: ['to'] },
+)
 
 const createBodySchema = z.object({
   type: z.enum(['personal', 'interview']),
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   location: z.string().max(500).optional(),
-  meetingUrl: z.string().url().optional(),
+  // `httpUrlSchema`, not `z.string().url()`: an interview event's meeting URL is rendered as an
+  // anchor on the candidate portal and on the organizer's list, and `z.string().url()` accepts
+  // `javascript:alert(1)`. The shared `eventDraftInputSchema` already uses it; this route-local
+  // copy of the body shape did not, which made the shared schema's guarantee reachable only
+  // through paths that happened to use it.
+  meetingUrl: httpUrlSchema.optional(),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   timezone: z.string().min(1).max(64),
@@ -62,6 +82,12 @@ export function calendarErrorResponse(error: unknown) {
   }
   if (code === 'event_changed' || code === 'invalid_state_transition') {
     return Response.json({ error: 'state_changed' }, { status: 409 })
+  }
+  // 501, not the default 400: the request is well-formed and the caller cannot fix it by changing
+  // anything. A 400 here would send a client into a validation-error path for a capability the
+  // server simply does not have yet — see the note on recurrence scopes in `calendar/service.ts`.
+  if (code === 'not_implemented') {
+    return Response.json({ error: 'not_implemented' }, { status: 501 })
   }
   if (code) {
     const known: ApiErrorCode[] = ['invalid_input', 'forbidden', 'not_found', 'slot_unavailable', 'state_changed']

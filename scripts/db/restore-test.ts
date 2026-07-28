@@ -35,11 +35,11 @@ try {
         'billing_credit_grants', 'billing_credit_reservations', 'billing_credit_allocations',
         'billing_ledger_entries', 'billing_provider_usage', 'billing_auto_recharge_rules',
         'billing_refunds', 'billing_terms_acceptances',
-        // calendar-scheduling-interview-intelligence tables (drizzle/0080–0093). Every one is tenant-private
+        // calendar-scheduling-interview-intelligence tables (drizzle/0080–0095). Every one is tenant-private
         // with RLS forced, and the point of listing them here is that a restore which lost a policy would
         // otherwise present a candidate's transcript to anyone with a connection — the failure a restore
         // rehearsal exists to catch before an incident does.
-        'user_calendars', 'calendar_events', 'event_participants',
+        'user_calendars', 'calendar_events', 'calendar_event_exceptions', 'event_participants',
         'scheduling_invitations', 'candidate_submissions', 'candidate_documents', 'document_extractions',
         'candidate_links', 'candidate_web_imports', 'privacy_consents',
         'interview_briefs', 'interview_sessions', 'transcript_segments', 'interview_suggestions',

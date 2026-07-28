@@ -53,11 +53,41 @@ const HHMM_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/
 
 const boundedRangeShape = { from: z.string().datetime(), to: z.string().datetime() }
 
+/**
+ * The widest span any range read will accept.
+ *
+ * 400 days covers the widest legitimate use — a full year plus the partial months a
+ * "next 12 months" view straddles — with room left over. It exists because every
+ * consumer of these schemas reads *all* rows in the requested range into memory
+ * before trimming the response, so the span is the caller-controlled dimension of
+ * that read. `?from=2000&to=2099` used to be accepted; the response cap of 500 items
+ * hid the cost, which is exactly what makes it worth bounding here rather than
+ * downstream.
+ */
+export const MAX_RANGE_SPAN_DAYS = 400
+const MAX_RANGE_SPAN_MS = MAX_RANGE_SPAN_DAYS * 24 * 60 * 60 * 1000
+
+/**
+ * `to` after `from`, and no more than {@link MAX_RANGE_SPAN_DAYS} between them.
+ *
+ * The name promised a bound before this did anything but order the two ends. The
+ * slots route had already solved the same problem in its own service layer — see the
+ * note there about a bounded window not being a bounded bill — and this is that idea
+ * applied where the schema is the only guard.
+ */
 function withBoundedRange<T extends z.ZodRawShape>(shape: T) {
-  return z.object({ ...shape, ...boundedRangeShape }).strict().refine(
-    (v) => new Date((v as { to: string }).to) > new Date((v as { from: string }).from),
-    { message: 'to must be after from', path: ['to'] },
-  )
+  return z.object({ ...shape, ...boundedRangeShape }).strict()
+    .refine(
+      (v) => new Date((v as { to: string }).to) > new Date((v as { from: string }).from),
+      { message: 'to must be after from', path: ['to'] },
+    )
+    .refine(
+      (v) => {
+        const range = v as { from: string; to: string }
+        return new Date(range.to).getTime() - new Date(range.from).getTime() <= MAX_RANGE_SPAN_MS
+      },
+      { message: `the range must not span more than ${MAX_RANGE_SPAN_DAYS} days`, path: ['to'] },
+    )
 }
 
 const paginationRequestSchema = z.object({
@@ -228,7 +258,12 @@ const consentDecisionInputSchema = z.object({
 }).strict()
 
 const candidateLinkInputSchema = z.object({
-  url: z.string().url(),
+  // `httpUrlSchema`, not `z.string().url()`: a candidate's submitted links are rendered as
+  // anchors on the organizer's brief and on the portal itself, and `z.string().url()` accepts
+  // `javascript:alert(1)`. The render sites already refuse an unsafe scheme, because rows stored
+  // before this line existed still have to be safe to display — but a store that accepts one is
+  // a store that will hand it to whatever renders next.
+  url: httpUrlSchema,
   label: z.string().min(1).max(200).optional(),
 }).strict()
 

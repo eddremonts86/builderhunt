@@ -1,7 +1,7 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { expandRecurrenceRule } from '~/shared/lib/scheduling'
-import { upsertOccurrences } from '~/shared/lib/repositories/calendar'
+import { listEventExceptions, upsertOccurrences } from '~/shared/lib/repositories/calendar'
 import {
   listRecurringEventsForMaterialization,
   listWorkerOrganizationIds,
@@ -90,6 +90,11 @@ export async function runRecurrenceWorker(options: RecurrenceWorkerOptions = {})
             if (effectiveTo <= rangeFrom) continue
 
             const durationMs = event.endsAt.getTime() - event.startsAt.getTime()
+            // The removed occurrences, read every pass. This was `[]` until the Phase 12 e2e
+            // deleted one occurrence and re-ran the worker: the expander supported exceptions from
+            // the start, nothing supplied them, and the upsert's `status: 'active'` restored every
+            // deleted occurrence on the next run.
+            const exceptions = await listEventExceptions(transaction, organizationId, event.id)
             const occurrences = expandRecurrenceRule({
               rruleText: event.rrule,
               eventStartsAt: event.startsAt,
@@ -97,7 +102,7 @@ export async function runRecurrenceWorker(options: RecurrenceWorkerOptions = {})
               timeZone: event.timezone,
               rangeFrom,
               rangeTo: effectiveTo,
-              exceptionInstants: [],
+              exceptionInstants: exceptions.map((exception) => new Date(exception.recurrenceId)),
           })
 
           if (occurrences.length > 0) {

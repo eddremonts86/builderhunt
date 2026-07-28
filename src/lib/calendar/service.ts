@@ -16,10 +16,13 @@ import {
   cancelRemindersForEvent,
   countUnreadDeliveries,
   deleteEventWithVersion,
+  deleteOccurrenceByRecurrenceId,
   deleteOccurrencesForEvent,
+  deleteOccurrencesFrom,
   findEventById,
   hasGrantedParticipation,
   insertEvent,
+  insertEventException,
   insertParticipants,
   insertReminders,
   listOwnDeliveries,
@@ -289,6 +292,28 @@ export async function updateEvent(
     ? resolveRecurrenceMutationPlan({ scope: input.recurrenceScope!, recurrenceId: input.recurrenceId ?? null })
     : null
 
+  /*
+   * Only `series` is implemented for an *edit*, and saying so is the point.
+   *
+   * The write below applies `input.patch` to the master row, which is a whole-series edit whatever
+   * scope was requested. Until this returned a coded refusal, a caller asking for `this` got a
+   * `recurrencePlan: { kind: 'single_occurrence_exception' }` in the response *and* a renamed,
+   * re-timed series — the plan was computed, returned, and never acted on. The e2e suite found it
+   * because it asserted on rows rather than on the response.
+   *
+   * A per-occurrence edit needs an override event (a detached row carrying the new values, linked
+   * back to the series) and `following` needs a truncate-and-successor split. Both are real work
+   * and neither is reachable from the UI today; a scoped *delete* is, and that one is implemented
+   * in `deleteEvent`. Refusing here is strictly better than silently rewriting a series a user
+   * asked not to touch.
+   */
+  if (plan && plan.kind !== 'rematerialize_series') {
+    throw new CalendarServiceError(
+      'Editing a single occurrence or the following occurrences is not supported yet — edit the series, or delete the occurrence',
+      'not_implemented',
+    )
+  }
+
   if (input.patch.startsAt || input.patch.endsAt || input.patch.busy !== undefined) {
     const overlap = await evaluateOverlap(transaction, principal, {
       startsAt,
@@ -371,18 +396,108 @@ export async function cancelEvent(transaction: TenantTransaction, principal: Ten
   return transitionEventStatus(transaction, principal, eventId, version, 'cancelled')
 }
 
-export async function deleteEvent(transaction: TenantTransaction, principal: TenantPrincipal, eventId: string, version: number) {
+export interface DeleteEventInput {
+  version: number
+  recurrenceScope?: RecurrenceMutationScope
+  recurrenceId?: string | null
+}
+
+export type DeleteEventResult =
+  | { kind: 'tombstoned'; eventId: string }
+  | { kind: 'occurrence_removed'; eventId: string; recurrenceId: string }
+  | { kind: 'series_truncated'; eventId: string; recurrenceUntil: Date }
+
+/**
+ * Delete, with the recurrence scope spec.md requires ("Editing/deleting a recurring occurrence
+ * always asks for `this occurrence`, `this and following`, or `entire series`").
+ *
+ * ## The scope is mandatory for a recurring event, and the reason is not symmetry
+ *
+ * Removing "the standup" when you meant "next Tuesday's standup" is unrecoverable — the series is
+ * gone along with every exception and participant response on it. So a recurring delete without a
+ * scope is refused rather than defaulted, exactly as `updateEvent` refuses a scopeless edit.
+ *
+ * ## `this` writes an exception row, not a status flag on the occurrence
+ *
+ * Materialized occurrences are a cache of a pure expansion; the worker's upsert rewrites their
+ * status on every pass. A removal recorded there is a removal that comes back. See
+ * `calendar_event_exceptions` for the whole argument.
+ *
+ * ## `following` truncates the rule rather than writing N exceptions
+ *
+ * The tail of a series is unbounded — a `FREQ=WEEKLY` with no `UNTIL` has no last occurrence to
+ * enumerate. Moving `recurrenceUntil` back is the only representation that terminates, and it is
+ * also what an external calendar expects to receive.
+ */
+export async function deleteEvent(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  eventId: string,
+  input: DeleteEventInput,
+): Promise<DeleteEventResult> {
   const access = await resolveEventAccess(transaction, principal, eventId)
   if (!access) throw new CalendarServiceError('Event not found', 'not_found')
   if (!can(principal, 'calendar:mutate', access.context)) {
     throw new CalendarServiceError('Only the event owner can delete this event', 'forbidden')
   }
-  assertMatchingEventVersion(access.event.version, version)
+  const { event } = access
+  assertMatchingEventVersion(event.version, input.version)
+
+  if (event.rrule && !input.recurrenceScope) {
+    throw new CalendarServiceError('A recurring event deletion must state its scope', 'invalid_input')
+  }
+  const plan = event.rrule
+    ? resolveRecurrenceMutationPlan({ scope: input.recurrenceScope!, recurrenceId: input.recurrenceId ?? null })
+    : { kind: 'rematerialize_series' as const }
+
+  if (plan.kind === 'single_occurrence_exception') {
+    const instant = new Date(plan.recurrenceId)
+    if (Number.isNaN(instant.getTime())) {
+      throw new CalendarServiceError('recurrenceId must be the occurrence instant', 'invalid_input')
+    }
+    await insertEventException(transaction, {
+      organizationId: principal.organizationId,
+      eventId,
+      recurrenceId: plan.recurrenceId,
+    })
+    // The cached row goes now so the calendar is correct before the worker's next pass; the
+    // exception is what keeps it gone afterwards.
+    await deleteOccurrenceByRecurrenceId(transaction, principal.organizationId, eventId, plan.recurrenceId)
+    // Reminders are deliberately not touched: `calendar_event_reminders` is keyed on the event with
+    // one `next_fire_at`, not on the occurrence, so there is nothing per-occurrence to cancel here.
+    // Suppressing the event's reminders would silence the occurrences that survive.
+    return { kind: 'occurrence_removed', eventId, recurrenceId: plan.recurrenceId }
+  }
+
+  if (plan.kind === 'truncate_and_link_successor') {
+    const instant = new Date(plan.recurrenceId)
+    if (Number.isNaN(instant.getTime())) {
+      throw new CalendarServiceError('recurrenceId must be the occurrence instant', 'invalid_input')
+    }
+    if (instant <= event.startsAt) {
+      // Truncating before the first occurrence would leave a recurring event with no occurrences
+      // at all — an empty series that still shows in every list. That intent is `series`.
+      throw new CalendarServiceError('Deleting from the first occurrence onward is a series delete', 'invalid_input')
+    }
+    // One millisecond before, so `UNTIL` excludes the named occurrence itself.
+    const recurrenceUntil = new Date(instant.getTime() - 1)
+    const updated = await updateEventWithVersion(
+      transaction,
+      principal.organizationId,
+      principal.userId,
+      eventId,
+      input.version,
+      { recurrenceUntil },
+    )
+    if (!updated) throw new CalendarEventError('Event was modified concurrently', 'event_changed')
+    await deleteOccurrencesFrom(transaction, principal.organizationId, eventId, instant)
+    return { kind: 'series_truncated', eventId, recurrenceUntil }
+  }
 
   await cancelRemindersForEvent(transaction, principal.organizationId, eventId)
-  const deleted = await deleteEventWithVersion(transaction, principal.organizationId, principal.userId, eventId, version)
+  const deleted = await deleteEventWithVersion(transaction, principal.organizationId, principal.userId, eventId, input.version)
   if (!deleted) throw new CalendarEventError('Event was modified concurrently', 'event_changed')
-  return deleted
+  return { kind: 'tombstoned', eventId }
 }
 
 // ── ICS identity (spec.md: "stable UID and increasing SEQUENCE") ────────────────────────────

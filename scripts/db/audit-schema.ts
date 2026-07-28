@@ -70,6 +70,10 @@ const classifications: Classification[] = [
   tenant('user_calendars', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
   tenant('calendar_events', 'organization_id + owner_user_id', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
   tenant('calendar_event_occurrences', 'organization_id (via calendar_events)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
+  // The durable record that one occurrence of a series was removed. Separate from the occurrences
+  // table because those rows are a rebuildable cache of a pure expansion, and the worker's upsert
+  // overwrites any status written onto them.
+  tenant('calendar_event_exceptions', 'organization_id (via calendar_events)', ['calendar-scheduling-interview-intelligence'], { organizationColumn: true }),
   // `event_owner_user_id` is denormalized from calendar_events and held true by a composite FK, so
   // this table's policies read only its own columns — see the schema comment for the policy-recursion
   // reason. Rows may name an external candidate by address rather than by user id.

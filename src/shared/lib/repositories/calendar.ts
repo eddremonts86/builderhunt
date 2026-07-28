@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, inArray, lt, lte, or, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
+  calendarEventExceptions,
   calendarEventOccurrences,
   calendarEventReminders,
   calendarEvents,
@@ -396,6 +397,79 @@ export async function deleteOccurrencesForEvent(transaction: TenantTransaction, 
     .delete(calendarEventOccurrences)
     .where(and(eq(calendarEventOccurrences.organizationId, organizationId), eq(calendarEventOccurrences.eventId, eventId)))
     .returning({ id: calendarEventOccurrences.id })
+}
+
+/** One occurrence, by the identity the expansion assigned it. */
+export async function deleteOccurrenceByRecurrenceId(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+  recurrenceId: string,
+) {
+  return transaction
+    .delete(calendarEventOccurrences)
+    .where(and(
+      eq(calendarEventOccurrences.organizationId, organizationId),
+      eq(calendarEventOccurrences.eventId, eventId),
+      eq(calendarEventOccurrences.recurrenceId, recurrenceId),
+    ))
+    .returning({ id: calendarEventOccurrences.id })
+}
+
+/** Every occurrence at or after an instant — what a `following` scope removes. */
+export async function deleteOccurrencesFrom(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+  from: Date,
+) {
+  return transaction
+    .delete(calendarEventOccurrences)
+    .where(and(
+      eq(calendarEventOccurrences.organizationId, organizationId),
+      eq(calendarEventOccurrences.eventId, eventId),
+      gte(calendarEventOccurrences.startsAt, from),
+    ))
+    .returning({ id: calendarEventOccurrences.id })
+}
+
+// ── Recurrence exceptions ────────────────────────────────────────────────────────────────────
+
+/**
+ * Records that one occurrence is removed. Idempotent on the table's identity, so a retried
+ * request is the same fact rather than a second row the worker would have to deduplicate.
+ */
+export async function insertEventException(
+  transaction: TenantTransaction,
+  row: { organizationId: string; eventId: string; recurrenceId: string },
+) {
+  return transaction
+    .insert(calendarEventExceptions)
+    .values(row)
+    .onConflictDoNothing({
+      target: [calendarEventExceptions.organizationId, calendarEventExceptions.eventId, calendarEventExceptions.recurrenceId],
+    })
+    .returning({ id: calendarEventExceptions.id })
+}
+
+/**
+ * The suppressed instants for one event.
+ *
+ * `recurrenceId` is the occurrence's UTC instant, which is what `expandRecurrenceRule` compares
+ * against — so the worker can pass these straight through without a second lookup.
+ */
+export async function listEventExceptions(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+) {
+  return transaction
+    .select({ recurrenceId: calendarEventExceptions.recurrenceId })
+    .from(calendarEventExceptions)
+    .where(and(
+      eq(calendarEventExceptions.organizationId, organizationId),
+      eq(calendarEventExceptions.eventId, eventId),
+    ))
 }
 
 // ── Participants ─────────────────────────────────────────────────────────────────────────────
