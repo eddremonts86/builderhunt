@@ -122,7 +122,15 @@ export async function createE2EWorkerDatabase(workerIndex: number) {
   const db = drizzle(client)
 
   try {
-    await migrateWithRetry(db)
+    // The same advisory lock `createDisposableTestDatabase` takes, and for a stronger reason: this
+    // path also creates and drops cluster-wide roles. Without it, an e2e worker booting while a unit
+    // test file migrates races on exactly the catalogue rows the lock exists to protect.
+    await admin`select pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`
+    try {
+      await migrateWithRetry(db)
+    } finally {
+      await admin`select pg_advisory_unlock(${MIGRATION_ADVISORY_LOCK_KEY})`
+    }
     // Roles are cluster-wide, while CONNECT is database-specific. Never
     // mutate the shared base roles' passwords — that races every other
     // session on the same local cluster. Create per-database login roles
@@ -158,7 +166,7 @@ export async function createE2EWorkerDatabase(workerIndex: number) {
   }
 }
 
-async function migrateWithRetry(db: PostgresJsDatabase, attempts = 5): Promise<void> {
+async function migrateWithRetry(db: PostgresJsDatabase, attempts = 8): Promise<void> {
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       await migrate(db, { migrationsFolder: './drizzle' })
@@ -170,9 +178,25 @@ async function migrateWithRetry(db: PostgresJsDatabase, attempts = 5): Promise<v
   }
 }
 
-function isConcurrentDdlConflict(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error)
-  const cause = error instanceof Error ? error.cause : undefined
-  const causeMessage = cause instanceof Error ? cause.message : undefined
-  return message.includes('tuple concurrently updated') || (causeMessage?.includes('tuple concurrently updated') ?? false)
+/**
+ * Recognises Postgres's concurrent-catalogue-update error.
+ *
+ * Matched on the structured fields, not on the message. The thrown error's `message` is drizzle's
+ * `"Failed query: ALTER ROLE …"`, and the phrase this used to look for — "tuple concurrently
+ * updated" — lives only in the Postgres error's own properties. So the detector matched nothing, the
+ * retry loop never ran, and the "defense-in-depth backstop" the module header describes was dead
+ * code that had never fired once.
+ *
+ * `XX000` is `internal_error` and far too broad on its own, hence pairing it with the routine that
+ * raises this specific conflict. The message check is kept for the wrapped shapes, and the whole
+ * chain is walked because drizzle sometimes wraps and sometimes rethrows.
+ */
+export function isConcurrentDdlConflict(error: unknown): boolean {
+  for (let current: unknown = error, depth = 0; current !== undefined && current !== null && depth < 5; depth += 1) {
+    const candidate = current as { message?: unknown; code?: unknown; routine?: unknown; cause?: unknown }
+    if (typeof candidate.message === 'string' && candidate.message.includes('tuple concurrently updated')) return true
+    if (candidate.code === 'XX000' && candidate.routine === 'simple_heap_update') return true
+    current = candidate.cause
+  }
+  return false
 }
