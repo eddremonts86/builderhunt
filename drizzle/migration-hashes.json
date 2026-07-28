@@ -376,6 +376,22 @@
     "0093_live_interview_rls_grants": {
       "sql": "ef5b9cb7a3b899c2996b699119c1a3274b3a47834b74270f7cb22d7d3b6b3f29",
       "snapshot": "acdd5cf1d0036e8186d08769e5c6949355334df4cc6342422f181c2383374ec6"
+    },
+    "0094_tricky_the_enforcers": {
+      "sql": "6500490ee3fcb1a0e34b1186d6bf381ba1de8b99731b716549570bbe2eab231d",
+      "snapshot": "9cb7bc198dd331e68fcb3a835da9e90179c9454181c68695114ef09870805a1d"
+    },
+    "0095_calendar_event_exceptions_rls_grants": {
+      "sql": "93d18ba23b9a011fcf92041231074bd63c982552d95c5bbaf99dfe81a909279f",
+      "snapshot": "8191f45ffff86b49751b0a0f1cc886c744f5bf5c787e9ff732c632203e522247"
+    },
+    "0096_capability_select_own_booked_event": {
+      "sql": "b64f5d52699364c3813a5fcbbf3c3d1e0cdd2cb723c8a73babdf6e54df3361ac",
+      "snapshot": "442d268accff8ccf34f20810273300c678e83a6e3af826d8fd82a11370984fc5"
+    },
+    "0097_scheduling_busy_ranges": {
+      "sql": "2c4e5872968148e3be5e2d3e94a1583809ff219ef3d6c787a95b5235b646b279",
+      "snapshot": "67a90aa8cae1bd598cc192000e29f30f687e8a42c8ddf259edbfee4a8b14dfac"
     }
   }
 }

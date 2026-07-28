@@ -5,6 +5,7 @@ import { env } from '~/shared/lib/env'
 import { httpStatusForApiErrorCode, type ApiErrorCode } from '~/shared/lib/api-errors'
 import { putAvailabilityRequestSchema } from '~/shared/lib/interview-api'
 import { getOwnAvailability, putOwnAvailability } from '~/lib/scheduling/availability'
+import { ensureDefaultCalendar } from '~/shared/lib/repositories/calendar'
 
 /**
  * The caller's own weekly availability policy (plan:
@@ -61,7 +62,20 @@ export const Route = createFileRoute('/api/calendar/availability/')({
           if (!parsed.success) {
             return Response.json({ error: 'invalid_input', details: parsed.error.flatten() }, { status: 400 })
           }
-          const saved = await withTenantContext(principal, (tx) => putOwnAvailability(tx, principal, parsed.data))
+          const saved = await withTenantContext(principal, async (tx) => {
+            // Publishing availability is the other way an organizer says time can be booked with
+            // them, and a booking needs a calendar to land in. See `ensureDefaultCalendar` — the
+            // candidate flow used to fail with `invalid_input` when neither path had run.
+            const timezone = parsed.data.rules[0]?.timeZone
+            if (timezone) {
+              await ensureDefaultCalendar(tx, {
+                organizationId: principal.organizationId,
+                ownerUserId: principal.userId,
+                timezone,
+              })
+            }
+            return putOwnAvailability(tx, principal, parsed.data)
+          })
           return Response.json(saved)
         } catch (error) {
           return availabilityErrorResponse(error)

@@ -45,9 +45,25 @@ export async function startWorkerServer(
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  /**
+   * The child's output is buffered for the startup-failure message, and forwarded only when
+   * `E2E_SERVER_LOG=1`.
+   *
+   * Every route in this app answers a coded error and logs the cause server-side — which is right,
+   * and means a failing assertion shows `{"error":"invalid_input"}` with the reason sitting in a
+   * string no one reads. Silently forwarding it always would bury the reporter under Vite noise, so
+   * it is one env var away instead of a code edit away.
+   */
+  const forward = process.env.E2E_SERVER_LOG === '1'
   let output = ''
-  child.stdout?.on('data', (chunk) => { output += String(chunk) })
-  child.stderr?.on('data', (chunk) => { output += String(chunk) })
+  child.stdout?.on('data', (chunk) => {
+    output += String(chunk)
+    if (forward) process.stderr.write(`[w${workerIndex}] ${chunk}`)
+  })
+  child.stderr?.on('data', (chunk) => {
+    output += String(chunk)
+    if (forward) process.stderr.write(`[w${workerIndex}] ${chunk}`)
+  })
   const deadline = Date.now() + 60_000
   while (Date.now() < deadline) {
     if (child.exitCode !== null) throw new Error(`Worker Vite exited (${child.exitCode}):\n${output}`)

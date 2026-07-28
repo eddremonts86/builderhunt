@@ -62,6 +62,7 @@ export function workerDatabaseUrls(databaseName: string): {
   DATABASE_WORKER_URL: string
   DATABASE_PLATFORM_URL: string
   DATABASE_MIGRATION_URL: string
+  DATABASE_CAPABILITY_URL: string
 } {
   const env = e2eEnv()
   const adminUrl = new URL(env.DATABASE_MIGRATION_URL)
@@ -86,6 +87,23 @@ export function workerDatabaseUrls(databaseName: string): {
     DATABASE_WORKER_URL: templateFor(env.DATABASE_WORKER_URL, env.DATABASE_URL || adminUrl.toString()),
     DATABASE_PLATFORM_URL: templateFor(env.DATABASE_PLATFORM_URL, env.DATABASE_URL || adminUrl.toString()),
     DATABASE_MIGRATION_URL: templateFor(env.DATABASE_MIGRATION_URL, adminUrl.toString()),
+    /**
+     * The public candidate flow's role, and the one this function used to leave behind.
+     *
+     * `capability-db.ts` falls back to the worker URL when `DATABASE_CAPABILITY_URL` is unset, so on
+     * a runner with no capability URL everything worked; on a laptop whose `.env` sets one, every
+     * public scheduling route resolved capabilities against the *real* local database while the rest
+     * of the run used the disposable copy. The candidate half of the product was therefore untestable
+     * locally and untested in the only place it appeared to pass.
+     *
+     * Falls back to the worker URL to match `capability-db.ts` exactly — including the rewrite to the
+     * per-database role, so a leftover `builderhunt_capability` password in someone's `.env` cannot
+     * decide whether the suite runs.
+     */
+    DATABASE_CAPABILITY_URL: templateFor(
+      env.DATABASE_CAPABILITY_URL,
+      env.DATABASE_WORKER_URL || env.DATABASE_URL || adminUrl.toString(),
+    ),
   }
 }
 

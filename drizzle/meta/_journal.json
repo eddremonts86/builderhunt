@@ -673,6 +673,20 @@
       "when": 1785268588461,
       "tag": "0095_calendar_event_exceptions_rls_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1785268589461,
+      "tag": "0096_capability_select_own_booked_event",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1785268590461,
+      "tag": "0097_scheduling_busy_ranges",
+      "breakpoints": true
     }
   ]
 }

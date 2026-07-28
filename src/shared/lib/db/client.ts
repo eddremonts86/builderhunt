@@ -1,6 +1,7 @@
 import { drizzle, type PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { env } from '~/shared/lib/env'
+import { poolOptions } from './pool-options'
 
 /**
  * Lazily constructs the real `postgres()` client + drizzle instance on first
@@ -33,7 +34,7 @@ function lazyPostgresDb(resolveUrl: () => string): PostgresJsDatabase {
   let instance: PostgresJsDatabase | null = null
   function resolve(): PostgresJsDatabase {
     if (!instance) {
-      instance = drizzle(postgres(resolveUrl(), { prepare: false }))
+      instance = drizzle(postgres(resolveUrl(), poolOptions()))
     }
     return instance
   }

@@ -5,6 +5,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { createInvitationRequestSchema } from '~/shared/lib/interview-api'
+import { ensureDefaultCalendar } from '~/shared/lib/repositories/calendar'
 import { findAvailabilityPolicy } from '~/shared/lib/repositories/scheduling'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
@@ -125,6 +126,21 @@ export const Route = createFileRoute('/api/scheduling/invitations/')({
           }
 
           const outcome = await withTenantContext(principal, async (tx) => {
+            /*
+             * The organizer's calendar has to exist before anyone can book into it.
+             *
+             * `bookSlot` runs under the capability role and cannot create one — correctly: a
+             * candidate must not be able to write a `user_calendars` row. So the calendar has to be
+             * in place by the time the link goes out, and issuing an invitation is the act that says
+             * time can be booked with me. Without this, an organizer who never hand-created a
+             * calendar event sent a working link whose booking failed with `invalid_input`, which
+             * reads to the candidate as though their own submission was wrong.
+             */
+            await ensureDefaultCalendar(tx, {
+              organizationId: principal.organizationId,
+              ownerUserId: principal.userId,
+              timezone: parsed.data.timezone,
+            })
             // The policy version is snapshotted onto the invitation so a booking can tell that the
             // organizer changed their availability after the candidate saw it.
             const policy = await findAvailabilityPolicy(tx, principal.organizationId, principal.userId)

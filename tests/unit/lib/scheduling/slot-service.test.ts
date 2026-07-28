@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
@@ -76,9 +77,28 @@ function query(overrides: Partial<Parameters<typeof querySlots>[1]> = {}) {
   }
 }
 
+/**
+ * Runs `operation` with the tenant settings the real callers pin.
+ *
+ * `querySlots` reads busy intervals through `scheduling_busy_ranges` (drizzle/0097), which is
+ * `SECURITY DEFINER` and refuses to answer for an identity the caller's own context does not pin —
+ * fail-closed by design. A bare transaction pins nothing, so the busy list came back empty and the
+ * subtraction assertions below silently measured nothing. Every real path (a candidate's capability,
+ * an organizer's session) sets these, so setting them here makes the test more faithful, not less.
+ */
+async function withPinnedTenant<T>(operation: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select
+      set_config('app.organization_id', ${ORG}, true),
+      set_config('app.user_id', ${OWNER}, true),
+      set_config('app.capability_owner_user_id', ${OWNER}, true)`)
+    return operation(tx)
+  })
+}
+
 describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 5)', () => {
   it('derives bookable slots inside the configured window', async () => {
-    const result = await db.transaction((tx) => querySlots(tx, query()))
+    const result = await withPinnedTenant((tx) => querySlots(tx, query()))
     expect(result.slots.length).toBeGreaterThan(0)
     expect(result.policyVersion).not.toBeNull()
 
@@ -91,7 +111,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
   })
 
   it('returns slots in chronological order with unique opaque ids', async () => {
-    const { slots } = await db.transaction((tx) => querySlots(tx, query()))
+    const { slots } = await withPinnedTenant((tx) => querySlots(tx, query()))
     const starts = slots.map((s) => s.startsAt.getTime())
     expect(starts).toEqual([...starts].sort((a, b) => a - b))
     expect(new Set(slots.map((s) => s.slotId)).size).toBe(slots.length)
@@ -104,14 +124,14 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
 
   it('never offers a slot shorter than the interview', async () => {
     // The rule's slot size is 30 minutes; a 45-minute interview must not be squeezed into it.
-    const { slots } = await db.transaction((tx) => querySlots(tx, query({ durationMinutes: 45 })))
+    const { slots } = await withPinnedTenant((tx) => querySlots(tx, query({ durationMinutes: 45 })))
     for (const slot of slots) {
       expect(slot.endsAt.getTime() - slot.startsAt.getTime()).toBeGreaterThanOrEqual(45 * 60_000)
     }
   })
 
   it('subtracts the organizer\'s existing events without revealing them', async () => {
-    const before = await db.transaction((tx) => querySlots(tx, query()))
+    const before = await withPinnedTenant((tx) => querySlots(tx, query()))
 
     // Block the whole first working day.
     await db.transaction((tx) => insertEvent(tx, {
@@ -128,7 +148,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
       busy: true,
     }))
 
-    const after = await db.transaction((tx) => querySlots(tx, query()))
+    const after = await withPinnedTenant((tx) => querySlots(tx, query()))
     expect(after.slots.length).toBeLessThan(before.slots.length)
 
     // The reason a time disappeared must not be discoverable from the response.
@@ -139,7 +159,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
   })
 
   it('clamps an absurd range instead of scanning it', async () => {
-    const result = await db.transaction((tx) => querySlots(tx, query({
+    const result = await withPinnedTenant((tx) => querySlots(tx, query({
       from: MONDAY,
       to: new Date(Date.UTC(2999, 0, 1)),
     })))
@@ -148,7 +168,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
   })
 
   it('returns nothing for an inverted range', async () => {
-    const result = await db.transaction((tx) => querySlots(tx, query({
+    const result = await withPinnedTenant((tx) => querySlots(tx, query({
       from: new Date(MONDAY.getTime() + 60_000),
       to: MONDAY,
     })))
@@ -158,11 +178,11 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
   it('an organizer with no availability looks identical to one with nothing free', async () => {
     // Both must be an empty list, not an error and not a distinguishable shape: the candidate is
     // unauthenticated and must not learn whether the organizer ever configured anything.
-    const unconfigured = await db.transaction((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
+    const unconfigured = await withPinnedTenant((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
     expect(unconfigured.slots).toEqual([])
     expect(unconfigured.policyVersion).toBeNull()
 
-    const nothingFree = await db.transaction((tx) => querySlots(tx, query({
+    const nothingFree = await withPinnedTenant((tx) => querySlots(tx, query({
       // A window entirely in the past relative to `now` leaves nothing bookable.
       from: new Date(MONDAY.getTime() - 10 * 24 * 60 * 60_000),
       to: new Date(MONDAY.getTime() - 9 * 24 * 60 * 60_000),
@@ -175,7 +195,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
       rules: [rule({ minNoticeMinutes: 60 * 24 * 30 })], // 30 days' notice
       overrides: [],
     }))
-    const result = await db.transaction((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
+    const result = await withPinnedTenant((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
     // The window is two days out; a 30-day notice period rules all of it out.
     expect(result.slots).toEqual([])
   })
@@ -185,7 +205,7 @@ describe('slot service (plan: calendar-scheduling-interview-intelligence, Phase 
       rules: [rule({ enabled: false })],
       overrides: [],
     }))
-    const result = await db.transaction((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
+    const result = await withPinnedTenant((tx) => querySlots(tx, query({ ownerUserId: QUIET_OWNER })))
     expect(result.slots).toEqual([])
   })
 })

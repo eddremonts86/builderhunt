@@ -54,6 +54,19 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/book'
 
           const booking = result.value
           if (!booking.ok) {
+            /*
+             * The reason, server-side only.
+             *
+             * `bookSlot` returns a code *and* a sentence explaining it, and this route used to
+             * forward only the code — so "the candidate could not book" arrived as
+             * `{"error":"invalid_input"}` with the actual cause discarded at exactly the point where
+             * someone would need it. Two different failures ("no submission" and "the organizer has
+             * no calendar") were indistinguishable in production and in the test suite alike.
+             *
+             * The reason stays out of the response body: it names the organizer's setup, which is
+             * not the candidate's business, and the codes are the contract.
+             */
+            console.error('public scheduling book refused:', booking.code, booking.reason)
             return withPublicHeaders(publicError(booking.code, {
               ...(booking.missingPurposes ? { missingPurposes: booking.missingPurposes } : {}),
               // spec.md: a race loser gets refreshed alternatives, not a dead end.

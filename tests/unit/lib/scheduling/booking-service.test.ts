@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
@@ -128,7 +129,7 @@ async function readyInvitation(overrides: { requiredAccepted?: readonly string[]
 }
 
 async function firstSlot() {
-  const result = await db.transaction((tx) => querySlots(tx, {
+  const result = await withPinnedTenant((tx) => querySlots(tx, {
     organizationId: ORG,
     ownerUserId: OWNER,
     durationMinutes: 30,
@@ -159,12 +160,31 @@ function bookInput(
   }
 }
 
+/**
+ * Runs `operation` with the tenant settings the real callers pin.
+ *
+ * `bookSlot` recomputes the slots through `querySlots`, which reads busy intervals via
+ * `scheduling_busy_ranges` (drizzle/0097). That function is `SECURITY DEFINER` and answers only for
+ * an identity the caller's own context pins — fail-closed. A bare transaction pins nothing, so the
+ * recomputation saw no conflicts and the two tests below (a booked slot disappearing, and a race
+ * having one winner) could not have failed for the right reason. Every real path sets these.
+ */
+async function withPinnedTenant<T>(operation: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select
+      set_config('app.organization_id', ${ORG}, true),
+      set_config('app.user_id', ${OWNER}, true),
+      set_config('app.capability_owner_user_id', ${OWNER}, true)`)
+    return operation(tx)
+  })
+}
+
 describe('atomic booking', () => {
   it('creates the event, both participants, and marks the invitation booked in one transaction', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
 
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
@@ -195,7 +215,7 @@ describe('atomic booking', () => {
   it('arms the organizer reminders from the policy defaults', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     if (!result.ok) throw new Error(result.reason)
 
     const reminders = await db.transaction((tx) => listRemindersForEvent(tx, ORG, result.eventId))
@@ -209,7 +229,7 @@ describe('atomic booking', () => {
     const { invitation, consentReceiptIds } = await readyInvitation({ requiredAccepted: ['terms_and_privacy'] })
     const slot = await firstSlot()
 
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('consent_required')
@@ -221,7 +241,7 @@ describe('atomic booking', () => {
     const slot = await firstSlot()
     const before = await db.transaction((tx) => listEventsInRange(tx, ORG, OWNER, { from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000) }))
 
-    await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
 
     const after = await db.transaction((tx) => listEventsInRange(tx, ORG, OWNER, { from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000) }))
     expect(after).toHaveLength(before.length)
@@ -233,7 +253,7 @@ describe('atomic booking', () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
 
-    const result = await db.transaction((tx) => bookSlot(tx, {
+    const result = await withPinnedTenant((tx) => bookSlot(tx, {
       ...bookInput(invitation.id, consentReceiptIds, slot),
       slotId: 'not-a-slot-we-issued',
     }))
@@ -251,7 +271,7 @@ describe('atomic booking', () => {
       status: 'revoked', revokedAt: NOW,
     }))
 
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('invitation_unavailable')
@@ -264,7 +284,7 @@ describe('atomic booking', () => {
       expiresAt: new Date(NOW.getTime() - 60_000),
     }))
 
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('invitation_unavailable')
@@ -291,7 +311,7 @@ describe('atomic booking', () => {
     ))
     const slot = await firstSlot()
 
-    const result = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, [], slot)))
+    const result = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, [], slot)))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('invalid_input')
@@ -302,8 +322,8 @@ describe('atomic booking', () => {
     const slot = await firstSlot()
     const input = bookInput(invitation.id, consentReceiptIds, slot)
 
-    const first = await db.transaction((tx) => bookSlot(tx, input))
-    const second = await db.transaction((tx) => bookSlot(tx, input))
+    const first = await withPinnedTenant((tx) => bookSlot(tx, input))
+    const second = await withPinnedTenant((tx) => bookSlot(tx, input))
     expect(first.ok && second.ok).toBe(true)
     if (!first.ok || !second.ok) return
 
@@ -314,17 +334,17 @@ describe('atomic booking', () => {
 
   it('tells a candidate whose invitation was booked for a different time that the slot is gone', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
-    const slots = await db.transaction((tx) => querySlots(tx, {
+    const slots = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
     const [taken, other] = slots.slots
     if (!taken || !other) throw new Error('fixture produced too few slots')
 
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, taken)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, taken)))
     expect(booked.ok).toBe(true)
 
-    const late = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, other)))
+    const late = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, other)))
     expect(late.ok).toBe(false)
     if (late.ok) return
     expect(late.code).toBe('slot_unavailable')
@@ -333,10 +353,10 @@ describe('atomic booking', () => {
   it('a confirmed booking removes its own time from the slots offered to the next candidate', async () => {
     const first = await readyInvitation()
     const slot = await firstSlot()
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(first.invitation.id, first.consentReceiptIds, slot)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(first.invitation.id, first.consentReceiptIds, slot)))
     expect(booked.ok).toBe(true)
 
-    const after = await db.transaction((tx) => querySlots(tx, {
+    const after = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
@@ -354,8 +374,8 @@ describe('the race', () => {
     const slot = await firstSlot()
 
     const [resultA, resultB] = await Promise.all([
-      db.transaction((tx) => bookSlot(tx, bookInput(a.invitation.id, a.consentReceiptIds, slot))),
-      db.transaction((tx) => bookSlot(tx, bookInput(b.invitation.id, b.consentReceiptIds, slot))),
+      withPinnedTenant((tx) => bookSlot(tx, bookInput(a.invitation.id, a.consentReceiptIds, slot))),
+      withPinnedTenant((tx) => bookSlot(tx, bookInput(b.invitation.id, b.consentReceiptIds, slot))),
     ])
 
     const winners = [resultA, resultB].filter((result) => result.ok)
@@ -383,10 +403,10 @@ describe('cancellation', () => {
   it('cancels the appointment and its reminders while preserving the booking history', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     if (!booked.ok) throw new Error(booked.reason)
 
-    const cancelled = await db.transaction((tx) => cancelBooking(tx, {
+    const cancelled = await withPinnedTenant((tx) => cancelBooking(tx, {
       organizationId: ORG, ownerUserId: OWNER, invitationId: invitation.id, now: NOW,
     }))
     expect(cancelled.ok).toBe(true)
@@ -409,17 +429,17 @@ describe('cancellation', () => {
   it('cancelling twice is not an error', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(booked.ok).toBe(true)
 
     const args = { organizationId: ORG, ownerUserId: OWNER, invitationId: invitation.id, now: NOW }
-    expect((await db.transaction((tx) => cancelBooking(tx, args))).ok).toBe(true)
-    expect((await db.transaction((tx) => cancelBooking(tx, args))).ok).toBe(true)
+    expect((await withPinnedTenant((tx) => cancelBooking(tx, args))).ok).toBe(true)
+    expect((await withPinnedTenant((tx) => cancelBooking(tx, args))).ok).toBe(true)
   })
 
   it('refuses to cancel an invitation that was never booked', async () => {
     const { invitation } = await readyInvitation()
-    const result = await db.transaction((tx) => cancelBooking(tx, {
+    const result = await withPinnedTenant((tx) => cancelBooking(tx, {
       organizationId: ORG, ownerUserId: OWNER, invitationId: invitation.id, now: NOW,
     }))
     expect(result.ok).toBe(false)
@@ -428,13 +448,13 @@ describe('cancellation', () => {
   it('a cancelled slot becomes bookable again', async () => {
     const first = await readyInvitation()
     const slot = await firstSlot()
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(first.invitation.id, first.consentReceiptIds, slot)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(first.invitation.id, first.consentReceiptIds, slot)))
     expect(booked.ok).toBe(true)
-    await db.transaction((tx) => cancelBooking(tx, {
+    await withPinnedTenant((tx) => cancelBooking(tx, {
       organizationId: ORG, ownerUserId: OWNER, invitationId: first.invitation.id, now: NOW,
     }))
 
-    const after = await db.transaction((tx) => querySlots(tx, {
+    const after = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
@@ -445,17 +465,17 @@ describe('cancellation', () => {
 describe('rescheduling', () => {
   it('creates a linked replacement, retires the old event, and never leaves the invitation without one', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
-    const slots = await db.transaction((tx) => querySlots(tx, {
+    const slots = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
     const [original, moved] = slots.slots
     if (!original || !moved) throw new Error('fixture produced too few slots')
 
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
     if (!booked.ok) throw new Error(booked.reason)
 
-    const result = await db.transaction((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, moved)))
+    const result = await withPinnedTenant((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, moved)))
     expect(result.ok).toBe(true)
     if (!result.ok) return
     expect(result.eventId).not.toBe(booked.eventId)
@@ -474,16 +494,16 @@ describe('rescheduling', () => {
 
   it('cancels the old reminders and arms new ones', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
-    const slots = await db.transaction((tx) => querySlots(tx, {
+    const slots = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
     const [original, moved] = slots.slots
     if (!original || !moved) throw new Error('fixture produced too few slots')
 
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
     if (!booked.ok) throw new Error(booked.reason)
-    const result = await db.transaction((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, moved)))
+    const result = await withPinnedTenant((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, moved)))
     if (!result.ok) throw new Error(result.reason)
 
     const oldReminders = await db.transaction((tx) => listRemindersForEvent(tx, ORG, booked.eventId))
@@ -497,17 +517,17 @@ describe('rescheduling', () => {
 
   it('re-verifies consent, so a purpose withdrawn after booking blocks the move', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
-    const slots = await db.transaction((tx) => querySlots(tx, {
+    const slots = await withPinnedTenant((tx) => querySlots(tx, {
       organizationId: ORG, ownerUserId: OWNER, durationMinutes: 30,
       from: MONDAY, to: new Date(MONDAY.getTime() + 86_400_000), now: NOW,
     }))
     const [original, moved] = slots.slots
     if (!original || !moved) throw new Error('fixture produced too few slots')
 
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, original)))
     if (!booked.ok) throw new Error(booked.reason)
 
-    const result = await db.transaction((tx) => rescheduleBooking(tx, {
+    const result = await withPinnedTenant((tx) => rescheduleBooking(tx, {
       ...bookInput(invitation.id, consentReceiptIds, moved),
       // Same receipts, but the portal now renders a newer notice: those receipts consent to text the
       // candidate has not seen.
@@ -525,10 +545,10 @@ describe('rescheduling', () => {
   it('rolls the release back when the new slot is gone, leaving the original appointment intact', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
-    const booked = await db.transaction((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const booked = await withPinnedTenant((tx) => bookSlot(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     if (!booked.ok) throw new Error(booked.reason)
 
-    await expect(db.transaction((tx) => rescheduleBooking(tx, {
+    await expect(withPinnedTenant((tx) => rescheduleBooking(tx, {
       ...bookInput(invitation.id, consentReceiptIds, slot),
       slotId: 'a-slot-that-does-not-exist',
     }))).rejects.toThrow(/no longer available/)
@@ -545,7 +565,7 @@ describe('rescheduling', () => {
   it('refuses to reschedule an invitation that was never booked', async () => {
     const { invitation, consentReceiptIds } = await readyInvitation()
     const slot = await firstSlot()
-    const result = await db.transaction((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, slot)))
+    const result = await withPinnedTenant((tx) => rescheduleBooking(tx, bookInput(invitation.id, consentReceiptIds, slot)))
     expect(result.ok).toBe(false)
     if (result.ok) return
     expect(result.code).toBe('invitation_unavailable')

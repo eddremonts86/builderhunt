@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { env } from '../env'
+import { poolOptions } from './pool-options'
 
 /**
  * The platform-operator connection.
@@ -14,7 +15,7 @@ import { env } from '../env'
  * Falls back to DATABASE_URL when unset, matching `worker-db.ts`: the role-separation cutover is a
  * sign-off-gated step, and the fallback is what keeps local development working before it lands.
  */
-const platformClient = postgres(env.DATABASE_PLATFORM_URL ?? env.DATABASE_URL, { prepare: false })
+const platformClient = postgres(env.DATABASE_PLATFORM_URL ?? env.DATABASE_URL, poolOptions())
 
 export const platformDb = drizzle(platformClient)
 export type PlatformTransaction = Parameters<Parameters<typeof platformDb.transaction>[0]>[0]

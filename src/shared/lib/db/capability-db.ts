@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
 import { env } from '../env'
+import { poolOptions } from './pool-options'
 
 /**
  * The connection used by the public capability flow (drizzle/0078).
@@ -18,7 +19,7 @@ import { env } from '../env'
  */
 const capabilityClient = postgres(
   env.DATABASE_CAPABILITY_URL ?? env.DATABASE_WORKER_URL ?? env.DATABASE_URL,
-  { prepare: false },
+  poolOptions(),
 )
 
 export const capabilityDb = drizzle(capabilityClient)

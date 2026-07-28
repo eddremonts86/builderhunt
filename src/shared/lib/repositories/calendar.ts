@@ -174,6 +174,34 @@ export async function insertCalendar(
 
 // ── Events ───────────────────────────────────────────────────────────────────────────────────
 
+/**
+ * The caller's default calendar, created on first need.
+ *
+ * Every event has to belong to a calendar, and the product deliberately never asks a user to create
+ * one — so something has to. Until this existed, the only place that did was `POST
+ * /api/calendar/events`, which meant an organizer who set their availability and sent an invitation
+ * but never hand-created an event had no calendar, and `bookSlot` refused every candidate booking
+ * with `invalid_input`: a message that blames the candidate for the organizer never having opened a
+ * page. Found by the Phase 12 candidate e2e, whose organizer does exactly that and nothing more.
+ *
+ * Idempotent, and safe to call on any organizer-authenticated path that implies "time can be booked
+ * with me".
+ */
+export async function ensureDefaultCalendar(
+  transaction: TenantTransaction,
+  input: { organizationId: string; ownerUserId: string; timezone: string },
+) {
+  const existing = await findDefaultCalendar(transaction, input.organizationId, input.ownerUserId)
+  if (existing) return existing
+  return insertCalendar(transaction, {
+    organizationId: input.organizationId,
+    ownerUserId: input.ownerUserId,
+    name: 'My calendar',
+    timezone: input.timezone,
+    isDefault: true,
+  })
+}
+
 export async function findEventById(transaction: TenantTransaction, organizationId: string, eventId: string) {
   const [row] = await transaction
     .select(eventColumns)
@@ -756,6 +784,33 @@ export async function insertDeliveryIfAbsent(
 }
 
 /** Busy ranges for availability subtraction: confirmed/scheduled, busy-flagged events only. */
+/**
+ * Busy intervals for slot generation, through `scheduling_busy_ranges` (drizzle/0097).
+ *
+ * Separate from `listBusyRanges` because the two callers have different reach.
+ * `evaluateOverlap` runs as the organizer, who may read their own events as rows.
+ * `querySlots` runs under a candidate's capability, which — correctly, since 0086 — cannot see
+ * another candidate's interview at all. That made the busy list empty and offered every taken slot
+ * as free: two candidates each booked the same minute, both with a 200.
+ *
+ * The function returns two timestamps and nothing else, and refuses any owner the caller's own
+ * context does not pin. See the migration for the whole argument.
+ */
+export async function listBookableBusyRanges(
+  transaction: TenantTransaction,
+  ownerUserId: string,
+  range: { from: Date; to: Date },
+): Promise<{ start: Date; end: Date }[]> {
+  const rows = await transaction.execute(sql`
+    select starts_at, ends_at
+    from scheduling_busy_ranges(${ownerUserId}, ${range.from.toISOString()}::timestamptz, ${range.to.toISOString()}::timestamptz)
+  `) as unknown as { starts_at: Date | string; ends_at: Date | string }[]
+  return rows.map((row) => ({
+    start: row.starts_at instanceof Date ? row.starts_at : new Date(row.starts_at),
+    end: row.ends_at instanceof Date ? row.ends_at : new Date(row.ends_at),
+  }))
+}
+
 export async function listBusyRanges(
   transaction: TenantTransaction,
   organizationId: string,

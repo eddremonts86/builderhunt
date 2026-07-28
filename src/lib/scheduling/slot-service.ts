@@ -19,7 +19,7 @@
  *    into an expensive scan.
  */
 import type { TenantTransaction } from '~/shared/lib/db/client'
-import { listBusyRanges } from '~/shared/lib/repositories/calendar'
+import { listBookableBusyRanges } from '~/shared/lib/repositories/calendar'
 import {
   findAvailabilityPolicy,
   listAvailabilityOverrides,
@@ -94,7 +94,10 @@ export async function querySlots(
   }
 
   // Start/end only — see the no-leakage note in the module header.
-  const busyRanges = await listBusyRanges(transaction, query.organizationId, query.ownerUserId, effectiveRange)
+  // Through the privileged function, not a row read: a candidate's capability cannot see another
+  // candidate's interview, so a plain read returned an empty busy list and offered taken slots as
+  // free. See `listBookableBusyRanges` and drizzle/0097.
+  const busyRanges = await listBookableBusyRanges(transaction, query.ownerUserId, effectiveRange)
 
   const overrideDtos = overrides.map((override) => ({
     ownerUserId: query.ownerUserId,

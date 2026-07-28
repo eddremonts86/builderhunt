@@ -102,6 +102,14 @@ export const E2E_BASE_ROLES = [
   'builderhunt_auth',
   'builderhunt_worker',
   'builderhunt_platform',
+  // `builderhunt_capability` is not optional here even though `DATABASE_CAPABILITY_URL` itself is.
+  // Without a per-database capability role, the harness leaves that URL pointing at whatever the
+  // developer's `.env` names — which is their real local database. Every public scheduling route
+  // then resolved capabilities against it while the rest of the run used the disposable copy, so
+  // the candidate flow answered `invitation_unavailable` for invitations that plainly existed. In
+  // CI the variable is unset and falls back to the worker URL, which *is* redirected — so the
+  // whole accountless half of the product passed there and could not work locally.
+  'builderhunt_capability',
 ] as const
 
 export const E2E_ROLE_PASSWORD = 'builderhunt_e2e'

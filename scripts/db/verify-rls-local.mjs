@@ -497,6 +497,84 @@ try {
       return rows.length
     })
     if (unpinned !== 0) throw new Error(`capability without a pinned invitation saw ${unpinned} submissions`)
+
+    /*
+     * The candidate's WRITE, with RETURNING — the case none of these checks covered.
+     *
+     * Everything above is a read. `bookSlot` writes the interview event and reads it straight back
+     * with `RETURNING`, and PostgreSQL evaluates the **SELECT** policies against the new row for the
+     * returned columns. 0086 had scoped the capability SELECT to invitations whose `booked_event_id`
+     * equals the row's id — a back-pointer written *after* the insert — so every booking failed with
+     * `42501 new row violates row-level security policy` and the candidate got `400 invalid_input`.
+     *
+     * Nothing caught it: the booking-service tests run as the migration superuser (RLS bypassed),
+     * the local `DATABASE_URL` is `postgres` (also a superuser), and the E2E harness pointed
+     * `DATABASE_CAPABILITY_URL` at the developer's real database. The one role that would have
+     * failed was the one role no test connected as for a write. 0096 fixes the policy; this asserts
+     * it, in the shape the product actually uses.
+     */
+    const bookedEventId = await asCandidateA(async (tx) => {
+      const [calendar] = await tx`select id from user_calendars where organization_id = 'org-a' limit 1`
+      if (!calendar) throw new Error('the RLS fixture has no calendar for org-a to book into')
+      const [row] = await tx`
+        insert into calendar_events
+          (organization_id, calendar_id, owner_user_id, type, status, title, starts_at, ends_at,
+           timezone, all_day, busy, source_type, source_id)
+        values ('org-a', ${calendar.id}, 'user-a', 'interview', 'confirmed', 'RLS booked interview',
+                now() + interval '3 days', now() + interval '3 days 30 minutes',
+                'Europe/Copenhagen', false, true, 'scheduling_invitation', ${INVITATION_A})
+        returning id
+      `
+      return row?.id ?? null
+    })
+    if (!bookedEventId) throw new Error('capability could not insert its own interview event with RETURNING')
+
+    // And the neighbouring candidate must not see it. The fix widened the SELECT predicate, so this
+    // is the assertion that the widening did not become "any event in the organization".
+    const neighbourSees = await capability.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.invitation_id', ${INVITATION_B}, true)`
+      await transaction`select set_config('app.capability_owner_user_id', 'user-a', true)`
+      const rows = await transaction`select id from calendar_events where id = ${bookedEventId}`
+      return rows.length
+    })
+    if (neighbourSees !== 0) {
+      throw new Error(`another candidate's capability read the booked event (${neighbourSees} rows)`)
+    }
+
+    /*
+     * `scheduling_busy_ranges` (drizzle/0097) must report that time as taken.
+     *
+     * The candidate's own row read cannot do this job — by design, since 0086 — and slot generation
+     * depended on it, so the busy list came back empty and two candidates of the same organizer each
+     * booked the same minute with a 200. The function returns two timestamps and refuses any owner
+     * the caller's context does not pin.
+     */
+    const busyForNeighbour = await capability.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.invitation_id', ${INVITATION_B}, true)`
+      await transaction`select set_config('app.capability_owner_user_id', 'user-a', true)`
+      return transaction`
+        select starts_at from scheduling_busy_ranges('user-a', now(), now() + interval '10 days')
+      `
+    })
+    if (busyForNeighbour.length === 0) {
+      throw new Error('scheduling_busy_ranges reported no conflicts, so a taken slot would be offered as free')
+    }
+
+    // The owner cannot be chosen by the caller: asking about a different organizer returns nothing
+    // rather than their calendar.
+    const busyForStranger = await capability.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.invitation_id', ${INVITATION_A}, true)`
+      await transaction`select set_config('app.capability_owner_user_id', 'user-a', true)`
+      return transaction`
+        select starts_at from scheduling_busy_ranges('user-b', now() - interval '365 days', now() + interval '365 days')
+      `
+    })
+    if (busyForStranger.length !== 0) {
+      throw new Error(`scheduling_busy_ranges answered for an owner the caller does not hold (${busyForStranger.length} rows)`)
+    }
   }
 
   // candidate_documents / document_extractions (Phase 6): ownership is proven by walking back to

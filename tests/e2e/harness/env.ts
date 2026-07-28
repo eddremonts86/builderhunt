@@ -32,6 +32,10 @@ const e2eEnvSchema = z.object({
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
   DATABASE_PLATFORM_URL: z.string().min(1).optional(),
+  // Optional, matching `capability-db.ts`'s own fallback to the worker URL. Read here so
+  // `workerDatabaseUrls` can redirect it at the disposable database instead of leaving the public
+  // candidate flow pointed at whatever a developer's `.env` names.
+  DATABASE_CAPABILITY_URL: z.string().min(1).optional(),
   E2E_RUN_ID: z.string().min(1).optional(),
   E2E_FIXED_TIME: z.string().optional(),
   // Wave 1 Task 4 — external-service fake seams

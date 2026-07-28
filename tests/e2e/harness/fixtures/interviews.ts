@@ -335,12 +335,38 @@ export async function sendInvitation(
  * every later request with the `HttpOnly` cookie. Contexts are tracked on the
  * harness so a spec cannot leak one.
  */
+/** Distinct forwarded-for per candidate, so one spec's candidates do not share a rate-limit bucket. */
+let candidateIpCounter = 0
+
 export async function candidateContext(
   harness: InterviewHarness,
   invitationId: string,
   secret: string,
+  options: { clientIp?: string } = {},
 ): Promise<APIRequestContext> {
-  const context = await request.newContext({ baseURL: harness.baseURL })
+  candidateIpCounter += 1
+  /**
+   * Each candidate gets its own `x-forwarded-for`.
+   *
+   * `getRateLimitId` keys the public budgets on the forwarded address, and every request context in
+   * a spec file otherwise arrives from 127.0.0.1 — so a file that drives the whole candidate journey
+   * a handful of times exhausts the 20-writes-per-minute budget and later tests fail with `429` for
+   * a reason that has nothing to do with what they assert. Two real candidates are two addresses;
+   * this makes the fixture match. A spec that *wants* to trip the limiter passes a fixed `clientIp`.
+   */
+  const clientIp = options.clientIp ?? `10.42.${Math.floor(candidateIpCounter / 250) % 250}.${candidateIpCounter % 250}`
+  const context = await request.newContext({
+    baseURL: harness.baseURL,
+    /**
+     * `Origin`, because the capability cookie is the only credential the public flow has.
+     *
+     * `isTrustedMutationOrigin` lets a cookie-less mutation through — that is how the exchange
+     * below works at all — and refuses any cookie-bearing mutation with no matching origin. A
+     * browser always sends one; an `APIRequestContext` does not, so without this every candidate
+     * write answers `403 forbidden` and the spec would be measuring its own missing header.
+     */
+    extraHTTPHeaders: { origin: harness.baseURL, 'x-forwarded-for': clientIp },
+  })
   harness.extraContexts.push(context)
   const response = await context.post(`/api/public/scheduling/${invitationId}/session`, {
     data: { secret },
@@ -353,7 +379,11 @@ export async function candidateContext(
 
 /** An anonymous context with no capability cookie — the enumeration baseline. */
 export async function anonymousContext(harness: InterviewHarness): Promise<APIRequestContext> {
-  const context = await request.newContext({ baseURL: harness.baseURL })
+  candidateIpCounter += 1
+  const context = await request.newContext({
+    baseURL: harness.baseURL,
+    extraHTTPHeaders: { 'x-forwarded-for': `10.43.0.${candidateIpCounter % 250}` },
+  })
   harness.extraContexts.push(context)
   return context
 }

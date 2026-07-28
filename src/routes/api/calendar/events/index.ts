@@ -8,7 +8,7 @@ import { REMINDER_OFFSET_MINUTES } from '~/shared/lib/calendar'
 import { MAX_RANGE_SPAN_DAYS } from '~/shared/lib/interview-api'
 import { httpUrlSchema } from '~/shared/lib/url-safety'
 import { createEvent, listRange, search } from '~/lib/calendar/service'
-import { findDefaultCalendar, insertCalendar } from '~/shared/lib/repositories/calendar'
+import { ensureDefaultCalendar } from '~/shared/lib/repositories/calendar'
 
 /**
  * Authenticated range/search read and event creation (plan:
@@ -135,15 +135,13 @@ export const Route = createFileRoute('/api/calendar/events/')({
           }
 
           const created = await withTenantContext(principal, async (tx) => {
-            // Every user gets a default calendar lazily on their first event, so the UI never has
-            // to expose calendar management before there is anything to manage.
-            const existing = await findDefaultCalendar(tx, principal.organizationId, principal.userId)
-            const calendar = existing ?? await insertCalendar(tx, {
+            // Every user gets a default calendar lazily, so the UI never has to expose calendar
+            // management before there is anything to manage. Shared with the two scheduling paths
+            // that also need one to exist — see `ensureDefaultCalendar`.
+            const calendar = await ensureDefaultCalendar(tx, {
               organizationId: principal.organizationId,
               ownerUserId: principal.userId,
-              name: 'My calendar',
               timezone: parsed.data.timezone,
-              isDefault: true,
             })
             return createEvent(tx, principal, {
               ...parsed.data,
