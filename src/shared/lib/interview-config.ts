@@ -6,6 +6,7 @@
  * owned by `billing/catalog.ts` and the platform ledger.
  */
 import type { CatalogTier } from './billing/catalog'
+import { getRateCard } from './billing/rate-cards'
 import { env } from './env'
 
 // ── Document upload contract (spec.md "Private file contract") ──────────────────────────────
@@ -123,12 +124,18 @@ export function assertValidHorizonDays(days: number): number {
 }
 
 // ── Interview operation rate-card keys (spec.md "Usage credits and pricing") ────────────────
-// These are this module's own immutable local constants — not registered with the billing
-// platform's `RATE_CARDS` map yet (a separate later task). `operationKey`/`units`/`version` are
-// what interview code imports to build a reservation request; bumping units for an operation
-// that's already live must mint a new `version` rather than mutate the entry in place, so a
-// historical run's settlement always resolves the rate-card version that actually governed it
-// (same convention as `billing/rate-cards.ts` and `solutions/config.ts`).
+//
+// **Derived from `billing/rate-cards.ts`, not declared here.** These used to be local constants with
+// their own operation names (`interview.brief.v1`) and their own copy of the unit counts, described in
+// this very comment as "not registered with the billing platform's RATE_CARDS map yet". That made two
+// sources of truth for one price — and worse, the names were unregistered, so `reserveCredits` with
+// any of them would have thrown `unknown_feature`: interview code could not actually have billed
+// anything through the platform.
+//
+// Now the platform registry is the single source. `units` is the rate card's `maxUnits`, which for
+// these operations *is* the price (transcription's card is the per-minute unit, and the worker
+// extends the reservation as it runs). Version bumps happen in one place, so a rate change cannot
+// leave a stale copy behind.
 
 export interface InterviewRateCardKey {
   operationKey: string
@@ -136,11 +143,23 @@ export interface InterviewRateCardKey {
   units: number
 }
 
+function fromRateCard(operation: string): InterviewRateCardKey {
+  const card = getRateCard(operation)
+  // A missing card means the registry and this map disagree about what exists — a mistake that would
+  // otherwise surface as an `unknown_feature` reservation failure at the worst possible moment.
+  if (!card) throw new Error(`Interview rate card '${operation}' is not registered in billing/rate-cards.ts`)
+  return { operationKey: card.operation, version: card.version, units: card.maxUnits }
+}
+
 export const INTERVIEW_RATE_CARD_KEYS = {
-  brief: { operationKey: 'interview.brief.v1', version: 1, units: 5 } as const satisfies InterviewRateCardKey,
-  transcriptionPerMinute: { operationKey: 'interview.transcription_minute.v1', version: 1, units: 1 } as const satisfies InterviewRateCardKey,
-  report: { operationKey: 'interview.report.v1', version: 1, units: 5 } as const satisfies InterviewRateCardKey,
-} as const
+  brief: fromRateCard('interview_brief'),
+  // The card's `maxUnits` is 180 — a three-hour reservation ceiling, not a price — so the per-minute
+  // unit is stated here explicitly. It is asserted against the card in
+  // `tests/unit/shared/lib/interview-config.test.ts` so the two cannot drift apart silently.
+  transcriptionPerMinute: { operationKey: 'interview_live_transcription', version: 1, units: 1 },
+  contextualQuestion: fromRateCard('interview_contextual_question'),
+  report: fromRateCard('interview_final_report'),
+} as const satisfies Record<string, InterviewRateCardKey>
 
 export type InterviewRateCardOperation = keyof typeof INTERVIEW_RATE_CARD_KEYS
 

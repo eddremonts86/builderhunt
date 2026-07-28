@@ -38,6 +38,42 @@ export const RATE_CARDS: Record<string, RateCard> = {
     operation: 'builder_work_sample_analysis', version: 1, maxUnits: 20, maxDurationSeconds: 180,
     settlementGraceSeconds: 60, minimumTier: 'pro_max',
   },
+
+  // ── Interview intelligence (plan: calendar-scheduling-interview-intelligence, Phase 7) ────────
+  //
+  // spec.md "Usage credits and pricing" fixes the numbers: brief 5, transcription 1 credit per
+  // provider-billed minute, contextual questions included, final report 5, and "typical 60-minute
+  // interview: 70 credits" — which is 5 + 60 + 5 and is asserted as an arithmetic identity in
+  // `src/modules/interviews/billing.ts`, so a rate change cannot silently contradict the marketing
+  // figure.
+  //
+  // `minimumTier: 'pro'` on all four, from spec.md "Sensitive brief/transcription/report: Pro, Pro
+  // Max, and Team plus sufficient credits". Free tier cannot reach any of them.
+  interview_brief: {
+    operation: 'interview_brief', version: 1, maxUnits: 5, maxDurationSeconds: 300,
+    settlementGraceSeconds: 60, minimumTier: 'pro',
+  },
+  // `maxUnits` is a per-reservation ceiling, not the price of an interview: transcription bills by the
+  // minute and extends as it runs, so this bounds how much one reservation may ever consume before the
+  // caller has to extend it. Three hours is well past any interview and still a real cap — an unbounded
+  // reservation is how a stuck session eats a month of credits.
+  interview_live_transcription: {
+    operation: 'interview_live_transcription', version: 1, maxUnits: 180, maxDurationSeconds: 10_800,
+    settlementGraceSeconds: 300, minimumTier: 'pro',
+  },
+  // Zero units, deliberately. spec.md: contextual questions are "included during active paid
+  // transcription", so there is nothing to reserve — but the card still exists, because it is what
+  // gates the feature by tier. `checkEntitlement` returns `tier_too_low` for a free-tier caller
+  // without any reservation being attempted. The "only while transcription is active" half cannot be
+  // expressed here and is enforced in `src/modules/interviews/billing.ts`.
+  interview_contextual_question: {
+    operation: 'interview_contextual_question', version: 1, maxUnits: 0, maxDurationSeconds: 30,
+    settlementGraceSeconds: 30, minimumTier: 'pro',
+  },
+  interview_final_report: {
+    operation: 'interview_final_report', version: 1, maxUnits: 5, maxDurationSeconds: 300,
+    settlementGraceSeconds: 60, minimumTier: 'pro',
+  },
 }
 
 export function getRateCard(operation: string): RateCard | null {

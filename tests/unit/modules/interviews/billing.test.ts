@@ -167,3 +167,62 @@ describe('boundary: no local grant/ledger state machine', () => {
     }
   })
 })
+
+// ── Boundary: interview code consumes the billing platform, it does not reimplement it ─────────
+//
+// plan Phase 7: "Import the platform contracts; do not create Stripe, catalog, grant, ledger,
+// checkout, refund, auto-recharge, or reconciliation code here." Enforced as a source scan rather
+// than trusted to review, because the failure is invisible: a second ledger works fine in tests and
+// diverges from the real one only once money has moved through both.
+
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
+
+/** Every interview and scheduling source file — the surfaces this rule governs. */
+function sourceFiles(root: string): string[] {
+  const found: string[] = []
+  for (const entry of readdirSync(root)) {
+    const path = join(root, entry)
+    if (statSync(path).isDirectory()) found.push(...sourceFiles(path))
+    else if (/\.(ts|tsx)$/.test(entry)) found.push(path)
+  }
+  return found
+}
+
+const GOVERNED_ROOTS = ['src/modules/interviews', 'src/lib/scheduling', 'src/modules/scheduling']
+
+/**
+ * Imports that would mean a second implementation rather than a consumer of the first.
+ *
+ * `feature-authorization`, `rate-cards` and `credits` are deliberately absent: those *are* the
+ * platform's public contracts, and importing them is the whole point.
+ */
+const FORBIDDEN_IMPORTS: ReadonlyArray<{ pattern: RegExp; why: string }> = [
+  { pattern: /from ['"]stripe['"]/, why: 'the Stripe SDK belongs to the billing platform' },
+  { pattern: /billing\/stripe-(client|provider)/, why: 'Stripe wiring belongs to the billing platform' },
+  { pattern: /billing\/(checkout|refunds|disputes|dunning|auto-recharge|reconciliation|packs|subscriptions)/, why: 'payment lifecycle belongs to the billing platform' },
+  { pattern: /\b(billingCreditGrants|billingCreditLedger|billingCreditReservations|billingSubscriptions|billingCustomers)\b/, why: 'billing tables are the platform ledger; go through its contracts' },
+]
+
+describe('interview code does not reimplement billing', () => {
+  const files = GOVERNED_ROOTS.flatMap((root) => {
+    try {
+      return sourceFiles(root)
+    } catch {
+      return []
+    }
+  })
+
+  it('scans a non-empty set of files', () => {
+    // Without this, a renamed directory turns the whole rule into a silently passing no-op.
+    expect(files.length).toBeGreaterThan(5)
+  })
+
+  it.each(FORBIDDEN_IMPORTS.map((rule) => [rule.pattern.source, rule] as const))(
+    'no governed file matches %s',
+    (_source, rule) => {
+      const offenders = files.filter((file) => rule.pattern.test(readFileSync(file, 'utf8')))
+      expect(offenders, `${rule.why}. Offending files: ${offenders.join(', ')}`).toEqual([])
+    },
+  )
+})

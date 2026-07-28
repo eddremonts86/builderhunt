@@ -1,3 +1,4 @@
+import { getRateCard } from '~/shared/lib/billing/rate-cards'
 import { describe, expect, it, vi } from 'vitest'
 
 // Same pattern as solutions/config.test.ts: env.ts always uses its browser-stub branch under
@@ -135,9 +136,41 @@ describe('availability booking horizon', () => {
 
 describe('interview rate-card keys', () => {
   it('pins the exact fixed units from spec.md', () => {
-    expect(INTERVIEW_RATE_CARD_KEYS.brief).toEqual({ operationKey: 'interview.brief.v1', version: 1, units: 5 })
-    expect(INTERVIEW_RATE_CARD_KEYS.transcriptionPerMinute).toEqual({ operationKey: 'interview.transcription_minute.v1', version: 1, units: 1 })
-    expect(INTERVIEW_RATE_CARD_KEYS.report).toEqual({ operationKey: 'interview.report.v1', version: 1, units: 5 })
+    // spec.md "Usage credits and pricing": brief 5, transcription 1 per provider-billed minute,
+    // contextual questions included (0), final report 5.
+    expect(INTERVIEW_RATE_CARD_KEYS.brief).toEqual({ operationKey: 'interview_brief', version: 1, units: 5 })
+    expect(INTERVIEW_RATE_CARD_KEYS.transcriptionPerMinute).toEqual({ operationKey: 'interview_live_transcription', version: 1, units: 1 })
+    expect(INTERVIEW_RATE_CARD_KEYS.contextualQuestion).toEqual({ operationKey: 'interview_contextual_question', version: 1, units: 0 })
+    expect(INTERVIEW_RATE_CARD_KEYS.report).toEqual({ operationKey: 'interview_final_report', version: 1, units: 5 })
+  })
+
+  it('names operations the billing platform actually knows', () => {
+    // The reason this exists: these keys were previously `interview.brief.v1` and friends, registered
+    // nowhere. `reserveCredits` resolves an operation through `getRateCard`, so every one of them would
+    // have thrown `unknown_feature` — interview code could not have billed anything, and no test said so.
+    for (const key of Object.values(INTERVIEW_RATE_CARD_KEYS)) {
+      const card = getRateCard(key.operationKey)
+      expect(card, `operation '${key.operationKey}' is not in billing/rate-cards.ts`).not.toBeNull()
+      expect(card?.version).toBe(key.version)
+    }
+  })
+
+  it('keeps the per-minute transcription unit in step with its rate card', () => {
+    // Transcription's card carries a three-hour *ceiling* in `maxUnits`, not a price, so the per-minute
+    // unit is the one number here that is not derived. This is what stops it drifting: the ceiling must
+    // be exactly the per-minute unit times the documented maximum session length.
+    const card = getRateCard('interview_live_transcription')
+    expect(card?.maxUnits).toBe(180 * INTERVIEW_RATE_CARD_KEYS.transcriptionPerMinute.units)
+    expect(card?.maxDurationSeconds).toBe(180 * 60)
+  })
+
+  it('gates every interview operation behind a paid tier', () => {
+    // spec.md "Enforcement": "Sensitive brief/transcription/report: Pro, Pro Max, and Team plus
+    // sufficient credits." A card that slipped to `minimumTier: null` would silently open all of it
+    // to the free tier.
+    for (const key of Object.values(INTERVIEW_RATE_CARD_KEYS)) {
+      expect(getRateCard(key.operationKey)?.minimumTier, key.operationKey).toBe('pro')
+    }
   })
 
   it('getInterviewRateCardKey resolves a known operation', () => {
