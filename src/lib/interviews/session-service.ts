@@ -111,6 +111,8 @@ export interface ConsentState {
   granted: boolean
   withdrawnAt: Date | null
   noticeVersion: string | null
+  /** When the candidate decided. The receipt shown at preflight is not checkable without it. */
+  decidedAt: Date | null
 }
 
 /**
@@ -133,12 +135,13 @@ export async function readTranscriptionConsent(
     // consent check means transcribing someone who declined.
     .sort((a, b) => a.decidedAt.getTime() - b.decidedAt.getTime() || a.id.localeCompare(b.id))
     .at(-1)
-  if (!current) return { granted: false, withdrawnAt: null, noticeVersion: null }
+  if (!current) return { granted: false, withdrawnAt: null, noticeVersion: null, decidedAt: null }
 
   return {
     granted: current.withdrawnAt === null && current.decision === 'accepted',
     withdrawnAt: current.withdrawnAt,
     noticeVersion: current.noticeVersion,
+    decidedAt: current.decidedAt,
   }
 }
 

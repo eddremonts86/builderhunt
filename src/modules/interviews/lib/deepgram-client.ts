@@ -30,7 +30,19 @@ export const MAX_RECONNECT_ATTEMPTS = 5
 export const RECONNECT_BASE_DELAY_MS = 250
 
 export class DeepgramClientError extends Error {
-  constructor(message: string, readonly code: 'no_token' | 'connect_failed' | 'gave_up' | 'closed') {
+  constructor(
+    message: string,
+    readonly code: 'no_token' | 'connect_failed' | 'gave_up' | 'closed',
+    /**
+     * The code of whatever caused this, when there was one.
+     *
+     * Kept because the *reason* a grant was refused is usually the most important sentence on the page —
+     * "the candidate withdrew consent" is not the same as "could not connect", and collapsing both into
+     * `no_token` left the organizer reading "something went wrong" at the one moment they needed to know
+     * exactly what had happened.
+     */
+    readonly reason: string | null = null,
+  ) {
     super(message)
     this.name = 'DeepgramClientError'
   }
@@ -121,9 +133,11 @@ export class DeepgramLiveClient {
       // A refused token is usually a withdrawal or a spent balance, and neither is worth retrying: the
       // answer will be the same in 250 ms. Surfacing it immediately is what makes the hard stop prompt.
       this.setState('failed')
+      const cause = (error as { code?: unknown } | null)?.code
       const failure = new DeepgramClientError(
         `could not obtain a transcription grant: ${(error as Error)?.name ?? 'unknown'}`,
         'no_token',
+        typeof cause === 'string' ? cause : null,
       )
       this.options.onGaveUp?.(failure)
       throw failure

@@ -214,6 +214,7 @@ import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
+import { Route as DashboardInterviewsInterviewIdLiveRouteImport } from './routes/_dashboard/interviews/$interviewId/live'
 import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
 import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
@@ -1328,6 +1329,12 @@ const DashboardSettingsBillingReturnRoute =
     path: '/return',
     getParentRoute: () => DashboardSettingsBillingRoute,
   } as any)
+const DashboardInterviewsInterviewIdLiveRoute =
+  DashboardInterviewsInterviewIdLiveRouteImport.update({
+    id: '/interviews/$interviewId/live',
+    path: '/interviews/$interviewId/live',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const ApiPublicSchedulingInvitationIdIndexRoute =
   ApiPublicSchedulingInvitationIdIndexRouteImport.update({
     id: '/api/public/scheduling/$invitationId/',
@@ -1616,6 +1623,7 @@ export interface FileRoutesByFullPath {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
+  '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -1847,6 +1855,7 @@ export interface FileRoutesByTo {
   '/api/sprints': typeof ApiSprintsIndexRoute
   '/api/status': typeof ApiStatusIndexRoute
   '/api/work-samples': typeof ApiWorkSamplesIndexRoute
+  '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -2083,6 +2092,7 @@ export interface FileRoutesById {
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
+  '/_dashboard/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
@@ -2318,6 +2328,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/api/work-samples/'
+    | '/interviews/$interviewId/live'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -2549,6 +2560,7 @@ export interface FileRouteTypes {
     | '/api/sprints'
     | '/api/status'
     | '/api/work-samples'
+    | '/interviews/$interviewId/live'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -2784,6 +2796,7 @@ export interface FileRouteTypes {
     | '/api/sprints/'
     | '/api/status/'
     | '/api/work-samples/'
+    | '/_dashboard/interviews/$interviewId/live'
     | '/_dashboard/settings/billing/return'
     | '/api/admin/abuse/clusters'
     | '/api/admin/alerts/run-worker'
@@ -4496,6 +4509,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsBillingReturnRouteImport
       parentRoute: typeof DashboardSettingsBillingRoute
     }
+    '/_dashboard/interviews/$interviewId/live': {
+      id: '/_dashboard/interviews/$interviewId/live'
+      path: '/interviews/$interviewId/live'
+      fullPath: '/interviews/$interviewId/live'
+      preLoaderRoute: typeof DashboardInterviewsInterviewIdLiveRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/api/public/scheduling/$invitationId/': {
       id: '/api/public/scheduling/$invitationId/'
       path: '/api/public/scheduling/$invitationId'
@@ -4736,6 +4756,7 @@ interface DashboardRouteRouteChildren {
   DashboardSearchIndexRoute: typeof DashboardSearchIndexRoute
   DashboardSolutionsIndexRoute: typeof DashboardSolutionsIndexRoute
   DashboardSprintsIndexRoute: typeof DashboardSprintsIndexRoute
+  DashboardInterviewsInterviewIdLiveRoute: typeof DashboardInterviewsInterviewIdLiveRoute
   DashboardBuilderBuilderIdIndexRoute: typeof DashboardBuilderBuilderIdIndexRoute
   DashboardInterviewsInterviewIdIndexRoute: typeof DashboardInterviewsInterviewIdIndexRoute
   DashboardSprintsSprintIdIndexRoute: typeof DashboardSprintsSprintIdIndexRoute
@@ -4766,6 +4787,8 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardSearchIndexRoute: DashboardSearchIndexRoute,
   DashboardSolutionsIndexRoute: DashboardSolutionsIndexRoute,
   DashboardSprintsIndexRoute: DashboardSprintsIndexRoute,
+  DashboardInterviewsInterviewIdLiveRoute:
+    DashboardInterviewsInterviewIdLiveRoute,
   DashboardBuilderBuilderIdIndexRoute: DashboardBuilderBuilderIdIndexRoute,
   DashboardInterviewsInterviewIdIndexRoute:
     DashboardInterviewsInterviewIdIndexRoute,

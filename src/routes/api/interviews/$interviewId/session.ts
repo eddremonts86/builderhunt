@@ -131,23 +131,43 @@ export const Route = createFileRoute('/api/interviews/$interviewId/session')({
         try {
           const principal = await requireTenantPrincipal(request)
           const result = await withTenantContext(principal, async (transaction) => {
+            // The context first: it is what says this event is an interview at all, and a session that
+            // somehow existed without one still could not be transcribed.
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context) return null
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
             })
-            if (!session) return null
-            const context = await briefContextForEvent(transaction, principal, params.interviewId)
-            const consent = context
-              ? await readTranscriptionConsent(transaction, {
-                organizationId: principal.organizationId,
-                invitationId: context.invitationId,
-              })
-              : null
-            return { session, consent }
+            const consent = await readTranscriptionConsent(transaction, {
+              organizationId: principal.organizationId,
+              invitationId: context.invitationId,
+            })
+            return { session, consent, context }
           })
 
-          if (!result) return Response.json({ session: null }, { status: 200 })
+          // Everything the workspace needs to render its preflight, in one round trip. Three requests for
+          // the consent receipt, the booked modality and the session would each need the same tenant
+          // context and the same RLS decision.
+          if (!result) return Response.json({ error: 'not_found' }, { status: 404 })
+          const bootstrap = {
+            userId: principal.userId,
+            captureMode: result.context.modality === 'in_person' ? 'in_person' : 'remote_call',
+            // A booking carries no language of its own yet, so the deployment default stands until it does.
+            language: 'en' as const,
+            consent: result.consent.noticeVersion === null ? null : {
+              purpose: 'live_audio_transcription',
+              noticeVersion: result.consent.noticeVersion,
+              // The real date from the ledger. A receipt showing the epoch would be worse than one showing
+              // no date at all: it reads as a fact and is not one.
+              decidedAt: (result.consent.decidedAt ?? new Date()).toISOString(),
+              withdrawnAt: result.consent.withdrawnAt?.toISOString() ?? null,
+            },
+          }
+
+          if (!result.session) return Response.json({ session: null, ...bootstrap }, { status: 200 })
           return Response.json({
+            ...bootstrap,
             session: toSessionDto(result.session, principal.userId),
             // The withdrawal poll. Reported on every read so a client that is only listening still learns
             // it must stop, without a separate endpoint it might not be calling.

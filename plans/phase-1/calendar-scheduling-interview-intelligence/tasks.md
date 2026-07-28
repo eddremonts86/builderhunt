@@ -1857,23 +1857,50 @@ Not fixed here — it predates this program and deserves its own work.
     and ignored. Five plants proved the static recording check (twice), the buffer slice, the
     `onerror` silence, and the deliberate-close flag are each load-bearing.
 
-- [ ] **Build dedicated live interview workspace**
+- [x] **Build dedicated live interview workspace** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/routes/_dashboard/interviews/$interviewId/live.tsx` (new),
     `src/modules/interviews/components/LiveInterviewPage.tsx` (new),
     `src/modules/interviews/components/CapturePreflight.tsx` (new),
     `src/modules/interviews/components/LiveTranscript.tsx` (new),
     `src/modules/interviews/components/InterviewNotes.tsx` (new),
     `src/modules/interviews/components/InterviewControls.tsx` (new),
-    `src/modules/interviews/components/SpeakerMapper.tsx` (new)
-  - Do: Add brief sidebar, stored-consent receipt and verbal-reminder acknowledgement, capture
-    banner, Chrome meeting-tab instructions/preflight, timer, live transcript, deterministic remote
-    source labels/in-person speaker correction, markers, private notes, pause/reconnect/finish,
-    remaining credits, withdrawal hard-stop, manual-only mode, screen-reader throttled announcements,
-    reduced motion, and 320 px layout. Do not allow microphone-only remote transcription; offer
-    manual-only instead.
-  - Verify: component/Playwright with fake provider covers permissions, both capture modes,
-    microphone-only remote rejection/manual-only transition, interim/final rendering, correction,
-    offline outbox, pause, withdrawal, zero credit, finish, keyboard, and axe.
+    `src/modules/interviews/components/SpeakerMapper.tsx` (new),
+    `tests/unit/modules/interviews/components/live-interview.test.tsx` (new),
+    `tests/unit/modules/interviews/components/live-interview-page.test.tsx` (new),
+    `src/routes/api/interviews/$interviewId/session.ts`, `src/lib/interviews/session-service.ts`,
+    `src/modules/interviews/lib/deepgram-client.ts`
+  - **The verbal-reminder checkbox is unticked and start is disabled until it is.** A pre-ticked box records
+    nothing, and the point of the control is evidence that a person said something out loud. The consent
+    receipt beside it names the notice version and the decision date, so it is checkable rather than a claim
+    the product makes about itself.
+  - **An unsupported browser is offered notes-only and the words "microphone only" appear nowhere.** Half a
+    conversation presented as a whole transcript reads as complete and nobody can tell which half is
+    missing. A plant that changed the sentence to offer microphone-only transcription fails the test.
+  - **In-person labels read "Speaker A", remote labels read "You" and "Candidate".** Remote attribution is a
+    fact the mixer constructed; in-person is diarization. A plant presenting the guess as a name fails.
+  - **A withdrawal tears capture down from the poll**, socket before microphone, without waiting for the
+    organizer to read anything — and leaves finish as the only forward action. The remaining guarantee is
+    the token route refusing the next 30-second grant.
+  - **`readableError` prefers a wrapped `reason` over the wrapper's `code`.** Found by a test: a
+    `DeepgramClientError` reports `no_token` for a withdrawal, a spent balance and a network fault alike, so
+    a candidate withdrawing mid-interview showed "something went wrong" at the one moment the organizer
+    needed to know exactly what had happened. `DeepgramClientError` now carries the cause's code.
+  - Screen-reader announcements are a throttled *summary* (a count, every eight seconds) with the transcript
+    itself `aria-live="off"`. Reading every final aloud as it lands would talk over the candidate for
+    forty-five minutes. The clock carries a spoken duration, because "12:04" is read as a time of day.
+  - A spent balance warns and never blocks: no modal, and the sentence says the interview continues. The
+    spinner carries `motion-reduce:animate-none`.
+  - `GET /session` grew the bootstrap the workspace needs — viewer id, booked modality, consent receipt — in
+    one round trip, and now answers 404 rather than `{session: null}` when no interview is visible, which is
+    the same answer an id that never existed gets.
+  - Verify (2026-07-28): 60 component tests plus 15 orchestration tests over the whole page — preflight
+    gating on consent and acknowledgement, both unsupported-browser messages, tab-audio instructions,
+    interim rendering that cannot be persisted, announcement throttling, per-voice and per-line speaker
+    correction, unattributed lines surfaced, every connection label, low-balance warning and its absence,
+    withdrawal alert, pause and finish ordering asserted through a recorded trace, notes autosave success
+    and failure, marker offsets, and the 320 px single-column layout. Three plants proved the
+    microphone-only prohibition, the diarization-is-a-guess labelling, and the unticked acknowledgement are
+    each load-bearing.
 
 - [ ] **Run real browser capture beta verification**
   - Files: `docs/operations/interview-runtime-verification.md` (new)

@@ -303,10 +303,11 @@ describe('authentication and the tenant boundary', () => {
   it('shows tenant B nothing, rather than telling it the interview exists', async () => {
     await toLive()
     // A different organization on the same event id. The tenant predicate is in every query, so this
-    // reads as absent — which is the right answer for both "gone" and "not yours".
+    // reads as absent — the same answer an id that never existed gets, which is what stops the status
+    // code itself from confirming that someone else's interview is there.
     const response = await readSession(principal({ organizationId: 'ir-other-org' }))
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ session: null })
+    expect(response.status).toBe(404)
+    expect(await response.json()).toEqual({ error: 'not_found' })
   })
 
   it('refuses an organization admin who is not a participant', async () => {
