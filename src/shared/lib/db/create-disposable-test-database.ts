@@ -43,11 +43,23 @@ export async function createDisposableTestDatabase(namePrefix: string) {
   const client = postgres(databaseUrl.toString(), { max: 5, prepare: false })
   const db = drizzle(client)
 
-  await admin`select pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`
   try {
-    await migrateWithRetry(db)
-  } finally {
-    await admin`select pg_advisory_unlock(${MIGRATION_ADVISORY_LOCK_KEY})`
+    await admin`select pg_advisory_lock(${MIGRATION_ADVISORY_LOCK_KEY})`
+    try {
+      await migrateWithRetry(db)
+    } finally {
+      await admin`select pg_advisory_unlock(${MIGRATION_ADVISORY_LOCK_KEY})`
+    }
+  } catch (error) {
+    // Both pools are already open at this point, and a throw here means `drop()` is never returned — so
+    // nothing will ever close them. Iterating on a test whose `beforeAll` fails then leaks a pool per
+    // attempt, and after enough attempts every later suite dies with `sorry, too many clients already`,
+    // which looks like a database problem rather than the accumulated debris of a failing test.
+    // Observed: 197 idle connections against a 200 limit.
+    await client.end({ timeout: 5 }).catch(() => undefined)
+    await admin.unsafe(`DROP DATABASE IF EXISTS ${databaseName}`).catch(() => undefined)
+    await admin.end({ timeout: 5 }).catch(() => undefined)
+    throw error
   }
 
   return {

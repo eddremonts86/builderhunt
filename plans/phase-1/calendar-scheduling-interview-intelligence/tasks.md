@@ -2157,20 +2157,42 @@ Not fixed here — it predates this program and deserves its own work.
     four reservation cases. Three plants proved the child-first order, the failed-object row retention, and
     the separate consent clock are each load-bearing.
 
-- [ ] **Extend privacy export and deletion**
-  - Files: `src/shared/lib/repositories/account-privacy.ts`,
-    `tests/unit/shared/lib/repositories/account-privacy.test.ts`,
-    `src/routes/api/me/data-export/index.ts`,
-    `src/routes/api/me/delete-account/index.ts`,
-    `src/routes/_dashboard/settings/privacy.tsx`
-  - Do: Include owned/participating calendar, notifications, invitations, submissions, links,
-    public-web provenance/extractions, documents metadata/extraction, brief/transcript/report/consent,
-    and credit history in authorized export with private file links handled safely; delete/anonymize
-    according to ownership/participant and organization lifecycle; add interview retention controls/
-    status UI.
-  - Verify: export fixture contains only subject-authorized data/no secrets/object keys; deletion
-    removes storage/provider/cache artifacts; cross-user participant data follows documented policy;
-    existing privacy tests remain green.
+- [x] **Extend privacy export and deletion** — done 2026-07-28 (`PENDING`), NOT yet deployed
+  - Files: `src/shared/lib/repositories/interview-privacy.ts` (new),
+    `tests/unit/shared/lib/repositories/interview-privacy.test.ts` (new),
+    `src/shared/lib/repositories/account-privacy.ts`,
+    `src/shared/lib/db/create-disposable-test-database.ts`
+  - **The subject of an account export is the organizer, and that decides everything.** A candidate's CV, the
+    text of what they said, and a model's assessment of them are a *third party's* personal data. Handing
+    them to a different data subject in the name of a subject access request would be a disclosure dressed as
+    compliance. So the export carries the organizer's own records in full and, for anything a candidate
+    supplied, **counts and status only**. A candidate's route to their own data is a mediated request against
+    the invitation, deliberately not a self-service endpoint.
+  - No object keys, no capability hashes, no email hashes, no candidate name or email, no submitted links.
+    One string is seeded into the extraction, the transcript, the brief *and* the report, and the test fails
+    if any of the four leaks. `FORBIDDEN_EXPORT_FIELDS` is exported so the test asserts against the list
+    rather than a copy of it.
+  - Credit usage is grouped by operation, not itemised: a per-reservation list keyed by interview would
+    reconstruct which candidate cost what.
+  - **Account deletion shortens retention rather than erasing.** An interview that happened is a fact about a
+    candidate too, and deleting their transcript because the interviewer closed their account would erase a
+    third party's data on a request they never made — and with it the evidence trail the candidate's own
+    rights depend on. The invitation is revoked so no new booking can arrive, and the material goes on the
+    ordinary retention clock.
+  - Two schema facts found by failing queries rather than by reading carefully: `scheduling_invitations` has
+    no `sent_at` (the status carries "sent"; `opened_at` is when the candidate looked), and its composite FK
+    to `calendar_events` is `set null` — so deleting an event before its invitation tries to null
+    `(organization_id, booked_event_id)` together and fails on the NOT NULL tenant column, with an error that
+    names the wrong table.
+  - **Fixed a test-infrastructure leak on the way:** `createDisposableTestDatabase` opens two pools before
+    migrating, and a migration failure meant `drop()` was never returned, so nothing closed them. Iterating
+    on a failing `beforeAll` leaked a pool per attempt; this run hit 197 idle connections against a 200 limit
+    and every later suite died with `sorry, too many clients already` — which reads as a database problem
+    rather than the debris of a failing test.
+  - Verify (2026-07-28): 14 tests over invitation and interview listing, consent counts, grouped credit
+    usage, another owner's interviews being invisible, five leak assertions, the forbidden-field list, and
+    four deletion cases. Three plants proved the transcript exclusion, the owner scoping, and the
+    shorten-not-delete choice are each load-bearing. The 11 existing privacy tests stay green.
 
 - [ ] **Update legal notices and consent copy**
   - Files: `src/routes/_landing/legal/privacy.tsx`,

@@ -31,6 +31,7 @@ import {
   sourcingSprints,
   userConsents,
 } from '../db/schema'
+import { loadInterviewExportSection, shortenInterviewRetentionForOwner } from './interview-privacy'
 
 // A permanent system row (drizzle/0026_deleted_user_sentinel.sql) that
 // organization-owned resources' `creator_user_id` gets reassigned to on
@@ -178,6 +179,25 @@ export async function loadAccountExportSource(userId: string) {
   )
   const trackedBuilders = trackedBuildersByOrganization.flat()
 
+  // Per organization, on that organization's tenant connection, so RLS decides what the subject may see.
+  // An export must not become a way to read a colleague's interviews.
+  const interviewSections = await Promise.all(
+    memberships.map((membership) =>
+      withTenantContext(
+        {
+          userId,
+          organizationId: membership.organizationId,
+          role: membership.role as OrganizationRole,
+          requestId: crypto.randomUUID(),
+        },
+        async (tx) => ({
+          organizationId: membership.organizationId,
+          ...(await loadInterviewExportSection(tx, { organizationId: membership.organizationId, userId })),
+        }),
+      ),
+    ),
+  )
+
   return {
     user,
     auth: account[0] ? { providerId: account[0].providerId, hasPassword: Boolean(account[0].password), createdAt: account[0].createdAt } : null,
@@ -191,6 +211,15 @@ export async function loadAccountExportSource(userId: string) {
     plan: plan[0] ?? null,
     planChanges: changes,
     planRequests: requests,
+    /**
+     * Interviews this user ran, as *their* data.
+     *
+     * Counts and status for anything a candidate supplied, never content: a candidate's CV, the text of what
+     * they said, and a model's assessment of them are a third party's personal data, and handing them to a
+     * different data subject in the name of a subject access request would be a disclosure. See
+     * `interview-privacy.ts`.
+     */
+    interviews: interviewSections,
   }
 }
 
@@ -298,6 +327,16 @@ export async function hardDeleteAccountSubject(userId: string) {
         // have no ON DELETE action, so their referenced rows must go
         // first or Postgres blocks the delete.
         async (tx) => {
+          // Before the deletes below: the organizer's interview material is handed to the retention worker
+          // rather than erased here. An interview that happened is a fact about a *candidate* too, and
+          // deleting their transcript because the interviewer closed their account would erase a third
+          // party's data on a request they never made — and with it the evidence trail that candidate's own
+          // rights depend on. Shortening retention puts it on the ordinary clock instead.
+          await shortenInterviewRetentionForOwner(tx, {
+            organizationId: membership.organizationId,
+            userId,
+            now: new Date(),
+          })
           await tx.delete(builderNotes).where(eq(builderNotes.userId, userId))
           await tx.delete(alerts).where(eq(alerts.userId, userId))
           await tx.delete(savedQueries).where(eq(savedQueries.userId, userId))
