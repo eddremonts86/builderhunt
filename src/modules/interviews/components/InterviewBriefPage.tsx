@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from '@tanstack/react-router'
 import { InterviewBriefEditor, type BriefView } from './InterviewBriefEditor'
+import { InterviewReportEditor, type ReportContent, type ReportView } from './InterviewReportEditor'
 import { CreditBalance, type CreditBalanceProps } from './CreditBalance'
+import type { EvidenceSegment } from './TranscriptEvidence'
 
 /**
  * Loads and renders one interview's brief alongside the credit state.
@@ -17,6 +19,22 @@ import { CreditBalance, type CreditBalanceProps } from './CreditBalance'
  * A participant can read a brief and must not be offered a regenerate button that the API will refuse.
  * The read response says whether this reader owns it; the client does not infer it from a role string.
  */
+interface ReportResponse {
+  report: ReportView | null
+  latestVersion: number | null
+  canEdit?: boolean
+}
+
+interface SegmentResponse {
+  segments: Array<{
+    id: string
+    startsMs: number
+    speakerEstimate: string
+    speakerMapping: string | null
+    text: string
+  }>
+}
+
 interface BriefResponse {
   brief: (BriefView & { id: string; eventId: string }) | null
   latestVersion: number | null
@@ -31,6 +49,8 @@ export function InterviewBriefPage() {
   const [summary, setSummary] = useState<CreditBalanceProps['summary']>(null)
   const [summaryStale, setSummaryStale] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [report, setReport] = useState<ReportResponse | null>(null)
+  const [segments, setSegments] = useState<EvidenceSegment[]>([])
 
   const loadBrief = useCallback(async () => {
     try {
@@ -62,10 +82,37 @@ export function InterviewBriefPage() {
     }
   }, [])
 
+  const loadReport = useCallback(async () => {
+    try {
+      const [reportResponse, segmentResponse] = await Promise.all([
+        fetch(`/api/interviews/${interviewId}/report`, { headers: { accept: 'application/json' } }),
+        fetch(`/api/interviews/${interviewId}/segments`, { headers: { accept: 'application/json' } }),
+      ])
+      // A failure here leaves the brief alone. An interview with no report is the normal case, and treating
+      // it as an error would put a red banner on every interview that was never transcribed.
+      if (reportResponse.ok) setReport(await reportResponse.json() as ReportResponse)
+      if (segmentResponse.ok) {
+        const body = await segmentResponse.json() as SegmentResponse
+        setSegments(body.segments.map((segment) => ({
+          id: segment.id,
+          startsMs: segment.startsMs,
+          speakerLabel: segment.speakerMapping === 'organizer' ? 'You'
+            : segment.speakerMapping === 'candidate_or_remote' ? 'Candidate'
+            : segment.speakerEstimate === 'speaker_a' ? 'Speaker A' : 'Speaker B',
+          text: segment.text,
+        })))
+      }
+    } catch {
+      // Same reasoning: the brief is the primary content of this page.
+      setReport((current) => current)
+    }
+  }, [interviewId])
+
   useEffect(() => {
     void loadBrief()
     void loadSummary()
-  }, [loadBrief, loadSummary])
+    void loadReport()
+  }, [loadBrief, loadReport, loadSummary])
 
   const onChanged = useCallback(() => {
     // Both, because generating a brief spends credits: refreshing only the brief would leave a balance
@@ -92,6 +139,72 @@ export function InterviewBriefPage() {
           canEdit={brief.canEdit ?? false}
         />
       )}
+
+      {report !== null && (
+        <InterviewReportEditor
+          report={report.report}
+          latestVersion={report.latestVersion}
+          segments={segments}
+          canEdit={report.canEdit ?? false}
+          topicQuestions={topicQuestionsFrom(brief?.brief)}
+          onGenerate={async (organizerNotes) => {
+            await postJson(`/api/interviews/${interviewId}/report`, { creditConfirmation: true, organizerNotes })
+            // Both, because a report spends five credits.
+            void loadReport()
+            void loadSummary()
+          }}
+          onSave={async (content, expectedVersion) => {
+            await patchJson(`/api/interviews/${interviewId}/report`, { expectedVersion, content })
+            void loadReport()
+          }}
+          onFinalize={async (expectedVersion) => {
+            await postJson(`/api/interviews/${interviewId}/finalize`, { expectedVersion, confirmFinal: true })
+            void loadReport()
+          }}
+        />
+      )}
     </div>
   )
+}
+
+/**
+ * Topic id → the question it came from.
+ *
+ * Derived exactly as the services do — critical, then technical, then general — so `topic:2` in a report
+ * resolves to the same question the suggestion service attributed it to. Two independent orderings would put
+ * the wrong question above the right answer, which is worse than showing the raw id.
+ */
+function topicQuestionsFrom(brief: BriefView | null | undefined): Record<string, string> {
+  const groups = brief?.content.questionGroups
+  if (!Array.isArray(groups)) return {}
+  const rank: Record<string, number> = { critical: 0, technical: 1, general: 2 }
+  const questions: Record<string, string> = {}
+  ;[...groups]
+    .sort((a, b) => (rank[a.category] ?? 3) - (rank[b.category] ?? 3))
+    .forEach((group, index) => { questions[`topic:${index + 1}`] = group.question })
+  return questions
+}
+
+/** Throws an error carrying the server's code, which is the only part the editor shows a user. */
+async function postJson(url: string, body: unknown): Promise<void> {
+  await sendJson(url, 'POST', body)
+}
+
+async function patchJson(url: string, body: unknown): Promise<void> {
+  await sendJson(url, 'PATCH', body)
+}
+
+async function sendJson(url: string, method: string, body: unknown): Promise<void> {
+  const response = await fetch(url, {
+    method,
+    headers: { 'content-type': 'application/json' },
+    credentials: 'same-origin',
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({})) as { error?: string }
+    // The code, never a message: a server message can echo request details, and these requests carry a
+    // candidate's transcript.
+    throw Object.assign(new Error(payload.error ?? 'failed'), { code: payload.error ?? 'failed' })
+  }
 }

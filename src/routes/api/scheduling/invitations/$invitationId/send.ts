@@ -25,6 +25,14 @@ import { invitationFailureResponse, schedulingDisabledResponse } from '../index'
  * to `draft` for the organizer to retry. This follows the same direct-send shape organization
  * invitations already use in `auth/organization-lifecycle.ts`.
  *
+ * **Without an email provider the response carries the link.** `devLink` is present only when
+ * `RESEND_API_KEY` is unset — the sender returns nothing otherwise, so the field cannot appear in an
+ * environment that can deliver mail. It exists because the secret is minted here and never stored: before
+ * this, a local or preview environment produced an invitation that was `sent`, had its hash committed, and
+ * whose only copy of the link went to a server console. The organizer had no way to obtain it and no way
+ * to re-send, so every such invitation was dead on arrival and the candidate page showed the ordinary
+ * "no longer open" message with no way to tell that from a genuine revocation.
+ *
  * The residual risk is the dual-write one: the provider accepts the mail and the commit then fails,
  * so a candidate holds a link whose hash was never stored. They see the ordinary "no longer open"
  * page, the invitation is still a draft, and sending again mints a fresh secret that works — the
@@ -74,7 +82,9 @@ export const Route = createFileRoute('/api/scheduling/invitations/$invitationId/
             // Throwing unwinds the transaction: the status returns to `draft` and the hash we just
             // wrote goes with it, so no invitation is left claiming to have been sent.
             if (!delivery.ok) throw new InvitationDeliveryError('provider_failed', delivery.error)
-            return sent
+            // Carried out of the transaction so the response can show it. Present only when no email
+            // provider is configured — see the `devLink` note on the response below.
+            return { ...sent, value: { ...sent.value, devLink: delivery.devLink ?? null } }
           })
           if (!result.ok) return invitationFailureResponse(result)
 
@@ -93,6 +103,17 @@ export const Route = createFileRoute('/api/scheduling/invitations/$invitationId/
             invitationId: result.value.invitation.id,
             status: result.value.invitation.status,
             version: result.value.invitation.version,
+            /**
+             * The candidate link, **only when no email provider is configured**.
+             *
+             * `sendInterviewInvitationEmail` returns `devLink` when `RESEND_API_KEY` is unset and nothing
+             * at all when it is set, so this field is structurally absent in any environment that can
+             * actually deliver mail. It is not a convenience: the secret is minted here and only its hash
+             * is stored, so without this the response was the last moment the link existed and it was
+             * discarded — every invitation created in a local or preview environment was dead on arrival
+             * and irrecoverable, with the only copy printed to a server console nobody was watching.
+             */
+            devLink: result.value.devLink,
           })
         } catch (error) {
           if (error instanceof TenantAuthorizationError) {

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CapturePreflight, type ConsentReceipt } from './CapturePreflight'
+import { ContextualQuestions, type ContextualSuggestion } from './ContextualQuestions'
+import { TranscriptExcerpt, type EvidenceSegment } from './TranscriptEvidence'
 import { InterviewControls } from './InterviewControls'
 import { InterviewNotes, type InterviewMarker } from './InterviewNotes'
 import { LiveTranscript, type TranscriptSegmentView } from './LiveTranscript'
@@ -56,6 +58,16 @@ export interface LiveInterviewApi {
   sendSegments: (segments: readonly OutboxShape[]) => Promise<{ accepted: string[]; inserted: number }>
   correctSpeaker: (input: { segmentId: string; speakerMapping: 'organizer' | 'candidate_or_remote' }) => Promise<void>
   saveNotes: (notes: string) => Promise<void>
+  /** Absent when contextual questions are switched off for this deployment. */
+  suggestFollowups?: () => Promise<{
+    source: 'suggested' | 'prepared'
+    reason?: string
+    suggestions: ContextualSuggestion[]
+  }>
+  recordSuggestion?: (input: {
+    suggestion: ContextualSuggestion
+    action: 'used' | 'saved' | 'dismissed'
+  }) => Promise<void>
 }
 
 interface OutboxShape {
@@ -111,6 +123,11 @@ export function LiveInterviewPage(props: LiveInterviewPageProps) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [suggestions, setSuggestions] = useState<ContextualSuggestion[]>([])
+  const [suggestionSource, setSuggestionSource] = useState<'suggested' | 'prepared' | null>(null)
+  const [suggestionReason, setSuggestionReason] = useState<string | null>(null)
+  const [suggestBusy, setSuggestBusy] = useState(false)
+  const [excerpt, setExcerpt] = useState<EvidenceSegment | null>(null)
 
   const mixer = useRef<AudioMixer | null>(null)
   const client = useRef<DeepgramLiveClient | null>(null)
@@ -321,6 +338,37 @@ export function LiveInterviewPage(props: LiveInterviewPageProps) {
     }
   }, [correctSpeaker, segments])
 
+  const askForSuggestions = useCallback(async () => {
+    if (!props.api.suggestFollowups) return
+    setSuggestBusy(true)
+    try {
+      const result = await props.api.suggestFollowups()
+      setSuggestions(result.suggestions)
+      setSuggestionSource(result.source)
+      // Held, not rendered as a banner. The panel labels the *source*; the reason is for a test and for a
+      // settings page, never for a screen the candidate may be able to see.
+      setSuggestionReason(result.reason ?? null)
+    } catch {
+      // Silent. The organizer is mid-sentence and there is nothing they can do about it now.
+      setSuggestionSource('prepared')
+    } finally {
+      setSuggestBusy(false)
+    }
+  }, [props.api])
+
+  /** The transcript as evidence, so a citation resolves to a timestamp and a line. */
+  const evidenceSegments = useMemo<EvidenceSegment[]>(
+    () => segments.map((segment) => ({
+      id: segment.id,
+      startsMs: segment.startsMs,
+      speakerLabel: segment.speakerMapping === 'organizer' ? 'You'
+        : segment.speakerMapping === 'candidate_or_remote' ? 'Candidate'
+        : segment.speakerEstimate === 'speaker_a' ? 'Speaker A' : 'Speaker B',
+      text: segment.text,
+    })),
+    [segments],
+  )
+
   const capturing = session?.state === 'live' || session?.state === 'paused'
   const remainingCredits = reservedUnits === null
     ? null
@@ -392,6 +440,8 @@ export function LiveInterviewPage(props: LiveInterviewPageProps) {
           onMapAll={mapAll}
           disabled={busy}
         />
+
+        <TranscriptExcerpt segment={excerpt} onClose={() => setExcerpt(null)} />
       </div>
 
       <aside className="flex min-w-0 flex-col gap-6">
@@ -408,6 +458,21 @@ export function LiveInterviewPage(props: LiveInterviewPageProps) {
             { id: `marker-${current.length + 1}`, atMs, label: 'Come back to this' },
           ])}
         />
+        {props.api.suggestFollowups && (
+          <ContextualQuestions
+            suggestions={suggestions}
+            source={suggestionSource}
+            reason={suggestionReason}
+            segments={evidenceSegments}
+            busy={suggestBusy}
+            // Offered only while live: a suggestion about what was just said is meaningless when nothing is
+            // being said, and the server refuses it anyway.
+            onAsk={session?.state === 'live' ? () => { void askForSuggestions() } : undefined}
+            onAction={(suggestion, action) => { void props.api.recordSuggestion?.({ suggestion, action }) }}
+            onOpenSegment={setExcerpt}
+          />
+        )}
+
         {props.brief}
       </aside>
     </div>

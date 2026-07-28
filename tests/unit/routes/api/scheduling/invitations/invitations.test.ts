@@ -31,9 +31,24 @@ vi.mock('~/shared/lib/db/tenant-context', async (importOriginal) => {
   return { ...actual, withTenantContext: mocks.withTenantContext }
 })
 
+/** Mutable, so the presence of an email provider can be flipped between requests. */
+const mockEnv = vi.hoisted(() => ({
+  SCHEDULING_ENABLED: 'true' as const,
+  RESEND_API_KEY: undefined as string | undefined,
+  APP_URL: 'https://app.test',
+}))
+
 vi.mock('~/shared/lib/env', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/env')>()
-  return { ...actual, env: { ...actual.env, SCHEDULING_ENABLED: 'true' } }
+  return {
+    ...actual,
+    env: new Proxy({} as Record<string, unknown>, {
+      // A proxy rather than a spread: the spread is evaluated once at import, so flipping
+      // `RESEND_API_KEY` in a test would have had no effect and the security branch could not be tested.
+      get: (_target, key: string) => (key in mockEnv ? (mockEnv as Record<string, unknown>)[key] : (actual.env as unknown as Record<string, unknown>)[key]),
+      has: (_target, key: string) => key in mockEnv || key in (actual.env as object),
+    }),
+  }
 })
 
 const { createDisposableTestDatabase } = await import('~/shared/lib/db/create-disposable-test-database')
@@ -311,8 +326,56 @@ describe('POST .../send', () => {
     const sent = await response.json()
     expect(sent.status).toBe('sent')
     expect(sent.version).toBeGreaterThan(body.version)
-    // The state response is three fields; nothing about the capability rides along.
-    expect(Object.keys(sent).sort()).toEqual(['invitationId', 'status', 'version'])
+    expect(Object.keys(sent).sort()).toEqual(['devLink', 'invitationId', 'status', 'version'])
+  })
+
+  it('returns the candidate link when no email provider is configured', async () => {
+    // The invariant this pair replaces was "the response is three fields; nothing about the capability
+    // rides along". That was right about production and wrong about everywhere else: the secret is minted
+    // at send and never stored, so with no provider the response was the last moment the link existed and
+    // it was discarded. Every invitation created locally or in a preview environment was `sent`, had its
+    // hash committed, and was unreachable — the only copy printed to a server console — and the candidate
+    // page showed the ordinary "no longer open" message with no way to tell that from a real revocation.
+    const { body } = await createInvitationViaApi()
+    const sent = await (await send(body.invitationId, body.version)).json()
+    expect(sent.devLink).toMatch(new RegExp(`/schedule/${body.invitationId}#`))
+    // And the fragment is not empty: a link without the secret is exactly the dead URL that was the
+    // original symptom.
+    expect(String(sent.devLink).split('#')[1] ?? '').not.toBe('')
+  })
+
+  it('returns no link once an email provider is configured', async () => {
+    // The security half, and the one that matters: with `RESEND_API_KEY` set the sender returns no
+    // `devLink` at all, so the capability cannot reach an organizer-facing response in production. This is
+    // the branch the original single assertion was protecting.
+    //
+    // The provider has to *succeed* for this to test anything. A first version let the real Resend fetch
+    // fail, which returned a 502 whose body has no `devLink` either way — so the test passed with the
+    // route deliberately leaking the link. Verified by planting exactly that.
+    mockEnv.RESEND_API_KEY = 're_test_key'
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      if (String(input).includes('api.resend.com')) {
+        return new Response(JSON.stringify({ id: 'email-1' }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        })
+      }
+      return realFetch(input)
+    }) as typeof fetch
+
+    try {
+      const { body } = await createInvitationViaApi()
+      const response = await send(body.invitationId, body.version)
+      expect(response.status).toBe(200)
+      const sent = await response.json()
+      expect(sent.status).toBe('sent')
+      // The link went to the candidate's inbox and nowhere else.
+      expect(sent.devLink ?? null).toBeNull()
+      expect(JSON.stringify(sent)).not.toMatch(/#/)
+    } finally {
+      globalThis.fetch = realFetch
+      mockEnv.RESEND_API_KEY = undefined
+    }
   })
 
   it('refuses a resend, because the secret was never kept', async () => {
