@@ -92,6 +92,59 @@ const classifications: Classification[] = [
     organizationColumn: true,
     retention: 'bounded by invitation terminal state (booked/declined/expired/revoked) plus a support window; capability_hash and candidate_email_normalized must not outlive it — enforcement pending the Phase 11 retention worker',
   }),
+
+  // Candidate submissions, documents and briefs (Phase 5, 6 and 8). Added on the same criterion the
+  // block above states: these all carry RLS with per-role grants today (0078, 0085, 0086, 0089, 0091),
+  // so what this manifest claims about them is checkable rather than a placeholder.
+  //
+  // Every one of them is tenant-private *and narrower than the tenant*. The capability policies are
+  // scoped to a single pinned invitation, not to the organization — 0086 and 0089 closed exactly that
+  // gap — and `interview_briefs` is narrower still. `ownerKey` records the path each policy actually
+  // takes, since the tenant-private check reads `organizationColumn` and not this prose.
+  tenant('candidate_submissions', 'organization_id + invitation owner; capability scoped to app.invitation_id', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, 180 days by default (INTERVIEW_DOCUMENT_RETENTION_DAYS); holds email_normalized for someone who may never hold an account — enforcement pending the Phase 11 retention worker',
+  }),
+  tenant('candidate_links', 'organization_id + invitation owner; capability scoped to app.invitation_id', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'inherits the submission it hangs off by cascade; holds a candidate-supplied URL and a versioned ownership attestation',
+  }),
+  // `object_key` is the only handle to the bytes and there is deliberately no public-URL column: a URL
+  // that exists is a URL that leaks. The file itself lives in MinIO, so a row deletion is not by itself
+  // a deletion of the document.
+  tenant('candidate_documents', 'organization_id + invitation owner; capability scoped to app.invitation_id (0089)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, 180 days by default; the object in MinIO must be deleted with the row — enforcement pending the Phase 11 retention worker',
+  }),
+  // Holds extracted CV text: the same personal data as the document, in a form that is trivially
+  // searchable. No candidate policy at all — they upload bytes, they do not read what a parser made of
+  // them.
+  tenant('document_extractions', 'organization_id (via candidate_documents → submission → invitation owner)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, inherited from the document it parsed',
+  }),
+  // Stores `robots_result` and both the requested and final URL rather than inferring them later:
+  // "we were allowed to fetch this" must stay auditable after the site's robots.txt changes. The raw
+  // response body is deliberately not stored.
+  tenant('candidate_web_imports', 'organization_id (via candidate_links → submission → invitation owner)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, 180 days by default; holds extracted visible text from a third-party site',
+  }),
+  // The narrowest policy in the schema (0091): owner, or a colleague *explicitly granted* access to that
+  // interview. No organization-admin path and no capability grant — an admin manages seats without
+  // reading a colleague's evaluation of a candidate, and a candidate's route to what was written about
+  // them is a GDPR access request, not an endpoint.
+  tenant('interview_briefs', 'organization_id + owner_user_id, or event_participants.access_granted = true', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at; an assessment of a named person, and it stores no model prompt or response envelope',
+  }),
+  // Append-only by privilege, not by convention: 0075 gives the app role no DELETE and only permits
+  // writing `withdrawn_at` on UPDATE, so a withdrawal supersedes rather than erases. That is what makes
+  // the ledger evidence — a consent record that can be deleted proves nothing about what was agreed.
+  tenant('privacy_consents', 'organization_id + invitation owner (via scheduling_invitations)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'INTERVIEW_CONSENT_RETENTION_MONTHS, 24 by default and deliberately longer than the documents it authorizes: the record of what was agreed must outlive the processing it permitted',
+  }),
 ]
 
 const schemaSource = await readFile(new URL('../../src/shared/lib/db/schema.ts', import.meta.url), 'utf8')
