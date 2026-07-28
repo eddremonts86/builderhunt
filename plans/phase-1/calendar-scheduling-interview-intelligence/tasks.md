@@ -1363,18 +1363,50 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
     scheduler POSTs `/api/admin/documents/run-worker`). Nothing schedules it yet, so on deploy the
     worker exists and is reachable but idle until that entry is added.
 
-- [ ] **Add candidate upload, completion, consent, and download APIs**
+- [x] **Add candidate upload, completion, consent, and download APIs** — done 2026-07-28 (`8c52575`), NOT yet deployed
   - Files: `src/routes/api/public/scheduling/$invitationId/uploads.ts` (new),
-    `src/routes/api/public/scheduling/$invitationId/uploads/$documentId/complete.ts` (new),
-    `src/routes/api/public/scheduling/$invitationId/consents.ts` (new),
-    `src/routes/api/interviews/$interviewId/documents/$documentId/download.ts` (new)
-  - Do: Issue quota-bound signed upload, validate completion metadata, record each unticked positive
-    purpose act with rendered notice/version/evidence hash, expose review/withdrawal, and issue
-    authorized five-minute clean-download only to owner/participants. Apply CSRF, capability/IP rate
-    limit, safe status DTO, and audit without filename/email/token.
-  - Verify: tests cover quota, forged key/size/type/checksum, cross-invitation completion, pending/
-    rejected download, admin denial, tenant B, URL expiry, consent version, and withdrawal.
-
+    `.../uploads/$documentId/complete.ts` (new),
+    `src/routes/api/scheduling/invitations/$invitationId/documents/$documentId/download.ts` (new),
+    `drizzle/0088_lively_the_executioner.sql` (new),
+    `drizzle/0089_candidate_document_capability_scoping.sql` (new),
+    `src/shared/lib/interviews.ts`, `src/shared/lib/interview-api.ts`,
+    `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
+  - **The row is created when the URL is issued**, which is what makes the 25 MB quota a
+    *reservation* rather than a check: signing without recording would let a client take a hundred
+    intents, each seeing an empty allowance, then upload against all of them. `0088` adds the
+    `awaiting_upload` state that makes this safe — the worker leases only `pending`, so nothing is
+    scanned before completion confirms what landed, and `sha256` is nullable for exactly that one
+    state rather than forever. The DTO layer had already been describing this: `DOCUMENT_STATUSES`
+    starts at `pending_upload` and `candidateDocumentSchema` already declared `sha256` nullable.
+  - Consent gates the URL, not just the UI. A candidate without `candidate_document_processing`
+    cannot upload by driving the API directly, and a URL already issued is a URL that works.
+  - **Authorization and writing use different roles on purpose.** `builderhunt_capability` holds
+    SELECT and INSERT and deliberately no UPDATE (0085: "Capability writes go through a narrowly
+    privileged server command, never anonymous SQL grants"), so the read proving a document belongs
+    to this invitation's submission runs as the candidate and the single scoped UPDATE runs as the
+    worker. Intent creation needed no escalation at all once the id was generated in JS, letting the
+    object key go into the same INSERT.
+  - **`0089` closes the ⚠️ that 0085 left explicitly open.** The candidate's policy on
+    `candidate_documents` was organization-scoped, so isolation *between candidates of one
+    organization* rested on the resolver and the query rather than on RLS. 0085 said narrowing it
+    needed a GUC nothing set; 0086 has since pinned `app.invitation_id`, so it can be written against
+    a GUC that exists. 0085's header also claimed the resolver pins `app.submission_id`, which
+    contradicted its own ⚠️ forty lines below and was never true — corrected in 0089, since an
+    applied migration is immutable.
+  - The RLS fixture gained a second candidate's document. Without it the assertion "capability saw
+    exactly one document" held under either policy, certifying an isolation it never tested — the
+    same blind spot that hid the organization-wide capability policies until 0086.
+  - Two plan deviations, both recorded in the code. The download route lives under
+    `/api/scheduling/invitations/:id/` rather than `/api/interviews/:id/`, because `interview_sessions`
+    — and therefore any notion of a participant — arrives in Phase 9; owner authority is what exists
+    today, and the participant variant is an addition rather than a replacement. And the planned
+    `consents.ts` already exists, split across `submission.ts` (record), `index.ts` (review) and
+    `withdraw.ts` (withdrawal).
+  - Verify (2026-07-28): `pnpm ci:local` green — 18 steps, `schema-audit` tolerated as the workflow
+    marks it informational; RLS 102 assertions including the narrowed capability policy measured
+    against a second candidate in the same organization; 3475 unit tests; 211 e2e; 90 migrations
+    apply twice clean. The gate caught the owner/worker document-count assertions my fixture change
+    invalidated — they now name the expected ids rather than counting rows.
 - [ ] **Implement policy-controlled public-web import**
   - Files: `src/lib/enrichment/network.ts`, `tests/unit/lib/enrichment/network.test.ts`,
     `src/lib/enrichment/policies.ts`, `tests/unit/lib/enrichment/policies.test.ts`,
