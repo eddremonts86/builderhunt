@@ -207,9 +207,18 @@ export function InvitationComposer({
             type="url"
             value={draft.meetingUrl}
             onChange={(event) => set('meetingUrl', event.target.value)}
-            placeholder="https://…"
+            placeholder="https://meet.google.com/… or https://zoom.us/j/…"
             required
           />
+          {/* Named explicitly because this field was read as the *invitation* link, which is a different
+              thing entirely — that one is minted at send, goes in the email, and never appears in this
+              form. An empty box labelled "Meeting link" beside a `https://…` placeholder reads as
+              something the product failed to fill in. spec.md's non-goals list video conferencing, so it
+              never will: BuilderHunt runs beside the call. */}
+          <p className="text-xs text-bh-text-muted">
+            Your video call: Google Meet, Zoom or Teams. This is not the invitation link — that one is
+            emailed to the candidate when you send.
+          </p>
         </div>
       ) : (
         <div>
