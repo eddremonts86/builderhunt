@@ -1818,7 +1818,7 @@ Not fixed here — it predates this program and deserves its own work.
     aborts after a successful `put`. Three plants proved the compound-index read, the primary key, and
     the sweep-at-open are each load-bearing.
 
-- [x] **Implement browser capture and Web Audio mixer** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Implement browser capture and Web Audio mixer** — done 2026-07-28 (`da254d6`), NOT yet deployed
   - Files: `src/modules/interviews/lib/audio-capture.ts` (new),
     `tests/unit/modules/interviews/lib/audio-capture.test.ts` (new),
     `src/modules/interviews/lib/deepgram-client.ts` (new),
