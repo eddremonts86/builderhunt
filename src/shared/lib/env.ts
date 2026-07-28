@@ -213,9 +213,13 @@ const zodEnv = z.object({
   INTERVIEW_TRANSCRIPTION_ENABLED: z.enum(['true', 'false']).default('false'),
   INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED: z.enum(['true', 'false']).default('false'),
   CALENDAR_OPERATIONAL_LAYERS_ENABLED: z.enum(['true', 'false']).default('false'),
-  // Cloudflare R2 (spec.md: "private Standard bucket, EU jurisdiction") — required in production
-  // when CANDIDATE_UPLOADS_ENABLED=true. `INTERVIEW_R2_JURISDICTION` is fixed to 'eu'; the schema
-  // rejects any other value rather than silently accepting a non-EU bucket.
+  // Object storage for candidate documents (spec.md: "private bucket, EU jurisdiction") — required
+  // in production when CANDIDATE_UPLOADS_ENABLED=true. `INTERVIEW_R2_JURISDICTION` is fixed to 'eu';
+  // the schema rejects any other value rather than silently accepting a non-EU bucket.
+  // The backing store is **self-hosted MinIO**, not Cloudflare R2
+  // (`docs/operations/interview-provider-register.md` chose it to avoid a paid vendor and a
+  // sub-processor entry). The `INTERVIEW_R2_*` names are kept on purpose so switching to R2 later
+  // is env-only — e.g. `INTERVIEW_R2_ENDPOINT=http://minio:9000`.
   INTERVIEW_R2_ENDPOINT: z.string().optional(),
   INTERVIEW_R2_ACCOUNT_ID: z.string().optional(),
   INTERVIEW_R2_BUCKET: z.string().optional(),

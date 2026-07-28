@@ -32,7 +32,7 @@ Ordered so the app ships cleanly after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test the pure helpers**
-  - Files: `src/shared/lib/ai/enrichment.test.ts`
+  - Files: `tests/unit/shared/lib/ai/enrichment.test.ts`
   - Do: Threshold matrix for `hasEnrichableContent` (each criterion alone passes; all-empty
     fails; 39-char bio fails, 40 passes); `buildEnrichInput` extracts highlights from a
     GitHub-shaped and a devto-shaped metadata fixture and survives `metadata: {}` /
@@ -41,7 +41,7 @@ Ordered so the app ships cleanly after every checkbox.
   - Verify: `pnpm test enrichment`.
 
 - [x] **Register the profile-enrich task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add `profile-enrich`: tier `server-only`; input/output schemas imported from
     `enrichment.ts`; `cacheTtlSeconds: 2_592_000`; allowances `{ free: 5, pro: 100,
 team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,

@@ -31,7 +31,7 @@
       `src/routes/api/me/delete-account/index.ts`, `requestDeletion`/`cancelDeletion` in `legal.ts`
 - [x] **Privacy settings UI (export / delete / cancel)** —
       `src/routes/_dashboard/settings/privacy.tsx`
-- [x] **Legal lib tests** — `src/shared/lib/legal.test.ts`
+- [x] **Legal lib tests** — `tests/unit/shared/lib/legal.test.ts`
 
 ## Phase 1 — Execute the promised rights
 
@@ -62,7 +62,7 @@
 
 - [x] **Complete the export payload**
   - Files: `src/shared/lib/repositories/account-privacy.ts`, `src/shared/lib/legal.ts`,
-    `src/shared/lib/legal.test.ts`
+    `tests/unit/shared/lib/legal.test.ts`
   - Do: `loadAccountExportSource` now also selects `builders` (tracked builders,
     `eq(builders.userId, userId)`), the `plans` row, `plan_changes` (via the existing
     `listAccountPlanChanges`), and `plan_requests`, returned as `trackedBuilders`/`plan`/
@@ -77,7 +77,7 @@
 
 - [x] **Purge cascade covers the new data**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
-    `src/shared/lib/repositories/account-privacy.test.ts`
+    `tests/unit/shared/lib/repositories/account-privacy.test.ts`
   - Do: Audited every FK referencing `auth_users.id` or `builders.id`/`saved_queries.id`
     directly (not just the table list this task originally named, which was incomplete).
     `plans`/`plan_changes`/`plan_requests`/`user_consents`/`data_export_requests`/

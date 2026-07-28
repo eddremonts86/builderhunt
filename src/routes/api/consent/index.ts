@@ -1,14 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auth } from '~/shared/lib/auth/better-auth'
-import { randomId } from '~/lib/utils'
-import { insertAccountConsent, listAccountConsents } from '~/shared/lib/repositories/account-privacy'
+import { CURRENT_CONSENT_VERSIONS, getConsentStatus, recordConsent } from '~/shared/lib/legal'
 
-const CURRENT_VERSIONS = {
-  tos: 'v1.0',
-  privacy: 'v1.0',
-  cookies: 'v1.0',
-}
+// The required-version map and the needs-acceptance rule live in `~/shared/lib/legal`. This route
+// used to keep its own copy, which silently froze at `privacy: 'v1.0'` after the policy moved to
+// v1.1 — so the endpoint advertised a superseded version as the one to accept.
 
 const ConsentBody = z.object({
   document: z.enum(['tos', 'privacy', 'cookies']),
@@ -22,36 +19,23 @@ export const Route = createFileRoute('/api/consent/')({
       GET: async ({ request }) => {
         try {
           const session = await auth.api.getSession({ headers: request.headers })
+          // An anonymous caller is not "up to date", it is unknown — report nothing outstanding
+          // rather than the full list, so the signed-out shell never renders an acceptance prompt.
           if (!session?.user?.id) {
             return Response.json({
               userId: null,
               consents: {},
-              required: CURRENT_VERSIONS,
+              required: CURRENT_CONSENT_VERSIONS,
               needsAcceptance: [],
             })
           }
-          const rows = await listAccountConsents(session.user.id)
-          // Keep latest consent per document
-          const map: Record<string, string> = {}
-          for (const r of rows) {
-            if (!map[r.document]) map[r.document] = r.version
-          }
-          const needsAcceptance: string[] = []
-          for (const [doc, ver] of Object.entries(CURRENT_VERSIONS)) {
-            if (map[doc] !== ver) needsAcceptance.push(doc)
-          }
-          return Response.json({
-            userId: session.user.id,
-            consents: map,
-            required: CURRENT_VERSIONS,
-            needsAcceptance,
-          })
+          return Response.json(await getConsentStatus(session.user.id))
         } catch (err) {
           console.error('consent status error:', err)
           return Response.json({
             userId: null,
             consents: {},
-            required: CURRENT_VERSIONS,
+            required: CURRENT_CONSENT_VERSIONS,
             needsAcceptance: [],
           })
         }
@@ -64,12 +48,7 @@ export const Route = createFileRoute('/api/consent/')({
           const parsed = ConsentBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
-          await insertAccountConsent({
-            id: randomId(),
-            userId: session.user.id,
-            document: parsed.data.document,
-            version: parsed.data.version,
-          })
+          await recordConsent(session.user.id, parsed.data.document, parsed.data.version)
           return Response.json({ ok: true })
         } catch (err) {
           console.error('consent post error:', err)

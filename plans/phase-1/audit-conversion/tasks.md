@@ -32,13 +32,13 @@
   - Verify: reviewer-traceable; every retained claim links to code or a dated fix in this pass.
 
 - [x] **Define closed conversion event and metric contracts**
-  - Files: `src/shared/lib/conversion-events.ts`, `src/shared/lib/conversion-events.test.ts`
+  - Files: `src/shared/lib/conversion-events.ts`, `tests/unit/shared/lib/conversion-events.test.ts`
   - Do: `parseConversionEvent` — `.strict()` zod schema (rejects unknown keys) plus a `(name,
     surface)` → allowed-surfaces map (a plain union can't express "this action is invalid from that
     position," so this is enforced separately); `isWithinClockSkewWindow` (±5 min);
     `computeConversionRate` — Wilson score 95% CI, `insufficientSample` below n=30 (raw rate still
     reported).
-  - Verify: `pnpm vitest run src/shared/lib/conversion-events.test.ts` — 19/19 passing (valid
+  - Verify: `pnpm vitest run tests/unit/shared/lib/conversion-events.test.ts` — 19/19 passing (valid
     events, unknown keys, invalid name/surface combos, bad timestamps, bad variant, PII-shaped
     extra fields, clock-skew edges, CI math at extreme proportions and small/large samples).
 
@@ -53,7 +53,7 @@
     --write` → 63 migrations; grants confirmed live.
 
 - [x] **Implement consent-aware non-blocking ingestion**
-  - Files: `src/routes/api/analytics/conversion.ts`, `src/routes/api/analytics/conversion.test.ts`, `src/shared/lib/conversion-client.ts`, `src/shared/lib/conversion-client.test.ts`, `src/shared/lib/env.ts` (`CONVERSION_EVENTS_ENABLED`, default `false`), `.env.example`, `src/shared/components/CookieBanner.tsx`
+  - Files: `src/routes/api/analytics/conversion.ts`, `tests/unit/routes/api/analytics/conversion.test.ts`, `src/shared/lib/conversion-client.ts`, `tests/unit/shared/lib/conversion-client.test.ts`, `src/shared/lib/env.ts` (`CONVERSION_EVENTS_ENABLED`, default `false`), `.env.example`, `src/shared/components/CookieBanner.tsx`
   - Do: `trackConversionEvent` reads `CookieBanner`'s own `bh_cookie_consent` record — no second
     consent store — and no-ops without explicit `analytics: true`. Server validates schema, clock
     skew, and rate-limits by `getRateLimitId` (IP/UA-derived, never persisted) before writing;
@@ -62,13 +62,13 @@
     description updated to state what it *would* record (still off by default) — the legal
     cookies/privacy pages weren't touched since they already truthfully say analytics isn't
     currently in use, which stays true with the flag off.
-  - Verify: `pnpm vitest run src/routes/api/analytics/conversion.test.ts` (6/6: disabled flag,
+  - Verify: `pnpm vitest run tests/unit/routes/api/analytics/conversion.test.ts` (6/6: disabled flag,
     invalid event, clock skew, rate limit, write failure, happy path) and
     `conversion-client.test.ts` (9/9: consent gating, session id stability, dedup, swallowed
     rejection).
 
 - [x] **Add retention and aggregate reporting**
-  - Files: `src/shared/lib/conversion-retention.ts`, `src/shared/lib/conversion-retention.test.ts`, `src/routes/api/admin/analytics/run-retention.ts`, `src/routes/api/admin/metrics/conversion.ts`, `src/shared/lib/repositories/conversion-events.ts`, `src/shared/lib/repositories/conversion-events.test.ts`
+  - Files: `src/shared/lib/conversion-retention.ts`, `tests/unit/shared/lib/conversion-retention.test.ts`, `src/routes/api/admin/analytics/run-retention.ts`, `src/routes/api/admin/metrics/conversion.ts`, `src/shared/lib/repositories/conversion-events.ts`, `tests/unit/shared/lib/repositories/conversion-events.test.ts`
   - Do: `runConversionEventRetention` (30-day window, named constant) → `deleteExpiredConversionEvents`,
     exposed via the same `tryCronPrincipal ?? requirePlatformAdminPrincipal` dual-auth pattern as
     `api/admin/billing/reconcile.ts`. `api/admin/metrics/conversion.ts` returns 6 named funnel
@@ -79,7 +79,7 @@
     (`api/admin/metrics/index.ts`); given the size of this plan already, a UI panel for this new
     endpoint is deferred rather than bolted on hastily. The API itself is complete and
     live-verified.
-  - Verify: `pnpm vitest run src/shared/lib/repositories/conversion-events.test.ts` — 7/7 passing,
+  - Verify: `pnpm vitest run tests/unit/shared/lib/repositories/conversion-events.test.ts` — 7/7 passing,
     disposable-DB integration (idempotency, distinct-session counting, day-range/variant
     separation, retention delete + idempotent re-run). `conversion-retention.test.ts` — 2/2.
 
@@ -111,7 +111,7 @@
     honest phrasing already established on `/explore` and the bento grid's own "+ 11 more sources".
 
 - [x] **Preserve guest search intent safely through signup**
-  - Files: `src/shared/lib/safe-next.ts`, `src/shared/lib/safe-next.test.ts`, `src/shared/lib/post-onboarding-next.ts`, `src/shared/lib/post-onboarding-next.test.ts`, `src/routes/auth/sign-up.tsx` (`validateSearch`), `src/modules/auth/components/SignUpPage.tsx`, `src/routes/onboarding/welcome.tsx`, `src/routes/onboarding/search.tsx`
+  - Files: `src/shared/lib/safe-next.ts`, `tests/unit/shared/lib/safe-next.test.ts`, `src/shared/lib/post-onboarding-next.ts`, `tests/unit/shared/lib/post-onboarding-next.test.ts`, `src/routes/auth/sign-up.tsx` (`validateSearch`), `src/modules/auth/components/SignUpPage.tsx`, `src/routes/onboarding/welcome.tsx`, `src/routes/onboarding/search.tsx`
   - Do: `parseSafeNext` allows only an exact `/search` path (+ query string), rejecting absolute/
     protocol-relative/encoded-bypass/backslash targets. `SignUpPage.tsx` validates `next` on
     successful signup and stashes it (sessionStorage) for onboarding to consume; both onboarding
@@ -122,7 +122,7 @@
   - **Real bug found and fixed**: this `next` param was already being passed by `/explore`'s
     sign-up CTA but silently dropped — `SignUpPage.tsx` never read it, so every guest-search user
     lost their query on signup regardless of what the link claimed.
-  - Verify: `pnpm vitest run src/shared/lib/safe-next.test.ts src/shared/lib/post-onboarding-next.test.ts`
+  - Verify: `pnpm vitest run tests/unit/shared/lib/safe-next.test.ts tests/unit/shared/lib/post-onboarding-next.test.ts`
     (11/11, 2/2). **Live end-to-end in the real browser**: real query on `/explore` → real signup →
     real onboarding → clicked "Skip" → landed on `/search?q=<the original query>&mode=keyword`,
     confirmed via the actual URL after navigation. Also confirmed all 5 real funnel events
@@ -138,7 +138,7 @@
     Nothing left to do here.
 
 - [x] **Add fixed experiment assignment and treatment instrumentation**
-  - Files: `src/shared/lib/conversion-variant.ts`, `src/shared/lib/conversion-variant.test.ts`, `.env.example`
+  - Files: `src/shared/lib/conversion-variant.ts`, `tests/unit/shared/lib/conversion-variant.test.ts`, `.env.example`
   - Do: `VITE_LANDING_CONVERSION_TREATMENT_PCT` (default 10) sets the random-draw allocation;
     `VITE_LANDING_CONVERSION_VARIANT=baseline|treatment` force-overrides it (manual QA /
     deterministic tests). `getStableVariant` draws once per session and caches in sessionStorage —
@@ -148,7 +148,7 @@
     session per the spec's own phasing (`docs/conversion-baseline.md` §4), and there's no baseline
     window yet to design a treatment against. The assignment mechanism is ready for when that
     phase starts.
-  - Verify: `pnpm vitest run src/shared/lib/conversion-variant.test.ts` — 5/5 passing.
+  - Verify: `pnpm vitest run tests/unit/shared/lib/conversion-variant.test.ts` — 5/5 passing.
 
 - [ ] **Add conversion browser smoke and CI gate** — explicitly out of scope this session
   - Reason: `test/test-conversion.mjs` (Playwright) is barred by this session's standing

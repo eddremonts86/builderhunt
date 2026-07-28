@@ -15,7 +15,7 @@
 ## Phase 1 — Pure synergy lib
 
 - [x] **Team aggregate builder**
-  - Files: `src/shared/lib/synergy.ts`, `src/shared/lib/synergy.test.ts`
+  - Files: `src/shared/lib/synergy.ts`, `tests/unit/shared/lib/synergy.test.ts`
   - Done: `buildTeamAggregate(rows)` — per row, a stored v2 fingerprint if
     `codeStyleFingerprintV2Schema.safeParse(row.privateMetadata.codeStyleFingerprint)` succeeds
     (never true today — no plan has shipped v2 yet, confirmed by grep), else
@@ -24,11 +24,11 @@
     members carry `privateMetadata.aiEnrichment`), `aiFingerprintShare`. Pure over an in-memory
     row list, capped at 50. `codeStyleFingerprintV2Schema` itself is defined here (didn't exist
     anywhere in the repo before this plan).
-  - Verify: `pnpm vitest run src/shared/lib/synergy.test.ts` — 14/14 passing: mixed v1/v2
+  - Verify: `pnpm vitest run tests/unit/shared/lib/synergy.test.ts` — 14/14 passing: mixed v1/v2
     members (confirms the v2 mean pulls above the pure-v1 baseline), no-enrichment team
     (`seniorityMix: null`), 50-row cap, empty team (no crash).
 - [x] **Deterministic baseline**
-  - Files: `src/shared/lib/synergy.ts`, `src/shared/lib/synergy.test.ts`
+  - Files: `src/shared/lib/synergy.ts`, `tests/unit/shared/lib/synergy.test.ts`
   - Done: `computeSynergyBaseline(candidate, team)` — language bridge (+20 when a shared
     language covers ≥ 20% of the team), complementary-metric gap (up to +40, `Math.min(40, gap
     * 0.4)` — this scaling is exactly what keeps it monotonic in gap size), paradigm fit (+10
@@ -55,7 +55,7 @@
     no-hire-verdict rule, untrusted-content rule for `candidate.bio`/`topics`. Registered in
     `AI_TASKS`, tier `server-only`, `cacheTtlSeconds: 86_400`, allowances
     `{ free: 0, pro: 0, team: 25 }`, `maxOutputTokens: 600`.
-  - Verify: `pnpm vitest run src/shared/lib/ai/tasks.test.ts` — 15/15 passing (registry
+  - Verify: `pnpm vitest run tests/unit/shared/lib/ai/tasks.test.ts` — 15/15 passing (registry
     integrity checks, which the new task satisfies).
 
 ## Phase 3 — Endpoint

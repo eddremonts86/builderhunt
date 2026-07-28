@@ -26,7 +26,7 @@
     length).
   - Verify: `pnpm type-check`. — Done: 60 cells (30 topics × source groups), clean.
 - [x] **Matrix tests**
-  - Files: `src/lib/discovery/matrix.test.ts`
+  - Files: `tests/unit/lib/discovery/matrix.test.ts`
   - Do: Unique keys; every cell: 1–3 keywords, 1–4 sources, all sources valid; matrix
     length ≥ 40; `cellAt(len)` === `cellAt(0)`.
   - Verify: `pnpm test matrix`. — Done: 6/6 passing.
@@ -65,7 +65,7 @@
     of the full 82, i.e. most rows hit the `ON CONFLICT` no-op path) even though the
     worker's own `upserted` counter can't distinguish insert vs. no-op.
 - [x] **Worker tests (pure parts)**
-  - Files: `src/lib/discovery/worker.test.ts`
+  - Files: `tests/unit/lib/discovery/worker.test.ts`
   - Do: `isCapped` boundary cases; cursor wrap/reset logic (extract as pure
     `nextCursor(cursor, step, len)`).
   - Verify: `pnpm test discovery`. — Done: 6/6 passing (12/12 combined with matrix.test.ts).

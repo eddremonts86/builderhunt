@@ -13,7 +13,7 @@
       step, completed, skipped, skipped_count, first_query_id, first_builder_ids), migrated in `drizzle/`
 - [x] **State machine lib + tests** — `src/shared/lib/onboarding.ts`
       (`getOnboardingStatus`, eligibility: 7-day window, existing-data auto-skip, max 3 skips,
-      `STARTER_QUERIES`), `src/shared/lib/onboarding.test.ts`
+      `STARTER_QUERIES`), `tests/unit/shared/lib/onboarding.test.ts`
 - [x] **GET /api/onboarding/status** — `src/routes/api/onboarding/status.ts`
 - [x] **POST /api/onboarding/complete** — `src/routes/api/onboarding/complete.ts`
       (step 3 sets `completed=true` + `completed_at`, records builder ids)

@@ -14,7 +14,7 @@
 ## Source design
 
 The approved design is
-[`docs/superpowers/specs/2026-07-21-stripe-billing-platform-design.md`](../../docs/superpowers/specs/2026-07-21-stripe-billing-platform-design.md).
+[`docs/superpowers/specs/2026-07-21-stripe-billing-platform-design.md`](../../../docs/superpowers/specs/2026-07-21-stripe-billing-platform-design.md).
 This spec and `tasks.md` are the executable contract. The source design records product rationale.
 
 ## Problem

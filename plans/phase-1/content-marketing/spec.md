@@ -38,7 +38,7 @@ writing tasks — concrete title, angle, and target keyword — not code.
   2. `12-sources-developer-search.md` (listicle/SEO)
   3. `cold-emails-devs-reply.md` (value-first outreach guide)
 - **Loader**: `src/shared/lib/blog.ts` — `getAllPosts` (sorted desc, frontmatter-parsed),
-  `getPostBySlug`, `getRelatedPosts` (tag overlap); tests in `src/shared/lib/blog.test.ts`.
+  `getPostBySlug`, `getRelatedPosts` (tag overlap); tests in `tests/unit/shared/lib/blog.test.ts`.
 - **Routes**: `/blog` list + `/blog/$slug` (SSR, meta tags, `BlogPosting` JSON-LD at
   `$slug.tsx:42`, related posts), Atom feed at `/blog/atom.xml`.
 - **Footer/blog discoverability**: footer links `/blog` (`src/shared/components/Footer.tsx:41`).

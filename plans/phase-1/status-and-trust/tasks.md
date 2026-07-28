@@ -14,7 +14,7 @@
 - [x] **Schema: `incidents`, `changelog`, `roadmap_items`, `roadmap_votes`** —
       `src/shared/lib/db/schema.ts`, migrated
 - [x] **Status logic lib + tests** — `src/shared/lib/status.ts` (`aggregateStatus`, duration
-      helpers), `src/shared/lib/status.test.ts` (11 tests)
+      helpers), `tests/unit/shared/lib/status.test.ts` (11 tests)
 - [x] **GET /api/status (DB SELECT 1, Redis ping, memory RSS, open incidents)** —
       `src/routes/api/status/index.ts`
 - [x] **/status page with 30s polling** — `src/routes/_landing/status.tsx`
@@ -84,7 +84,7 @@
     unauthenticated calls.
 
 - [x] **Uptime computation + display**
-  - Files: `src/shared/lib/status.ts`, `src/shared/lib/status.test.ts`,
+  - Files: `src/shared/lib/status.ts`, `tests/unit/shared/lib/status.test.ts`,
     `src/routes/api/status/index.ts`, `src/routes/_landing/status.tsx`
   - Do: Pure function `computeUptime(checks: {checkedAt: Date; ok: boolean}[], days: number,
 intervalMinutes = 5): number | null` — expected samples = days×24×60/interval; missing

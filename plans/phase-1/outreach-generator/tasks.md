@@ -3,14 +3,14 @@
 > **Status**: `complete` (v1 + AI upgrade both shipped, 2026-07-20)
 > **Depends on**: [`ai-expansion`](../ai-expansion/spec.md) (client ladder `ai()`, `/api/ai/complete`, `useAICapabilities`, `AIDownloadPrompt` all implemented)
 > **Blocks**: nothing
-> **Reality check**: v1 shipped — `src/shared/lib/outreach.ts`, `src/shared/lib/outreach.test.ts`, `src/modules/builder-profile/components/OutreachCopilot.tsx`. Do not modify `outreach.ts` logic; it is the frozen fallback rung.
+> **Reality check**: v1 shipped — `src/shared/lib/outreach.ts`, `tests/unit/shared/lib/outreach.test.ts`, `src/modules/builder-profile/components/OutreachCopilot.tsx`. Do not modify `outreach.ts` logic; it is the frozen fallback rung.
 
 Ordered so the panel keeps working after every checkbox.
 
 ## Phase 0 — Delivered (record, do not redo)
 
 - [x] **Rule-based outreach generator (v1)**
-  - Files: `src/shared/lib/outreach.ts`, `src/shared/lib/outreach.test.ts`
+  - Files: `src/shared/lib/outreach.ts`, `tests/unit/shared/lib/outreach.test.ts`
   - Delivered: `generateOutreach()` with tones `'casual' | 'professional' | 'geek'` and a
     bio → topic → language → followers hook cascade.
 - [x] **Outreach Copilot panel (v1)**
@@ -38,7 +38,7 @@ Ordered so the panel keeps working after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test the task definition**
-  - Files: `src/shared/lib/ai/tasks.test.ts`
+  - Files: `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Extend the registry test for `outreach-draft`; assert the output schema rejects a
     body containing "exciting opportunity" and accepts a clean fixture; assert
     `buildPrompt` output wraps a fixture bio in `<untrusted>`; type-level check

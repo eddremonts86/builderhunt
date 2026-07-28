@@ -40,7 +40,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test the task registry**
-  - Files: `src/shared/lib/ai/tasks.test.ts`
+  - Files: `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Assert every registered task has a non-empty system prompt, allowances for all
     three plan tiers, positive `maxOutputTokens`; `wrapUntrusted` escapes embedded
     delimiters; `isTaskDisabled` honors `AI_DISABLED` and `AI_DISABLED_TASKS=a,b` lists.
@@ -56,7 +56,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test cache key hashing**
-  - Files: `src/shared/lib/ai/cache.test.ts`
+  - Files: `tests/unit/shared/lib/ai/cache.test.ts`
   - Do: `canonicalJson` is key-order invariant (`{a:1,b:2}` ≡ `{b:2,a:1}`, nested);
     `cacheKeyFor` is stable across calls, differs across taskIds and across inputs;
     arrays keep order (order-sensitive inputs must differ).
@@ -74,7 +74,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test budget logic**
-  - Files: `src/shared/lib/ai/budget.test.ts`
+  - Files: `tests/unit/shared/lib/ai/budget.test.ts`
   - Do: `decideBudget` under/at/over limit, zero limit → `plan`, Infinity; in-memory
     fallback of `checkAndConsumeBudget` counts per user+task+day and blocks at the limit
     (inject date or use vi.useFakeTimers).
@@ -95,7 +95,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test MiniMax parsing and retry**
-  - Files: `src/shared/lib/ai/minimax.test.ts`
+  - Files: `tests/unit/shared/lib/ai/minimax.test.ts`
   - Do: Mock global `fetch` (vi.stubGlobal): valid JSON → parsed output; schema-invalid
     first response + valid retry → success with exactly 2 calls; invalid twice →
     `AIParseError`; HTTP 500 → `AIProviderError`; the request uses `MiniMax-M3` and does not
@@ -103,7 +103,7 @@ Ordered so the codebase builds, lints, and passes tests after every checkbox.
   - Verify: `pnpm test minimax.test`.
 
 - [x] **Implement and test the embedding adapter**
-  - Files: `src/shared/lib/ai/embeddings.ts`, `src/shared/lib/ai/embeddings.test.ts`
+  - Files: `src/shared/lib/ai/embeddings.ts`, `tests/unit/shared/lib/ai/embeddings.test.ts`
   - Do: Export `embedTexts(texts)` using `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, and an
     optional bearer `AI_EMBEDDING_API_KEY`; send OpenAI-compatible `{ model, input }`, use
     `AI_EMBEDDING_TIMEOUT_MS`, batch

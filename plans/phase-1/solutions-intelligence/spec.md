@@ -16,7 +16,7 @@
 ## Source design
 
 The approved source design is
-[`docs/superpowers/specs/2026-07-23-solutions-intelligence-design.md`](../../docs/superpowers/specs/2026-07-23-solutions-intelligence-design.md).
+[`docs/superpowers/specs/2026-07-23-solutions-intelligence-design.md`](../../../docs/superpowers/specs/2026-07-23-solutions-intelligence-design.md).
 This specification, `plan.md`, and `tasks.md` are the delivery contract.
 
 ## Goal

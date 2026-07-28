@@ -7,7 +7,7 @@
 > organization tracking, entitlements, RLS, and Team organization-keyed cache are verified.
 
 - [ ] **Define shared-resource contracts and characterization tests**
-  - Files: `src/shared/lib/shared-resources/contracts.ts`, `src/shared/lib/shared-resources/contracts.test.ts`, `test/security/shared-resources-characterization.test.ts`
+  - Files: `src/shared/lib/shared-resources/contracts.ts`, `tests/unit/shared/lib/shared-resources/contracts.test.ts`, `test/security/shared-resources-characterization.test.ts`
   - Do: Define allowlisted query/list/item DTOs, `private | organization` visibility, creator attribution, permission actions, and typed errors. Characterize current personal query/alert behavior before switching repositories; forbid organization authority in request DTOs.
   - Verify: contract/characterization tests pass and reject unknown/private ORM/provider fields.
 
@@ -17,12 +17,12 @@
   - Verify: app-role SQL rejects A alert→B query and A item→B list; missing/A/B contexts pass the manifest RLS suite.
 
 - [ ] **Implement tenant saved-query repository**
-  - Files: `src/shared/lib/repositories/saved-queries.ts`, `src/shared/lib/repositories/saved-queries.test.ts`, `src/shared/lib/authorization/permissions.ts`
+  - Files: `src/shared/lib/repositories/saved-queries.ts`, `tests/unit/shared/lib/repositories/saved-queries.test.ts`, `src/shared/lib/authorization/permissions.ts`
   - Do: Accept `TenantTransaction` plus principal; list private creator rows and organization-visible rows only inside active organization; create/update/delete/change visibility via centralized permissions; maintain normalized keywords/sources atomically; return DTOs.
   - Verify: tests cover creator/member/admin/owner and tenant A/B for every operation, concurrent visibility change, and no global DB import.
 
 - [ ] **Implement tenant builder-list repository**
-  - Files: `src/shared/lib/repositories/builder-lists.ts`, `src/shared/lib/repositories/builder-lists.test.ts`
+  - Files: `src/shared/lib/repositories/builder-lists.ts`, `tests/unit/shared/lib/repositories/builder-lists.test.ts`
   - Do: Implement list/get/create/update/delete and add/remove item using canonical `builderIdentityId`, tenant composite FKs, creator/admin permissions, idempotent unique item insertion, and `trackedByOrganization`/allowed user attribution from organization tracking. Return no source snapshot/private artifact.
   - Verify: repository tests cover duplicate add, roles, deleted identity handling, A/B IDs, and DB rejection of cross-tenant parent references.
 
@@ -37,7 +37,7 @@
   - Verify: full role and A/B matrix, duplicate item, invalid identity, spoofed tenant, and plan lapse tests pass.
 
 - [ ] **Preserve tenant integrity when creating alerts from shared queries**
-  - Files: `src/routes/api/alerts/index.ts`, `src/shared/lib/repositories/alerts.ts`, `src/shared/lib/repositories/alerts.test.ts`, `test/security/shared-alerts.test.ts`
+  - Files: `src/routes/api/alerts/index.ts`, `src/shared/lib/repositories/alerts.ts`, `tests/unit/shared/lib/repositories/alerts.test.ts`, `test/security/shared-alerts.test.ts`
   - Do: Allow an authorized member to opt into their own alert from an organization-visible query; copy validated keywords while composite FK preserves organization. Sharing alone creates no alert/delivery. Query visibility/deletion follows documented snapshot retention.
   - Verify: A member opt-in sends only that recipient; no share email; A cannot reference B query; PostgreSQL rejects forged composite relation.
 

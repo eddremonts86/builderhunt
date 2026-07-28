@@ -1,4 +1,5 @@
 import type { TenantTransaction } from '../db/client'
+import { getRateCard } from './rate-cards'
 import type {
   BillingCreditAllocationRecord,
   BillingCreditReservationRecord,
@@ -339,10 +340,17 @@ export async function settleReservation(transaction: TenantTransaction, input: S
     reason: 'settle marker',
   })
 
+  // The rate card owns the grace window, the same way it owns `maxUnits` and `maxDurationSeconds`:
+  // a caller must not be able to widen it. `input.settlementGraceSeconds` is the fallback for
+  // operations that have no card (internal `ai_task` work), not an override for ones that do —
+  // until now every card's value was ignored and every settlement used whatever the caller passed.
+  const card = getRateCard(reservation.operation)
+  const graceSeconds = card?.settlementGraceSeconds ?? input.settlementGraceSeconds
+
   const updatedReservation = await updateReservation(transaction, input.organizationId, reservation.id, {
     state: 'settled',
     settledUnits: input.actualUnits,
-    settlementGraceEndsAt: new Date(now.getTime() + input.settlementGraceSeconds * 1000),
+    settlementGraceEndsAt: new Date(now.getTime() + graceSeconds * 1000),
   })
 
   return { reservation: updatedReservation, allocations: finalAllocations, replayed: false }

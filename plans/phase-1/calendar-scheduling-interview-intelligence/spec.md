@@ -21,7 +21,7 @@
 ## Source design
 
 The approved research and design is
-[`docs/superpowers/specs/2026-07-21-calendar-scheduling-interview-intelligence-design.md`](../../docs/superpowers/specs/2026-07-21-calendar-scheduling-interview-intelligence-design.md).
+[`docs/superpowers/specs/2026-07-21-calendar-scheduling-interview-intelligence-design.md`](../../../docs/superpowers/specs/2026-07-21-calendar-scheduling-interview-intelligence-design.md).
 This spec is the implementation contract. If prose differs, this file and `tasks.md` govern.
 
 ## Problem

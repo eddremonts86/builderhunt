@@ -36,7 +36,7 @@ Files:
 
 - `src/lib/enrichment/types.ts`
 - `src/lib/enrichment/policies.ts`
-- `src/lib/enrichment/policies.test.ts`
+- `tests/unit/lib/enrichment/policies.test.ts`
 - `docs/operations/public-enrichment-source-register.md`
 
 Deliverables:
@@ -133,7 +133,7 @@ assert no request reaches a disallowed server.
 Files:
 
 - `src/lib/enrichment/worker.ts`
-- `src/lib/enrichment/worker.test.ts`
+- `tests/unit/lib/enrichment/worker.test.ts`
 - `src/routes/api/admin/enrichment/run-worker.ts`
 - `src/shared/lib/env.ts`
 - `.env.example`
@@ -187,7 +187,7 @@ subject, restricted subject, and unauthenticated caller passes against exact DB 
 Files:
 
 - `src/modules/builder-profile/components/PublicEvidenceCard.tsx`
-- `src/modules/builder-profile/components/PublicEvidenceCard.test.tsx`
+- `tests/unit/modules/builder-profile/components/PublicEvidenceCard.test.tsx`
 - `src/modules/builder-profile/components/BuilderProfilePage.tsx`
 - relevant legal/product pages and README claims
 

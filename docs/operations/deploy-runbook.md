@@ -123,6 +123,7 @@ Copy `.env.production.example` as the source of truth. Critical ones:
 | `DATABASE_AUTH_URL` | `builderhunt_auth` | optional — falls back to `DATABASE_URL` |
 | `DATABASE_WORKER_URL` | `builderhunt_worker` | optional — **the scrapers/workers connect with this** |
 | `DATABASE_PLATFORM_URL` | `builderhunt_platform` | optional — falls back to `DATABASE_URL` |
+| `DATABASE_CAPABILITY_URL` | `builderhunt_capability` | optional — accountless capability holders (scheduling links); provisioned by the orchestrator (`scripts/deploy/orchestrate.mjs`) |
 | `DEFAULT_ADMIN_EMAIL` / `DEFAULT_ADMIN_PASSWORD` | admin seed | required in prod or step 7 warns and skips |
 | `AI_EMBEDDING_URL` | embeddings resource | e.g. `http://embeddings:11434/v1/embeddings` |
 | `GITHUB_TOKEN` | GitHub enrichment scraper | higher rate limit; enrichment is the only enabled connector |
@@ -137,9 +138,15 @@ re-`ALTER ROLE`s it and step 6 verifies it.
 ## Workers / scrapers
 
 Background work uses the idempotent HTTP-cron pattern (no queue). Each endpoint requires a
-platform-admin principal (`requirePlatformAdminPrincipal`) and connects to the DB as
-`builderhunt_worker` (`DATABASE_WORKER_URL`) — so the orchestrator's role-password step is
-what keeps them working.
+platform-admin principal (`requirePlatformAdminPrincipal`).
+
+**They do not all connect as the same role.** Most go through `workerDb`
+(`DATABASE_WORKER_URL` → `builderhunt_worker`), but the ones that only touch global-public tables
+use `publicDb`, which is `runtimeDb` — i.e. `DATABASE_URL` → `builderhunt_app`
+(`src/shared/lib/db/client.ts`). `src/lib/discovery/worker.ts` is one of those. So a deployment that
+sets `DATABASE_WORKER_URL` correctly but breaks `DATABASE_URL` still breaks background work, and
+granting a table to `builderhunt_worker` alone does not necessarily make a worker able to read it.
+Check the specific worker's imports before reasoning about its grants.
 
 | Endpoint | Purpose | Key env |
 |----------|---------|---------|

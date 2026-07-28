@@ -14,7 +14,7 @@
 - [x] **Content directory with frontmatter posts** — `content/posts/` (title, description,
       slug, date, tags, author)
 - [x] **Blog loader lib + tests** — `src/shared/lib/blog.ts` (`getAllPosts`, `getPostBySlug`,
-      `getRelatedPosts`), `src/shared/lib/blog.test.ts`
+      `getRelatedPosts`), `tests/unit/shared/lib/blog.test.ts`
 - [x] **/blog list route (SSR)** — `src/routes/_landing/blog/index.tsx`
 - [x] **/blog/$slug route (meta, BlogPosting JSON-LD, related posts)** —
       `src/routes/_landing/blog/$slug.tsx`

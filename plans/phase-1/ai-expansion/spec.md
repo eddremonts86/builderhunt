@@ -14,7 +14,7 @@ feature would reinvent it inconsistently and touch providers directly.
 
 ## Goal
 
-Build the two-tier shared AI layer defined in [`_meta/ai-policy.md`](../_meta/ai-policy.md),
+Build the two-tier shared AI layer defined in [`_meta/ai-policy.md`](../../_meta/ai-policy.md),
 exactly as specified there. This plan delivers **infrastructure only** — no user-facing AI
 feature ships here. Feature plans register tasks and call `ai(taskId, input)`.
 

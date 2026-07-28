@@ -13,7 +13,7 @@
 - [x] **Schema: trigger conditions + delivery channel + triggers table**
   - Files: `src/shared/lib/db/schema.ts` (`alerts.triggerConditions`, `alerts.deliveryChannel`, `alertTriggers`)
 - [x] **Matcher + trigger recording lib with tests**
-  - Files: `src/shared/lib/alerts.ts`, `src/shared/lib/alerts.test.ts` (`evaluateMatch`, `recordTrigger`, `listTriggersForUser`, `markTriggerRead`, `unreadTriggerCount`)
+  - Files: `src/shared/lib/alerts.ts`, `tests/unit/shared/lib/alerts.test.ts` (`evaluateMatch`, `recordTrigger`, `listTriggersForUser`, `markTriggerRead`, `unreadTriggerCount`)
 - [x] **Worker: builder-watch + keyword alerts, dedupe, digest emails**
   - Files: `src/lib/alerts/worker.ts` (`runAlertsWorker`), `src/shared/lib/email.ts` (`sendAlertDigestEmail`)
 - [x] **Admin HTTP-cron endpoint**
@@ -31,7 +31,7 @@
   - Verified: migration applied locally; column present, existing rows NULL.
 - [x] **Frequency window logic in the worker**
   - Files: `src/shared/lib/alerts.ts` (`isDueForCheck`, `FREQUENCY_WINDOW_MS`),
-    `src/shared/lib/alerts.test.ts`, `src/lib/alerts/worker.ts`,
+    `tests/unit/shared/lib/alerts.test.ts`, `src/lib/alerts/worker.ts`,
     `src/shared/lib/repositories/alerts-worker.ts` (`markWorkerAlertChecked`)
   - Did: `isDueForCheck('hourly'|'daily'|'weekly', lastCheckedAt, now)` — null → true;
     windows: hourly 55 min, daily 20 h, weekly 6.5 d (each slightly under nominal to absorb
@@ -85,7 +85,7 @@
 ## Phase 3 — Optional AI digest summary (after ai-expansion)
 
 - [x] **Register `alert-digest-summary` task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Did: `server-only`; input `{ items: [{alertName, username, source, eventType}] }`
     (1–20, wrapped via `wrapUntrusted`); output `{ summary: string (10-300 chars) }`;
     `cacheTtlSeconds: null`; allowances `{ free: 0, pro: 2, team: 2 }`;

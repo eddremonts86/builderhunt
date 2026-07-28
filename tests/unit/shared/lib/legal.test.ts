@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   sendDeletionCompletedEmail: vi.fn(),
   findDeletionRequest: vi.fn(),
   insertDeletionRequest: vi.fn(),
+  listAccountConsents: vi.fn(),
 }))
 
 vi.mock('~/shared/lib/repositories/account-privacy', () => ({
@@ -23,7 +24,7 @@ vi.mock('~/shared/lib/repositories/account-privacy', () => ({
   findDeletionRequest: mocks.findDeletionRequest,
   insertAccountConsent: vi.fn(),
   insertDeletionRequest: mocks.insertDeletionRequest,
-  listAccountConsents: vi.fn(),
+  listAccountConsents: mocks.listAccountConsents,
 }))
 
 vi.mock('~/shared/lib/email', () => ({
@@ -36,6 +37,7 @@ import {
   GRACE_PERIOD_MS,
   EXPORT_TTL_MS,
   buildExportPayload,
+  getConsentStatus,
   isMaterialVersionChange,
   parseDocumentVersion,
   performHardDelete,
@@ -104,6 +106,50 @@ describe('isMaterialVersionChange', () => {
 
   it('an identical unparseable version on both sides is still "unchanged", not material', () => {
     expect(isMaterialVersionChange('garbage', 'garbage')).toBe(false)
+  })
+})
+
+describe('getConsentStatus', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('reports every document as outstanding when the user has accepted nothing', async () => {
+    mocks.listAccountConsents.mockResolvedValue([])
+    const status = await getConsentStatus('user-1')
+    expect(status.needsAcceptance.sort()).toEqual(['cookies', 'privacy', 'tos'])
+  })
+
+  // The regression this guards: `needsAcceptance` used to be exact-version equality, so bumping
+  // privacy v1.0 -> v1.1 for a clarification would have demanded fresh acceptance from every
+  // existing user — and would have disagreed with the billing consent gate, which has always used
+  // isMaterialVersionChange.
+  it('keeps a minor-version acceptance valid instead of demanding re-acceptance', async () => {
+    mocks.listAccountConsents.mockResolvedValue([
+      { document: 'tos', version: 'v1.0' },
+      { document: 'privacy', version: 'v1.0' },
+      { document: 'cookies', version: 'v1.0' },
+    ])
+    const status = await getConsentStatus('user-1')
+    expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v1.1')
+    expect(status.needsAcceptance).toEqual([])
+    expect(status.consents.privacy).toBe('v1.0')
+  })
+
+  it('demands re-acceptance on a major bump', async () => {
+    mocks.listAccountConsents.mockResolvedValue([
+      { document: 'tos', version: 'v0.9' },
+      { document: 'privacy', version: 'v1.0' },
+      { document: 'cookies', version: 'v1.0' },
+    ])
+    const status = await getConsentStatus('user-1')
+    expect(status.needsAcceptance).toEqual(['tos'])
+  })
+
+  it('reports the current version map so a caller never advertises a superseded version', async () => {
+    mocks.listAccountConsents.mockResolvedValue([])
+    const status = await getConsentStatus('user-1')
+    expect(status.required).toEqual(CURRENT_CONSENT_VERSIONS)
   })
 })
 

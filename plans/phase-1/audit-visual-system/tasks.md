@@ -41,7 +41,7 @@
     the only remaining `!important` uses (5, all in the single `prefers-reduced-motion` block) are a
     deliberate, load-bearing accessibility override, not specificity debt — documented as such.
   - **Not done**: `scripts/check-visual-contract.mjs` (an automated version of this check) — the
-    hand-written doc plus `pnpm test -- src/shared/lib/accessibility.test.ts` are the closest
+    hand-written doc plus `pnpm test -- tests/unit/shared/lib/accessibility.test.ts` are the closest
     existing automated proxies.
   - Verify: `grep -c "!important" src/shared/styles/globals.css` → 5, all inside
     `@media (prefers-reduced-motion: reduce)`; no duplicate late `:root` background override found.

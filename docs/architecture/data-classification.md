@@ -23,13 +23,13 @@ an explicitly reviewed view or command is listed.
 | builder_claims | account-subject | `subject_user_id` + source evidence | verification status only through reviewed DTO | claim/audit schedule |
 | published_builder_profiles | global-public | verified identity + publisher | opt-in profile fields | until unpublish/revocation + audit |
 | builders | tenant-private (legacy mixed model) | currently `user_id`; split required | none from this table after split | dual-write then contract |
-| saved_queries | tenant-private | currently `user_id`; target `organization_id` | none | organization lifetime |
-| alerts | tenant-private | currently `user_id`; target `organization_id` | none | organization lifetime |
-| alert_triggers | tenant-private | currently `user_id`; target `organization_id` | none | configured alert history window |
-| builder_notes | tenant-private | currently `user_id`; target `organization_id` | none | organization lifetime |
+| saved_queries | tenant-private | `organization_id` NOT NULL (`drizzle/0081`) | none | organization lifetime |
+| alerts | tenant-private | `organization_id` NOT NULL (`drizzle/0081`) | none | organization lifetime |
+| alert_triggers | tenant-private | `organization_id` NOT NULL (`drizzle/0081`) | none | configured alert history window |
+| builder_notes | tenant-private | `organization_id` NOT NULL (`drizzle/0081`) | none | organization lifetime |
 | builder_claim_requests | account-subject | claimant + source evidence | none; token must be hashed | expiry + abuse window |
 | builder_profile_views | system-operational | measured builder + optional viewer subject | aggregates only | bounded analytics window |
-| onboarding_progress | tenant-private | currently `user_id`; target `organization_id` | none | organization lifetime |
+| onboarding_progress | tenant-private | `organization_id` NOT NULL (`drizzle/0081`) | none | organization lifetime |
 | incidents | global-public | platform | reviewed incident DTO | permanent status history |
 | changelog | global-public | platform | reviewed published entry | permanent |
 | roadmap_items | global-public | platform | reviewed roadmap DTO | permanent |
@@ -47,10 +47,17 @@ an explicitly reviewed view or command is listed.
 | session_signals | system-operational | correlation only (`session_id_hash`, no FK) | none | bounded investigation window |
 | abuse_signals | system-operational | correlation only (`user_id`/`organization_id`, no FK) | none | append-only; bounded investigation window |
 
-The source currently contains 32 tables after the additive organization, entitlement, and builder-normalization migrations.
-`builders`, queries, alerts, notes, onboarding, and legacy plan surfaces
-remain explicitly marked as transition findings until tenant columns, canonical tables, RLS, and
-repository cutover are complete.
+The schema contains **95 tables** as of 2026-07-27 (`grep -c '= pgTable(' src/shared/lib/db/schema.ts`
+— re-derive it rather than trusting this number, which has been stale before). This table does not
+yet have a row for every one of them: `pnpm db:audit-schema` currently reports ~53 unclassified
+tables and exits non-zero, so it cannot be used as a release gate until that backlog is cleared.
+Adding the missing rows is tracked work, not an oversight to rediscover.
+
+The tenant-column half of the cutover is **done**: `organization_id` is `NOT NULL` on all seven
+tenant-private tables (`drizzle/0081_wakeful_butterfly.sql`). What remains is the contract phase —
+dropping the legacy `user_id` columns — and flipping reads to canonical mode (`TENANT_READ_MODE`
+still defaults to `legacy`). `builders` and the legacy plan surfaces stay marked as transition
+findings until then.
 
 Authorization must never depend on `metadata`, `payload`, `topics`, `keywords`, selections, or other
 JSON fields. Future tables must be added here before their migration is accepted and must document

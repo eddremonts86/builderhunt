@@ -15,7 +15,7 @@
 ## Delivered (v1)
 
 - [x] **Hygiene scoring + grade helpers**
-  - Files: `src/shared/lib/hygiene.ts`, `src/shared/lib/hygiene.test.ts`
+  - Files: `src/shared/lib/hygiene.ts`, `tests/unit/shared/lib/hygiene.test.ts`
   - Done: `computeHygiene` (30/30/20/20 weighting), `hygieneGrade`, `RepoSignals`/`ProjectHygiene` types.
 - [x] **Hygiene profile card**
   - Files: `src/shared/components/HygieneCard.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`
@@ -24,22 +24,22 @@
 ## Phase 1 — Deterministic fallback
 
 - [x] **Seed the estimator**
-  - Files: `src/shared/lib/hygiene.ts`, `src/shared/lib/hygiene.test.ts`
+  - Files: `src/shared/lib/hygiene.ts`, `tests/unit/shared/lib/hygiene.test.ts`
   - Do: replaced every `Math.random()` in `estimateRepoSignalsFromBuilder` with a `stableHash`/
     `seededRange` pair (djb2-style string hash) seeded by `username:language:followers:repoName`.
     Added `username` as an optional field on the function's input (threaded through from
     `BuilderProfilePage.tsx`) since it wasn't part of the original signature.
-  - Verify: `pnpm vitest run src/shared/lib/hygiene.test.ts` — 22/22 passing, including two new
+  - Verify: `pnpm vitest run tests/unit/shared/lib/hygiene.test.ts` — 22/22 passing, including two new
     tests asserting identical inputs produce byte-identical signals across calls.
 
 ## Phase 2 — Real signal fetcher
 
 - [x] **Pure aggregation helpers**
-  - Files: `src/lib/github/repo-signals.ts`, `src/lib/github/repo-signals.test.ts`
+  - Files: `src/lib/github/repo-signals.ts`, `tests/unit/lib/github/repo-signals.test.ts`
   - Do: `issuesToSignals` (filters `pull_request` rows, open/closed counts, `averageCloseDays`),
     `docsFromRootListing` (case-insensitive README/CONTRIBUTING/LICENSE, plus the British
     "licence" spelling), `selectReposForSignals` (non-fork, size > 0, top 5 by stars).
-  - Verify: `pnpm vitest run src/lib/github/repo-signals.test.ts` — 12/12 passing against fixture
+  - Verify: `pnpm vitest run tests/unit/lib/github/repo-signals.test.ts` — 12/12 passing against fixture
     payloads (empty issues, PR-only lists, forks, empty repos, >5 repos).
 - [x] **Fetch pipeline**
   - Files: `src/lib/github/repo-signals.ts`
@@ -59,7 +59,7 @@
   - Files: `src/shared/lib/hygiene.ts`
   - Do: added `repoSignalsSchema`, `projectHygieneSchema`, `projectHygieneEnvelopeSchema`
     (`{ hygiene, signals (≤5), computedAt, version: z.literal(1) }`).
-  - Verify: `pnpm vitest run src/shared/lib/hygiene.test.ts` — round-trip parse test passes;
+  - Verify: `pnpm vitest run tests/unit/shared/lib/hygiene.test.ts` — round-trip parse test passes;
     a 6th signal correctly fails the `.max(5)` constraint.
 - [x] **Hygiene endpoint**
   - Files: `src/routes/api/builders/$builderId/hygiene.ts`,

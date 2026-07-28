@@ -10,7 +10,7 @@ Ordered so the app ships cleanly after every checkbox.
 ## Phase 1 — pgvector + schema
 
 - [x] **Preflight the embedding deployment contract**
-  - Files: `src/shared/lib/ai/embeddings.test.ts`, `.env.example`
+  - Files: `tests/unit/shared/lib/ai/embeddings.test.ts`, `.env.example`
   - Do: Configure `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, optional
     `AI_EMBEDDING_API_KEY`, and `AI_EMBEDDING_DIM`; call `embedTexts(['dimension probe'])`
     against the intended staging provider and refuse migration if the returned vector length
@@ -67,7 +67,7 @@ Ordered so the app ships cleanly after every checkbox.
   - Verify: `pnpm type-check`.
 
 - [x] **Test the document module**
-  - Files: `src/lib/semantic/embedding-doc.test.ts`
+  - Files: `tests/unit/lib/semantic/embedding-doc.test.ts`
   - Do: Same profile → same doc/hash; bio change → different hash; missing optional fields
     omit their lines; >6000-char bio truncates; `toEmbeddedProfile` strips unknown/private
     fields.
@@ -101,7 +101,7 @@ content_hash, embedding = NULL, embedded_at = NULL, updated_at = now()` **only**
 ## Phase 4 — Query path
 
 - [x] **Register the query-translate AI task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add `query-translate`: tier `local-first`; input `z.object({ query:
 z.string().min(3).max(300) })`; output `QueryTranslation` zod schema per spec.md §6
     (keywords 1–8, optional language/country, optional `sources` enum from

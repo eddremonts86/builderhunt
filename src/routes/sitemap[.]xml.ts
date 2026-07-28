@@ -120,28 +120,44 @@ export const Route = createFileRoute('/sitemap.xml')({
           }
         }
 
-        const { listAllPublicRadarSlugs } = await import('~/shared/lib/repositories/public-radars')
-        const radars = await listAllPublicRadarSlugs()
-        for (const radar of radars) {
-          entries.push({
-            loc: `${SITE}/r/${radar.slug}`,
-            lastmod: radar.createdAt.toISOString().slice(0, 10),
-            changefreq: 'daily',
-            priority: 0.6,
-          })
+        // The DB-backed sections degrade independently. A sitemap that 500s is a Search Console
+        // error; a sitemap that is temporarily shorter is not — absence from a sitemap is not a
+        // removal signal. `getSurfaceDirectives` above already made this trade; these two queries
+        // were the last ones that could still take the whole route down.
+        let degraded = false
+
+        try {
+          const { listAllPublicRadarSlugs } = await import('~/shared/lib/repositories/public-radars')
+          const radars = await listAllPublicRadarSlugs()
+          for (const radar of radars) {
+            entries.push({
+              loc: `${SITE}/r/${radar.slug}`,
+              lastmod: radar.createdAt.toISOString().slice(0, 10),
+              changefreq: 'daily',
+              priority: 0.6,
+            })
+          }
+        } catch (error) {
+          degraded = true
+          console.error('sitemap: public radars unavailable, omitting that section:', error)
         }
 
-        // Only published, actively-verified portfolios — never a draft or a revoked claim.
-        const { publicDb } = await import('~/shared/lib/db/client')
-        const { listPublishedPortfolioClaimIds } = await import('~/shared/lib/repositories/builder-claims')
-        const portfolioClaimIds = await listPublishedPortfolioClaimIds(publicDb)
-        for (const claimId of portfolioClaimIds) {
-          entries.push({
-            loc: `${SITE}/portfolio/${claimId}`,
-            lastmod: today,
-            changefreq: 'weekly',
-            priority: 0.6,
-          })
+        try {
+          // Only published, actively-verified portfolios — never a draft or a revoked claim.
+          const { publicDb } = await import('~/shared/lib/db/client')
+          const { listPublishedPortfolioClaimIds } = await import('~/shared/lib/repositories/builder-claims')
+          const portfolioClaimIds = await listPublishedPortfolioClaimIds(publicDb)
+          for (const claimId of portfolioClaimIds) {
+            entries.push({
+              loc: `${SITE}/portfolio/${claimId}`,
+              lastmod: today,
+              changefreq: 'weekly',
+              priority: 0.6,
+            })
+          }
+        } catch (error) {
+          degraded = true
+          console.error('sitemap: published portfolios unavailable, omitting that section:', error)
         }
 
         // /explore pages for each popular query
@@ -163,7 +179,11 @@ ${entries.map(urlEntry).join('\n')}
           status: 200,
           headers: {
             'Content-Type': 'application/xml; charset=utf-8',
-            'Cache-Control': 'public, max-age=3600, s-maxage=3600',
+            // A degraded sitemap must not be cached for an hour: that would turn a few seconds of
+            // database trouble into an hour of serving a truncated URL set to every crawler.
+            'Cache-Control': degraded
+              ? 'public, max-age=60, s-maxage=60'
+              : 'public, max-age=3600, s-maxage=3600',
           },
         })
       },

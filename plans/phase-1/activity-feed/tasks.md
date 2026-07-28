@@ -7,7 +7,7 @@
 > separation, shared resource services, non-owner roles, RLS, and tenant A/B harness exist.
 
 - [ ] **Define versioned event and redaction registry**
-  - Files: `src/shared/lib/activity/contracts.ts`, `src/shared/lib/activity/contracts.test.ts`, `docs/architecture/activity-events.md`
+  - Files: `src/shared/lib/activity/contracts.ts`, `tests/unit/shared/lib/activity/contracts.test.ts`, `docs/architecture/activity-events.md`
   - Do: Define approved event types, version, criticality, target integrity mode, zod metadata allowlist, formatter, retention, and security-audit mapping. Reject unknown keys and sensitive canaries; define deterministic idempotency key input.
   - Verify: one test per type/version/formatter/redaction plus unknown/email/token/note/query/prompt payload rejection passes.
 
@@ -17,7 +17,7 @@
   - Verify: app-role missing/A/B contexts, update denial, duplicate idempotency, cross-tenant target, and worker-grant tests pass.
 
 - [ ] **Implement transaction-bound activity repository**
-  - Files: `src/shared/lib/repositories/activity.ts`, `src/shared/lib/repositories/activity.test.ts`
+  - Files: `src/shared/lib/repositories/activity.ts`, `tests/unit/shared/lib/repositories/activity.test.ts`
   - Do: Implement `emitActivity(tx, principal, event)` and `listActivity(tx, principal, options)`; derive organization/actor/request from principal, validate metadata, use idempotency upsert/no-op, and keyset pagination. No global DB import or optional organization input.
   - Verify: atomic rollback, retry duplicate, A/B, missing context, equal timestamp pagination, actor deletion, and DTO allowlist tests pass.
 

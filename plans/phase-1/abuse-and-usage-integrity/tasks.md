@@ -87,8 +87,8 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     cover yet (will be exercised again once Phase 1+ routes read/write these tables).
 
 - [x] **Abuse lib: signals + device fingerprint**
-  - Files: `src/shared/lib/abuse/signals.ts`, `src/shared/lib/abuse/signals.test.ts`,
-    `src/shared/lib/abuse/device.ts`, `src/shared/lib/abuse/device.test.ts`
+  - Files: `src/shared/lib/abuse/signals.ts`, `tests/unit/shared/lib/abuse/signals.test.ts`,
+    `src/shared/lib/abuse/device.ts`, `tests/unit/shared/lib/abuse/device.test.ts`
   - Do: `AbuseSignalType`/`AbuseSignal` types + `emitAbuseSignal()` layered over `emitSecurityAudit`
     (redacts via `redactLogValue`, stores salted session-id hash never the token). `device.ts`:
     first-party `bh_did` cookie issue/read + `computeDeviceHash(cookie, uaFamily, salt)` (coarse UA
@@ -317,7 +317,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     not-allowed→flagged) + 2 wrapper tests (below-threshold no-emit, threshold-exceeded emits with
     `type: 'cross_tenant_denied'`, `severity: 'medium'`). Full local sweep:
     `pnpm tsc --noEmit` clean, `pnpm eslint` clean on all 4 changed files, `pnpm vitest run
-    src/shared/lib/abuse src/shared/lib/auth/tenant-principal.test.ts` → 74/74 green (up from 66,
+    src/shared/lib/abuse tests/unit/shared/lib/auth/tenant-principal.test.ts` → 74/74 green (up from 66,
     tenant-principal's own 4 pre-existing tests unaffected), `pnpm security:boundaries` → 0 legacy
     imports. **Live end-to-end verification against the real dev Postgres** (not just unit tests):
     wrote a throwaway `tsx` script calling the real `resolveTenantPrincipal` with only
@@ -363,8 +363,8 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     integration tests for `recomputeAccountRisk` (real `abuse_signals` rows in → real scored
     `account_risk` upsert out, matching `stored` via `getAccountRisk`; a user with zero signals
     lands at `observe`/score 0/`reason: null`). Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint`
-    clean, `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/account-risk.test.ts
-    src/shared/lib/repositories/abuse-signals.test.ts src/shared/lib/auth/tenant-principal.test.ts`
+    clean, `pnpm vitest run src/shared/lib/abuse tests/unit/shared/lib/repositories/account-risk.test.ts
+    tests/unit/shared/lib/repositories/abuse-signals.test.ts tests/unit/shared/lib/auth/tenant-principal.test.ts`
     → 99/99 green, `pnpm security:boundaries` → 0 legacy imports.
 
 ## Phase 3 — Multi-accounting defenses (B)
@@ -400,7 +400,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     table (case-insensitive match, custom list override, malformed input never matches), and the
     gate itself (silent for normal emails regardless of flag, silent for disposable emails when the
     flag is off, throws when both apply). Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint`
-    clean, `pnpm vitest run src/shared/lib/abuse/email-hygiene.test.ts src/shared/lib/auth` → 101/101
+    clean, `pnpm vitest run tests/unit/shared/lib/abuse/email-hygiene.test.ts src/shared/lib/auth` → 101/101
     green, `pnpm security:boundaries` → 0 legacy imports. **Live-verified against the real dev
     server** (not just unit tests): browser-based sign-up became unreliable mid-session (a
     concurrent session's edits to `__root.tsx`/`globals.css`/`ThemeProvider.tsx` triggered repeated
@@ -489,8 +489,8 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     never takes IP as input at all, so keying on device hash instead of IP is inherently immune to
     IP rotation).
     **Full local sweep**: `pnpm tsc --noEmit` clean, `pnpm eslint` clean on all 9 changed/new
-    source files, `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/user-devices.test.ts
-    src/shared/lib/rate-limit.test.ts src/shared/lib/auth/tenant-principal.test.ts
+    source files, `pnpm vitest run src/shared/lib/abuse tests/unit/shared/lib/repositories/user-devices.test.ts
+    tests/unit/shared/lib/rate-limit.test.ts tests/unit/shared/lib/auth/tenant-principal.test.ts
     src/routes/api/admin/abuse --no-file-parallelism` → 134/134 green (ran with reduced
     parallelism after hitting real Postgres connection-limit contention — 203/200 connections,
     traced to an orphaned dev-server process from an earlier `preview_stop` in this same session
@@ -558,7 +558,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     cap; emits `seat_overuse` only once accumulated real usage exceeds the cap (3 calls, cap 2 →
     exactly 1 emission, on the 3rd call); tracks distinct actions independently for the same
     org/user/day. Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean on all 5 changed files,
-    `pnpm vitest run src/shared/lib/abuse src/shared/lib/repositories/seat-usage.test.ts
+    `pnpm vitest run src/shared/lib/abuse tests/unit/shared/lib/repositories/seat-usage.test.ts
     --no-file-parallelism` → 128/128 green, `pnpm security:boundaries` → 0 legacy imports.
     **Live end-to-end verification against the real dev server + Postgres**: signed up a real test
     user, called `/api/search/builders`, `/api/export/builders`, and (after inserting a real
@@ -569,7 +569,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     Cleaned up the test user, its org-builder row, and the extra dev-server instance afterward.
 
 - [x] **Re-key rate limiting on identity, not IP alone**
-  - Files: `src/shared/lib/rate-limit.ts`, `src/shared/lib/rate-limit.test.ts`
+  - Files: `src/shared/lib/rate-limit.ts`, `tests/unit/shared/lib/rate-limit.test.ts`
   - Do: add `getRateLimitId` variants that compose authenticated `userId` + `organizationId` +
     session hash; apply on authed endpoints so IP rotation cannot reset an authed bucket.
   - Verify: `rate-limit.test.ts` proves an authed user is limited across changing IPs.
@@ -593,7 +593,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     and the task-mandated "identity cap holds across IP rotation" case using the same
     `rateLimit()` primitive as the signup-device test, proving the key itself never reads the
     request/IP. Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean,
-    `pnpm vitest run src/shared/lib/rate-limit.test.ts src/shared/lib/abuse --no-file-parallelism`
+    `pnpm vitest run tests/unit/shared/lib/rate-limit.test.ts src/shared/lib/abuse --no-file-parallelism`
     → 133/133 green, `pnpm security:boundaries` → 0 legacy imports. **Live end-to-end verification**
     against the real dev server: a real signed-in test user made 61 rapid `/api/search/builders`
     calls cycling through 5 different `X-Forwarded-For` values (203.0.113.x/198.51.100.x/192.0.2.x)
@@ -654,7 +654,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 ## Phase 4B — Credit / premium-feature abuse (G)
 
 - [x] **Verify built credit-ledger invariants under the real runtime role (G3/G5/G9/G10)**
-  - Files: `scripts/db/verify-api-isolation-local.mjs`, `src/shared/lib/billing/reservations.test.ts`,
+  - Files: `scripts/db/verify-api-isolation-local.mjs`, `tests/unit/shared/lib/billing/reservations.test.ts`,
     `src/shared/lib/repositories/billing-ledger.ts`
   - Do: add adversarial checks as `builderhunt_app` — concurrent `reserveCredits` never overspends;
     balance never negative; a monthly-window grant is unique per subscription/window/type; a replayed
@@ -724,7 +724,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     under genuine concurrency (exactly one of two racing 80-unit settles succeeds, the other sees
     "no longer reserved," total remaining is 20 as expected, never a double-consume).
     Full sweep: `pnpm tsc --noEmit` clean, `pnpm eslint` clean, `pnpm vitest run
-    src/shared/lib/billing/reservations.test.ts src/shared/lib/billing/credits.test.ts
+    tests/unit/shared/lib/billing/reservations.test.ts tests/unit/shared/lib/billing/credits.test.ts
     --no-file-parallelism` → 35/35 green, `pnpm exec drizzle-kit check` clean,
     `node scripts/db/verify-migration-integrity.mjs` valid, `pnpm security:boundaries` → 0 legacy
     imports. Removed the throwaway Docker container afterward.
@@ -755,8 +755,8 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     blocks/flags however far over cap; observe mode records usage + emits `pool_drain` but never
     blocks a multi-seat org's over-cap seat; enforce mode blocks a multi-seat org's seat before any
     credits are reserved, leaving `seat_usage_daily` unchanged) — all 18 tests in that file plus all
-    8 new tests pass (`pnpm vitest run src/shared/lib/billing/feature-authorization.test.ts
-    src/shared/lib/abuse/credit-abuse.test.ts`). Full `src/shared/lib/billing` + `src/shared/lib/abuse`
+    8 new tests pass (`pnpm vitest run tests/unit/shared/lib/billing/feature-authorization.test.ts
+    tests/unit/shared/lib/abuse/credit-abuse.test.ts`). Full `src/shared/lib/billing` + `src/shared/lib/abuse`
     suites (821 tests) pass with no regressions; `pnpm tsc --noEmit` and `pnpm eslint` on every
     touched file are clean. Live-verified end-to-end against the real local dev Postgres database
     (not disposable/mocked) via a throwaway direct-call script (no route wires to
@@ -1190,7 +1190,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     reassuring, "Yes." opener, no legalese) and `spec.md`'s framing goal ("fairness, not
     accusation") by naming the in-app warning/step-up UX (Phase 5 tasks 1-2) before any restriction.
     Verify: `pnpm tsc --noEmit`, `pnpm eslint` (both clean), `pnpm vitest run
-    src/routes/_landing/pricing.test.tsx` (7/7 passing, unaffected), and a visual check in the real
+    tests/unit/routes/_landing/pricing.test.tsx` (7/7 passing, unaffected), and a visual check in the real
     dev browser confirming the new accordion entry renders with the rest of the FAQ list.
 
 ## Phase 6 — Baseline, calibrate, gate
@@ -1277,7 +1277,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       data" disclosure (section 1) and the "Data retention" paragraph (section 5) in
       `privacy.tsx` and confirmed accurate/sufficient. Task fully closed.
     - Verify: `pnpm tsc --noEmit`, `pnpm eslint` on both touched files (clean), `pnpm vitest run
-      src/shared/lib/legal.test.ts src/shared/lib/billing/consent.test.ts` (42/42, confirmed
+      tests/unit/shared/lib/legal.test.ts tests/unit/shared/lib/billing/consent.test.ts` (42/42, confirmed
       `checkout.test.ts`/`webhook-handlers.test.ts`'s hardcoded `{ terms: 'v1.0', privacy: 'v1.0' }`
       fixtures are literal DB snapshot inputs for unrelated scenarios, not assertions against the
       live constant, so they're unaffected by the bump), and a live browser check confirming the
@@ -1310,7 +1310,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
       (`requireTenantPrincipal`'s `getEnforcementStage` wiring) calls
       `resolveEnforcementForUser(userId)` with **no mode override at all**, relying entirely on
       `env.ABUSE_ENFORCEMENT_MODE`'s default. New file
-      `src/shared/lib/abuse/enforcement-kill-switch.test.ts` seeds a REAL `account_risk` row at
+      `tests/unit/shared/lib/abuse/enforcement-kill-switch.test.ts` seeds a REAL `account_risk` row at
       `stage: 'blocked'` in a disposable database, mocks `env.ABUSE_ENFORCEMENT_MODE` to
       `'observe'` (no `mode` passed to the function — the exact production default path), and
       confirms the decision is still `observe` for that real flagged account, and that the

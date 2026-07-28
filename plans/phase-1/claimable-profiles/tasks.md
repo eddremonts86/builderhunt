@@ -37,14 +37,14 @@
   - Verify: `pnpm db:migrate` (applied clean, additive-only, verified against local DB).
 
 - [x] **Implement claim state and proof primitives**
-  - Files: `src/shared/lib/claims.ts`, `src/shared/lib/claims.test.ts`
+  - Files: `src/shared/lib/claims.ts`, `tests/unit/shared/lib/claims.test.ts`
   - Do: `generateClaimChallenge()` (public, unhashed — the challenge is meant to be visible on the claimant's public profile, unlike the old emailed secret), `isClaimExpired()`, `buildClaimInstructions()`. No SHA-256/hashing needed for this method since there's no secret to protect.
-  - Verify: `pnpm vitest run src/shared/lib/claims.test.ts` — 10/10 passing.
+  - Verify: `pnpm vitest run tests/unit/shared/lib/claims.test.ts` — 10/10 passing.
 
 - [x] **Implement source-proof adapters**
-  - Files: `src/shared/lib/claim-sources/{types,index,github,gitlab,codeberg,devto}.ts`, `src/shared/lib/claim-sources/index.test.ts`
+  - Files: `src/shared/lib/claim-sources/{types,index,github,gitlab,codeberg,devto}.ts`, `tests/unit/shared/lib/claim-sources/index.test.ts`
   - Do: Each adapter fetches the claimant's real public profile from the source's own API (GitHub `/users/{username}`, GitLab `/api/v4/users?username=`, Codeberg/Gitea `/api/v1/users/{username}`, DEV.to `/api/users/by_username`) and checks whether the challenge string appears in its bio/summary/description field. 5s `AbortController` timeout on every adapter. Aggregator sources with no editable public bio (HN, Reddit, npm, Hugging Face, Stack Overflow, Lobsters, SourceHut, Devpost, Product Hunt, Bluesky) deliberately have no adapter — `isClaimSourceSupported()` returns false and the claim route responds `unsupported_source` rather than faking proof.
-  - Verify: `pnpm vitest run src/shared/lib/claim-sources/index.test.ts` — 15/15 passing (mocked fetch).
+  - Verify: `pnpm vitest run tests/unit/shared/lib/claim-sources/index.test.ts` — 15/15 passing (mocked fetch).
 
 - [x] **Replace arbitrary-email initiation with authenticated source-bound claims**
   - Files: `src/routes/api/builders/$builderId/claim.ts` (rewritten), `src/shared/lib/env.ts`, `.env.example`
@@ -84,4 +84,4 @@
 
 ## What wasn't written (and why)
 
-No `claim.ts`/`verify.ts`/`revoke.ts` `*.test.ts` files were added — everything above was live-verified end-to-end against the running dev server and a real Postgres instance (see the Verify notes per task) rather than covered by new integration test files, to keep this pass proportionate to the actual gap being closed. `src/shared/lib/repositories/builder-claims.test.ts` (pre-existing, static source-assertion style) still passes unchanged. If this flow needs regression coverage going forward, that's the next thing to add — flagged here rather than silently left uncovered.
+No `claim.ts`/`verify.ts`/`revoke.ts` `*.test.ts` files were added — everything above was live-verified end-to-end against the running dev server and a real Postgres instance (see the Verify notes per task) rather than covered by new integration test files, to keep this pass proportionate to the actual gap being closed. `tests/unit/shared/lib/repositories/builder-claims.test.ts` (pre-existing, static source-assertion style) still passes unchanged. If this flow needs regression coverage going forward, that's the next thing to add — flagged here rather than silently left uncovered.

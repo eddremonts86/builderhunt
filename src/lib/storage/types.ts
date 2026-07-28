@@ -2,8 +2,16 @@
  * Object storage provider contract (plan: calendar-scheduling-interview-intelligence, spec.md
  * "Private file contract"). No I/O, no vendor SDK import — this module only defines the shapes
  * the rest of the candidate-document pipeline (upload routes, scan worker, extraction worker)
- * share. A real adapter (Cloudflare R2 via `@aws-sdk/client-s3`) lives elsewhere and implements
- * this interface; domain code never sees an AWS SDK response type or error class.
+ * share. The concrete adapter implements this interface against the S3 API; domain code never sees
+ * an AWS SDK response type or error class.
+ *
+ * The backing store is **self-hosted MinIO**, not Cloudflare R2 — see
+ * `docs/operations/interview-provider-register.md`, which chose MinIO to avoid a paid vendor, a DPA
+ * and a sub-processor entry. The env vars keep their `INTERVIEW_R2_*` prefix deliberately, so
+ * moving to R2 later is a configuration change rather than a code change. Do not infer the vendor
+ * from the variable names.
+ *
+ * No adapter exists yet: this file and its test are the whole module today.
  */
 
 export interface SignedUploadUrl {

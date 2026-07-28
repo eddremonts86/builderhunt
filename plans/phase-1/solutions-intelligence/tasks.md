@@ -36,7 +36,7 @@
 
 - [ ] **Define solution domain schemas**
   - Files: `src/shared/lib/solutions/contracts.ts` (new),
-    `src/shared/lib/solutions/contracts.test.ts` (new)
+    `tests/unit/shared/lib/solutions/contracts.test.ts` (new)
   - Do: Define strict discriminated schemas for structured briefs, unknown values, ranking modes,
     components, capabilities, evidence levels, compatibility edges, route graphs, estimates,
     source status, result completeness, and feedback. Reject unknown persisted fields.
@@ -45,7 +45,7 @@
 
 - [ ] **Define flags and immutable rate-card keys**
   - Files: `src/shared/lib/solutions/config.ts` (new),
-    `src/shared/lib/solutions/config.test.ts` (new), `src/shared/lib/env.ts`
+    `tests/unit/shared/lib/solutions/config.test.ts` (new), `src/shared/lib/env.ts`
   - Do: Add independent catalog-ingestion, public-scrape, live-enrichment, interpretation,
     explanation, external-human, and paid-generation flags. Declare 10-unit
     `solutions.generate.v1` and 3-unit `solutions.regenerate.v1`; import billing types.

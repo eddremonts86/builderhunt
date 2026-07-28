@@ -98,8 +98,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm type-check
       # Includes the ABUSE_ENFORCEMENT_MODE=observe kill-switch smoke
-      # (src/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed, `pnpm test`
-      # picks up every *.test.ts file already.
+      # (tests/unit/shared/lib/abuse/enforcement-kill-switch.test.ts) — no separate step needed,
+      # `pnpm test` picks up every tests/unit/**/*.test.ts file already.
       - run: pnpm test
       - run: pnpm exec playwright install --with-deps chromium
       - name: End-to-end suite
@@ -245,5 +245,5 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         if: env.STRIPE_SECRET_KEY != ''
-      - run: pnpm vitest run src/shared/lib/billing/real-provider.test.ts
+      - run: pnpm vitest run tests/unit/shared/lib/billing/real-provider.test.ts
         if: env.STRIPE_SECRET_KEY != ''

@@ -67,8 +67,15 @@ export async function getConsentStatus(userId: string | null) {
   const rows = await listAccountConsents(userId)
   const consents: Record<string, string> = {}
   for (const row of rows) if (!consents[row.document]) consents[row.document] = row.version
+  // Exact-version equality would demand fresh acceptance for a typo fix. `isMaterialVersionChange`
+  // is the documented rule (major bump only), and it is what the billing consent gate already uses
+  // — the two must not disagree about whether a user has accepted the current terms.
   const needsAcceptance = Object.entries(CURRENT_VERSIONS)
-    .filter(([document, version]) => consents[document] !== version)
+    .filter(([document, version]) => {
+      const accepted = consents[document]
+      if (accepted === undefined) return true
+      return isMaterialVersionChange(accepted, version)
+    })
     .map(([document]) => document as ConsentDocument)
   return { userId, consents, required: CURRENT_VERSIONS, needsAcceptance }
 }

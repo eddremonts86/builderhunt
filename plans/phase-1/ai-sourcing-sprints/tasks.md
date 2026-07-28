@@ -13,12 +13,12 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 ## Phase 1 — Contracts and tasks
 
 - [x] **Define sprint contracts and deterministic fallbacks**
-  - Files: `src/shared/lib/sprints-shared.ts`, `src/shared/lib/sprints-shared.test.ts`
+  - Files: `src/shared/lib/sprints-shared.ts`, `tests/unit/shared/lib/sprints-shared.test.ts`
   - Do: Export the spec's `ExtractedCriteria`, `QueryVariant`, `SprintFilter`, `SprintProfileSnapshot`, create/update schemas, status enum, response DTOs, `manualCriteriaToVariant`, and strict `SOURCE_NAMES` validation. Bound all strings/arrays and strip no unknown fields silently.
   - Verify: `pnpm test sprints-shared` covers valid/invalid sources, maxima, fallback output, and unknown-key rejection. — Done: 15/15 passing, including strict-schema unknown-key rejection.
 
 - [x] **Register the three local-first AI tasks**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add `jd-parse`, `criteria-decompose`, and `filter-refine` with the exact schemas, TTLs, allowances, and token limits in spec.md. `jd-parse` uses `wrapUntrusted`; all three declare `tier: 'local-first'` and return strict JSON.
   - Verify: `pnpm test tasks` proves registry integrity and malicious delimiter text remains data. — Done: all 3 tasks registered and unit-tested; live-verified against real MiniMax (see Phase 5 evidence below) — `jd-parse` and `criteria-decompose` both returned high-quality structured output from a real pasted JD, and `filter-refine` correctly turned "only people with at least 100 followers" into `{ minFollowers: 100 }`.
 
@@ -60,7 +60,7 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 ## Phase 3 — Domain and worker
 
 - [x] **Build snapshot/result helpers**
-  - Files: `src/lib/sprints/results.ts`, `src/lib/sprints/results.test.ts`
+  - Files: `src/lib/sprints/results.ts`, `tests/unit/lib/sprints/results.test.ts`
   - Do: Implement `toSprintProfileSnapshot`, stable `source:sourceId` identity, quota clipping, location facets with an `Unknown` bucket, sort/filter helpers, and tracked annotation using `trackedKey`/`getTrackedBuilderIds` conventions.
   - Verify: `pnpm test sprints/results` covers private-field stripping, duplicates, quota boundaries, facets, and tracked IDs. — Done: 11/11 passing.
 
@@ -71,12 +71,12 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
     Phase 2 deviation). No DB-backed unit test file was added — this codebase's repository
     layer (`organization-alerts.ts` and peers) has no DB-integration test file either; the
     convention here is a static architecture-boundary test
-    (`src/lib/sprints/service.test.ts`, mirroring `organization-alerts.test.ts`) plus live
+    (`tests/unit/lib/sprints/service.test.ts`, mirroring `organization-alerts.test.ts`) plus live
     curl/browser verification of the actual isolation behavior (every query includes
     `eq(organizationId, ...)`, confirmed by both code review and the boundary test).
 
 - [x] **Implement cursor and worker core**
-  - Files: `src/lib/sprints/worker.ts`, `src/lib/sprints/worker.test.ts`, `src/shared/lib/repositories/sprints-worker.ts`
+  - Files: `src/lib/sprints/worker.ts`, `tests/unit/lib/sprints/worker.test.ts`, `src/shared/lib/repositories/sprints-worker.ts`
   - Do: Export pure `nextSprintCursor`; lease at most three oldest due active sprints with `FOR UPDATE SKIP LOCKED`; execute one variant/page cell (`page <= 3`, `perPage: 30`), keep people only, insert snapshots on conflict-do-nothing, clip at quota, and compare-and-set the leased cursor before advancing. A cell error leaves its cursor unchanged and is reported without aborting peers.
   - Verify: `pnpm test sprints/worker` covers wrap/completion, duplicate rerun, overlap, partial upstream failure, downgrade skip, and quota hit. — Done, with a documented deviation
     (see spec.md): iterates every organization (`listWorkerOrganizationIds`, matching
@@ -173,7 +173,7 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 - [ ] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task. What
   IS covered: `sprints-shared.test.ts` rejects invalid sources/oversized input/unknown keys
   (Phase 1); the architecture-boundary test
-  (`src/lib/sprints/service.test.ts`) proves every tenant route derives its principal via
+  (`tests/unit/lib/sprints/service.test.ts`) proves every tenant route derives its principal via
   `requireTenantPrincipal`/`withTenantContext` and every service function scopes by
   `organizationId`, which is the actual isolation mechanism (Postgres session vars +
   `eq(organizationId, ...)` on every query — the same mechanism `alerts`/`saved-queries`

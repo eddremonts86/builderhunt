@@ -194,6 +194,42 @@ describe('heartbeatReservation', () => {
 })
 
 describe('settleReservation', () => {
+  // `RATE_CARDS[*].settlementGraceSeconds` was declared on every card and read by nothing: the
+  // settle path used whatever the caller passed. These two pin the ownership — the card wins when
+  // there is one, the caller's value is the fallback only for card-less internal operations.
+  it('takes the settlement grace from the rate card, not from the caller', async () => {
+    const orgId = await freshOrg()
+    await seedGrant(orgId, 100, FAR_FUTURE())
+    const reservationId = uniqueId('reservation')
+    await db.transaction((tx) => reserveCredits(tx, {
+      // semantic_search_query's card declares settlementGraceSeconds: 30.
+      reservationId, organizationId: orgId, operation: 'semantic_search_query', rateCardVersion: 1,
+      idempotencyKey: uniqueId('idem'), maximumUnits: 5, maxDurationSeconds: 30,
+    }))
+    const settledAt = new Date('2026-07-27T12:00:00.000Z')
+    const result = await db.transaction((tx) => settleReservation(tx, {
+      organizationId: orgId, reservationId, actualUnits: 5, idempotencyKey: uniqueId('idem'),
+      settlementGraceSeconds: 9999,
+    }, settledAt))
+    expect(result.reservation.settlementGraceEndsAt).toEqual(new Date('2026-07-27T12:00:30.000Z'))
+  })
+
+  it('falls back to the caller value for an operation with no rate card', async () => {
+    const orgId = await freshOrg()
+    await seedGrant(orgId, 100, FAR_FUTURE())
+    const reservationId = uniqueId('reservation')
+    await db.transaction((tx) => reserveCredits(tx, {
+      reservationId, organizationId: orgId, operation: 'ai_task', rateCardVersion: 1,
+      idempotencyKey: uniqueId('idem'), maximumUnits: 10, maxDurationSeconds: 300,
+    }))
+    const settledAt = new Date('2026-07-27T12:00:00.000Z')
+    const result = await db.transaction((tx) => settleReservation(tx, {
+      organizationId: orgId, reservationId, actualUnits: 10, idempotencyKey: uniqueId('idem'),
+      settlementGraceSeconds: 60,
+    }, settledAt))
+    expect(result.reservation.settlementGraceEndsAt).toEqual(new Date('2026-07-27T12:01:00.000Z'))
+  })
+
   it('fully consumes an allocation with no leftover to release', async () => {
     const orgId = await freshOrg()
     await seedGrant(orgId, 100, FAR_FUTURE())

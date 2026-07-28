@@ -7,13 +7,16 @@
 > auth-broker, backfill-state, bootstrap, RLS, worker/claim policies, and platform-role layers are
 > implemented through migration `0012` and verified against local PostgreSQL. The tenant-boundary
 > ratchet (`pnpm security:boundaries`) now tracks **0** legacy global-db imports (down from the
-> earlier 37) and dual-write/shadow-read/backfill/readiness modules exist with tests. Still **not**
-> done: `TENANT_READ_MODE`/`TENANT_WRITE_MODE` default to `legacy` in `.env.example` (canonical mode
-> is not enabled anywhere), most tenant tables still have a **nullable** `organization_id` (contract
-> phase/`NOT NULL` not applied), no contract migration has dropped legacy columns, and
-> `assessTenantReadiness` requires production-only evidence (24h zero-mismatch shadow window,
-> restore rehearsal, exact-role RLS/API/worker isolation runs) that has not been produced. Status
-> remains `in_progress` until canonical cutover and contract land.
+> earlier 37) and dual-write/shadow-read/backfill/readiness modules exist with tests.
+> **Updated 2026-07-27**: the canonical tenant cutover shipped. `organization_id` is `NOT NULL` on
+> all seven tenant-private tables (`drizzle/0081_wakeful_butterfly.sql`), which adopted leftover rows
+> itself so a forgotten backfill could not take a release down; `TENANT_WRITE_MODE` is gone entirely
+> (every insert has always written both columns); and the `assessTenantReadiness` gate that demanded
+> a 24h zero-mismatch production window was removed, because it could never be satisfied.
+> Still **not** done, and the only reason this is not `implemented`: `TENANT_READ_MODE` still
+> defaults to `legacy` and `TENANT_CANONICAL_READY` to `false` (`src/shared/lib/env.ts`,
+> `.env.example`), so reads do not resolve canonically yet, and no contract migration has dropped the
+> legacy columns.
 
 ## Problem
 
@@ -52,7 +55,7 @@ Create a secure multi-tenant foundation in which:
 7. every remaining BuilderHunt plan inherits a concrete security and migration gate.
 
 The approved architecture record is
-[`docs/superpowers/specs/2026-07-20-security-multitenancy-design.md`](../../docs/superpowers/specs/2026-07-20-security-multitenancy-design.md).
+[`docs/superpowers/specs/2026-07-20-security-multitenancy-design.md`](../../../docs/superpowers/specs/2026-07-20-security-multitenancy-design.md).
 
 ## Non-goals
 

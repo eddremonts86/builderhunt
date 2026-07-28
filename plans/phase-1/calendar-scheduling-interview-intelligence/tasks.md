@@ -73,7 +73,7 @@
     can enable; interview-only beta works with platform operator grants and all paid providers off.
 
 - [x] **Add environment schema and kill switches**
-  - Files: `src/shared/lib/env.ts`, `src/shared/lib/env.security.test.ts`, `.env.example`,
+  - Files: `src/shared/lib/env.ts`, `tests/unit/shared/lib/env.security.test.ts`, `.env.example`,
     `.env.production.example`
   - Do: Add server-only R2 endpoint/account/bucket/access keys/jurisdiction, ClamAV host/port,
     Deepgram key/EU base URL, Azure endpoint/key/deployment/API version, interview retention days,
@@ -83,7 +83,7 @@
     secrets prefixed with `VITE_`.
   - Verify: env tests cover disabled minimal config, each enabled dependency, non-EU rejection,
     missing secret, malformed retention/price values, and public-secret leakage; `pnpm test
-src/shared/lib/env.security.test.ts`.
+tests/unit/shared/lib/env.security.test.ts`.
   - **Evidence (2026-07-26)**: Added all 8 release flags (`CALENDAR_ENABLED` through
     `CALENDAR_OPERATIONAL_LAYERS_ENABLED`), R2/ClamAV/Deepgram/Azure OpenAI config, and 3
     retention ceilings to `src/shared/lib/env.ts`. Production-only `superRefine` requires R2+ClamAV
@@ -127,14 +127,14 @@ src/shared/lib/env.security.test.ts`.
 
 - [x] **Define shared feature/catalog configuration**
   - Files: `src/shared/lib/interview-config.ts` (new),
-    `src/shared/lib/interview-config.test.ts` (new)
+    `tests/unit/shared/lib/interview-config.test.ts` (new)
   - Do: Define supported MIME/extensions, 10 MB/25 MB document and 2 MB web-import limits,
     retention defaults, Chrome desktop current/previous major matrix, capture modes/languages,
     interview operation rate-card keys/estimates, low-balance warning thresholds, recurrence horizon,
     and safe public flag DTO. Import catalog/entitlement types from billing; define no price, tax,
     grant-expiry, or pack authority here.
   - Verify: tests reject negative/zero limits, unknown rate-card key, excessive retention, and
-    missing fallback; `pnpm test src/shared/lib/interview-config.test.ts`.
+    missing fallback; `pnpm test tests/unit/shared/lib/interview-config.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `interview-config.ts` — PDF/DOCX/TXT MIME allowlist,
     10 MB/25 MB/2 MB size limits with `assertPositiveByteLimit`, retention defaults
     (90d/180d/24mo) plus `resolveRetentionDays` (org override capped by the operator ceiling from
@@ -157,14 +157,14 @@ src/shared/lib/env.security.test.ts`.
 ## Phase 1 — Pure domain contracts
 
 - [x] **Implement calendar contracts and state machine**
-  - Files: `src/shared/lib/calendar.ts` (new), `src/shared/lib/calendar.test.ts` (new)
+  - Files: `src/shared/lib/calendar.ts` (new), `tests/unit/shared/lib/calendar.test.ts` (new)
   - Do: Add event/occurrence/participant/reminder/delivery/feed DTO schemas, event types/statuses,
     source types, visibility fixed to `private`, optimistic-version and `this|following|series`
     mutation input, transition/split guards, half-open overlap helper, search/export filters, and
     explicit read-only projection discrimination.
   - Verify: tests cover every valid/invalid transition, invalid ranges, stale version mapping,
     participant DTO minimization, and projection `editable: false`; `pnpm test
-src/shared/lib/calendar.test.ts`.
+tests/unit/shared/lib/calendar.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `calendar.ts` (Zod `.strict()` throughout, matching
     `solutions/contracts.ts`'s convention). `CalendarEventError` (coded, mirrors
     `billing/credits.ts`'s `CreditLedgerError`) backs `assertValidEventStatusTransition` (a
@@ -192,13 +192,13 @@ src/shared/lib/calendar.test.ts`.
     `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2503 passed) are clean.
 
 - [x] **Implement timezone, recurrence, and availability calculations**
-  - Files: `src/shared/lib/scheduling.ts` (new), `src/shared/lib/scheduling.test.ts` (new)
+  - Files: `src/shared/lib/scheduling.ts` (new), `tests/unit/shared/lib/scheduling.test.ts` (new)
   - Do: Add availability/override/invitation/slot/consent-receipt schemas, IANA timezone validation, Temporal-based
     local-to-instant conversion, RFC 5545/RRule expansion contract, exception dates, buffers,
     minimum notice/horizon, busy-range subtraction, deterministic slot IDs, and safe public errors.
   - Verify: fixtures cover Copenhagen spring-forward/fall-back, UTC, America/New_York, half-hour
     offsets, overnight invalid rules, recurrence exclusions, buffer collisions, no availability,
-    and deterministic ordering; `pnpm test src/shared/lib/scheduling.test.ts`.
+    and deterministic ordering; `pnpm test tests/unit/shared/lib/scheduling.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `scheduling.ts`. `resolveLocalWallClockInstant` uses
     `Temporal.ZonedDateTime.from` with all three disambiguation modes to distinguish
     `nonexistent` (spring-forward gap — omitted, never shifted), `ambiguous` (fall-back — resolved
@@ -227,13 +227,13 @@ src/shared/lib/calendar.test.ts`.
     `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2547 passed) are clean.
 
 - [x] **Implement interview schemas and prohibited-output validation**
-  - Files: `src/shared/lib/interviews.ts` (new), `src/shared/lib/interviews.test.ts` (new)
+  - Files: `src/shared/lib/interviews.ts` (new), `tests/unit/shared/lib/interviews.test.ts` (new)
   - Do: Add document/session/segment/suggestion/report/consent schemas, all state transitions,
     speaker estimate/mapping, evidence reference integrity, source manifest, capture capability
     states, and rejection of score/rank/personality/emotion/culture-fit/hire-reject fields or text.
   - Verify: tests cover all transitions, dangling evidence, duplicate segment IDs/sequences,
     prohibited outputs, unknown speaker, correction audit, and deterministic manual templates;
-    `pnpm test src/shared/lib/interviews.test.ts`.
+    `pnpm test tests/unit/shared/lib/interviews.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `interviews.ts`, reusing `interview-config.ts`'s capture-mode/
     capability enums rather than redefining them. `assertValidDocumentStatusTransition` and
     `assertValidInterviewSessionTransition` implement the exact Document (7-state) and Interview
@@ -264,7 +264,7 @@ src/shared/lib/calendar.test.ts`.
     `pnpm vitest run` (2729 passed) are clean.
 
 - [x] **Implement interview usage estimation arithmetic**
-  - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`,
+  - Files: `src/modules/interviews/billing.ts`, `tests/unit/modules/interviews/billing.test.ts`,
     `src/shared/lib/billing/rate-cards.ts`
   - Do: Define only interview-specific duration/token-to-unit estimation, maximum reservations,
     warning projections, and provider-usage normalization with integer units. Import platform
@@ -317,14 +317,14 @@ src/shared/lib/calendar.test.ts`.
 
 - [x] **Implement the normative HTTP and error schemas**
   - Files: `src/shared/lib/interview-api.ts` (new),
-    `src/shared/lib/interview-api.test.ts` (new), `src/shared/lib/api-errors.ts`
+    `tests/unit/shared/lib/interview-api.test.ts` (new), `src/shared/lib/api-errors.ts`
   - Do: Encode every method/route request, success DTO, authority, idempotency key, bounded range,
     pagination, and common error code from `spec.md` as named Zod schemas and discriminated unions.
     Export route-safe types only; reject organization/owner/provider/price/credit authority fields
     from client inputs. Public errors collapse unavailable capability states.
   - Verify: contract tests instantiate every route row, reject unknown fields and oversized ranges/
     batches, assert every declared error has stable HTTP mapping, and prove no private ORM/provider
-    object is assignable to a public DTO; `pnpm test src/shared/lib/interview-api.test.ts`.
+    object is assignable to a public DTO; `pnpm test tests/unit/shared/lib/interview-api.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `src/shared/lib/api-errors.ts` (new, generic/reusable) — the
     14 error codes from spec.md's "HTTP contract" (10 common + `invitation_unavailable`), a fixed
     `API_ERROR_HTTP_STATUS` map, an `ApiError` class, and `httpStatusForApiErrorCode`.
@@ -431,7 +431,7 @@ drizzle-kit check && pnpm test:migrations:local`.
     design intends. `pnpm tsc --noEmit` and the full `pnpm vitest run` (2836 passed) are clean.
 
 - [x] **Add strict private-user RLS policies**
-  - Files: `drizzle/`, `src/shared/lib/security/rls-policy.test.ts`,
+  - Files: `drizzle/`, `tests/unit/shared/lib/security/rls-policy.test.ts`,
     `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
   - Do: Enable/force RLS on every new tenant table. Calendar/availability/invitation owner can
     access; explicitly participating internal users get only resource-permitted read; org admin
@@ -476,13 +476,13 @@ test:rls:local`.
 
 - [x] **Implement calendar repository**
   - Files: `src/shared/lib/repositories/calendar.ts` (new),
-    `src/shared/lib/repositories/calendar.test.ts` (new)
+    `tests/unit/shared/lib/repositories/calendar.test.ts` (new)
   - Do: Add calendar/event/occurrence/participant/reminder/delivery CRUD, search, and range queries using an injected
     `TenantTransaction`; explicit DTO columns only; all predicates include server-resolved
     organization and owner/participant semantics; optimistic updates match `id+organization+version`.
   - Verify: repository tests cover tenant predicates, no unrestricted row serialization, stale
     update, occurrence upsert, participant access, and admin denial; `pnpm test
-src/shared/lib/repositories/calendar.test.ts`.
+tests/unit/shared/lib/repositories/calendar.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `repositories/calendar.ts` — calendar/event/occurrence/
     participant/reminder/delivery access over an injected `TenantTransaction`. Every select names
     its columns explicitly (never `select()`), so a column added later is never accidentally
@@ -508,13 +508,13 @@ src/shared/lib/repositories/calendar.test.ts`.
 
 - [x] **Implement scheduling repository**
   - Files: `src/shared/lib/repositories/scheduling.ts` (new),
-    `src/shared/lib/repositories/scheduling.test.ts` (new)
+    `tests/unit/shared/lib/repositories/scheduling.test.ts` (new)
   - Do: Add availability/override/invitation/submission/link methods, hashed-capability lookup,
     generic public DTOs, expiry/revocation mutation, and transaction operations needed for atomic
     booking. Never return token hash or organization ID publicly.
   - Verify: tests cover tenant scope, capability hash lookup, expired/revoked/used tokens,
     non-enumerating misses, and cross-invitation mutation denial; `pnpm test
-src/shared/lib/repositories/scheduling.test.ts`.
+tests/unit/shared/lib/repositories/scheduling.test.ts`.
   - **Evidence (2026-07-26)**: Wrote `repositories/scheduling.ts` with two deliberately different
     audiences. Organizer functions re-filter on `organizationId` + `ownerUserId`. Public-capability
     functions return a `PublicInvitationDto` that structurally omits `organizationId`,
@@ -538,9 +538,9 @@ src/shared/lib/repositories/scheduling.test.ts`.
 ## Phase 3 — Calendar service, API, worker, and UI
 
 - [x] **Implement calendar service and authorization**
-  - Files: `src/lib/calendar/service.ts` (new), `src/lib/calendar/service.test.ts` (new),
+  - Files: `src/lib/calendar/service.ts` (new), `tests/unit/lib/calendar/service.test.ts` (new),
     `src/shared/lib/authorization/permissions.ts`,
-    `src/shared/lib/authorization/permissions.test.ts`
+    `tests/unit/shared/lib/authorization/permissions.test.ts`
   - Do: Orchestrate create/update/move/resize/cancel/delete/search/export/range operations through
     tenant context; centralize owner/participant permissions; enforce start/end, private visibility,
     recurrence `this|following|series`, manual-overlap warning versus interview hard conflict,
@@ -575,7 +575,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement recurrence materialization worker**
   - Files: `src/lib/calendar/recurrence-worker.ts` (new),
-    `src/lib/calendar/recurrence-worker.test.ts` (new),
+    `tests/unit/lib/calendar/recurrence-worker.test.ts` (new),
     `src/shared/lib/repositories/calendar-worker.ts` (new),
     `src/routes/api/admin/calendar/run-worker.ts` (new)
   - Do: Expand recurring events idempotently for the configured past/future horizon, apply
@@ -614,8 +614,8 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement reminder and participant-notification delivery**
   - Files: `src/lib/calendar/reminder-worker.ts` (new),
-    `src/lib/calendar/reminder-worker.test.ts` (new), `src/lib/calendar/ics.ts` (new),
-    `src/lib/calendar/ics.test.ts` (new),
+    `tests/unit/lib/calendar/reminder-worker.test.ts` (new), `src/lib/calendar/ics.ts` (new),
+    `tests/unit/lib/calendar/ics.test.ts` (new),
     `src/routes/api/admin/calendar/run-reminders.ts` (new), `src/shared/lib/email.ts`,
     `src/shared/lib/repositories/calendar-worker.ts`, `src/shared/lib/repositories/calendar.ts`,
     `src/lib/calendar/service.ts`
@@ -694,7 +694,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - **Evidence (2026-07-26, export + notifications now shipped)**: Added
     `src/routes/api/calendar/export[.]ics.ts` and `src/routes/api/calendar/notifications.ts`
     against the existing `interview-api.ts` contracts, plus
-    `src/lib/calendar/notifications.test.ts` (7 tests).
+    `tests/unit/lib/calendar/notifications.test.ts` (7 tests).
 
     **The ICS export is authenticated per request, with no subscribable URL.** A signed feed link
     is the conventional way to ship this and also the conventional way to leak an entire calendar
@@ -734,7 +734,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [x] **Add availability APIs**
   - Files: `src/routes/api/calendar/availability/index.ts` (new),
     `src/routes/api/calendar/availability/overrides.ts` (new),
-    `src/lib/scheduling/availability.ts` (new), `src/lib/scheduling/availability.test.ts` (new),
+    `src/lib/scheduling/availability.ts` (new), `tests/unit/lib/scheduling/availability.test.ts` (new),
     `src/shared/lib/scheduling.ts`, `src/shared/lib/interview-api.ts`,
     `src/shared/lib/repositories/scheduling.ts`, `src/shared/lib/db/schema.ts`,
     `drizzle/0070_availability_policy.sql`, `drizzle/0071_availability_policy_rls.sql`,
@@ -820,7 +820,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement schedule registry and next-run calculation**
   - Files: `src/shared/lib/operational-schedules.ts` (new),
-    `src/shared/lib/operational-schedules.test.ts` (new),
+    `tests/unit/shared/lib/operational-schedules.test.ts` (new),
     `src/shared/lib/repositories/platform-operations.ts`,
     `src/shared/lib/db/platform-db.ts` (new),
     `src/routes/api/admin/operations/sync-schedules.ts` (new), `package.json`
@@ -873,7 +873,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     `src/routes/api/admin/legal/run-worker.ts`,
     `src/routes/api/admin/sprints/run-worker.ts`,
     `src/shared/lib/repositories/platform-operations.ts`,
-    `src/shared/lib/repositories/platform-operations.test.ts`
+    `tests/unit/shared/lib/repositories/platform-operations.test.ts`
   - Do: Wrap each run in a shared start/finish/fail recorder using stable idempotency per scheduled
     occurrence, counters and redacted error codes; never store payload/candidate content.
   - Verify: success/failure/retry tests produce one monotonic run row and no raw error secrets;
@@ -919,9 +919,9 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/shared/lib/db/schema.ts`,
     `drizzle/0072_alert_evaluation_timing.sql`,
     `drizzle/0073_alert_evaluation_timing_grant.sql`,
-    `src/shared/lib/alerts.ts`, `src/shared/lib/alerts.test.ts`,
+    `src/shared/lib/alerts.ts`, `tests/unit/shared/lib/alerts.test.ts`,
     `src/shared/lib/repositories/alerts-worker.ts`,
-    `src/shared/lib/repositories/alerts-timing.test.ts` (new), `src/lib/alerts/worker.ts`
+    `tests/unit/shared/lib/repositories/alerts-timing.test.ts` (new), `src/lib/alerts/worker.ts`
   - Do: Add/normalize `next_evaluation_at`, cadence, pause state, and last evaluated timestamp for
     alerts so calendar estimates come from source state. Update worker atomically on success/failure;
     do not promise a match.
@@ -968,7 +968,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement unified calendar feed**
   - Files: `src/lib/calendar/projections.ts` (new),
-    `src/lib/calendar/projections.test.ts` (new),
+    `tests/unit/lib/calendar/projections.test.ts` (new),
     `src/routes/api/calendar/feed.ts` (new),
     `src/shared/lib/repositories/organization-alerts.ts`
   - Do: Merge authorized internal events, operational next runs, alert estimates, job runs, and
@@ -1028,7 +1028,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/modules/calendar/components/CalendarLayers.tsx` (new),
     `src/modules/calendar/components/ProjectionDetails.tsx` (new),
     `src/modules/calendar/components/CalendarPage.tsx`,
-    `src/modules/calendar/components/CalendarPage.test.tsx` (new),
+    `tests/unit/modules/calendar/components/CalendarPage.test.tsx` (new),
     `src/shared/lib/calendar.ts`, `src/shared/lib/scheduling.ts`
   - Do: Add independent appointment/job/alert/result toggles, shape+label distinctions,
     estimate/stale badges, read-only detail, source navigation, and persisted user display preference.
@@ -1085,7 +1085,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   in `server/security.mjs`. Public scheduling responses currently carry `Referrer-Policy:
   no-referrer` and `no-store` per route, but they inherit the site-wide CSP rather than a tighter one.
   - Files: `src/lib/scheduling/capability.ts` (new),
-    `src/lib/scheduling/capability.test.ts` (new),
+    `tests/unit/lib/scheduling/capability.test.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/session.ts` (new),
     `server/security.mjs`, `test/security/http-security.test.ts`
   - Do: Generate/hash 256-bit secrets, validate constant-time, exchange fragment token once for
@@ -1101,7 +1101,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement invitation service**
   - Files: `src/lib/scheduling/invitation-service.ts` (new),
-    `src/lib/scheduling/invitation-service.test.ts` (new),
+    `tests/unit/lib/scheduling/invitation-service.test.ts` (new),
     `src/shared/lib/security/audit.ts`
   - Do: Create/preview/send/open/decline/revoke/expire transitions, optional builder identity link,
     role context snapshot, policy validation, one active capability, audit, and outbox-safe send.
@@ -1110,7 +1110,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement slot-query service**
   - Files: `src/lib/scheduling/slot-service.ts` (new),
-    `src/lib/scheduling/slot-service.test.ts` (new)
+    `tests/unit/lib/scheduling/slot-service.test.ts` (new)
   - Do: Load invitation policy, rules, overrides, busy occurrences, and booked appointments; derive
     bounded opaque slots in requested timezone; cache only keyed by organization/owner/invitation/
     version/range; invalidate on relevant mutation.
@@ -1119,7 +1119,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [x] **Implement atomic booking, cancellation, and rescheduling**
   - Files: `src/lib/scheduling/booking-service.ts` (new),
-    `src/lib/scheduling/booking-service.test.ts` (new),
+    `tests/unit/lib/scheduling/booking-service.test.ts` (new),
     `src/shared/lib/repositories/scheduling.ts`
   - Do: Acquire transaction advisory lock by organizer/date, recompute slot, create event and
     participants, verify current individual consent receipts for every required purpose, mark invite
@@ -1161,8 +1161,8 @@ src/shared/lib/repositories/scheduling.test.ts`.
   means a resend invalidates the link already in the candidate's inbox — the opposite of what
   `invitation-service.ts` currently claims in its `markInvitationSent` comment. Resolve before
   writing the templates.
-  - Files: `src/shared/lib/email.ts`, `src/shared/lib/email.test.ts`,
-    `src/lib/calendar/ics.ts` (new), `src/lib/calendar/ics.test.ts` (new)
+  - Files: `src/shared/lib/email.ts`, `tests/unit/shared/lib/email.test.ts`,
+    `src/lib/calendar/ics.ts` (new), `tests/unit/lib/calendar/ics.test.ts` (new)
   - Do: Add invitation/confirmation/reschedule/cancel/expiry templates; generate standards-compliant
     UID, DTSTART/DTEND/TZID, organizer/attendee, METHOD request/cancel, sequence, escaped text, and
     external meeting/location fields. Email links use fragment token and no tracking query.
@@ -1208,7 +1208,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Add document, extraction, and consent schema/RLS**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
-    `docs/architecture/data-classification.md`, `src/shared/lib/security/rls-policy.test.ts`
+    `docs/architecture/data-classification.md`, `tests/unit/shared/lib/security/rls-policy.test.ts`
   - Do: Add exact `spec.md` columns/checks for `candidate_documents`, `document_extractions`,
     `candidate_web_imports`, and append-only `privacy_consents` with tenant composite FKs,
     generated-key uniqueness, hashes/bytes/type/status/error/expiry indexes, individual versioned
@@ -1218,7 +1218,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     FK, worker scan, and missing context.
 
 - [ ] **Implement R2 EU private storage adapter**
-  - Files: `src/lib/storage/r2.ts` (new), `src/lib/storage/r2.test.ts` (new),
+  - Files: `src/lib/storage/r2.ts` (new), `tests/unit/lib/storage/r2.test.ts` (new),
     `src/lib/storage/private-object-storage.ts` (new)
   - Do: Implement generated quarantine/clean keys, short signed PUT/GET, required content length/
     type/checksum, HEAD verification, copy/move, delete, lifecycle prefix cleanup, EU endpoint
@@ -1227,7 +1227,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     tampered checksum, cannot list/public-read, expires URLs, moves clean, and deletes all variants.
 
 - [ ] **Implement ClamAV streaming scanner**
-  - Files: `src/lib/storage/clamav.ts` (new), `src/lib/storage/clamav.test.ts` (new),
+  - Files: `src/lib/storage/clamav.ts` (new), `tests/unit/lib/storage/clamav.test.ts` (new),
     `docker-compose.yml`, `Dockerfile`, `docs/operations/interview-provider-register.md`
   - Do: Implement bounded TCP `INSTREAM` client with timeout/size guard and clean/infected/error
     normalization. Add pinned ClamAV service/healthcheck for local/production topology and document
@@ -1237,9 +1237,9 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement deterministic document validation and extraction**
   - Files: `src/lib/storage/document-validation.ts` (new),
-    `src/lib/storage/document-validation.test.ts` (new),
+    `tests/unit/lib/storage/document-validation.test.ts` (new),
     `src/lib/storage/document-extraction.ts` (new),
-    `src/lib/storage/document-extraction.test.ts` (new)
+    `tests/unit/lib/storage/document-extraction.test.ts` (new)
   - Do: Validate extension, actual media type/magic bytes, bytes, checksum, invitation quota; extract
     clean PDF/DOCX/TXT into bounded normalized plain text with page/section map; reject encrypted,
     corrupt, unsupported, polyglot, decompression-bomb-like, or empty files; sanitize control chars.
@@ -1248,9 +1248,9 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement document repository and worker**
   - Files: `src/shared/lib/repositories/interview-documents.ts` (new),
-    `src/shared/lib/repositories/interview-documents.test.ts` (new),
+    `tests/unit/shared/lib/repositories/interview-documents.test.ts` (new),
     `src/lib/scheduling/document-worker.ts` (new),
-    `src/lib/scheduling/document-worker.test.ts` (new),
+    `tests/unit/lib/scheduling/document-worker.test.ts` (new),
     `src/routes/api/admin/documents/run-worker.ts` (new)
   - Do: Lease uploaded documents per tenant, mark scanning/extracting terminal states atomically,
     download quarantine stream, scan, move clean, extract, store text/map, delete rejected objects,
@@ -1271,11 +1271,11 @@ src/shared/lib/repositories/scheduling.test.ts`.
     rejected download, admin denial, tenant B, URL expiry, consent version, and withdrawal.
 
 - [ ] **Implement policy-controlled public-web import**
-  - Files: `src/lib/enrichment/network.ts`, `src/lib/enrichment/network.test.ts`,
-    `src/lib/enrichment/policies.ts`, `src/lib/enrichment/policies.test.ts`,
-    `src/lib/enrichment/robots.ts`, `src/lib/enrichment/robots.test.ts`,
+  - Files: `src/lib/enrichment/network.ts`, `tests/unit/lib/enrichment/network.test.ts`,
+    `src/lib/enrichment/policies.ts`, `tests/unit/lib/enrichment/policies.test.ts`,
+    `src/lib/enrichment/robots.ts`, `tests/unit/lib/enrichment/robots.test.ts`,
     `src/lib/scheduling/web-import-worker.ts` (new),
-    `src/lib/scheduling/web-import-worker.test.ts` (new),
+    `tests/unit/lib/scheduling/web-import-worker.test.ts` (new),
     `src/shared/lib/repositories/interview-documents.ts`,
     `src/routes/api/admin/documents/run-web-imports.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/links/$linkId/import.ts` (new)
@@ -1309,7 +1309,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 ## Phase 7 — Consume the Stripe billing platform
 
 - [ ] **Register interview rate cards with the billing platform**
-  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`
+  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/modules/interviews/billing.ts`, `tests/unit/modules/interviews/billing.test.ts`
   - Do: Add versioned interview brief, live transcription, contextual-question, and final-report unit
     rules plus maximum reservations/durations. Import the platform contracts; do not create Stripe,
     catalog, grant, ledger, checkout, refund, auto-recharge, or reconciliation code here.
@@ -1317,7 +1317,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     module that imports Stripe or billing tables directly.
 
 - [ ] **Wrap every interview provider boundary in reserve and settlement**
-  - Files: `src/modules/interviews/billing.ts`, `src/modules/interviews/billing.test.ts`, `src/shared/lib/billing/feature-authorization.ts`
+  - Files: `src/modules/interviews/billing.ts`, `tests/unit/modules/interviews/billing.test.ts`, `src/shared/lib/billing/feature-authorization.ts`
   - Do: Call entitlement check and reserve before brief/STT/question/report provider access; extend
     long-running live work, settle actual use with provider references, and release/refund on failure.
     Stop only paid provider capture at zero and preserve manual notes/interview controls.
@@ -1326,7 +1326,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     and prove no provider request starts before reservation.
 
 - [ ] **Show platform-owned credit state in interview UX**
-  - Files: `src/modules/interviews/components/CreditBalance.tsx`, `src/modules/interviews/components/CreditBalance.test.tsx`, `src/routes/api/billing/summary.ts`
+  - Files: `src/modules/interviews/components/CreditBalance.tsx`, `tests/unit/modules/interviews/components/CreditBalance.test.tsx`, `src/routes/api/billing/summary.ts`
   - Do: Render the role-minimized platform summary, 80/90/ten-minute/zero live warnings, and owner
     links to billing/pack/auto-recharge settings. Do not expose payment mutations or duplicate the
     general billing settings inside interview pages.
@@ -1336,8 +1336,8 @@ src/shared/lib/repositories/scheduling.test.ts`.
 ## Phase 8 — Sensitive AI and brief
 
 - [ ] **Implement Azure regional sensitive AI adapter**
-  - Files: `src/shared/lib/ai/azure.ts` (new), `src/shared/lib/ai/azure.test.ts` (new),
-    `src/shared/lib/ai/sensitive.ts` (new), `src/shared/lib/ai/sensitive.test.ts` (new)
+  - Files: `src/shared/lib/ai/azure.ts` (new), `tests/unit/shared/lib/ai/azure.test.ts` (new),
+    `src/shared/lib/ai/sensitive.ts` (new), `tests/unit/shared/lib/ai/sensitive.test.ts` (new)
   - Do: Use Azure OpenAI regional endpoint/deployment with structured output, timeout, abort,
     bounded retry, no storage/training configuration, usage normalization, independent kill switch,
     redacted telemetry, and no MiniMax/local fallback. Reject non-regional configuration at runtime
@@ -1346,7 +1346,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
     non-EU endpoint, and logs without prompt/content; live smoke sends synthetic data only.
 
 - [ ] **Register interview brief task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add exact `interview-brief-generate` schemas from `spec.md`, server-only/no-cache metadata,
     evidence ID existence/refinement, untrusted wrapping, prohibited claims/language, bounded input/
     output, prompt version, and Pro/Pro Max/Team allowance. Route it through sensitive client
@@ -1357,8 +1357,8 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [ ] **Add brief schema and repository**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
     `src/shared/lib/repositories/interviews.ts` (new),
-    `src/shared/lib/repositories/interviews.test.ts` (new),
-    `src/shared/lib/security/rls-policy.test.ts`
+    `tests/unit/shared/lib/repositories/interviews.test.ts` (new),
+    `tests/unit/shared/lib/security/rls-policy.test.ts`
   - Do: Add `interview_briefs` with organization/event composite FK, owner, version/status, validated
     structured content/evidence manifest, provider/model/prompt version, expiry, editor, indexes, and
     private owner/explicit-participant RLS. Store no model prompt/response envelope.
@@ -1367,7 +1367,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement brief generation/version service**
   - Files: `src/lib/interviews/brief-service.ts` (new),
-    `src/lib/interviews/brief-service.test.ts` (new)
+    `tests/unit/lib/interviews/brief-service.test.ts` (new)
   - Do: Assemble role/profile/document and approved public-web extraction evidence with stable source
     IDs/provenance, reserve 5 credits, call sensitive task, validate evidence, save new draft version,
     settle/refund, support section regeneration/manual edits, and create deterministic fallback when
@@ -1392,7 +1392,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Add live interview schema and RLS**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
-    `docs/architecture/data-classification.md`, `src/shared/lib/security/rls-policy.test.ts`
+    `docs/architecture/data-classification.md`, `tests/unit/shared/lib/security/rls-policy.test.ts`
   - Do: Add `interview_sessions`, `transcript_segments`, `interview_suggestions`, and
     `interview_reports` with tenant/event/session composite FKs, stable provider segment uniqueness,
     sequence/timestamp/confidence checks, speaker/correction columns, state/version/provider/prompt/
@@ -1403,7 +1403,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement Deepgram EU token and usage adapter**
   - Files: `src/lib/interviews/transcription/deepgram.ts` (new),
-    `src/lib/interviews/transcription/deepgram.test.ts` (new)
+    `tests/unit/lib/interviews/transcription/deepgram.test.ts` (new)
   - Do: Generate a Deepgram 30-second JWT and explicit
     `wss://api.eu.deepgram.com/v1/listen` session configuration for streaming multilingual STT:
     remote Nova-3 interleaved linear PCM 16 kHz with `channels=2&multichannel=true` and in-person
@@ -1417,7 +1417,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement interview session service**
   - Files: `src/lib/interviews/session-service.ts` (new),
-    `src/lib/interviews/session-service.test.ts` (new),
+    `tests/unit/lib/interviews/session-service.test.ts` (new),
     `src/shared/lib/repositories/interviews.ts`
   - Do: Start/ready/live/pause/resume/finish/fail/abandon transitions, participant permission,
     stored per-purpose consent recheck, candidate withdrawal state polling/SSE and ten-second hard
@@ -1439,7 +1439,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement IndexedDB final-text outbox**
   - Files: `src/modules/interviews/lib/transcript-outbox.ts` (new),
-    `src/modules/interviews/lib/transcript-outbox.test.ts` (new)
+    `tests/unit/modules/interviews/lib/transcript-outbox.test.ts` (new)
   - Do: Store only unacknowledged final text segments keyed by session/user, encrypt where supported
     or minimize to required fields, retry idempotently, delete on acknowledgement/logout/finish/
     expiry, and expose a cleanup marker for retention on next visit. Never store audio/interim text.
@@ -1448,9 +1448,9 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement browser capture and Web Audio mixer**
   - Files: `src/modules/interviews/lib/audio-capture.ts` (new),
-    `src/modules/interviews/lib/audio-capture.test.ts` (new),
+    `tests/unit/modules/interviews/lib/audio-capture.test.ts` (new),
     `src/modules/interviews/lib/deepgram-client.ts` (new),
-    `src/modules/interviews/lib/deepgram-client.test.ts` (new)
+    `tests/unit/modules/interviews/lib/deepgram-client.test.ts` (new)
   - Do: Enforce current/previous desktop Chrome on macOS/Windows for remote mode. Request
     `getDisplayMedia` from a user gesture with browser-tab preference, self/monitor/system-audio
     exclusion and local playback; require a separate meeting tab with audio; inspect
@@ -1496,7 +1496,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 ## Phase 10 — Contextual questions and reports
 
 - [ ] **Register follow-up and report AI tasks**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add `interview-followup-suggest` and `interview-report-generate` exact schemas, server-only/
     no-cache/sensitive routing, bounded transcript windows, evidence validation, prohibited-output
     refinement, prompt versions, allowance/cost behavior, and deterministic templates.
@@ -1505,7 +1505,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement topic window and suggestion service**
   - Files: `src/lib/interviews/suggestion-service.ts` (new),
-    `src/lib/interviews/suggestion-service.test.ts` (new)
+    `tests/unit/lib/interviews/suggestion-service.test.ts` (new)
   - Do: Derive covered/pending topics, select bounded recent final segments, debounce/rate-limit per
     session, call sensitive task while paid live session is active, save only explicit use/save/
     dismiss actions, and degrade silently to prepared questions.
@@ -1514,7 +1514,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement report generation and finalization service**
   - Files: `src/lib/interviews/report-service.ts` (new),
-    `src/lib/interviews/report-service.test.ts` (new),
+    `tests/unit/lib/interviews/report-service.test.ts` (new),
     `src/shared/lib/repositories/interviews.ts`
   - Do: On finish, reserve 5 credits, load final segments/notes, generate or template report,
     validate evidence/prohibited content, save versioned review state, allow edits, prevent unresolved
@@ -1547,7 +1547,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement retention and reservation cleanup worker**
   - Files: `src/lib/interviews/retention-worker.ts` (new),
-    `src/lib/interviews/retention-worker.test.ts` (new),
+    `tests/unit/lib/interviews/retention-worker.test.ts` (new),
     `src/shared/lib/repositories/interview-retention.ts` (new),
     `src/routes/api/admin/interviews/run-retention.ts` (new)
   - Do: Lease expired resources per tenant, delete R2/provider/cache artifacts, then relational data
@@ -1558,7 +1558,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Extend privacy export and deletion**
   - Files: `src/shared/lib/repositories/account-privacy.ts`,
-    `src/shared/lib/repositories/account-privacy.test.ts`,
+    `tests/unit/shared/lib/repositories/account-privacy.test.ts`,
     `src/routes/api/me/data-export/index.ts`,
     `src/routes/api/me/delete-account/index.ts`,
     `src/routes/_dashboard/settings/privacy.tsx`
@@ -1574,7 +1574,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [ ] **Update legal notices and consent copy**
   - Files: `src/routes/_landing/legal/privacy.tsx`,
     `src/routes/_landing/legal/terms.tsx`, `src/shared/lib/legal.ts`,
-    `src/shared/lib/legal.test.ts`, `docs/operations/interview-provider-register.md`
+    `tests/unit/shared/lib/legal.test.ts`, `docs/operations/interview-provider-register.md`
   - Do: After legal review, describe controller, documents, approved public-web import, transient
     audio capture, stored transcript, sensitive AI, four required purposes, legal basis, processors/
     regions, retention, rights, withdrawal consequences, no training, no automated decision, and
@@ -1588,7 +1588,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
   - Files: `docs/compliance/interview-ai-act-classification.md` (new),
     `docs/operations/interview-ai-human-oversight.md` (new),
     `docs/operations/interview-ai-post-market-monitoring.md` (new),
-    `src/shared/lib/ai/tasks.test.ts`, `src/shared/lib/interviews.test.ts`,
+    `tests/unit/shared/lib/ai/tasks.test.ts`, `tests/unit/shared/lib/interviews.test.ts`,
     `src/modules/interviews/components/InterviewBriefEditor.tsx`,
     `src/modules/interviews/components/InterviewReportEditor.tsx`,
     `src/routes/_landing/legal/privacy.tsx`
@@ -1609,7 +1609,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 
 - [ ] **Implement provider usage reconciliation**
   - Files: `src/lib/interviews/usage-reconciliation.ts` (new),
-    `src/lib/interviews/usage-reconciliation.test.ts` (new),
+    `tests/unit/lib/interviews/usage-reconciliation.test.ts` (new),
     `src/shared/lib/billing/feature-authorization.ts`,
     `src/shared/lib/billing/reconciliation.ts`
   - Do: Normalize Deepgram duration and Azure token usage, attach provider references/actuals to the
@@ -1622,7 +1622,7 @@ src/shared/lib/repositories/scheduling.test.ts`.
 - [ ] **Add redacted metrics and operator dashboards**
   - Files: `src/shared/lib/metrics.ts`, `src/routes/api/admin/metrics.ts`,
     `src/routes/_dashboard/admin/metrics.tsx`, `src/shared/lib/log.ts`,
-    `src/shared/lib/log.test.ts`
+    `tests/unit/shared/lib/log.test.ts`
   - Do: Add booking conflict, slot latency, document backlog/failure, capture capability, transcript
     latency/reconnect/persistence, provider error, credit reservation, margin/variance, retention,
     and stale-schedule metrics. Use IDs/counters only; expand redaction for candidate/provider/payment

@@ -17,12 +17,12 @@
   - Do: `TimelineEventType`, `TimelineEvent`, `TimelineResult` exactly per spec §1.
   - Verify: `pnpm tsc --noEmit` — clean.
 - [x] **Normalizer (pure) + tests**
-  - Files: `src/lib/timeline/normalize.ts`, `src/lib/timeline/normalize.test.ts`
+  - Files: `src/lib/timeline/normalize.ts`, `tests/unit/lib/timeline/normalize.test.ts`
   - Do: `normalizeEvents(events)` — sort desc, drop future/>365-day-old, dedupe by `id`,
     cap 30, truncate `description` to 280 chars with an ellipsis.
-  - Verify: `pnpm vitest run src/lib/timeline/normalize.test.ts` — 8/8 passing.
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/normalize.test.ts` — 8/8 passing.
 - [x] **GitHub fetcher**
-  - Files: `src/lib/timeline/fetchers/github.ts`, `src/lib/timeline/fetchers/github.test.ts`
+  - Files: `src/lib/timeline/fetchers/github.ts`, `tests/unit/lib/timeline/fetchers/github.test.ts`
   - Do: `fetchGithubEvents`/`mapGithubEvent` per spec (PushEvent, CreateEvent(repository),
     ReleaseEvent, PullRequestEvent(opened); repo-kind `owner/name` usernames short-circuit
     to `[]`).
@@ -35,19 +35,19 @@
     the repo name (`Opened PR #{number} in {repo}`, `{repoUrl}/pull/{number}`) when the feed
     doesn't supply the richer fields, while still preferring real `title`/`html_url` if a
     future/different payload shape ever includes them.
-  - Verify: `pnpm vitest run src/lib/timeline/fetchers/github.test.ts` — 12/12 passing
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/fetchers/github.test.ts` — 12/12 passing
     (including a regression test for the stripped-payload fallback).
 
 ## Phase 2 — Service, API, UI
 
 - [x] **Timeline service with two-layer cache**
-  - Files: `src/lib/timeline/index.ts`, `src/lib/timeline/index.test.ts`
+  - Files: `src/lib/timeline/index.ts`, `tests/unit/lib/timeline/index.test.ts`
   - Do: `getBuilderTimeline({ source, sourceId, username })` — in-memory `Map` + Redis
     (`getRedis()`) two-layer cache, key `timeline:{source}:{sourceId}`, 6h TTL on a
     non-empty result, 10m negative-cache TTL when the fetcher yields nothing (fetch
     failure and genuine no-activity are indistinguishable at this layer by design — the
     fetchers never throw, so this is the only sensible behavior).
-  - Verify: `pnpm vitest run src/lib/timeline/index.test.ts` — 4/4 passing (fetch+cache,
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/index.test.ts` — 4/4 passing (fetch+cache,
     second call served from memory without refetching, unsupported source short-circuits,
     empty-but-supported result).
 - [x] **API route**
@@ -74,21 +74,21 @@
 ## Phase 3 — Remaining fetchers
 
 - [x] **HN fetcher (Algolia author search)**
-  - Files: `src/lib/timeline/fetchers/hn.ts`, `src/lib/timeline/fetchers/hn.test.ts`
+  - Files: `src/lib/timeline/fetchers/hn.ts`, `tests/unit/lib/timeline/fetchers/hn.test.ts`
   - Do: story → `post`, comment → `comment`, reusing the HTML-entity-stripping approach
     from `src/lib/sources/hn.ts`; `hn` supported.
-  - Verify: `pnpm vitest run src/lib/timeline/fetchers/hn.test.ts` — 9/9 passing.
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/fetchers/hn.test.ts` — 9/9 passing.
 - [x] **dev.to fetcher**
-  - Files: `src/lib/timeline/fetchers/devto.ts`, `src/lib/timeline/fetchers/devto.test.ts`
+  - Files: `src/lib/timeline/fetchers/devto.ts`, `tests/unit/lib/timeline/fetchers/devto.test.ts`
   - Do: `article` events from `{env.DEVTO_API_URL}/articles`; `devto` supported.
-  - Verify: `pnpm vitest run src/lib/timeline/fetchers/devto.test.ts` — 6/6 passing.
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/fetchers/devto.test.ts` — 6/6 passing.
 - [x] **Stack Overflow fetcher**
-  - Files: `src/lib/timeline/fetchers/stackoverflow.ts`, `src/lib/timeline/fetchers/stackoverflow.test.ts`
+  - Files: `src/lib/timeline/fetchers/stackoverflow.ts`, `tests/unit/lib/timeline/fetchers/stackoverflow.test.ts`
   - Do: `answer` events linking `https://stackoverflow.com/a/{answer_id}`; `stackoverflow`
     supported.
-  - Verify: `pnpm vitest run src/lib/timeline/fetchers/stackoverflow.test.ts` — 5/5 passing.
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/fetchers/stackoverflow.test.ts` — 5/5 passing.
 - [x] **GitLab fetcher**
-  - Files: `src/lib/timeline/fetchers/gitlab.ts`, `src/lib/timeline/fetchers/gitlab.test.ts`
+  - Files: `src/lib/timeline/fetchers/gitlab.ts`, `tests/unit/lib/timeline/fetchers/gitlab.test.ts`
   - Do: pushed/created → `repo`, opened/accepted merge request → `pr`; `gitlab` supported.
   - Deviation from the plan's literal approach: GitLab's events API never includes a
     project's path/URL, only its numeric id — a real gap discovered while implementing,
@@ -97,17 +97,17 @@
     guessing at a URL shape; an event whose project URL can't be resolved is dropped
     (pure `mapGitlabEvent` takes the resolved URL as an explicit second argument, so this
     stays unit-testable without network mocking of the resolution step itself).
-  - Verify: `pnpm vitest run src/lib/timeline/fetchers/gitlab.test.ts` — 8/8 passing.
+  - Verify: `pnpm vitest run tests/unit/lib/timeline/fetchers/gitlab.test.ts` — 8/8 passing.
 
 ## Phase 4 — AI summary
 
 - [x] **Register `timeline-summary` task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/ai/tasks.test.ts`
+  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: `local-first`, input capped at 20 events (titles wrapped via `wrapUntrusted` —
     they're third-party API content), `cacheTtlSeconds: 21600`,
     `allowances: { free: 10, pro: 100, team: 200 }`, `maxOutputTokens: 160`, exactly per
     spec.
-  - Verify: `pnpm vitest run src/shared/lib/ai/tasks.test.ts` — 2 new dedicated tests
+  - Verify: `pnpm vitest run tests/unit/shared/lib/ai/tasks.test.ts` — 2 new dedicated tests
     (registration/schema, untrusted-wrapping) plus the existing generic every-task sweep,
     all passing.
 - [x] **Summarize button**

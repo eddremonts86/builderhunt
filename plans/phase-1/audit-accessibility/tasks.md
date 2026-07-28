@@ -48,29 +48,29 @@
     `pnpm test:a11y`'s `bypass`/`skip-link` axe checks pass across the full route matrix.
 
 - [x] **Harden the reusable dialog focus contract**
-  - Files: `src/components/ui/dialog.tsx`, `src/components/ui/dialog.test.tsx`
+  - Files: `src/components/ui/dialog.tsx`, `tests/unit/components/ui/dialog.test.tsx`
   - Do: `Dialog` is Radix-based already (focus-trap/scroll-lock/portal/Escape/focus-restore come
     free); added an optional `initialFocusRef` prop wired to Radix's `onOpenAutoFocus` for call
     sites that need a specific starting control instead of DOM-order default, without touching
     existing callers.
-  - Verify: `pnpm test -- src/components/ui/dialog.test.tsx` (5 tests: portal render, closed-state
+  - Verify: `pnpm test -- tests/unit/components/ui/dialog.test.tsx` (5 tests: portal render, closed-state
     render, `initialFocusRef` honored, default autofocus, Escape → `onClose`) — all pass.
 
 - [x] **Apply the focus contract to mandatory consent**
-  - Files: `src/shared/components/TosModal.tsx`, `src/shared/components/TosModal.test.tsx`
+  - Files: `src/shared/components/TosModal.tsx`, `tests/unit/shared/components/TosModal.test.tsx`
   - Do: `TosModal` deliberately isn't Radix-based (must stay non-dismissible) — added a hand-rolled
     equivalent: initial focus on "Accept and continue", a Tab/Shift+Tab loop scoped to the panel,
     `inert` on `#main-content` and the cookie banner while open, body scroll lock, and focus
     restoration to whatever was focused before the modal appeared, all cleaned up on close.
     `CookieBanner` needed no change — it never programmatically focuses anything, so it can't steal
     focus from the modal.
-  - Verify: `pnpm test -- src/shared/components/TosModal.test.tsx` (5 tests: renders nothing when
+  - Verify: `pnpm test -- tests/unit/shared/components/TosModal.test.tsx` (5 tests: renders nothing when
     already accepted, initial focus on Accept, Tab wraps last→first, `#main-content` inert
     while open, focus restored on accept) — all pass.
 
 - [x] **Measure and fix contrast pairs**
   - Files: `src/shared/styles/globals.css`, `src/shared/lib/accessibility.ts` (new — pure
-    luminance/contrast helpers), `src/shared/lib/accessibility.test.ts` (new)
+    luminance/contrast helpers), `tests/unit/shared/lib/accessibility.test.ts` (new)
   - Do: Fixed every failing pair found (via `pnpm test:a11y` live + the new pure-math test, which
     caught two the live run never exercised — it only ever ran in dark theme):
     - Dark mode `--color-bh-text-dim` #71717a → #a4a4ab (was 3.1-3.7:1 against dark surfaces; given
@@ -93,7 +93,7 @@
       brand terracotta itself. Two hardcoded `bg-bh-accent text-white` call sites
       (`SearchPage.tsx`, `RecommendationsSection.tsx`) were routed through the token too. See
       2026-07-25 in `docs/accessibility-verification.md`.
-  - Verify: `pnpm test -- src/shared/lib/accessibility.test.ts` (9/9 pass) and `pnpm test:a11y`
+  - Verify: `pnpm test -- tests/unit/shared/lib/accessibility.test.ts` (9/9 pass) and `pnpm test:a11y`
     (0 unexplained `color-contrast` failures across the full route matrix).
 
 - [x] **Measure and fix pointer target sizes**

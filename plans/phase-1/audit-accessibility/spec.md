@@ -103,7 +103,7 @@ depend on live third-party source results.
   `src/modules/builder-profile/components/{BuilderProfilePage,OutreachCopilot}.tsx`.
 - Add deterministic browser coverage in `test/test-accessibility.mjs` using
   `@axe-core/playwright`; add pure contrast/token assertions in
-  `src/shared/lib/accessibility.test.ts`.
+  `tests/unit/shared/lib/accessibility.test.ts`.
 - Add `test:a11y` to `package.json` and run it in `.github/workflows/quality.yml` after starting a
   production preview against seeded PostgreSQL.
 

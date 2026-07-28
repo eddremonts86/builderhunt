@@ -15,7 +15,7 @@
 
 > Source: this plan is the `$impeccable audit` (technical + critique lens) of the whole app, run
 > 2026-07-23 (detector over `src/routes`+`src/modules`+`src/shared/components`, app-wide Explore
-> inventory). Target world = the warm premium-**light** direction in [PRODUCT.md](../../PRODUCT.md)
+> inventory). Target world = the warm premium-**light** direction in [PRODUCT.md](../../../PRODUCT.md)
 > (terracotta `#e07338` + cream); the legacy dark/neon/glass look is **evidence + anti-reference**,
 > not a co-equal option.
 

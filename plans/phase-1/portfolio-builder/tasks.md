@@ -11,14 +11,14 @@
 > `organization_builders.privateMetadata` elsewhere in this codebase.
 
 - [x] **Define portfolio settings and public contracts**
-  - Files: `src/shared/lib/portfolio.ts`, `src/shared/lib/portfolio.test.ts`
+  - Files: `src/shared/lib/portfolio.ts`, `tests/unit/shared/lib/portfolio.test.ts`
   - Do: `PortfolioSettingsSchema`/`PortfolioDraftInputSchema`/`PublicPortfolioSchema`, fail-closed `parsePortfolioSettings` (corrupt/future-shaped stored data reads as "no portfolio", never throws), `mergePortfolioDraft`/`publishPortfolio`/`unpublishPortfolio` (idempotent — repeated publish never moves `publishedAt`), deterministic `selectPortfolioProjects` (owner-selected order, silently drops ids no longer among candidates).
-  - Verify: `pnpm vitest run src/shared/lib/portfolio.test.ts` — 14/14 passing.
+  - Verify: `pnpm vitest run tests/unit/shared/lib/portfolio.test.ts` — 14/14 passing.
 
 - [x] **Add the portfolio feature flag and cache helpers**
-  - Files: `src/shared/lib/env.ts`, `.env.example`, `src/shared/lib/portfolio-cache.ts`, `src/shared/lib/portfolio-cache.test.ts`
+  - Files: `src/shared/lib/env.ts`, `.env.example`, `src/shared/lib/portfolio-cache.ts`, `tests/unit/shared/lib/portfolio-cache.test.ts`
   - Do: `PORTFOLIOS_ENABLED` (default true), Redis-with-in-memory-fallback cache keyed `portfolio:<claimId>:v1`, 60s TTL, schema-revalidates on read (a stale/malformed cached blob can't leak past `PublicPortfolioSchema`).
-  - Verify: `pnpm vitest run src/shared/lib/portfolio-cache.test.ts` — 4/4 passing (in-memory path, since no `REDIS_URL` in this environment).
+  - Verify: `pnpm vitest run tests/unit/shared/lib/portfolio-cache.test.ts` — 4/4 passing (in-memory path, since no `REDIS_URL` in this environment).
 
 - [x] **Implement verified-owner draft read and write**
   - Files: `src/routes/api/me/builder-claims/$claimId/portfolio.ts`, `src/shared/lib/repositories/builder-claims.ts` (`getPortfolioForOwner`, `savePortfolioDraft`), `src/shared/lib/db/schema.ts` (migration 0060: `builder_claims.metadata`)
@@ -60,19 +60,19 @@
   - Reason: the owner draft route already reports `integrationsAvailable: { aiPersona: false }` honestly rather than a fake toggle. Wiring the real `ai-profile-enrichment` artifact parsing is separable, genuinely optional per the plan's own framing, and not reached this pass.
 
 - [ ] **Integrate timeline without making it a hard dependency** — not attempted, same reason as above (`integrationsAvailable.timeline: false` reported honestly)
-  - Files: `src/shared/lib/portfolio-integrations.ts`, `src/shared/lib/portfolio-integrations.test.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`
+  - Files: `src/shared/lib/portfolio-integrations.ts`, `tests/unit/shared/lib/portfolio-integrations.test.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`
   - Do: When `ai-profile-enrichment` exists and owner opted in, parse the existing `metadata.aiEnrichment` artifact with its exported schema and expose only summary/focus/strengths/provenance. Never invoke `profile-enrich` from a public request; omit invalid, stale-policy-disabled, or absent artifacts.
-  - Verify: `pnpm test -- src/shared/lib/portfolio-integrations.test.ts`; run with no AI files/config and with valid/invalid fixture artifacts.
+  - Verify: `pnpm test -- tests/unit/shared/lib/portfolio-integrations.test.ts`; run with no AI files/config and with valid/invalid fixture artifacts.
 
 - [ ] **Integrate timeline without making it a hard dependency**
-  - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
+  - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
   - Do: Render public events only when owner opted in and unified-timeline is available. Preserve its lazy cache/degradation. If summary UI is exposed, call `timeline-summary` local-first through Chrome built-in AI; use the authenticated MiniMax proxy fallback and hide the control when neither tier is usable.
-  - Verify: `pnpm test -- src/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`; exercise Chrome-available, authenticated proxy fallback, unavailable, and dependency-absent states.
+  - Verify: `pnpm test -- tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`; exercise Chrome-available, authenticated proxy fallback, unavailable, and dependency-absent states.
 
 - [ ] **Wire revocation and state transitions to immediate visibility**
-  - Files: `src/routes/api/admin/builder-claims/$claimId/revoke.ts`, `src/shared/lib/portfolio-cache.ts`, `src/routes/api/portfolio/$claimId.test.ts`
+  - Files: `src/routes/api/admin/builder-claims/$claimId/revoke.ts`, `src/shared/lib/portfolio-cache.ts`, `tests/unit/routes/api/portfolio/$claimId.test.ts`
   - Do: Purge portfolio cache on claim revocation and all portfolio writes; public lookup must independently recheck active verification so stale cache cannot keep a revoked portfolio live.
-  - Verify: `pnpm test -- 'src/routes/api/portfolio/$claimId.test.ts'`; warm cache, revoke claim, then assert the next public read is 404.
+  - Verify: `pnpm test -- 'tests/unit/routes/api/portfolio/$claimId.test.ts'`; warm cache, revoke claim, then assert the next public read is 404.
 
 - [ ] **Run end-to-end privacy, publication, and degradation checks**
   - Files: `tests/e2e/portfolio-builder.spec.ts`, `playwright.config.ts`

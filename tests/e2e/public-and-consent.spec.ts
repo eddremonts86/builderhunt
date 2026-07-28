@@ -250,7 +250,14 @@ test.describe('consent API', () => {
       const body = await response.json()
       expect(body.userId).toBeNull()
       expect(body.needsAcceptance).toEqual([])
-      expect(body.required).toMatchObject({ tos: 'v1.0', privacy: 'v1.0', cookies: 'v1.0' })
+      // Assert the contract, not the values. This used to pin `privacy: 'v1.0'`, which is how the
+      // route's frozen copy of the version map survived the policy moving to v1.1 — the test was
+      // enforcing the bug. The current values are pinned in tests/unit/shared/lib/legal.test.ts,
+      // next to the constant they belong to.
+      expect(Object.keys(body.required).sort()).toEqual(['cookies', 'privacy', 'tos'])
+      for (const version of Object.values(body.required)) {
+        expect(version).toMatch(/^v\d+\.\d+$/)
+      }
     } finally {
       await api.dispose()
     }
@@ -295,6 +302,9 @@ test.describe('consent API', () => {
     expect(body.needsAcceptance).toEqual(expect.arrayContaining(['tos', 'privacy', 'cookies']))
   })
 
+  // Privacy is at v1.1 while this posts v1.0 — deliberately. A minor bump is not a material change
+  // (src/shared/lib/legal.ts#isMaterialVersionChange), so the earlier acceptance stays valid and the
+  // document must drop out of needsAcceptance without the user re-accepting anything.
   test('accepting a document via POST records it and clears it from needsAcceptance', async () => {
     const { tosUser, sql } = harness
     const accept = await tosUser.api!.post('/api/consent', {

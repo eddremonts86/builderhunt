@@ -14,7 +14,12 @@ describe('account privacy repository boundary', () => {
     const source = await readFile(path, 'utf8')
     expect(source).not.toContain("~/shared/lib/db/index")
     expect(source).not.toContain("~/shared/lib/db/schema")
-    expect(source).toContain("~/shared/lib/repositories/account-privacy")
+    // Reaching the repository through `legal.ts` counts: it is itself in this list, so it is held
+    // to the same no-direct-table rule, and routing through it is what keeps the consent
+    // version map in one place instead of copied into each route.
+    const reachesRepository =
+      source.includes('~/shared/lib/repositories/account-privacy') || source.includes('~/shared/lib/legal')
+    expect(reachesRepository).toBe(true)
   })
 })
 

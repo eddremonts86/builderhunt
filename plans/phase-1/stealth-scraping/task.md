@@ -18,7 +18,7 @@
   - Verify: `pnpm type-check`.
 
 - [x] **Prove blocked providers fail closed**
-  - Files: `src/lib/enrichment/policies.test.ts`
+  - Files: `tests/unit/lib/enrichment/policies.test.ts`
   - Cases: missing policy; malformed allowlist; allowlist containing LinkedIn/X/Meta;
     disabled global feature; duplicate connector IDs.
   - Verify: targeted Vitest; assert no executable adapter is returned.
