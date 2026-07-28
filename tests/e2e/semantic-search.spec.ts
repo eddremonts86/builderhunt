@@ -98,7 +98,12 @@ test.beforeAll(async () => {
   try {
     const server = await startWorkerServer(workerIndex, database, cache)
     sql = postgres(database.databaseUrl, { max: 3, prepare: false })
-    const ctx: FixtureContext = { baseURL: server.baseURL, sql, scope: `w${workerIndex}-semsearch` }
+    // `sql` stays `let ... | undefined` so the catch below can close a
+    // connection opened before a later step threw. The body uses this const
+    // instead: a closure (`seedRow`) cannot carry the non-undefined narrowing,
+    // so the tagged-template call would not typecheck through the mutable one.
+    const db = sql
+    const ctx: FixtureContext = { baseURL: server.baseURL, sql: db, scope: `w${workerIndex}-semsearch` }
     const clock = fixedClockFromEnv()
 
     const { principal: owner } = await createOwnerPrincipal(ctx, { tier: 'pro', seatLimit: 1, clock })
@@ -114,7 +119,7 @@ test.beforeAll(async () => {
     // `AI_EMBEDDING_DIM` parity between this process and the spawned app
     // server — same defensive rationale as the unit regression test in
     // `public-builder-embeddings.test.ts`.
-    const [column] = await sql<{ atttypmod: number }[]>`
+    const [column] = await db<{ atttypmod: number }[]>`
       select atttypmod from pg_attribute
       where attrelid = 'builder_embeddings'::regclass and attname = 'embedding'
     `
@@ -138,12 +143,12 @@ test.beforeAll(async () => {
     const midSourceId = 'mid-match'
     const noiseSourceId = 'noise'
 
-    const seedRow = (sourceId: string, embedding: number[]) => sql`
+    const seedRow = (sourceId: string, embedding: number[]) => db`
       insert into builder_embeddings
         (id, source, source_id, content_hash, document, profile, embedding, embedded_at, created_at, updated_at)
       values (
         ${`e2e-embed-${sourceId}`}, 'e2e', ${sourceId}, ${`hash-${sourceId}`}, ${`document for ${sourceId}`},
-        ${sql.json({ username: sourceId, profileUrl: `https://example.test/${sourceId}`, topics: [] })},
+        ${db.json({ username: sourceId, profileUrl: `https://example.test/${sourceId}`, topics: [] })},
         ${toVectorLiteral(embedding)}::vector, now(), now(), now()
       )
     `
@@ -156,7 +161,7 @@ test.beforeAll(async () => {
       databaseName: database.databaseName,
       redisPrefix: cache.prefix,
       baseURL: server.baseURL,
-      sql,
+      sql: db,
       owner,
       expectedMidSimilarity,
       exactSourceIds,
