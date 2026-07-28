@@ -5,6 +5,7 @@ import { CandidateDetailsForm, type CandidateSubmission } from './CandidateDetai
 import { CandidateIntake, type CandidateLinkView } from './CandidateIntake'
 import type { CandidateDocumentView } from './DocumentUploader'
 import { SlotPicker, type SlotDto } from './SlotPicker'
+import { safeHttpHref } from '~/shared/lib/url-safety'
 
 /**
  * The accountless candidate portal (plan: calendar-scheduling-interview-intelligence, Phase 5
@@ -461,7 +462,12 @@ export function CandidatePortal({ invitationId, fetcher, initialSecret }: Candid
           ) : null}
           {invitation.meetingUrl ? (
             <p className="text-sm text-bh-text-muted break-words">
-              Join link: <a className="underline" href={invitation.meetingUrl} rel="noreferrer">{invitation.meetingUrl}</a>
+              {/* Checked here as well as at the API boundary: rows stored before `httpUrlSchema` landed are
+                  still in the database, and validating only on the way in would leave those clickable. A
+                  refused URL is shown as text so the candidate can still see what they were given. */}
+              Join link: {safeHttpHref(invitation.meetingUrl)
+                ? <a className="underline" href={safeHttpHref(invitation.meetingUrl)!} rel="noreferrer">{invitation.meetingUrl}</a>
+                : <span>{invitation.meetingUrl}</span>}
             </p>
           ) : null}
 

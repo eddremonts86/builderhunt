@@ -136,6 +136,20 @@ Sign in as the seeded admin, then:
 What you cannot check alone is the part that needs two people and real audio. That is
 [interview-runtime-verification.md](interview-runtime-verification.md), and it is not done.
 
+## The meeting link is not generated, by design
+
+spec.md's non-goals list opens with "Video conferencing, PSTN calling, screen recording, or stored audio",
+and the constraints say "BuilderHunt operates **beside** an in-person interview or external meeting URL".
+Google Calendar and Outlook are named as "deliberately deferred adapters".
+
+So the **Meeting link** field on the invitation composer is not a placeholder for something unimplemented —
+it is where the organizer pastes their own Meet, Zoom or Teams URL, and it is `required` for a video call.
+Nothing in the product mints one, and generating one would mean a provider integration the spec defers.
+
+What *was* wrong with it: `z.string().url()` accepted `javascript:alert(1)`, and the value is rendered as an
+`<a href>` on the public candidate portal. Fixed with `httpUrlSchema` and `safeHttpHref` — see
+`src/shared/lib/url-safety.ts`.
+
 ## What is not verified anywhere yet
 
 Honest list, so nothing here reads as more finished than it is.

@@ -13,6 +13,7 @@
  * files.
  */
 import { z } from 'zod'
+import { httpUrlSchema } from './url-safety'
 import {
   calendarFeedResponseSchema,
   eventDraftInputSchema,
@@ -171,7 +172,9 @@ export const createInvitationRequestSchema = z.object({
   durationMinutes: z.number().int().positive().max(480),
   timezone: z.string().min(1),
   modality: z.enum(SCHEDULING_MODALITIES),
-  meetingUrl: z.string().url().optional(),
+  // `httpUrlSchema`, not `z.string().url()`: the latter accepts `javascript:` and this value is
+  // rendered as a link on the public candidate portal. See `url-safety.ts`.
+  meetingUrl: httpUrlSchema.optional(),
   location: z.string().min(1).max(500).optional(),
   organizationBuilderId: z.string().min(1).optional(),
 }).strict()

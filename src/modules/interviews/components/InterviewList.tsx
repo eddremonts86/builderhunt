@@ -1,5 +1,6 @@
 import { Link } from '@tanstack/react-router'
 import { CalendarDays, FileText, Mic, Radio, Video } from 'lucide-react'
+import { safeHttpHref } from '~/shared/lib/url-safety'
 
 /**
  * Every interview this organizer owns, and what state each one is in (plan:
@@ -125,9 +126,11 @@ export function InterviewList(props: InterviewListProps) {
                 </Link>
               )}
 
-              {interview.meetingUrl && (
+              {/* `safeHttpHref`, not the raw value: `z.string().url()` accepted `javascript:` until
+                  `httpUrlSchema` landed, so a stored row can still carry one. */}
+              {safeHttpHref(interview.meetingUrl) && (
                 <a
-                  href={interview.meetingUrl}
+                  href={safeHttpHref(interview.meetingUrl)!}
                   target="_blank"
                   // `noreferrer` as well as `noopener`: the referrer would tell the meeting provider which
                   // interview page a click came from.

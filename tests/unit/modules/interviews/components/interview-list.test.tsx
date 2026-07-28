@@ -157,6 +157,20 @@ describe('each row', () => {
     expect(join?.getAttribute('target')).toBe('_blank')
   })
 
+  it('refuses to make a javascript URL clickable', () => {
+    // `z.string().url()` accepted `javascript:` until `httpUrlSchema` landed, so a stored row can still
+    // carry one — and this list renders the value as an `<a href>`. Checked at the render site as well as
+    // at the API boundary, because validating only on the way in leaves the old rows clickable.
+    render([interview({ meetingUrl: 'javascript:alert(document.cookie)' })])
+    expect(linkNamed(/Join the call/)).toBeUndefined()
+    expect(links().some((a) => (a.getAttribute('href') ?? '').startsWith('javascript:'))).toBe(false)
+  })
+
+  it('refuses a data URL too', () => {
+    render([interview({ meetingUrl: 'data:text/html,<script>alert(1)</script>' })])
+    expect(linkNamed(/Join the call/)).toBeUndefined()
+  })
+
   it('offers no call link when the invitation carried none', () => {
     // Nothing in this product mints a meeting URL — it is whatever the organizer typed on the invitation.
     render([interview({ meetingUrl: null, modality: 'in_person', location: 'Room 3' })])

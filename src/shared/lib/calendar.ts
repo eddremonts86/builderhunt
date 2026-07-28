@@ -9,6 +9,7 @@
  * columns directly.").
  */
 import { z } from 'zod'
+import { httpUrlSchema } from './url-safety'
 // `rrule` ships CommonJS, and the two runtimes disagree about how to reach into it:
 //   - vitest resolves a NAMED import fine.
 //   - Vite's SSR runtime throws "Named export 'RRule' not found", so a default import is needed.
@@ -274,7 +275,8 @@ const eventObjectSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).nullable(),
   location: z.string().max(500).nullable(),
-  meetingUrl: z.string().url().nullable(),
+  // See `url-safety.ts`: `z.string().url()` accepts `javascript:` and this is rendered as a link.
+  meetingUrl: httpUrlSchema.nullable(),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   timezone: z.string().min(1),
@@ -310,7 +312,7 @@ const eventDraftObjectSchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(5000).optional(),
   location: z.string().max(500).optional(),
-  meetingUrl: z.string().url().optional(),
+  meetingUrl: httpUrlSchema.optional(),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
   timezone: z.string().min(1),
