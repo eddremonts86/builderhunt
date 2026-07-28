@@ -1902,7 +1902,7 @@ Not fixed here — it predates this program and deserves its own work.
     microphone-only prohibition, the diarization-is-a-guess labelling, and the unticked acknowledgement are
     each load-bearing.
 
-- [~] **Run real browser capture beta verification** — runbook written 2026-07-28 (`PENDING`);
+- [~] **Run real browser capture beta verification** — runbook written 2026-07-28 (`d6b1833`);
   **execution BLOCKED on hardware and human participants**
   - Files: `docs/operations/interview-runtime-verification.md` (new)
   - **What is done:** the full procedure. The browser/platform matrix as `detectCaptureSupport` actually
