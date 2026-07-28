@@ -2302,7 +2302,7 @@ Not fixed here — it predates this program and deserves its own work.
     late export reconciling on the next run. Three plants proved the under-billing refusal, the rounding band,
     and duplicate detection are each load-bearing.
 
-- [~] **Add redacted metrics and operator dashboards** — metrics and redaction done 2026-07-28 (`PENDING`);
+- [~] **Add redacted metrics and operator dashboards** — metrics and redaction done 2026-07-28 (`50491d8`);
   **the admin dashboard page is not built**
   - Files: `src/shared/lib/metrics.ts`, `src/shared/lib/log.ts`, `tests/unit/shared/lib/log.test.ts`
   - **Twenty interview counters**, all counters and ids and nothing else: booking conflicts, document backlog
