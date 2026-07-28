@@ -2057,7 +2057,7 @@ Not fixed here — it predates this program and deserves its own work.
     refusal, paused-session fallback, ephemeral proposals writing nothing, action recording, and both
     feature flags. Two plants proved the flag gate and the 422 mapping are load-bearing.
 
-- [x] **Build contextual question and report UI** — done 2026-07-28 (`2a623a1`), NOT yet deployed
+- [x] **Build contextual question and report UI** — done 2026-07-28 (`49ac31f`), NOT yet deployed
   - Files: `src/modules/interviews/components/ContextualQuestions.tsx` (new),
     `src/modules/interviews/components/InterviewReportEditor.tsx` (new),
     `src/modules/interviews/components/TranscriptEvidence.tsx` (new),
