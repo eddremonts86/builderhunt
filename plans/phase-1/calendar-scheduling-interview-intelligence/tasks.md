@@ -1857,7 +1857,7 @@ Not fixed here — it predates this program and deserves its own work.
     and ignored. Five plants proved the static recording check (twice), the buffer slice, the
     `onerror` silence, and the deliberate-close flag are each load-bearing.
 
-- [x] **Build dedicated live interview workspace** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Build dedicated live interview workspace** — done 2026-07-28 (`89d227e`), NOT yet deployed
   - Files: `src/routes/_dashboard/interviews/$interviewId/live.tsx` (new),
     `src/modules/interviews/components/LiveInterviewPage.tsx` (new),
     `src/modules/interviews/components/CapturePreflight.tsx` (new),
