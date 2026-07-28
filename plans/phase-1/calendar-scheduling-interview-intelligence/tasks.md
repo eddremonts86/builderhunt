@@ -1407,57 +1407,78 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
     against a second candidate in the same organization; 3475 unit tests; 211 e2e; 90 migrations
     apply twice clean. The gate caught the owner/worker document-count assertions my fixture change
     invalidated — they now name the expected ids rather than counting rows.
-- [ ] **Implement policy-controlled public-web import** — PARTIAL: the policy gate is done (`3fce545`..HEAD)
-  - Done: `src/lib/scheduling/link-import-policy.ts` + 24 tests. Decides whether a URL may be fetched
-    at all, before a request is built — the question the enrichment envelope cannot answer, because
-    the envelope validates a *request* and this validates *permission*.
+- [x] **Implement policy-controlled public-web import** — done 2026-07-28 (`b3d1a4b`, `c2bd69c`), NOT yet deployed
+  - Files: `src/lib/scheduling/link-import-policy.ts` (new), `src/lib/scheduling/web-import-extraction.ts` (new),
+    `src/lib/scheduling/web-import-worker.ts` (new), `src/shared/lib/repositories/interview-web-imports.ts` (new),
+    `src/routes/api/public/scheduling/$invitationId/links/$linkId/import.ts` (new),
+    `src/routes/api/admin/documents/run-web-imports.ts` (new),
+    `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
+  - **Three gates, each of which can only narrow.** The policy decision is re-evaluated at run time
+    rather than trusted from the queue: the attestation may have been made against a notice version
+    since superseded, or the host may have entered the blocked list in between. Robots is fail-closed —
+    `unavailable` blocks, because a site we could not ask has not said yes. Then `safeFetch`'s existing
+    envelope. Its redirect cap of **3** wins over the plan's 5: loosening a shared SSRF guard to match
+    a sentence would weaken every other consumer for no gain here.
   - **A bug worth remembering.** Every hard-blocked connector in `policies.ts` has `allowedHosts: []`,
     correctly, since nothing may ever be fetched from them. The first implementation resolved hosts
     against the registry, so `linkedin.com` matched no connector, fell through to the personal-site
     branch, and an ownership attestation promoted it to `authorized_crawl` — the one rule the module
-    exists to enforce, inverted by an empty array. Blocked hosts are now listed explicitly and
-    checked *before* the registry, with a load-time assertion and a test so a fifth blocked platform
-    added without hosts fails loudly rather than silently becoming attestable.
-  - Still to do: `src/lib/scheduling/web-import-worker.ts`, the two routes
-    (`.../links/$linkId/import.ts`, `api/admin/documents/run-web-imports.ts`), the repository writes
-    against `candidate_web_imports`, and the fake-host verification matrix (robots allow/disallow/
-    unreachable, SSRF and DNS rebinding, redirect escape, MIME mismatch, oversized/compressed bodies,
-    Redis rate limits, duplicate content, raw-body discard). The safety envelope those reuse —
-    `safeFetch`, `isPathAllowedByRobots` — already exists and is already tested.
-  - Files: `src/lib/enrichment/network.ts`, `tests/unit/lib/enrichment/network.test.ts`,
-    `src/lib/enrichment/policies.ts`, `tests/unit/lib/enrichment/policies.test.ts`,
-    `src/lib/enrichment/robots.ts`, `tests/unit/lib/enrichment/robots.test.ts`,
-    `src/lib/scheduling/web-import-worker.ts` (new),
-    `tests/unit/lib/scheduling/web-import-worker.test.ts` (new),
-    `src/shared/lib/repositories/interview-documents.ts`,
-    `src/routes/api/admin/documents/run-web-imports.ts` (new),
-    `src/routes/api/public/scheduling/$invitationId/links/$linkId/import.ts` (new)
-  - Do: Reuse the shared enrichment safety envelope and source registry. Permit only `official_api`
-    or `authorized_crawl`; create candidate personal/project host eligibility only after a positive,
-    versioned ownership/authorization attestation; keep LinkedIn/X/Meta `user_submitted` and URL-only
-    without source permission. Enforce HTTPS, honest user agent, RFC 9309 fail-closed robots, public A/AAAA on every
-    revalidated redirect, no credentials/nonstandard ports, five redirects, 10 seconds, 2 MB,
-    HTML/text/PDF allowlist, host Redis rate/concurrency limit, no JavaScript, sanitized visible-text
-    extraction, stable evidence IDs/hashes, raw-body discard, retention, idempotency, and redacted
-    job run.
-  - Verify: fake-host tests cover allowed import, robots allow/disallow/unreachable, LinkedIn hard
-    block, localhost/private/link-local/metadata IPv4/IPv6, DNS rebinding, redirect escape, auth,
-    port/scheme, compressed/oversized body, MIME mismatch, active HTML, timeout, Redis unavailable,
-    duplicate content, tenant isolation, raw-body absence, and unauthorized worker/API.
+    exists to enforce, inverted by an empty array. Blocked hosts are now listed explicitly and checked
+    *before* the registry, with a load-time assertion and a test so a fifth blocked platform added
+    without hosts fails loudly rather than silently becoming attestable.
+  - Extraction removes whole elements with their contents *before* stripping a single tag. The other
+    order leaves a page's minified JavaScript in the evidence a model later reads — useless, and the
+    most obvious place to hide an instruction aimed at that model. It also strips `<!DOCTYPE>` and
+    processing instructions, which the tag pattern cannot see because it requires a letter after `<`.
+  - The body is hashed and discarded. What persists is the visible text, the robots answer (stored,
+    never recomputed — "we were allowed to fetch this" must stay auditable after robots.txt changes),
+    and both the requested and final URL, because a redirect that changed the page is unrecoverable
+    once only the final one is stored.
+  - `candidate_links` isolation is now measured. 0086 narrowed that policy to the pinned invitation and
+    nothing tested it: the table had no fixture row and no assertion at all.
+  - Verify (2026-07-28): 63 tests — 24 policy, 26 extraction, 13 worker against a real disposable
+    Postgres. Covers robots allow/disallow/unreachable, LinkedIn refused even with a valid attestation
+    (8 host forms), a superseded notice, an unattested link, an envelope refusal recorded with its own
+    code, a page with no visible text, dedupe on unchanged content, redirect recording, and that
+    `not_requested`/`succeeded`/`running` links are never leased.
+- [x] **Add candidate links and intake UI** — done 2026-07-28 (`8b1f258`, `12dbb75`), NOT yet deployed
+  - Files: `src/modules/scheduling/components/DocumentUploader.tsx` (new),
+    `src/modules/scheduling/components/CandidateIntake.tsx` (new),
+    `src/modules/scheduling/components/CandidatePortal.tsx`,
+    `src/routes/api/public/scheduling/$invitationId/index.ts`,
+    `tests/unit/modules/scheduling/CandidateIntake.test.tsx` (new)
+  - Upload is three requests and the middle one does not touch our server: an intent that reserves the
+    slot and returns a signed URL, a PUT straight to object storage, then a completion call. A 10 MB
+    body through a request handler is a 10 MB body a request handler can be made to hold.
+  - The browser hashes the file and sends it with the completion call. Not a boundary on its own — the
+    server hashes what it received and compares — but it turns a truncated upload into a checksum
+    mismatch instead of a valid short document that passes scanning.
+  - Status words are shown as themselves. A candidate whose file was refused needs to know a *virus
+    scan* refused it; the alternative reading, that we lost it, is what makes people upload the same
+    file four times.
+  - A blocked platform gets a sentence, not a greyed-out button: their terms, not the candidate's
+    choice, and the link is still kept as evidence an interviewer can open. The ownership attestation is
+    per host, unticked, with no bulk setter, and separate from `public_web_import` consent — one says
+    imports are acceptable in principle, the other says this site is mine to offer.
+  - Intake sits above the confirm button and gates nothing: spec.md is explicit that booking may
+    complete while documents are still processing.
+  - **`ConsentFields.tsx` was not created**: `CandidateDetailsForm.tsx` already has all five purposes
+    with independent state and no bulk setter, so the plan's file exists in substance under another
+    name. Building it would have been a second, divergent consent surface.
+  - Verify (2026-07-28): 11 component tests, all asserting what the UI *refuses* to offer — no import
+    control for a blocked platform, disabled until the per-host box is ticked, the server's notice
+    version sent rather than one the client invented, no second import once queued, a retry after a
+    failure, and a rejected document not holding quota.
 
-- [ ] **Add candidate links and intake UI**
-  - Files: `src/modules/scheduling/components/CandidateIntake.tsx` (new),
-    `src/modules/scheduling/components/DocumentUploader.tsx` (new),
-    `src/modules/scheduling/components/ConsentFields.tsx` (new),
-    `src/modules/scheduling/components/CandidatePortal.tsx`
-  - Do: Add LinkedIn/personal/other URL validation, source-policy/import status, a separate unticked
-    ownership/authorization attestation for each importable personal/project host, notes, resumable
-    status UI, PDF/DOCX/TXT limits, four separate required purpose controls, scan/extraction states,
-    delete/retry, and explicit URL-only state for blocked platforms. Booking may finish while
-    documents and permitted websites continue processing.
-  - Verify: Playwright uploads valid and EICAR/fake-type/oversized fixtures, imports an approved
-    public site, keeps LinkedIn URL-only, proves missing consent blocks booking, accepts all purposes,
-    books, and sees correct processing/error/withdrawal state.
+### Phase 6 also fixed the test infrastructure it stressed
+
+- Adding three disposable-database test files pushed the parallel migration count past what the
+  cluster-wide `ALTER ROLE` statements tolerate, and four unrelated test files failed to load.
+  `isConcurrentDdlConflict` matched the phrase "tuple concurrently updated" in `error.message`, but the
+  thrown error's message is drizzle's `"Failed query: ALTER ROLE …"` — the phrase lives only in the
+  Postgres error's structured fields. **The retry loop the module header calls a "defense-in-depth
+  backstop" had never fired once.** Matched on `XX000` + `simple_heap_update` now, walking a bounded
+  cause chain, and `createE2EWorkerDatabase` takes the advisory lock its sibling always took (`617793c`).
 
 ## Phase 7 — Consume the Stripe billing platform
 
