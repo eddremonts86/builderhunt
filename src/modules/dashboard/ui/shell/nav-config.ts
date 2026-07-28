@@ -15,6 +15,7 @@
 import {
   Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Compass, CreditCard,
   Download, Gauge, Inbox, Layers, LayoutDashboard, Lightbulb, Mail, Map, Plus, RotateCcw,
+  Mic,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
 } from 'lucide-react'
 
@@ -85,11 +86,15 @@ export const NAV_AREAS: readonly NavArea[] = [
     id: 'pipeline',
     label: 'Pipeline',
     icon: Compass,
-    routes: ['/sprints', '/calendar'],
+    routes: ['/sprints', '/calendar', '/interviews'],
     items: [
       { to: '/sprints', label: 'Sprints', icon: Compass, group: 'Pipeline', exact: true },
       { to: '/sprints/new', label: 'New sprint', icon: Plus, group: 'Pipeline' },
       { to: '/calendar', label: 'Calendar', icon: CalendarDays, group: 'Schedule' },
+      // Owned by Pipeline because that is where the calendar lives, and an interview *is* a calendar event
+      // in this schema. Without an entry here the page existed but nothing linked to it, which is the state
+      // the whole interview feature was in until now.
+      { to: '/interviews', label: 'Interviews', icon: Mic, group: 'Schedule', exact: true },
     ],
   },
   {

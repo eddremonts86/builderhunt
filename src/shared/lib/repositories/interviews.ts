@@ -957,3 +957,108 @@ export async function listReportVersions(
     ))
     .orderBy(desc(interviewReports.version))
 }
+
+// ── The interview list (plan: calendar-scheduling-interview-intelligence, Phase 10 follow-up) ─────
+//
+// Added because there was no way to reach an interview at all. `/interviews/$interviewId` was the only
+// route, so an organizer had to know a calendar event's uuid and type the URL — which is exactly what
+// happened in practice, and the hand-built URL then failed for an unrelated reason nobody could diagnose.
+
+export interface InterviewListRow {
+  eventId: string
+  invitationId: string
+  roleTitle: string
+  candidateDisplayName: string | null
+  startsAt: Date
+  endsAt: Date
+  timezone: string
+  modality: string
+  meetingUrl: string | null
+  location: string | null
+  eventStatus: string
+  /** Null when no session was ever started — a manual-only interview, or one still upcoming. */
+  sessionState: string | null
+  hasBrief: boolean
+  reportStatus: string | null
+  transcriptSegments: number
+}
+
+/**
+ * Every booked interview this organizer owns, newest first.
+ *
+ * One query rather than a list plus N lookups: the page shows, per row, whether a brief exists, whether a
+ * session ran, whether a report is final and how much transcript there is — and fetching those separately
+ * would be four round trips per interview on a page whose whole purpose is an overview.
+ *
+ * Driven from `scheduling_invitations` with an inner join to the booked event, because an invitation that
+ * was never booked is not an interview yet and belongs on the invitations screen instead.
+ */
+export async function listInterviewsForOwner(
+  transaction: BriefTransaction,
+  params: { organizationId: string; ownerUserId: string; limit?: number },
+): Promise<InterviewListRow[]> {
+  const rows = await transaction.execute(sql`
+    select
+      e.id                        as event_id,
+      i.id                        as invitation_id,
+      i.role_title,
+      s.display_name              as candidate_display_name,
+      e.starts_at,
+      e.ends_at,
+      e.timezone,
+      i.modality,
+      i.meeting_url,
+      i.location,
+      e.status                    as event_status,
+      sess.state                  as session_state,
+      (b.id is not null)          as has_brief,
+      r.status                    as report_status,
+      coalesce(seg.n, 0)::int     as transcript_segments
+    from scheduling_invitations i
+    join calendar_events e
+      on e.organization_id = i.organization_id and e.id = i.booked_event_id
+    left join candidate_submissions s
+      on s.organization_id = i.organization_id and s.invitation_id = i.id
+    left join interview_sessions sess
+      on sess.organization_id = e.organization_id and sess.event_id = e.id
+    -- The *active* brief only. A superseded draft existing is not the same as this interview having a
+    -- brief to read, and showing a tick for one would send the organizer to an empty page.
+    left join interview_briefs b
+      on b.organization_id = e.organization_id and b.event_id = e.id and b.status = 'active'
+    left join (
+      select organization_id, event_id, status
+      from interview_reports r1
+      where version = (
+        select max(version) from interview_reports r2
+        where r2.organization_id = r1.organization_id and r2.event_id = r1.event_id
+      )
+    ) r on r.organization_id = e.organization_id and r.event_id = e.id
+    left join (
+      select organization_id, session_id, count(*)::int as n
+      from transcript_segments group by 1, 2
+    ) seg on seg.organization_id = sess.organization_id and seg.session_id = sess.id
+    where i.organization_id = ${params.organizationId}
+      and i.owner_user_id = ${params.ownerUserId}
+      and i.booked_event_id is not null
+    order by e.starts_at desc
+    limit ${params.limit ?? 100}
+  `)
+
+  return (rows as unknown as Record<string, unknown>[]).map((row) => ({
+    eventId: String(row.event_id),
+    invitationId: String(row.invitation_id),
+    roleTitle: String(row.role_title),
+    candidateDisplayName: optionalText(row.candidate_display_name),
+    startsAt: new Date(row.starts_at as string),
+    endsAt: new Date(row.ends_at as string),
+    timezone: String(row.timezone),
+    modality: String(row.modality),
+    meetingUrl: optionalText(row.meeting_url),
+    location: optionalText(row.location),
+    eventStatus: String(row.event_status),
+    sessionState: optionalText(row.session_state),
+    hasBrief: row.has_brief === true,
+    reportStatus: optionalText(row.report_status),
+    transcriptSegments: Number(row.transcript_segments ?? 0),
+  }))
+}

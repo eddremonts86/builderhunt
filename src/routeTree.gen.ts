@@ -44,6 +44,7 @@ import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
 import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
 import { Route as ApiOrganizationsIndexRouteImport } from './routes/api/organizations/index'
+import { Route as ApiInterviewsIndexRouteImport } from './routes/api/interviews/index'
 import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
 import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
 import { Route as ApiChangelogIndexRouteImport } from './routes/api/changelog/index'
@@ -55,6 +56,7 @@ import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/s
 import { Route as DashboardSolutionsIndexRouteImport } from './routes/_dashboard/solutions/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
+import { Route as DashboardInterviewsIndexRouteImport } from './routes/_dashboard/interviews/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
 import { Route as DashboardCalendarIndexRouteImport } from './routes/_dashboard/calendar/index'
@@ -420,6 +422,11 @@ const ApiOrganizationsIndexRoute = ApiOrganizationsIndexRouteImport.update({
   path: '/api/organizations/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInterviewsIndexRoute = ApiInterviewsIndexRouteImport.update({
+  id: '/api/interviews/',
+  path: '/api/interviews/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIncidentsIndexRoute = ApiIncidentsIndexRouteImport.update({
   id: '/api/incidents/',
   path: '/api/incidents/',
@@ -475,6 +482,12 @@ const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
   path: '/me/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardInterviewsIndexRoute =
+  DashboardInterviewsIndexRouteImport.update({
+    id: '/interviews/',
+    path: '/interviews/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardExportsIndexRoute = DashboardExportsIndexRouteImport.update({
   id: '/exports/',
   path: '/exports/',
@@ -1626,6 +1639,7 @@ export interface FileRoutesByFullPath {
   '/calendar/': typeof DashboardCalendarIndexRoute
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
+  '/interviews/': typeof DashboardInterviewsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
   '/solutions/': typeof DashboardSolutionsIndexRoute
@@ -1637,6 +1651,7 @@ export interface FileRoutesByFullPath {
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
+  '/api/interviews/': typeof ApiInterviewsIndexRoute
   '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
@@ -1861,6 +1876,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof DashboardCalendarIndexRoute
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
+  '/interviews': typeof DashboardInterviewsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
   '/solutions': typeof DashboardSolutionsIndexRoute
@@ -1872,6 +1888,7 @@ export interface FileRoutesByTo {
   '/api/changelog': typeof ApiChangelogIndexRoute
   '/api/consent': typeof ApiConsentIndexRoute
   '/api/incidents': typeof ApiIncidentsIndexRoute
+  '/api/interviews': typeof ApiInterviewsIndexRoute
   '/api/organizations': typeof ApiOrganizationsIndexRoute
   '/api/queries': typeof ApiQueriesIndexRoute
   '/api/recommendations': typeof ApiRecommendationsIndexRoute
@@ -2101,6 +2118,7 @@ export interface FileRoutesById {
   '/_dashboard/calendar/': typeof DashboardCalendarIndexRoute
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
+  '/_dashboard/interviews/': typeof DashboardInterviewsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
   '/_dashboard/solutions/': typeof DashboardSolutionsIndexRoute
@@ -2112,6 +2130,7 @@ export interface FileRoutesById {
   '/api/changelog/': typeof ApiChangelogIndexRoute
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
+  '/api/interviews/': typeof ApiInterviewsIndexRoute
   '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
@@ -2340,6 +2359,7 @@ export interface FileRouteTypes {
     | '/calendar/'
     | '/dashboard/'
     | '/exports/'
+    | '/interviews/'
     | '/me/'
     | '/search/'
     | '/solutions/'
@@ -2351,6 +2371,7 @@ export interface FileRouteTypes {
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
+    | '/api/interviews/'
     | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
@@ -2575,6 +2596,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/dashboard'
     | '/exports'
+    | '/interviews'
     | '/me'
     | '/search'
     | '/solutions'
@@ -2586,6 +2608,7 @@ export interface FileRouteTypes {
     | '/api/changelog'
     | '/api/consent'
     | '/api/incidents'
+    | '/api/interviews'
     | '/api/organizations'
     | '/api/queries'
     | '/api/recommendations'
@@ -2814,6 +2837,7 @@ export interface FileRouteTypes {
     | '/_dashboard/calendar/'
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
+    | '/_dashboard/interviews/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
     | '/_dashboard/solutions/'
@@ -2825,6 +2849,7 @@ export interface FileRouteTypes {
     | '/api/changelog/'
     | '/api/consent/'
     | '/api/incidents/'
+    | '/api/interviews/'
     | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
@@ -3016,6 +3041,7 @@ export interface RootRouteChildren {
   ApiChangelogIndexRoute: typeof ApiChangelogIndexRoute
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
   ApiIncidentsIndexRoute: typeof ApiIncidentsIndexRoute
+  ApiInterviewsIndexRoute: typeof ApiInterviewsIndexRoute
   ApiOrganizationsIndexRoute: typeof ApiOrganizationsIndexRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
@@ -3361,6 +3387,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrganizationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/interviews/': {
+      id: '/api/interviews/'
+      path: '/api/interviews'
+      fullPath: '/api/interviews/'
+      preLoaderRoute: typeof ApiInterviewsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/incidents/': {
       id: '/api/incidents/'
       path: '/api/incidents'
@@ -3436,6 +3469,13 @@ declare module '@tanstack/react-router' {
       path: '/me'
       fullPath: '/me/'
       preLoaderRoute: typeof DashboardMeIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/interviews/': {
+      id: '/_dashboard/interviews/'
+      path: '/interviews'
+      fullPath: '/interviews/'
+      preLoaderRoute: typeof DashboardInterviewsIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/exports/': {
@@ -4815,6 +4855,7 @@ interface DashboardRouteRouteChildren {
   DashboardCalendarIndexRoute: typeof DashboardCalendarIndexRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
+  DashboardInterviewsIndexRoute: typeof DashboardInterviewsIndexRoute
   DashboardMeIndexRoute: typeof DashboardMeIndexRoute
   DashboardSearchIndexRoute: typeof DashboardSearchIndexRoute
   DashboardSolutionsIndexRoute: typeof DashboardSolutionsIndexRoute
@@ -4846,6 +4887,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardCalendarIndexRoute: DashboardCalendarIndexRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
+  DashboardInterviewsIndexRoute: DashboardInterviewsIndexRoute,
   DashboardMeIndexRoute: DashboardMeIndexRoute,
   DashboardSearchIndexRoute: DashboardSearchIndexRoute,
   DashboardSolutionsIndexRoute: DashboardSolutionsIndexRoute,
@@ -5199,6 +5241,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChangelogIndexRoute: ApiChangelogIndexRoute,
   ApiConsentIndexRoute: ApiConsentIndexRoute,
   ApiIncidentsIndexRoute: ApiIncidentsIndexRoute,
+  ApiInterviewsIndexRoute: ApiInterviewsIndexRoute,
   ApiOrganizationsIndexRoute: ApiOrganizationsIndexRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
