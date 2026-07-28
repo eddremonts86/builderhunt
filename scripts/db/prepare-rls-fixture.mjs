@@ -216,6 +216,21 @@ try {
     on conflict (id) do nothing
   `
 
+  // A live session on that event, with one transcript segment: the most sensitive rows in the product,
+  // and the ones whose policy shape must be measured rather than assumed.
+  await owner`
+    insert into interview_sessions (id, organization_id, event_id, owner_user_id, state, capture_mode, language, provider, consent_notice_version, capture_capability, retention_expires_at)
+    values ('11111111-2222-4000-8000-00000000000a', 'org-a', 'bbbbbbbb-0000-4000-8000-00000000000a', 'user-a',
+            'live', 'in_person', 'en', 'deepgram', 'v1', 'microphone_and_shared_audio_available', now() + interval '90 days')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into transcript_segments (id, organization_id, session_id, provider_segment_id, sequence, speaker_estimate, text, starts_ms, ends_ms, retention_expires_at)
+    values ('22222222-3333-4000-8000-00000000000a', 'org-a', '11111111-2222-4000-8000-00000000000a', 'prov-1', 0,
+            'speaker_a', 'what the candidate said', 0, 1000, now() + interval '90 days')
+    on conflict (id) do nothing
+  `
+
   // An interview brief on that event: an assessment of a named person, which is why its policy is
   // narrower than any other table here.
   await owner`

@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, integer, jsonb, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
@@ -2529,6 +2529,215 @@ export const interviewBriefs = pgTable(
       sql`(${table.provider} is null and ${table.model} is null and ${table.promptVersion} is null)
           or (${table.provider} is not null and ${table.model} is not null and ${table.promptVersion} is not null)`,
     ),
+  ],
+)
+
+/**
+ * Live interview persistence (plan: calendar-scheduling-interview-intelligence, Phase 9).
+ *
+ * ## There is no audio column, in any of these four tables
+ *
+ * No blob, no storage key, no object reference, no duration-of-a-file. Transcription is streamed to the
+ * provider and only the resulting *text* is persisted — spec.md calls the audio "transient", and the
+ * consent a candidate gives is for transient live transcription, not for a recording. A column here that
+ * could hold or point at audio would make that consent inaccurate the moment someone used it, so
+ * `scripts/db/audit-schema.ts` asserts none of these tables gains an audio-like column.
+ *
+ * `provider_billed_seconds` is a *usage* figure for settlement, not a pointer to anything.
+ */
+export const interviewSessions = pgTable(
+  'interview_sessions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    state: text('state').notNull().default('not_started'),
+    captureMode: text('capture_mode').notNull(),
+    language: text('language').notNull(),
+    provider: text('provider').notNull(),
+    /** Which notice the organizer's verbal reminder was given against. Not the candidate's consent row. */
+    consentNoticeVersion: text('consent_notice_version').notNull(),
+    browserName: text('browser_name'),
+    browserMajor: text('browser_major'),
+    captureCapability: text('capture_capability').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+    /** Last sign of life from the live client. A stale one is how an abandoned session is reclaimed. */
+    heartbeatAt: timestamp('heartbeat_at', { withTimezone: true }),
+    providerRequestId: text('provider_request_id'),
+    providerBilledSeconds: integer('provider_billed_seconds').notNull().default(0),
+    /** Optimistic concurrency for the transition API: two tabs must not both move the session. */
+    version: integer('version').notNull().default(1),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('interview_sessions_organization_id_id_unique').on(table.organizationId, table.id),
+    // One session per event. A second live session on the same interview would produce two transcripts
+    // nobody could reconcile, and two provider bills for one conversation.
+    uniqueIndex('interview_sessions_event_unique').on(table.organizationId, table.eventId),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'interview_sessions_organization_event_fk',
+    }).onDelete('cascade'),
+    index('interview_sessions_state_idx').on(table.organizationId, table.state),
+    index('interview_sessions_heartbeat_idx').on(table.heartbeatAt),
+    index('interview_sessions_retention_idx').on(table.retentionExpiresAt),
+    check('interview_sessions_state_check', sql`${table.state} in ('not_started', 'consent_pending', 'ready', 'live', 'processing', 'review', 'finalized', 'paused', 'failed', 'abandoned')`),
+    check('interview_sessions_capture_mode_check', sql`${table.captureMode} in ('in_person', 'remote_call')`),
+    check('interview_sessions_language_check', sql`${table.language} in ('en', 'da')`),
+    check('interview_sessions_capability_check', sql`${table.captureCapability} in ('microphone_and_shared_audio_available', 'microphone_only', 'audio_capture_unsupported')`),
+    check('interview_sessions_billed_seconds_check', sql`${table.providerBilledSeconds} >= 0`),
+    check('interview_sessions_version_check', sql`${table.version} > 0`),
+    // `finished_at` only on a terminal state, and every terminal state has one. Without this a
+    // "finalized" session with no finish time would settle against an unbounded duration.
+    check(
+      'interview_sessions_finished_check',
+      sql`(${table.state} in ('finalized', 'failed', 'abandoned')) = (${table.finishedAt} is not null)`,
+    ),
+  ],
+)
+
+/**
+ * One final transcript segment. Interim text is never persisted — it is replaced within seconds and
+ * storing it would multiply a candidate's words several times over for no benefit.
+ */
+export const transcriptSegments = pgTable(
+  'transcript_segments',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').notNull(),
+    /** The provider's own id for this segment. What makes re-delivery idempotent. */
+    providerSegmentId: text('provider_segment_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    speakerEstimate: text('speaker_estimate').notNull(),
+    /** Null until an organizer confirms or corrects who the estimate refers to. */
+    speakerMapping: text('speaker_mapping'),
+    text: text('text').notNull(),
+    startsMs: integer('starts_ms').notNull(),
+    endsMs: integer('ends_ms').notNull(),
+    confidence: numeric('confidence', { precision: 4, scale: 3 }),
+    correctedByUserId: text('corrected_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    correctedAt: timestamp('corrected_at', { withTimezone: true }),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('transcript_segments_organization_id_id_unique').on(table.organizationId, table.id),
+    // Exactly-once persistence under a retrying client: the outbox resends unacknowledged segments, and
+    // this is what makes a resend a no-op rather than a duplicate line in the transcript.
+    uniqueIndex('transcript_segments_provider_unique').on(table.organizationId, table.sessionId, table.providerSegmentId),
+    uniqueIndex('transcript_segments_sequence_unique').on(table.organizationId, table.sessionId, table.sequence),
+    foreignKey({
+      columns: [table.organizationId, table.sessionId],
+      foreignColumns: [interviewSessions.organizationId, interviewSessions.id],
+      name: 'transcript_segments_organization_session_fk',
+    }).onDelete('cascade'),
+    index('transcript_segments_session_idx').on(table.organizationId, table.sessionId, table.sequence),
+    index('transcript_segments_retention_idx').on(table.retentionExpiresAt),
+    check('transcript_segments_speaker_estimate_check', sql`${table.speakerEstimate} in ('speaker_a', 'speaker_b', 'unknown')`),
+    check('transcript_segments_speaker_mapping_check', sql`${table.speakerMapping} is null or ${table.speakerMapping} in ('organizer', 'candidate_or_remote')`),
+    check('transcript_segments_sequence_check', sql`${table.sequence} >= 0`),
+    check('transcript_segments_timing_check', sql`${table.startsMs} >= 0 and ${table.endsMs} > ${table.startsMs}`),
+    check('transcript_segments_confidence_check', sql`${table.confidence} is null or (${table.confidence} >= 0 and ${table.confidence} <= 1)`),
+    // A correction without an author is unattributable, and an author without a time is unorderable.
+    // The pair is the audit trail for "a human changed what the machine heard".
+    check(
+      'transcript_segments_correction_check',
+      sql`(${table.correctedByUserId} is null) = (${table.correctedAt} is null)`,
+    ),
+  ],
+)
+
+/**
+ * Contextual follow-up questions produced during a live interview.
+ *
+ * Ephemeral by default — spec.md: "the result is ephemeral unless explicitly saved or used" — so a row
+ * exists here only once the organizer acted on it. `evidence_segment_ids` points at the segments that
+ * prompted it, so a question can always be traced back to what was actually said.
+ */
+export const interviewSuggestions = pgTable(
+  'interview_suggestions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    sessionId: uuid('session_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    question: text('question').notNull(),
+    rationale: text('rationale').notNull(),
+    evidenceSegmentIds: jsonb('evidence_segment_ids').$type<string[]>().notNull().default([]),
+    state: text('state').notNull().default('proposed'),
+    promptVersion: text('prompt_version').notNull(),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('interview_suggestions_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('interview_suggestions_sequence_unique').on(table.organizationId, table.sessionId, table.sequence),
+    foreignKey({
+      columns: [table.organizationId, table.sessionId],
+      foreignColumns: [interviewSessions.organizationId, interviewSessions.id],
+      name: 'interview_suggestions_organization_session_fk',
+    }).onDelete('cascade'),
+    index('interview_suggestions_session_idx').on(table.organizationId, table.sessionId),
+    index('interview_suggestions_retention_idx').on(table.retentionExpiresAt),
+    check('interview_suggestions_state_check', sql`${table.state} in ('proposed', 'used', 'saved', 'dismissed')`),
+    check('interview_suggestions_sequence_check', sql`${table.sequence} >= 0`),
+  ],
+)
+
+/**
+ * The post-interview report. Keyed to the event rather than the session: a report survives its session
+ * being reclaimed, and an interview conducted manually has a report with no session at all.
+ */
+export const interviewReports = pgTable(
+  'interview_reports',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    status: text('status').notNull().default('draft'),
+    content: jsonb('content').$type<Record<string, unknown>>().notNull(),
+    /** The segments the report's statements cite. Null-safe default so a manual report can carry none. */
+    evidenceSegmentIds: jsonb('evidence_segment_ids').$type<string[]>().notNull().default([]),
+    provider: text('provider'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    editedByUserId: text('edited_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    finalizedAt: timestamp('finalized_at', { withTimezone: true }),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('interview_reports_organization_id_id_unique').on(table.organizationId, table.id),
+    uniqueIndex('interview_reports_event_version_unique').on(table.organizationId, table.eventId, table.version),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'interview_reports_organization_event_fk',
+    }).onDelete('cascade'),
+    index('interview_reports_event_idx').on(table.organizationId, table.eventId),
+    index('interview_reports_retention_idx').on(table.retentionExpiresAt),
+    check('interview_reports_status_check', sql`${table.status} in ('draft', 'final')`),
+    check('interview_reports_version_check', sql`${table.version} > 0`),
+    // Same all-or-nothing provenance as `interview_briefs`: either a model wrote it and we can say
+    // which, or it is manual and carries none.
+    check(
+      'interview_reports_provenance_check',
+      sql`(${table.provider} is null and ${table.model} is null and ${table.promptVersion} is null)
+          or (${table.provider} is not null and ${table.model} is not null and ${table.promptVersion} is not null)`,
+    ),
+    // `final` and `finalized_at` move together, mirroring `interviewReportSchema`'s own refinement.
+    check('interview_reports_finalized_check', sql`(${table.status} = 'final') = (${table.finalizedAt} is not null)`),
   ],
 )
 

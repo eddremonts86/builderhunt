@@ -145,6 +145,27 @@ const classifications: Classification[] = [
     organizationColumn: true,
     retention: 'INTERVIEW_CONSENT_RETENTION_MONTHS, 24 by default and deliberately longer than the documents it authorizes: the record of what was agreed must outlive the processing it permitted',
   }),
+
+  // Live interview (Phase 9, 0092/0093). The most sensitive rows in the product: what a named candidate
+  // actually said, what a model inferred from it, and the assessment written afterwards. Same policy
+  // shape as `interview_briefs` — owner, or a colleague with `access_granted` — and no audio column
+  // anywhere, which the loop above asserts rather than merely documenting here.
+  tenant('interview_sessions', 'organization_id + owner_user_id, or event_participants.access_granted = true', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, bounded by INTERVIEW_TRANSCRIPT_RETENTION_DAYS (90 max); provider_billed_seconds is a settlement figure, not a pointer to a recording',
+  }),
+  tenant('transcript_segments', 'organization_id (via interview_sessions → owner or granted participant)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, inherited from the session; holds a candidate\'s own words, and only final segments — interim text is never persisted',
+  }),
+  tenant('interview_suggestions', 'organization_id (via interview_sessions → owner)', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at, inherited from the session; a row exists only once an organizer saved or used the suggestion, since the rest are ephemeral',
+  }),
+  tenant('interview_reports', 'organization_id + owner_user_id, or event_participants.access_granted = true', ['calendar-scheduling-interview-intelligence'], {
+    organizationColumn: true,
+    retention: 'retention_expires_at; keyed to the event rather than the session so a report survives its session being reclaimed',
+  }),
 ]
 
 const schemaSource = await readFile(new URL('../../src/shared/lib/db/schema.ts', import.meta.url), 'utf8')
@@ -157,6 +178,57 @@ const findings: string[] = []
 for (const table of schemaTables) {
   if (!classified.has(table)) findings.push(`${table}: unclassified table`)
 }
+
+/**
+ * The live-interview tables must never gain a column that could hold or point at audio.
+ *
+ * spec.md calls the audio transient, and the consent a candidate gives is for transient live
+ * transcription — not for a recording. A `recording_key` added in good faith by someone wiring up
+ * "just a debug copy" would make that consent inaccurate the moment it was used, and nothing else in
+ * this repository would notice. So it is asserted here rather than trusted to review, and it is
+ * asserted by *pattern* rather than by an exact column list: the point is to catch a name nobody has
+ * thought of yet.
+ */
+const NO_AUDIO_TABLES = ['interview_sessions', 'transcript_segments', 'interview_suggestions', 'interview_reports']
+const AUDIO_LIKE_COLUMN = /audio|blob|bytea|recording|waveform|object_key|storage_key|media_url|file_path/i
+
+/**
+ * Column names of one `pgTable` definition.
+ *
+ * Plain string slicing rather than a constructed `RegExp`. The regex version looked right, matched in
+ * isolation, and silently found nothing here — so the assertion below reported clean while a planted
+ * `recordingObjectKey` sat in the schema. A check that cannot fail is worse than no check, so this is
+ * written to be obviously correct instead of cleverly short, and `columns.length === 0` is itself a
+ * finding so a future rename cannot turn it back into a no-op.
+ */
+function tableColumnNames(source: string, table: string): string[] {
+  const marker = `pgTable(\n  '${table}',`
+  const at = source.indexOf(marker)
+  if (at < 0) return []
+  const bodyStart = source.indexOf('{', at + marker.length)
+  const bodyEnd = source.indexOf('\n  },', bodyStart)
+  if (bodyStart < 0 || bodyEnd < 0) return []
+  return source
+    .slice(bodyStart, bodyEnd)
+    .split('\n')
+    .map((line) => /^\s{4}(\w+)\s*:/.exec(line)?.[1])
+    .filter((name): name is string => name !== undefined)
+}
+
+for (const table of NO_AUDIO_TABLES) {
+  const columns = tableColumnNames(schemaSource, table)
+  if (columns.length === 0) {
+    findings.push(`${table}: no columns found — the no-audio assertion cannot run and must be repaired`)
+    continue
+  }
+  for (const column of columns) {
+    if (AUDIO_LIKE_COLUMN.test(column)) {
+      findings.push(`${table}.${column}: audio-like column on a table that must never hold or reference audio`)
+    }
+  }
+}
+
+
 for (const entry of classifications) {
   if (!schemaTables.includes(entry.table)) findings.push(`${entry.table}: classification has no schema table`)
   if (entry.class === 'tenant-private' && !entry.tenantRoot && !entry.organizationColumn) {

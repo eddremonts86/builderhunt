@@ -368,6 +368,14 @@
     "0091_interview_briefs_rls_grants": {
       "sql": "cfb3d84e6a5d9f664b6ec6cb7a64971b256b9fcad995e094e6b3ab9aca8b60ba",
       "snapshot": "c3f361fd8afd6cce4cc4c4004ea58a1df1d00b788d9be8f553978fded7cf3df7"
+    },
+    "0092_lovely_mad_thinker": {
+      "sql": "8d55c41f91947d0baac706c3a03e49748c928f340fb5c0e3f324154d68b727ca",
+      "snapshot": "6c0617d2bca553c35decd4bd79a2e460d541b824a157b8e2cd1e17aa4a5ab5f6"
+    },
+    "0093_live_interview_rls_grants": {
+      "sql": "ef5b9cb7a3b899c2996b699119c1a3274b3a47834b74270f7cb22d7d3b6b3f29",
+      "snapshot": "acdd5cf1d0036e8186d08769e5c6949355334df4cc6342422f181c2383374ec6"
     }
   }
 }

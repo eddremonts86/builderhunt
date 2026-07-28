@@ -588,6 +588,62 @@ try {
   })
   if (briefsWorker !== 1) throw new Error(`worker could not read interview briefs (${briefsWorker} rows)`)
 
+  // interview_sessions / transcript_segments (Phase 9): the same owner-or-granted-participant shape as
+  // interview_briefs, because they hold what a named candidate actually said. Segments inherit their rule
+  // through the session, so this also proves that inheritance works rather than trusting the join.
+  const readLive = async (userId, organizationId = 'org-a') => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    await transaction`select set_config('app.user_id', ${userId}, true)`
+    await transaction`select set_config('app.organization_role', 'admin', true)`
+    const sessions = await transaction`select id from interview_sessions`
+    const segments = await transaction`select id from transcript_segments`
+    return { sessions: sessions.length, segments: segments.length }
+  })
+
+  const liveOwner = await readLive('user-a')
+  if (liveOwner.sessions !== 1 || liveOwner.segments !== 1) {
+    throw new Error(`session owner could not read their own session/transcript: ${JSON.stringify(liveOwner)}`)
+  }
+  // `user-c` is a participant with access_granted = true: reads both, writes neither.
+  const liveParticipant = await readLive('user-c')
+  if (liveParticipant.sessions !== 1 || liveParticipant.segments !== 1) {
+    throw new Error(`granted participant could not read the session/transcript: ${JSON.stringify(liveParticipant)}`)
+  }
+  // `user-d` is an org admin AND a participant with access_granted = false. Both paths must fail.
+  const liveAdmin = await readLive('user-d')
+  if (liveAdmin.sessions !== 0 || liveAdmin.segments !== 0) {
+    throw new Error(`an admin / non-granted participant read a transcript: ${JSON.stringify(liveAdmin)}`)
+  }
+  const liveTenantB = await readLive('user-b', 'org-b')
+  if (liveTenantB.sessions !== 0 || liveTenantB.segments !== 0) {
+    throw new Error(`tenant B read tenant A's transcript: ${JSON.stringify(liveTenantB)}`)
+  }
+
+  // A granted participant may read a segment but must not write one: segments arrive from the organizer's
+  // capture client, and a second writer would break the sequence contract.
+  const participantWrite = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-c', true)`
+    try {
+      await transaction`
+        insert into transcript_segments (organization_id, session_id, provider_segment_id, sequence, speaker_estimate, text, starts_ms, ends_ms, retention_expires_at)
+        values ('org-a', '11111111-2222-4000-8000-00000000000a', 'prov-injected', 99, 'speaker_a', 'injected', 0, 500, now() + interval '90 days')
+      `
+      return 'inserted'
+    } catch {
+      return 'refused'
+    }
+  })
+  if (participantWrite !== 'refused') throw new Error('a granted participant wrote a transcript segment')
+
+  // The retention sweeper runs as the worker and must see both.
+  const liveWorker = await worker.begin(async (transaction) => {
+    const sessions = await transaction`select id from interview_sessions`
+    const segments = await transaction`select id from transcript_segments`
+    return sessions.length + segments.length
+  })
+  if (liveWorker !== 2) throw new Error(`worker could not read live interview rows (${liveWorker})`)
+
   // availability_policies: owner-only, and specifically NOT readable by an org admin. This table
   // is where a policy's version and default reminder settings live, so a leak here would expose
   // when a colleague changed their working hours.
