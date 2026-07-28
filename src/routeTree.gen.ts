@@ -191,6 +191,7 @@ import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/l
 import { Route as ApiAdminIncidentsIdRouteImport } from './routes/api/admin/incidents/$id'
 import { Route as ApiAdminEnrichmentRunWorkerRouteImport } from './routes/api/admin/enrichment/run-worker'
 import { Route as ApiAdminEmbeddingsRunWorkerRouteImport } from './routes/api/admin/embeddings/run-worker'
+import { Route as ApiAdminDocumentsRunWorkerRouteImport } from './routes/api/admin/documents/run-worker'
 import { Route as ApiAdminDiscoveryRunWorkerRouteImport } from './routes/api/admin/discovery/run-worker'
 import { Route as ApiAdminDevpostRunWorkerRouteImport } from './routes/api/admin/devpost/run-worker'
 import { Route as ApiAdminChangelogIdRouteImport } from './routes/api/admin/changelog/$id'
@@ -1184,6 +1185,12 @@ const ApiAdminEmbeddingsRunWorkerRoute =
     path: '/api/admin/embeddings/run-worker',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminDocumentsRunWorkerRoute =
+  ApiAdminDocumentsRunWorkerRouteImport.update({
+    id: '/api/admin/documents/run-worker',
+    path: '/api/admin/documents/run-worker',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminDiscoveryRunWorkerRoute =
   ApiAdminDiscoveryRunWorkerRouteImport.update({
     id: '/api/admin/discovery/run-worker',
@@ -1547,6 +1554,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
@@ -1766,6 +1774,7 @@ export interface FileRoutesByTo {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
@@ -1990,6 +1999,7 @@ export interface FileRoutesById {
   '/api/admin/changelog/$id': typeof ApiAdminChangelogIdRoute
   '/api/admin/devpost/run-worker': typeof ApiAdminDevpostRunWorkerRoute
   '/api/admin/discovery/run-worker': typeof ApiAdminDiscoveryRunWorkerRoute
+  '/api/admin/documents/run-worker': typeof ApiAdminDocumentsRunWorkerRoute
   '/api/admin/embeddings/run-worker': typeof ApiAdminEmbeddingsRunWorkerRoute
   '/api/admin/enrichment/run-worker': typeof ApiAdminEnrichmentRunWorkerRoute
   '/api/admin/incidents/$id': typeof ApiAdminIncidentsIdRoute
@@ -2213,6 +2223,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
@@ -2432,6 +2443,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
@@ -2655,6 +2667,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/$id'
     | '/api/admin/devpost/run-worker'
     | '/api/admin/discovery/run-worker'
+    | '/api/admin/documents/run-worker'
     | '/api/admin/embeddings/run-worker'
     | '/api/admin/enrichment/run-worker'
     | '/api/admin/incidents/$id'
@@ -2829,6 +2842,7 @@ export interface RootRouteChildren {
   ApiAdminChangelogIdRoute: typeof ApiAdminChangelogIdRoute
   ApiAdminDevpostRunWorkerRoute: typeof ApiAdminDevpostRunWorkerRoute
   ApiAdminDiscoveryRunWorkerRoute: typeof ApiAdminDiscoveryRunWorkerRoute
+  ApiAdminDocumentsRunWorkerRoute: typeof ApiAdminDocumentsRunWorkerRoute
   ApiAdminEmbeddingsRunWorkerRoute: typeof ApiAdminEmbeddingsRunWorkerRoute
   ApiAdminEnrichmentRunWorkerRoute: typeof ApiAdminEnrichmentRunWorkerRoute
   ApiAdminIncidentsIdRoute: typeof ApiAdminIncidentsIdRoute
@@ -4168,6 +4182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminEmbeddingsRunWorkerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/documents/run-worker': {
+      id: '/api/admin/documents/run-worker'
+      path: '/api/admin/documents/run-worker'
+      fullPath: '/api/admin/documents/run-worker'
+      preLoaderRoute: typeof ApiAdminDocumentsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/discovery/run-worker': {
       id: '/api/admin/discovery/run-worker'
       path: '/api/admin/discovery/run-worker'
@@ -4864,6 +4885,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminChangelogIdRoute: ApiAdminChangelogIdRoute,
   ApiAdminDevpostRunWorkerRoute: ApiAdminDevpostRunWorkerRoute,
   ApiAdminDiscoveryRunWorkerRoute: ApiAdminDiscoveryRunWorkerRoute,
+  ApiAdminDocumentsRunWorkerRoute: ApiAdminDocumentsRunWorkerRoute,
   ApiAdminEmbeddingsRunWorkerRoute: ApiAdminEmbeddingsRunWorkerRoute,
   ApiAdminEnrichmentRunWorkerRoute: ApiAdminEnrichmentRunWorkerRoute,
   ApiAdminIncidentsIdRoute: ApiAdminIncidentsIdRoute,

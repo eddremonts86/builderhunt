@@ -348,6 +348,10 @@
     "0086_capability_invitation_scoping": {
       "sql": "34897ba89071df014affbcfa380be43309eea36813bacfbbcd871db5911fcec0",
       "snapshot": "8cb578e14d4ee57e870e9bfc2fd32158af2ca269a69ece55388c154f794796af"
+    },
+    "0087_romantic_karen_page": {
+      "sql": "e0acb9bba8c232280f5f7486a3fe8ac2298fde2b1870c0a5b4c6e3c349ab4fe6",
+      "snapshot": "c29faa0151426c1b974a3c565fe84569b8e1613ddb794a13f7056ff7dcd7039d"
     }
   }
 }

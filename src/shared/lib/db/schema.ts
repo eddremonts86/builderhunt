@@ -2363,6 +2363,17 @@ export const candidateDocuments = pgTable(
     bytes: integer('bytes').notNull(),
     scanStatus: text('scan_status').notNull().default('pending'),
     extractionStatus: text('extraction_status').notNull().default('pending'),
+    /**
+     * How many times the worker has leased this document for each stage.
+     *
+     * Persisted rather than held in the worker, because the retry cap is the
+     * only thing separating "try again later" from an infinite loop: a
+     * transient failure returns the row to `pending`, and without a durable
+     * count an object the scanner can never read would be re-leased and
+     * re-scanned forever, at real cost, with nothing to show it.
+     */
+    scanAttempts: integer('scan_attempts').notNull().default(0),
+    extractionAttempts: integer('extraction_attempts').notNull().default(0),
     rejectionCode: text('rejection_code'),
     retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
