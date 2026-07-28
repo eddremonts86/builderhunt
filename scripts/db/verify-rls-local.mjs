@@ -496,14 +496,22 @@ try {
   // the invitation's owner, so the interesting cases are the three principals who are *inside* the
   // organization and must still see nothing — a participant, an org admin, and a colleague — plus
   // tenant B, which must not even reach the join.
+  // `user-a` owns both org-a invitations, so both candidates' documents are legitimately theirs —
+  // that is the difference between the owner policy and the capability one, which is now scoped to a
+  // single invitation. Asserted by id rather than by count, so this states which rows are expected
+  // instead of tracking whatever the fixture happens to insert.
   const documentsOwner = await app.begin(async (transaction) => {
     await transaction`select set_config('app.organization_id', 'org-a', true)`
     await transaction`select set_config('app.user_id', 'user-a', true)`
-    const docs = await transaction`select id from candidate_documents`
+    const docs = await transaction`select id from candidate_documents order by id`
     const extractions = await transaction`select id from document_extractions`
-    return { docs: docs.length, extractions: extractions.length }
+    return { docs: docs.map((row) => row.id), extractions: extractions.length }
   })
-  if (documentsOwner.docs !== 1 || documentsOwner.extractions !== 1) {
+  const expectedOwnerDocs = [
+    'ffffffff-0000-4000-8000-00000000000a',
+    'ffffffff-0000-4000-8000-00000000000c',
+  ]
+  if (documentsOwner.docs.join(',') !== expectedOwnerDocs.join(',') || documentsOwner.extractions !== 1) {
     throw new Error(`invitation owner could not read their own documents: ${JSON.stringify(documentsOwner)}`)
   }
 
@@ -534,7 +542,8 @@ try {
     const rows = await transaction`select id from candidate_documents`
     return rows.length
   })
-  if (documentsWorker !== 1) throw new Error(`worker could not read candidate documents (${documentsWorker} rows)`)
+  // The worker is cross-tenant by design and sees every document there is — two in org-a now.
+  if (documentsWorker !== 2) throw new Error(`worker could not read candidate documents (${documentsWorker} rows)`)
 
   // availability_policies: owner-only, and specifically NOT readable by an org admin. This table
   // is where a policy's version and default reminder settings live, so a leak here would expose
