@@ -9,7 +9,7 @@ import { findActiveBrief, findLatestBrief } from '~/shared/lib/repositories/inte
 import { findSubmissionByInvitation } from '~/shared/lib/repositories/scheduling'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
-import { briefContextForEvent } from './-context'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 
 /**
  * Read and generate the interview brief (plan:

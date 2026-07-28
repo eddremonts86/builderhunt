@@ -6,8 +6,11 @@ import { calendarEvents, schedulingInvitations } from '~/shared/lib/db/schema'
 /**
  * Resolves the role a brief is being prepared for.
  *
- * The `-` prefix keeps this out of TanStack's route tree — it is a helper the two brief route files
- * share, not a route.
+ * Lives in `lib/`, not beside the routes that use it. A `-` prefix does keep a file out of TanStack's
+ * route tree, but `scripts/check-route-coverage.mjs` scans everything under `src/routes/api/**` and
+ * requires an auth guard in each file — correctly, since a route without one is the failure that check
+ * exists for. Allowlisting this would have weakened the check to accommodate a file that reads the
+ * database and has nothing to do with routing.
  *
  * ## Why the invitation rather than the event
  *

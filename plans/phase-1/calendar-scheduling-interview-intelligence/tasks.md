@@ -1593,48 +1593,106 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
     production cannot take while the guard rotted.
   - Outstanding, and not code: the live smoke test with synthetic data only. It needs a real
     `MISTRAL_API_KEY` against the EU endpoint, which is a deploy-time check rather than a local one.
-- [ ] **Register interview brief task**
-  - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
-  - Do: Add exact `interview-brief-generate` schemas from `spec.md`, server-only/no-cache metadata,
-    evidence ID existence/refinement, untrusted wrapping, prohibited claims/language, bounded input/
-    output, prompt version, and Pro/Pro Max/Team allowance. Route it through sensitive client
-    selection.
-  - Verify: task tests cover valid output, missing/dangling evidence, fabricated claim, prompt
-    injection in CV, excessive arrays/text, cache null, free gate, and sensitive routing.
+- [x] **Register interview brief task** — done 2026-07-28 (`0374563`), NOT yet deployed
+  - Files: `src/shared/lib/ai/tasks.ts`, `src/routes/api/ai/complete.ts`,
+    `tests/unit/shared/lib/ai/interview-brief-task.test.ts` (new)
+  - **The output schema is built per call from the manifest that was actually sent.** A static schema
+    cannot know which source ids are legitimate, and "any non-empty string" accepts every fabricated
+    citation. A model asked to summarise a CV will cheerfully attribute a plausible claim to a document
+    nobody supplied, and a human reading a tidy `[doc-3]` has no way to notice.
+  - A `submitted_link` cannot be cited as factual evidence at all: citing it would present something we
+    never read as something we verified.
+  - Prohibited language is rejected **structurally**, not discouraged in the prompt. A brief is read by
+    someone deciding whether to hire; "not a culture fit" launders a judgement as an observation, and a
+    prompt is advice where a schema is a boundary. The check also applies on the registry's
+    manifest-less schema so the weaker path is not a way around it.
+  - A new `sensitive` flag makes `/api/ai/complete` refuse the task — that route reaches MiniMax, which
+    is not the provider a candidate was told would process their CV. Refused by flag rather than by an id
+    list that could drift, and answered `unknown_task` because a caller probing the route has no business
+    learning the task exists.
+  - Verify (2026-07-28): 27 tests. Fabricated citations in all three citation sites, a restricted link
+    cited as evidence, four kinds of prohibited language in four positions, unbounded input, and that
+    injected instructions in a CV stay inside the `<candidate-evidence>` boundary.
 
-- [ ] **Add brief schema and repository**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
+- [x] **Add brief schema and repository** — done 2026-07-28 (`7375439`), NOT yet deployed
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0090_sour_stranger.sql` (new),
+    `drizzle/0091_interview_briefs_rls_grants.sql` (new),
     `src/shared/lib/repositories/interviews.ts` (new),
-    `tests/unit/shared/lib/repositories/interviews.test.ts` (new),
-    `tests/unit/shared/lib/security/rls-policy.test.ts`
-  - Do: Add `interview_briefs` with organization/event composite FK, owner, version/status, validated
-    structured content/evidence manifest, provider/model/prompt version, expiry, editor, indexes, and
-    private owner/explicit-participant RLS. Store no model prompt/response envelope.
-  - Verify: migration/RLS/repository tests cover version uniqueness, owner/participant/admin denial,
-    evidence shape, tenant B, and explicit DTO.
+    `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`, `scripts/db/audit-schema.ts`
+  - **The narrowest policy in the schema.** Owner has ALL; a colleague *explicitly granted* access to that
+    interview has SELECT; nobody else has anything — including an organization admin, who manages seats
+    and billing without needing a colleague's evaluation of a candidate. No capability grant: a GDPR
+    access request is the lawful mediated route for a candidate to see what was written about them.
+  - The fixture gained a participant with `access_granted = false`, because without one "the granted
+    participant can read it" holds whether the policy checks the flag or merely membership.
+  - No prompt, no raw_response, no messages column. Provenance is constrained all-or-nothing, so "which
+    model wrote this" is answerable per row or says plainly that no model did.
+  - **Three defects the tests caught, not review**: `toRow` assumed snake_case while drizzle returns
+    camelCase, and `String(undefined)` yields the *string* `'undefined'` — silently corrupting six
+    functions; `insertBriefVersion` superseded the active brief even for a draft, leaving the organizer
+    with a pending draft and no active brief; and a `Date` as a raw postgres.js parameter fails with an
+    opaque `ERR_INVALID_ARG_TYPE` far from the column responsible.
+  - Also closed a gap open since Phase 6: the schema audit was reporting **seven** unclassified tables
+    (every one this program added, plus `privacy_consents`) and the step is `continue-on-error`, so it
+    never blocked anything. All seven are now classified with the path each policy actually takes.
+  - Verify (2026-07-28): 17 repository tests including three concurrent generations never claiming the
+    same version, plus RLS assertions for owner, granted participant, admin, non-granted participant,
+    tenant B, and by-id targeting.
 
-- [ ] **Implement brief generation/version service**
-  - Files: `src/lib/interviews/brief-service.ts` (new),
+- [x] **Implement brief generation/version service** — done 2026-07-28 (`f0549e4`), NOT yet deployed
+  - Files: `src/lib/interviews/evidence.ts` (new), `src/lib/interviews/brief-service.ts` (new),
     `tests/unit/lib/interviews/brief-service.test.ts` (new)
-  - Do: Assemble role/profile/document and approved public-web extraction evidence with stable source
-    IDs/provenance, reserve 5 credits, call sensitive task, validate evidence, save new draft version,
-    settle/refund, support section regeneration/manual edits, and create deterministic fallback when
-    disabled/failing. URL-only restricted-platform links are displayed but never treated as fetched
-    factual evidence.
-  - Verify: tests cover ready/pending/rejected docs and websites, LinkedIn URL-only, no evidence, provider invalid/timeout, credit
-    shortage, idempotent retry, fallback, edit/version conflict, settle and refund.
+  - Only material we actually read becomes citable. A pending or rejected document contributes **nothing**
+    — not an empty slot — because a manifest entry with no text invites the model to invent what it might
+    have said, and a citation to it would look identical to a citation of something real.
+  - Source ids derive from the row (`doc:<uuid>`), never an array index: renumbering on regeneration would
+    silently repoint every citation in every earlier version.
+  - Credits, then provider, then persistence — the row is written inside the reservation wrapper, so a
+    persistence failure rolls the settlement back and nobody is charged for a brief they never received.
+    The kill switch is checked *before* reserving.
+  - Failure yields a deterministic fallback marked by carrying no provenance at all. Every fallback claim
+    is true by construction ("a source was supplied") at low confidence, and the absence of AI is stated
+    rather than disguised. Entitlement and credit failures are deliberately *not* smoothed into a
+    fallback: an organizer out of credits needs to know that.
+  - Verify (2026-07-28): 16 tests against a real disposable Postgres and the real billing platform.
+    Two of my own test defects along the way: reservations persisted between tests so "nothing was
+    charged" read a previous row, and my fake threw a ZodError no production path can produce instead of
+    the `AIParseError` the real adapter throws.
 
-- [ ] **Add brief APIs and editor**
-  - Files: `src/routes/api/interviews/$interviewId/brief/index.ts` (new),
-    `src/routes/api/interviews/$interviewId/brief/$version.ts` (new),
-    `src/routes/_dashboard/interviews/$interviewId/index.tsx` (new),
+- [x] **Add brief APIs and editor** — done 2026-07-28 (`c8122c9`), NOT yet deployed
+  - Files: `src/routes/api/interviews/$interviewId/brief/index.ts` (new), `.../$version.ts` (new),
+    `src/lib/interviews/brief-context.ts` (new), `src/routes/_dashboard/interviews/$interviewId/index.tsx` (new),
     `src/modules/interviews/components/InterviewBriefEditor.tsx` (new),
-    `src/modules/interviews/components/EvidenceDrawer.tsx` (new)
-  - Do: Add generate/read/version/edit/ready handlers and UI with evidence navigation, gaps,
-    contradictions, question groups, section regeneration, credit estimate/confirmation, manual
-    fallback, version conflict recovery, and owner/participant permissions.
-  - Verify: API/component/Playwright tests generate from fixture CV, open every evidence link, edit,
-    regenerate, handle insufficient credits/provider failure, and deny admin/tenant B.
+    `.../EvidenceDrawer.tsx` (new), `.../InterviewBriefPage.tsx` (new), `src/shared/lib/interview-api.ts`
+  - `interviewId` is the calendar event id, so unlike the Phase 6 document download these routes needed
+    **no** deviation from the planned path.
+  - "Not yours" and "does not exist" are the same empty read: telling them apart would confirm an
+    interview exists to someone who cannot see it. `canEdit` is answered by the server, so a participant
+    is never offered a regenerate button the API will refuse.
+  - `PATCH` takes content only and the route re-supplies the manifest from the stored row — an editable
+    manifest would let a citation be pointed at something never in evidence.
+  - Provenance is on screen: a brief with no provider says plainly it was written without AI. Every
+    citation is a button labelled with its source, because a citation you cannot open is one you must take
+    on trust. A newer version is *offered*, never applied, so nothing being typed is discarded.
+  - The evidence drawer renders text in `<pre>`, never `dangerouslySetInnerHTML` — not because the text is
+    markup (the extractors strip it) but because a component that *can* render candidate HTML will
+    eventually be handed some.
+  - Verify (2026-07-28): 19 component tests. Two defects of mine: an assertion looked for uppercase
+    headings CSS produces and `textContent` does not, and a textarea edit assigned `.value` directly,
+    which React does not observe.
+
+### Phase 8 deviated from the plan on the provider, and the plan was wrong
+
+The first task read "Implement Azure regional sensitive AI adapter" with files `azure.ts`. Mistral has
+been primary since 2026-07-26 (`docs/operations/interview-provider-register.md`, `env.ts`'s default, and
+the product owner directly) after Azure provisioning hit a zero-quota wall and a residency regression.
+Renamed in place rather than left for the next reader to rediscover.
+
+Both providers were also verified against their real endpoints for the first time — `pnpm test:ai-live`,
+opt-in and synthetic-only. That measured something worth keeping: MiniMax fails schema validation roughly
+one call in four *after* its own retry, while Mistral passed four for four. Eight production routes call
+MiniMax and surface it as a 502, so the user-visible effect is an AI feature that fails intermittently.
+Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 9 — Live interview persistence and transcription
 
