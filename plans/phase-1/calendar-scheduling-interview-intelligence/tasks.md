@@ -2117,7 +2117,7 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 11 — Retention, privacy, reconciliation, and operations
 
-- [x] **Implement retention and reservation cleanup worker** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Implement retention and reservation cleanup worker** — done 2026-07-28 (`8c1d7c3`), NOT yet deployed
   - Files: `src/lib/interviews/retention-worker.ts` (new),
     `tests/unit/lib/interviews/retention-worker.test.ts` (new),
     `src/shared/lib/repositories/interview-retention.ts` (new),
