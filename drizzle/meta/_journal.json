@@ -631,6 +631,20 @@
       "when": 1785230255564,
       "tag": "0089_candidate_document_capability_scoping",
       "breakpoints": true
+    },
+    {
+      "idx": 90,
+      "version": "7",
+      "when": 1785244433839,
+      "tag": "0090_sour_stranger",
+      "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1785244434839,
+      "tag": "0091_interview_briefs_rls_grants",
+      "breakpoints": true
     }
   ]
 }

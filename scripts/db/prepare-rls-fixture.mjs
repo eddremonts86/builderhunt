@@ -206,6 +206,26 @@ try {
             'org-a/eeeeeeee/cv.pdf', 'cv.pdf', 'application/pdf', repeat('a', 64), 1024, now() + interval '180 days')
     on conflict (id) do nothing
   `
+  // A participant who is on the event but was NOT granted access to its preparation material. Without
+  // this row, "the granted participant can read the brief" holds whether the policy checks
+  // `access_granted` or merely membership — and being added to a calendar invite is not the same act as
+  // being handed a candidate assessment.
+  await owner`
+    insert into event_participants (id, organization_id, event_id, event_owner_user_id, user_id, role, access_granted)
+    values ('cccccccc-0000-4000-8000-00000000000d', 'org-a', 'bbbbbbbb-0000-4000-8000-00000000000a', 'user-a', 'user-d', 'attendee', false)
+    on conflict (id) do nothing
+  `
+
+  // An interview brief on that event: an assessment of a named person, which is why its policy is
+  // narrower than any other table here.
+  await owner`
+    insert into interview_briefs (id, organization_id, event_id, owner_user_id, version, status, content, evidence_manifest, retention_expires_at)
+    values ('aaaaaaaa-1111-4000-8000-00000000000a', 'org-a', 'bbbbbbbb-0000-4000-8000-00000000000a', 'user-a', 1, 'active',
+            '{"candidateSummary":"s","relevantEvidence":[],"informationGaps":[],"contradictions":[],"questionGroups":[]}'::jsonb,
+            '[]'::jsonb, now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+
   // One link per candidate, so the invitation-scoped capability policy 0086 applied to
   // `candidate_links` is measured rather than assumed. It had no fixture and no assertion at all
   // until now, which meant the narrowing was shipped unverified.

@@ -2464,6 +2464,74 @@ export const documentExtractions = pgTable(
  * `robotsResult` is stored rather than inferred because "we were allowed to fetch this" is a claim
  * that has to be auditable after the fact, when robots.txt has since changed.
  */
+/**
+ * Versioned interview briefs (plan: calendar-scheduling-interview-intelligence, Phase 8).
+ *
+ * ## No model envelope, ever
+ *
+ * There is no `prompt`, no `raw_response`, no `messages` column, and that absence is the design. The
+ * prompt contains the candidate's CV and the response contains an assessment of a named person; a
+ * stored envelope would be a second copy of both, in a table with different access rules from the
+ * documents it was assembled from, outliving the retention the candidate was told about. What is kept
+ * is the *validated* content, the manifest of what was cited, and enough provenance
+ * (`provider`/`model`/`promptVersion`) to answer "which model wrote this, under which prompt".
+ *
+ * ## Versions accumulate; they do not overwrite
+ *
+ * A regenerated brief is a new row at the next version, and the previous one becomes `superseded`.
+ * Overwriting would silently change text an organizer may already have read, quoted in a decision, or
+ * cited to a colleague — and would make `edited_by_user_id` a lie, because the row would no longer be
+ * the thing that person edited.
+ */
+export const interviewBriefs = pgTable(
+  'interview_briefs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    eventId: uuid('event_id').notNull(),
+    /** The organizer the brief belongs to. Copied rather than joined so RLS can decide without a hop. */
+    ownerUserId: text('owner_user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    status: text('status').notNull().default('draft'),
+    /** Validated against `interviewBriefContentSchema` before it is written — never raw model output. */
+    content: jsonb('content').$type<Record<string, unknown>>().notNull(),
+    /** Every source the brief was allowed to cite, with the ids its claims reference. */
+    evidenceManifest: jsonb('evidence_manifest').$type<unknown[]>().notNull().default([]),
+    /** Null on a deterministic fallback brief, which is assembled without a model at all. */
+    provider: text('provider'),
+    model: text('model'),
+    promptVersion: text('prompt_version'),
+    /** Set when a human edited this version's content. Null on a freshly generated one. */
+    editedByUserId: text('edited_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    retentionExpiresAt: timestamp('retention_expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('interview_briefs_organization_id_id_unique').on(table.organizationId, table.id),
+    // One row per version per event. This is what makes "regenerate" an insert rather than a race:
+    // two concurrent generations cannot both claim version 3.
+    uniqueIndex('interview_briefs_event_version_unique').on(table.organizationId, table.eventId, table.version),
+    foreignKey({
+      columns: [table.organizationId, table.eventId],
+      foreignColumns: [calendarEvents.organizationId, calendarEvents.id],
+      name: 'interview_briefs_organization_event_fk',
+    }).onDelete('cascade'),
+    index('interview_briefs_event_idx').on(table.organizationId, table.eventId),
+    index('interview_briefs_retention_idx').on(table.retentionExpiresAt),
+    check('interview_briefs_status_check', sql`${table.status} in ('draft', 'active', 'superseded')`),
+    check('interview_briefs_version_check', sql`${table.version} > 0`),
+    // Provenance is all-or-nothing: a brief either came from a model — in which case we can say which
+    // one, under which prompt — or it is the deterministic fallback and says so by carrying none. A
+    // half-filled provenance would leave "which model wrote this" unanswerable for that row.
+    check(
+      'interview_briefs_provenance_check',
+      sql`(${table.provider} is null and ${table.model} is null and ${table.promptVersion} is null)
+          or (${table.provider} is not null and ${table.model} is not null and ${table.promptVersion} is not null)`,
+    ),
+  ],
+)
+
 export const candidateWebImports = pgTable(
   'candidate_web_imports',
   {

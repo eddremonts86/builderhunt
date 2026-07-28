@@ -360,6 +360,14 @@
     "0089_candidate_document_capability_scoping": {
       "sql": "c7d3689f1dde5cab5a411498d999c4607a5fd168af3f0dfb29308e83b84c1b01",
       "snapshot": "41b826c779b5d18858ba7e2892780c136f796fee03b358362eef80945ffa1b33"
+    },
+    "0090_sour_stranger": {
+      "sql": "471f952094dc0ecd5ad26f9fed5c4a78650be416c87c3b7c211d4e10ab5c5619",
+      "snapshot": "532790c84a6f1d4f3309bee49fbb4bd553a8cd8a42f9be99392d3a9310bfcecb"
+    },
+    "0091_interview_briefs_rls_grants": {
+      "sql": "cfb3d84e6a5d9f664b6ec6cb7a64971b256b9fcad995e094e6b3ab9aca8b60ba",
+      "snapshot": "c3f361fd8afd6cce4cc4c4004ea58a1df1d00b788d9be8f553978fded7cf3df7"
     }
   }
 }

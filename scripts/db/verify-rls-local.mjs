@@ -552,6 +552,42 @@ try {
   // The worker is cross-tenant by design and sees every document there is — two in org-a now.
   if (documentsWorker !== 2) throw new Error(`worker could not read candidate documents (${documentsWorker} rows)`)
 
+  // interview_briefs (Phase 8): the narrowest policy in the schema. A brief is an assessment of a named
+  // person, so it is readable by the organizer who owns it and by a colleague *explicitly granted* access
+  // to that interview — and by nobody else, including an organization admin.
+  const readBriefs = async (userId, organizationId = 'org-a') => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    await transaction`select set_config('app.user_id', ${userId}, true)`
+    await transaction`select set_config('app.organization_role', 'admin', true)`
+    const rows = await transaction`select id from interview_briefs`
+    return rows.length
+  })
+
+  if (await readBriefs('user-a') !== 1) throw new Error('brief owner could not read their own brief')
+  // `user-c` is a participant with access_granted = true.
+  if (await readBriefs('user-c') !== 1) throw new Error('granted participant could not read the brief')
+  // `user-d` is an org ADMIN *and* a participant with access_granted = false. Both paths must fail: an
+  // admin manages seats and billing without reading a colleague's evaluation of a candidate, and being
+  // listed on an event is not the same act as being granted its preparation material.
+  if (await readBriefs('user-d') !== 0) throw new Error('an admin / non-granted participant read a brief they do not own')
+  if (await readBriefs('user-b', 'org-b') !== 0) throw new Error("tenant B read tenant A's brief")
+
+  // Asked for by primary key, which is the request a filtering bug would still answer.
+  const targetedBrief = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-d', true)`
+    const rows = await transaction`select id from interview_briefs where id = 'aaaaaaaa-1111-4000-8000-00000000000a'`
+    return rows.length
+  })
+  if (targetedBrief !== 0) throw new Error('a non-granted user reached a brief by id')
+
+  // The worker sweeps expired briefs and must see them.
+  const briefsWorker = await worker.begin(async (transaction) => {
+    const rows = await transaction`select id from interview_briefs`
+    return rows.length
+  })
+  if (briefsWorker !== 1) throw new Error(`worker could not read interview briefs (${briefsWorker} rows)`)
+
   // availability_policies: owner-only, and specifically NOT readable by an org admin. This table
   // is where a policy's version and default reminder settings live, so a leak here would expose
   // when a colleague changed their working hours.
