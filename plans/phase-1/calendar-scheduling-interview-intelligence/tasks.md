@@ -2272,17 +2272,35 @@ Not fixed here — it predates this program and deserves its own work.
     legitimate work statement accepted, Spanish accepted and the Spanish-only gap documented. Plus four UI
     tests for the label, the limitations, and the template's different notice.
 
-- [ ] **Implement provider usage reconciliation**
+- [x] **Implement provider usage reconciliation** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/lib/interviews/usage-reconciliation.ts` (new),
-    `tests/unit/lib/interviews/usage-reconciliation.test.ts` (new),
-    `src/shared/lib/billing/feature-authorization.ts`,
-    `src/shared/lib/billing/reconciliation.ts`
-  - Do: Normalize Deepgram duration and Azure token usage, attach provider references/actuals to the
-    platform settlement, and report matched/variance/missing/duplicate evidence through the billing
-    reconciliation contract. Request reviewed platform `refundUsage` adjustments above policy; never
-    write the ledger or create a second billing worker/route and never debit extra after close.
-  - Verify: fixtures cover exact, rounding, <1%, >1%, missing provider, duplicate, late usage, refund,
-    and unauthorized route; test provider export reconciles to ledger.
+    `tests/unit/lib/interviews/usage-reconciliation.test.ts` (new)
+  - **It compares and requests; it never writes the ledger.** Every correction goes through the platform's
+    `refundUsage`, which makes the entries, demands provider evidence, and refuses a refund larger than what
+    was consumed. Reimplementing any of that would be a second billing path that agrees with the first until
+    the day it does not. No new worker and no new route — the existing reconciliation contract carries the
+    report.
+  - **It only ever refunds.** An under-billing above policy is *reported*, never chased: the customer has
+    already been told what the interview cost, and reaching into a closed period to take more is not a
+    correction. A plant that removed the direction check fails.
+  - **Rounding is not a variance.** Transcription bills whole minutes and Deepgram reports fractional seconds,
+    so a 1,800-second call settles at 31 against a provider figure of 30. Treating that as a discrepancy would
+    make every interview one and the report worthless. The band is the rate card's own unit, not a percentage.
+  - A duplicated provider reference is refused rather than summed: two records for one reference could be a
+    retry or a double-report, and adding them would bill a customer for the provider's own ambiguity.
+  - Token counts are carried as evidence and contribute zero units, because brief and report are flat-priced —
+    for those operations the comparison is about whether the call happened, not how large it was.
+  - `matched` and `rounding` map to no mismatch type at all: reporting them would bury the ones that matter.
+  - **A test of mine measured the wrong thing.** "calls a small real difference a variance within policy" used
+    100 against 101 units — a one-unit difference, which is inside the rounding band by design. It was
+    measuring rounding while claiming to measure variance.
+  - Verify (2026-07-28): 23 tests over minute rounding in both directions, flat token pricing, exact match,
+    rounding, within and above policy, the 1% boundary, a settled reservation with no provider record, a
+    release with none (the expected pair, not an alarm), provider work never settled, a duplicated reference,
+    counts across a mixed export, orphan provider records, report-only runs, the refund path with its evidence
+    and idempotency key, three refusals to refund, an unresolvable settlement id, the mismatch mapping, and a
+    late export reconciling on the next run. Three plants proved the under-billing refusal, the rounding band,
+    and duplicate detection are each load-bearing.
 
 - [ ] **Add redacted metrics and operator dashboards**
   - Files: `src/shared/lib/metrics.ts`, `src/routes/api/admin/metrics.ts`,
