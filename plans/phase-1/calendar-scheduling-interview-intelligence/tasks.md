@@ -1788,14 +1788,35 @@ Not fixed here — it predates this program and deserves its own work.
     refusal for participant/paused/finished/withdrawn, 429 on both buckets, reordered/repeated/oversized/
     empty batches, exactly-once resend, and speaker correction attribution.
 
-- [ ] **Implement IndexedDB final-text outbox**
+- [x] **Implement IndexedDB final-text outbox** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/modules/interviews/lib/transcript-outbox.ts` (new),
-    `tests/unit/modules/interviews/lib/transcript-outbox.test.ts` (new)
-  - Do: Store only unacknowledged final text segments keyed by session/user, encrypt where supported
-    or minimize to required fields, retry idempotently, delete on acknowledgement/logout/finish/
-    expiry, and expose a cleanup marker for retention on next visit. Never store audio/interim text.
-  - Verify: browser tests cover refresh/offline/reconnect, duplicate ack, cross-user separation,
-    expiry/logout cleanup, storage quota error, and absence of audio/interim payload.
+    `tests/unit/modules/interviews/lib/transcript-outbox.test.ts` (new), `package.json`
+    (`fake-indexeddb` devDependency)
+  - **Minimized rather than encrypted.** Web Crypto can encrypt the text, but the key would have to live
+    in the same browser storage as the ciphertext, so anything that could read one could read the other.
+    The real reduction is holding less for less time: only unacknowledged finals, deleted the moment the
+    server confirms them, so the steady state during a healthy interview is an *empty* store. A test
+    asserts that steady state rather than assuming it.
+  - **`IDBObjectStore.delete` fires `onsuccess` whether or not the key existed**, so the first
+    `acknowledge` counted attempts and reported a duplicate acknowledgement as having removed something.
+    It reads first now, which is also what makes the count mean "this send was new".
+  - **A plant found a test passing for the wrong reason.** Removing the user from the primary key broke
+    nothing, because the user-scoped *read* was doing the work. The case the key actually protects is two
+    organizers on one shared machine with access to the same interview: without it, B's `put` silently
+    overwrites A's record, the row carries B's userId, and A's next read returns nothing with no error
+    anywhere. Added that test; it now fails under the plant.
+  - Retention is swept at open, not on a timer — a timer does not run while the tab is closed, which is
+    exactly the case that produces stale records. Twelve-hour TTL, and a sweep collects *every* user's
+    expired records because only a different user's visit will ever reach one belonging to someone who
+    never came back.
+  - `assertNoForbiddenPayload` is exported as the guarantee: eleven field names plus the *shapes*
+    (`ArrayBuffer`, typed array, `Blob`, a `blob:` URL string) under any name. `isFinal` is on the list
+    because its presence means the caller is storing provider messages rather than parsed finals.
+  - Verify (2026-07-28): 38 tests over reload, offline accumulation and drain, duplicate acknowledgement,
+    cross-user read/acknowledge/overwrite, per-session isolation, logout and finish cleanup, expiry sweep
+    in both directions, absent IndexedDB, a failing open, `QuotaExceededError`, and a transaction that
+    aborts after a successful `put`. Three plants proved the compound-index read, the primary key, and
+    the sweep-at-open are each load-bearing.
 
 - [ ] **Implement browser capture and Web Audio mixer**
   - Files: `src/modules/interviews/lib/audio-capture.ts` (new),
