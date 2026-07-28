@@ -2302,16 +2302,39 @@ Not fixed here — it predates this program and deserves its own work.
     late export reconciling on the next run. Three plants proved the under-billing refusal, the rounding band,
     and duplicate detection are each load-bearing.
 
-- [ ] **Add redacted metrics and operator dashboards**
-  - Files: `src/shared/lib/metrics.ts`, `src/routes/api/admin/metrics.ts`,
-    `src/routes/_dashboard/admin/metrics.tsx`, `src/shared/lib/log.ts`,
-    `tests/unit/shared/lib/log.test.ts`
-  - Do: Add booking conflict, slot latency, document backlog/failure, capture capability, transcript
-    latency/reconnect/persistence, provider error, credit reservation, margin/variance, retention,
-    and stale-schedule metrics. Use IDs/counters only; expand redaction for candidate/provider/payment
-    fields.
-  - Verify: log tests prove no CV/link/email/transcript/prompt/token/signed URL/Stripe secret;
-    synthetic workflow updates dashboard and thresholds without content.
+- [~] **Add redacted metrics and operator dashboards** — metrics and redaction done 2026-07-28 (`PENDING`);
+  **the admin dashboard page is not built**
+  - Files: `src/shared/lib/metrics.ts`, `src/shared/lib/log.ts`, `tests/unit/shared/lib/log.test.ts`
+  - **Twenty interview counters**, all counters and ids and nothing else: booking conflicts, document backlog
+    and failures, capture capability split three ways, transcript reconnects, segments persisted and retried,
+    provider errors separated from model parse failures, template fallbacks, prohibited-output refusals, stale
+    reservations, usage variances, retention rows and objects deleted, retention object failures, and stale
+    schedules. Each one is a number a dashboard can show with no candidate's name anywhere near it.
+  - **`metrics.reset()` listed every key by hand**, so a counter added later survived every reset — and a test
+    that resets between cases would have read a previous case's number. Derived from `Object.keys` now.
+  - **The log redaction was extended for the fields that actually carry interview material**, and this is the
+    part that mattered most: a log aggregator has its own retention, its own access list, and its own export,
+    so a transcript line that leaks into one has escaped every guarantee the feature makes — *including the
+    retention sweep that deleted it from the table*. Added transcript and segment text, extracted document
+    text, brief summaries, report statements, rationales, answers, organizer notes, object keys, signed URLs,
+    capability secrets and hashes, provider access tokens, candidate emails and filenames, and provider API
+    keys.
+  - Three string patterns the key-based rules could not catch: a capability in a **URL fragment** (no
+    `token=`, no `Bearer`, just `#<secret>`, and it is the entire authorization for the candidate portal), a
+    presigned URL's **whole query string** (removing only `X-Amz-Signature` leaves a URL that still works), and
+    Stripe secret keys as they appear in provider error bodies.
+  - **Not done: the operator dashboard page.** The counters and the redaction are the load-bearing half and are
+    complete; rendering them is a separate surface with no test that would fail without it, and the
+    post-market monitoring document already records which signals are unmeasured and therefore what the page
+    would show today. Recorded rather than quietly skipped.
+  - **Another of my assertions measured itself:** "counts without carrying content" ran a regex for long
+    lowercase runs over the serialized snapshot, which matched the *counter names* —
+    `interviewRetentionObjectsDeleted` is twenty-odd letters. It now asserts every value is a number.
+  - Verify (2026-07-28): 36 tests. Twenty-one field shapes redacted with the candidate's words, email,
+    filename, capability and token all absent from the serialized entry; the fragment, presigned-URL and
+    Stripe-key string patterns; a circular structure staying redacted; and an explicit test that the
+    identifiers an operator *needs* still survive — a log with nothing left in it drives someone to log the
+    content directly. A plant removing `transcript` from the key list fails four of them.
 
 - [ ] **Add backup and restore coverage**
   - Files: `scripts/db/backup.ts`, `scripts/db/restore-test.ts`,
