@@ -1902,15 +1902,26 @@ Not fixed here — it predates this program and deserves its own work.
     microphone-only prohibition, the diarization-is-a-guess labelling, and the unticked acknowledgement are
     each load-bearing.
 
-- [ ] **Run real browser capture beta verification**
+- [~] **Run real browser capture beta verification** — runbook written 2026-07-28 (`PENDING`);
+  **execution BLOCKED on hardware and human participants**
   - Files: `docs/operations/interview-runtime-verification.md` (new)
-  - Do: Test current/previous stable Chrome on macOS/Windows using in-person microphone and separate
-    Meet/Zoom/Teams web-tab audio, headphones/speakers/external mic, Spanish/English, noise and crosstalk. Record
-    capability—not candidate content—latency, loss, diarization corrections, cleanup, and failures.
-    Document Edge beta and Safari/Firefox/mobile/native-app manual-only degradation.
-  - Verify: two consented/synthetic 30-minute sessions finish/reconnect with 99.9% acknowledged final
-    segments, correct channel attribution/billing variance, candidate withdrawal stop within ten
-    seconds, and DevTools/storage/network inspection showing no audio or video artifact.
+  - **What is done:** the full procedure. The browser/platform matrix as `detectCaptureSupport` actually
+    decides it (ten cells), the degradation table naming where each fallback is enforced in code, the
+    session script (crosstalk, two languages, noise, a deliberate 20-second network cut, pause/resume,
+    device change), the seven measurements with their targets, the four DevTools artifact inspections, and
+    empty results tables with sign-off criteria.
+  - **What is NOT done, and why I cannot do it:** the two consented 30-minute sessions. They need current
+    *and* previous stable Chrome on macOS *and* Windows, physical microphones, headphones and an external
+    mic, a real Meet/Zoom/Teams call on a second machine, and two humans holding a conversation with
+    deliberate crosstalk in two languages. `getDisplayMedia` has no headless path — Chrome's
+    `--auto-select-desktop-capture-source` bypasses the very picker under test — and synthetic audio
+    separates cleanly, so it would certify diarization that fails on two people interrupting each other.
+  - The measurements are also only meaningful from a real session: billing variance is provider-billed
+    seconds against a conversation with real pauses, and echo cancellation only matters when a speaker
+    plays the remote voice into the same room as the microphone.
+  - Results tables are left **empty on purpose**. A guessed row would be worse than a missing one — this
+    document exists precisely so the numbers can be shown to have come from a machine.
+  - Verify: sign-off criteria are in the document as an unchecked list. None are ticked.
 
 ## Phase 10 — Contextual questions and reports
 
