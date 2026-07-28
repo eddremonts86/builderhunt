@@ -523,12 +523,42 @@ route candidate data to the general-purpose MiniMax provider the rest of the app
 
 ## 5. Non-credential blockers
 
+These are split by **what they actually gate**. Conflating the two stalled Phase 6 for no reason:
+a legal sign-off cannot be a precondition for writing a storage adapter against a container running
+on the developer's own machine.
+
+### Gates development — must be resolved to build or run the feature
+
+| Item | Who | Status |
+| --- | --- | --- |
+| **Canonical tenant/RLS release gate** | — | ✅ Closed 2026-07-27. `organization_id` is `NOT NULL` on all seven tenant-private tables (`drizzle/0081`), in production. |
+| **MinIO + ClamAV deployed and env set** | You | The only remaining thing standing between Phase 6 and production. Both are first-party, so there is no account, DPA or vendor to wait for. |
+
+### Gates turning a feature ON in production with real people's data
+
 | Item | Who | Notes |
 | --- | --- | --- |
-| **DPIA** | You + data-protection advisor | Required before production voice launch. Now narrower in scope: storage and scanning are first-party, so only Deepgram and Azure are third-country transfers. |
-| **Security/privacy reviewer sign-off** | A named human | `spec.md` requires a reviewer to sign this register once accounts exist. |
-| **Legal review of consent basis + retention** | Legal advisor | The consent wording and the 90-day / 180-day / 24-month retention periods. I can draft; I cannot approve. |
-| **Canonical tenant/RLS release gate** | You (in-flight) | The `security-and-multitenancy` cutover. |
+| **DPIA** | You + data-protection advisor | Before production **voice**. Narrower than first written: storage and scanning are first-party, so only Deepgram and Mistral are third-country transfers. |
+| **Deepgram no-training/no-retention statement** | Deepgram | Currently accepted without a written vendor statement — see §2. The claim made to candidates is unbacked until this exists. |
+| **Mistral Zero Data Retention** | Mistral support | Not self-serve; a support request. |
+
+### Gates general availability only — explicitly NOT development or MVP blockers
+
+Tracked in `docs/operations/general-availability-checklist.md`.
+
+Deferred by product-owner decision, 2026-07-28: neither is obtainable in the near term, and treating
+them as preconditions would block work they have no bearing on. They move to the pre-launch
+checklist, and nothing in `plans/phase-1/*` may list them as a dependency.
+
+| Item | Who | Notes |
+| --- | --- | --- |
+| **Security/privacy reviewer sign-off** | A named human | `spec.md` asks a reviewer to sign this register. Required before opening the product to the general public, not before building or piloting it. |
+| **Legal review of consent basis + retention** | Legal advisor | The consent wording and the 90/180-day and 24-month retention periods. Drafted and implemented as specified; approval is a launch step. |
+
+The distinction that makes this safe rather than a shortcut: an unsigned register does not change
+what the software does. Retention periods, consent capture and the fail-closed defaults are all
+implemented and enforced in code today; what is deferred is a human countersignature on choices that
+have already been made conservatively.
 
 ---
 

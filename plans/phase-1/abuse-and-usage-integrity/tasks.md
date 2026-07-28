@@ -1244,7 +1244,9 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
   - Files: `src/routes/_landing/legal/privacy.tsx`, consent surface
   - Do: disclose device fingerprinting (salted hashes, coarse UA) and its abuse-prevention purpose;
     align retention with the existing 30-day window.
-  - Verify: legal review sign-off recorded; privacy page renders the new disclosure.
+  - Verify: privacy page renders the new disclosure.
+  - Legal sign-off moved to `docs/operations/general-availability-checklist.md` (2026-07-28):
+    it gates opening to the general public, not this task, whose content is already shipped.
   - **Done (content).** Added a new "Device recognition data" bullet to section 1 ("Data we
     collect"), a cross-reference in section 4 ("Cookies and localStorage") for the `bh_did` device
     cookie, and a new paragraph in section 5 ("Data retention"). Two factual corrections made

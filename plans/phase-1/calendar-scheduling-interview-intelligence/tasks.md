@@ -35,8 +35,12 @@
     DPA links/status, retention, training opt-out, deletion, subprocessors, region, account owner,
     and annual review date. Reference the billing platform's independent Stripe provider register;
     do not duplicate it. Complete a DPIA before production voice enablement. Store no secret values.
-  - Verify: security/privacy reviewer signs the register; each regional endpoint is confirmed from a
-    test response/console and every provider can be disabled independently.
+  - Verify: each regional endpoint is confirmed from a test response/console and every provider can
+    be disabled independently.
+  - **The reviewer signature is deliberately NOT part of this task's Verify line** (product-owner
+    decision 2026-07-28). It is a general-availability gate, recorded as such in the register's
+    "Gates general availability only" table. A countersignature on an artifact does not change what
+    the software does, and blocking a storage adapter on it stalls work it has no bearing on.
   - ⚠️ **The task text above is stale in two places.** The provider set changed on 2026-07-26,
     after it was written: storage is **MinIO, self-hosted** — not Cloudflare R2 (commit `cb642d5`,
     which also widened `env.ts` to accept a private endpoint) — and sensitive AI is **Mistral (La
@@ -59,8 +63,10 @@
     `docker-compose` and the register has no deployment target recorded; `SENSITIVE_AI_ENABLED`,
     `CANDIDATE_UPLOADS_ENABLED` and `INTERVIEW_TRANSCRIPTION_ENABLED` are all unset, so every path
     is dark despite the credentials being present; the register flags a **missing bucket backup
-    target before real candidate data lands**; and the DPIA plus the reviewer signature are human
-    steps nobody can do for you.
+    target before real candidate data lands**; and the DPIA is a human step nobody can do for you
+    before production voice. The reviewer signature and the legal review of consent/retention are
+    **general-availability gates, not development or MVP blockers** — see the register's three-way
+    split. Nothing in this plan may list them as a dependency.
 
 - [ ] **Verify the billing platform certification dependency**
   - Files: `plans/stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
@@ -1206,7 +1212,33 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 6 — Private documents and candidate intake
 
-- [ ] **Add document, extraction, and consent schema/RLS**
+- [x] **Add document, extraction, and consent schema/RLS** — done 2026-07-28, deployed
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0084_flowery_gunslinger.sql`,
+    `drizzle/0085_candidate_documents_rls_grants.sql`, `drizzle/0086_capability_invitation_scoping.sql`,
+    `scripts/db/verify-rls-local.mjs`, `scripts/db/prepare-rls-fixture.mjs`
+  - `candidate_documents`, `document_extractions` and `candidate_web_imports` with tenant composite
+    FKs, checks, indexes, forced RLS and per-role grants. `privacy_consents` already existed.
+  - Shape choices worth keeping: no public-URL column (a URL that exists is a URL that leaks —
+    the generated object key is the only handle); audio media types rejected by check, because
+    accepting them would route recordings around the consent gate that governs interview capture;
+    extractions unique by (document, parser version, content hash) so a newer parser adds a row
+    instead of overwriting text a brief already cites; web imports store `robots_result` rather than
+    inferring it, since "we were allowed to fetch this" must stay auditable after robots.txt changes.
+  - **The RLS this task asked for turned out to be missing far more widely than these three tables.**
+    All fourteen capability policies matched on `app.organization_id` alone, so one candidate's
+    scheduling link admitted every other invitation in the organization — and their submissions,
+    links, consents, booked events and every organizer's hours. `0086` scopes them to
+    `app.invitation_id` (and `app.capability_owner_user_id` for availability, which a candidate
+    legitimately needs). Measured, not assumed: 2 invitations visible before, 1 after, 0 when asking
+    for the other candidate's by id.
+  - It survived because the real-roles verifier had **no capability connection at all**. It has one
+    now, plus a second candidate in the same organization — with only one seeded, an
+    organization-scoped policy and an invitation-scoped one are indistinguishable — and an assertion
+    that an unpinned connection sees nothing.
+  - Verify (2026-07-28): 87 migrations apply twice clean; RLS forced on all three tables with the
+    exact grants and no others; owner reads their documents while participant, org admin, colleague
+    and tenant B read none, and the worker still can; full `pnpm ci:local` green (18 passed), and CI
+    green with the capability role exercised for the first time.
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
     `docs/architecture/data-classification.md`, `tests/unit/shared/lib/security/rls-policy.test.ts`
   - Do: Add exact `spec.md` columns/checks for `candidate_documents`, `document_extractions`,
@@ -1575,7 +1607,11 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/routes/_landing/legal/privacy.tsx`,
     `src/routes/_landing/legal/terms.tsx`, `src/shared/lib/legal.ts`,
     `tests/unit/shared/lib/legal.test.ts`, `docs/operations/interview-provider-register.md`
-  - Do: After legal review, describe controller, documents, approved public-web import, transient
+  - **Not gated on legal review** (product-owner decision 2026-07-28). The copy is drafted and
+    shipped describing what the system actually does; a lawyer's approval is a general-availability
+    step, not a precondition for writing accurate notices. Writing them first is also what gives the
+    review something concrete to react to — waiting produces neither copy nor a review.
+  - Do: describe controller, documents, approved public-web import, transient
     audio capture, stored transcript, sensitive AI, four required purposes, legal basis, processors/
     regions, retention, rights, withdrawal consequences, no training, no automated decision, and
     credit billing. Version the exact independently accepted controls and preserve old versions.
