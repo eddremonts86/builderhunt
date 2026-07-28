@@ -40,7 +40,7 @@ the authoritative version.
 | **DPIA** | Production voice capture. Narrower than first scoped: storage and virus scanning are first-party, so only Deepgram and Mistral are third-country transfers. |
 | **Deepgram no-training/no-retention written statement** | `INTERVIEW_TRANSCRIPTION_ENABLED` in production. The claim currently made to candidates has no vendor statement behind it. |
 | **Mistral Zero Data Retention** | `SENSITIVE_AI_ENABLED` in production. A support request, not a self-serve toggle. |
-| **Off-box backup replication** | Real candidate documents. `pnpm db:backup:documents` survives a deletion; it does not survive the disk. |
+| ~~Off-box backup replication~~ | ✅ Already done since 2026-07-26 — `builderhunt-backup-sync.sh` rsyncs the MinIO volume to a Hetzner Storage Box nightly, which snapshots it at 05:00. Listed here in error; verified 2026-07-28. |
 
 ## Before flipping any of the interview flags
 
@@ -48,8 +48,9 @@ Mechanical, and none of it needs a third party:
 
 - [ ] MinIO and ClamAV deployed, with the deployment target and image digests recorded in the register.
 - [ ] A MinIO service account scoped to the one bucket — never the root credentials.
-- [ ] `pnpm db:backup:documents` on cron at 03:30 UTC, and one restore actually rehearsed. A backup
-      nobody has restored from is a hypothesis.
+- [x] Off-box document backup — already running (`builderhunt-backup-sync.sh`, 03:30 UTC).
+- [ ] One restore of the document volume actually rehearsed. The database restore has been; this one
+      has not. A backup nobody has restored from is a hypothesis.
 - [ ] `INTERVIEW_CLAMAV_HOST` reachable and `clamd` answering, verified with the EICAR string rather
       than a port check — a scanner that starts but never detects returns a clean verdict, which is
       worse than no scanner.

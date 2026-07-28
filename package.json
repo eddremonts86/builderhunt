@@ -57,8 +57,7 @@
     "abuse:baseline-report": "tsx --env-file=.env scripts/abuse/baseline-report.ts",
     "test:e2e:repeat": "node scripts/ci/e2e-repeat.mjs",
     "test:visual": "playwright test --project=visual-desktop --project=visual-mobile",
-    "test:lighthouse": "lhci autorun",
-    "db:backup:documents": "tsx --env-file-if-exists=.env scripts/db/backup-documents.ts"
+    "test:lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",

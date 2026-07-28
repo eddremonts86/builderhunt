@@ -115,15 +115,11 @@ services:
       - '127.0.0.1:3310:3310'
     volumes:
       - builderhunt_antivirus_data:/var/lib/clamav
-    healthcheck:
-      # First boot downloads the signature database and takes minutes. The
-      # scanner must not be pointed at until this passes — an unready clamd
-      # refuses connections, which is indistinguishable from a scan failure.
-      test: ['CMD-SHELL', 'clamdscan --ping 1 || exit 1']
-      interval: 15s
-      timeout: 10s
-      retries: 20
-      start_period: 300s
+    # No healthcheck here: it lives in the image (docker/clamav/Dockerfile), so a
+    # `docker run` deployment — which is how this is deployed on the server —
+    # reports health too. First boot downloads the signature database and takes
+    # minutes; the scanner must not be pointed at until it passes, because an
+    # unready clamd refuses connections, which looks exactly like a scan failure.
 
 volumes:
   builderhunt_postgres_data:

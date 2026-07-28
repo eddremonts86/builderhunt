@@ -131,19 +131,19 @@ rather than every bucket on the instance.
 MinIO on a single box has **no redundancy**. If that disk fails, candidate documents are gone;
 Cloudflare R2 offers eleven-nines durability. Two mitigations, in order of effort:
 
-1. ✅ **Done 2026-07-28**: `pnpm db:backup:documents` (`scripts/db/backup-documents.ts`) mirrors the
-   bucket to local disk daily, 14 snapshots retained. Cron at 03:30 UTC, half an hour after the
-   database dump, so a restore does not pair a `candidate_documents` row with missing bytes — the
-   worse of the two failure modes, because the app then believes it has a document it cannot serve.
-   It uses `@aws-sdk/client-s3`, already a dependency, rather than the `mc` binary: a cron job on a
-   production box should not need a second binary installed and version-matched beside it. Verified
-   against the local MinIO — object copied with its key path intact, and a missing credential fails
-   the run loudly instead of writing an empty snapshot.
-   Retention is 14 days against the database's 30, deliberately: documents are personal data under a
-   180-day product retention, and backup copies that outlive the product's own promise widen the
-   blast radius of the backup.
-2. Still open — a Hetzner Storage Box (1 TB, ~€4/month) as an **off-box** target. Item 1 survives a
-   dropped table; it does not survive the disk or the box.
+Both mitigations are **already in place**, and were before this section was last read:
+
+1. ✅ The MinIO volume is rsynced nightly by `builderhunt-backup-sync.sh` — the same script that
+   ships the database dumps and the cluster roles, deliberately in one place because the €4/month
+   Storage Box was justified by this volume, not by the ~5 MB database.
+2. ✅ The Hetzner Storage Box **is** the off-box target, with its own 05:00 snapshot so a deletion
+   propagated by rsync is still recoverable.
+
+One real defect found and fixed 2026-07-28: the installed crontab entry was missing the
+`>> /var/log/builderhunt-backup-sync.log 2>&1` redirection its own header documents, so two nightly
+runs left no trace and a failure would have been invisible. The runs were in fact succeeding —
+confirmed by comparing the dumps on the Storage Box against the local ones — but a backup you cannot
+observe is one you will discover the state of at the worst possible moment.
 
 Disk pressure is also real: 80 GB is shared with Postgres, Redis, Ollama and the app. At 25 MB per
 invitation, 1,000 candidates is 25 GB. Monitor it.
@@ -156,8 +156,13 @@ invitation, 1,000 candidates is 25 GB. Monitor it.
   are set there, with a 20/40-character service account rather than the root credentials.
 - **Image + digest**: _(pin on deployment)_
 - **Bucket**: `builderhunt-interview-documents`
-- **Backup target**: local disk via `pnpm db:backup:documents`, 14 daily snapshots — see §"The one
-  real trade-off". ⚠️ Still no **off-box** copy; that survives a deletion, not a dead disk.
+- **Backup target**: ✅ **off-box, and it has been since 2026-07-26.**
+  `/usr/local/bin/builderhunt-backup-sync.sh` rsyncs the `builderhunt-minio-data` volume to the
+  Hetzner Storage Box sub-account nightly at 03:30 UTC, and the Storage Box takes its own snapshot
+  at 05:00 (max 10) — a replication target without snapshots just mirrors a deletion. Wired up
+  deliberately *before* any document existed, so the off-site copy was never retrofitted onto data
+  that already mattered. Verified 2026-07-28: today's run completed and `./minio-data/` on the
+  Storage Box is current.
 - **DPA / sub-processor**: **none — no third party involved.**
 - **Deletion API**: yes (S3 `DeleteObject`) — the retention worker uses it.
 

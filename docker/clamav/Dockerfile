@@ -41,4 +41,13 @@ COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 EXPOSE 3310
+
+# On the image, not only in compose. `docker run` ignores a compose-level
+# healthcheck, so an image that only described its health there reported none at
+# all when deployed the way this one actually is — and a wait-for-healthy loop
+# then spins until it times out on a container that was fine all along.
+# `--ping 1` is clamd answering on the socket, which is the thing callers need.
+HEALTHCHECK --interval=15s --timeout=10s --start-period=300s --retries=20 \
+  CMD clamdscan --ping 1 || exit 1
+
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
