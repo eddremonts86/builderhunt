@@ -91,6 +91,27 @@ describe.skipIf(!configured)('S3StorageProvider against a real object store', ()
     expect(await response.text()).toBe('downloadable')
   })
 
+  it('streams the bytes back for the scanner', async () => {
+    const key = `${prefix}/scannable.pdf`
+    await put(key, 'bytes for clamd')
+    const object = await provider.readObject({ key })
+    expect(object.bytes).toBe('bytes for clamd'.length)
+
+    const chunks: Uint8Array[] = []
+    for await (const chunk of object.stream) chunks.push(chunk)
+    expect(Buffer.concat(chunks).toString()).toBe('bytes for clamd')
+  })
+
+  it('throws rather than yielding an empty stream for a missing object', async () => {
+    // The distinction that matters: `headObject` answers null because absence
+    // is a legitimate answer, but a zero-byte stream handed to clamd comes back
+    // `clean`. Reading something that is not there has to be an error.
+    await expect(provider.readObject({ key: `${prefix}/not-here.pdf` })).rejects.toMatchObject({
+      name: 'StorageProviderError',
+      code: 'not_found',
+    })
+  })
+
   it('moves an object and leaves nothing behind at the source', async () => {
     const from = `${prefix}/quarantine/scan-me.pdf`
     const to = `${prefix}/clean/scanned.pdf`

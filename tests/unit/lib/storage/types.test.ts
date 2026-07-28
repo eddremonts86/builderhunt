@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { StorageProviderError } from '~/lib/storage/types'
 import type {
   DocumentExtractionProvider,
   ScanResult,
@@ -10,6 +11,7 @@ import type {
 /** Proves `StorageProvider` is implementable with zero I/O and no provider package — no `@aws-sdk/*` import here. */
 class FakeStorageProvider implements StorageProvider {
   private readonly objects = new Map<string, StorageObjectMetadata>()
+  private readonly bodies = new Map<string, Uint8Array>()
 
   async createSignedUploadUrl(params: { key: string; contentType: string; maxBytes: number }) {
     this.objects.set(params.key, { bytes: 0, contentType: params.contentType, sha256: null })
@@ -34,6 +36,22 @@ class FakeStorageProvider implements StorageProvider {
       this.objects.set(params.toKey, metadata)
       this.objects.delete(params.fromKey)
     }
+  }
+
+  async readObject(params: { key: string }) {
+    const body = this.bodies.get(params.key)
+    // Absent throws rather than yielding nothing: an empty stream would come
+    // back from a scanner as `clean`, which is the one answer a missing object
+    // must never produce.
+    if (!body) throw new StorageProviderError(`no object at ${params.key}`, 'not_found')
+    return { bytes: body.byteLength, stream: (async function* () { yield body })() }
+  }
+
+  /** Test-only: the real adapter gets bytes from a signed PUT this fake cannot receive. */
+  putBody(key: string, body: string): void {
+    const bytes = new TextEncoder().encode(body)
+    this.bodies.set(key, bytes)
+    this.objects.set(key, { bytes: bytes.byteLength, contentType: 'text/plain', sha256: null })
   }
 }
 
@@ -61,6 +79,19 @@ describe('storage provider interfaces', () => {
 
     await storage.deleteObject({ key: 'clean/abc' })
     expect(await storage.headObject({ key: 'clean/abc' })).toBeNull()
+  })
+
+  it('reads bytes back as a stream, and refuses to invent one for a missing object', async () => {
+    const storage = new FakeStorageProvider()
+    storage.putBody('quarantine/cv.txt', 'candidate bytes')
+
+    const object = await storage.readObject({ key: 'quarantine/cv.txt' })
+    expect(object.bytes).toBe('candidate bytes'.length)
+    const chunks: Uint8Array[] = []
+    for await (const chunk of object.stream) chunks.push(chunk)
+    expect(new TextDecoder().decode(Buffer.concat(chunks))).toBe('candidate bytes')
+
+    await expect(storage.readObject({ key: 'quarantine/gone.txt' })).rejects.toBeInstanceOf(StorageProviderError)
   })
 
   it('a fake VirusScanProvider returns a normalized ScanResult', async () => {

@@ -202,6 +202,23 @@ export class S3StorageProvider implements StorageProvider {
     }
   }
 
+  async readObject(params: { key: string }): Promise<{ bytes: number; stream: AsyncIterable<Uint8Array> }> {
+    assertValidKey(params.key)
+    try {
+      const object = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: params.key }))
+      const body: unknown = object.Body
+      // The SDK types `Body` as a union that includes browser streams. On Node
+      // it is always a Readable, but an empty or unexpected body must not reach
+      // the scanner as a zero-byte stream — clamd would call that clean.
+      if (!body || typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] !== 'function') {
+        throw new StorageProviderError('object body was not readable as a stream', 'provider_unavailable')
+      }
+      return { bytes: object.ContentLength ?? 0, stream: body as AsyncIterable<Uint8Array> }
+    } catch (error) {
+      throw normalise(error, 'could not read object')
+    }
+  }
+
   async deleteObject(params: { key: string }): Promise<void> {
     assertValidKey(params.key)
     try {

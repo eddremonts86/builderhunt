@@ -11,7 +11,8 @@
  * moving to R2 later is a configuration change rather than a code change. Do not infer the vendor
  * from the variable names.
  *
- * No adapter exists yet: this file and its test are the whole module today.
+ * Implemented by `s3-provider.ts` (storage) and `clamav.ts` (scanning); resolve either through
+ * `provider.ts` rather than constructing one, so configuration is validated in a single place.
  */
 
 export interface SignedUploadUrl {
@@ -49,6 +50,16 @@ export interface StorageProvider {
   headObject(params: { key: string }): Promise<StorageObjectMetadata | null>
   deleteObject(params: { key: string }): Promise<void>
   moveObject(params: { fromKey: string; toKey: string }): Promise<void>
+  /**
+   * Streams the bytes back. This exists for the scan worker, which has to push
+   * the object through clamd; it is not a general-purpose read. Everything that
+   * serves a document to a person goes through `createSignedDownloadUrl` so the
+   * bytes never transit the app.
+   *
+   * Unlike `headObject`, a missing object throws rather than returning null —
+   * a scan asked to read something that is not there is a bug, not a verdict.
+   */
+  readObject(params: { key: string }): Promise<{ bytes: number; stream: AsyncIterable<Uint8Array> }>
 }
 
 // ── Virus scanning (spec.md: "Stream every object through ClamAV before moving/copying to the clean private prefix") ─

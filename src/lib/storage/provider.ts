@@ -9,8 +9,9 @@
  * which is to configure the store.
  */
 import { env } from '~/shared/lib/env'
+import { ClamAvScanner } from './clamav'
 import { S3StorageProvider } from './s3-provider'
-import type { StorageProvider } from './types'
+import type { StorageProvider, VirusScanProvider } from './types'
 
 export class StorageDisabledError extends Error {
   constructor(message: string) {
@@ -20,10 +21,12 @@ export class StorageDisabledError extends Error {
 }
 
 let singleton: StorageProvider | null = null
+let scanner: VirusScanProvider | null = null
 
-/** Drops the memo so a test can swap configuration between cases. */
+/** Drops the memos so a test can swap configuration between cases. */
 export function resetStorageProviderForTesting(): void {
   singleton = null
+  scanner = null
 }
 
 export function getStorageProvider(): StorageProvider {
@@ -47,4 +50,26 @@ export function getStorageProvider(): StorageProvider {
     secretAccessKey: INTERVIEW_R2_SECRET_ACCESS_KEY,
   })
   return singleton
+}
+
+/**
+ * Fails closed for the same reason `getStorageProvider` does, and it matters
+ * more here: the fallback a missing scanner invites is "skip the scan", which
+ * publishes an unscanned document to the clean prefix. There is no degraded
+ * mode — an operator without clamd has uploads switched off, not unscanned.
+ */
+export function getVirusScanner(): VirusScanProvider {
+  if (scanner) return scanner
+
+  const storage = getStorageProvider()
+  const { INTERVIEW_CLAMAV_HOST, INTERVIEW_CLAMAV_PORT } = env
+  if (!INTERVIEW_CLAMAV_HOST) {
+    throw new StorageDisabledError('virus scanning is not configured; INTERVIEW_CLAMAV_HOST is required')
+  }
+
+  scanner = new ClamAvScanner(
+    { host: INTERVIEW_CLAMAV_HOST, port: INTERVIEW_CLAMAV_PORT },
+    (key) => storage.readObject({ key }),
+  )
+  return scanner
 }
