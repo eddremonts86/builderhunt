@@ -2,13 +2,18 @@ import { randomUUID } from 'node:crypto'
 import { and, eq, lt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
+import type { CapabilityTransaction } from '../db/capability-db'
 import { candidateDocuments, documentExtractions, organizations } from '../db/schema'
 
 /**
- * Worker-role data access for candidate documents (plan:
- * calendar-scheduling-interview-intelligence, Phase 6, "Implement document repository and worker").
+ * Data access for candidate documents (plan: calendar-scheduling-interview-intelligence, Phase 6).
  *
- * Keeps its OWN `listWorkerOrganizationIds`/`withWorkerOrganization` pair rather than importing
+ * Two halves under one roof: the worker-role functions that scan and extract, and the
+ * capability/app-role functions the candidate and organizer routes use. They share a table and
+ * therefore share the vocabulary of its constraints, which is why splitting them into two modules
+ * would mean explaining the same constraints twice.
+ *
+ * The worker half keeps its OWN `listWorkerOrganizationIds`/`withWorkerOrganization` pair rather than importing
  * another module's, following the precedent `calendar-worker.ts`, `alerts-worker.ts`,
  * `billing-worker.ts` and `sprints-worker.ts` each set. There is deliberately no query spanning
  * organizations: RLS scopes each transaction to exactly one tenant, so a bug in one tenant's batch
@@ -82,6 +87,13 @@ const LEASED_COLUMNS = sql`
   sha256, bytes, scan_attempts, extraction_attempts, retention_expires_at
 `
 
+function assertHash(value: unknown): string {
+  if (typeof value !== 'string' || !/^[a-f0-9]{64}$/.test(value)) {
+    throw new Error('leased document has no usable sha256; candidate_documents_sha256_present_check should have prevented this')
+  }
+  return value
+}
+
 function toLeasedDocument(row: Record<string, unknown>): LeasedDocument {
   return {
     id: String(row.id),
@@ -90,7 +102,11 @@ function toLeasedDocument(row: Record<string, unknown>): LeasedDocument {
     objectKey: String(row.object_key),
     declaredMediaType: String(row.declared_media_type),
     detectedMediaType: row.detected_media_type === null ? null : String(row.detected_media_type),
-    sha256: String(row.sha256),
+    // The check constraint guarantees a hash on anything past `awaiting_upload`, and the lease only
+    // ever claims `pending`. Asserted rather than coerced: `String(null)` yields the literal "null",
+    // which would pass silently here and fail the hex check on `document_extractions.content_sha256`
+    // much later, with nothing pointing back at this line.
+    sha256: assertHash(row.sha256),
     bytes: Number(row.bytes),
     scanAttempts: Number(row.scan_attempts),
     extractionAttempts: Number(row.extraction_attempts),
@@ -332,6 +348,289 @@ export async function releaseDocumentForExtractionRetry(
       eq(candidateDocuments.id, params.documentId),
     ))
     .returning({ id: candidateDocuments.id })
+}
+
+// ── Candidate-facing reads and writes ───────────────────────────────────────────────────────────
+//
+// These run under the capability or app role, not the worker's, so they take the broader
+// `DocumentTransaction`. The SQL is identical either way — the *role* is what changes which rows
+// exist, and that is the point: a capability connection pinned to one invitation cannot see another
+// candidate's document even though the query does not mention the invitation at all.
+
+export type DocumentTransaction = WorkerTransaction | CapabilityTransaction
+
+export interface UploadIntent {
+  id: string
+  objectKey: string
+}
+
+/**
+ * Reserves an upload slot: a row in `awaiting_upload` with the declared size but no hash yet.
+ *
+ * The row exists before the bytes do so the 25 MB invitation quota is *reserved* rather than merely
+ * checked. Issuing a signed URL without a row would let a client request a hundred intents, each
+ * seeing an empty allowance, and then upload against all of them.
+ *
+ * The id is generated here rather than by `defaultRandom()`, so the object key — which contains it —
+ * can go into the same INSERT. That is not a tidiness preference: `builderhunt_capability` holds
+ * SELECT and INSERT on this table and deliberately no UPDATE (0085: "Capability writes go through a
+ * narrowly privileged server command, never anonymous SQL grants"), so a second statement to fill in
+ * the key would have needed a grant the security model refuses to give.
+ */
+export async function createUploadIntent(
+  transaction: DocumentTransaction,
+  params: {
+    organizationId: string
+    submissionId: string
+    originalName: string
+    declaredMediaType: string
+    declaredBytes: number
+    retentionExpiresAt: Date
+    keyFor: (documentId: string) => string
+  },
+): Promise<UploadIntent> {
+  const documentId = randomUUID()
+  const objectKey = params.keyFor(documentId)
+
+  const [created] = await transaction
+    .insert(candidateDocuments)
+    .values({
+      id: documentId,
+      organizationId: params.organizationId,
+      submissionId: params.submissionId,
+      objectKey,
+      originalName: params.originalName,
+      declaredMediaType: params.declaredMediaType,
+      sha256: null,
+      bytes: params.declaredBytes,
+      scanStatus: 'awaiting_upload',
+      retentionExpiresAt: params.retentionExpiresAt,
+    })
+    .returning({ id: candidateDocuments.id })
+
+  return { id: created.id, objectKey }
+}
+
+export interface DocumentForCompletion {
+  id: string
+  objectKey: string
+  originalName: string
+  declaredMediaType: string
+  declaredBytes: number
+  scanStatus: string
+}
+
+/**
+ * The row a completion call is allowed to act on.
+ *
+ * Scoped by submission as well as organization, and restricted to `awaiting_upload`. Both matter:
+ * the submission scope is what stops a candidate completing a document belonging to someone else in
+ * the same tenant, and the status scope makes completion single-use, so a replayed call cannot
+ * rewrite the hash of a document that has already been scanned.
+ */
+export async function findAwaitingUploadDocument(
+  transaction: DocumentTransaction,
+  params: { organizationId: string; submissionId: string; documentId: string },
+): Promise<DocumentForCompletion | null> {
+  const [row] = await transaction
+    .select({
+      id: candidateDocuments.id,
+      objectKey: candidateDocuments.objectKey,
+      originalName: candidateDocuments.originalName,
+      declaredMediaType: candidateDocuments.declaredMediaType,
+      declaredBytes: candidateDocuments.bytes,
+      scanStatus: candidateDocuments.scanStatus,
+    })
+    .from(candidateDocuments)
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.submissionId, params.submissionId),
+      eq(candidateDocuments.id, params.documentId),
+      eq(candidateDocuments.scanStatus, 'awaiting_upload'),
+    ))
+    .limit(1)
+  return row ?? null
+}
+
+/**
+ * Hands a completed upload to the scan queue.
+ *
+ * `bytes` is overwritten with the real size from the object store rather than kept as declared: the
+ * declared value was only ever a quota estimate, and a document whose recorded size disagrees with
+ * its object would make every later size check meaningless.
+ */
+export async function markDocumentUploaded(
+  transaction: DocumentTransaction,
+  params: {
+    organizationId: string
+    documentId: string
+    sha256: string
+    actualBytes: number
+    detectedMediaType: string
+  },
+) {
+  return transaction
+    .update(candidateDocuments)
+    .set({
+      scanStatus: 'pending',
+      sha256: params.sha256,
+      bytes: params.actualBytes,
+      detectedMediaType: params.detectedMediaType,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.id, params.documentId),
+      // Re-checked in the UPDATE, not just the preceding SELECT: two concurrent completion calls
+      // would otherwise both pass the read and both write.
+      eq(candidateDocuments.scanStatus, 'awaiting_upload'),
+    ))
+    .returning({ id: candidateDocuments.id })
+}
+
+/**
+ * Records an upload that failed validation, keeping the row so the candidate can see *why*.
+ *
+ * The hash and size stored are the ones actually computed from the object, not the ones the client
+ * claimed — the claim is what was just rejected, and recording it would enshrine the lie. Quota is
+ * released automatically: `sumSubmissionDocumentBytes` excludes terminal rejections, so a candidate
+ * whose upload was refused can immediately try again.
+ */
+export async function rejectUploadOnCompletion(
+  transaction: DocumentTransaction,
+  params: {
+    organizationId: string
+    documentId: string
+    rejectionCode: string
+    computedSha256: string
+    actualBytes: number
+    detectedMediaType: string | null
+  },
+) {
+  return transaction
+    .update(candidateDocuments)
+    .set({
+      scanStatus: 'failed',
+      // Nothing will ever parse this, and leaving extraction `pending` would let the worker try.
+      extractionStatus: 'skipped',
+      rejectionCode: params.rejectionCode.slice(0, 64),
+      sha256: params.computedSha256,
+      bytes: params.actualBytes,
+      detectedMediaType: params.detectedMediaType,
+      updatedAt: new Date(),
+    })
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.id, params.documentId),
+      eq(candidateDocuments.scanStatus, 'awaiting_upload'),
+    ))
+    .returning({ id: candidateDocuments.id })
+}
+
+/** Drops an intent whose upload never arrived, so its bytes stop holding quota. */
+export async function deleteUploadIntent(
+  transaction: DocumentTransaction,
+  params: { organizationId: string; documentId: string },
+) {
+  return transaction
+    .delete(candidateDocuments)
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.id, params.documentId),
+      eq(candidateDocuments.scanStatus, 'awaiting_upload'),
+    ))
+    .returning({ id: candidateDocuments.id, objectKey: candidateDocuments.objectKey })
+}
+
+/**
+ * Expires intents nobody completed, returning their keys so the caller can delete any partial object.
+ *
+ * Without this an abandoned upload holds part of the candidate's 25 MB forever — the row is not
+ * rejected, so the quota sum keeps counting it, and the candidate is locked out of re-uploading with
+ * no way to see why.
+ */
+export async function expireAbandonedUploadIntents(
+  transaction: DocumentTransaction,
+  params: { organizationId: string; olderThan: Date },
+) {
+  return transaction
+    .delete(candidateDocuments)
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.scanStatus, 'awaiting_upload'),
+      lt(candidateDocuments.createdAt, params.olderThan),
+    ))
+    .returning({ id: candidateDocuments.id, objectKey: candidateDocuments.objectKey })
+}
+
+export interface DocumentSummary {
+  id: string
+  submissionId: string
+  originalName: string
+  declaredMediaType: string
+  detectedMediaType: string | null
+  sha256: string | null
+  bytes: number
+  scanStatus: string
+  extractionStatus: string
+  rejectionCode: string | null
+  retentionExpiresAt: Date
+}
+
+/** Every document for one submission, for the candidate's own status view. */
+export async function listSubmissionDocuments(
+  transaction: DocumentTransaction,
+  params: { organizationId: string; submissionId: string },
+): Promise<DocumentSummary[]> {
+  return transaction
+    .select({
+      id: candidateDocuments.id,
+      submissionId: candidateDocuments.submissionId,
+      originalName: candidateDocuments.originalName,
+      declaredMediaType: candidateDocuments.declaredMediaType,
+      detectedMediaType: candidateDocuments.detectedMediaType,
+      sha256: candidateDocuments.sha256,
+      bytes: candidateDocuments.bytes,
+      scanStatus: candidateDocuments.scanStatus,
+      extractionStatus: candidateDocuments.extractionStatus,
+      rejectionCode: candidateDocuments.rejectionCode,
+      retentionExpiresAt: candidateDocuments.retentionExpiresAt,
+    })
+    .from(candidateDocuments)
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.submissionId, params.submissionId),
+    ))
+    .orderBy(candidateDocuments.createdAt)
+}
+
+/**
+ * A document an authorized reader may download.
+ *
+ * `scan_status = 'clean'` is part of the query rather than a check on the result, so there is no code
+ * path that holds an unscanned document's key and merely decides not to sign it. The only rows this
+ * can return are ones ClamAV passed, which — because promotion is the only way into the clean prefix
+ * — is the same statement as "this key is under `clean/`".
+ */
+export async function findCleanDocumentForDownload(
+  transaction: DocumentTransaction,
+  params: { organizationId: string; documentId: string },
+): Promise<{ id: string; objectKey: string; originalName: string; detectedMediaType: string | null } | null> {
+  const [row] = await transaction
+    .select({
+      id: candidateDocuments.id,
+      objectKey: candidateDocuments.objectKey,
+      originalName: candidateDocuments.originalName,
+      detectedMediaType: candidateDocuments.detectedMediaType,
+    })
+    .from(candidateDocuments)
+    .where(and(
+      eq(candidateDocuments.organizationId, params.organizationId),
+      eq(candidateDocuments.id, params.documentId),
+      eq(candidateDocuments.scanStatus, 'clean'),
+    ))
+    .limit(1)
+  return row ?? null
 }
 
 /**

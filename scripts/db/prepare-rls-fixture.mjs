@@ -206,6 +206,16 @@ try {
             'org-a/eeeeeeee/cv.pdf', 'cv.pdf', 'application/pdf', repeat('a', 64), 1024, now() + interval '180 days')
     on conflict (id) do nothing
   `
+  // A second candidate's document, in the SAME organization. Without it the capability assertion
+  // "saw exactly one document" holds whether the policy is scoped to the organization or to the
+  // invitation, so it would certify an isolation it never tested — the same blind spot that hid the
+  // organization-wide capability policies until 0086.
+  await owner`
+    insert into candidate_documents (id, organization_id, submission_id, object_key, original_name, declared_media_type, sha256, bytes, scan_status, retention_expires_at)
+    values ('ffffffff-0000-4000-8000-00000000000c', 'org-a', 'eeeeeeee-0000-4000-8000-00000000000b',
+            'quarantine/org-a/eeeeeeee-b/other.pdf', 'other.pdf', 'application/pdf', repeat('c', 64), 2048, 'pending', now() + interval '180 days')
+    on conflict (id) do nothing
+  `
   await owner`
     insert into document_extractions (id, organization_id, document_id, parser, parser_version, content_sha256, retention_expires_at)
     values ('ffffffff-0000-4000-8000-00000000000b', 'org-a', 'ffffffff-0000-4000-8000-00000000000a',

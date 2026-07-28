@@ -460,9 +460,15 @@ try {
       throw new Error(`capability saw another candidate's submission: ${JSON.stringify(ownSubmission)}`)
     }
 
-    const ownDocuments = await asCandidateA((tx) => tx`select id from candidate_documents`)
+    // Two documents exist in org-a, one per candidate. Before 0089 this policy was
+    // organization-scoped, so candidate A saw both; the count is the measurement that the narrowing
+    // to `app.invitation_id` actually took effect.
+    const ownDocuments = await asCandidateA((tx) => tx`select id, submission_id from candidate_documents`)
     if (ownDocuments.length !== 1) {
       throw new Error(`capability read ${ownDocuments.length} documents, expected its own single one`)
+    }
+    if (ownDocuments[0].submission_id !== 'eeeeeeee-0000-4000-8000-00000000000a') {
+      throw new Error(`capability read the wrong candidate's document: ${JSON.stringify(ownDocuments)}`)
     }
 
     // Explicitly ask for the other candidate's rows by id. A policy that merely
@@ -470,7 +476,9 @@ try {
     const targeted = await asCandidateA(async (tx) => {
       const invitations = await tx`select id from scheduling_invitations where id = ${INVITATION_B}`
       const submissions = await tx`select id from candidate_submissions where invitation_id = ${INVITATION_B}`
-      return invitations.length + submissions.length
+      // Asked for by primary key, which is the request a filtering bug would still answer.
+      const documents = await tx`select id from candidate_documents where id = 'ffffffff-0000-4000-8000-00000000000c'`
+      return invitations.length + submissions.length + documents.length
     })
     if (targeted !== 0) throw new Error(`capability reached the other candidate by id (${targeted} rows)`)
 

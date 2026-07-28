@@ -352,6 +352,14 @@
     "0087_romantic_karen_page": {
       "sql": "e0acb9bba8c232280f5f7486a3fe8ac2298fde2b1870c0a5b4c6e3c349ab4fe6",
       "snapshot": "c29faa0151426c1b974a3c565fe84569b8e1613ddb794a13f7056ff7dcd7039d"
+    },
+    "0088_lively_the_executioner": {
+      "sql": "2c5add07d5650c6e51f1ad63d33f14e2d7ea192ef0971b80b2e828f357c08973",
+      "snapshot": "0c8e89f1524f4690b91ba1d9a98085c7c96c4666c6546f30f594d37c37a584a5"
+    },
+    "0089_candidate_document_capability_scoping": {
+      "sql": "c7d3689f1dde5cab5a411498d999c4607a5fd168af3f0dfb29308e83b84c1b01",
+      "snapshot": "41b826c779b5d18858ba7e2892780c136f796fee03b358362eef80945ffa1b33"
     }
   }
 }

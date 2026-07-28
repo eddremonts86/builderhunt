@@ -41,6 +41,42 @@ export function assertValidDocumentStatusTransition(from: DocumentStatus, to: Do
   }
 }
 
+/**
+ * Collapses the two storage columns into the one status a candidate or organizer sees.
+ *
+ * `candidate_documents` tracks scanning and extraction separately because they fail separately and
+ * retry separately. Nobody outside the worker needs that: a candidate wants to know whether their CV
+ * is still processing, usable, or refused. Deriving the answer — rather than storing a third status
+ * column alongside the two real ones — means the DTO cannot drift out of step with the rows.
+ *
+ * The bias is deliberately toward *not* claiming readiness. Anything unrecognised reports `failed`,
+ * because a status the caller invented a reading for is how "we do not know" becomes "it is fine".
+ */
+export function deriveDocumentStatus(input: {
+  scanStatus: string
+  extractionStatus: string
+}): DocumentStatus {
+  switch (input.scanStatus) {
+    case 'awaiting_upload': return 'pending_upload'
+    case 'pending': return 'uploaded'
+    case 'scanning': return 'scanning'
+    case 'infected': return 'rejected'
+    case 'failed': return 'failed'
+    case 'clean':
+      switch (input.extractionStatus) {
+        case 'pending':
+        case 'running': return 'extracting'
+        case 'succeeded': return 'ready'
+        // `skipped` on a clean document should not occur — the worker only skips extraction when it
+        // rejects a scan — but the document itself passed and is downloadable, so readiness is the
+        // honest answer rather than a failure the candidate cannot act on.
+        case 'skipped': return 'ready'
+        default: return 'failed'
+      }
+    default: return 'failed'
+  }
+}
+
 export const candidateDocumentSchema = z.object({
   id: z.string().uuid(),
   submissionId: z.string().uuid(),

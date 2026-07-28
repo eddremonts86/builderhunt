@@ -2359,9 +2359,15 @@ export const candidateDocuments = pgTable(
     originalName: text('original_name').notNull(),
     declaredMediaType: text('declared_media_type').notNull(),
     detectedMediaType: text('detected_media_type'),
-    sha256: text('sha256').notNull(),
+    /**
+     * Null only while `scan_status = 'awaiting_upload'`. The candidate computes the hash from the
+     * bytes they actually sent, which does not exist when the row is created to reserve the upload
+     * slot and the quota. `candidate_documents_sha256_present_check` makes the window exact rather
+     * than leaving the column loosely nullable forever.
+     */
+    sha256: text('sha256'),
     bytes: integer('bytes').notNull(),
-    scanStatus: text('scan_status').notNull().default('pending'),
+    scanStatus: text('scan_status').notNull().default('awaiting_upload'),
     extractionStatus: text('extraction_status').notNull().default('pending'),
     /**
      * How many times the worker has leased this document for each stage.
@@ -2390,10 +2396,16 @@ export const candidateDocuments = pgTable(
     index('candidate_documents_submission_idx').on(table.organizationId, table.submissionId),
     index('candidate_documents_scan_status_idx').on(table.scanStatus),
     index('candidate_documents_retention_idx').on(table.retentionExpiresAt),
-    check('candidate_documents_scan_status_check', sql`${table.scanStatus} in ('pending', 'scanning', 'clean', 'infected', 'failed')`),
+    // `awaiting_upload` is the state a row is created in: the slot and the quota are reserved before
+    // any bytes exist. The worker only ever leases `pending`, so a row cannot be scanned before the
+    // completion call has confirmed what was actually written.
+    check('candidate_documents_scan_status_check', sql`${table.scanStatus} in ('awaiting_upload', 'pending', 'scanning', 'clean', 'infected', 'failed')`),
     check('candidate_documents_extraction_status_check', sql`${table.extractionStatus} in ('pending', 'running', 'succeeded', 'failed', 'skipped')`),
     check('candidate_documents_bytes_check', sql`${table.bytes} > 0`),
-    check('candidate_documents_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+    check('candidate_documents_sha256_check', sql`${table.sha256} is null or ${table.sha256} ~ '^[a-f0-9]{64}$'`),
+    // The nullable window is exactly one state wide. Without this the column would be loosely
+    // nullable forever and a scanned document could carry no hash at all.
+    check('candidate_documents_sha256_present_check', sql`${table.scanStatus} = 'awaiting_upload' or ${table.sha256} is not null`),
     // No audio: recordings belong to the consent-gated interview capture path, never to an upload.
     check('candidate_documents_no_audio_check', sql`${table.declaredMediaType} not like 'audio/%' and (${table.detectedMediaType} is null or ${table.detectedMediaType} not like 'audio/%')`),
     // A rejection needs a reason, and a clean document must not carry one.

@@ -57,6 +57,7 @@ import {
   recordExtraction,
   recordExtractionFailure,
   reclaimStaleLeases,
+  expireAbandonedUploadIntents,
   releaseDocumentForExtractionRetry,
   releaseDocumentForScanRetry,
   withWorkerOrganization,
@@ -81,9 +82,19 @@ const DOCUMENTS_PER_TENANT = 20
 /** Well above a 10 MB scan plus extraction, so this never reclaims work still running. */
 const STALE_LEASE_MS = 15 * 60_000
 
+/**
+ * How long an issued-but-never-completed upload keeps holding quota.
+ *
+ * The signed URL lasts five minutes, so anything still `awaiting_upload` an hour later is abandoned.
+ * Sweeping matters because the quota counts these rows: without it a candidate who closed the tab
+ * mid-upload is locked out of part of their 25 MB with nothing on screen explaining why.
+ */
+const ABANDONED_INTENT_MS = 60 * 60_000
+
 export interface DocumentWorkerResult extends JobRunOutcome {
   organizationsProcessed: number
   reclaimed: number
+  abandonedIntents: number
   scannedClean: number
   scannedInfected: number
   scanRejected: number
@@ -127,6 +138,7 @@ export async function runDocumentWorker(options: DocumentWorkerOptions = {}): Pr
     const result: DocumentWorkerResult = {
       organizationsProcessed: 0,
       reclaimed: 0,
+      abandonedIntents: 0,
       scannedClean: 0,
       scannedInfected: 0,
       scanRejected: 0,
@@ -144,10 +156,15 @@ export async function runDocumentWorker(options: DocumentWorkerOptions = {}): Pr
     for (const { id: organizationId } of organizationIds) {
       try {
         // Step 1, committed on its own: reclaim anything stranded, then claim this pass's work.
-        const { toScan, toExtract, reclaimed } = await withWorkerOrganization(organizationId, async (transaction) => {
+        const { toScan, toExtract, reclaimed, abandoned } = await withWorkerOrganization(organizationId, async (transaction) => {
           const stale = await reclaimStaleLeases(transaction, { organizationId, staleAfterMs: staleLeaseMs, now })
+          const expired = await expireAbandonedUploadIntents(transaction, {
+            organizationId,
+            olderThan: new Date(now.getTime() - ABANDONED_INTENT_MS),
+          })
           return {
             reclaimed: stale.scanning + stale.extracting,
+            abandoned: expired,
             toScan: await leaseDocumentsForScan(transaction, organizationId, {
               limit: perTenant,
               maxAttempts: MAX_SCAN_ATTEMPTS,
@@ -160,6 +177,12 @@ export async function runDocumentWorker(options: DocumentWorkerOptions = {}): Pr
         }, db)
 
         result.reclaimed += reclaimed
+        result.abandonedIntents += abandoned.length
+        // Any partial object a broken upload left behind. The row is already gone, so a failure here
+        // leaks bytes rather than state, and retention sweeps the prefix regardless.
+        for (const intent of abandoned) {
+          await storage.deleteObject({ key: intent.objectKey }).catch(() => undefined)
+        }
 
         for (const document of toScan) {
           const outcome = await scanOne({ document, scanner, storage })

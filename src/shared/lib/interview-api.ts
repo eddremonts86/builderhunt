@@ -301,6 +301,21 @@ export const completeUploadResponseSchema = z.object({
   status: z.enum(DOCUMENT_STATUSES),
 }).strict()
 
+// ── GET /api/scheduling/invitations/:id/documents/:documentId/download ───────────────────────
+//
+// Owner authority, not participant. The plan puts this under `/api/interviews/:id/`, but
+// `interview_sessions` — and therefore any notion of a participant — arrives in Phase 9. This is the
+// authority that exists today; the participant-scoped variant is an addition, not a replacement.
+
+export const documentDownloadResponseSchema = z.object({
+  documentId: z.string().uuid(),
+  downloadUrl: z.string().url(),
+  expiresAt: z.string().datetime(),
+  // Display metadata only. It is not part of the object key and plays no part in authorization.
+  originalName: z.string().min(1).max(255),
+  mediaType: z.string().min(1).nullable(),
+}).strict()
+
 // ── POST /api/interviews/:id/brief ───────────────────────────────────────────────────────────
 
 export const generateBriefRequestSchema = z.object({
@@ -427,6 +442,7 @@ export const INTERVIEW_API_ROUTES: readonly InterviewApiRoute[] = [
   { method: 'POST', path: '/api/public/scheduling/:id/links/:linkId/import', authority: 'capability', requestSchema: importCandidateLinkRequestSchema, responseSchema: importCandidateLinkResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/uploads', authority: 'capability', requestSchema: createUploadIntentRequestSchema, responseSchema: createUploadIntentResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/uploads/:documentId/complete', authority: 'capability', requestSchema: completeUploadRequestSchema, responseSchema: completeUploadResponseSchema },
+  { method: 'GET', path: '/api/scheduling/invitations/:id/documents/:documentId/download', authority: 'owner', requestSchema: null, responseSchema: documentDownloadResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/brief', authority: 'participant', requestSchema: generateBriefRequestSchema, responseSchema: generateBriefResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/session', authority: 'participant', requestSchema: interviewSessionActionRequestSchema, responseSchema: interviewSessionActionResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/transcription-token', authority: 'participant', requestSchema: requestTranscriptionTokenRequestSchema, responseSchema: transcriptionTokenResponseSchema },

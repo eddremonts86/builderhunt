@@ -146,11 +146,14 @@ beforeEach(async () => {
   })
 })
 
+/** A document whose upload already completed, which is the worker's actual input. */
 async function seedDocument(options: {
   organizationId?: string
   body?: string
   scanAttempts?: number
   extractionAttempts?: number
+  scanStatus?: string
+  createdAt?: Date
 } = {}) {
   const organizationId = options.organizationId ?? ORG_A
   const submissionId = organizationId === ORG_A ? submissionA : submissionB
@@ -163,6 +166,13 @@ async function seedDocument(options: {
     declaredMediaType: 'text/plain',
     sha256: 'a'.repeat(64),
     bytes: 32,
+    // The column defaults to `awaiting_upload`; the worker only leases `pending`, so a fixture that
+    // relied on the default would silently test nothing.
+    scanStatus: options.scanStatus ?? 'pending',
+    // Stamped from the worker's clock, not the database's. `created_at` defaults to real `now()`,
+    // which against a fixed 2027 `now` makes every fixture row look an epoch old — the abandoned-
+    // intent sweep would then delete the very row a test just set up.
+    createdAt: options.createdAt ?? NOW,
     scanAttempts: options.scanAttempts ?? 0,
     extractionAttempts: options.extractionAttempts ?? 0,
     retentionExpiresAt: RETENTION,
@@ -215,6 +225,48 @@ describe('a clean document is promoted and extracted', () => {
     expect(third.extracted).toBe(0)
     const rows = await db.select().from(documentExtractions)
     expect(rows).toHaveLength(1)
+  })
+})
+
+describe('an upload that never completed is not work', () => {
+  it('never leases a document still awaiting its bytes', async () => {
+    // The reason `awaiting_upload` exists. The row is created when the signed URL is issued, so
+    // without this state the worker would lease it and scan an object that does not exist yet —
+    // burning attempts on, and eventually failing, a document the candidate is still uploading.
+    const document = await seedDocument({ scanStatus: 'awaiting_upload' })
+    // No object either, matching reality before the PUT lands.
+    storage.objects.delete(document.objectKey)
+
+    const result = await run()
+
+    expect(result.scannedClean).toBe(0)
+    expect(result.processedCount).toBe(0)
+    expect((await readDocument(document.id)).scanStatus).toBe('awaiting_upload')
+    expect((await readDocument(document.id)).scanAttempts).toBe(0)
+  })
+})
+
+describe('an upload nobody completed stops holding quota', () => {
+  it('sweeps an intent older than the abandonment window and deletes its partial object', async () => {
+    // The candidate closed the tab mid-upload. The row counts toward their 25 MB, so leaving it
+    // locks them out of part of their allowance with nothing on screen explaining why.
+    const document = await seedDocument({
+      scanStatus: 'awaiting_upload',
+      createdAt: new Date(NOW.getTime() - 2 * 60 * 60_000),
+    })
+
+    const result = await run()
+
+    expect(result.abandonedIntents).toBe(1)
+    expect(await readDocument(document.id)).toBeUndefined()
+    expect(storage.objects.has(document.objectKey), 'a partial object must not survive its row').toBe(false)
+  })
+
+  it('leaves a fresh intent alone', async () => {
+    const document = await seedDocument({ scanStatus: 'awaiting_upload', createdAt: NOW })
+    const result = await run()
+    expect(result.abandonedIntents).toBe(0)
+    expect((await readDocument(document.id)).scanStatus).toBe('awaiting_upload')
   })
 })
 

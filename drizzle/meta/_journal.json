@@ -617,6 +617,20 @@
       "when": 1785228085328,
       "tag": "0087_romantic_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1785230254564,
+      "tag": "0088_lively_the_executioner",
+      "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1785230255564,
+      "tag": "0089_candidate_document_capability_scoping",
+      "breakpoints": true
     }
   ]
 }
