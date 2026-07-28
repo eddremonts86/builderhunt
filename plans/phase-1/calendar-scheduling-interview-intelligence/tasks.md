@@ -2228,7 +2228,7 @@ Not fixed here — it predates this program and deserves its own work.
     bump, and the accept-all ban are each load-bearing.
 
 - [~] **Complete EU AI Act classification and operational controls** — controls done 2026-07-28
-  (`PENDING`); **sign-off NOT obtained, launch stays behind `SENSITIVE_AI_ENABLED=false`**
+  (`a51efc5`); **sign-off NOT obtained, launch stays behind `SENSITIVE_AI_ENABLED=false`**
   - Files: `docs/compliance/interview-ai-act-classification.md` (new),
     `docs/operations/interview-ai-human-oversight.md` (new),
     `docs/operations/interview-ai-post-market-monitoring.md` (new),
