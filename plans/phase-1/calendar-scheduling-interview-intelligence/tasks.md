@@ -2057,17 +2057,63 @@ Not fixed here — it predates this program and deserves its own work.
     refusal, paused-session fallback, ephemeral proposals writing nothing, action recording, and both
     feature flags. Two plants proved the flag gate and the 422 mapping are load-bearing.
 
-- [ ] **Build contextual question and report UI**
+- [x] **Build contextual question and report UI** — done 2026-07-28 (`2a623a1`), NOT yet deployed
   - Files: `src/modules/interviews/components/ContextualQuestions.tsx` (new),
     `src/modules/interviews/components/InterviewReportEditor.tsx` (new),
     `src/modules/interviews/components/TranscriptEvidence.tsx` (new),
     `src/modules/interviews/components/LiveInterviewPage.tsx`,
-    `src/routes/_dashboard/interviews/$interviewId/index.tsx`
-  - Do: Show at most three contextual questions, rationale/evidence, use/save/dismiss, pending topics,
-    processing state, report sections, transcript timestamp links, unsupported evidence resolution,
-    manual fallback, credit confirmation, version conflict, and finalize confirmation.
-  - Verify: Playwright completes live suggestion to final report, follows timestamp evidence, handles
-    provider/credit failure, edits/finalizes, and confirms no score/recommendation UI.
+    `src/modules/interviews/components/InterviewBriefPage.tsx`,
+    `src/routes/_dashboard/interviews/$interviewId/index.tsx`,
+    `tests/unit/modules/interviews/components/report-ui.test.tsx` (new)
+  - **There is no score, rating or recommendation control anywhere in the report editor** — absent, not
+    hidden or disabled. A plant adding an "overall impression" slider fails the test, and the test also
+    asserts no `input[type=range]`, no `input[type=number]` and no `select` exists at all.
+  - **The questions panel never renders a failure reason.** Six degrade reasons are passed in and none
+    reaches the screen; the panel labels the *source* ("based on what was just said" versus "from your
+    prepared brief") instead. A plant rendering the reason fails six tests. The single exception is
+    `not_entitled`, which is a plan limit the organizer can act on afterwards.
+  - A citation is a timestamp, never a uuid, and a citation whose segment is gone renders a visible "source
+    unavailable" warning rather than disappearing — retention deleting a segment while the report survives
+    would otherwise make a supported statement look unsupported, and a reader cannot tell those apart.
+  - Finalizing takes two steps and is refused over unsaved changes: finalizing a version that does not
+    include what the organizer just typed would freeze the wrong record.
+  - The excerpt panel says "no audio was kept" explicitly, so a reader looking for a play button learns
+    there is nothing to play rather than concluding the feature is broken.
+  - Verify (2026-07-28): 38 tests over citation labelling and the missing-segment warning, the excerpt
+    panel, six silent degrade reasons, source labelling, the three-question cap, explicit-only actions,
+    template-versus-generated provenance, topic questions rendered instead of ids, read-only for a
+    participant and once final, save appearing only after an edit, two-step finalize, finalize refused over
+    unsaved work, the newer-version notice, and every error sentence. Two plants proved the score-control
+    absence and the silent-degradation guarantee.
+
+### Phase 10 follow-up — found by using it
+
+- [x] **Fix the invitation that was dead on arrival** — done 2026-07-28 (`f56bae2`), NOT yet deployed
+  - Files: `src/routes/api/scheduling/invitations/$invitationId/send.ts`,
+    `tests/unit/routes/api/scheduling/invitations/invitations.test.ts`
+  - The capability is minted at send and only its hash stored, so the response is the last moment the link
+    exists — and the route discarded the `devLink` the sender returns when `RESEND_API_KEY` is unset,
+    printing the only other copy to a server console. Every invitation created locally or in preview was
+    `sent`, had its hash committed, and was permanently unreachable; there is deliberately no resend.
+  - The existing test encoded "the response is three fields; nothing about the capability rides along" —
+    right about production, wrong everywhere else. Now two tests. The security branch had to be fixed
+    before it tested anything: the first version let the real Resend call fail, so the 502 body carried no
+    `devLink` either way and the test passed with the route deliberately leaking the link.
+
+- [x] **Add the interviews index** — done 2026-07-28 (`e8a33d9`), NOT yet deployed
+  - Files: `src/modules/interviews/components/InterviewList.tsx` (new),
+    `src/routes/_dashboard/interviews/index.tsx` (new), `src/routes/api/interviews/index.ts` (new),
+    `src/shared/lib/repositories/interviews.ts`, `src/modules/dashboard/ui/shell/nav-config.ts`,
+    `tests/unit/modules/interviews/components/interview-list.test.tsx` (new),
+    `tests/unit/shared/lib/repositories/interview-list.test.ts` (new)
+  - **There was no page listing interviews at all.** `/interviews/$interviewId` was the only route and
+    nothing linked to it, so opening an interview meant knowing a calendar event's uuid and typing the URL.
+  - The listing query is hand-written SQL with five joins and a correlated subquery, none typechecked, so it
+    is tested against real Postgres: three transcript segments and two report versions joined naively return
+    six rows for one interview.
+  - **Nothing in this product mints a meeting URL.** There is no calendar-provider integration, so
+    `meetingUrl` is whatever the organizer typed on the invitation and the list shows a join link only when
+    one exists.
 
 ## Phase 11 — Retention, privacy, reconciliation, and operations
 
