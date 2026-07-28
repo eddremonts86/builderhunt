@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — central safe network client.
- * Spec reference: plans/stealth-scraping/spec.md §8, §14.
+ * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §8, §14.
  *
  * No connector may call `fetch` directly (enforced by a static test in
  * registry.test.ts) — every outbound request goes through this module, which

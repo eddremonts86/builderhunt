@@ -74,7 +74,7 @@ The embedding model has no hardcoded provider default: `AI_EMBEDDING_URL`,
 > Persisted, shared, or background language work → server-side MiniMax M3.
 > Embeddings → the server-only embedding adapter. Always.
 
-## Shared AI layer (built once by `plans/ai-expansion` = the AI Platform plan; everyone else imports it)
+## Shared AI layer (built once by `plans/phase-1/20-ai-expansion` = the AI Platform plan; everyone else imports it)
 
 ```
 src/shared/lib/ai/

@@ -1,5 +1,5 @@
 /**
- * Fraud and high-volume exception controls (plans/stripe-billing-platform/tasks.md §8 "Add fraud and
+ * Fraud and high-volume exception controls (plans/phase-1/29-stripe-billing-platform/tasks.md §8 "Add fraud and
  * high-volume exception controls"; spec.md §Packs and auto-recharge: "Provider-requested 3DS, Radar,
  * failure/card-rotation velocity checks, and a reviewed time-bounded high-volume exception protect
  * against spend-then-chargeback abuse.").

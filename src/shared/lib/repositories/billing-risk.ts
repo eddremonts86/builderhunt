@@ -5,7 +5,7 @@ import { platformDb, type TenantTransaction } from '../db/client'
 import { billingRiskEvents, billingRiskExceptions } from '../db/schema'
 
 /**
- * Data access for fraud/high-volume exception controls (plans/stripe-billing-platform/tasks.md §8
+ * Data access for fraud/high-volume exception controls (plans/phase-1/29-stripe-billing-platform/tasks.md §8
  * "Add fraud and high-volume exception controls"). `billing_risk_events`/`billing_risk_exceptions`
  * are tenant-private (RLS-scoped by `organization_id`), so the tenant/worker-context functions below
  * take an already-scoped `TenantTransaction` like every other repository in this codebase.

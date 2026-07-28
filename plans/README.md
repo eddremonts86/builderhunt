@@ -1,26 +1,33 @@
 # BuilderHunt implementation roadmap
 
 This directory is the implementation backlog for BuilderHunt. It contains 53 plan
-records plus the shared planning policy in [`_meta/`](./_meta/). (Note: this count and the
-categorized index below have drifted out of sync with the plan directories that actually exist —
-several newer plans, e.g. `calendar-scheduling-interview-intelligence`, `exhaustive-local-e2e-design`,
-and `solutions-intelligence`, are on disk but not yet listed in the sections below. Reconciling that
-is a separate cleanup, out of scope here.) Each plan is a trio:
+records plus the shared planning policy in [`_meta/`](./_meta/). Each plan is a trio:
 `spec.md` defines the outcome, `plan.md` defines the delivery sequence, and `tasks.md`
 is the executable checklist.
 
+Every directory in [`phase-1/`](./phase-1/) is prefixed with its position in the canonical
+build order, `01`–`53`. That number is the answer to "in what sequence would these plans be
+built from an empty repository, so no plan starts before its dependencies exist" — and it is
+also the order to walk when auditing plan-vs-reality.
+
 ## Read this first
 
-1. [`_meta/app-reality.md`](./_meta/app-reality.md) is the source of truth for what is
+1. [`_meta/phase-1-order.md`](./_meta/phase-1-order.md) is the complete numbered index:
+   all 53 plans, their dependencies as numbers, live task counts, and the divergences
+   between what a plan's status claims and what its checklist shows. It is the only index
+   here that covers every plan on disk — the categorized sections further down this file
+   predate `calendar-scheduling-interview-intelligence`, `exhaustive-local-e2e-design`, and
+   `solutions-intelligence` and still omit them.
+2. [`_meta/app-reality.md`](./_meta/app-reality.md) is the source of truth for what is
    already shipped and which architectural constraints exist.
-2. [`_meta/security-policy.md`](./_meta/security-policy.md) is binding for every plan that reads,
+3. [`_meta/security-policy.md`](./_meta/security-policy.md) is binding for every plan that reads,
    persists, shares, exports, deletes, or sends private data.
-3. [`_meta/ai-policy.md`](./_meta/ai-policy.md) is binding for every AI feature:
+4. [`_meta/ai-policy.md`](./_meta/ai-policy.md) is binding for every AI feature:
    Chrome built-in AI is the local-first default; MiniMax M3 is server-side for
    persisted, shared, background, embedding, and fallback work.
-4. [`_meta/conventions.md`](./_meta/conventions.md) defines when a plan is ready for
+5. [`_meta/conventions.md`](./_meta/conventions.md) defines when a plan is ready for
    implementation.
-5. Execute a plan's `tasks.md` from top to bottom. Re-check its dependency headers
+6. Execute a plan's `tasks.md` from top to bottom. Re-check its dependency headers
    immediately before starting because statuses can change independently.
 
 Status means:
@@ -42,23 +49,23 @@ in parallel unless an explicit dependency says otherwise.
 
 Ship the small, already-understood gaps before adding AI infrastructure:
 
-- [`security-and-multitenancy`](./security-and-multitenancy/spec.md): normalize global/public,
+- [`security-and-multitenancy`](./phase-1/01-security-and-multitenancy/spec.md): normalize global/public,
   account-subject, tenant-private, and operational data; adopt Better Auth organizations; separate
   runtime/migration database roles; add transaction-scoped tenant context, composite integrity,
   RLS, migration rehearsal, and tenant A/B gates. Its expand/backfill work may run alongside the
   non-schema truth fixes below, but RLS enforcement precedes every later private-data expansion.
-- [`project-hygiene`](./project-hygiene/spec.md): remove fabricated `Math.random()`
+- [`project-hygiene`](./phase-1/04-project-hygiene/spec.md): remove fabricated `Math.random()`
   evidence and use real repository signals.
-- [`hashnode-integration`](./hashnode-integration/spec.md): migrate the dead legacy API.
-- [`gitlab-integration`](./gitlab-integration/spec.md),
-  [`codeberg-integration`](./codeberg-integration/spec.md),
-  [`huggingface-integration`](./huggingface-integration/spec.md),
-  [`sourcehut-integration`](./sourcehut-integration/spec.md), and
-  [`stack-overflow-integration`](./stack-overflow-integration/spec.md): close env,
+- [`hashnode-integration`](./phase-1/15-hashnode-integration/spec.md): migrate the dead legacy API.
+- [`gitlab-integration`](./phase-1/08-gitlab-integration/spec.md),
+  [`codeberg-integration`](./phase-1/09-codeberg-integration/spec.md),
+  [`huggingface-integration`](./phase-1/12-huggingface-integration/spec.md),
+  [`sourcehut-integration`](./phase-1/10-sourcehut-integration/spec.md), and
+  [`stack-overflow-integration`](./phase-1/13-stack-overflow-integration/spec.md): close env,
   observability, and quota-reporting gaps.
-- [`production-infrastructure`](./production-infrastructure/spec.md): backups,
+- [`production-infrastructure`](./phase-1/02-production-infrastructure/spec.md): backups,
   monitoring, cron authentication, and operational prerequisites for workers and AI.
-- [`legal-and-compliance`](./legal-and-compliance/spec.md): finish hard deletion and
+- [`legal-and-compliance`](./phase-1/03-legal-and-compliance/spec.md): finish hard deletion and
   disclose external AI processing before MiniMax receives production traffic.
 
 Exit gate: no UI presents synthetic evidence as measured fact; backup restore and worker
@@ -67,7 +74,7 @@ non-owner role and tenant A/B plus direct-SQL RLS tests pass for every migrated 
 
 ### Wave 1 — shared AI platform
 
-- [`ai-expansion`](./ai-expansion/spec.md) is the only provider integration layer.
+- [`ai-expansion`](./phase-1/20-ai-expansion/spec.md) is the only provider integration layer.
 - Build its task registry, Chrome capability/download UX, MiniMax server client,
   structured-output validation, Redis cache, budgets, kill switches, and audit-safe
   telemetry before any feature-specific AI endpoint.
@@ -79,13 +86,13 @@ rate-limit, privacy, and provider-failure tests in a production-like runtime.
 
 These features reuse the shared platform and can be delivered independently:
 
-- [`outreach-generator`](./outreach-generator/spec.md): lowest-risk interactive value;
+- [`outreach-generator`](./phase-1/25-outreach-generator/spec.md): lowest-risk interactive value;
   keep the shipped rule-based generator as the final fallback.
-- [`ai-profile-enrichment`](./ai-profile-enrichment/spec.md): persisted MiniMax persona
+- [`ai-profile-enrichment`](./phase-1/23-ai-profile-enrichment/spec.md): persisted MiniMax persona
   cards with provenance and a 30-day cache.
-- [`code-fingerprinting`](./code-fingerprinting/spec.md): real repository evidence,
+- [`code-fingerprinting`](./phase-1/24-code-fingerprinting/spec.md): real repository evidence,
   persisted v2 artifacts, and the shipped heuristic v1 as fallback.
-- [`semantic-search`](./semantic-search/spec.md): configured embeddings, pgvector, a global
+- [`semantic-search`](./phase-1/21-semantic-search/spec.md): configured embeddings, pgvector, a global
   external-profile index, and cold-start fallback to federated search.
 
 Exit gate: each task is plan-gated, schema-validated, budgeted, kill-switchable, and
@@ -93,26 +100,26 @@ usable when Chrome AI or MiniMax is unavailable according to its degradation lad
 
 ### Wave 3 — discovery and source coverage
 
-- [`bluesky-integration`](./bluesky-integration/spec.md) can ship without credentials.
-- [`producthunt-integration`](./producthunt-integration/spec.md) is token-gated.
-- [`proactive-discovery`](./proactive-discovery/spec.md) follows semantic search and
+- [`bluesky-integration`](./phase-1/16-bluesky-integration/spec.md) can ship without credentials.
+- [`producthunt-integration`](./phase-1/17-producthunt-integration/spec.md) is token-gated.
+- [`proactive-discovery`](./phase-1/22-proactive-discovery/spec.md) follows semantic search and
   populates the global index using an idempotent HTTP-cron worker.
-- [`unified-timeline`](./unified-timeline/spec.md) is non-AI core functionality; its
+- [`unified-timeline`](./phase-1/32-unified-timeline/spec.md) is non-AI core functionality; its
   optional summary task plugs into the AI platform.
-- Keep [`devpost-integration`](./devpost-integration/spec.md) and
-  [`indiehackers-integration`](./indiehackers-integration/spec.md) blocked until their
+- Keep [`devpost-integration`](./phase-1/18-devpost-integration/spec.md) and
+  [`indiehackers-integration`](./phase-1/19-indiehackers-integration/spec.md) blocked until their
   explicit acquisition-policy decisions are resolved. Do not add brittle scraping to
   the live search request path.
 
 ### Wave 4 — teams and shared ownership
 
-- [`security-and-multitenancy`](./security-and-multitenancy/spec.md) supplies organizations,
+- [`security-and-multitenancy`](./phase-1/01-security-and-multitenancy/spec.md) supplies organizations,
   multi-membership, active tenant context, invitations, RLS, and organization entitlements.
-- [`team-accounts`](./team-accounts/spec.md) then supplies the Team settings/switcher/seat UX over
+- [`team-accounts`](./phase-1/26-team-accounts/spec.md) then supplies the Team settings/switcher/seat UX over
   that foundation; it does not create a competing organization model.
-- [`shared-resources`](./shared-resources/spec.md) second: shared searches and builder
+- [`shared-resources`](./phase-1/27-shared-resources/spec.md) second: shared searches and builder
   lists against the organization authorization boundary.
-- [`activity-feed`](./activity-feed/spec.md) last: append-only organization events over
+- [`activity-feed`](./phase-1/28-activity-feed/spec.md) last: append-only organization events over
   the mutations introduced by the first two plans.
 
 Exit gate: cross-organization isolation, invitation lifecycle, owner-deletion guards,
@@ -120,33 +127,33 @@ seat limits, and audit-event redaction all pass integration tests.
 
 ### Wave 5 — advanced AI workflows
 
-- [`work-sample`](./work-sample/spec.md) and
-  [`team-synergy`](./team-synergy/spec.md) provide the Team-tier analysis promises.
-- [`ai-sourcing-sprints`](./ai-sourcing-sprints/spec.md) composes federated search, the
+- [`work-sample`](./phase-1/37-work-sample/spec.md) and
+  [`team-synergy`](./phase-1/39-team-synergy/spec.md) provide the Team-tier analysis promises.
+- [`ai-sourcing-sprints`](./phase-1/40-ai-sourcing-sprints/spec.md) composes federated search, the
   AI task registry, tracking, semantic-index write-through, and the worker pattern.
-- [`portfolio-builder`](./portfolio-builder/spec.md) composes verified claims and
+- [`portfolio-builder`](./phase-1/36-portfolio-builder/spec.md) composes verified claims and
   optional enrichment/timeline artifacts into an explicitly published surface.
-- [`technical-sandbox`](./technical-sandbox/spec.md) stays superseded by work-sample;
+- [`technical-sandbox`](./phase-1/38-technical-sandbox/spec.md) stays superseded by work-sample;
   never implement real-person roleplay.
 
 ### Wave 6 — launch and continuous quality
 
-- Complete [`pricing-and-billing`](./pricing-and-billing/spec.md),
-  [`public-landing-pages`](./public-landing-pages/spec.md),
-  [`content-marketing`](./content-marketing/spec.md), and
-  [`status-and-trust`](./status-and-trust/spec.md).
-- Run [`waitlist-launch`](./waitlist-launch/spec.md) as the launch checklist; the product
+- Complete [`pricing-and-billing`](./phase-1/30-pricing-and-billing/spec.md),
+  [`public-landing-pages`](./phase-1/44-public-landing-pages/spec.md),
+  [`content-marketing`](./phase-1/45-content-marketing/spec.md), and
+  [`status-and-trust`](./phase-1/46-status-and-trust/spec.md).
+- Run [`waitlist-launch`](./phase-1/53-waitlist-launch/spec.md) as the launch checklist; the product
   keeps open signup and does not add an artificial waitlist.
 - Apply all five audits as release gates, not as a one-time cleanup:
-  [`audit-accessibility`](./audit-accessibility/spec.md),
-  [`audit-conversion`](./audit-conversion/spec.md),
-  [`audit-performance-qa`](./audit-performance-qa/spec.md),
-  [`audit-trust`](./audit-trust/spec.md), and
-  [`audit-visual-system`](./audit-visual-system/spec.md).
+  [`audit-accessibility`](./phase-1/47-audit-accessibility/spec.md),
+  [`audit-conversion`](./phase-1/50-audit-conversion/spec.md),
+  [`audit-performance-qa`](./phase-1/48-audit-performance-qa/spec.md),
+  [`audit-trust`](./phase-1/51-audit-trust/spec.md), and
+  [`audit-visual-system`](./phase-1/49-audit-visual-system/spec.md).
 
-[`onboarding-flow`](./onboarding-flow/spec.md) is already implemented.
-[`rss-feeds`](./rss-feeds/spec.md), [`smart-alerts`](./smart-alerts/spec.md), and
-[`claimable-profiles`](./claimable-profiles/spec.md) should close their remaining gaps in
+[`onboarding-flow`](./phase-1/07-onboarding-flow/spec.md) is already implemented.
+[`rss-feeds`](./phase-1/34-rss-feeds/spec.md), [`smart-alerts`](./phase-1/33-smart-alerts/spec.md), and
+[`claimable-profiles`](./phase-1/35-claimable-profiles/spec.md) should close their remaining gaps in
 the earliest wave where their touched surface is already being changed.
 
 ## Dependency graph
@@ -200,69 +207,69 @@ flowchart LR
 
 ### Foundations and business
 
-- [`security-and-multitenancy`](./security-and-multitenancy/spec.md)
-- [`abuse-and-usage-integrity`](./abuse-and-usage-integrity/spec.md)
-- [`production-infrastructure`](./production-infrastructure/spec.md)
-- [`pricing-and-billing`](./pricing-and-billing/spec.md)
-- [`legal-and-compliance`](./legal-and-compliance/spec.md)
-- [`status-and-trust`](./status-and-trust/spec.md)
-- [`public-landing-pages`](./public-landing-pages/spec.md)
-- [`content-marketing`](./content-marketing/spec.md)
-- [`waitlist-launch`](./waitlist-launch/spec.md)
-- [`onboarding-flow`](./onboarding-flow/spec.md)
+- [`security-and-multitenancy`](./phase-1/01-security-and-multitenancy/spec.md)
+- [`abuse-and-usage-integrity`](./phase-1/31-abuse-and-usage-integrity/spec.md)
+- [`production-infrastructure`](./phase-1/02-production-infrastructure/spec.md)
+- [`pricing-and-billing`](./phase-1/30-pricing-and-billing/spec.md)
+- [`legal-and-compliance`](./phase-1/03-legal-and-compliance/spec.md)
+- [`status-and-trust`](./phase-1/46-status-and-trust/spec.md)
+- [`public-landing-pages`](./phase-1/44-public-landing-pages/spec.md)
+- [`content-marketing`](./phase-1/45-content-marketing/spec.md)
+- [`waitlist-launch`](./phase-1/53-waitlist-launch/spec.md)
+- [`onboarding-flow`](./phase-1/07-onboarding-flow/spec.md)
 
 ### AI and analysis
 
-- [`ai-expansion`](./ai-expansion/spec.md)
-- [`semantic-search`](./semantic-search/spec.md)
-- [`ai-profile-enrichment`](./ai-profile-enrichment/spec.md)
-- [`outreach-generator`](./outreach-generator/spec.md)
-- [`code-fingerprinting`](./code-fingerprinting/spec.md)
-- [`project-hygiene`](./project-hygiene/spec.md)
-- [`work-sample`](./work-sample/spec.md)
-- [`team-synergy`](./team-synergy/spec.md)
-- [`technical-sandbox`](./technical-sandbox/spec.md) (superseded)
+- [`ai-expansion`](./phase-1/20-ai-expansion/spec.md)
+- [`semantic-search`](./phase-1/21-semantic-search/spec.md)
+- [`ai-profile-enrichment`](./phase-1/23-ai-profile-enrichment/spec.md)
+- [`outreach-generator`](./phase-1/25-outreach-generator/spec.md)
+- [`code-fingerprinting`](./phase-1/24-code-fingerprinting/spec.md)
+- [`project-hygiene`](./phase-1/04-project-hygiene/spec.md)
+- [`work-sample`](./phase-1/37-work-sample/spec.md)
+- [`team-synergy`](./phase-1/39-team-synergy/spec.md)
+- [`technical-sandbox`](./phase-1/38-technical-sandbox/spec.md) (superseded)
 
 ### Orchestration and publishing
 
-- [`ai-sourcing-sprints`](./ai-sourcing-sprints/spec.md)
-- [`proactive-discovery`](./proactive-discovery/spec.md)
-- [`unified-timeline`](./unified-timeline/spec.md)
-- [`portfolio-builder`](./portfolio-builder/spec.md)
-- [`smart-alerts`](./smart-alerts/spec.md)
-- [`claimable-profiles`](./claimable-profiles/spec.md)
-- [`rss-feeds`](./rss-feeds/spec.md)
+- [`ai-sourcing-sprints`](./phase-1/40-ai-sourcing-sprints/spec.md)
+- [`proactive-discovery`](./phase-1/22-proactive-discovery/spec.md)
+- [`unified-timeline`](./phase-1/32-unified-timeline/spec.md)
+- [`portfolio-builder`](./phase-1/36-portfolio-builder/spec.md)
+- [`smart-alerts`](./phase-1/33-smart-alerts/spec.md)
+- [`claimable-profiles`](./phase-1/35-claimable-profiles/spec.md)
+- [`rss-feeds`](./phase-1/34-rss-feeds/spec.md)
 
 ### Teams
 
-- [`team-accounts`](./team-accounts/spec.md)
-- [`shared-resources`](./shared-resources/spec.md)
-- [`activity-feed`](./activity-feed/spec.md)
+- [`team-accounts`](./phase-1/26-team-accounts/spec.md)
+- [`shared-resources`](./phase-1/27-shared-resources/spec.md)
+- [`activity-feed`](./phase-1/28-activity-feed/spec.md)
 
 ### Sources
 
-- [`bluesky-integration`](./bluesky-integration/spec.md)
-- [`producthunt-integration`](./producthunt-integration/spec.md)
-- [`devpost-integration`](./devpost-integration/spec.md) (blocked)
-- [`indiehackers-integration`](./indiehackers-integration/spec.md) (blocked)
-- [`gitlab-integration`](./gitlab-integration/spec.md)
-- [`codeberg-integration`](./codeberg-integration/spec.md)
-- [`sourcehut-integration`](./sourcehut-integration/spec.md)
-- [`hashnode-integration`](./hashnode-integration/spec.md)
-- [`huggingface-integration`](./huggingface-integration/spec.md)
-- [`lobsters-integration`](./lobsters-integration/spec.md)
-- [`npm-registry-integration`](./npm-registry-integration/spec.md)
-- [`stack-overflow-integration`](./stack-overflow-integration/spec.md)
+- [`bluesky-integration`](./phase-1/16-bluesky-integration/spec.md)
+- [`producthunt-integration`](./phase-1/17-producthunt-integration/spec.md)
+- [`devpost-integration`](./phase-1/18-devpost-integration/spec.md) (blocked)
+- [`indiehackers-integration`](./phase-1/19-indiehackers-integration/spec.md) (blocked)
+- [`gitlab-integration`](./phase-1/08-gitlab-integration/spec.md)
+- [`codeberg-integration`](./phase-1/09-codeberg-integration/spec.md)
+- [`sourcehut-integration`](./phase-1/10-sourcehut-integration/spec.md)
+- [`hashnode-integration`](./phase-1/15-hashnode-integration/spec.md)
+- [`huggingface-integration`](./phase-1/12-huggingface-integration/spec.md)
+- [`lobsters-integration`](./phase-1/14-lobsters-integration/spec.md)
+- [`npm-registry-integration`](./phase-1/11-npm-registry-integration/spec.md)
+- [`stack-overflow-integration`](./phase-1/13-stack-overflow-integration/spec.md)
 
 ### Release audits
 
-- [`design-modernization`](./design-modernization/spec.md)
-- [`audit-accessibility`](./audit-accessibility/spec.md)
-- [`audit-conversion`](./audit-conversion/spec.md)
-- [`audit-performance-qa`](./audit-performance-qa/spec.md)
-- [`audit-trust`](./audit-trust/spec.md)
-- [`audit-visual-system`](./audit-visual-system/spec.md)
-- [`responsive-mobile-design`](./responsive-mobile-design/spec.md) — overlaps
+- [`design-modernization`](./phase-1/05-design-modernization/spec.md)
+- [`audit-accessibility`](./phase-1/47-audit-accessibility/spec.md)
+- [`audit-conversion`](./phase-1/50-audit-conversion/spec.md)
+- [`audit-performance-qa`](./phase-1/48-audit-performance-qa/spec.md)
+- [`audit-trust`](./phase-1/51-audit-trust/spec.md)
+- [`audit-visual-system`](./phase-1/49-audit-visual-system/spec.md)
+- [`responsive-mobile-design`](./phase-1/06-responsive-mobile-design/spec.md) — overlaps
   `audit-visual-system`'s unchecked "dashboard shell" task; see that plan's spec.md for the
   relationship
 

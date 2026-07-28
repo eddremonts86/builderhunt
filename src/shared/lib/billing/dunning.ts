@@ -1,5 +1,5 @@
 /**
- * Seven-day dunning and recovery (plans/stripe-billing-platform/tasks.md §7 "Implement seven-day
+ * Seven-day dunning and recovery (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Implement seven-day
  * dunning and recovery"; spec.md §Failed payments and disputes: "The first renewal failure starts
  * seven calendar days of grace. Configure Stripe retries inside that window. Access and credits
  * continue during grace. After grace, an idempotent worker sets `payment_blocked`, blocks new

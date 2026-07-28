@@ -47,7 +47,7 @@ export const Route = createFileRoute('/api/admin/metrics/')({
               lastRunAt: discovery.lastRunAt,
               stats: discovery.stats,
             },
-            // plans/stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and
+            // plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and
             // alerts" — checkout/recovery/webhook-age/ledger-invariant/auto-recharge/cost-margin/
             // country-gate metrics, plus the critical SLO alerts computed from them.
             billing: { ...billingMetrics, alerts: evaluateBillingAlerts(billingMetrics) },

@@ -45,7 +45,7 @@ import {
 
 /**
  * The ONLY surface feature code may use to authorize and pay for AI-powered
- * work (plans/stripe-billing-platform/tasks.md §4 "Expose server-only
+ * work (plans/phase-1/29-stripe-billing-platform/tasks.md §4 "Expose server-only
  * feature billing contracts"; spec.md §Credit authorization contract).
  * Feature code never touches `reservations.ts`/`credits.ts` directly, never
  * reads or mutates balances itself, and never begins a provider-backed

@@ -1,7 +1,7 @@
 # Look-alike Sourcing (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`semantic-search`](../../phase-1/semantic-search/tasks.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../phase-1/proactive-discovery/tasks.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
+> **Depends on**: [`semantic-search`](../../phase-1/21-semantic-search/tasks.md) (global `builder_embeddings` + pgvector HNSW — already shipped); [`proactive-discovery`](../../phase-1/22-proactive-discovery/tasks.md) (index breadth; already shipped — a thin index makes look-alikes weak but must not break them). Enhanced by [`collaboration-graph`](../collaboration-graph/spec.md) and [`availability-signals`](../availability-signals/spec.md) (neither is required).
 > **Blocks**: nothing
 > **Reality check**: Extends shipped files only — `src/lib/semantic/embedding-doc.ts`, `src/lib/dedup.ts`, `src/shared/lib/repositories/public-builder-embeddings.ts`, `src/shared/lib/billing-shared.ts`, `src/modules/search/components/{PersonResultCard,SearchPage}.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/db/verify-api-isolation-local.mjs`. All verified to exist at HEAD 2026-07-27. No new table, no migration, no new env var, no entry in `AI_TASKS`.
 

@@ -13,7 +13,7 @@ import { similarBuilderEmbeddingsQuery } from '~/shared/lib/repositories/public-
  * HNSW index can only answer an ordering expressed as the bare distance
  * operator — the planner cannot match a monotonic transform of it back to the
  * index — so every semantic query fell back to `Seq Scan + Sort` over the
- * whole table while the doc comment (and plans/semantic-search/spec.md's
+ * whole table while the doc comment (and plans/phase-1/21-semantic-search/spec.md's
  * "warm-index semantic query p95 < 100 ms (local HNSW)" target) claimed an
  * index scan.
  *

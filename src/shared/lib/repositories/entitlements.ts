@@ -11,7 +11,7 @@ interface EntitlementInput {
 
 /**
  * `PlanTier` plus Pro Max — the Stripe-native tier `subscriptions.ts` can
- * project into `organization_entitlements` (plans/stripe-billing-platform/tasks.md
+ * project into `organization_entitlements` (plans/phase-1/29-stripe-billing-platform/tasks.md
  * §7 "Project paid subscription and monthly renewal state").
  *
  * Declared in the client-safe `billing-shared.ts` as `OrganizationTier` and

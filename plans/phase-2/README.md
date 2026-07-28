@@ -188,7 +188,7 @@ its Phase 0. It is #7 for disclosure-risk reasons, not technical ones.
 ### `ai-cv-generation-and-tailoring` cannot reuse `candidate_documents`
 
 The plan claimed it reuses the private-document foundation from
-[`calendar-scheduling-interview-intelligence`](../phase-1/calendar-scheduling-interview-intelligence/spec.md).
+[`calendar-scheduling-interview-intelligence`](../phase-1/43-calendar-scheduling-interview-intelligence/spec.md).
 Verified false in part: `candidate_documents` has `submission_id uuid NOT NULL` with a composite FK
 to `candidate_submissions(organization_id, id)` `ON DELETE CASCADE`. **A job seeker's base CV has no
 candidate submission**, and cascade-deleting someone's CV because an unrelated interview submission

@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  CANDIDATE_NOTICE,
   guardPublicRequest,
   publicError,
   withCapabilityRequest,
@@ -16,7 +17,8 @@ import {
   findLinkForSubmission,
   recordLinkPolicyDecision,
 } from '~/shared/lib/repositories/interview-web-imports'
-import { findSubmissionByInvitation, listConsentsForInvitation } from '~/shared/lib/repositories/scheduling'
+import { findSubmissionByInvitation } from '~/shared/lib/repositories/scheduling'
+import { hasLiveConsent } from '~/lib/scheduling/consent-service'
 
 /**
  * The candidate attests to owning a site and asks for it to be imported (plan:
@@ -74,9 +76,14 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/links
             })
             if (!link) return null
 
-            const consents = await listConsentsForInvitation(transaction, tenant.organizationId, tenant.invitationId)
-            const granted = consents.some((consent) =>
-              consent.purpose === 'public_web_import' && consent.decision === 'granted')
+            // See `hasLiveConsent`: the local check this replaces compared against `'granted'`, a
+            // decision value that does not exist, so web import was unreachable for every candidate.
+            const granted = await hasLiveConsent(transaction, {
+              organizationId: tenant.organizationId,
+              invitationId: tenant.invitationId,
+              purpose: 'public_web_import',
+              noticeVersion: CANDIDATE_NOTICE,
+            })
             // The separate per-purpose consent, on top of the per-host attestation. Both are required
             // and they answer different questions: whether we may import at all, and whether this
             // particular site is theirs to offer.

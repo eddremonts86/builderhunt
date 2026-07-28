@@ -4,7 +4,7 @@ import { getBillingAvailability, getOrganizationBillingSummary } from '~/shared/
 import { canReadBillingSummary } from '~/shared/lib/billing/permissions'
 
 /**
- * The canonical billing read (plans/stripe-billing-platform/tasks.md §9 task 1) — role-minimized per
+ * The canonical billing read (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 1) — role-minimized per
  * spec.md §Permissions and UX: owner/admin get the full `OrganizationBillingSummaryDto`, a plain
  * member gets only `BillingAvailabilityDto` (feature availability, no financial detail).
  * `/api/plans/me` is the legacy compatibility route this replaces; it now delegates to

@@ -22,7 +22,7 @@ import {
 } from '../repositories/billing-ledger'
 
 /**
- * Atomic credit reservation lifecycle (plans/stripe-billing-platform/tasks.md
+ * Atomic credit reservation lifecycle (plans/phase-1/29-stripe-billing-platform/tasks.md
  * §4 "Implement atomic reservation lifecycle"; spec.md §Credit authorization
  * contract). A provider-backed operation must never begin before
  * `reserveCredits` succeeds, and must stop if `extendReservation` fails.

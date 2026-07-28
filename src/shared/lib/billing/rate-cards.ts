@@ -2,7 +2,7 @@ import type { CatalogTier } from './catalog'
 
 /**
  * Server-owned, versioned per-operation billing limits
- * (plans/stripe-billing-platform/tasks.md §4 "Expose server-only feature
+ * (plans/phase-1/29-stripe-billing-platform/tasks.md §4 "Expose server-only feature
  * billing contracts"). Every reservation goes through `getRateCard` — client
  * input can never widen `maxUnits`/`maxDurationSeconds` beyond what's defined
  * here (spec.md: "Client input cannot extend operation limits").

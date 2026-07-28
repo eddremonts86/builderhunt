@@ -1,7 +1,7 @@
 /**
  * The only surface any future billing route/UI may import for reads over
  * customer/subscription/checkout-attempt/terms-acceptance/credit-grant/
- * credit-reservation/refund state (plans/stripe-billing-platform/tasks.md §3).
+ * credit-reservation/refund state (plans/phase-1/29-stripe-billing-platform/tasks.md §3).
  * Every export here is a `TenantPrincipal`-gated DTO or typed function — never
  * a schema table, a raw ORM row, or a Stripe payload/card/bank/PII field.
  * `src/shared/lib/billing/dependency-contracts.test.ts`'s "billing module
@@ -91,7 +91,7 @@ export interface BillingUsageDto {
   savedBuilders: number
 }
 
-/** `null` means unlimited — the canonical, typed replacement for a JS `Infinity` value JSON can never actually carry (`JSON.stringify(Infinity) === 'null'` regardless of intent) — plans/stripe-billing-platform/tasks.md §9 task 1. */
+/** `null` means unlimited — the canonical, typed replacement for a JS `Infinity` value JSON can never actually carry (`JSON.stringify(Infinity) === 'null'` regardless of intent) — plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 1. */
 export interface BillingUsageLimitsDto {
   savedSearches: number | null
   savedBuilders: number | null
@@ -105,7 +105,7 @@ export interface BillingCapabilitiesDto {
   canConfigureAutoRecharge: boolean
 }
 
-/** Placeholder until plans/stripe-billing-platform/tasks.md §9 task 4 ("Add verified billing contact management") lands — always `null` today; typed now so this DTO's shape doesn't need a second breaking change later. */
+/** Placeholder until plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4 ("Add verified billing contact management") lands — always `null` today; typed now so this DTO's shape doesn't need a second breaking change later. */
 export interface BillingContactSummaryDto {
   email: string
   verifiedAt: string | null
@@ -252,7 +252,7 @@ export async function getBillingSummary(principal: TenantPrincipal): Promise<Bil
 }
 
 /**
- * The canonical organization billing DTO (plans/stripe-billing-platform/tasks.md §9 task 1) — plan/
+ * The canonical organization billing DTO (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 1) — plan/
  * period, payment/grace/scheduled state, seats, credit grants, usage vs. limits, capabilities, and a
  * billing-contact placeholder. Owner/admin only — the route calls this behind `canReadBillingSummary`
  * and falls back to `getBillingAvailability` for a plain member. `/api/plans/me` (legacy) delegates to
@@ -308,7 +308,7 @@ export async function getOrganizationBillingSummary(principal: TenantPrincipal):
     recentTermsAcceptances: summary.recentTermsAcceptances.map(toBillingTermsAcceptanceSummaryDto),
     usage: { savedSearches: summary.savedSearches, savedBuilders: summary.savedBuilders },
     limits: toBillingUsageLimitsDto(PLAN_LIMITS[entitlementsRepo.resolveLegacyPlanTier(summary.policy.tier)]),
-    // Always null until plans/stripe-billing-platform/tasks.md §9 task 4 lands — see BillingContactSummaryDto's own comment.
+    // Always null until plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4 lands — see BillingContactSummaryDto's own comment.
     billingContact: null,
     capabilities: {
       paidActionsAllowed: summary.policy.paidActionsAllowed,
@@ -341,7 +341,7 @@ export interface OwnershipTransferPaymentMethodDto {
 }
 
 /**
- * Read-only preview shown before confirming an ownership transfer (plans/stripe-billing-platform/
+ * Read-only preview shown before confirming an ownership transfer (plans/phase-1/29-stripe-billing-platform/
  * tasks.md §9 task 5). Deliberately makes ZERO calls to any provider method that could create a
  * charge, a Checkout Session, or a PaymentIntent — only `getCustomer`/`getDefaultPaymentMethodSummary`
  * (both pure reads). "Atomically move billing authority with ownership" needs no write of its own

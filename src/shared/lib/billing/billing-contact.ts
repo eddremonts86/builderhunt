@@ -1,5 +1,5 @@
 /**
- * Verified billing contact (plans/stripe-billing-platform/tasks.md §9 task 4 "Add verified billing
+ * Verified billing contact (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4 "Add verified billing
  * contact management"; spec.md: a separate address, owned by the organization, that receives
  * invoices/receipts/renewal and payment-failure notices — while every critical message (payment
  * failure) is ALSO always sent to the organization owner, since a billing contact grants no

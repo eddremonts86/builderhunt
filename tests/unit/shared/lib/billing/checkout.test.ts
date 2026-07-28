@@ -289,7 +289,7 @@ describe('getCheckoutReturnStatus', () => {
     const firstPoll = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
     expect(firstPoll).toEqual({ state: 'pending' })
 
-    // Stands in for the not-yet-built webhook handler (plans/stripe-billing-platform/tasks.md §6)
+    // Stands in for the not-yet-built webhook handler (plans/phase-1/29-stripe-billing-platform/tasks.md §6)
     // activating the subscription after Stripe confirms payment. createSubscriptionCheckout above
     // already provisioned the org's billing_customers row, so reuse it instead of inserting a
     // second one for the same (organizationId, livemode) pair.

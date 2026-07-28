@@ -1,7 +1,7 @@
 /**
  * Unified client entry point for AI features: `ai(taskId, input, opts?)`.
  *
- * Implements the local-first ladder from plans/ai-expansion/spec.md:
+ * Implements the local-first ladder from plans/phase-1/20-ai-expansion/spec.md:
  *   1. Task `local-first` + prompt capability `available` (and the user
  *      hasn't opted into `forceServer`/the `bh-ai-prefer-server` preference)
  *      -> `promptLocal`. Success -> `{ output, via: 'local' }`.

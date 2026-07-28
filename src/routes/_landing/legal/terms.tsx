@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { Scale } from 'lucide-react'
+import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 
 export const Route = createFileRoute('/_landing/legal/terms')({
   component: TermsPage,
@@ -11,6 +12,9 @@ export const Route = createFileRoute('/_landing/legal/terms')({
     ],
   }),
 })
+
+/** Moves with the text, not with the deploy. */
+const TERMS_LAST_UPDATED = '2026-07-28'
 
 const SECTIONS: Array<{ heading: string; body: string }> = [
   {
@@ -76,7 +80,14 @@ function TermsPage() {
             <Scale className="w-7 h-7 text-bh-accent" aria-hidden="true" />
             Terms of Service
           </h1>
-          <p className="text-sm text-bh-text-muted">Version v1.0 · Last updated 2026-07-16</p>
+          {/*
+            * Derived, never restated. A hand-written "v1.0" here is what let section 11 be added while
+            * the page still claimed the version a reader had accepted — the same defect the privacy
+            * page had, and the reason `legal-versions.ts` is the single source.
+            */}
+          <p className="text-sm text-bh-text-muted">
+            Version {CURRENT_CONSENT_VERSIONS.tos} · Last updated {TERMS_LAST_UPDATED}
+          </p>
         </header>
         <div className="prose prose-invert max-w-none text-bh-text-muted leading-relaxed space-y-6">
           {SECTIONS.map((s) => (

@@ -123,7 +123,7 @@ badges (`.kbd`), and literal keys/identifiers — never for marketing or discove
 
 **Character:** A single, versatile grotesk (Inter) carries the whole system today. Hero numbers
 and large stat figures are the system's next typographic differentiation point (tracked in
-`plans/design-modernization`), not yet a second display face.
+`plans/phase-1/05-design-modernization`), not yet a second display face.
 
 ### Hierarchy
 - **Display / Hero** (800 weight, `text-5xl`–`text-7xl`, tight tracking): landing hero headline.
@@ -141,7 +141,7 @@ Two container widths: `.container` (max 1200px) for standard sections, `.contain
 
 The dashboard shell is a fixed glass topbar over scrollable content; the public/landing layout
 is a standard flowing page. Responsive collapse below `md` (768px) is being formalized in
-`plans/responsive-mobile-design` (mobile nav pattern, floating-panel viewport clamping, table
+`plans/phase-1/06-responsive-mobile-design` (mobile nav pattern, floating-panel viewport clamping, table
 overflow handling).
 
 ## Elevation & Depth
@@ -201,7 +201,7 @@ for glass panels, `24px` for cards. Pills (`9999px`) for badges and eyebrows. Bo
 ### Navigation
 - Dashboard shell: fixed glass topbar; account/org controls always reachable. Below `md`, the
   primary nav collapses into a single disclosure pattern (see
-  `plans/responsive-mobile-design/spec.md` for the confirmed pattern) rather than silent
+  `plans/phase-1/06-responsive-mobile-design/spec.md` for the confirmed pattern) rather than silent
   horizontal scroll.
 
 ## Do's and Don'ts

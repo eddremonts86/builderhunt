@@ -1,6 +1,6 @@
 /**
  * Migrates manual (non-Stripe) organization entitlements into the new billing schema without
- * charging anyone (plans/stripe-billing-platform/tasks.md §10 "Migrate manual entitlements without
+ * charging anyone (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Migrate manual entitlements without
  * charging"; spec.md §Migration: "Manual organization entitlements remain valid until their current
  * end... Import current manual periods, operator trials, and promotional credits as audited
  * `legacy_manual` records... Voluntary Checkout activation atomically ends overlapping manual

@@ -68,11 +68,11 @@ function StatCard({
 
 /**
  * Platform-admin-only read-only summary of live billing operational health
- * (plans/stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
+ * (plans/phase-1/29-stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
  * Every number here is an aggregate count from `getBillingOperationsMetrics` — no raw webhook
  * payloads, no per-organization detail, no secrets ever render on this page. Reconciliation and
  * cost/margin sections intentionally show "not yet available" rather than a fabricated number:
- * neither has been built yet (plans/stripe-billing-platform/tasks.md §10, unstarted).
+ * neither has been built yet (plans/phase-1/29-stripe-billing-platform/tasks.md §10, unstarted).
  */
 export function BillingOperationsPage() {
   const [metrics, setMetrics] = React.useState<BillingOperationsMetrics | null>(null)

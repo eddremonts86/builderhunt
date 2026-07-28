@@ -210,7 +210,7 @@ test.afterAll(async () => {
  * is that a developer machine has a real embedding provider configured while
  * CI has none, so locally the test passes through the provider and never
  * proves the `E2E_EMBEDDINGS_SCENARIO=success` fake works at all. Diagnosing
- * that is tracked in plans/phase-1/exhaustive-local-e2e-design; do not silence
+ * that is tracked in plans/phase-1/52-exhaustive-local-e2e-design; do not silence
  * it by weakening the assertion.
  */
 test('a pro-tier user gets HNSW-ordered semantic matches, correctly thresholded @requires-embeddings', async () => {

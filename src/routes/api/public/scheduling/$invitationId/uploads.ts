@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import {
+  CANDIDATE_NOTICE,
   guardPublicRequest,
   publicError,
   withCapabilityRequest,
@@ -20,7 +21,8 @@ import {
   createUploadIntent,
   sumSubmissionDocumentBytes,
 } from '~/shared/lib/repositories/interview-documents'
-import { findSubmissionByInvitation, listConsentsForInvitation } from '~/shared/lib/repositories/scheduling'
+import { findSubmissionByInvitation } from '~/shared/lib/repositories/scheduling'
+import { hasLiveConsent } from '~/lib/scheduling/consent-service'
 
 /**
  * Issues a signed upload URL for one candidate document (plan:
@@ -85,9 +87,15 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/uploa
             // nothing to attach a document to, and nothing that made storing one lawful.
             if (!submission) return { kind: 'no_submission' as const }
 
-            const consents = await listConsentsForInvitation(transaction, tenant.organizationId, tenant.invitationId)
-            const granted = consents.some((consent) =>
-              consent.purpose === 'candidate_document_processing' && consent.decision === 'granted')
+            // `hasLiveConsent`, not a local `.some()`. The local one compared against `'granted'`,
+            // which is not one of the two decisions the enum and the check constraint allow, so this
+            // gate refused every candidate and no document could ever be uploaded.
+            const granted = await hasLiveConsent(transaction, {
+              organizationId: tenant.organizationId,
+              invitationId: tenant.invitationId,
+              purpose: 'candidate_document_processing',
+              noticeVersion: CANDIDATE_NOTICE,
+            })
             if (!granted) return { kind: 'consent_missing' as const }
 
             const existingBytes = await sumSubmissionDocumentBytes(transaction, {

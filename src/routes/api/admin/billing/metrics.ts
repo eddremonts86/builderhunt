@@ -4,7 +4,7 @@ import { getBillingOperationsMetrics } from '~/shared/lib/billing/operations-met
 
 /**
  * Read-only aggregate metrics for the platform billing operations dashboard
- * (plans/stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
+ * (plans/phase-1/29-stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
  * Platform-admin only; returns nothing beyond aggregate counts (no per-organization detail, no raw
  * webhook payloads, no secrets — every field comes straight from `getBillingOperationsMetrics`,
  * which never reads anything encrypted/secret itself).

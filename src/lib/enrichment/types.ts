@@ -1,7 +1,7 @@
 /**
  * Public Profile Enrichment — shared contracts.
  *
- * Spec reference: plans/stealth-scraping/spec.md §§4, 7, 8
+ * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §§4, 7, 8
  *
  * This module has no I/O. It only defines the compile-time shapes that the
  * rest of the enrichment pipeline (policies, resolver, network client,

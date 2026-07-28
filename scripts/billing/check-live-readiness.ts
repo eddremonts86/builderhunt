@@ -1,5 +1,5 @@
 /**
- * Read-only live billing readiness check (plans/stripe-billing-platform/tasks.md
+ * Read-only live billing readiness check (plans/phase-1/29-stripe-billing-platform/tasks.md
  * §3 "Implement live billing readiness gate"; docs/operations/stripe-launch-register.md's
  * "Release gates" checklist). Gathers real evidence — env config, the catalog,
  * the recorded seller profile, and recent reconciliation runs — and hands it

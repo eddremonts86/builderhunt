@@ -221,7 +221,7 @@ policies — verified against the exact non-owner roles via `pnpm test:rls:local
 seven tenant-private tables since `drizzle/0081_wakeful_butterfly.sql`; the read path is a
 separate switch and still defaults to `legacy` — see constraint 1 below. Five real,
 previously-undiscovered permission/logic bugs were found and fixed this way in the 2026-07-23
-session alone (see `security-and-multitenancy/tasks.md` task 15's progress notes) — a
+session alone (see `01-security-and-multitenancy/tasks.md` task 15's progress notes) — a
 reasonable prior for treating any *newly-exercised* code path as suspect until proven
 against the real roles, not just the DB owner.
 

@@ -217,6 +217,17 @@ export const Route = createFileRoute('/api/interviews/$interviewId/session')({
             // No invitation behind the event means this is a personal calendar entry, not an interview.
             // There is no candidate, so there is no consent, so there is nothing to transcribe.
             if (!context) return { kind: 'not_found' as const }
+            /*
+             * Writes are the owner's alone.
+             *
+             * A granted participant watches and reads; starting, pausing or finishing someone else's
+             * interview is not theirs to do, and `finish` also settles credits. Same `not_found` as an
+             * absent interview, so a colleague cannot distinguish "not allowed" from "does not exist".
+             *
+             * Found by the Phase 12 e2e: an ungranted colleague created a session and got a 200, because
+             * the only check on this path was RLS and a developer's `DATABASE_URL` is the superuser.
+             */
+            if (!context.isOwner) return { kind: 'not_found' as const }
             const invitationId = context.invitationId
 
             switch (body.action) {

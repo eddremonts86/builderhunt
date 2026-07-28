@@ -29,6 +29,7 @@ import {
 } from './harness/fixtures/principals'
 import { seedConsent } from './harness/fixtures/privacy'
 import { uniqueId } from './harness/ids'
+import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 import {
   expectStrictBrowser,
   gotoHydrated,
@@ -302,27 +303,51 @@ test.describe('consent API', () => {
     expect(body.needsAcceptance).toEqual(expect.arrayContaining(['tos', 'privacy', 'cookies']))
   })
 
-  // Privacy is at v1.1 while this posts v1.0 — deliberately. A minor bump is not a material change
-  // (src/shared/lib/legal.ts#isMaterialVersionChange), so the earlier acceptance stays valid and the
-  // document must drop out of needsAcceptance without the user re-accepting anything.
-  test('accepting a document via POST records it and clears it from needsAcceptance', async () => {
+  /*
+   * Privacy is at v2.0, and this is the case that proves what that costs.
+   *
+   * This test used to post `v1.0` and assert that privacy dropped out of `needsAcceptance`, on the
+   * grounds that v1.1 was a minor bump and `isMaterialVersionChange` compares only the major part.
+   * The interview work moved the notice to v2.0 — deliberately, because the AI-processing and
+   * live-transcription disclosures are not a wording change and an acceptance of v1.x must not be
+   * allowed to carry — so a v1 acceptance is now *correctly* insufficient.
+   *
+   * The consequence is real and lands on deploy day: `requireCurrentCommercialConsent` uses the same
+   * rule, so every organization holding a v1.x acceptance meets a re-acceptance gate at checkout. It
+   * is recorded in the provider register; this is the assertion that would have surfaced it.
+   */
+  test('a stale major acceptance does not clear the requirement; the current version does', async () => {
     const { tosUser, sql } = harness
-    const accept = await tosUser.api!.post('/api/consent', {
+
+    const stale = await tosUser.api!.post('/api/consent', {
       data: { document: 'privacy', version: 'v1.0' },
     })
-    expect(accept.status()).toBe(200)
-    expect((await accept.json()).ok).toBe(true)
+    // The POST itself succeeds — the ledger records what the user actually accepted, whatever it
+    // was. Refusing to record it would lose the audit trail of their earlier decision.
+    expect(stale.status()).toBe(200)
+    expect((await stale.json()).ok).toBe(true)
 
-    const rows = await sql<{ version: string }[]>`
+    const staleRows = await sql<{ version: string }[]>`
       select version from user_consents
       where user_id = ${tosUser.userId!} and document = 'privacy'
     `
-    expect(rows.map((r) => r.version)).toContain('v1.0')
+    expect(staleRows.map((r) => r.version)).toContain('v1.0')
 
-    const status = await tosUser.api!.get('/api/consent')
-    const body = await status.json()
-    expect(body.needsAcceptance).not.toContain('privacy')
-    expect(body.consents.privacy).toBe('v1.0')
+    const afterStale = await tosUser.api!.get('/api/consent').then((r) => r.json())
+    // Still required. A v1 acceptance predates the disclosures v2.0 added.
+    expect(afterStale.needsAcceptance).toContain('privacy')
+    expect(afterStale.consents.privacy).toBe('v1.0')
+
+    // And the current version clears it, so the assertion above is about the major bump rather than
+    // about the endpoint having stopped working.
+    const current = await tosUser.api!.post('/api/consent', {
+      data: { document: 'privacy', version: CURRENT_CONSENT_VERSIONS.privacy },
+    })
+    expect(current.status()).toBe(200)
+
+    const afterCurrent = await tosUser.api!.get('/api/consent').then((r) => r.json())
+    expect(afterCurrent.needsAcceptance).not.toContain('privacy')
+    expect(afterCurrent.consents.privacy).toBe(CURRENT_CONSENT_VERSIONS.privacy)
   })
 })
 

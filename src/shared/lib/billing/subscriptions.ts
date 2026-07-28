@@ -1,6 +1,6 @@
 /**
  * Projects `billing_subscriptions`' authoritative Stripe state into
- * `organization_entitlements` (plans/stripe-billing-platform/tasks.md §7
+ * `organization_entitlements` (plans/phase-1/29-stripe-billing-platform/tasks.md §7
  * "Project paid subscription and monthly renewal state"). This is a
  * read-model projection only: the monthly credit grant itself is already
  * handled by `webhook-handlers.ts`'s `handleInvoicePaid` (idempotent by

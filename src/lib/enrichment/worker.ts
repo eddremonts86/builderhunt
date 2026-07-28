@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — worker orchestration.
- * Spec reference: plans/stealth-scraping/spec.md §11. Sequential connectors
+ * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §11. Sequential connectors
  * per job, bounded concurrency of two jobs, deterministic retry schedule.
  */
 

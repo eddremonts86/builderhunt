@@ -100,7 +100,7 @@
   --color-bh-accent-glow: rgba(224, 115, 56, 0.25);
   /* Text/icon color for content painted directly on a solid --color-bh-accent
      fill (buttons, skip link, selection). White measured 3.14:1 here — short
-     of the 4.5:1 text minimum (axe: color-contrast, plans/audit-accessibility).
+     of the 4.5:1 text minimum (axe: color-contrast, plans/phase-1/47-audit-accessibility).
      Rather than darken the signature terracotta accent itself (used
      everywhere: badges, links, focus rings, the brand mark), a dark ink
      clears AA comfortably (5.98:1 on --color-bh-accent, 4.57:1 on
@@ -180,7 +180,7 @@
   /* Lighter than the light-mode value (#71717a) — that value only clears
      WCAG AA (4.5:1) against the light surfaces it was tuned for (~7:1); against
      dark-mode surfaces it measured 3.1-3.7:1 (axe: color-contrast, found via
-     plans/audit-accessibility). Extra margin beyond the bare 4.5:1 floor is
+     plans/phase-1/47-audit-accessibility). Extra margin beyond the bare 4.5:1 floor is
      deliberate: nested card/stat-tile contexts composite against slightly
      different effective backgrounds than the flat surface tokens, so a
      value that only just clears 4.5:1 against `--color-bh-surface` can still
@@ -668,7 +668,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, [role="button"]:focu
 /* The remaining source badges only had their light-mode ink tuned (comment
    above) — every one of them measured under the 4.5:1 text-contrast minimum
    against its own dark-tinted fill (axe: color-contrast, 2.5-3.2:1, found
-   via plans/audit-accessibility). Brighten each ink for dark mode; the fill/
+   via plans/phase-1/47-audit-accessibility). Brighten each ink for dark mode; the fill/
    border tints already scale with the brand color via currentColor-free
    rgba() so they don't need their own override. */
 .dark .badge-reddit { color: #ff7a4d; }

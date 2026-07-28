@@ -11,7 +11,7 @@ import {
 } from '../repositories/billing-ledger'
 
 /**
- * The append-only credit grant/balance layer (plans/stripe-billing-platform/tasks.md
+ * The append-only credit grant/balance layer (plans/phase-1/29-stripe-billing-platform/tasks.md
  * §4 "Implement append-only grant and balance logic"). Every operation here:
  *
  * - Is idempotent by `idempotencyKey` — a retried call with the same key

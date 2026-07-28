@@ -16,7 +16,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * user base. This is a known limitation; a real user-profile lookup would
  * need an HF API token (out of scope per spec).
  *
- * Spec reference: plans/huggingface-integration/spec.md
+ * Spec reference: plans/phase-1/12-huggingface-integration/spec.md
  */
 interface HFModel {
   _id: string

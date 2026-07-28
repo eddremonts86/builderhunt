@@ -3,7 +3,7 @@ import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/sha
 import { getAccountingExport, type AccountingExportResult } from '~/shared/lib/billing/accounting-export'
 
 /**
- * Monthly accounting and margin export (plans/stripe-billing-platform/tasks.md §10 "Create
+ * Monthly accounting and margin export (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Create
  * accounting and margin export"). Platform-admin only, read-only — no per-organization detail, no
  * bank/payout credentials (this app never even receives any), no raw payloads. `?month=YYYY-MM`
  * selects a specific UTC calendar month (defaults to the previous full month); `?format=csv` returns

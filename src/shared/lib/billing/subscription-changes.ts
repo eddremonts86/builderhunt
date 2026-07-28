@@ -1,5 +1,5 @@
 /**
- * Subscription preview and change matrix (plans/stripe-billing-platform/tasks.md §7 "Implement
+ * Subscription preview and change matrix (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Implement
  * subscription preview and change matrix"; spec.md §Changes). The caller (route handler) is
  * responsible for owner-only permission enforcement — this module never checks `principal.role`
  * itself, matching every other billing service file's separation of concerns.
@@ -49,7 +49,7 @@ import { idempotencyKeyFor, isLiveMode } from './stripe-client'
 /**
  * Team-to-one-seat-tier downgrades must never be sent to Stripe while the organization still has
  * more accepted members plus usable invitations than the target tier's seat limit allows
- * (plans/stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). Reuses the
+ * (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). Reuses the
  * SAME seat count (`getSeatUsage`) the invite-time limit already enforces — an owner never sees two
  * different seat numbers for the same organization from two different features.
  */

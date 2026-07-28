@@ -223,3 +223,40 @@ deliberate rather than an omission:
   the candidate is asked to re-upload. That is a worse product day and a better privacy posture, and it is the
   same trade the `document-worker`'s move-before-mark ordering already makes.
 - **No audio exists to back up.** There is no bucket, no key prefix and no code path that writes one.
+
+## OPEN, BLOCKING DEPLOY — the app role cannot reserve credits (found 2026-07-28, Phase 12)
+
+`DATABASE_URL` in `.env.production.example` is `builderhunt_app`. That role holds **SELECT only** on
+`billing_credit_reservations`, `billing_credit_grants` and `billing_credit_allocations` (drizzle/0028,
+deliberately: the app reads balances, the worker settles). `reserveCredits` and `settleReservation` run
+on the caller's *tenant* transaction — the app role — so on deploy every interview operation that
+reserves credits fails with a `500`:
+
+- `POST /api/interviews/:id/session` with `action: 'live'` (reserves 180 units for transcription),
+- `POST /api/interviews/:id/brief` and `/report` once `SENSITIVE_AI_ENABLED=true`,
+- every settlement on `finish`.
+
+### Why nothing caught it
+
+The local `DATABASE_URL` names the `postgres` superuser, which bypasses RLS *and* every grant. So the
+authenticated half of the product has never run under the role it will run under in production —
+neither in development, nor in the E2E suite, whose harness passed that URL through unchanged. The
+harness now forces `builderhunt_app` (`tests/e2e/harness/database.ts`, `forceRole`), which is what
+surfaced this; `tests/e2e/interview-live.spec.ts`, `billing-credits.spec.ts` and
+`interview-privacy.spec.ts` fail on it today and are the reproduction.
+
+### The fix is not a grant
+
+`GRANT INSERT, UPDATE ON billing_credit_reservations TO builderhunt_app` would make the tests pass and
+would hand every request-scoped connection the ability to mint and settle credit — undoing the
+separation 0028 chose on purpose, and the same mistake 0078 exists to prevent on the capability side
+("Capability writes go through a narrowly privileged server command, never anonymous SQL grants").
+
+The correct shape is the one the candidate-document path already uses: authorize on the app
+transaction, then perform the ledger write through a worker-role transaction
+(`withWorkerOrganization`). That is a change across `feature-authorization.ts`, `reservations.ts` and
+every caller of `withInterviewCredits`, and it is not done.
+
+**Until it is, no interview AI feature may be enabled in production.** `SENSITIVE_AI_ENABLED` and
+`INTERVIEW_TRANSCRIPTION_ENABLED` must stay `false`, which is also where the AI Act sign-off gate
+leaves them.

@@ -4,7 +4,7 @@
  * `~/shared/lib/billing-shared.ts` (`PlanTier`/`PLAN_LIMITS`/`PLAN_PRICING`,
  * still `free | pro | team` at $0/$19/$99) — that system keeps serving
  * existing manually-billed organizations unchanged until the voluntary
- * migration in plans/stripe-billing-platform/tasks.md §10 ("Migrate manual
+ * migration in plans/phase-1/29-stripe-billing-platform/tasks.md §10 ("Migrate manual
  * entitlements without charging") atomically moves an organization off it.
  * Do NOT mutate `PlanTier`/`PLAN_PRICING` to match this file — Team's price
  * changes ($99 → $199) and Pro Max is entirely new; existing subscribers on

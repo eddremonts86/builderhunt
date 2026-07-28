@@ -389,6 +389,40 @@ export async function anonymousContext(harness: InterviewHarness): Promise<APIRe
 }
 
 /**
+ * An active paid subscription, which is what the interview features actually check.
+ *
+ * `checkEntitlement` reads `billing_subscriptions` and requires `stripe_status` of `active` or
+ * `trialing` — not `organization_entitlements`, which is what `createOwnerPrincipal`'s `tier` seeds.
+ * So a `tier: 'team'` fixture without this row is refused with `403 not_entitled` on every AI
+ * feature, which is how the first run of the live-session spec failed: the tier looked right in one
+ * table and the gate was reading the other.
+ *
+ * Stripe is never called. The rows are what a completed checkout leaves behind, and forging a webhook
+ * to produce them would be testing the webhook.
+ */
+export async function seedActiveSubscription(
+  harness: InterviewHarness,
+  options: { tier?: 'pro' | 'pro_max' | 'team'; interval?: 'monthly' | 'annual' } = {},
+): Promise<void> {
+  const tier = options.tier ?? 'team'
+  const interval = options.interval ?? 'monthly'
+  const customerId = uniqueId('bcust')
+  await harness.sql`
+    insert into billing_customers (id, organization_id, livemode, stripe_customer_id)
+    values (${customerId}, ${harness.organization.organizationId}, false, ${`cus_${customerId}`})
+    on conflict (id) do nothing
+  `
+  await harness.sql`
+    insert into billing_subscriptions
+      (id, organization_id, customer_id, livemode, catalog_key, tier, interval, catalog_version,
+       stripe_subscription_id, stripe_status, current_period_start, current_period_end)
+    values (${uniqueId('bsub')}, ${harness.organization.organizationId}, ${customerId}, false,
+            ${`${tier}_${interval}`}, ${tier}, ${interval}, 1,
+            ${`sub_${uniqueId('s')}`}, 'active', now() - interval '1 day', now() + interval '30 days')
+  `
+}
+
+/**
  * Tops up credits with a direct grant row.
  *
  * `grantCredits` is the product path and it requires a Stripe payment reference, so

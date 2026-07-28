@@ -15,7 +15,7 @@ export const Route = createFileRoute('/_dashboard/admin/billing')({
   component: AdminBillingPage,
 })
 
-/** Combines the live operations summary (plans/stripe-billing-platform/tasks.md §9 task 7) with the
+/** Combines the live operations summary (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 7) with the
  * pre-existing seller/tax configuration form (§3) on the same admin route — both are platform-admin-
  * only billing surfaces, and this route was the only one either ever had. */
 function AdminBillingPage() {

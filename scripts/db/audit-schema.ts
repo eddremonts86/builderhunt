@@ -50,7 +50,7 @@ const classifications: Classification[] = [
   operational('migration_backfill_runs', 'migration owner', ['security-and-multitenancy']),
   operational('migration_backfill_conflicts', 'migration run', ['security-and-multitenancy']),
 
-  // Calendar and scheduling (plans/phase-1/calendar-scheduling-interview-intelligence).
+  // Calendar and scheduling (plans/phase-1/43-calendar-scheduling-interview-intelligence).
   //
   // Classified ahead of the rest of the unclassified set — roughly fifty tables across billing,
   // enrichment, sprints and abuse still have no entry — because these ten already carry RLS and

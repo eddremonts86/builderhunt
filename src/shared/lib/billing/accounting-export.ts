@@ -1,5 +1,5 @@
 /**
- * Monthly accounting and margin export (plans/stripe-billing-platform/tasks.md §10 "Create
+ * Monthly accounting and margin export (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Create
  * accounting and margin export"). Same read-only, cross-organization sweep pattern
  * `operations-metrics.ts`/`reconciliation.ts` already establish (`listWorkerOrganizationIds` +
  * `withWorkerOrganization`), no new RLS policy.

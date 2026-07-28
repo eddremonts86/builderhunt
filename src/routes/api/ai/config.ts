@@ -2,7 +2,7 @@
  * Public-safe AI configuration for the client tier.
  *
  * No auth, no secrets — the client uses this to hide AI UI entirely
- * (degradation rung 4 from plans/ai-expansion/spec.md) without needing to
+ * (degradation rung 4 from plans/phase-1/20-ai-expansion/spec.md) without needing to
  * probe /api/ai/complete first. Never leaks the MiniMax key or model IDs.
  */
 import { createFileRoute } from '@tanstack/react-router'

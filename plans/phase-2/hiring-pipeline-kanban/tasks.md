@@ -1,7 +1,7 @@
 # Hiring Pipeline Kanban (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../phase-1/security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal — all shipped; that plan stays `in_progress` only for the legacy-column contraction, which this one does not touch, so nothing here waits on it); [`team-accounts`](../../phase-1/team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../phase-1/activity-feed/spec.md) (stage-change events; not required).
+> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (tenant-private `organization_builders` ownership, RLS, tenant principal — all shipped; that plan stays `in_progress` only for the legacy-column contraction, which this one does not touch, so nothing here waits on it); [`team-accounts`](../../phase-1/26-team-accounts/spec.md) (organization roles and seats — already implemented). Enhanced by [`activity-feed`](../../phase-1/28-activity-feed/spec.md) (stage-change events; not required).
 > **Blocks**: [`ats-integrations`](../ats-integrations/spec.md) (hard — the ATS sync maps its external status back onto this plan's stage model)
 > **Reality check**: `organization_builders` already exists (`src/shared/lib/db/schema.ts:179`) with a dead `status` check constraint nothing reads; tenant notes already exist (`builder_notes` + `src/routes/api/builders/$builderId/notes.ts`); there is no `/me/builders` page, only `GET /api/me/builders` consumed by `src/modules/dashboard/components/ExportsPage.tsx`; dashboard navigation is `src/modules/dashboard/ui/shell/nav-config.ts`'s `NAV_AREAS`, not a flat array in `DashboardLayout.tsx`.
 

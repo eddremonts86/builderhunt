@@ -19,7 +19,7 @@ async function fetchContact(): Promise<BillingContact | null> {
 }
 
 /**
- * Owner-only billing contact card (plans/stripe-billing-platform/tasks.md §9 task 4). Shows the
+ * Owner-only billing contact card (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4). Shows the
  * currently VERIFIED contact only — a pending, unconfirmed address is never shown as if active, since
  * the owner already sees the "check your inbox" confirmation immediately after submitting.
  */

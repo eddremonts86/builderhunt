@@ -69,7 +69,7 @@ GitHub rate-limit headroom and no Tier-2 AI, which is a *local* gap, not a produ
 
 | Service | Decision |
 | --- | --- |
-| Sentry / PostHog / Datadog / PagerDuty | **No paid observability for v1.** Structured stdout logs + `/api/admin/metrics` + `/status` are the launch answer. `VITE_SENTRY_DSN` is a phantom var wired to nothing — delete it, don't fill it. (`production-infrastructure/spec.md`) |
+| Sentry / PostHog / Datadog / PagerDuty | **No paid observability for v1.** Structured stdout logs + `/api/admin/metrics` + `/status` are the launch answer. `VITE_SENTRY_DSN` is a phantom var wired to nothing — delete it, don't fill it. (`02-production-infrastructure/spec.md`) |
 | Cloudflare R2 | Replaced by self-hosted MinIO. Env vars keep the `INTERVIEW_R2_*` prefix so switching back is config-only. |
 | Self-hosted GPU (Hetzner GEX44, €184/mo) | Break-even is 150–335 interviews/month. Revisit then. |
 | Hashnode API key | Hashnode moved its public GraphQL API to a paid offering (2026-07-25); the connector returns `[]` either way. Don't pay for it. |
@@ -406,14 +406,14 @@ Two things currently have no off-box copy:
 - **MinIO's volume** — candidate CVs on a single 80 GB disk with no redundancy. If the disk dies,
   those documents are gone. This is the one real trade-off accepted when choosing MinIO over R2.
 - **Postgres dumps** — `scripts/db/backup.ts` writes to local disk only, and
-  `production-infrastructure/spec.md` lists "no restore script, cron unverified" as open gaps. A
+  `02-production-infrastructure/spec.md` lists "no restore script, cron unverified" as open gaps. A
   backup on the same disk as the thing it backs up is not a backup.
 
 ### The prerequisite, found and fixed (2026-07-26)
 
 Audited in Coolify: `builderhunt-db` → Backups read **"No scheduled backups configured."**
 Production had **no database backup at all** — worse than the "unverified cron"
-`production-infrastructure/spec.md` recorded, because nothing was scheduled in Coolify either.
+`02-production-infrastructure/spec.md` recorded, because nothing was scheduled in Coolify either.
 
 **Fixed the same session:**
 
@@ -461,7 +461,7 @@ DB leg is the price of the cheaper, more suitable target.
 3. Point the backup routine at it over SSH/rsync (`BorgBackup` or plain `rsync` over SSH; do not
    use the SMB/CIFS mount for this).
 4. **Then actually restore from it once, into a scratch database, and write down that you did.**
-   `production-infrastructure/spec.md` is explicit: a backup that has never been restored is a
+   `02-production-infrastructure/spec.md` is explicit: a backup that has never been restored is a
    hope, not a backup.
 
 ### Recorded
@@ -724,7 +724,7 @@ These gate the same launches and cannot be bought.
 | **Sub-processor list in the privacy policy** | You | Every account created above that touches user data is a new entry: Resend, MiniMax, Deepgram, Azure, Hetzner. The policy currently claims fewer. |
 | **Canonical tenant/RLS release gate** | You (in-flight) | The `security-and-multitenancy` cutover. |
 | ~~**First successful backup restore**~~ | Done 2026-07-26 | Restore performed, found the missing-roles defect, fixed it, and re-tested on a fresh cluster: 0 errors, 192/192 policies. Procedure in [`database-restore.md`](database-restore.md). Two non-blocking follow-ups in §7: ship the updated sync script to the VPS, and re-run the drill against a dump pulled back from the Storage Box. |
-| ~~**Delete `VITE_SENTRY_DSN`**~~ | Done 2026-07-26 | Removed from `.env.production.example` and the README env table. `production-infrastructure/tasks.md` claimed this was already "removed from both files" — it was not; it survived in the production example and the README, which is how a phantom var outlives its own deletion. Confirmed absent from the Coolify production env too. |
+| ~~**Delete `VITE_SENTRY_DSN`**~~ | Done 2026-07-26 | Removed from `.env.production.example` and the README env table. `02-production-infrastructure/tasks.md` claimed this was already "removed from both files" — it was not; it survived in the production example and the README, which is how a phantom var outlives its own deletion. Confirmed absent from the Coolify production env too. |
 | **Coolify `COOLIFY_APP_UUID` is ambiguous** | Done — documented | One variable, twelve apps on the server; the stored value points at `edd-app-template`. Resolve by name from `GET /api/v1/applications` before writing env vars or deploying — Coolify returns 200 when you target the wrong app. Documented in `ai-os` (`env-config-and-secrets`, both Coolify skills, the dossier and its example). |
 | **Coolify API is plain HTTP** | You | `COOLIFY_API_URL` is `http://178.105.106.79:8000` — the API token crosses the public internet in cleartext on every deploy, including from GitHub Actions. Put it behind TLS. |
 

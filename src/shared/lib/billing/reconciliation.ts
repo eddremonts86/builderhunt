@@ -1,5 +1,5 @@
 /**
- * Daily financial reconciliation (plans/stripe-billing-platform/tasks.md §10 "Implement daily
+ * Daily financial reconciliation (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Implement daily
  * financial reconciliation"). Pages through the provider's own listing of customers, subscriptions,
  * payment intents, and refunds (`BillingProvider.listForReconciliation`) and compares each against
  * this app's internal record for the same object, across every organization — the SAME

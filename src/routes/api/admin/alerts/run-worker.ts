@@ -8,7 +8,7 @@ import { withJobRun } from '~/shared/lib/repositories/platform-operations'
  * Manually (or via external scheduler) runs the smart-alerts worker.
  *
  * There's no OS-level cron in this bootstrap deployment (see
- * plans/production-infrastructure/spec.md — "no paid services" v1). Point an
+ * plans/phase-1/02-production-infrastructure/spec.md — "no paid services" v1). Point an
  * external scheduler (systemd timer, Coolify scheduled task, or a plain
  * `curl -X POST` in a crontab authenticated as an admin) at this endpoint
  * every 12 hours, matching the plan's cadence.

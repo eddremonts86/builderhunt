@@ -44,7 +44,7 @@ async function run() {
   const page = await context.newPage()
 
   // ====================================================================
-  // /pricing — public (plans/stripe-billing-platform/tasks.md §9 task 3 — real
+  // /pricing — public (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 3 — real
   // catalog.ts-driven page: Free/Pro/Pro Max/Team, real Stripe amounts, a pack
   // table, and an account-aware Checkout CTA — replaces the old $99 Team /
   // manual-payment content this script used to assert against.)
@@ -137,7 +137,7 @@ async function run() {
   //
   // Asserts the legacy self-service path still works — this script only runs against a dev
   // environment with STRIPE_BILLING_ENABLED=false (this repo's own default). Once that flag flips to
-  // 'true' (plans/stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after
+  // 'true' (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after
   // canonical cutover"), this same request instead returns 409 with `migrationGuidance: true` and a
   // `checkoutUrl` — see `platform-billing.test.ts`'s `shouldBlockLegacyPlanMutations` and
   // `request-upgrade.test.ts`/`admin/plan-requests/index.test.ts` for that behavior's real coverage.

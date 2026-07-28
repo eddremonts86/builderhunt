@@ -1,5 +1,5 @@
 /**
- * Versioned commercial consent evidence (plans/stripe-billing-platform/tasks.md §5 "Implement
+ * Versioned commercial consent evidence (plans/phase-1/29-stripe-billing-platform/tasks.md §5 "Implement
  * versioned commercial consent"; spec.md §"Checkout, Portal, consent, and billing contact").
  * Checkout requires current Terms and Privacy Policy acceptance and disclosure of renewal,
  * amount, interval, cancellation/refund policy, credit expiry/non-transferability, tax, and

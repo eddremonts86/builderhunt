@@ -3,11 +3,19 @@
 A dated snapshot of every `plans/phase-1/*` plan, ordered easiest → hardest, so a
 session can pick up work without re-reading 53 `tasks.md` files.
 
+This file answers "what can I pick up next". [`phase-1-order.md`](./phase-1-order.md) answers
+the different question "in what sequence would all 53 be built from nothing" — that is where
+each plan's `NN-` directory prefix comes from, and its counts are newer than the ones below
+(regenerated 2026-07-28: `calendar-scheduling-interview-intelligence` is 9 open / 69 done, not
+47/32; `audit-performance-qa` 1/9, not 7/4; `audit-visual-system` 2/8, not 3/7;
+`exhaustive-local-e2e-design` 10/3, not 12/0). Plan names below are written without their
+number prefix; the directories on disk carry it.
+
 **Snapshot: 2026-07-27.** 53 plans, 749 tasks, 581 done (78%), 168 open, 26 plans fully closed.
 Counts are `- [ ]` / `- [x]` lines in each plan's checklist. Regenerate with:
 
 ```bash
-for f in plans/phase-1/*/tasks.md plans/phase-1/stealth-scraping/task.md; do
+for f in plans/phase-1/*/tasks.md plans/phase-1/41-stealth-scraping/task.md; do
   p=$(basename $(dirname "$f"))
   o=$(grep -c "^- \[ \]" "$f" || true); d=$(grep -c "^- \[x\]" "$f" || true)
   printf "%3s|%3s|%s\n" "${o:-0}" "${d:-0}" "$p"

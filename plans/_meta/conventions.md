@@ -3,6 +3,15 @@
 Applies to every directory in `plans/`. A plan is "100% implementation-ready" only when it
 follows this document. Written 2026-07-19 during the full plan-reconciliation pass.
 
+## Directory name
+
+A `plans/phase-1/` directory is named `NN-slug`, where `NN` is its position in the canonical
+build order recorded in [`phase-1-order.md`](./phase-1-order.md). A new plan takes the number
+of the earliest position whose dependencies it satisfies, and every existing plan from that
+position onward shifts up — renumbering means `git mv` plus rewriting the `../NN-slug/` links
+that point at each moved directory. `pnpm plans:check-order` fails on an unnumbered directory,
+a duplicate or missing position, and any `Depends on` header that points at a higher number.
+
 ## Files per plan
 
 Every plan directory contains exactly three files:

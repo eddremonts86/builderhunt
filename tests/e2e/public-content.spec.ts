@@ -28,6 +28,7 @@ import {
 import type { OrganizationFixture } from './harness/fixtures/organizations'
 import { seedConsent } from './harness/fixtures/privacy'
 import { uniqueId } from './harness/ids'
+import { CURRENT_CONSENT_VERSIONS } from '~/shared/lib/legal-versions'
 import {
   expectStrictBrowser,
   gotoHydrated,
@@ -234,14 +235,38 @@ test.describe('pricing page', () => {
 // ---------------------------------------------------------------------------
 
 test.describe('legal pages', () => {
-  test('terms of service renders every numbered section with its version', async ({ browser }) => {
+  test('terms of service renders a contiguous section list and the version it is accepted at', async ({ browser }) => {
     await withPage(browser, undefined, async (page) => {
       await gotoHydrated(page, `${harness.baseURL}/legal/terms`)
       const article = page.getByTestId('legal-terms')
       await expect(article).toBeVisible()
-      await expect(article).toContainText('Version v1.0')
+
+      /*
+       * The version comes from `CURRENT_CONSENT_VERSIONS`, not a literal.
+       *
+       * This used to assert `Version v1.0` and `12. Contact`. Adding section 11 for the interview
+       * features moved Contact to 13 and left the page claiming v1.0 for text nobody had accepted —
+       * so the literal caught the renumbering and said nothing about the version being stale, which
+       * was the part that mattered. Reading the constant makes the page and the consent ledger agree
+       * by construction, which is the property worth pinning.
+       */
+      await expect(article).toContainText(`Version ${CURRENT_CONSENT_VERSIONS.tos}`)
       await expect(article).toContainText('1. Acceptance of terms')
-      await expect(article).toContainText('12. Contact')
+
+      // Contiguous and complete, wherever Contact ends up: gaps and duplicates in a numbered
+      // agreement are what make one unenforceable.
+      const headings = await article.getByRole('heading', { level: 2 }).allInnerTexts()
+      const numbers = headings
+        .map((heading) => Number(heading.match(/^(\d+)\./)?.[1] ?? NaN))
+        .filter((n) => Number.isFinite(n))
+      expect(numbers.length, 'the sections are numbered').toBeGreaterThan(10)
+      expect(numbers).toEqual(Array.from({ length: numbers.length }, (_, i) => i + 1))
+      expect(headings.at(-1), 'Contact is last, whatever number it now has').toMatch(/Contact$/)
+
+      // The interview obligations are present, since a customer is bound by them.
+      await expect(article).toContainText(/Interview features/i)
+      await expect(article).toContainText(/never stored/i)
+
       await expect(page).toHaveTitle(/Terms of Service — BuilderHunt/)
     })
   })

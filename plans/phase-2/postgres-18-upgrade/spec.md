@@ -12,7 +12,7 @@ forced upgrade and must not be sold as one. The actual case is narrower:
 
 1. **The upgrade only gets more expensive.** The cutover cost is a function of data size and of
    how many tenants are writing. Today the app bills nobody: the Stripe integration plan
-   ([`../../phase-1/stripe-billing-platform/spec.md`](../../phase-1/stripe-billing-platform/spec.md))
+   ([`../../phase-1/29-stripe-billing-platform/spec.md`](../../phase-1/29-stripe-billing-platform/spec.md))
    is still `pending`, and while 19 `billing_*` tables exist in the schema there is no live
    checkout or webhook inbox. That makes a write-freeze window cheap in a way it will never be
    again.

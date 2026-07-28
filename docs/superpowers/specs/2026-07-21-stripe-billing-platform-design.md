@@ -14,7 +14,7 @@ payment webhooks, payment reconciliation, or production credit ledger. The calen
 program introduces provider-backed operations whose cost cannot be safely included as unlimited
 usage in a flat subscription.
 
-This design replaces the deferred, thin Stripe phase in `plans/pricing-and-billing/` with a reusable
+This design replaces the deferred, thin Stripe phase in `plans/phase-1/30-pricing-and-billing/` with a reusable
 billing platform. Stripe is the payment, invoice, tax-calculation, and payment-method provider.
 BuilderHunt remains authoritative for tenant ownership, permissions, entitlements, and real-time
 credit authorization.

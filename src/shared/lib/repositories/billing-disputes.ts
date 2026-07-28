@@ -4,7 +4,7 @@ import type { TenantTransaction } from '../db/client'
 import { billingDisputes } from '../db/schema'
 
 /**
- * Data access for chargeback tracking (plans/stripe-billing-platform/tasks.md §8 "Implement dispute
+ * Data access for chargeback tracking (plans/phase-1/29-stripe-billing-platform/tasks.md §8 "Implement dispute
  * freeze, outcome, and alerts"). Entirely worker/webhook-written — see `billing/disputes.ts`'s
  * module comment; this file only inserts/reads/updates, all invariants live one layer up.
  */

@@ -1,6 +1,6 @@
 /**
  * Read-only aggregation for the platform billing operations dashboard
- * (plans/stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
+ * (plans/phase-1/29-stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
  * Every number here is derived from data that already exists elsewhere in this module — this file
  * adds no new business logic, only composes and counts. Platform-admin-only; the route calling this
  * never returns anything beyond these aggregate counts (no raw payloads, no per-organization detail,
@@ -64,7 +64,7 @@ export interface BillingOperationsMetrics {
   reconciliation: {
     lastRun: { windowEnd: string; result: string } | null
   }
-  /** Cost/margin tracking does not exist yet (plans/stripe-billing-platform/tasks.md §10 "Create accounting and margin export") — reported explicitly rather than a fabricated number. */
+  /** Cost/margin tracking does not exist yet (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Create accounting and margin export") — reported explicitly rather than a fabricated number. */
   costMargin: { available: false }
   /** Last 24h of `billing_checkout_attempts`, by status, across every organization — an elevated `expired`/`canceled` share is the checkout-failure signal §10 asks for. `billing_checkout_attempts` has no `builderhunt_platform` RLS policy (only `app`/`worker`), so this MUST be read per-organization through the same worker-scoped sweep as everything else below, never through a bare `platformDb` query (which would silently return zero rows forever). */
   checkout: {
@@ -246,7 +246,7 @@ export async function getBillingOperationsMetrics(deps: BillingOperationsMetrics
 }
 
 /**
- * SLO thresholds for the platform billing operations metrics (plans/stripe-billing-platform/
+ * SLO thresholds for the platform billing operations metrics (plans/phase-1/29-stripe-billing-platform/
  * tasks.md §10 "...critical SLO alerts"). No prior doc in this codebase defines a concrete number
  * for any of these — this is the first place one is set, deliberately conservative (catches a real
  * problem, not routine noise) and documented in `docs/operations/stripe-alerts.md`. Pure function,

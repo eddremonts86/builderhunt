@@ -4,7 +4,7 @@ import sharp from 'sharp'
 
 const IMAGES_DIR = join(process.cwd(), 'public', 'images')
 
-// KiB budgets from plans/phase-1/audit-performance-qa/spec.md — desktop
+// KiB budgets from plans/phase-1/48-audit-performance-qa/spec.md — desktop
 // retains its verified 2774:2110 ratio, mobile crop is 1212:2380.
 const DESKTOP_RATIO = 2774 / 2110
 const MOBILE_RATIO = 1212 / 2380

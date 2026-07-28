@@ -13,7 +13,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  *   returns an auth error
  * - When SOURCEHUT_TOKEN is set, search becomes available
  *
- * Spec reference: plans/sourcehut-integration/spec.md
+ * Spec reference: plans/phase-1/10-sourcehut-integration/spec.md
  */
 interface SHUser {
   canonicalName: string

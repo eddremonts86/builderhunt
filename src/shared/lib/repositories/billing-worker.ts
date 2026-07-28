@@ -1,5 +1,5 @@
 /**
- * Worker-only, cross-organization billing data access (plans/stripe-billing-platform/tasks.md §6
+ * Worker-only, cross-organization billing data access (plans/phase-1/29-stripe-billing-platform/tasks.md §6
  * task 2, "Implement idempotent monotonic event handlers"). A Stripe webhook event carries only
  * Stripe object ids (customer/subscription/checkout-session id) — never our organizationId — so
  * resolving "which organization does this belong to" requires a lookup RLS's
@@ -210,7 +210,7 @@ export interface ActiveAnnualBillingSubscriptionRecord {
   currentPeriodEnd: Date | null
 }
 
-/** Annual subscriptions in good standing (`active`/`trialing`) for the sweep that issues the remaining 11 monthly credit windows (plans/stripe-billing-platform/tasks.md §7 "Issue annual subscription credits monthly") — stops naturally once a subscription lapses into any other status. */
+/** Annual subscriptions in good standing (`active`/`trialing`) for the sweep that issues the remaining 11 monthly credit windows (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Issue annual subscription credits monthly") — stops naturally once a subscription lapses into any other status. */
 export async function listActiveAnnualBillingSubscriptions(
   transaction: WorkerTransaction,
   organizationId: string,
@@ -236,7 +236,7 @@ export interface GracePeriodBillingSubscriptionRecord {
   paymentBlockedAt: Date | null
 }
 
-/** Every subscription currently in a grace period (payment-failure marker set) and not yet blocked — what the daily dunning sweep (plans/stripe-billing-platform/tasks.md §7 "Implement seven-day dunning and recovery") checks against `dunning.ts`'s `shouldBlockForNonPayment`. Already-blocked subscriptions are excluded here (not merely re-checked and no-op'd) so the sweep's own row count reflects real work, not repeats. */
+/** Every subscription currently in a grace period (payment-failure marker set) and not yet blocked — what the daily dunning sweep (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Implement seven-day dunning and recovery") checks against `dunning.ts`'s `shouldBlockForNonPayment`. Already-blocked subscriptions are excluded here (not merely re-checked and no-op'd) so the sweep's own row count reflects real work, not repeats. */
 export async function listGracePeriodBillingSubscriptions(
   transaction: WorkerTransaction,
   organizationId: string,
@@ -279,7 +279,7 @@ export async function updateBillingSubscriptionFromStripe(
 
 /**
  * Records the first-failure timestamp exactly once (an already-set `gracePeriodEndsAt` is left
- * untouched) — the seven-day grace/block worker (plans/stripe-billing-platform/tasks.md §7
+ * untouched) — the seven-day grace/block worker (plans/phase-1/29-stripe-billing-platform/tasks.md §7
  * "Implement seven-day dunning and recovery") owns acting on it. Returns whether THIS call actually
  * started the grace period (`true`) versus a no-op because one was already in progress (`false`) —
  * §9 task 4's payment-failed notification email uses this to send exactly once per grace window,

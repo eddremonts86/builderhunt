@@ -17,7 +17,7 @@ const Body = z.object({
 
 /**
  * Immediately (not after a 30-day grace period) cancels the organization's subscription and
- * deletes its product data (plans/stripe-billing-platform/tasks.md §9 "Integrate subscription-safe
+ * deletes its product data (plans/phase-1/29-stripe-billing-platform/tasks.md §9 "Integrate subscription-safe
  * organization deletion" — the "immediate path" alongside the existing scheduled
  * `DELETE /api/organizations`). Owner-only, recent-auth-gated (`requestImmediateDeletion` enforces
  * both). Deliberately its own endpoint rather than a body flag on the scheduled route: a

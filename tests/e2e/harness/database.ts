@@ -71,21 +71,36 @@ export function workerDatabaseUrls(databaseName: string): {
   // roles) with a deterministic test password, so any URL that names a
   // base role is rewritten to that database's dedicated role. URLs using
   // other users (e.g. the local `postgres` superuser) pass through.
-  const templateFor = (source: string | undefined, fallback: string): string => {
+  /**
+   * Rewrites one URL onto the disposable database under a per-database dedicated role.
+   *
+   * `forceRole` exists because a URL that names some other user — typically the local `postgres`
+   * superuser — used to pass straight through. A superuser **bypasses RLS entirely**, so every
+   * authenticated request in the E2E suite ran with the database's own tenant isolation switched off,
+   * and every "another tenant cannot see this" assertion was really only testing application code.
+   * That is how an ungranted colleague creating a session on someone else's interview reached a `200`
+   * in a suite whose whole purpose is to catch exactly that.
+   *
+   * Naming the intended role explicitly means the suite exercises the policies that will be in force
+   * in production, whatever a developer's `.env` happens to say.
+   */
+  const templateFor = (source: string | undefined, fallback: string, forceRole?: string): string => {
     const u = new URL(source ?? fallback)
     u.pathname = `/${databaseName}`
     const username = decodeURIComponent(u.username)
-    if ((E2E_BASE_ROLES as readonly string[]).includes(username)) {
-      u.username = e2eWorkerRoleName(username, databaseName)
+    const baseRole = (E2E_BASE_ROLES as readonly string[]).includes(username) ? username : forceRole
+    if (baseRole) {
+      u.username = e2eWorkerRoleName(baseRole, databaseName)
       u.password = E2E_ROLE_PASSWORD
     }
     return u.toString()
   }
   return {
-    DATABASE_URL: templateFor(env.DATABASE_URL, adminUrl.toString()),
-    DATABASE_AUTH_URL: templateFor(env.DATABASE_AUTH_URL, env.DATABASE_URL || adminUrl.toString()),
-    DATABASE_WORKER_URL: templateFor(env.DATABASE_WORKER_URL, env.DATABASE_URL || adminUrl.toString()),
-    DATABASE_PLATFORM_URL: templateFor(env.DATABASE_PLATFORM_URL, env.DATABASE_URL || adminUrl.toString()),
+    // The product connection is the app role, never a superuser — see `forceRole` above.
+    DATABASE_URL: templateFor(env.DATABASE_URL, adminUrl.toString(), 'builderhunt_app'),
+    DATABASE_AUTH_URL: templateFor(env.DATABASE_AUTH_URL, env.DATABASE_URL || adminUrl.toString(), 'builderhunt_auth'),
+    DATABASE_WORKER_URL: templateFor(env.DATABASE_WORKER_URL, env.DATABASE_URL || adminUrl.toString(), 'builderhunt_worker'),
+    DATABASE_PLATFORM_URL: templateFor(env.DATABASE_PLATFORM_URL, env.DATABASE_URL || adminUrl.toString(), 'builderhunt_platform'),
     DATABASE_MIGRATION_URL: templateFor(env.DATABASE_MIGRATION_URL, adminUrl.toString()),
     /**
      * The public candidate flow's role, and the one this function used to leave behind.
@@ -103,6 +118,7 @@ export function workerDatabaseUrls(databaseName: string): {
     DATABASE_CAPABILITY_URL: templateFor(
       env.DATABASE_CAPABILITY_URL,
       env.DATABASE_WORKER_URL || env.DATABASE_URL || adminUrl.toString(),
+      'builderhunt_capability',
     ),
   }
 }
