@@ -1696,30 +1696,45 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 9 — Live interview persistence and transcription
 
-- [ ] **Add live interview schema and RLS**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`,
-    `docs/architecture/data-classification.md`, `tests/unit/shared/lib/security/rls-policy.test.ts`
-  - Do: Add `interview_sessions`, `transcript_segments`, `interview_suggestions`, and
-    `interview_reports` with tenant/event/session composite FKs, stable provider segment uniqueness,
-    sequence/timestamp/confidence checks, speaker/correction columns, state/version/provider/prompt/
-    expiry fields, evidence references, and strict owner/explicit-participant RLS. Add no audio/blob/
-    storage-key column.
-  - Verify: migration schema audit asserts no audio-like column; RLS tests cover owner, participant,
-    admin denial, tenant B, worker retention, and cross-session evidence FK.
+- [x] **Add live interview schema and RLS** — done 2026-07-28 (`556ef05`), NOT yet deployed
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0092_lovely_mad_thinker.sql` (new),
+    `drizzle/0093_live_interview_rls_grants.sql` (new), `scripts/db/audit-schema.ts`,
+    `scripts/db/prepare-rls-fixture.mjs`, `scripts/db/verify-rls-local.mjs`
+  - **No audio column in any of the four tables** — no blob, no storage key, no object reference. The
+    consent a candidate gives is for transient live transcription, not a recording, and a column that
+    could hold or point at audio would make that consent inaccurate the moment somebody used it.
+  - **Getting that assertion to work took four attempts and every failed one reported clean.** The block
+    sat above `const findings`, so both pushes were in the temporal dead zone; a constructed `RegExp`
+    matched in isolation and found nothing in situ; and the reason all three "verifications" passed was my
+    own plant — `.replace(x, 1)` put the audio column in an *earlier* table sharing the anchor line, so it
+    was never in the table under test. Rewritten with string slicing and proved in both directions.
+  - Policies copy `interview_briefs`: owner, or `event_participants.access_granted = true`, and nobody
+    else. Segments and suggestions inherit through the session, so one sharing rule lives in one place.
+    The verifier proves a granted participant can read a segment and **cannot write one** — segments come
+    from the organizer's capture client and a second writer would break the sequence contract.
+  - `0092` is hand-reordered for the same 42830 reason as `0084`: drizzle-kit emits every ADD CONSTRAINT
+    before every CREATE UNIQUE INDEX, and the composite FKs reference an index the same file creates.
+  - Verify (2026-07-28): 94 migrations apply twice clean; no audio-like column; 11 policies; RLS
+    assertions for owner, granted participant, admin, non-granted participant, tenant B and worker.
 
-- [ ] **Implement Deepgram EU token and usage adapter**
+- [x] **Implement Deepgram EU token and usage adapter** — done 2026-07-28 (`dd4405e`, `bd76866`), NOT yet deployed
   - Files: `src/lib/interviews/transcription/deepgram.ts` (new),
     `tests/unit/lib/interviews/transcription/deepgram.test.ts` (new)
-  - Do: Generate a Deepgram 30-second JWT and explicit
-    `wss://api.eu.deepgram.com/v1/listen` session configuration for streaming multilingual STT:
-    remote Nova-3 interleaved linear PCM 16 kHz with `channels=2&multichannel=true` and in-person
-    mono Nova-3 with streaming diarization; smart formatting, provider request ID, and normalized
-    termination duration. Never return master key or permit management/
-    non-transcription endpoints; the WebSocket may continue after token expiry but reconnect obtains
-    a new token.
-  - Verify: fake/live synthetic tests cover exact EU URL, 30-second TTL/scope, master-key absence,
-    separate remote channels, in-person diarization, invalid response, expired initial connect,
-    reconnect token, final segment shape, unknown speaker, and usage duration.
+  - **The master key never leaves the server.** A 30-second scoped grant instead, with
+    `assertNoMasterKey` exported as the guarantee — including against a provider that echoes the key back.
+    30 seconds is not too short: the token authorizes the handshake, not the conversation, and a reconnect
+    asks for a new one anyway.
+  - The two capture modes are deliberately **not** interchangeable. Remote gets two interleaved channels
+    with `multichannel` and *no* diarization, because attribution is already deterministic from the channel
+    the mixer assigned. In-person gets one channel and diarization, because one microphone carrying two
+    voices makes attribution impossible — and that guess is why `speaker_mapping` exists. A test pins that
+    a diarization label cannot override the channel in remote mode.
+  - Silent finals persist nothing; unusable metadata bills zero rather than inventing a duration; a real
+    duration rounds *up*, because Deepgram bills fractions while the ledger is integers and rounding down
+    would systematically under-bill every session.
+  - Verify (2026-07-28): 35 tests covering the exact EU URL, TTL clamping, master-key absence and echo,
+    four malformed-grant shapes, both mode configurations, speaker attribution in both modes, unknown
+    speakers, and billed-duration rounding.
 
 - [ ] **Implement interview session service**
   - Files: `src/lib/interviews/session-service.ts` (new),

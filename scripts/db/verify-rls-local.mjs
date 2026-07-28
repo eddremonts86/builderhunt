@@ -621,19 +621,23 @@ try {
 
   // A granted participant may read a segment but must not write one: segments arrive from the organizer's
   // capture client, and a second writer would break the sequence contract.
-  const participantWrite = await app.begin(async (transaction) => {
-    await transaction`select set_config('app.organization_id', 'org-a', true)`
-    await transaction`select set_config('app.user_id', 'user-c', true)`
-    try {
+  // Caught *outside* `begin`, not inside it. A rejected statement aborts the transaction, so a
+  // try/catch within the block swallows the error and then the commit fails anyway — the refusal is
+  // real, but the test reports it as an unhandled failure rather than as the pass it is.
+  let participantWrite = 'refused'
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.user_id', 'user-c', true)`
       await transaction`
         insert into transcript_segments (organization_id, session_id, provider_segment_id, sequence, speaker_estimate, text, starts_ms, ends_ms, retention_expires_at)
         values ('org-a', '11111111-2222-4000-8000-00000000000a', 'prov-injected', 99, 'speaker_a', 'injected', 0, 500, now() + interval '90 days')
       `
-      return 'inserted'
-    } catch {
-      return 'refused'
-    }
-  })
+      participantWrite = 'inserted'
+    })
+  } catch {
+    participantWrite = 'refused'
+  }
   if (participantWrite !== 'refused') throw new Error('a granted participant wrote a transcript segment')
 
   // The retention sweeper runs as the worker and must see both.
