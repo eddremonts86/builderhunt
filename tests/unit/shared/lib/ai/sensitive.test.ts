@@ -34,6 +34,9 @@ const { mistralStructuredCompletion } = await import('~/shared/lib/ai/mistral')
 const { assertRegionalConfiguration, isSensitiveAIEnabled, sensitiveCompletion } =
   await import('~/shared/lib/ai/sensitive')
 const { AIDisabledError, AIParseError, AIProviderError } = await import('~/shared/lib/ai/errors')
+// A static type-only import alongside the dynamic value one: `await import` binds values, so the
+// classes are not usable as types without this, and `vi.mock` still governs the runtime module.
+type ProviderError = import('~/shared/lib/ai/errors').AIProviderError
 
 const schema = z.object({ summary: z.string(), score: z.number() })
 type Output = z.infer<typeof schema>
@@ -134,10 +137,17 @@ describe('bad output is not retried', () => {
     }
 
     await expect(call()).rejects.toMatchObject({ name: 'AIParseError' })
-    const error = await call().catch((caught: Error) => caught)
-    expect(error.message).toContain('score')
+    // A plain try/catch, because `promise.catch(fn)` types the result as the union of the resolved
+    // value and whatever the handler returns.
+    let message = ''
+    try {
+      await call()
+    } catch (caught) {
+      message = (caught as Error).message
+    }
+    expect(message).toContain('score')
     // Zod's default message embeds the offending value. This must not.
-    expect(error.message).not.toContain('not a number')
+    expect(message).not.toContain('not a number')
   })
 })
 
@@ -168,9 +178,9 @@ describe('transient failures retry once, then give up', () => {
       response.end('down')
     }
 
-    const error = await call().catch((caught: AIProviderError) => caught)
+    const error = await call().catch((caught: unknown) => caught)
     expect(error).toBeInstanceOf(AIProviderError)
-    expect((error as AIProviderError).status).toBe(503)
+    expect((error as ProviderError).status).toBe(503)
     expect(calls, 'bounded — two would double the worst-case latency of a UI action').toBe(2)
   })
 
@@ -209,10 +219,10 @@ describe('the caller can stop it, and it stops itself', () => {
     await new Promise((resolve) => setTimeout(resolve, 50))
     controller.abort()
 
-    const error = await pending.catch((caught: AIProviderError) => caught)
+    const error = await pending.catch((caught: unknown) => caught)
     // 0 distinguishes "never got an answer" from "got a bad one", which is what a caller needs to
     // decide whether retrying could help.
-    expect((error as AIProviderError).status).toBe(0)
+    expect((error as ProviderError).status).toBe(0)
   })
 })
 
