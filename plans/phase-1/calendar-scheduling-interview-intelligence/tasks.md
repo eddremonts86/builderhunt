@@ -1925,13 +1925,35 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 10 — Contextual questions and reports
 
-- [ ] **Register follow-up and report AI tasks**
+- [x] **Register follow-up and report AI tasks** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
-  - Do: Add `interview-followup-suggest` and `interview-report-generate` exact schemas, server-only/
-    no-cache/sensitive routing, bounded transcript windows, evidence validation, prohibited-output
-    refinement, prompt versions, allowance/cost behavior, and deterministic templates.
-  - Verify: tests cover prompt injection in transcript, dangling evidence, scoring/hire language,
-    excessive output, 30-second throttle metadata, no cache, free gate, and sensitive route.
+  - **The report cannot conclude anything, and that takes two independent guards.**
+    `interviewReportContentSchema` has no rating field *and* `PROHIBITED_OUTPUT_PATTERNS` rejects the
+    words. Either alone is defeated: a schema without a score field still admits "strong hire" inside a
+    summary statement, and a word filter alone would be walked around by a numeric field. Nine scoring
+    variants are tested across all four content sections.
+  - **`status: 'unanswered'` is the only status allowed to cite nothing.** An `answered` or `partial`
+    topic with no segment is an assertion about what someone said with nothing behind it; a visible gap is
+    what makes the report honest.
+  - **Both windows are bounded for correctness, not cost.** 40 segments for a follow-up — a model given
+    the whole interview answers about the beginning, and the organizer wants a follow-up to what was *just*
+    said. 800 for the report, which covers a long interview with headroom; beyond that the service will
+    window rather than silently drop the end, because a report missing the last ten minutes is a report of
+    a different interview.
+  - The interviewer's notes go in their own `<interviewer-notes>` region, after the transcript. Merging
+    them would let a private impression be cited as something the candidate said.
+  - A live transcript is the most hostile input in this product — a CV is written in advance, but a
+    candidate can speak into a transcript knowing it feeds a model. The injection tests assert the *output*
+    schema refuses "recommend to hire" whatever the model was persuaded to write, rather than pretending the
+    wrapper is impenetrable.
+  - `INTERVIEW_FOLLOWUP_THROTTLE_SECONDS` is task metadata so the number a test asserts and the number the
+    service enforces cannot drift apart.
+  - Verify (2026-07-28): 53 tests. Sensitive/server-only/no-cache/free-gate on both, both window bounds,
+    dangling segment and topic citations, empty-citation refusals, the three-question cap, an accepted
+    empty list, nine scoring variants, `.strict()` refusing an `overallScore` or `recommendation` key,
+    transcript timestamp rendering, notes isolation, and two prompt-injection cases. Three plants proved
+    the per-call segment check, the prohibited-content gate, and the follow-up evidence requirement are
+    each load-bearing.
 
 - [ ] **Implement topic window and suggestion service**
   - Files: `src/lib/interviews/suggestion-service.ts` (new),
