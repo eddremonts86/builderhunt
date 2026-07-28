@@ -16,6 +16,7 @@ import {
   INTERVIEW_SESSION_STATES,
   InterviewDomainError,
   interviewBriefContentSchema,
+  interviewReportContentSchema,
   interviewFollowupSuggestOutputSchema,
   interviewReportSchema,
   sourceManifestEntrySchema,
@@ -366,10 +367,30 @@ describe('deterministic fallback templates', () => {
   it('buildFallbackReportTemplate produces content that passes the clean-content and schema checks', () => {
     const template = buildFallbackReportTemplate([{ id: 't1' }])
     expect(() => assertReportContentIsClean(template)).not.toThrow()
+    // The schema half of this test's own name was missing, and the template failed it: `answer: ''` is
+    // below the schema's `min(1)`, so the fallback could not be persisted — it would have failed at exactly
+    // the moment the provider did, which is the one moment it exists for. The sibling brief test two lines
+    // down parses its schema, which is what made the omission visible.
+    const result = interviewReportContentSchema.safeParse(template)
+    expect(result.success, JSON.stringify(result.success ? {} : result.error.issues)).toBe(true)
   })
 
   it('buildFallbackBriefTemplate is deterministic and schema-valid', () => {
     expect(buildFallbackBriefTemplate()).toEqual(buildFallbackBriefTemplate())
     expect(() => interviewBriefContentSchema.parse(buildFallbackBriefTemplate())).not.toThrow()
+  })
+})
+
+describe('the fallback report is honest about being a template', () => {
+  it('marks every topic unanswered rather than inventing an answer', () => {
+    const template = buildFallbackReportTemplate([{ id: 'a' }, { id: 'b' }])
+    expect(template.answersByTopic.map((entry) => entry.status)).toEqual(['unanswered', 'unanswered'])
+    // And cites nothing, because nothing was read.
+    for (const entry of template.answersByTopic) expect(entry.segmentIds).toEqual([])
+  })
+
+  it('says plainly that no model wrote it', () => {
+    // The organizer must not mistake a blank template for a generated report they can trust.
+    expect(buildFallbackReportTemplate([]).summary[0].statement).toMatch(/unavailable/i)
   })
 })

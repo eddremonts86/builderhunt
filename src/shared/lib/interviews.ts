@@ -449,7 +449,16 @@ export function assertReportContentIsClean(content: InterviewReportContent): voi
 export function buildFallbackReportTemplate(topics: readonly { id: string }[]): InterviewReportContent {
   return {
     summary: [{ statement: 'AI-generated summary is unavailable. Please complete this section manually.', segmentIds: [] }],
-    answersByTopic: topics.map((topic) => ({ topicId: topic.id, answer: '', segmentIds: [], status: 'unanswered' as const })),
+    // Not an empty string. `interviewReportContentSchema` requires `answer` to be non-empty, so the
+    // template as written could not be persisted — the fallback would have failed at exactly the moment the
+    // provider did, which is the one moment it exists for. `tests/unit/shared/lib/interviews.test.ts`
+    // asserts the template validates against its own schema.
+    answersByTopic: topics.map((topic) => ({
+      topicId: topic.id,
+      answer: 'Not written up. Add what was said, or leave this topic as unanswered.',
+      segmentIds: [],
+      status: 'unanswered' as const,
+    })),
     openQuestions: [],
     followUps: [],
   }
