@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import type { WorkerTransaction } from '../db/worker-db'
-import { interviewBriefs, interviewSessions, transcriptSegments } from '../db/schema'
+import { interviewBriefs, interviewSessions, interviewSuggestions, transcriptSegments } from '../db/schema'
 import {
   assertNoDanglingSourceReference,
   interviewBriefContentSchema,
@@ -627,4 +627,118 @@ export async function listSessionSegments(
       eq(transcriptSegments.sessionId, params.sessionId),
     ))
     .orderBy(transcriptSegments.sequence)
+}
+
+// ── Interview suggestions (plan: calendar-scheduling-interview-intelligence, Phase 10) ───────────
+
+export interface InterviewSuggestionRow {
+  id: string
+  sessionId: string
+  sequence: number
+  question: string
+  rationale: string
+  evidenceSegmentIds: string[]
+  state: string
+  promptVersion: string
+  createdAt: Date
+}
+
+function toSuggestionRow(row: Record<string, unknown>): InterviewSuggestionRow {
+  return {
+    id: String(row.id),
+    sessionId: String(column(row, 'sessionId', 'session_id')),
+    sequence: Number(row.sequence),
+    question: String(row.question),
+    rationale: String(row.rationale),
+    evidenceSegmentIds: (column(row, 'evidenceSegmentIds', 'evidence_segment_ids') ?? []) as string[],
+    state: String(row.state),
+    promptVersion: String(column(row, 'promptVersion', 'prompt_version')),
+    createdAt: new Date(column(row, 'createdAt', 'created_at') as string),
+  }
+}
+
+/**
+ * Persists suggestions the organizer acted on.
+ *
+ * Only ever called for an explicit use/save action. spec.md: "The result is ephemeral unless explicitly
+ * saved or used" — so a proposal the organizer ignored leaves no row at all, and a dismissal is recorded
+ * only because knowing a suggestion was rejected is what stops it being proposed again.
+ *
+ * The sequence comes from the current maximum inside the INSERT, for the same reason brief versions do:
+ * two clicks in the same second must not collide on `interview_suggestions_sequence_unique`.
+ */
+export async function insertSuggestion(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    sessionId: string
+    question: string
+    rationale: string
+    evidenceSegmentIds: readonly string[]
+    state: 'used' | 'saved' | 'dismissed'
+    promptVersion: string
+    retentionExpiresAt: Date
+  },
+): Promise<InterviewSuggestionRow> {
+  const rows = await transaction.execute(sql`
+    insert into interview_suggestions
+      (organization_id, session_id, sequence, question, rationale, evidence_segment_ids, state,
+       prompt_version, retention_expires_at)
+    select
+      ${params.organizationId}, ${params.sessionId},
+      coalesce(max(sequence), -1) + 1,
+      ${params.question}, ${params.rationale},
+      ${JSON.stringify([...params.evidenceSegmentIds])}::jsonb,
+      ${params.state}, ${params.promptVersion}, ${params.retentionExpiresAt.toISOString()}
+    from interview_suggestions
+    where organization_id = ${params.organizationId} and session_id = ${params.sessionId}
+    returning *
+  `)
+  const row = (rows as unknown as Record<string, unknown>[])[0]
+  if (!row) throw new InterviewBriefError('could not record the suggestion', 'not_found')
+  return toSuggestionRow(row)
+}
+
+/** Everything the organizer acted on for this session, oldest first. */
+export async function listSuggestions(
+  transaction: BriefTransaction,
+  params: { organizationId: string; sessionId: string },
+): Promise<InterviewSuggestionRow[]> {
+  const rows = await transaction
+    .select()
+    .from(interviewSuggestions)
+    .where(and(
+      eq(interviewSuggestions.organizationId, params.organizationId),
+      eq(interviewSuggestions.sessionId, params.sessionId),
+    ))
+    .orderBy(interviewSuggestions.sequence)
+  return rows.map((row) => toSuggestionRow(row as unknown as Record<string, unknown>))
+}
+
+/**
+ * Moves a recorded suggestion to another state.
+ *
+ * Returns null when there is no such row rather than throwing: an organizer clicking "dismiss" on a
+ * suggestion that was never persisted is the normal case, not an error — the proposal was ephemeral.
+ */
+export async function updateSuggestionState(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    sessionId: string
+    suggestionId: string
+    state: 'used' | 'saved' | 'dismissed'
+  },
+): Promise<InterviewSuggestionRow | null> {
+  const rows = await transaction
+    .update(interviewSuggestions)
+    .set({ state: params.state, updatedAt: new Date() })
+    .where(and(
+      eq(interviewSuggestions.organizationId, params.organizationId),
+      eq(interviewSuggestions.sessionId, params.sessionId),
+      eq(interviewSuggestions.id, params.suggestionId),
+    ))
+    .returning()
+  const row = rows[0]
+  return row ? toSuggestionRow(row as unknown as Record<string, unknown>) : null
 }

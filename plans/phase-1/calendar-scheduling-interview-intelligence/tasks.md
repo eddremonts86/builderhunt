@@ -1955,14 +1955,44 @@ Not fixed here — it predates this program and deserves its own work.
     the per-call segment check, the prohibited-content gate, and the follow-up evidence requirement are
     each load-bearing.
 
-- [ ] **Implement topic window and suggestion service**
+- [x] **Implement topic window and suggestion service** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/lib/interviews/suggestion-service.ts` (new),
-    `tests/unit/lib/interviews/suggestion-service.test.ts` (new)
-  - Do: Derive covered/pending topics, select bounded recent final segments, debounce/rate-limit per
-    session, call sensitive task while paid live session is active, save only explicit use/save/
-    dismiss actions, and degrade silently to prepared questions.
-  - Verify: tests cover throttle, no new context, paused/manual/free state, provider failure,
-    evidence references, ephemeral unsaved output, and concurrent request dedupe.
+    `tests/unit/lib/interviews/suggestion-service.test.ts` (new),
+    `src/shared/lib/repositories/interviews.ts`
+  - **A proposal writes nothing.** spec.md: ephemeral unless explicitly saved or used. That is not storage
+    thrift — a table of every question an organizer glanced at and rejected about a named candidate is a
+    record of impressions nobody agreed to keep. A row appears only on use/save/dismiss, and dismissal is
+    kept solely so the same question is not proposed again.
+  - **Every failure returns the brief's pending prepared questions, in the same shape as a success.** An
+    organizer mid-sentence cannot read an error, and a panel that looked different would tell the candidate
+    something went wrong. Nine degrade reasons, all silent, and none of the fallbacks carries a citation —
+    a prepared question responds to nothing that was said.
+  - **A plant found my concurrency test proving nothing.** Removing the in-flight flag left all 30 green,
+    because two requests at the same instant are already refused by the *elapsed-time* check. The flag's
+    only unique scenario is a completion slower than the thirty-second floor while speech continues — both
+    other checks pass and only the flag stops a second paid call whose answer the organizer never sees.
+    Rewritten to that scenario; it now fails under the plant.
+  - The gate order is the design: session state, then speech, then throttle, then the switch, then
+    entitlement, then the provider. A throttled request must not consult the billing platform, and an
+    operator reading a tier error for a feature the switch forbids would go and fix a tier that was never
+    the problem.
+  - `deriveTopicCoverage` is a token-overlap heuristic, deliberately not a model call: asking a model which
+    topics are covered would cost a second sensitive completion for a hint, and a wrong answer here is cheap
+    (a topic is deprioritised, not deleted) where the same wrongness in a report would be a fabrication.
+    Stop words are filtered so "Tell me about your work" is not matched by "tell me".
+  - The prompt carries speaker *labels*, never `speaker_a`: a confirmed human mapping beats the guess it
+    replaced, and in-person stays "Speaker A" rather than guessing a role — telling the model the candidate
+    said something the interviewer said produces a follow-up aimed at nobody.
+  - **The test's fake provider was wrong before it was right.** It called `schema.parse` and threw a
+    `ZodError`; the real boundary uses `safeParse` and throws `AIParseError`. So the bad-output-versus-outage
+    classification was being tested against a shape production never produces. Fake aligned, and the service
+    now treats either as bad output.
+  - Verify (2026-07-28): 30 tests over ephemeral output, all three action states, sequence collision,
+    critical-first fallback ordering, the three-item cap, paused/finished/no-brief/no-speech/disabled/
+    not-entitled degradations, provider outage versus invalid output, a dangling segment citation, a smuggled
+    hire recommendation, the thirty-second floor in both directions, no-new-speech after ten minutes, the
+    slow-provider collapse, and speaker labelling in both capture modes. Three plants proved the ephemeral
+    guarantee, the switch-before-billing order, and the in-flight collapse are each load-bearing.
 
 - [ ] **Implement report generation and finalization service**
   - Files: `src/lib/interviews/report-service.ts` (new),
