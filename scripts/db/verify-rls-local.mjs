@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 
 const appUrl = process.env.RLS_TEST_APP_URL
 const authUrl = process.env.RLS_TEST_AUTH_URL
+const capabilityUrl = process.env.RLS_TEST_CAPABILITY_URL
 const workerUrl = process.env.RLS_TEST_WORKER_URL
 const platformUrl = process.env.RLS_TEST_PLATFORM_URL
 if (!appUrl || !authUrl || !workerUrl || !platformUrl) throw new Error('All exact-role test URLs are required')
@@ -16,6 +17,7 @@ for (const value of [appUrl, authUrl, workerUrl, platformUrl]) {
 const app = postgres(appUrl, { max: 2 })
 const auth = postgres(authUrl, { max: 1 })
 const worker = postgres(workerUrl, { max: 1 })
+const capability = capabilityUrl ? postgres(capabilityUrl, { max: 1 }) : null
 const platform = postgres(platformUrl, { max: 1 })
 
 try {
@@ -432,6 +434,56 @@ try {
   })
   if (participantCandidates !== 0) throw new Error('participant saw candidate submissions')
 
+  // The accountless candidate. A capability secret is issued for ONE invitation,
+  // so the row-level predicate must admit that invitation's data and nothing
+  // else — not the rest of the organization's. Both candidates below live in
+  // org-a: with only one seeded, an organization-scoped policy and an
+  // invitation-scoped one would look identical.
+  if (capability) {
+    const INVITATION_A = 'dddddddd-0000-4000-8000-00000000000a'
+    const INVITATION_B = 'dddddddd-0000-4000-8000-00000000000b'
+
+    const asCandidateA = async (fn) => capability.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.invitation_id', ${INVITATION_A}, true)`
+      await transaction`select set_config('app.capability_owner_user_id', 'user-a', true)`
+      return fn(transaction)
+    })
+
+    const ownInvitation = await asCandidateA((tx) => tx`select id from scheduling_invitations`)
+    if (ownInvitation.length !== 1 || ownInvitation[0].id !== INVITATION_A) {
+      throw new Error(`capability saw ${ownInvitation.length} invitations, expected only its own`)
+    }
+
+    const ownSubmission = await asCandidateA((tx) => tx`select id, invitation_id from candidate_submissions`)
+    if (ownSubmission.length !== 1 || ownSubmission[0].invitation_id !== INVITATION_A) {
+      throw new Error(`capability saw another candidate's submission: ${JSON.stringify(ownSubmission)}`)
+    }
+
+    const ownDocuments = await asCandidateA((tx) => tx`select id from candidate_documents`)
+    if (ownDocuments.length !== 1) {
+      throw new Error(`capability read ${ownDocuments.length} documents, expected its own single one`)
+    }
+
+    // Explicitly ask for the other candidate's rows by id. A policy that merely
+    // filters a bare SELECT could still admit a targeted one.
+    const targeted = await asCandidateA(async (tx) => {
+      const invitations = await tx`select id from scheduling_invitations where id = ${INVITATION_B}`
+      const submissions = await tx`select id from candidate_submissions where invitation_id = ${INVITATION_B}`
+      return invitations.length + submissions.length
+    })
+    if (targeted !== 0) throw new Error(`capability reached the other candidate by id (${targeted} rows)`)
+
+    // An unpinned connection must see nothing at all: `col = NULL` is NULL, so
+    // forgetting to pin the invitation fails closed rather than opening up.
+    const unpinned = await capability.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      const rows = await transaction`select id from candidate_submissions`
+      return rows.length
+    })
+    if (unpinned !== 0) throw new Error(`capability without a pinned invitation saw ${unpinned} submissions`)
+  }
+
   // candidate_documents / document_extractions (Phase 6): ownership is proven by walking back to
   // the invitation's owner, so the interesting cases are the three principals who are *inside* the
   // organization and must still see nothing — a participant, an org admin, and a colleague — plus
@@ -596,7 +648,7 @@ try {
     workerCandidateWrite: 'denied',
   }))
 } finally {
-  await Promise.all([app.end(), auth.end(), worker.end(), platform.end()])
+  await Promise.all([app.end(), auth.end(), worker.end(), platform.end(), capability?.end()].filter(Boolean))
 }
 
 function assertIds(rows, expected, label) {

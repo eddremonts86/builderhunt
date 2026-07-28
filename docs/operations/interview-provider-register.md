@@ -115,8 +115,19 @@ endpoint **or** a self-hosted one — see the note in that file for exactly whic
 MinIO on a single box has **no redundancy**. If that disk fails, candidate documents are gone;
 Cloudflare R2 offers eleven-nines durability. Two mitigations, in order of effort:
 
-1. Point the existing backup routine at the MinIO volume.
-2. A Hetzner Storage Box (1 TB, ~€4/month) as an off-box replication target.
+1. ✅ **Done 2026-07-28**: `pnpm db:backup:documents` (`scripts/db/backup-documents.ts`) mirrors the
+   bucket to local disk daily, 14 snapshots retained. Cron at 03:30 UTC, half an hour after the
+   database dump, so a restore does not pair a `candidate_documents` row with missing bytes — the
+   worse of the two failure modes, because the app then believes it has a document it cannot serve.
+   It uses `@aws-sdk/client-s3`, already a dependency, rather than the `mc` binary: a cron job on a
+   production box should not need a second binary installed and version-matched beside it. Verified
+   against the local MinIO — object copied with its key path intact, and a missing credential fails
+   the run loudly instead of writing an empty snapshot.
+   Retention is 14 days against the database's 30, deliberately: documents are personal data under a
+   180-day product retention, and backup copies that outlive the product's own promise widen the
+   blast radius of the backup.
+2. Still open — a Hetzner Storage Box (1 TB, ~€4/month) as an **off-box** target. Item 1 survives a
+   dropped table; it does not survive the disk or the box.
 
 Disk pressure is also real: 80 GB is shared with Postgres, Redis, Ollama and the app. At 25 MB per
 invitation, 1,000 candidates is 25 GB. Monitor it.
@@ -136,13 +147,21 @@ invitation, 1,000 candidates is 25 GB. Monitor it.
 
 ### What to deploy
 
-> ⚠️ **Blocked on an architecture decision (found 2026-07-27).** No official `clamav/clamav` tag
-> publishes an arm64 manifest — `stable`, `stable_base`, `latest`, `1.4` and `1.4_base` are all
-> amd64 only. conductor-01 is a CAX21, which is ARM, so this section as written cannot be deployed
-> there. The options are an emulated run (a ~1 GB signature database loaded under qemu on four
-> shared cores), a third-party arm64 image on a path whose whole job is to be trustworthy, an
-> in-house build from ClamAV source, or putting this one service on an amd64 host. `docker-compose`
-> carries the service under the `interviews` profile so amd64 developer machines can use it today.
+> **Resolved 2026-07-28 — build from the Alpine package.** No official `clamav/clamav` tag publishes
+> an arm64 manifest (`stable`, `stable_base`, `latest`, `1.4`, `1.4_base` are all amd64, and the
+> image is absent from ghcr.io and quay.io), while conductor-01 is a CAX21 (ARM). Rather than emulate,
+> trust a third-party rebuild of an antivirus, or move the service to its own amd64 host, the image
+> is now built from Alpine's own `clamav` package — see `docker/clamav/Dockerfile`. Provenance stays
+> with a distro that signs and rebuilds it, and the same Dockerfile serves an ARM server and an amd64
+> laptop.
+>
+> Verified on arm64 (2026-07-28): builds, `clamd` healthy in 40 s on a warm signature volume,
+> ClamAV 1.4.2 with the 2026-07-27 database, and **detects the EICAR test string over TCP 3310**.
+> That last check is the one that matters — a scanner that starts but never detects is worse than
+> none, because it produces a clean verdict.
+>
+> The image sets `StreamMaxLength`/`MaxFileSize` to 64 MB. That must stay above the largest upload
+> the app accepts, or a big-but-legitimate CV comes back as a scan *failure* rather than a verdict.
 
 A `clamav` service using `clamav/clamav:stable`, TCP port **3310** internal only, ~1.5 GB RAM
 (below that it OOMs while loading signature definitions). First boot downloads the database and

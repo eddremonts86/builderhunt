@@ -100,17 +100,16 @@ services:
       retries: 10
       start_period: 20s
 
-  # ⚠️ amd64 only. No official `clamav/clamav` tag publishes an arm64 manifest —
-  # checked stable, stable_base, latest, 1.4 and 1.4_base, all amd64. This
-  # matters beyond a developer's Mac: the register targets a Hetzner CAX21,
-  # which is ARM, so that deployment would fail the same way. Resolving it means
-  # choosing between an emulated build (a signature database load under qemu on
-  # four shared cores), a third-party image on a security-critical path, an
-  # in-house build from source, or an amd64 host for this one service. That is a
-  # decision, not a default — see the register.
+  # Built here rather than pulled: `clamav/clamav` is amd64-only on Docker Hub
+  # and absent from ghcr.io and quay.io, while the deployment target is a
+  # Hetzner CAX21 (ARM). The image comes from Alpine's own clamav package, which
+  # keeps the provenance of an antivirus binary with a distro instead of an
+  # unknown rebuild, and is multi-arch for free — the same Dockerfile serves an
+  # amd64 laptop and an ARM server. See docker/clamav/Dockerfile.
   antivirus:
     profiles: ['interviews']
-    image: clamav/clamav:stable
+    build:
+      context: ./docker/clamav
     container_name: builderhunt-antivirus
     ports:
       - '127.0.0.1:3310:3310'

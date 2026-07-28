@@ -603,6 +603,13 @@
       "when": 1785184597522,
       "tag": "0085_candidate_documents_rls_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 86,
+      "version": "7",
+      "when": 1785216942635,
+      "tag": "0086_capability_invitation_scoping",
+      "breakpoints": true
     }
   ]
 }

@@ -23,6 +23,10 @@ const ROLE_PASSWORDS = {
   builderhunt_auth: 'test-auth-password',
   builderhunt_worker: 'test-worker-password',
   builderhunt_platform: 'test-platform-password',
+  // The accountless candidate identity (drizzle/0078). Its policies were never
+  // exercised by this fixture, which is how they stayed organization-scoped —
+  // and therefore cross-candidate readable — without anyone noticing.
+  builderhunt_capability: 'test-capability-password',
 }
 const roleSuffix = databaseName.replace(/^builderhunt_security_test_/, '')
 
@@ -175,6 +179,21 @@ try {
   await owner`
     insert into candidate_submissions (id, organization_id, invitation_id, display_name, email_normalized, retention_expires_at)
     values ('eeeeeeee-0000-4000-8000-00000000000a', 'org-a', 'dddddddd-0000-4000-8000-00000000000a', 'Candidate', 'cand@test.invalid', now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+
+  // A second invitation and candidate inside org-a. One candidate's capability
+  // link must not reach the other's row; with only one candidate seeded, an
+  // organization-scoped policy and an invitation-scoped one are
+  // indistinguishable.
+  await owner`
+    insert into scheduling_invitations (id, organization_id, owner_user_id, role_title, role_context, duration_minutes, timezone, modality, capability_hash, policy_version)
+    values ('dddddddd-0000-4000-8000-00000000000b', 'org-a', 'user-a', 'Designer', 'context', 45, 'Europe/Copenhagen', 'remote_call', 'capability-hash-b', 'v1')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into candidate_submissions (id, organization_id, invitation_id, display_name, email_normalized, retention_expires_at)
+    values ('eeeeeeee-0000-4000-8000-00000000000b', 'org-a', 'dddddddd-0000-4000-8000-00000000000b', 'Other Candidate', 'other@test.invalid', now() + interval '180 days')
     on conflict (id) do nothing
   `
 

@@ -80,10 +80,25 @@ export async function withCapabilityContext<T>(
       capabilityHash,
     }
 
+    /**
+     * `app.invitation_id` and `app.capability_owner_user_id` are what the
+     * capability policies scope by. Before they existed every capability policy
+     * matched on the organization alone, which meant one candidate's link could
+     * read every other candidate's submission, links and consents in that
+     * organization — and every other invitation, exposing who else was being
+     * interviewed and for what. Isolation between candidates lived in the
+     * repository queries; now it lives in the database.
+     *
+     * The owner is pinned separately because the candidate legitimately needs
+     * the organizer's availability to pick a slot, and that is keyed by user
+     * rather than by invitation.
+     */
     await transaction.execute(sql`
       select
         set_config('app.organization_id', ${tenant.organizationId}, true),
         set_config('app.organization_role', 'capability', true),
+        set_config('app.invitation_id', ${tenant.invitationId}, true),
+        set_config('app.capability_owner_user_id', ${tenant.ownerUserId}, true),
         set_config('app.request_id', ${randomUUID()}, true)
     `)
 

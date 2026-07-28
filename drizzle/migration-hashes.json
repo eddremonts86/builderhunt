@@ -344,6 +344,10 @@
     "0085_candidate_documents_rls_grants": {
       "sql": "114b7d2cbec34edde0b13adc399f8e4c7e8cf20be567f49be1233ca65978e400",
       "snapshot": "13ca643921de7594900e853b6795e50cfd5dc9d76d95acd0ee143ae6f9256f44"
+    },
+    "0086_capability_invitation_scoping": {
+      "sql": "34897ba89071df014affbcfa380be43309eea36813bacfbbcd871db5911fcec0",
+      "snapshot": "8cb578e14d4ee57e870e9bfc2fd32158af2ca269a69ece55388c154f794796af"
     }
   }
 }
