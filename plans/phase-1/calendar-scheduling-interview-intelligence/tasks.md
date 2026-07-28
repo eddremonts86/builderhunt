@@ -1558,16 +1558,41 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
 
 ## Phase 8 — Sensitive AI and brief
 
-- [ ] **Implement Azure regional sensitive AI adapter**
-  - Files: `src/shared/lib/ai/azure.ts` (new), `tests/unit/shared/lib/ai/azure.test.ts` (new),
-    `src/shared/lib/ai/sensitive.ts` (new), `tests/unit/shared/lib/ai/sensitive.test.ts` (new)
-  - Do: Use Azure OpenAI regional endpoint/deployment with structured output, timeout, abort,
-    bounded retry, no storage/training configuration, usage normalization, independent kill switch,
-    redacted telemetry, and no MiniMax/local fallback. Reject non-regional configuration at runtime
-    as defense in depth.
-  - Verify: fake-server tests cover valid/invalid JSON, timeout, 429/5xx, abort, usage, disabled,
-    non-EU endpoint, and logs without prompt/content; live smoke sends synthetic data only.
-
+- [x] **Implement the regional sensitive AI adapter** — done 2026-07-28 (`8043d63`, `bc80b9a`), NOT yet deployed
+  - **Built for Mistral, not Azure.** The task title above used to say "Azure regional sensitive AI
+    adapter" with files `azure.ts`/`azure.test.ts`. That is stale: the provider decision was revised on
+    2026-07-26 (`docs/operations/interview-provider-register.md`: "Mistral (La Plateforme) becomes
+    primary; the provisioned Azure resource stays as a fallback") after Azure provisioning hit a
+    zero-quota wall and a residency regression, and `env.ts` has defaulted `SENSITIVE_AI_PROVIDER` to
+    `mistral` ever since. The product owner confirmed it directly. Renamed here rather than left to be
+    rediscovered by whoever reads the plan next.
+  - Files: `src/shared/lib/ai/mistral.ts` (new), `src/shared/lib/ai/sensitive.ts` (new),
+    `tests/unit/shared/lib/ai/sensitive.test.ts` (new)
+  - **There is no fallback**, and `SENSITIVE_AI_PROVIDER=azure` *fails* rather than routing to Mistral.
+    An operator who set it believes their data goes to Azure; honouring that belief with a different
+    provider is the one failure this module exists to prevent. Falling back to a non-EU model would
+    move candidate data outside the residency the candidate was told about — a different processing
+    operation with no lawful basis, not a degraded experience.
+  - **Bad output is not retried**, unlike `minimax.ts` which re-prompts once on unparseable JSON. This
+    output is candidate-evaluation material: a model that returned something structurally invalid
+    misunderstood the task, and asking again spends credits to re-roll an assessment somebody will act
+    on. The caller shows the deterministic manual path.
+  - Telemetry is *typed* so it cannot carry content — numbers and identifiers only, so a future "log
+    the prompt that failed" needs an interface change a reviewer sees. Validation failures name Zod
+    issue paths rather than using `error.message`, which embeds the offending value. `AIProviderError`
+    status `0` means no HTTP response happened at all, which callers need to distinguish from a
+    provider that answered badly.
+  - Verify (2026-07-28): 22 tests against a real HTTP fixture server rather than a mocked `fetch` —
+    signal composition, timeouts and status handling are the three things most likely to be wrong and a
+    mock would pass regardless. Covers valid output, non-JSON, schema violation, 429/500/503 retried
+    once then abandoned, 400 not retried, caller abort, disabled kill switch, four non-EU URL forms,
+    non-regional Azure endpoint, and that no prompt or completion appears in telemetry.
+  - **The residency guard makes the adapter untestable through `sensitiveCompletion` by design**, so the
+    transport tests call `mistralStructuredCompletion` directly — and one test proves
+    `sensitiveCompletion` refuses that very localhost URL. Without it this file would exercise a path
+    production cannot take while the guard rotted.
+  - Outstanding, and not code: the live smoke test with synthetic data only. It needs a real
+    `MISTRAL_API_KEY` against the EU endpoint, which is a deploy-time check rather than a local one.
 - [ ] **Register interview brief task**
   - Files: `src/shared/lib/ai/tasks.ts`, `tests/unit/shared/lib/ai/tasks.test.ts`
   - Do: Add exact `interview-brief-generate` schemas from `spec.md`, server-only/no-cache metadata,
