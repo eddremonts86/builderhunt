@@ -1249,34 +1249,75 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
   - Verify: migration/RLS tests cover owner, participant, admin denial, tenant B, cross-invitation
     FK, worker scan, and missing context.
 
-- [ ] **Implement R2 EU private storage adapter**
-  - Files: `src/lib/storage/r2.ts` (new), `tests/unit/lib/storage/r2.test.ts` (new),
-    `src/lib/storage/private-object-storage.ts` (new)
-  - Do: Implement generated quarantine/clean keys, short signed PUT/GET, required content length/
-    type/checksum, HEAD verification, copy/move, delete, lifecycle prefix cleanup, EU endpoint
-    assertion, normalized errors, timeouts, and no public bucket ACL.
-  - Verify: unit contract tests with fake S3; integration against test R2/MinIO uploads, rejects
-    tampered checksum, cannot list/public-read, expires URLs, moves clean, and deletes all variants.
+- [x] **Implement R2 EU private storage adapter** — done 2026-07-28, deployed (`64bea05`)
+  - Files: `src/lib/storage/s3-provider.ts` (new), `src/lib/storage/provider.ts` (new),
+    `tests/unit/lib/storage/s3-provider.test.ts` (new)
+  - Named `s3-provider.ts`, not `r2.ts`: the store is self-hosted MinIO speaking the S3 API, and
+    naming the file after a vendor the code does not talk to is how the plan/reality drift starts.
+    The `INTERVIEW_R2_*` env names are kept so a later move to R2 is configuration, not code.
+  - **`maxBytes` is not enforceable on the URL, and pretending otherwise would have left the only
+    real check unwritten.** A presigned PUT cannot cap a body — only a presigned POST policy can.
+    Carrying it as `x-amz-meta-max-bytes` was tried and removed: a presigned URL cannot sign it and
+    MinIO rejects unsigned headers, so it broke every upload while enforcing nothing. The limit is
+    the completion path's job, against `headObject`. A test pins the weakness deliberately.
+  - `signableHeaders: new Set(['content-type'])` is load-bearing — without it the SDK signs only
+    `host` and MinIO rejects the upload the moment the client sends the type back. A comment here
+    once claimed the type was signature-enforced when it was not; the real MinIO caught it.
+  - Verify (2026-07-28): 20 tests against the real bucket, not a mock — signed PUT completes, a
+    mismatched content type is refused, `headObject` returns null for absence, download serves the
+    bytes, move leaves nothing at the source, delete of an absent key succeeds, and six key shapes
+    (traversal, absolute, empty segment, control chars) are rejected before a request is built.
 
-- [ ] **Implement ClamAV streaming scanner**
+- [x] **Implement ClamAV streaming scanner** — done 2026-07-28 (`23db61a`)
   - Files: `src/lib/storage/clamav.ts` (new), `tests/unit/lib/storage/clamav.test.ts` (new),
-    `docker-compose.yml`, `Dockerfile`, `docs/operations/interview-provider-register.md`
-  - Do: Implement bounded TCP `INSTREAM` client with timeout/size guard and clean/infected/error
-    normalization. Add pinned ClamAV service/healthcheck for local/production topology and document
-    signature updates/RAM. Scanner unavailable must never mark a file clean.
-  - Verify: fake protocol tests plus EICAR integration produces `infected`; clean fixture passes;
-    timeout remains quarantined; container healthcheck reports ready.
+    `src/lib/storage/types.ts`, `src/lib/storage/provider.ts`, `docker/clamav/`, `docker-compose.yml`
+  - Bounded `zINSTREAM` client (`z`, not `n`: NUL-terminated replies cannot be desynchronised by a
+    signature name containing a newline). 64 KiB chunks, a hard deadline on the whole exchange
+    rather than socket idleness, and `getVirusScanner()` resolving storage into the scanner.
+  - **Every failure path either throws or returns `error`; none can reach `clean`.** That shaped
+    two decisions beyond the scanner: an unrecognised reply parses as `error`, and the new
+    `readObject` throws for a missing object where `headObject` returns null — a zero-byte stream
+    handed to clamd comes back clean.
+  - Built from Alpine for arm64 with the `HEALTHCHECK` in the image rather than compose, because a
+    `docker run` deployment ignores a compose-only healthcheck and reports no health at all.
+  - Verify (2026-07-28): 11 tests. EICAR is detected and an ordinary document passes against the
+    real container; a full resolver-to-verdict round trip uploads EICAR to the real bucket and gets
+    `infected`. Fake-clamd cases cover a scanner that accepts and says nothing (rejects at its 600ms
+    deadline), one that closes without replying, and a garbled reply — none yields `clean`.
 
-- [ ] **Implement deterministic document validation and extraction**
-  - Files: `src/lib/storage/document-validation.ts` (new),
+- [x] **Implement deterministic document validation and extraction** — done 2026-07-28 (`a8b9523`)
+  - Files: `src/lib/storage/document-validation.ts` (new), `src/lib/storage/document-extraction.ts` (new),
     `tests/unit/lib/storage/document-validation.test.ts` (new),
-    `src/lib/storage/document-extraction.ts` (new),
-    `tests/unit/lib/storage/document-extraction.test.ts` (new)
-  - Do: Validate extension, actual media type/magic bytes, bytes, checksum, invitation quota; extract
-    clean PDF/DOCX/TXT into bounded normalized plain text with page/section map; reject encrypted,
-    corrupt, unsupported, polyglot, decompression-bomb-like, or empty files; sanitize control chars.
-  - Verify: fixture suite covers valid formats and every rejection; extraction has deterministic
-    content hash/page references and never renders source HTML.
+    `tests/unit/lib/storage/document-extraction.test.ts` (new),
+    `tests/unit/lib/storage/fixtures/documents.ts` (new), `src/lib/storage/types.ts`
+  - **Declared metadata is a claim to check, never a fact.** The presigned PUT cannot enforce size,
+    type or name, so each is verified against the bytes and a mismatch is a *rejection* rather than a
+    correction — trusting the sniff over the declaration would let a `.pdf` that is really something
+    else make the system agree with the file.
+  - A DOCX is inspected as the archive it is: the central directory is walked to total uncompressed
+    sizes without inflating anything (the only way to catch a bomb before mammoth sees it) and to
+    prove the zip is a WordprocessingML package rather than a renamed archive that starts with `PK`.
+    Read from the central directory, not local headers, because a local header may zero its sizes and
+    put the real values in a trailing descriptor — so a bomb can look empty from the front.
+  - Extraction is deterministic because `document_extractions` is keyed by content hash: NFC
+    normalisation and stable line handling are correctness, not tidiness. Truncation over the
+    500k-char cap sets `truncated` instead of quietly shortening a document a brief will cite, and
+    an extraction with no text is a failure — `""` would read as "the candidate said nothing".
+  - Fixtures are *built*, not committed: a binary `.docx` in the repo makes the bomb test unreviewable
+    (nobody can see from a diff whether it still declares an inflated size), and every hostile case
+    here is the valid fixture with one field changed, which no zip library will let you do.
+  - **Two production bugs the tests caught**: pdfjs rejects a Node `Buffer` outright, which is exactly
+    what `StoredDocumentExtractor` hands it from `Buffer.concat` — every real PDF would have failed;
+    and `isEvalSupported` was being passed as hardening while doing nothing, because pdfjs v6 removed
+    the option along with the eval-based font path. Also corrected a comment claiming the PDF header
+    check closes the polyglot hole: `file-type` does, by requiring the magic at offset 0, and a test
+    now pins that dependency behaviour so the hole cannot reopen silently.
+  - Verify (2026-07-28): 44 tests. Valid PDF/DOCX/TXT accepted; empty, oversized, size/checksum
+    mismatch, wrong extension, unsupported type, docx-as-pdf, binary-as-txt, invalid UTF-8, displaced
+    PDF header (4 prefixes), missing `%%EOF`, encrypted PDF, zip bomb by absolute size and by ratio,
+    non-Word zip and truncated archive all rejected with distinct codes. Extraction asserts exact text
+    and exact hash twice over, per-page and per-heading offsets that address their own text, repeated
+    headings mapping to ascending offsets, and that no markup escapes into the text.
 
 - [ ] **Implement document repository and worker**
   - Files: `src/shared/lib/repositories/interview-documents.ts` (new),
