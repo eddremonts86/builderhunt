@@ -61,6 +61,14 @@ export const Route = createFileRoute('/api/ai/complete')({
           // 4. Unknown task / invalid input
           const task = getTask(taskId)
           if (!task) return Response.json({ error: 'unknown_task' }, { status: 400 })
+
+          // A sensitive task reads candidate material and may only run on the EU provider through
+          // `~/shared/lib/ai/sensitive.ts`. This route reaches MiniMax, which is not the provider a
+          // candidate was told would process their CV — so it is refused here rather than routed, and
+          // refused by task flag rather than by an id list that could fall out of step with the
+          // registry. `unknown_task` deliberately, not a distinct code: a caller probing this route has
+          // no business learning that the task exists.
+          if (task.sensitive) return Response.json({ error: 'unknown_task' }, { status: 400 })
           const parsedInput = task.inputSchema.safeParse(body.input)
           if (!parsedInput.success) return Response.json({ error: 'invalid_input' }, { status: 400 })
 
