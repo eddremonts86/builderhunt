@@ -1818,24 +1818,44 @@ Not fixed here — it predates this program and deserves its own work.
     aborts after a successful `put`. Three plants proved the compound-index read, the primary key, and
     the sweep-at-open are each load-bearing.
 
-- [ ] **Implement browser capture and Web Audio mixer**
+- [x] **Implement browser capture and Web Audio mixer** — done 2026-07-28 (`PENDING`), NOT yet deployed
   - Files: `src/modules/interviews/lib/audio-capture.ts` (new),
     `tests/unit/modules/interviews/lib/audio-capture.test.ts` (new),
     `src/modules/interviews/lib/deepgram-client.ts` (new),
     `tests/unit/modules/interviews/lib/deepgram-client.test.ts` (new)
-  - Do: Enforce current/previous desktop Chrome on macOS/Windows for remote mode. Request
-    `getDisplayMedia` from a user gesture with browser-tab preference, self/monitor/system-audio
-    exclusion and local playback; require a separate meeting tab with audio; inspect
-    `displaySurface`; stop the mandatory video track immediately and before provider connect; keep
-    microphone as channel 0 and meeting tab as channel 1 in interleaved linear PCM 16 kHz; use
-    diarization only for in-person and reject remote multichannel failure to manual-only; implement
-    WebSocket parsing/reconnect/device change and guaranteed track/context/socket cleanup. Do not
-    import/use `MediaRecorder`, attach video, send video frames, or construct audio Blob/object URL.
-  - Verify: mocked media/WebSocket tests cover browser/version/OS matrix, non-tab/no-audio/self-tab,
-    permission denial, user-gesture requirement, video stopped before connect, zero video bytes,
-    distinct channel labels, in-person diarization, track end, reconnect, unload, pause/stop, and
-    static assertions forbidding `MediaRecorder`, audio Blob, video transport/element; manual Chrome
-    preflight confirms devices.
+  - **The video track is stopped before `requestCapture` returns**, not on teardown. `getDisplayMedia`
+    cannot give audio alone, so a video track exists — and one alive during a provider connection is one
+    something could attach. It is also *removed* from the stream, because `getVideoTracks().length === 0`
+    is a far easier invariant to hold than "every video track has readyState 'ended'".
+  - **A remote session that cannot get two channels degrades to manual-only, never microphone-only.** A
+    transcript missing the candidate's half reads as complete and nobody can tell which half is absent. The
+    mixer throws with `manualOnly` rather than quietly building a one-channel graph.
+  - **The microphone and the meeting want opposite processing.** Echo cancellation on for the microphone,
+    because it is in a room with a speaker playing the meeting back and without it the organizer's channel
+    would carry the candidate's voice — destroying the attribution the two-channel design exists for. Off
+    for the meeting stream, because it is already clean and the filters remove speech.
+  - `MINIMUM_SUPPORTED_CHROME_MAJOR = 138` is a floor that must be raised deliberately; code cannot know
+    what today's current stable is. Mobile is checked *before* the version, because Chrome on Android
+    reports the right brand and version and still cannot share a tab's audio at all.
+  - `sendFrame` sends a slice, not `pcm.buffer`. A frame that is a view into a reused pool would otherwise
+    ship the whole pool — every previous frame included.
+  - `onerror` deliberately does nothing: a browser fires it and then `onclose` for one drop, and
+    reconnecting from both opens two sockets and bills two streams for one conversation.
+  - **The recording prohibition is a static check on the source, read from disk.** No behavioural test can
+    cover a refactor that adds `MediaRecorder` — the new path simply would not be exercised. Nine patterns
+    (`MediaRecorder`, `new Blob`, `createObjectURL`, audio/video elements, `srcObject`, `captureStream`,
+    a download attribute, `showSaveFilePicker`), with comment lines stripped so the files' own
+    documentation of what is absent does not trip it.
+  - Verify (2026-07-28): 78 tests. Browser/version/OS matrix including Edge-is-not-Chrome and
+    Chrome-is-not-Safari, mobile, missing `getDisplayMedia`; gesture requirement with no premature
+    microphone prompt; monitor/window/self-tab/no-audio refusals; stream release on every failure path;
+    interleaving, channel order, clamping and the Int16 positive peak; graph wiring asserting channel 0 is
+    the microphone; teardown ordering; socket URL EU pinning including a look-alike host; grant as a
+    subprotocol not a query parameter; backlog bound and oldest-first eviction; five-step backoff and
+    giving up without a sixth wait; no reconnect after a clean or deliberate close; one socket per drop;
+    interim/empty/metadata/malformed messages; attribution by channel with a diarization label present
+    and ignored. Five plants proved the static recording check (twice), the buffer slice, the
+    `onerror` silence, and the deliberate-close flag are each load-bearing.
 
 - [ ] **Build dedicated live interview workspace**
   - Files: `src/routes/_dashboard/interviews/$interviewId/live.tsx` (new),
