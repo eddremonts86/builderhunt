@@ -1759,7 +1759,7 @@ Not fixed here — it predates this program and deserves its own work.
     withdrawal mid-session and during a pause, insufficient credits, tier refusal, participant refusal on
     each control, four staleness cases, release-vs-settle, extension refusal, and warning thresholds.
 
-- [x] **Add session/token/segment APIs** — done 2026-07-28 (`80fccc8`), NOT yet deployed
+- [x] **Add session/token/segment APIs** — done 2026-07-28 (`fc5a532`), NOT yet deployed
   - Files: `src/routes/api/interviews/$interviewId/session.ts` (new),
     `src/routes/api/interviews/$interviewId/transcription-token.ts` (new),
     `src/routes/api/interviews/$interviewId/segments.ts` (new),
