@@ -2028,7 +2028,7 @@ Not fixed here — it predates this program and deserves its own work.
     score and dangling reference, evidence-list immutability, finalize with timestamp, double finalize,
     stale-version finalize, post-finalize edit refusal, and version metadata without content.
 
-- [x] **Add suggestion/report APIs** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Add suggestion/report APIs** — done 2026-07-28 (`ef10bab`), NOT yet deployed
   - Files: `src/routes/api/interviews/$interviewId/suggestions.ts` (new),
     `src/routes/api/interviews/$interviewId/report.ts` (new),
     `src/routes/api/interviews/$interviewId/finalize.ts` (new),
