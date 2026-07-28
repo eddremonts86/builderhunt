@@ -2157,7 +2157,7 @@ Not fixed here — it predates this program and deserves its own work.
     four reservation cases. Three plants proved the child-first order, the failed-object row retention, and
     the separate consent clock are each load-bearing.
 
-- [x] **Extend privacy export and deletion** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Extend privacy export and deletion** — done 2026-07-28 (`2201ed4`), NOT yet deployed
   - Files: `src/shared/lib/repositories/interview-privacy.ts` (new),
     `tests/unit/shared/lib/repositories/interview-privacy.test.ts` (new),
     `src/shared/lib/repositories/account-privacy.ts`,
