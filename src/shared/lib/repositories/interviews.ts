@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import type { WorkerTransaction } from '../db/worker-db'
-import { interviewBriefs } from '../db/schema'
+import { interviewBriefs, interviewSessions, transcriptSegments } from '../db/schema'
 import {
   assertNoDanglingSourceReference,
   interviewBriefContentSchema,
@@ -353,4 +353,278 @@ export async function activateBriefVersion(
   const row = rows[0]
   if (!row) throw new InterviewBriefError(`no brief at version ${params.version}`, 'not_found')
   return toRow(row as unknown as Record<string, unknown>)
+}
+
+// ── Live interview sessions (plan: calendar-scheduling-interview-intelligence, Phase 9) ──────────
+
+/**
+ * Session reads and writes.
+ *
+ * Every transition is guarded by `version`, and the guard is in the WHERE clause rather than checked
+ * beforehand. Two tabs, or a tab and a reconnecting client, will both try to move a session; a
+ * read-then-write would let the second silently overwrite the first's state, and "who finished this
+ * interview" would become unanswerable.
+ */
+export interface InterviewSessionRow {
+  id: string
+  organizationId: string
+  eventId: string
+  ownerUserId: string
+  state: string
+  captureMode: string
+  language: string
+  provider: string
+  consentNoticeVersion: string
+  captureCapability: string
+  startedAt: Date | null
+  pausedAt: Date | null
+  finishedAt: Date | null
+  heartbeatAt: Date | null
+  providerRequestId: string | null
+  providerBilledSeconds: number
+  version: number
+}
+
+function toSessionRow(row: Record<string, unknown>): InterviewSessionRow {
+  const date = (value: unknown) => (value === null || value === undefined ? null : new Date(value as string))
+  return {
+    id: String(row.id),
+    organizationId: String(column(row, 'organizationId', 'organization_id')),
+    eventId: String(column(row, 'eventId', 'event_id')),
+    ownerUserId: String(column(row, 'ownerUserId', 'owner_user_id')),
+    state: String(row.state),
+    captureMode: String(column(row, 'captureMode', 'capture_mode')),
+    language: String(row.language),
+    provider: String(row.provider),
+    consentNoticeVersion: String(column(row, 'consentNoticeVersion', 'consent_notice_version')),
+    captureCapability: String(column(row, 'captureCapability', 'capture_capability')),
+    startedAt: date(column(row, 'startedAt', 'started_at')),
+    pausedAt: date(column(row, 'pausedAt', 'paused_at')),
+    finishedAt: date(column(row, 'finishedAt', 'finished_at')),
+    heartbeatAt: date(column(row, 'heartbeatAt', 'heartbeat_at')),
+    providerRequestId: optionalText(column(row, 'providerRequestId', 'provider_request_id')),
+    providerBilledSeconds: Number(column(row, 'providerBilledSeconds', 'provider_billed_seconds')),
+    version: Number(row.version),
+  }
+}
+
+export async function findSessionByEvent(
+  transaction: BriefTransaction,
+  params: { organizationId: string; eventId: string },
+): Promise<InterviewSessionRow | null> {
+  const rows = await transaction
+    .select()
+    .from(interviewSessions)
+    .where(and(
+      eq(interviewSessions.organizationId, params.organizationId),
+      eq(interviewSessions.eventId, params.eventId),
+    ))
+    .limit(1)
+  const row = rows[0]
+  return row ? toSessionRow(row as unknown as Record<string, unknown>) : null
+}
+
+/**
+ * Creates the session for an event, or returns the one that already exists.
+ *
+ * `onConflictDoNothing` on `interview_sessions_event_unique` rather than a read-then-insert: two clients
+ * opening the workspace at once would otherwise both see "no session" and both insert, and one would get
+ * a constraint error it has no way to recover from. Here the loser simply reads the winner's row, which
+ * is what it wanted anyway.
+ */
+export async function ensureSession(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    eventId: string
+    ownerUserId: string
+    captureMode: string
+    language: string
+    provider: string
+    consentNoticeVersion: string
+    captureCapability: string
+    retentionExpiresAt: Date
+  },
+): Promise<InterviewSessionRow> {
+  await transaction
+    .insert(interviewSessions)
+    .values({
+      organizationId: params.organizationId,
+      eventId: params.eventId,
+      ownerUserId: params.ownerUserId,
+      captureMode: params.captureMode,
+      language: params.language,
+      provider: params.provider,
+      consentNoticeVersion: params.consentNoticeVersion,
+      captureCapability: params.captureCapability,
+      retentionExpiresAt: params.retentionExpiresAt,
+    })
+    .onConflictDoNothing()
+
+  const session = await findSessionByEvent(transaction, params)
+  if (!session) throw new InterviewBriefError('session insert returned no row', 'not_found')
+  return session
+}
+
+/**
+ * Applies a state transition, guarded by the version the caller was holding.
+ *
+ * The version bump and the state change are one statement. A caller that read version 3, decided to
+ * finish, and wrote while another client moved to `paused` will match zero rows and learn about it —
+ * rather than overwriting a state somebody else chose.
+ */
+export async function transitionSession(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    sessionId: string
+    expectedVersion: number
+    state: string
+    startedAt?: Date | null
+    pausedAt?: Date | null
+    finishedAt?: Date | null
+    heartbeatAt?: Date | null
+    providerRequestId?: string | null
+    providerBilledSeconds?: number
+  },
+): Promise<InterviewSessionRow> {
+  const rows = await transaction
+    .update(interviewSessions)
+    .set({
+      state: params.state,
+      version: sql`${interviewSessions.version} + 1`,
+      updatedAt: new Date(),
+      ...(params.startedAt !== undefined ? { startedAt: params.startedAt } : {}),
+      ...(params.pausedAt !== undefined ? { pausedAt: params.pausedAt } : {}),
+      ...(params.finishedAt !== undefined ? { finishedAt: params.finishedAt } : {}),
+      ...(params.heartbeatAt !== undefined ? { heartbeatAt: params.heartbeatAt } : {}),
+      ...(params.providerRequestId !== undefined ? { providerRequestId: params.providerRequestId } : {}),
+      ...(params.providerBilledSeconds !== undefined ? { providerBilledSeconds: params.providerBilledSeconds } : {}),
+    })
+    .where(and(
+      eq(interviewSessions.organizationId, params.organizationId),
+      eq(interviewSessions.id, params.sessionId),
+      eq(interviewSessions.version, params.expectedVersion),
+    ))
+    .returning()
+
+  const row = rows[0]
+  if (!row) {
+    throw new InterviewBriefError(
+      `session is no longer at version ${params.expectedVersion}; another client moved it`,
+      'version_conflict',
+    )
+  }
+  return toSessionRow(row as unknown as Record<string, unknown>)
+}
+
+/** Records a sign of life. Deliberately not a transition: a heartbeat must not bump `version`. */
+export async function touchSessionHeartbeat(
+  transaction: BriefTransaction,
+  params: { organizationId: string; sessionId: string; at: Date },
+) {
+  return transaction
+    .update(interviewSessions)
+    .set({ heartbeatAt: params.at })
+    .where(and(
+      eq(interviewSessions.organizationId, params.organizationId),
+      eq(interviewSessions.id, params.sessionId),
+    ))
+    .returning({ id: interviewSessions.id })
+}
+
+/**
+ * Persists a batch of final segments, ignoring ones already stored.
+ *
+ * `onConflictDoNothing` is what makes the outbox's resend a no-op. Returns the number actually written so
+ * a caller can tell "accepted, already had it" from "accepted, new" — the outbox needs the first to
+ * acknowledge and stop resending.
+ */
+export async function insertTranscriptSegments(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    sessionId: string
+    retentionExpiresAt: Date
+    segments: ReadonlyArray<{
+      providerSegmentId: string
+      sequence: number
+      speakerEstimate: string
+      text: string
+      startsMs: number
+      endsMs: number
+      confidence: number | null
+    }>
+  },
+): Promise<{ accepted: string[]; inserted: number }> {
+  if (params.segments.length === 0) return { accepted: [], inserted: 0 }
+
+  const rows = await transaction
+    .insert(transcriptSegments)
+    .values(params.segments.map((segment) => ({
+      organizationId: params.organizationId,
+      sessionId: params.sessionId,
+      providerSegmentId: segment.providerSegmentId,
+      sequence: segment.sequence,
+      speakerEstimate: segment.speakerEstimate,
+      text: segment.text,
+      startsMs: segment.startsMs,
+      endsMs: segment.endsMs,
+      // The column is `numeric`, which drizzle maps to a string. Passing a number here silently stores
+      // nothing on some drivers, so the conversion is explicit.
+      confidence: segment.confidence === null ? null : String(segment.confidence),
+      retentionExpiresAt: params.retentionExpiresAt,
+    })))
+    .onConflictDoNothing()
+    .returning({ providerSegmentId: transcriptSegments.providerSegmentId })
+
+  return {
+    // Every id the caller sent is acknowledged, whether it was new or already present. Acknowledging
+    // only the new ones would make the outbox resend a duplicate forever.
+    accepted: params.segments.map((segment) => segment.providerSegmentId),
+    inserted: rows.length,
+  }
+}
+
+/** Corrects who a segment is attributed to. The only field a human may change after the fact. */
+export async function correctSegmentSpeaker(
+  transaction: BriefTransaction,
+  params: {
+    organizationId: string
+    sessionId: string
+    segmentId: string
+    speakerMapping: 'organizer' | 'candidate_or_remote'
+    correctedByUserId: string
+    at: Date
+  },
+) {
+  return transaction
+    .update(transcriptSegments)
+    .set({
+      speakerMapping: params.speakerMapping,
+      // Author and time together: the check constraint requires it, and a correction without an author
+      // is unattributable.
+      correctedByUserId: params.correctedByUserId,
+      correctedAt: params.at,
+    })
+    .where(and(
+      eq(transcriptSegments.organizationId, params.organizationId),
+      eq(transcriptSegments.sessionId, params.sessionId),
+      eq(transcriptSegments.id, params.segmentId),
+    ))
+    .returning({ id: transcriptSegments.id })
+}
+
+export async function listSessionSegments(
+  transaction: BriefTransaction,
+  params: { organizationId: string; sessionId: string },
+) {
+  return transaction
+    .select()
+    .from(transcriptSegments)
+    .where(and(
+      eq(transcriptSegments.organizationId, params.organizationId),
+      eq(transcriptSegments.sessionId, params.sessionId),
+    ))
+    .orderBy(transcriptSegments.sequence)
 }
