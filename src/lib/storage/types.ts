@@ -90,7 +90,23 @@ export interface VirusScanProvider {
 export interface DocumentExtractionResult {
   text: string
   sectionMap: ReadonlyArray<{ page?: number; section?: string; offset: number }>
+  /** Which parser produced this, stored alongside the version — `document_extractions.parser`. */
+  parser: string
   parserVersion: string
+  /**
+   * sha256 of `text`, not of the source file. It keys
+   * `document_extractions_document_parser_content_unique`, so a re-run that
+   * produces identical text collides instead of duplicating, while a newer
+   * parser version adds a row rather than overwriting text a brief may cite.
+   */
+  contentSha256: string
+  /**
+   * True when the source held more text than the extractor is willing to carry.
+   * Surfaced rather than silently swallowed: a brief citing a truncated CV must
+   * be able to say so, and a caller that ignores this would present a partial
+   * document as a whole one.
+   */
+  truncated: boolean
 }
 
 export type DocumentExtractionErrorCode = 'unsupported_media_type' | 'encrypted_document' | 'corrupt_document' | 'parser_failure'

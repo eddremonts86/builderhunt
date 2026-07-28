@@ -63,7 +63,14 @@ class FakeVirusScanProvider implements VirusScanProvider {
 
 class FakeDocumentExtractionProvider implements DocumentExtractionProvider {
   async extractText(_params: { key: string; mediaType: string }) {
-    return { text: 'extracted text', sectionMap: [{ page: 1, offset: 0 }], parserVersion: 'fake-v1' }
+    return {
+      text: 'extracted text',
+      sectionMap: [{ page: 1, offset: 0 }],
+      parser: 'fake',
+      parserVersion: 'fake-v1',
+      contentSha256: 'a'.repeat(64),
+      truncated: false,
+    }
   }
 }
 
