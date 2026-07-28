@@ -7,7 +7,15 @@ import {
   withCapabilityRequest,
   withPublicHeaders,
 } from '~/lib/scheduling/public-route-support'
-import { findInvitationByCapabilityHash, listConsentsForInvitation } from '~/shared/lib/repositories/scheduling'
+import { deriveDocumentStatus } from '~/shared/lib/interviews'
+import { LINK_AUTHORIZATION_NOTICE_VERSION } from '~/lib/scheduling/link-import-policy'
+import { listSubmissionDocuments } from '~/shared/lib/repositories/interview-documents'
+import { listLinksForSubmission } from '~/shared/lib/repositories/interview-web-imports'
+import {
+  findInvitationByCapabilityHash,
+  findSubmissionByInvitation,
+  listConsentsForInvitation,
+} from '~/shared/lib/repositories/scheduling'
 
 /**
  * The candidate's view of their own invitation (plan:
@@ -34,12 +42,25 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/')({
             const invitation = await findInvitationByCapabilityHash(transaction, tenant.capabilityHash, new Date())
             if (!invitation) return null
             const consents = await listConsentsForInvitation(transaction, tenant.organizationId, tenant.invitationId)
-            return { invitation, consents }
+
+            // Documents and links only exist once the candidate has given their details, so a first
+            // visit legitimately has neither. Read on the same connection, so RLS scopes them to this
+            // invitation without the query having to say so.
+            const submission = await findSubmissionByInvitation(transaction, tenant.organizationId, tenant.invitationId)
+            const documents = submission === null ? [] : await listSubmissionDocuments(transaction, {
+              organizationId: tenant.organizationId,
+              submissionId: submission.id,
+            })
+            const links = submission === null ? [] : await listLinksForSubmission(transaction, {
+              organizationId: tenant.organizationId,
+              submissionId: submission.id,
+            })
+            return { invitation, consents, documents, links }
           })
 
           if (!result.ok || !result.value) return withPublicHeaders(publicError('invitation_unavailable'))
 
-          const { invitation, consents } = result.value
+          const { invitation, consents, documents, links } = result.value
           return withPublicHeaders(Response.json({
             ...invitation,
             noticeVersion: CANDIDATE_NOTICE,
@@ -51,6 +72,24 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/')({
               noticeVersion: consent.noticeVersion,
               decidedAt: consent.decidedAt.toISOString(),
               withdrawnAt: consent.withdrawnAt?.toISOString() ?? null,
+            })),
+            attestationVersion: LINK_AUTHORIZATION_NOTICE_VERSION,
+            // Deliberately not the object key, the sha256 or the retention date. The portal needs a
+            // name to show, a size for the quota, and a status — anything more is detail a candidate's
+            // browser has no use for and a shared screen should not display.
+            documents: documents.map((document) => ({
+              id: document.id,
+              originalName: document.originalName,
+              bytes: document.bytes,
+              status: deriveDocumentStatus(document),
+              rejectionCode: document.rejectionCode,
+            })),
+            links: links.map((link) => ({
+              id: link.id,
+              url: link.url,
+              policyDecision: link.policyDecision,
+              importState: link.importState,
+              attested: link.authorizationAttestedAt !== null,
             })),
           }))
         } catch (error) {

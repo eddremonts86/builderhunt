@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarCheck, Loader2, ShieldCheck } from 'lucide-react'
 import { Button, Label } from '~/components/ui'
 import { CandidateDetailsForm, type CandidateSubmission } from './CandidateDetailsForm'
+import { CandidateIntake, type CandidateLinkView } from './CandidateIntake'
+import type { CandidateDocumentView } from './DocumentUploader'
 import { SlotPicker, type SlotDto } from './SlotPicker'
 
 /**
@@ -45,6 +47,9 @@ interface InvitationDto {
     noticeVersion: string
     withdrawnAt: string | null
   }[]
+  attestationVersion?: string
+  documents?: CandidateDocumentView[]
+  links?: CandidateLinkView[]
 }
 
 interface BookingDto {
@@ -411,6 +416,21 @@ export function CandidatePortal({ invitationId, fetcher, initialSecret }: Candid
             onSelect={setSelectedSlot}
             disabled={busy}
           />
+
+          {/* Documents and links sit above the confirm button and gate nothing. spec.md is explicit
+              that booking may finish while these are still processing, so a candidate who wants to
+              secure a slot now and upload later must not be blocked — and one who uploads first
+              should not have to re-find the time they had chosen. */}
+          {invitation?.attestationVersion !== undefined && (
+            <CandidateIntake
+              invitationId={invitationId}
+              attestationVersion={invitation.attestationVersion}
+              documents={invitation.documents ?? []}
+              links={invitation.links ?? []}
+              onChanged={() => void refreshInvitation()}
+              disabled={busy}
+            />
+          )}
 
           <div className="flex flex-wrap gap-2">
             <Button type="button" disabled={!selectedSlot || busy} onClick={confirm}>

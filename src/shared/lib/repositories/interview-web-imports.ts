@@ -131,6 +131,21 @@ export async function recordLinkPolicyDecision(
     .returning({ id: candidateLinks.id, policyDecision: candidateLinks.policyDecision, importState: candidateLinks.importState })
 }
 
+/** Every link on a submission, for the candidate's own intake view and the organizer's review. */
+export async function listLinksForSubmission(
+  transaction: ImportTransaction,
+  params: { organizationId: string; submissionId: string },
+): Promise<CandidateLinkRow[]> {
+  return transaction
+    .select(LINK_COLUMNS)
+    .from(candidateLinks)
+    .where(and(
+      eq(candidateLinks.organizationId, params.organizationId),
+      eq(candidateLinks.submissionId, params.submissionId),
+    ))
+    .orderBy(candidateLinks.createdAt)
+}
+
 /**
  * Claims queued links for import, atomically, exactly as the document worker claims documents.
  *
