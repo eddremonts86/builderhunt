@@ -16,6 +16,7 @@
     "assets:check": "node scripts/check-performance-budgets.mjs",
     "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run tests/unit",
+    "test:ai-live": "AI_LIVE_SMOKE=true SENSITIVE_AI_ENABLED=true vitest run tests/unit/shared/lib/ai/live-provider-smoke.test.ts",
     "test:security": "vitest run tests/unit/security",
     "test:rls": "pnpm test:rls:local",
     "test:e2e": "playwright test --project=chromium --project=mobile",
