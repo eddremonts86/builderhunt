@@ -2194,7 +2194,7 @@ Not fixed here — it predates this program and deserves its own work.
     four deletion cases. Three plants proved the transcript exclusion, the owner scoping, and the
     shorten-not-delete choice are each load-bearing. The 11 existing privacy tests stay green.
 
-- [x] **Update legal notices and consent copy** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Update legal notices and consent copy** — done 2026-07-28 (`2de73e4`), NOT yet deployed
   - Files: `src/routes/_landing/legal/privacy.tsx`, `src/routes/_landing/legal/terms.tsx`,
     `src/shared/lib/legal-versions.ts` (new), `src/shared/lib/legal.ts`,
     `src/shared/lib/consent-notice.ts`, `tests/unit/shared/lib/legal-interview-copy.test.ts` (new),
