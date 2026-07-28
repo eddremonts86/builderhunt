@@ -1407,7 +1407,23 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
     against a second candidate in the same organization; 3475 unit tests; 211 e2e; 90 migrations
     apply twice clean. The gate caught the owner/worker document-count assertions my fixture change
     invalidated — they now name the expected ids rather than counting rows.
-- [ ] **Implement policy-controlled public-web import**
+- [ ] **Implement policy-controlled public-web import** — PARTIAL: the policy gate is done (`3fce545`..HEAD)
+  - Done: `src/lib/scheduling/link-import-policy.ts` + 24 tests. Decides whether a URL may be fetched
+    at all, before a request is built — the question the enrichment envelope cannot answer, because
+    the envelope validates a *request* and this validates *permission*.
+  - **A bug worth remembering.** Every hard-blocked connector in `policies.ts` has `allowedHosts: []`,
+    correctly, since nothing may ever be fetched from them. The first implementation resolved hosts
+    against the registry, so `linkedin.com` matched no connector, fell through to the personal-site
+    branch, and an ownership attestation promoted it to `authorized_crawl` — the one rule the module
+    exists to enforce, inverted by an empty array. Blocked hosts are now listed explicitly and
+    checked *before* the registry, with a load-time assertion and a test so a fifth blocked platform
+    added without hosts fails loudly rather than silently becoming attestable.
+  - Still to do: `src/lib/scheduling/web-import-worker.ts`, the two routes
+    (`.../links/$linkId/import.ts`, `api/admin/documents/run-web-imports.ts`), the repository writes
+    against `candidate_web_imports`, and the fake-host verification matrix (robots allow/disallow/
+    unreachable, SSRF and DNS rebinding, redirect escape, MIME mismatch, oversized/compressed bodies,
+    Redis rate limits, duplicate content, raw-body discard). The safety envelope those reuse —
+    `safeFetch`, `isPathAllowedByRobots` — already exists and is already tested.
   - Files: `src/lib/enrichment/network.ts`, `tests/unit/lib/enrichment/network.test.ts`,
     `src/lib/enrichment/policies.ts`, `tests/unit/lib/enrichment/policies.test.ts`,
     `src/lib/enrichment/robots.ts`, `tests/unit/lib/enrichment/robots.test.ts`,
