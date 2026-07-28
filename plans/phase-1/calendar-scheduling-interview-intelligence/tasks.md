@@ -1955,7 +1955,7 @@ Not fixed here — it predates this program and deserves its own work.
     the per-call segment check, the prohibited-content gate, and the follow-up evidence requirement are
     each load-bearing.
 
-- [x] **Implement topic window and suggestion service** — done 2026-07-28 (`PENDING`), NOT yet deployed
+- [x] **Implement topic window and suggestion service** — done 2026-07-28 (`2e0d442`), NOT yet deployed
   - Files: `src/lib/interviews/suggestion-service.ts` (new),
     `tests/unit/lib/interviews/suggestion-service.test.ts` (new),
     `src/shared/lib/repositories/interviews.ts`
