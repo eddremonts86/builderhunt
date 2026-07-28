@@ -30,6 +30,9 @@ import {
 } from './scheduling'
 import {
   candidateDocumentSchema,
+  INTERVIEW_BRIEF_STATUSES,
+  interviewBriefContentSchema,
+  sourceManifestEntrySchema,
   DOCUMENT_STATUSES,
   interviewFollowupSuggestOutputSchema,
   interviewReportContentSchema,
@@ -328,6 +331,40 @@ export const generateBriefResponseSchema = z.object({
   version: z.number().int().positive(),
 }).strict()
 
+// ── GET /api/interviews/:id/brief, GET|PATCH|POST /api/interviews/:id/brief/:version ─────────
+//
+// `:id` is the calendar event id: an interview *is* a calendar event here, and `interview_briefs.event_id`
+// points at it. Authorization is the table's own RLS — owner, or a participant with `access_granted` —
+// so "not yours" and "does not exist" are the same 404 rather than a 403 that confirms it exists.
+
+export const briefDtoSchema = z.object({
+  id: z.string().uuid(),
+  eventId: z.string().uuid(),
+  version: z.number().int().positive(),
+  status: z.enum(INTERVIEW_BRIEF_STATUSES),
+  content: interviewBriefContentSchema,
+  evidenceManifest: z.array(sourceManifestEntrySchema),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  promptVersion: z.string().nullable(),
+  editedByUserId: z.string().nullable(),
+}).strict()
+
+export const readBriefResponseSchema = z.object({
+  brief: briefDtoSchema.nullable(),
+  latestVersion: z.number().int().positive().nullable(),
+  hasUnreviewedDraft: z.boolean().optional(),
+  /** Server-decided. A participant reads; only the owner regenerates or edits. */
+  canEdit: z.boolean().optional(),
+}).strict()
+
+export const patchBriefRequestSchemaRef = z.object({
+  content: interviewBriefContentSchema,
+  status: z.enum(['draft', 'active']).optional(),
+}).strict()
+
+export const briefEnvelopeResponseSchema = z.object({ brief: briefDtoSchema }).strict()
+
 // ── POST /api/interviews/:id/session ─────────────────────────────────────────────────────────
 
 export const INTERVIEW_SESSION_ACTIONS = ['start', 'pause', 'resume', 'finish'] as const
@@ -444,6 +481,10 @@ export const INTERVIEW_API_ROUTES: readonly InterviewApiRoute[] = [
   { method: 'POST', path: '/api/public/scheduling/:id/uploads/:documentId/complete', authority: 'capability', requestSchema: completeUploadRequestSchema, responseSchema: completeUploadResponseSchema },
   { method: 'GET', path: '/api/scheduling/invitations/:id/documents/:documentId/download', authority: 'owner', requestSchema: null, responseSchema: documentDownloadResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/brief', authority: 'participant', requestSchema: generateBriefRequestSchema, responseSchema: generateBriefResponseSchema },
+  { method: 'GET', path: '/api/interviews/:id/brief', authority: 'participant', requestSchema: null, responseSchema: readBriefResponseSchema },
+  { method: 'GET', path: '/api/interviews/:id/brief/:version', authority: 'participant', requestSchema: null, responseSchema: briefEnvelopeResponseSchema },
+  { method: 'PATCH', path: '/api/interviews/:id/brief/:version', authority: 'owner', requestSchema: patchBriefRequestSchemaRef, responseSchema: briefEnvelopeResponseSchema },
+  { method: 'POST', path: '/api/interviews/:id/brief/:version', authority: 'owner', requestSchema: null, responseSchema: briefEnvelopeResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/session', authority: 'participant', requestSchema: interviewSessionActionRequestSchema, responseSchema: interviewSessionActionResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/transcription-token', authority: 'participant', requestSchema: requestTranscriptionTokenRequestSchema, responseSchema: transcriptionTokenResponseSchema },
   { method: 'POST', path: '/api/interviews/:id/segments', authority: 'participant', requestSchema: submitSegmentsRequestSchema, responseSchema: submitSegmentsResponseSchema },

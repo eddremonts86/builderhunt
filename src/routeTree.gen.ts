@@ -150,6 +150,7 @@ import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/c
 import { Route as ApiAdminAbuseIndexRouteImport } from './routes/api/admin/abuse/index'
 import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
 import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
+import { Route as DashboardInterviewsInterviewIdIndexRouteImport } from './routes/_dashboard/interviews/$interviewId/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
@@ -211,6 +212,7 @@ import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
+import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
 import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
@@ -227,6 +229,7 @@ import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } fro
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio'
+import { Route as ApiInterviewsInterviewIdBriefVersionRouteImport } from './routes/api/interviews/$interviewId/brief/$version'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
 import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
 import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
@@ -955,6 +958,12 @@ const DashboardSettingsBillingIndexRoute =
     path: '/',
     getParentRoute: () => DashboardSettingsBillingRoute,
   } as any)
+const DashboardInterviewsInterviewIdIndexRoute =
+  DashboardInterviewsInterviewIdIndexRouteImport.update({
+    id: '/interviews/$interviewId/',
+    path: '/interviews/$interviewId/',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardBuilderBuilderIdIndexRoute =
   DashboardBuilderBuilderIdIndexRouteImport.update({
     id: '/builder/$builderId/',
@@ -1304,6 +1313,12 @@ const ApiPublicSchedulingInvitationIdIndexRoute =
     path: '/api/public/scheduling/$invitationId/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiInterviewsInterviewIdBriefIndexRoute =
+  ApiInterviewsInterviewIdBriefIndexRouteImport.update({
+    id: '/api/interviews/$interviewId/brief/',
+    path: '/api/interviews/$interviewId/brief/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiBuildersBuilderIdEvidenceIndexRoute =
   ApiBuildersBuilderIdEvidenceIndexRouteImport.update({
     id: '/evidence/',
@@ -1398,6 +1413,12 @@ const ApiMeBuilderClaimsClaimIdPortfolioRoute =
   ApiMeBuilderClaimsClaimIdPortfolioRouteImport.update({
     id: '/api/me/builder-claims/$claimId/portfolio',
     path: '/api/me/builder-claims/$claimId/portfolio',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiInterviewsInterviewIdBriefVersionRoute =
+  ApiInterviewsInterviewIdBriefVersionRouteImport.update({
+    id: '/api/interviews/$interviewId/brief/$version',
+    path: '/api/interviews/$interviewId/brief/$version',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiBuildersBuilderIdEvidenceEvidenceIdRoute =
@@ -1634,6 +1655,7 @@ export interface FileRoutesByFullPath {
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/interviews/$interviewId/': typeof DashboardInterviewsInterviewIdIndexRoute
   '/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse/': typeof ApiAdminAbuseIndexRoute
@@ -1660,6 +1682,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1676,6 +1699,7 @@ export interface FileRoutesByFullPath {
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -1859,6 +1883,7 @@ export interface FileRoutesByTo {
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
+  '/interviews/$interviewId': typeof DashboardInterviewsInterviewIdIndexRoute
   '/settings/billing': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse': typeof ApiAdminAbuseIndexRoute
@@ -1885,6 +1910,7 @@ export interface FileRoutesByTo {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1901,6 +1927,7 @@ export interface FileRoutesByTo {
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/public/scheduling/$invitationId': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -2089,6 +2116,7 @@ export interface FileRoutesById {
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
+  '/_dashboard/interviews/$interviewId/': typeof DashboardInterviewsInterviewIdIndexRoute
   '/_dashboard/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/_dashboard/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse/': typeof ApiAdminAbuseIndexRoute
@@ -2115,6 +2143,7 @@ export interface FileRoutesById {
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
+  '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -2131,6 +2160,7 @@ export interface FileRoutesById {
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
+  '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -2318,6 +2348,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
+    | '/interviews/$interviewId/'
     | '/settings/billing/'
     | '/sprints/$sprintId/'
     | '/api/admin/abuse/'
@@ -2344,6 +2375,7 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/interviews/$interviewId/brief/$version'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2360,6 +2392,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
+    | '/api/interviews/$interviewId/brief/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2543,6 +2576,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
+    | '/interviews/$interviewId'
     | '/settings/billing'
     | '/sprints/$sprintId'
     | '/api/admin/abuse'
@@ -2569,6 +2603,7 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/interviews/$interviewId/brief/$version'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2585,6 +2620,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence'
+    | '/api/interviews/$interviewId/brief'
     | '/api/public/scheduling/$invitationId'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2772,6 +2808,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
+    | '/_dashboard/interviews/$interviewId/'
     | '/_dashboard/settings/billing/'
     | '/_dashboard/sprints/$sprintId/'
     | '/api/admin/abuse/'
@@ -2798,6 +2835,7 @@ export interface FileRouteTypes {
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
+    | '/api/interviews/$interviewId/brief/$version'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2814,6 +2852,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
+    | '/api/interviews/$interviewId/brief/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2961,6 +3000,7 @@ export interface RootRouteChildren {
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  ApiInterviewsInterviewIdBriefVersionRoute: typeof ApiInterviewsInterviewIdBriefVersionRoute
   ApiMeBuilderClaimsClaimIdPortfolioRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   ApiPublicSchedulingInvitationIdBookRoute: typeof ApiPublicSchedulingInvitationIdBookRoute
   ApiPublicSchedulingInvitationIdCancelRoute: typeof ApiPublicSchedulingInvitationIdCancelRoute
@@ -2971,6 +3011,7 @@ export interface RootRouteChildren {
   ApiPublicSchedulingInvitationIdSubmissionRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRoute
   ApiPublicSchedulingInvitationIdUploadsRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteWithChildren
   ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
+  ApiInterviewsInterviewIdBriefIndexRoute: typeof ApiInterviewsInterviewIdBriefIndexRoute
   ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
@@ -3965,6 +4006,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardSettingsBillingIndexRouteImport
       parentRoute: typeof DashboardSettingsBillingRoute
     }
+    '/_dashboard/interviews/$interviewId/': {
+      id: '/_dashboard/interviews/$interviewId/'
+      path: '/interviews/$interviewId'
+      fullPath: '/interviews/$interviewId/'
+      preLoaderRoute: typeof DashboardInterviewsInterviewIdIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/builder/$builderId/': {
       id: '/_dashboard/builder/$builderId/'
       path: '/builder/$builderId'
@@ -4392,6 +4440,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/interviews/$interviewId/brief/': {
+      id: '/api/interviews/$interviewId/brief/'
+      path: '/api/interviews/$interviewId/brief'
+      fullPath: '/api/interviews/$interviewId/brief/'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/$builderId/evidence/': {
       id: '/api/builders/$builderId/evidence/'
       path: '/evidence'
@@ -4504,6 +4559,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/interviews/$interviewId/brief/$version': {
+      id: '/api/interviews/$interviewId/brief/$version'
+      path: '/api/interviews/$interviewId/brief/$version'
+      fullPath: '/api/interviews/$interviewId/brief/$version'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdBriefVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/builders/$builderId/evidence/$evidenceId': {
       id: '/api/builders/$builderId/evidence/$evidenceId'
       path: '/evidence/$evidenceId'
@@ -4612,6 +4674,7 @@ interface DashboardRouteRouteChildren {
   DashboardSolutionsIndexRoute: typeof DashboardSolutionsIndexRoute
   DashboardSprintsIndexRoute: typeof DashboardSprintsIndexRoute
   DashboardBuilderBuilderIdIndexRoute: typeof DashboardBuilderBuilderIdIndexRoute
+  DashboardInterviewsInterviewIdIndexRoute: typeof DashboardInterviewsInterviewIdIndexRoute
   DashboardSprintsSprintIdIndexRoute: typeof DashboardSprintsSprintIdIndexRoute
 }
 
@@ -4641,6 +4704,8 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardSolutionsIndexRoute: DashboardSolutionsIndexRoute,
   DashboardSprintsIndexRoute: DashboardSprintsIndexRoute,
   DashboardBuilderBuilderIdIndexRoute: DashboardBuilderBuilderIdIndexRoute,
+  DashboardInterviewsInterviewIdIndexRoute:
+    DashboardInterviewsInterviewIdIndexRoute,
   DashboardSprintsSprintIdIndexRoute: DashboardSprintsSprintIdIndexRoute,
 }
 
@@ -5063,6 +5128,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
   ApiAdminBuilderClaimsClaimIdRevokeRoute:
     ApiAdminBuilderClaimsClaimIdRevokeRoute,
+  ApiInterviewsInterviewIdBriefVersionRoute:
+    ApiInterviewsInterviewIdBriefVersionRoute,
   ApiMeBuilderClaimsClaimIdPortfolioRoute:
     ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren,
   ApiPublicSchedulingInvitationIdBookRoute:
@@ -5083,6 +5150,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicSchedulingInvitationIdUploadsRouteWithChildren,
   ApiPublicSchedulingInvitationIdWithdrawRoute:
     ApiPublicSchedulingInvitationIdWithdrawRoute,
+  ApiInterviewsInterviewIdBriefIndexRoute:
+    ApiInterviewsInterviewIdBriefIndexRoute,
   ApiPublicSchedulingInvitationIdIndexRoute:
     ApiPublicSchedulingInvitationIdIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:
