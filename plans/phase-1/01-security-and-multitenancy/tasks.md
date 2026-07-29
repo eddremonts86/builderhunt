@@ -242,7 +242,7 @@ must include its tests and must not stage unrelated worktree changes.
   - Verify (2026-07-27): backfill dry-run then real run on a local DB → `saved_queries` 1 migrated/21 skipped, `alerts` 2 migrated, `onboarding_progress` 2 migrated, **0 conflicts, 0 orphans**, every surface reconciled; zero null `organization_id` across all 7 tables afterwards. `drizzle-kit check` clean; `verify-migrations-local` applies all 82 migrations twice, idempotent, on a disposable DB. Guard proven both ways on that DB: with a seeded orphan row it aborts with `Tenant cutover blocked: rows without an organization remain in saved_queries (1 rows) — run pnpm db:backfill:resources first`; with clean data it passes. Full `pnpm ci:local` green — 18 passed (migration integrity, drizzle-check, migrations, RLS, api-isolation, restore rehearsal, boundaries, route coverage, provider metering, lint, type-check, 3298 unit tests, dependency audit, build, a11y 44/44), 1 tolerated (`schema-audit`, `continue-on-error` in the workflow and failing before this change).
   - **Not done, needs the environment owner**: running `pnpm db:backfill:resources` against production behind a fresh restore point, and flipping `TENANT_READ_MODE`/`TENANT_CANONICAL_READY` surface by surface. Both are explicitly owner-gated by this plan's execution handoff.
 
-- [ ] **Classify the 45 unclassified tables**
+- [x] **Classify the 45 unclassified tables**
   - Files: `scripts/db/audit-schema.ts`, `plans/_meta/security-policy.md`
   - Do: `pnpm db:audit-schema` reports 47 findings against 101 `pgTable`s, of which only 56 are
     classified. Add an entry for each missing table with its data class, owner key, public DTO fields,
