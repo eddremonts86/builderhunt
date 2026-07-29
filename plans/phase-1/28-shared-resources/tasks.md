@@ -31,8 +31,8 @@
   - Do: Implement list/get/create/update/delete and add/remove item using canonical `builderIdentityId`, tenant composite FKs, creator/admin permissions, idempotent unique item insertion, and `trackedByOrganization`/allowed user attribution from organization tracking. Return no source snapshot/private artifact.
   - Verify: repository tests cover duplicate add, roles, deleted identity handling, A/B IDs, and DB rejection of cross-tenant parent references.
 
-- [ ] **Migrate query APIs to tenant repository and DTO boundary**
-  - Files: `src/routes/api/queries/index.ts`, `src/routes/api/queries/$id.visibility.ts`, `tests/unit/security/shared-query-api.test.ts`
+- [x] **Migrate query APIs to tenant repository and DTO boundary**
+  - Files: `src/routes/api/queries/index.ts`, `src/routes/api/queries/$id/visibility.ts`, `tests/unit/security/shared-query-api.test.ts`
   - Do: Resolve principal/context, validate inputs, call saved-query repository, map typed non-enumerating errors, return explicit DTOs, and emit redacted activity hook. Organization ID in body/query/header is rejected or ignored as data, never authority.
   - Verify: own/private/shared/role/A-B/spoofed-tenant/CSRF/rate tests pass using non-owner app role.
 
