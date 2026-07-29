@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — deterministic normalization.
- * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §9. Pure functions, no I/O.
+ * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §9. Pure functions, no I/O.
  */
 
 const TRACKING_PARAM_PREFIXES = ['utm_', 'ref', 'ref_src', 'igshid', 'fbclid', 'gclid', 'mc_cid', 'mc_eid']

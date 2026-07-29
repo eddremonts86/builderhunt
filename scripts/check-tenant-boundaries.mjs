@@ -31,7 +31,7 @@ const authDbAllowlist = new Set([
   'src/shared/lib/repositories/account-privacy.ts',
   'src/shared/lib/repositories/alerts-worker.ts',
   // Narrow, read-only worker access to auth_sessions.ip_address for linked-account clustering
-  // (abuse/linked-accounts.ts, plans/phase-1/31-abuse-and-usage-integrity/tasks.md Phase 3) — same exception
+  // (abuse/linked-accounts.ts, plans/phase-1/32-abuse-and-usage-integrity/tasks.md Phase 3) — same exception
   // shape as the two files above, not a general auth-db opening.
   'src/shared/lib/repositories/auth-sessions-worker.ts',
 ])
@@ -50,7 +50,7 @@ const globalDbAllowlist = new Set([
 // Only these pre-existing files compare `.role` against a role literal
 // directly. Everything else — including all Team-account UI/route files —
 // must call `can()` from authorization/permissions.ts instead of
-// reimplementing role logic inline (plans/phase-1/26-team-accounts/tasks.md's own
+// reimplementing role logic inline (plans/phase-1/27-team-accounts/tasks.md's own
 // "Lock Team consumers to foundation contracts" requirement).
 const roleLiteralCheckAllowlist = new Set([
   'src/shared/lib/authorization/permissions.ts',

@@ -7,7 +7,7 @@ import { SITE_URL } from '~/shared/lib/site-url'
  * otherwise logs the link to the console and returns it as `devLink` so
  * the UI can show it in dev mode.
  *
- * Spec reference: plans/phase-1/35-claimable-profiles/tasks.md#email-sending
+ * Spec reference: plans/phase-1/36-claimable-profiles/tasks.md#email-sending
  */
 
 export interface SendResult {
@@ -478,7 +478,7 @@ export async function sendExportReadyEmail(to: string): Promise<SendResult> {
   }
 }
 
-/** Verify a newly-set billing contact email (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4). */
+/** Verify a newly-set billing contact email (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 4). */
 export async function sendBillingContactVerificationEmail(to: string, link: string): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({ to, subject: 'Confirm your BuilderHunt billing contact email', html: billingContactVerificationEmailHtml(link), devLink: link })
@@ -553,7 +553,7 @@ export async function sendBillingReceiptEmail(to: string, details: BillingReceip
   }
 }
 
-/** A failed subscription payment attempt — this and its grace-period consequences (see dunning.ts) are critical enough that this sender is always ALSO called for the organization owner, even when a separate billing contact exists (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 4: "critical messages also reach owner"). */
+/** A failed subscription payment attempt — this and its grace-period consequences (see dunning.ts) are critical enough that this sender is always ALSO called for the organization owner, even when a separate billing contact exists (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 4: "critical messages also reach owner"). */
 export async function sendBillingPaymentFailedEmail(to: string): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({ to, subject: 'Action needed: your BuilderHunt payment failed', html: billingPaymentFailedEmailHtml() })
@@ -587,7 +587,7 @@ export async function sendBillingPaymentFailedEmail(to: string): Promise<SendRes
   }
 }
 
-/** Sent to the FORMER owner once an ownership transfer commits (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 5) — confirms billing authority moved with ownership, never a request for action. */
+/** Sent to the FORMER owner once an ownership transfer commits (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 5) — confirms billing authority moved with ownership, never a request for action. */
 export async function sendOwnershipTransferredFromEmail(to: string, organizationName: string, newOwnerName: string): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({ to, subject: `You transferred ownership of ${organizationName}`, html: ownershipTransferredFromEmailHtml(organizationName, newOwnerName) })
@@ -776,7 +776,7 @@ function ownershipTransferredToEmailHtml(organizationName: string, previousOwner
 </html>`
 }
 
-/** Credit expiry notice at 30/7/1 days (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and alerts") — `notifications.ts` calls this at most once per grant per bucket (deduplicated via `billing_notification_log`). */
+/** Credit expiry notice at 30/7/1 days (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Add financial notifications, metrics, and alerts") — `notifications.ts` calls this at most once per grant per bucket (deduplicated via `billing_notification_log`). */
 export async function sendCreditExpiryNoticeEmail(to: string, details: { remainingUnits: number; daysUntilExpiry: number }): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({
@@ -920,7 +920,7 @@ export async function sendRefundDecisionEmail(to: string, details: { amountCents
   }
 }
 
-/** A chargeback was opened against a payment — one email per dispute (plans/phase-1/29-stripe-billing-platform/tasks.md §8 task 5, §10). */
+/** A chargeback was opened against a payment — one email per dispute (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 5, §10). */
 export async function sendDisputeNotificationEmail(to: string, details: { amountCents: number; evidenceDueBy: Date | null }): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({ to, subject: 'A dispute was opened on a BuilderHunt payment', html: disputeNotificationEmailHtml(details) })

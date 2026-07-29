@@ -2,7 +2,7 @@
  * Authed, plan-gated, rate-limited, budgeted proxy to the shared AI layer.
  *
  * Pipeline (each step short-circuits with the listed response — see
- * plans/phase-1/20-ai-expansion/spec.md "API routes"):
+ * plans/phase-1/21-ai-expansion/spec.md "API routes"):
  *   1. Kill switch (AI_DISABLED / AI_DISABLED_TASKS)      -> 503 ai_disabled
  *   2. MINIMAX_API_KEY unset                              -> 503 ai_unconfigured
  *   3. Tenant principal required                          -> 401 / 403

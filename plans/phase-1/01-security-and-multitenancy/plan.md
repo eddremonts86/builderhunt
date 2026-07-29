@@ -2,7 +2,7 @@
 
 > **Status**: `in_progress`
 > **Depends on**: nothing
-> **Blocks**: [`team-accounts`](../26-team-accounts/plan.md), [`shared-resources`](../27-shared-resources/plan.md), [`activity-feed`](../28-activity-feed/plan.md), [`ai-expansion`](../20-ai-expansion/plan.md), [`semantic-search`](../21-semantic-search/plan.md), [`ai-sourcing-sprints`](../40-ai-sourcing-sprints/plan.md), [`production-infrastructure`](../02-production-infrastructure/plan.md)
+> **Blocks**: [`team-accounts`](../27-team-accounts/plan.md), [`shared-resources`](../28-shared-resources/plan.md), [`activity-feed`](../29-activity-feed/plan.md), [`ai-expansion`](../21-ai-expansion/plan.md), [`semantic-search`](../22-semantic-search/plan.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/plan.md), [`production-infrastructure`](../02-production-infrastructure/plan.md)
 > **Reality check**: roles, Better Auth organizations, tenant context, normalized expand schema,
 > personal-organization bootstrap, RLS, worker/claim policies, platform role, and local exact-role
 > verification are implemented, including dual-write/shadow-read/backfill/readiness code with tests.

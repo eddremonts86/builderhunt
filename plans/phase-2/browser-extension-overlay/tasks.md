@@ -1,7 +1,7 @@
 # Browser Extension Overlay (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (a new authenticated client outside the app's cookie/CSRF assumptions); [`ai-expansion`](../../phase-1/20-ai-expansion/spec.md) (Chrome built-in AI is the local-first tier this surface sits closest to); [`ai-sourcing-sprints`](../../phase-1/40-ai-sourcing-sprints/spec.md) (the "add to sprint" action target — already shipped). Binding: [`ai-policy`](../../_meta/ai-policy.md), [`security-policy`](../../_meta/security-policy.md).
+> **Depends on**: [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md) (a new authenticated client outside the app's cookie/CSRF assumptions); [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md) (Chrome built-in AI is the local-first tier this surface sits closest to); [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/spec.md) (the "add to sprint" action target — already shipped). Binding: [`ai-policy`](../../_meta/ai-policy.md), [`security-policy`](../../_meta/security-policy.md).
 > **Blocks**: nothing
 > **Reality check** (re-verified against `master` HEAD, 2026-07-27): Extends `src/shared/lib/db/schema.ts`, `src/shared/lib/env.ts`, `src/shared/lib/legal.ts`, `src/routes/api/consent/index.ts`, `scripts/check-route-coverage.mjs`, `scripts/check-tenant-boundaries.mjs`, `scripts/db/verify-api-isolation-local.mjs`, `src/modules/dashboard/components/UserMenu.tsx`. New credential guard modelled on `src/shared/lib/auth/cron.ts` and reconciled against the second existing non-session principal, `src/lib/scheduling/capability-context.ts` (spec §"The auth model"); new RLS/grants migration modelled on `drizzle/0044_abuse_usage_integrity_rls_grants.sql`. No existing route is modified and no existing table gains, loses, or alters a column, a grant, or a policy — the only DDL against an existing table is the additive `builder_identities_lower_username_idx`. Writes stay inside tables `builderhunt_app` already has grants and policies for: `sprint_results` is SELECT-only for that role (`drizzle/0024_sourcing_sprints_grants.sql:31,56`), so the sprint relationship is read-only and the write action is `organization_builders.status` — spec §8.
 
@@ -364,7 +364,7 @@ must be under `tests/`.
     operator alternative: if `builder_identities` exceeds ~1M rows in production, run
     `CREATE INDEX CONCURRENTLY` out-of-band before deploying (a drizzle migration runs in a
     transaction, so `CONCURRENTLY` cannot go in the file) — same operator-step shape as
-    [`semantic-search`](../../phase-1/21-semantic-search/spec.md)'s Coolify pgvector swap. Additive,
+    [`semantic-search`](../../phase-1/22-semantic-search/spec.md)'s Coolify pgvector swap. Additive,
     index-only: no column, grant, or policy is added or altered.
   - Verify: `pnpm test:migration-integrity`; `pnpm test:migrations:local`; then, against a seeded
     local DB, `EXPLAIN ANALYZE SELECT id, source, username, profile_url FROM builder_identities

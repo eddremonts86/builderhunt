@@ -2,7 +2,7 @@
 
 > **Status**: `partially-implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md) for database-role, RLS, restore, and tenant-aware production enforcement; existing non-database operations may proceed independently
-> **Blocks**: [`waitlist-launch`](../53-waitlist-launch/spec.md), [`ai-expansion`](../20-ai-expansion/spec.md), [`semantic-search`](../21-semantic-search/spec.md)
+> **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md)
 > **Reality check**: Docker/Coolify/Hetzner deploy, optional Redis, rate limiting, structured
 > logs, metrics, and a local backup script are all live (see spec). Remaining work is
 > operational hardening plus production groundwork for the AI plans.

@@ -104,7 +104,7 @@ function IncludeToggle({ checked, onChange }: { checked: boolean; onChange: () =
 // Step 1/2 — one queue entry per uploaded/pasted document. Batch upload is
 // capped at MAX_FILES and restricted to .txt/.md — PDF/DOCX parsing needs a
 // dedicated extraction library and is an explicitly deferred future phase
-// (see plans/phase-1/40-ai-sourcing-sprints/spec.md's v2 note).
+// (see plans/phase-1/41-ai-sourcing-sprints/spec.md's v2 note).
 interface FileEntry {
   id: string
   name: string

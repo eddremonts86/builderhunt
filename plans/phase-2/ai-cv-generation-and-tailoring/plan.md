@@ -1,7 +1,7 @@
 # Plan de entrega — generación y adaptación de CV con IA
 
 > **Status**: `pending`
-> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (sólo las fases 6–7; las fases 1–5 no lo necesitan), [`ai-expansion`](../../phase-1/20-ai-expansion/spec.md), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md)
+> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md) (sólo las fases 6–7; las fases 1–5 no lo necesitan), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md)
 > **Blocks**: [`delegated-job-applications`](../delegated-job-applications/spec.md)
 > **Reality check**: Extiende `src/shared/lib/db/schema.ts` (8 tablas nuevas), `src/shared/lib/ai/tasks.ts` (5 tasks), `src/shared/lib/billing/rate-cards.ts`, `src/shared/lib/billing-shared.ts`, `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/repositories/account-privacy.ts`, `src/modules/dashboard/ui/shell/nav-config.ts` y `scripts/db/verify-api-isolation-local.mjs`. Clona la forma RLS/grants de `drizzle/0085_candidate_documents_rls_grants.sql`, el patrón de worker de `src/routes/api/admin/alerts/run-worker.ts` y el contrato de storage de `src/lib/storage/types.ts`. **No** reutiliza `candidate_documents` (FK obligatoria a `candidate_submissions`; ver spec.md §Decisión sobre el foundation de documentos) y **no** implementa un segundo contrato de storage.
 

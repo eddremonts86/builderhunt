@@ -2,7 +2,7 @@
 
 > **Status**: `partially-implemented`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md) for database-role, RLS, restore, and tenant-aware production enforcement; existing non-database operations may proceed independently
-> **Blocks**: [`waitlist-launch`](../53-waitlist-launch/spec.md), [`ai-expansion`](../20-ai-expansion/spec.md), [`semantic-search`](../21-semantic-search/spec.md)
+> **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md)
 > **Reality check**: Production is live: multi-stage `Dockerfile` + `server.prod.mjs` +
 > `start.sh`, Coolify push-to-deploy on a Hetzner VPS, migrations via Coolify
 > `post_deployment_command` (`drizzle-kit migrate`; runtime files are copied into the image —
@@ -73,14 +73,14 @@ management, pgvector image migration path).
    (incoming) `api/admin/legal/run-worker` (legal plan) + `api/admin/status/snapshot`
    (status plan). One documented crontab, one shared `CRON_SECRET` convention.
 5. **Log rotation**: docker's default json-file driver is unbounded on a small VPS disk.
-6. **NEW — AI secrets management** (from [`ai-expansion`](../20-ai-expansion/spec.md) /
+6. **NEW — AI secrets management** (from [`ai-expansion`](../21-ai-expansion/spec.md) /
    `_meta/ai-policy.md`): production env for `MINIMAX_API_KEY`, `MINIMAX_BASE_URL`,
    `MINIMAX_MODEL`, `AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`,
    `AI_EMBEDDING_API_KEY`, `AI_EMBEDDING_DIM`, `AI_EMBEDDING_TIMEOUT_MS`, `AI_DISABLED`,
    `AI_DISABLED_TASKS` — set via Coolify app env (never committed), with the kill-switch
    procedure (`AI_DISABLED=true` + redeploy/restart) documented in the runbook.
 7. **NEW — pgvector production migration** (from
-   [`semantic-search`](../21-semantic-search/spec.md)): the production Postgres is a Coolify
+   [`semantic-search`](../22-semantic-search/spec.md)): the production Postgres is a Coolify
    database resource on a plain `postgres:16` image; pgvector requires switching that
    resource's image to `pgvector/pgvector:pg16` (same major — the data volume is
    compatible), then `CREATE EXTENSION vector`. Must happen with a fresh verified backup and

@@ -5,7 +5,7 @@
  * be unique across the test run so that two workers running the same
  * fixture template cannot collide on a primary key. Tests must not use
  * fixed shared identifiers for this reason — see
- * `docs/superpowers/specs/2026-07-23-exhaustive-local-e2e-design.md`
+ * `docs/superpowers/specs/2026-07-53-exhaustive-local-e2e-design.md`
  * "Determinism and isolation".
  *
  * The id format is intentionally short and human-readable: prefixed with

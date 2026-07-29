@@ -5,7 +5,7 @@ import { Button } from '~/components/ui'
 
 /**
  * Read-only preview shown inside the transfer-ownership confirm dialog
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 5). Plain `fetch` + local
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 5). Plain `fetch` + local
  * state, matching this module's own established convention (team.tsx uses
  * manual fetch throughout, not React Query) rather than introducing a
  * QueryClientProvider dependency into OrganizationDangerZone's tests.

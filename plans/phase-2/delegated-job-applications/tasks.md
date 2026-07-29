@@ -1,7 +1,7 @@
 # Tareas — candidaturas delegadas
 
 > **Status**: `pending`
-> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md), [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`ai-expansion`](../../phase-1/20-ai-expansion/spec.md), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md)
+> **Depends on**: [`job-opportunities-workspace`](../job-opportunities-workspace/spec.md), [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), [`ai-expansion`](../../phase-1/21-ai-expansion/spec.md), [`security-and-multitenancy`](../../phase-1/01-security-and-multitenancy/spec.md)
 > **Blocks**: nothing
 > **Reality check**: Dominio candidate-side nuevo. No se modifican `pipeline_*` (propuestos en [`hiring-pipeline-kanban`](../hiring-pipeline-kanban/spec.md)), `candidate_submissions`, `organization_builders` ni integraciones ATS para almacenar candidaturas del job seeker. Se extienden ficheros reales de HEAD: `src/shared/lib/db/schema.ts`, `src/shared/lib/authorization/permissions.ts`, `src/shared/lib/ai/tasks.ts`, `src/shared/lib/billing/rate-cards.ts`, `src/shared/lib/repositories/account-privacy.ts`, `src/shared/lib/operational-schedules.ts`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/check-tenant-boundaries.mjs`, `scripts/db/verify-api-isolation-local.mjs`.
 

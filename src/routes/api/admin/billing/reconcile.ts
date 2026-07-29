@@ -6,7 +6,7 @@ import { runReconciliation, type ReconciliationCursor } from '~/shared/lib/billi
 
 /**
  * Manually (or via external scheduler) runs one daily-financial-reconciliation pass
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Implement daily financial reconciliation") — same
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Implement daily financial reconciliation") — same
  * "no OS-level cron in this bootstrap deployment, point an external scheduler at this endpoint"
  * pattern as `api/admin/billing/run-worker.ts`. Accepts an optional resume cursor in the body so a
  * run that hit its time budget mid-pass can be continued by the next scheduled invocation instead of

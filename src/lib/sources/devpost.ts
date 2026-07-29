@@ -4,7 +4,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * Devpost source — reads the durable `devpost_profiles` store, never scrapes
  * live (Devpost has no API and bot-challenges plain server-side fetch). Data
  * is populated by src/lib/devpost/worker.ts on a cron cadence; see
- * plans/phase-1/18-devpost-integration/spec.md. Degrades to `[]` like every
+ * plans/phase-1/19-devpost-integration/spec.md. Degrades to `[]` like every
  * other connector if the query has no matches or the DB read fails.
  *
  * `searchDevpostProfiles` is imported dynamically inside `searchDevpost`,

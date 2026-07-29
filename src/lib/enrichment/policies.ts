@@ -1,7 +1,7 @@
 /**
  * Public Profile Enrichment — compile-time source policy register.
  *
- * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §4
+ * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §4
  * Source register (owner/permission/lawful-basis detail): docs/operations/public-enrichment-source-register.md
  *
  * Rule: a connector with no entry here is disabled. Runtime allowlisting

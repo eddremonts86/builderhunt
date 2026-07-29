@@ -1,5 +1,5 @@
 /**
- * The only surface Team-account modules (plans/phase-1/26-team-accounts) may import
+ * The only surface Team-account modules (plans/phase-1/27-team-accounts) may import
  * from the security foundation. Every export here is an allowlisted DTO,
  * typed service function, or error type — never a schema table, a raw ORM
  * row, or a role-string literal. `scripts/check-tenant-boundaries.mjs`
@@ -78,7 +78,7 @@ export interface SeatUsageDto {
 
 /**
  * Owner-visible reason a Team-to-one-seat-tier subscription downgrade cannot be sent to Stripe yet
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). `currentSeatsUsed`
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §7 "Enforce Team downgrade seat blockers"). `currentSeatsUsed`
  * mirrors `SeatUsageDto.used` exactly (accepted members plus usable/pending invitations) — the same
  * count the seat-limit invite-time guard already enforces, so the number an owner sees here always
  * matches what `/settings/team` shows them. Never implies membership was or will be changed

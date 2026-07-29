@@ -1,5 +1,5 @@
 /**
- * Idempotent, monotonic Stripe webhook event handlers (plans/phase-1/29-stripe-billing-platform/tasks.md §6
+ * Idempotent, monotonic Stripe webhook event handlers (plans/phase-1/30-stripe-billing-platform/tasks.md §6
  * "Implement idempotent monotonic event handlers"; spec.md §Webhook and consistency contract).
  * `webhook-inbox.ts` (§6 task 1) already verified the signature and durably stored the event before
  * this module is ever called — everything here is about APPLYING one already-trusted event, safely,

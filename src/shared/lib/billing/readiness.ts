@@ -1,6 +1,6 @@
 /**
  * Fail-closed gate for enabling live (real-money) Stripe billing
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §3 "Implement live billing
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §3 "Implement live billing
  * readiness gate"; docs/operations/stripe-launch-register.md's "Release
  * gates" checklist). Pure evidence-in, decision-out — mirrors
  * `~/shared/lib/migration/tenant-readiness.ts`'s `assessTenantReadiness`

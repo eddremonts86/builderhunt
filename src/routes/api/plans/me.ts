@@ -4,7 +4,7 @@ import { PLAN_PRICING } from '~/shared/lib/billing-shared'
 import { getOrganizationBillingSummary } from '~/shared/lib/billing/contracts'
 
 /**
- * Legacy compatibility shim (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 1) — kept for its three
+ * Legacy compatibility shim (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 1) — kept for its three
  * live frontend consumers (`settings/billing/index.tsx`'s usage bars, `SearchPage.tsx`'s plan gate),
  * neither of which reads `plan.status`/`billingPeriod`/`currentPeriodEnd`/`trialEndsAt`/`notes`/
  * `seatLimit`/`seatsUsed`/`pricing`/`signedOut` today, but this route preserves every field's shape

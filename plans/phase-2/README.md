@@ -2,7 +2,9 @@
 
 Fourteen plans: ten derived from [`new-plans.md`](./new-plans.md) on 2026-07-24, three
 candidate-side career plans added 2026-07-27, and one infrastructure plan
-([`postgres-18-upgrade`](./postgres-18-upgrade/spec.md), added 2026-07-26).
+([`postgres-18-upgrade`](../phase-1/03-postgres-18-upgrade/spec.md), added 2026-07-26;
+**moved into phase-1 at position 03 on 2026-07-28** — the cutover only gets more expensive as data
+and paying tenants grow, so it was pulled forward).
 Each is the usual trio: `spec.md` (WHAT/WHY), `plan.md` (HOW, phases + risks + rollback),
 `tasks.md` (executable checklist). All fourteen are `pending` with zero implementation — the trios
 are implementation-ready, not implemented. **547 open tasks** across the phase.
@@ -86,7 +88,7 @@ plan must cite before writing PG18-only SQL.
 
 | Plan | What it is | Tasks | Verdict |
 | ---- | ---------- | ----: | ------- |
-| [`postgres-18-upgrade`](./postgres-18-upgrade/spec.md) | PostgreSQL 16 → 18 across dev/CI/prod, then the four PG18 capabilities that touch existing code | 39 | READY — blocked on uncommitted WIP |
+| [`postgres-18-upgrade`](../phase-1/03-postgres-18-upgrade/spec.md) | PostgreSQL 16 → 18 across dev/CI/prod, then the four PG18 capabilities that touch existing code | 39 | **Moved to phase-1 as `03-postgres-18-upgrade` on 2026-07-28** — no longer part of this phase |
 
 Its three dangerous claims were re-verified and **restated upward**: the plan described "tenant
 tables" under `FORCE ROW LEVEL SECURITY`; HEAD has **58 tables and 356 policies across 5 roles**,
@@ -188,7 +190,7 @@ its Phase 0. It is #7 for disclosure-risk reasons, not technical ones.
 ### `ai-cv-generation-and-tailoring` cannot reuse `candidate_documents`
 
 The plan claimed it reuses the private-document foundation from
-[`calendar-scheduling-interview-intelligence`](../phase-1/43-calendar-scheduling-interview-intelligence/spec.md).
+[`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md).
 Verified false in part: `candidate_documents` has `submission_id uuid NOT NULL` with a composite FK
 to `candidate_submissions(organization_id, id)` `ON DELETE CASCADE`. **A job seeker's base CV has no
 candidate submission**, and cascade-deleting someone's CV because an unrelated interview submission

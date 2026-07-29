@@ -88,7 +88,7 @@ This table is just the operational cadence in one place:
 | Daily 03:30 | `/usr/local/bin/builderhunt-backup-sync.sh` — roles dump + rsync to the Storage Box |
 | Daily 05:00 | Hetzner Storage Box snapshot (Console, not cron) |
 | Every 5 min | `curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/status/snapshot` |
-| Hourly | `.../api/admin/devpost/run-worker` (dark in prod — see `plans/phase-1/18-devpost-integration`) |
+| Hourly | `.../api/admin/devpost/run-worker` (dark in prod — see `plans/phase-1/19-devpost-integration`) |
 | Per-plan cadence | `.../api/admin/discovery/run-worker`, `.../api/admin/enrichment/run-worker`, `.../api/admin/embeddings/run-worker`, `.../api/admin/alerts/run-worker`, `.../api/admin/billing/run-worker`, `.../api/admin/legal/run-worker`, `.../api/admin/sprints/run-worker` |
 
 Every `run-worker` endpoint accepts either a platform-admin session or

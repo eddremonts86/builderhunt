@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — connector registry.
- * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §4, §8; tasks.md Phase 3.
+ * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §4, §8; tasks.md Phase 3.
  * Returns only connectors that are both compile-time enabled AND present in
  * the runtime allowlist — the one place the worker/routes ask "what can run".
  */

@@ -1,4 +1,4 @@
-// Metering-bypass boundary test (plans/phase-1/31-abuse-and-usage-integrity/tasks.md
+// Metering-bypass boundary test (plans/phase-1/32-abuse-and-usage-integrity/tasks.md
 // Phase 4B "G8"). Every server-side call into the MiniMax provider
 // (`minimaxChat`) or the embeddings provider (`embedTexts`) must be preceded,
 // within the SAME enclosing function, by a call to one of the two

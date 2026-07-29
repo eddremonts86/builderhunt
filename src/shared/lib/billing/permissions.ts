@@ -1,5 +1,5 @@
 /**
- * Centralizes owner/admin/member billing authorization (plans/phase-1/29-stripe-billing-platform/tasks.md §3)
+ * Centralizes owner/admin/member billing authorization (plans/phase-1/30-stripe-billing-platform/tasks.md §3)
  * on top of `can()` rather than reimplementing role comparisons — this file is deliberately NOT on
  * `scripts/check-tenant-boundaries.mjs`'s `roleLiteralCheckAllowlist`, so it must never compare a
  * principal's role against a string literal directly; every decision here is `can(principal, 'billing:...')`.

@@ -3,7 +3,7 @@ import type { TenantTransaction } from '../db/client'
 import { billingContacts } from '../db/schema'
 
 /**
- * Data access for the verified billing contact (plans/phase-1/29-stripe-billing-platform/tasks.md §9 "Add
+ * Data access for the verified billing contact (plans/phase-1/30-stripe-billing-platform/tasks.md §9 "Add
  * verified billing contact management"). All invariants live one layer up in `billing/billing-
  * contact.ts` — this file only inserts/reads/updates.
  */

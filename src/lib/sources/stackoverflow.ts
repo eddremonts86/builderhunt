@@ -17,7 +17,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * (https://stackapps.com/apps/register). One call per keyword + one batch
  * top-tags call.
  *
- * Spec reference: plans/phase-1/13-stack-overflow-integration/spec.md
+ * Spec reference: plans/phase-1/14-stack-overflow-integration/spec.md
  */
 interface SOTagTopUser {
   user: {

@@ -1,6 +1,6 @@
 /**
  * Pure, importable comparison between a `catalog.ts` entry and the real Stripe `Price` object it's
- * supposed to correspond to (plans/phase-1/29-stripe-billing-platform/tasks.md §1 "Validate Stripe Products and
+ * supposed to correspond to (plans/phase-1/30-stripe-billing-platform/tasks.md §1 "Validate Stripe Products and
  * Prices before mutation"). Extracted out of `scripts/billing/provision-stripe-catalog.ts`, which
  * used to inline this logic with no dedicated test coverage — this module is now the single place
  * that decides "does this real Stripe object match what the catalog claims," and the provisioning

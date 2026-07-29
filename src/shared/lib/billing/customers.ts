@@ -1,6 +1,6 @@
 /**
  * Creates and reuses one Stripe Customer per organization per livemode
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §5 "Create organization Stripe Customers idempotently").
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §5 "Create organization Stripe Customers idempotently").
  * The only email ever sent to the provider is the organization owner's account email — never
  * candidate/product data, never a client-supplied value. `metadata` carries only the opaque
  * organization id, nothing else.

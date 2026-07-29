@@ -1,5 +1,5 @@
 /**
- * Real Stripe Test Clock certification (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Certify Stripe
+ * Real Stripe Test Clock certification (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Certify Stripe
  * sandbox and Test Clock lifecycle"; stripe-launch-register.md's release gate: "Monthly and annual
  * Test Clock lifecycles pass (creation, renewal, upgrade, downgrade, grace, cancellation,
  * leap/month-end anniversaries)"). Drives Stripe's real `test_helpers.test_clocks` API against the

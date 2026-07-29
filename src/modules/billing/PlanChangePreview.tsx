@@ -5,7 +5,7 @@ import { AlertTriangle, ArrowRight, Loader2, XCircle } from 'lucide-react'
 import { Button } from '~/components/ui'
 
 /**
- * Preview and confirm a subscription plan change (plans/phase-1/29-stripe-billing-platform/tasks.md §7
+ * Preview and confirm a subscription plan change (plans/phase-1/30-stripe-billing-platform/tasks.md §7
  * "Implement subscription preview and change matrix" / "Enforce Team downgrade seat blockers").
  * Fetches `POST /api/billing/subscription/preview` on mount and shows the resolved charge/credit/
  * effective-date numbers — never anything the client itself computed. When the organization's

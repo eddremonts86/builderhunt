@@ -1,6 +1,6 @@
 /**
  * Imports current manual (non-Stripe) organization entitlements as audited `legacy_manual` credit
- * grant records (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Migrate manual entitlements without
+ * grant records (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Migrate manual entitlements without
  * charging"). Creates no Stripe Customer, subscription, or charge — ever. Changes NO feature access:
  * `feature-authorization.ts`'s `checkEntitlement` gates the new credit-consuming features on a real
  * `billing_subscriptions` row, never on `organization_entitlements.tier` or credit balance, so a

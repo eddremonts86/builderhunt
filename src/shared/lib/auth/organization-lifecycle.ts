@@ -1208,7 +1208,7 @@ export interface ProcessPendingOrganizationDeletionsResult {
  * for the next run rather than losing track of it.
  *
  * The actual hard delete is delegated to `organizations/deletion.ts`'s
- * `finalizeOrganizationDeletion` (plans/phase-1/29-stripe-billing-platform/tasks.md §9
+ * `finalizeOrganizationDeletion` (plans/phase-1/30-stripe-billing-platform/tasks.md §9
  * "Integrate subscription-safe organization deletion") — it force-cancels any
  * still-active subscription and writes a durable financial-retention snapshot
  * BEFORE the organization row (and its cascade) is removed, so this worker

@@ -1,6 +1,6 @@
 /**
  * Public Profile Enrichment — canonical content hash for evidence dedup.
- * Spec reference: plans/phase-1/41-stealth-scraping/spec.md §7.2, §9. Hashes only
+ * Spec reference: plans/phase-1/42-stealth-scraping/spec.md §7.2, §9. Hashes only
  * minimized evidence — never raw upstream response material.
  */
 

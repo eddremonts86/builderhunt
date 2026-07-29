@@ -2,7 +2,7 @@
 
 > **Status**: `partially-implemented`
 > **Depends on**: nothing
-> **Blocks**: [`team-accounts`](../26-team-accounts/spec.md), [`shared-resources`](../27-shared-resources/spec.md), [`activity-feed`](../28-activity-feed/spec.md), [`ai-expansion`](../20-ai-expansion/spec.md), [`semantic-search`](../21-semantic-search/spec.md), [`ai-sourcing-sprints`](../40-ai-sourcing-sprints/spec.md), [`production-infrastructure`](../02-production-infrastructure/spec.md)
+> **Blocks**: [`team-accounts`](../27-team-accounts/spec.md), [`shared-resources`](../28-shared-resources/spec.md), [`activity-feed`](../29-activity-feed/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/spec.md), [`production-infrastructure`](../02-production-infrastructure/spec.md)
 > **Reality check**: the additive organization, tenant-key, entitlement, normalized-builder,
 > auth-broker, backfill-state, bootstrap, RLS, worker/claim policies, and platform-role layers are
 > implemented through migration `0012` and verified against local PostgreSQL. The tenant-boundary

@@ -6,11 +6,11 @@ import { join } from 'node:path'
 // `> **Depends on**:` header may only point at lower-numbered plans. A dependency
 // that points forward means the number no longer describes a buildable sequence.
 //
-// One cycle in the headers is deliberate and allowed: 21-semantic-search declares a
-// dependency on 22-proactive-discovery while 22 declares one on 21. README.md's
-// dependency graph resolves it as semantic -> discovery, so 21 precedes 22.
+// One cycle in the headers is deliberate and allowed: 22-semantic-search declares a
+// dependency on 23-proactive-discovery, and 23 declares one back on 22. README.md's
+// dependency graph resolves it as semantic -> discovery, so 22 precedes 23.
 const PHASE_1 = join(process.cwd(), 'plans', 'phase-1')
-const ALLOWED_FORWARD_EDGES = new Set(['21-semantic-search -> 22-proactive-discovery'])
+const ALLOWED_FORWARD_EDGES = new Set(['22-semantic-search -> 23-proactive-discovery'])
 
 let failed = false
 

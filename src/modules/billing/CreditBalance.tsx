@@ -46,7 +46,7 @@ interface CreditBalanceProps {
 }
 
 /**
- * Balance-by-source-and-expiry (plans/phase-1/29-stripe-billing-platform/tasks.md §9 task 2) plus a pack
+ * Balance-by-source-and-expiry (plans/phase-1/30-stripe-billing-platform/tasks.md §9 task 2) plus a pack
  * purchase flow and a per-grant refund request. Refund eligibility (fully-unused only) is NOT
  * re-derived client-side — `POST /api/billing/refunds` already enforces it and returns a real error
  * for an ineligible grant, so the button is offered for every `pack`-sourced grant and the server's

@@ -4,7 +4,7 @@
 > two items — VPS backup cron, Docker log rotation — are fully documented and ready to run,
 > pending SSH access this session doesn't have; setting a real `MINIMAX_API_KEY` needs a human)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md) for database-role, RLS, restore, and tenant-aware production enforcement; existing non-database operations may proceed independently
-> **Blocks**: [`waitlist-launch`](../53-waitlist-launch/spec.md), [`ai-expansion`](../20-ai-expansion/spec.md), [`semantic-search`](../21-semantic-search/spec.md)
+> **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md), [`ai-expansion`](../21-ai-expansion/spec.md), [`semantic-search`](../22-semantic-search/spec.md)
 > **Reality check (2026-07-25)**: Deploy pipeline and observability v1 delivered. Restore
 > script built and live-verified against a real backup/restore rehearsal. Runbook written.
 > Sentry cleanup done. pgvector already applied in production (confirmed via Coolify API, no

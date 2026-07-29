@@ -1,7 +1,7 @@
 # Saved Search Health (tasks)
 
 > **Status**: `pending`
-> **Depends on**: [`smart-alerts`](../../phase-1/33-smart-alerts/tasks.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/40-ai-sourcing-sprints/tasks.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
+> **Depends on**: [`smart-alerts`](../../phase-1/34-smart-alerts/tasks.md) (`alerts` / `alert_triggers` are the signal source); [`ai-sourcing-sprints`](../../phase-1/41-ai-sourcing-sprints/tasks.md) (sprint results count as useful-match evidence). Both already have shipped code — see the reality check.
 > **Blocks**: nothing
 > **Reality check**: Touches existing `src/shared/lib/db/schema.ts`, `src/routes/api/alerts/index.ts`, `src/routes/api/alerts/$id.ts`, `src/shared/lib/repositories/organization-alerts.ts`, `src/shared/lib/repositories/saved-queries.ts`, `src/routes/api/sprints/index.ts`, `src/lib/sprints/service.ts`, `src/shared/lib/sprints-shared.ts`, `src/modules/dashboard/components/DashboardPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `scripts/db/verify-api-isolation-local.mjs`. `/saved-searches` is a new route; `/alerts` (`src/routes/_dashboard/alerts.tsx`) is not modified.
 

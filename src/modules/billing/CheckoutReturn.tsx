@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Clock, AlertTriangle, XCircle } from 'lucide-react'
 
 /**
- * Shown after Stripe redirects back from Checkout (plans/phase-1/29-stripe-billing-platform/tasks.md §5
+ * Shown after Stripe redirects back from Checkout (plans/phase-1/30-stripe-billing-platform/tasks.md §5
  * "Build pending Checkout return experience"). Deliberately reads NOTHING from the URL — no
  * `location.search`, no `useSearch()` — the entire state comes from polling
  * `GET /api/billing/checkout/status`, which itself derives the answer from the authenticated

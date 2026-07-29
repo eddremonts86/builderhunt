@@ -1,5 +1,5 @@
 /**
- * Pure Stripe subscription state-machine rules (plans/phase-1/29-stripe-billing-platform/tasks.md §6
+ * Pure Stripe subscription state-machine rules (plans/phase-1/30-stripe-billing-platform/tasks.md §6
  * "Implement idempotent monotonic event handlers"; spec.md §Webhook and consistency contract:
  * "Delivery order is not trusted... apply monotonic transitions"). No I/O — every function here
  * takes plain data and returns a plain decision, so the actual "is this transition legal / new

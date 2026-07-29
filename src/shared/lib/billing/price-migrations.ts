@@ -1,5 +1,5 @@
 /**
- * Renewal-safe catalog price migration (plans/phase-1/29-stripe-billing-platform/tasks.md §7 "Implement
+ * Renewal-safe catalog price migration (plans/phase-1/30-stripe-billing-platform/tasks.md §7 "Implement
  * cancellation and renewal-safe price migration"; spec.md §Catalog: "Existing subscribers retain
  * their contracted price until the next eligible renewal. Increases receive at least 30 days'
  * notice; annual prices remain unchanged through the paid year.").

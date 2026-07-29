@@ -2,7 +2,7 @@
 
 > Companion to [`src/lib/enrichment/policies.ts`](../../src/lib/enrichment/policies.ts)
 > (the compile-time enforcement point) and
-> [`plans/phase-1/41-stealth-scraping/spec.md`](../../plans/phase-1/41-stealth-scraping/spec.md) §4.
+> [`plans/phase-1/42-stealth-scraping/spec.md`](../../plans/phase-1/42-stealth-scraping/spec.md) §4.
 > Every connector registered in `policies.ts` must have exactly one entry below.
 > An entry with status `blocked` has no approval date and no lawful-basis reference.
 
@@ -82,5 +82,5 @@ Not yet registered in `policies.ts` — per spec §4 "missing policy means disab
 needs its own exact-profile adapter review (does the source's existing federated-search
 endpoint support fetching one known profile by ID, without broad search?) before it can be
 added with `status: 'approval_required'` or `'enabled'`. Tracked as future work in
-`plans/phase-1/41-stealth-scraping/task.md` ("Additional official API adapters after individual
+`plans/phase-1/42-stealth-scraping/task.md` ("Additional official API adapters after individual
 source-policy review").

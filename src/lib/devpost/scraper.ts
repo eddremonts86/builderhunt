@@ -1,6 +1,6 @@
 /**
  * Devpost has no API, and plain server-side `fetch` gets a 202 bot-challenge
- * page instead of data (verified live — see plans/phase-1/18-devpost-integration/
+ * page instead of data (verified live — see plans/phase-1/19-devpost-integration/
  * spec.md). A real browser session gets through (verified live via the
  * Browser pane during this feature's design: devpost.com renders full
  * project/team/profile data to a JS-executing client). These functions do the

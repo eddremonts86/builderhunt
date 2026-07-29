@@ -8,7 +8,7 @@ import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
 /**
  * Thrown by the self-service plan-request path once the canonical Stripe billing system is live
- * (plans/phase-1/29-stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after canonical
+ * (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after canonical
  * cutover"). `STRIPE_BILLING_ENABLED` is the same flag that gates the real Stripe adapter itself
  * (`stripe-client.ts`) — reused here rather than inventing a second flag, since "the canonical
  * system is live" is exactly the condition this class exists to react to. Deliberately does NOT gate

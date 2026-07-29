@@ -73,7 +73,7 @@ export class StepUpRequiredError extends Error {
  * Reusable guard for a "sensitive action" route to call before proceeding: throws
  * `StepUpRequiredError` if the caller's enforcement stage is `'stepup'` and no valid `bh_stepup`
  * cookie is present (i.e. they have not yet completed `POST /api/me/stepup`). A no-op for every
- * other stage. Not wired into a specific route yet — `plans/phase-1/31-abuse-and-usage-integrity/tasks.md`'s
+ * other stage. Not wired into a specific route yet — `plans/phase-1/32-abuse-and-usage-integrity/tasks.md`'s
  * own task text doesn't name one; this is the primitive ready for whichever sensitive action
  * needs it.
  */

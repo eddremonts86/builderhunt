@@ -1,5 +1,5 @@
 /**
- * Accessibility release gate (plans/phase-1/47-audit-accessibility/tasks.md).
+ * Accessibility release gate (plans/phase-1/48-audit-accessibility/tasks.md).
  *
  * Runs axe-core against a deterministic public + authenticated route matrix
  * at two viewports, waits for real React hydration (never a fixed delay —

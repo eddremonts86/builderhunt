@@ -2,7 +2,7 @@
 
 > **Status**: `in_progress`
 > **Depends on**: nothing
-> **Blocks**: [`team-accounts`](../26-team-accounts/tasks.md), [`shared-resources`](../27-shared-resources/tasks.md), [`activity-feed`](../28-activity-feed/tasks.md), [`ai-expansion`](../20-ai-expansion/tasks.md), [`semantic-search`](../21-semantic-search/tasks.md), [`ai-sourcing-sprints`](../40-ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../02-production-infrastructure/tasks.md)
+> **Blocks**: [`team-accounts`](../27-team-accounts/tasks.md), [`shared-resources`](../28-shared-resources/tasks.md), [`activity-feed`](../29-activity-feed/tasks.md), [`ai-expansion`](../21-ai-expansion/tasks.md), [`semantic-search`](../22-semantic-search/tasks.md), [`ai-sourcing-sprints`](../41-ai-sourcing-sprints/tasks.md), [`production-infrastructure`](../02-production-infrastructure/tasks.md)
 > **Reality check** (reconciled 2026-07-23): 18 of 19 tasks below are checked off with re-verified
 > evidence (test commands re-run this session, not just trusted from history) — migrations `0000`–
 > `0021`, RLS, migration/restore infra, tenant principals/context, permissions/boundary, builder
@@ -112,7 +112,7 @@
 > Confirmed empirically (see scratch scripts run against a disposable DB) that drizzle-orm's raw
 > `.execute()` returns those columns as strings — unlike its typed `.select()` builder, and unlike the
 > underlying `postgres` driver used directly, which both correctly parse to `Date`. This route has
-> 500'd on every real call since the 41-stealth-scraping/subject-rights feature shipped; nothing had ever
+> 500'd on every real call since the 42-stealth-scraping/subject-rights feature shipped; nothing had ever
 > exercised it with a real verified claim + real evidence row before. Fixed by wrapping both fields in
 > `new Date(...)` before calling `.toISOString()`/`.getTime()`. Full re-run: `pnpm test:migrations:local`
 > (26 migrations), `drizzle-kit check`, `pnpm test:api-isolation:local` → **83/83** (up from 61/61),

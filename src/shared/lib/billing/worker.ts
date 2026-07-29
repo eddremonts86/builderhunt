@@ -1,6 +1,6 @@
 /**
  * Billing worker: claims durable `billing_webhook_events` rows and processes them, with bounded
- * retry/backoff and dead-lettering, plus a credit-grant expiry sweep (plans/phase-1/29-stripe-billing-platform/
+ * retry/backoff and dead-lettering, plus a credit-grant expiry sweep (plans/phase-1/30-stripe-billing-platform/
  * tasks.md §6 "Build billing worker and event replay"). Exposed via the existing authenticated
  * HTTP-cron pattern (`requirePlatformAdminPrincipal` + `auditPlatformAdminAction`, matching every
  * other `run-worker.ts` route in this codebase) rather than a new mechanism.

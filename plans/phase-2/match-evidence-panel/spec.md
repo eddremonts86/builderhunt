@@ -1,7 +1,7 @@
 # Why This Match — Evidence Panel (spec)
 
 > **Status**: `pending`
-> **Depends on**: nothing (pure read-only consumer of `src/lib/score.ts` and `builder_source_snapshots`). Files new connector findings against [`audit-trust`](../../phase-1/51-audit-trust/spec.md) (it does not close any existing one — `audit-trust`'s two open tasks are the runtime trust gate and the staged rollout, neither of which this plan touches) and must respect [`project-hygiene`](../../phase-1/04-project-hygiene/spec.md) (no synthetic evidence presented as measured fact).
+> **Depends on**: nothing (pure read-only consumer of `src/lib/score.ts` and `builder_source_snapshots`). Files new connector findings against [`audit-trust`](../../phase-1/52-audit-trust/spec.md) (it does not close any existing one — `audit-trust`'s two open tasks are the runtime trust gate and the staged rollout, neither of which this plan touches) and must respect [`project-hygiene`](../../phase-1/05-project-hygiene/spec.md) (no synthetic evidence presented as measured fact).
 > **Blocks**: [`jd-to-candidates-matching`](../jd-to-candidates-matching/spec.md) (soft — that plan reuses this panel to explain per-JD match reasons); [`browser-extension-overlay`](../browser-extension-overlay/spec.md) (soft — it reads `src/lib/score.ts`, so land the `explainScore` refactor first)
 > **Reality check**: `src/lib/score.ts` returns a single clamped integer per builder with no breakdown. A second, **already-drifted** copy of the math lives in `getScoreBreakdown` (`src/components/ui/score-ring.tsx:158`) and feeds the ring tooltip. `SearchPage.tsx` already renders a one-line "why this match" (`getMatchHighlights`, line 1296; row 4 at line 1473). `builder_source_snapshots` exists (`src/shared/lib/db/schema.ts:164`, created in `drizzle/0005_builder_normalization.sql`) but has **zero readers, zero writers, and no `builderhunt_app` grant** — it is empty everywhere.
 
@@ -310,7 +310,7 @@ No `TRUNCATE`, no `REFERENCES`, no sequence usage (the primary key is `uuid … 
 
 ## Accessibility
 
-[`audit-accessibility`](../../phase-1/47-audit-accessibility/spec.md) is a release gate, so the panel is a
+[`audit-accessibility`](../../phase-1/48-audit-accessibility/spec.md) is a release gate, so the panel is a
 native `<details>`/`<summary>` disclosure — the primitive already blessed in
 `src/modules/landing/components/FAQSection.tsx`. That gives implicit `aria-expanded`, Enter/Space
 activation and correct roles for free; no `role="button"`, no focus trap, no roving tabindex.
@@ -387,7 +387,7 @@ No AI ⇒ **no cost model**. Runtime cost is one small insert per track request 
 - **Semantic-search hits**: `/api/search/semantic` results carry `similarity`
   (`SearchPage.tsx:39-41`) and an `EmbeddedProfile`-shaped payload, not source metadata. The panel
   shows the similarity plus derivable factors and a "from the local index" note; it invents no
-  items. See [`semantic-search`](../../phase-1/21-semantic-search/spec.md).
+  items. See [`semantic-search`](../../phase-1/22-semantic-search/spec.md).
 - **Score clamped at 100**: `clamped: true` renders "capped at 100 (raw {rawTotal})" so factor
   points that visibly exceed the ring are explained rather than contradictory.
 - **Cached search results**: `searchBuilders` serves from memory/Redis for 5 minutes

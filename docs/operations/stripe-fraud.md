@@ -22,7 +22,7 @@ This is a blunt, honest instrument, not a full fraud-scoring system:
   `billing_risk_events.event_type` CHECK constraint already allows a future `'card_rotation'` event
   so this is a pure additive follow-up, not a redesign, once that visibility exists.
 - **Dispute velocity is not tracked yet** — it depends on disputes existing at all
-  (plans/phase-1/29-stripe-billing-platform/tasks.md §8 task 5, not yet built). The schema already allows a
+  (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 5, not yet built). The schema already allows a
   `'dispute_opened'` event type for the same reason.
 
 ## What gets blocked, and what never does

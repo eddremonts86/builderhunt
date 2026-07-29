@@ -22,7 +22,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  *   { user(username: "X") { username name bio followersCount
  *       posts { totalDocuments } tagline } }
  *
- * Spec reference: plans/phase-1/15-hashnode-integration/spec.md
+ * Spec reference: plans/phase-1/16-hashnode-integration/spec.md
  */
 interface HashnodeUser {
   username: string

@@ -1,10 +1,10 @@
 # Phase 1 — implementation queue
 
 A dated snapshot of every `plans/phase-1/*` plan, ordered easiest → hardest, so a
-session can pick up work without re-reading 53 `tasks.md` files.
+session can pick up work without re-reading 54 `tasks.md` files.
 
 This file answers "what can I pick up next". [`phase-1-order.md`](./phase-1-order.md) answers
-the different question "in what sequence would all 53 be built from nothing" — that is where
+the different question "in what sequence would all 54 be built from nothing" — that is where
 each plan's `NN-` directory prefix comes from, and its counts are newer than the ones below
 (regenerated 2026-07-28: `calendar-scheduling-interview-intelligence` is 9 open / 69 done, not
 47/32; `audit-performance-qa` 1/9, not 7/4; `audit-visual-system` 2/8, not 3/7;
@@ -12,10 +12,12 @@ each plan's `NN-` directory prefix comes from, and its counts are newer than the
 number prefix; the directories on disk carry it.
 
 **Snapshot: 2026-07-27.** 53 plans, 749 tasks, 581 done (78%), 168 open, 26 plans fully closed.
+(Stale on both axes now: `03-postgres-18-upgrade` joined phase-1 from phase-2 on 2026-07-28, making
+it 54 plans and 787 tasks, and it is absent from every table below.)
 Counts are `- [ ]` / `- [x]` lines in each plan's checklist. Regenerate with:
 
 ```bash
-for f in plans/phase-1/*/tasks.md plans/phase-1/41-stealth-scraping/task.md; do
+for f in plans/phase-1/*/tasks.md plans/phase-1/42-stealth-scraping/task.md; do
   p=$(basename $(dirname "$f"))
   o=$(grep -c "^- \[ \]" "$f" || true); d=$(grep -c "^- \[x\]" "$f" || true)
   printf "%3s|%3s|%s\n" "${o:-0}" "${d:-0}" "$p"

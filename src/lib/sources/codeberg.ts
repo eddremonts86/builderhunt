@@ -9,7 +9,7 @@ import type { RawBuilder } from '~/lib/sources/types'
  * the env var, defaults to codeberg.org). Pattern is closest to GitHub
  * — proper user + repo search, full profile data, followers count.
  *
- * Spec reference: plans/phase-1/09-codeberg-integration/spec.md
+ * Spec reference: plans/phase-1/10-codeberg-integration/spec.md
  */
 interface GiteaUser {
   id: number

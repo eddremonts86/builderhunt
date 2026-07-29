@@ -1,5 +1,5 @@
 /**
- * Refund request and operator workflow (plans/phase-1/29-stripe-billing-platform/tasks.md §8 task 4
+ * Refund request and operator workflow (plans/phase-1/30-stripe-billing-platform/tasks.md §8 task 4
  * "Implement refund request and operator workflow"; spec.md §Refund contract).
  *
  * Three actors, three entry points:
