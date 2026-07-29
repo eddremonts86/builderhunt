@@ -10,6 +10,7 @@ import { InterviewInvitePanel } from '~/modules/scheduling/components/InterviewI
 import { PersonaCard } from '~/modules/builder-profile/components/PersonaCard'
 import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicEvidenceCard'
 import { BuilderTimeline } from '~/modules/builder-profile/components/BuilderTimeline'
+import { AddToListMenu } from '~/modules/builder-profile/components/AddToListMenu'
 import { Button, LinkButton, Textarea } from '~/components/ui'
 
 const CLAIM_ERROR_MESSAGES: Record<string, string> = {
@@ -391,9 +392,12 @@ export function BuilderProfilePage() {
                 </span>
               </div>
             ) : meId ? (
-              <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">
+              <div className="flex flex-wrap items-center gap-3 text-sm text-bh-text-muted">
                 <Lock className="w-4 h-4" />
-                Save and notes are in the dashboard. Claim below if this is you.
+                <span>Save to a shortlist to keep this builder close at hand.</span>
+                {builder.id && (
+                  <AddToListMenu builderIdentityId={builder.id} />
+                )}
               </div>
             ) : (
               <div className="flex flex-wrap items-center gap-2 text-sm text-bh-text-muted">

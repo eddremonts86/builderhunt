@@ -78,7 +78,7 @@ function Initials({ name, size = 40 }: { name: string; size?: number }) {
   )
 }
 
-export function PersonResultCard({ builder }: { builder: PersonCardData }) {
+export function PersonResultCard({ builder, actions }: { builder: PersonCardData; actions?: React.ReactNode }) {
   const meta = SOURCE_META[builder.source] ?? { label: builder.source, Icon: GithubIcon }
   const initial = (builder.displayName ?? builder.username ?? '?').trim()
   return (
@@ -120,6 +120,7 @@ export function PersonResultCard({ builder }: { builder: PersonCardData }) {
       <div className="hidden shrink-0 sm:block">
         <ScoreRing score={builder.score} />
       </div>
+      {actions}
       <a
         href={builder.profileUrl}
         target="_blank"
