@@ -13,13 +13,13 @@
 
 Replace the stale pricing renderer contract with the real `PLAN_PRICING` shape (`monthly`,
 `annual`, `label`, and `features`) as specified by `pricing-optimization`, and remove the unused
-`url` assignment in `test/test-landing-redesign.mjs`. Run lint and type-check without suppressions;
+`url` assignment in `tests/regression/test-landing-redesign.mjs`. Run lint and type-check without suppressions;
 the QA workflow must begin from zero known errors rather than allowlisting the current failures.
 
 ### Phase 1 — Make the harness deterministic
 
 Add the QA scripts and pinned tooling to `package.json`/`pnpm-lock.yaml`, then create
-`playwright.config.ts`, `.lighthouserc.cjs`, and `e2e/fixtures/`. Reuse `scripts/db/seed-admin.ts`
+`playwright.config.ts`, `.lighthouserc.cjs`, and `tests/e2e/fixtures/`. Reuse `scripts/db/seed-admin.ts`
 and Docker Compose Postgres/Redis; isolate the QA database name and fixture user. Document exact
 local and CI commands in `README.md`. This phase proves the harness can boot a production build
 before adding assertions.
@@ -27,7 +27,7 @@ before adding assertions.
 ### Phase 2 — Establish critical runtime coverage
 
 Implement anonymous navigation/link/console tests and one authenticated dashboard smoke test in
-`e2e/`. Mock external source and email boundaries, not BuilderHunt routes. Use semantic selectors
+`tests/e2e/`. Mock external source and email boundaries, not BuilderHunt routes. Use semantic selectors
 or `data-testid` values and deterministic fixture cleanup. Store traces/screenshots only after a
 failure and redact auth headers from reporters.
 
@@ -91,6 +91,6 @@ explicit maintainer approval.
 
 ## Completion evidence
 
-Attach the clean `pnpm qa` output, selected-resource/transfer report for all three viewports,
+Attach the clean `pnpm ci:local` output, selected-resource/transfer report for all three viewports,
 three-run Lighthouse summary, CI run URL, and post-deploy smoke output. Update all three headers to
 `implemented` only after those artifacts exist.

@@ -1056,7 +1056,7 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
     `stepup` before the next sensitive action.
   - Verify: component test; Playwright: forced `stepup` prompts re-auth once, then proceeds.
   - Progress: **No Playwright added** — standing instruction this session never builds new
-    e2e/Playwright test files; verified the flow live in the real dev browser instead (below).
+    tests/e2e/Playwright test files; verified the flow live in the real dev browser instead (below).
     `AbuseWarningBanner.tsx`: zero-props, self-fetching client component (same convention as
     `OnboardingBanner`/`PendingInvitationsBanner`), fetching `GET /api/me/stepup` on mount. At
     `warned`: a dismissible (per-stage, `sessionStorage`-remembered so it isn't a permanent

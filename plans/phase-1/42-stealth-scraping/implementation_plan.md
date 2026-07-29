@@ -59,7 +59,7 @@ Files:
 - next generated `drizzle/00XX_*.sql` and metadata/hash updates
 - `src/shared/lib/repositories/enrichment.ts`
 - `src/shared/lib/repositories/enrichment-worker.ts`
-- repository and exact-role RLS tests under `src/shared/lib/**.test.ts` / `test/security/`
+- repository and exact-role RLS tests under `src/shared/lib/**.test.ts` / `tests/unit/security/`
 
 Deliverables:
 

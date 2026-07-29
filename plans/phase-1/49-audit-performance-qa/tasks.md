@@ -1,6 +1,6 @@
 # Tasks: Performance and QA Release Gate
 
-> **Status**: `partially-implemented` — asset pipeline done; e2e/Lighthouse/CI-gate tasks explicitly
+> **Status**: `partially-implemented` — asset pipeline done; tests/e2e/Lighthouse/CI-gate tasks explicitly
 > out of scope for this session (see notes below), not attempted.
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
 > **Blocks**: [`audit-trust`](../52-audit-trust/spec.md), [`audit-visual-system`](../50-audit-visual-system/spec.md)
@@ -31,7 +31,7 @@
   - Files: `src/modules/landing/components/HomePage.tsx`
   - Do: Both hero images now use `<picture>` (AVIF source, WebP source, PNG `<img>` fallback) with the real generated srcset/sizes. `fetchPriority="high"` added to the LCP image (React 19 types it natively — no cast needed). Decorative mobile-crop picture unchanged in loading strategy (`loading="lazy"` inside a `hidden lg:block` ancestor).
   - Verify: live in-browser — `getEntriesByType('resource')` (a real per-navigation log, not a possibly-stale devtools view) at a 375px viewport shows **zero** requests for any `search-mobile-*` asset, confirming the "not fetched below `lg`" requirement holds. Screenshot confirms both hero images render crisply via AVIF `currentSrc`.
-  - Deviation: no `e2e/performance-resources.spec.ts` — that's a new Playwright file, forbidden this session. Verified by hand instead (see above); exact `sizes` breakpoint selection under different device-pixel-ratios wasn't exhaustively checked without real device/Lighthouse throttling.
+  - Deviation: no `tests/e2e/performance-resources.spec.ts` — that's a new Playwright file, forbidden this session. Verified by hand instead (see above); exact `sizes` breakpoint selection under different device-pixel-ratios wasn't exhaustively checked without real device/Lighthouse throttling.
 
 - [x] **Self-host the existing fonts** — already done on arrival (2026-07-26)
   - Verify: `rg fonts.googleapis fonts.gstatic src/routes/__root.tsx src/shared/styles/globals.css` — no matches. `globals.css` already has self-hosted `@font-face` blocks for Inter and JetBrains Mono with `font-display: swap`.

@@ -197,7 +197,7 @@ must include its tests and must not stage unrelated worktree changes.
   - Verify (2026-07-22, run for real against the disposable local test database with exact non-owner roles): `pnpm test:rls:local` → `{"missingContext":"denied","tenantA":["tracked-a"],"tenantB":["tracked-b"],"crossTenantInsert":"denied","poolReuse":"clean","claimSubjectIsolation":["claim-a"],"crossSubjectClaimInsert":"denied","authProductAccess":"denied","workerMissingContext":"denied","workerTenantIsolation":["alert-a"],"workerCrossTenantInsert":"denied","workerAuthColumns":"restricted","platformProductAccess":"denied","personalOrganizationBootstrap":"atomic"}`. Owner-role execution was not used as evidence — connected as `builderhunt_app`/`builderhunt_worker`/`builderhunt_platform`.
 
 - [x] **Migrate APIs, workers, admin tools, exports, and deletion to tenant repositories**
-  - Files: `src/routes/api/**/*.ts`, `src/shared/lib/legal.ts`, `src/lib/alerts/worker.ts`, `src/routes/api/admin/**/*.ts`, `scripts/db/seed-admin.ts`, `test/security/api-isolation.test.ts`, `test/security/worker-isolation.test.ts`, `test/security/privacy-isolation.test.ts`
+  - Files: `src/routes/api/**/*.ts`, `src/shared/lib/legal.ts`, `src/lib/alerts/worker.ts`, `src/routes/api/admin/**/*.ts`, `scripts/db/seed-admin.ts`, `tests/unit/security/api-isolation.test.ts`, `tests/unit/security/worker-isolation.test.ts`, `tests/unit/security/privacy-isolation.test.ts`
   - Do: Replace direct private-table queries with tenant repositories/context; keep public routes on explicit public DTO repositories. Workers enumerate server-side organization IDs and open one context/transaction per batch. Platform admin mutations require server-verified admin plus target organization audit context. Separate account-subject export/deletion from organization export/deletion; require owner/admin/recent auth for tenant export and ownership transfer before deleting an owner account.
   - Verify: two-tenant API matrix covers every private route with own/other/random IDs and roles; worker failure in A neither exposes nor rolls back B; account export contains only subject plus explicitly authorized org summaries; organization export/delete cannot target B.
   - Progress (2026-07-22): platform-admin auth centralized — `src/shared/lib/auth/platform-admin.ts` (`requirePlatformAdminPrincipal`, `parseAdminUserIds`, `auditPlatformAdminAction`) replaces the `ADMIN_USER_IDS`/`isAdmin()` pair previously duplicated inline across all 16 `src/routes/api/admin/**` handlers and `getIsAppAdmin`; every admin mutation now emits a redacted audit event.
@@ -227,9 +227,9 @@ must include its tests and must not stage unrelated worktree changes.
     exploitable, but the passing tests above proved nothing about the shipped posture. Collapsed
     into a single `server/security.mjs` (plain ESM, outside `src/` because the runtime Docker
     stage does not copy `src/`), imported by `server.prod.mjs` and covered by
-    `test/security/http-security.test.ts`. The old module and its test are deleted, so the
+    `tests/unit/security/http-security.test.ts`. The old module and its test are deleted, so the
     `headers.test.ts` path in the verify command above no longer exists — run
-    `pnpm vitest run test/security/http-security.test.ts` instead.
+    `pnpm vitest run tests/unit/security/http-security.test.ts` instead.
 
 - [x] **Cut over canonical reads and validate tenant constraints**
   - Files: `drizzle/0081_wakeful_butterfly.sql`, `src/shared/lib/db/schema.ts`, `tests/unit/shared/lib/db/tenant-schema.test.ts`, `src/shared/lib/migration/tenant-readiness.ts`, `tests/unit/shared/lib/migration/tenant-readiness.test.ts`, `src/shared/lib/migration/tenant-flags.ts`, `src/shared/lib/migration/resource-backfill.ts`, `src/shared/lib/onboarding.ts`, `src/routes/api/queries/index.ts`, `scripts/db/backfills/resources.ts`, `docs/operations/tenant-cutover.md`

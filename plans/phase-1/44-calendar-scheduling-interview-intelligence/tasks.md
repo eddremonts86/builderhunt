@@ -121,7 +121,7 @@ tests/unit/shared/lib/env.security.test.ts`.
     published a matching v7 release; mixing majors produced an unmet-peer error. `rrule`,
     `@js-temporal/polyfill`, `@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`, `file-type`,
     `pdfjs-dist`, `mammoth`, `ical-generator`, and `openai` installed at their current latest.
-    `pnpm peers check` reports no issues. Licenses verified from each package's own
+    `pnpm install --frozen-lockfile` reports no peer-dependency issues. Licenses verified from each package's own
     `package.json`: MIT (FullCalendar ×7, `file-type`, `ical-generator`), BSD-3-Clause (`rrule`),
     ISC (`@js-temporal/polyfill`), Apache-2.0 (`@aws-sdk/*`, `pdfjs-dist`, `openai`), BSD-2-Clause
     (`mammoth`) — all approved, no unmaintained ClamAV wrapper or FullCalendar Premium package
@@ -1093,7 +1093,7 @@ tests/unit/shared/lib/repositories/scheduling.test.ts`.
   - Files: `src/lib/scheduling/capability.ts` (new),
     `tests/unit/lib/scheduling/capability.test.ts` (new),
     `src/routes/api/public/scheduling/$invitationId/session.ts` (new),
-    `server/security.mjs`, `test/security/http-security.test.ts`
+    `server/security.mjs`, `tests/unit/security/http-security.test.ts`
   - Do: Generate/hash 256-bit secrets, validate constant-time, exchange fragment token once for
     invitation-scoped secure cookie, bind expiry/revocation, replace client history, apply no-referrer
     and strict public scheduling CSP, and implement safe replay/rotation behavior.

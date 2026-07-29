@@ -95,7 +95,7 @@ Gates:
 
 ## Security, privacy, and AI isolation
 
-Snapshots use synthetic names, avatars, emails, notes, and source payloads from `e2e/fixtures/`.
+Snapshots use synthetic names, avatars, emails, notes, and source payloads from `tests/e2e/fixtures/`.
 CI traces/screenshots must not include production sessions or personal data. No AI is needed; run
 with `AI_DISABLED=true`, and never generate visual “evidence” or testimonials with a model. If a
 future AI surface is captured, its output must be a fixed synthetic fixture, not a live provider

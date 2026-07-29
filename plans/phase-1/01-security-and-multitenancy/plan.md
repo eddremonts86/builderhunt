@@ -162,7 +162,7 @@ gate required before deployment.
 | `src/shared/lib/security/audit.ts`                     | redacted append-only audit events                                          |
 | `scripts/db/backfills/*`                               | resumable/idempotent data migrations and reconciliation                    |
 | `scripts/db/audit-schema.ts`                           | classification, ownership, FK/index/RLS/drift manifest                     |
-| `test/security/*`                                      | database role, RLS, tenant A/B, IDOR, migration, and pool-leak tests       |
+| `tests/unit/security/*`                                      | database role, RLS, tenant A/B, IDOR, migration, and pool-leak tests       |
 | `docs/architecture/data-classification.md`             | table/field class, retention, owner key, public DTO                        |
 | `docs/architecture/authorization-matrix.md`            | resource/action roles and owner/admin/system exceptions                    |
 | `docs/operations/database-migrations.md`               | immutable migration, rehearsal, rollout, recovery, and restore runbook     |
@@ -173,11 +173,11 @@ gate required before deployment.
 | --------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Migration metadata    | `pnpm exec drizzle-kit check`                             | no migration collision; journal/snapshots/files agree                              |
 | Schema policy         | `pnpm db:audit-schema`                                    | every table classified; every private table has tenant key/index/RLS/test manifest |
-| Migration rehearsal   | `pnpm test:migrations`                                    | empty + legacy fixture + sanitized-scale upgrade and rerun succeed                 |
-| Database privileges   | `pnpm test:db-roles`                                      | app/worker/read-only grants match manifest; no owner/BYPASSRLS runtime             |
+| Migration rehearsal   | `pnpm test:migrations:local`                               | empty + legacy fixture + sanitized-scale upgrade and rerun succeed                 |
+| Database privileges   | `pnpm test:rls:local`                                      | app/worker/read-only grants match manifest; no owner/BYPASSRLS runtime             |
 | RLS                   | `pnpm test:rls`                                           | missing context and tenant A/B direct-SQL matrix default-deny                      |
 | API authorization     | `pnpm test:security`                                      | IDOR, roles, invitations, CSRF, public DTO, export/delete matrices pass            |
-| Pool isolation        | `pnpm test:tenant-context`                                | committed/rolled-back transactions leave no context for next pooled request        |
+| Pool isolation        | `pnpm vitest run tests/unit/shared/lib/db/tenant-context.test.ts` | committed/rolled-back transactions leave no context for next pooled request        |
 | Static/build/runtime  | `pnpm lint && pnpm type-check && pnpm test && pnpm build` | exit 0 plus critical preview routes                                                |
 | Restore/forward proof | operations-run artifact                                   | encrypted backup restores; all migrations, integrity, RLS, and smoke checks pass   |
 

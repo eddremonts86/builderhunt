@@ -26,7 +26,7 @@
   - Verify: `rg -n 'href="#main-content"|id="main-content"' src/routes/-root-components.tsx src/modules/dashboard/ui/shell/DashboardLayout.tsx`
 
 - [x] **Install and script the accessibility harness**
-  - Files: `package.json`, `pnpm-lock.yaml`, `test/test-accessibility.mjs`
+  - Files: `package.json`, `pnpm-lock.yaml`, `tests/regression/test-accessibility.mjs`
   - Do: Added `@axe-core/playwright`, `pnpm test:a11y`, the public/auth route matrix at two
     viewports (390×844, 1280×800), a hydration + 2s settle wait (needed — entrance-animation/CSS-
     transition timing produces spurious `color-contrast` reads otherwise, confirmed live), per-node
@@ -37,7 +37,7 @@
     accent-contrast pairing — all fixed, see 2026-07-25 in `docs/accessibility-verification.md`),
     now exits 0 across the full route matrix except three unrelated, still-open exceptions
     (a confirmed-decorative element, and two Chromium-headless rendering artifacts — see
-    `EXPECTED_EXCEPTIONS` in `test/test-accessibility.mjs`).
+    `EXPECTED_EXCEPTIONS` in `tests/regression/test-accessibility.mjs`).
 
 - [x] **Create one universal skip target**
   - Files: `src/routes/-root-components.tsx`, `src/modules/landing/components/HomePage.tsx`, `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
@@ -97,7 +97,7 @@
     (0 unexplained `color-contrast` failures across the full route matrix).
 
 - [x] **Measure and fix pointer target sizes**
-  - Files: `test/test-accessibility.mjs`
+  - Files: `tests/regression/test-accessibility.mjs`
   - Do: Discovered axe-core's `target-size` rule (WCAG 2.2 SC 2.5.8) is **not** in its default rule
     set (verified by enumerating every rule id a default run actually executes) — explicitly enabled
     it via `.options({ rules: { 'target-size': { enabled: true } } })` so the full route matrix is
@@ -125,7 +125,7 @@
     failures across the full route matrix.
 
 - [x] **Respect reflow and reduced-motion preferences**
-  - Files: `src/modules/dashboard/components/DashboardPage.tsx`, `test/test-accessibility.mjs`
+  - Files: `src/modules/dashboard/components/DashboardPage.tsx`, `tests/regression/test-accessibility.mjs`
   - Do: `globals.css`'s global `@media (prefers-reduced-motion: reduce)` rule already zeroes every
     CSS animation/transition duration site-wide (covers `HomePage`'s marquee/entrance animations);
     `DashboardLayout`/`UserMenu`/`MobileNavSheet`/`BackToTop` already gated their Framer Motion via

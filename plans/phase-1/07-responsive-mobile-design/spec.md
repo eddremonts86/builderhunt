@@ -11,7 +11,7 @@
 > targets the same file (`DashboardLayout.tsx`) with the same requirement ("at 320/390 px every nav
 > action is reachable by keyboard and pointer"). That plan bundles this alongside canonical
 > color/radius/token migration and new Playwright screenshot-diff CI infrastructure
-> (`e2e/visual-structure.spec.ts`) across 5 surfaces — a much larger, slower-moving effort. This plan
+> (`tests/e2e/visual-structure.spec.ts`) across 5 surfaces — a much larger, slower-moving effort. This plan
 > is the narrower, immediately-actionable "make it responsive" slice, verified live rather than via
 > a new CI snapshot suite (consistent with this project's standing direction against adding new e2e
 > test files). A maintainer should decide whether to fold this plan's Phase 1 into

@@ -80,7 +80,7 @@
 
 - [ ] **Exercise the complete runtime claim flow** — explicitly out of scope for this session
   - Files: `tests/e2e/claimable-profiles.spec.ts`, `playwright.config.ts`
-  - Reason: this session's standing instructions forbid creating new e2e/Playwright test files. The equivalent flow (start → challenge → real external API check → verify → revoke) was live-verified by hand instead (see notes above) — real HTTP calls against the dev server, real Postgres rows, and a real (unmodified) public GitHub profile, not a mock.
+  - Reason: this session's standing instructions forbid creating new tests/e2e/Playwright test files. The equivalent flow (start → challenge → real external API check → verify → revoke) was live-verified by hand instead (see notes above) — real HTTP calls against the dev server, real Postgres rows, and a real (unmodified) public GitHub profile, not a mock.
 
 ## What wasn't written (and why)
 

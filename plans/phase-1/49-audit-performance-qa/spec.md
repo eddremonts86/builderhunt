@@ -11,7 +11,7 @@
 > Fresh verification on 2026-07-20 also finds `pnpm type-check` failing with 11 invalid
 > `PLAN_PRICING` field accesses in `src/routes/_landing/pricing.tsx`, while
 > `pnpm exec eslint . --quiet` reports one error: the unused `url` variable in
-> `test/test-landing-redesign.mjs`.
+> `tests/regression/test-landing-redesign.mjs`.
 
 ## Problem
 
@@ -80,10 +80,10 @@ assert that `/` makes no request to `fonts.googleapis.com` or `fonts.gstatic.com
 ### Browser and Lighthouse harness
 
 `playwright.config.ts` starts `pnpm preview --host 127.0.0.1 --port 4173` against a completed
-production build. `e2e/critical-paths.spec.ts` verifies page status, the primary sign-up route,
+production build. `tests/e2e/critical-paths.spec.ts` verifies page status, the primary sign-up route,
 native FAQ toggling, no console/page errors, and all same-origin anchors. It skips `mailto:`,
 fragments, downloads, logout/mutation links, and external origins; it uses GET rather than HEAD so
-TanStack routes are tested as users load them. `e2e/dashboard.smoke.spec.ts` uses a deterministic
+TanStack routes are tested as users load them. `tests/e2e/dashboard.smoke.spec.ts` uses a deterministic
 seed account created by existing DB tooling and never production credentials.
 
 `.lighthouserc.cjs` runs three times against `/` using the production preview and median results.
@@ -102,7 +102,7 @@ for seven days and must not contain session cookies in uploaded logs.
 
 ## Acceptance criteria
 
-- `pnpm qa` runs lint, type-check, unit tests, asset budgets, build, Chromium E2E, and Lighthouse
+- `pnpm ci:local` runs lint, type-check, unit tests, asset budgets, build, Chromium E2E, and Lighthouse
   from a clean checkout with documented local prerequisites.
 - The active hero selects a responsive AVIF/WebP and satisfies the byte/viewport budgets above.
 - Browser evidence shows no Google Fonts requests, unexpected console errors, broken same-origin

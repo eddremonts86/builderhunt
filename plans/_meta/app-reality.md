@@ -126,7 +126,7 @@ contradicts this document, the plan is wrong.
   security headers and the CSRF mutation-origin gate, imported directly by the production
   entrypoint `server.prod.mjs`. It lives in plain ESM because the runtime Docker stage copies
   `server.prod.mjs` and `server/` but NOT `src/`, so a TypeScript module could not be imported
-  there. Tests: `test/security/http-security.test.ts`; types: `server/security.d.mts`. Enforcement
+  there. Tests: `tests/unit/security/http-security.test.ts`; types: `server/security.d.mts`. Enforcement
   is at the wrapper because it must also cover paths the app handler never sees (static assets,
   the 403 itself, and the 500 emitted when `app.fetch` throws). A parallel copy previously lived
   at `src/shared/lib/security/headers.ts`, tested but imported by nothing while the shipped

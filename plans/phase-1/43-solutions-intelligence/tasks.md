@@ -16,7 +16,7 @@
     authorization, provider kill switches, and safe public fetching.
 
 - [ ] **Create the gold set and baseline report**
-  - Files: `test/fixtures/solutions/gold-set.json` (new),
+  - Files: `tests/fixtures/solutions/gold-set.json` (new),
     `scripts/evaluate-solutions.ts` (new), `docs/operations/solutions-evaluation.md` (new)
   - Do: Add 60 de-identified briefs and human judgments for valid lanes, hard constraints,
     capability coverage, unacceptable components, and ranking. Measure current lexical/vector

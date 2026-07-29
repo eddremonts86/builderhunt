@@ -14,7 +14,7 @@
    state, narrow viewport overflow, and contrast token failures as test output.
 3. Keep failures visible; do not add broad axe exclusions or lower severity thresholds.
 
-Checkpoint: `test/test-accessibility.mjs` runs locally and fails for the known gaps with selectors
+Checkpoint: `tests/regression/test-accessibility.mjs` runs locally and fails for the known gaps with selectors
 and route names in its output.
 
 ### Phase 2 — Fix global navigation and focus primitives

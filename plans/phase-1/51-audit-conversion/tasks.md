@@ -97,7 +97,7 @@
     underlined text link (per spec: "keep as a text-level tertiary anchor if retained"). Both new
     and existing CTAs instrumented (`hero_signup_click`/`hero_explore_click`, surface `hero`; the
     final-CTA section's own sign-up button fires the same event with surface `final_cta`).
-  - Deviation: no dedicated `test/test-conversion.mjs` Playwright script — out of scope per this
+  - Deviation: no dedicated `tests/regression/test-conversion.mjs` Playwright script — out of scope per this
     session's standing no-new-e2e-files rule. Verified live in-browser instead (see below).
 
 - [x] **Remove unsupported and dead conversion surfaces** — already done by `audit-trust`
@@ -151,7 +151,7 @@
   - Verify: `pnpm vitest run tests/unit/shared/lib/conversion-variant.test.ts` — 5/5 passing.
 
 - [ ] **Add conversion browser smoke and CI gate** — explicitly out of scope this session
-  - Reason: `test/test-conversion.mjs` (Playwright) is barred by this session's standing
+  - Reason: `tests/regression/test-conversion.mjs` (Playwright) is barred by this session's standing
     no-new-e2e-files rule, and wiring `.github/workflows/quality.yml` requires the user's explicit
     go-ahead per the standing CI/CD-edit rule. Every piece of logic this task would smoke-test is
     instead covered by real unit/integration tests (56 new tests across 9 files) plus the live
