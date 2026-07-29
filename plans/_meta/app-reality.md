@@ -29,17 +29,20 @@ contradicts this document, the plan is wrong.
 
 - **Framework**: TanStack Start (React 19, file-based routes in `src/routes/`, API routes
   as server route files under `src/routes/api/`). Router tree generated in `src/routeTree.gen.ts`.
-- **DB**: PostgreSQL via Drizzle ORM (`src/shared/lib/db/schema.ts`, **86 migrations** in
-  `drizzle/`, **95 tables** — verified 2026-07-27; two of those migrations, `0084`/`0085`, are
-  still untracked working-tree WIP, so a clean checkout sees 84 and 92. These counts drift
-  weekly: re-derive with `ls drizzle/*.sql | wc -l` and `grep -c 'pgTable(' src/shared/lib/db/schema.ts`
-  rather than trusting this line). pgvector extension enabled (`builder_embeddings.embedding`, HNSW
-  index). Multi-tenant: Better Auth Organizations, tenant-scoped RLS on every private table,
-  non-owner runtime/auth/worker/platform database roles
-  (`DATABASE_URL`/`DATABASE_AUTH_URL`/`DATABASE_WORKER_URL`/`DATABASE_PLATFORM_URL`), and a
-  migration-mode gate (`TENANT_READ_MODE`/`TENANT_WRITE_MODE`/`TENANT_CANONICAL_READY`) — see
-  `security-and-multitenancy` (17/19 tasks done; the remaining 2 are the canonical-cutover and
-  legacy-schema-contraction tasks, correctly blocked on a real production observation window).
+- **DB**: PostgreSQL 18 via Drizzle ORM (`src/shared/lib/db/schema.ts`, **103 migrations** in
+  `drizzle/`, **101 tables** — verified 2026-07-29; counts drift with every PR, re-derive with
+  `ls drizzle/*.sql | wc -l` and `grep -c 'pgTable(' src/shared/lib/db/schema.ts` rather than
+  trusting this line). pgvector extension enabled
+  (`builder_embeddings.embedding`, HNSW index); image pinned to
+  `pgvector/pgvector:0.8.5-pg18` for local dev and CI, with the matching pg16 leg still in
+  `.github/workflows/quality.yml` ahead of the production cutover
+  (`plans/phase-1/03-postgres-18-upgrade` Phase 4). Multi-tenant: Better Auth
+  Organizations, tenant-scoped RLS on every private table,
+  non-owner runtime/auth/worker/platform/capability database roles
+  (`DATABASE_URL`/`DATABASE_AUTH_URL`/`DATABASE_WORKER_URL`/`DATABASE_PLATFORM_URL`/`DATABASE_CAPABILITY_URL`),
+  and a migration-mode gate (`TENANT_READ_MODE`/`TENANT_WRITE_MODE`/`TENANT_CANONICAL_READY`)
+  — see `security-and-multitenancy` (the canonical-cutover and legacy-schema-contraction
+  tasks remain correctly blocked on a real production observation window).
 - **Cache/rate-limit**: Redis, optional (`src/shared/lib/redis.ts`, `REDIS_URL` read directly
   from `process.env`, not part of the validated `env` schema), used for search-result caching
   (`src/lib/search.ts`) and rate limiting (`src/shared/lib/rate-limit.ts`). In-memory fallbacks

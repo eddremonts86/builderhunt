@@ -557,7 +557,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
   - Verify: CI green with a single DB-bearing job; `grep -c 'pg16' .github/workflows/quality.yml`
     returns 0; total workflow runtime returns to roughly its pre-Phase-1 value.
 
-- [ ] **Refresh the plan-reality documents**
+- [x] **Refresh the plan-reality documents**
   - Files: `plans/_meta/app-reality.md`, `plans/phase-2/README.md`,
     `plans/phase-1/03-postgres-18-upgrade/{spec.md,plan.md,tasks.md}`
   - Do: update the DB line in `app-reality.md` — note it is already stale independently of this
