@@ -11,12 +11,12 @@
 > organization-keyed dashboard cache. `01` and `27` are closed apart from `01`'s legacy-column drop,
 > which touches nothing here. **Start at task 1.**
 
-- [ ] **Define shared-resource contracts and characterization tests**
+- [x] **Define shared-resource contracts and characterization tests**
   - Files: `src/shared/lib/shared-resources/contracts.ts`, `tests/unit/shared/lib/shared-resources/contracts.test.ts`, `tests/unit/security/shared-resources-characterization.test.ts`
   - Do: Define allowlisted query/list/item DTOs, `private | organization` visibility, creator attribution, permission actions, and typed errors. Characterize current personal query/alert behavior before switching repositories; forbid organization authority in request DTOs.
   - Verify: contract/characterization tests pass and reject unknown/private ORM/provider fields.
 
-- [ ] **Verify normalized tenant schema and RLS for shared resources**
+- [x] **Verify normalized tenant schema and RLS for shared resources**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/` foundation migrations, `tests/unit/security/shared-resource-schema.test.ts`, `tests/unit/security/rls.test.ts`
   - Do: Confirm saved queries/keyword/source associations, alerts, lists/items, organization builders, and notes have mandatory organization keys, candidate keys, composite tenant FKs, indexes, checks, and command policies. Add no competing nullable tenant model.
   - Verify: app-role SQL rejects A alert→B query and A item→B list; missing/A/B contexts pass the manifest RLS suite.
