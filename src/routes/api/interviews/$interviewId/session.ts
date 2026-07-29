@@ -402,6 +402,14 @@ function errorResponse(error: unknown, context: string): Response {
   }
   // The name only. A driver error message can carry parameter values, and these queries carry a
   // candidate's transcript.
-  console.error(`${context} error:`, (error as Error)?.name)
+  //
+  // Under E2E_MODE the message and stack are forwarded instead, because the data is fixture data and
+  // the name alone is undiagnosable: nine e2e failures reported `Error` and nothing else, and finding
+  // the cause needed a temporary patch to this very line.
+  if (process.env.E2E_MODE === 'true') {
+    console.error(`${context} error (E2E_MODE, full detail):`, error)
+  } else {
+    console.error(`${context} error:`, (error as Error)?.name)
+  }
   return Response.json({ error: 'failed' }, { status: 500 })
 }
