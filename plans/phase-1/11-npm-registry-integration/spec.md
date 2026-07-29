@@ -1,12 +1,13 @@
 # Feature: npm Registry Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/npm.ts` and is fully wired
-> (pipeline, opt-in pill, badge, icon, scoring branch, no env vars needed). It depends on
-> the third-party `api.npms.io` search service (alive as of 2026-07-19, but historically
-> unreliable) and never uses the downloads API this spec originally promised.
+> (pipeline, opt-in pill, badge, icon, scoring branch, no env vars needed). Search migrated off the third-party
+> `api.npms.io` service to the first-party `registry.npmjs.org/-/v1/search` endpoint on 2026-07-25,
+> with registry metadata for `time.modified` and a bounded quality signal. The downloads API this
+> spec originally promised is a closed non-goal, not pending work.
 
 ## Problem
 

@@ -1,12 +1,13 @@
 # Feature: Stack Overflow Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/stackoverflow.ts` and is fully
 > wired (pipeline, opt-in pill, badge, icon, scoring branch). `STACKOVERFLOW_API_KEY`
-> exists in `src/shared/lib/env.ts` but is not documented in `.env.example`, and quota
-> exhaustion is invisible (silent `[]`).
+> exists in `src/shared/lib/env.ts` and is documented in `.env.example`, and quota exhaustion is no
+> longer silent: `warnIfQuotaLow` emits `stackoverflow_quota_low` with `quota_remaining`/`quota_max`
+> on every call once the threshold is crossed. Both gaps closed 2026-07-25.
 
 ## Problem
 

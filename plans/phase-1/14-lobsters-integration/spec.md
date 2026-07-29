@@ -1,12 +1,16 @@
 # Feature: Lobsters Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (JSON-only, by decision — the scraping-based profile enrichment this
+> spec originally floated is a closed non-goal, not pending work)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector exists at `src/lib/sources/lobsters.ts` and is fully wired;
-> `lobsters` is one of the five **default-active** sources in `SearchPage.tsx`. The
-> HTML-scraping profile enrichment (bio/karma/avatar) this spec originally recommended was
-> never built — the connector works JSON-only.
+> **Reality check (verified 2026-07-28)**: every scoped task is real in `src/`. Connector
+> `src/lib/sources/lobsters.ts`; registered in the federated pipeline (`src/lib/search.ts`) and in
+> `SOURCE_NAMES` (`src/lib/sources/types.ts`); follower-free scoring branch in `src/lib/score.ts`;
+> `LobstersIcon` in `src/modules/landing/components/BrandIcons.tsx` and used by
+> `PersonResultCard.tsx`; `.badge-lobsters` in `src/shared/styles/globals.css` with a dark-mode
+> override; `lobsters` present in `ALL_SOURCES` in `SearchPage.tsx`. No `cheerio`/`linkedom`/`jsdom`
+> is in `package.json`, which is the "no scraping dependency" task holding.
 
 ## Problem
 

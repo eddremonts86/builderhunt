@@ -1,12 +1,13 @@
 # Feature: GitLab Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector exists at `src/lib/sources/gitlab.ts` and is wired into
 > `src/lib/search.ts`, the UI source pills (`src/modules/search/components/SearchPage.tsx`),
-> and scoring (`src/lib/score.ts`). `GITLAB_TOKEN` exists in `src/shared/lib/env.ts` but is
-> not documented in `.env.example`.
+> and scoring (`src/lib/score.ts`). `GITLAB_TOKEN` exists in `src/shared/lib/env.ts` and **is**
+> documented in `.env.example` (the earlier gap, closed 2026-07-25), so token-gated real search
+> and env docs are both delivered.
 
 ## Problem
 

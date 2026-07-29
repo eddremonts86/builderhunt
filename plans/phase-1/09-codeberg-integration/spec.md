@@ -1,12 +1,12 @@
 # Feature: Codeberg (Gitea) Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Fully functional connector at `src/lib/sources/codeberg.ts`, wired
 > into `src/lib/search.ts`, UI, and `src/lib/score.ts`. `CODEBERG_API_URL` /
-> `CODEBERG_TOKEN` exist in `src/shared/lib/env.ts`; the only remaining gap is that neither
-> is documented in `.env.example`.
+> `CODEBERG_TOKEN` exist in `src/shared/lib/env.ts` and both **are** documented in
+> `.env.example` (that last gap closed 2026-07-25).
 
 ## Problem
 

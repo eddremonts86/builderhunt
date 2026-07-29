@@ -1,10 +1,10 @@
 # Plan: npm Registry Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/lib/sources/npm.ts` shipped (npms.io search + registry metadata +
-> maintainer aggregation). Remaining: migrate search off the third-party npms.io service.
+> maintainer aggregation). The npms.io migration landed 2026-07-25 — search now uses `registry.npmjs.org`.
 
 ## Executed phases (record)
 

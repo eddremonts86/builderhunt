@@ -1,11 +1,11 @@
 # Plan: Codeberg Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: The original "defer until GitLab ships" decision is obsolete — both
-> shipped. `src/lib/sources/codeberg.ts` is complete and wired; only `.env.example`
-> documentation remains.
+> shipped. `src/lib/sources/codeberg.ts` is complete and wired; the `.env.example`
+> documentation landed 2026-07-25, so nothing remains.
 
 ## Executed phases (record)
 

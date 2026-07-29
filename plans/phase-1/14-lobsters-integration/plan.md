@@ -1,6 +1,6 @@
 # Plan: Lobsters Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (see `spec.md`; the optional enrichment below is a closed non-goal)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/lib/sources/lobsters.ts` shipped with a JSON-only strategy (no

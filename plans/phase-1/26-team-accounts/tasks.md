@@ -1,6 +1,7 @@
 # Tasks: Team Account Experience
 
-> **Status**: `done` (2026-07-22) — all 9 tasks complete and merged to `master`.
+> **Status**: `implemented` (2026-07-22) — all 9 tasks complete and merged to `master`; re-verified
+> against `src/` on 2026-07-28. (`done` is not one of the statuses `_meta/conventions.md` defines.)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md)
 > **Blocks (now unblocked)**: [`shared-resources`](../27-shared-resources/tasks.md), [`activity-feed`](../28-activity-feed/tasks.md),
 > [`stripe-billing-platform`](../29-stripe-billing-platform/tasks.md)

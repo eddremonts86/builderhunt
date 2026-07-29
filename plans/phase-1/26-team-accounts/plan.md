@@ -1,12 +1,12 @@
 # Delivery Plan: Team Account Experience
 
-> **Status**: `pending`
+> **Status**: `implemented` (2026-07-22; verified against `src/` 2026-07-28)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md)
 > **Blocks**: [`shared-resources`](../27-shared-resources/plan.md), [`activity-feed`](../28-activity-feed/plan.md),
 > [`stripe-billing-platform`](../29-stripe-billing-platform/plan.md)
 > **Reality check**: the organization, invitation, active-tenant, entitlement, authorization, audit,
-> RLS, and migration layers must come from the security foundation. This plan adds product routes/UI
-> only after those contracts have runtime evidence.
+> RLS, and migration layers come from the security foundation (`01`); this plan added the product
+> routes/UI on top, and all nine phases below are delivered.
 
 ## Phase 1 — Verify dependency contracts
 

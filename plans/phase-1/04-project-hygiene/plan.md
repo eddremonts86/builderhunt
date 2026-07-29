@@ -1,9 +1,14 @@
 # Project Hygiene — Real GitHub Signals (plan)
 
-> **Status**: `partially-implemented` (v1 shipped; phases below are the v2 work)
+> **Status**: `implemented` (all phases below are delivered; kept as the record)
 > **Depends on**: nothing (no AI; uses existing `GITHUB_TOKEN` env)
 > **Blocks**: nothing
-> **Reality check**: scoring math and card exist (`src/shared/lib/hygiene.ts`, `src/shared/components/HygieneCard.tsx`); today's inputs are fabricated when `metadata.repos` is absent (always). This is a small plan: one fetch module, one endpoint, one card upgrade.
+> **Reality check (verified 2026-07-28)**: the three deliverables this plan scoped all exist — the
+> fetch module (`src/lib/github/repo-signals.ts`), the endpoint
+> (`src/routes/api/builders/$builderId/hygiene.ts`), and the card upgrade
+> (`src/shared/components/HygieneCard.tsx`, which renders real signals when GitHub answers and an
+> explicitly labelled estimate when it does not). Inputs are no longer fabricated: the estimator is
+> hash-seeded and deterministic.
 
 ## Delivered (v1 — do not re-plan)
 

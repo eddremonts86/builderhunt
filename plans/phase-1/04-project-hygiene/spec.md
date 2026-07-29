@@ -1,9 +1,20 @@
 # Project Hygiene — Real GitHub Signals (spec)
 
-> **Status**: `partially-implemented` (v1 heuristic score + card shipped; v2 real repo signals pending)
+> **Status**: `implemented` (v2 real repo signals shipped; the `GITHUB_TOKEN` degrade path is what
+> was live-verified locally — see `tasks.md`)
 > **Depends on**: nothing (deliberately **no AI** — this is GitHub REST API work; see "Why no AI" below)
 > **Blocks**: nothing
-> **Reality check**: v1 exists: `src/shared/lib/hygiene.ts` (pure `computeHygiene(repos)` scoring — issue close rate 30% / resolution 30% / docs 20% / CI 20% — plus `hygieneGrade` and `estimateRepoSignalsFromBuilder`, tested in `hygiene.test.ts`) rendered by `src/shared/components/HygieneCard.tsx` in `BuilderProfilePage.tsx`. **Honest caveat**: when `metadata.repos` is absent (always, today — no source populates it), `estimateRepoSignalsFromBuilder` _fabricates_ 2–5 plausible repos using `Math.random()` — the current card is decorative, not evidence. This plan **owns the `builders.metadata.projectHygiene` key** (namespaced-key convention; `ai-profile-enrichment` owns `aiEnrichment`, `code-fingerprinting` owns `codeStyleFingerprint`).
+> **Reality check (verified 2026-07-28)**: the fabrication this plan existed to remove is gone.
+> `src/shared/lib/hygiene.ts` keeps the pure `computeHygiene(repos)` scoring (issue close rate 30% /
+> resolution 30% / docs 20% / CI 20%), `hygieneGrade`, and `estimateRepoSignalsFromBuilder` — but the
+> estimator is now seeded by a stable `djb2` hash, so the same builder always yields the same numbers;
+> the only `Math.random()` left in the file is the post-mortem comment explaining its removal. Real
+> per-repo signals come from `src/lib/github/repo-signals.ts` via
+> `src/routes/api/builders/$builderId/hygiene.ts`, and `src/shared/components/HygieneCard.tsx` labels
+> the fallback in the UI as "Estimated from profile signals — not real repo data", so no synthetic
+> number is presented as measured fact. This plan **owns the `builders.metadata.projectHygiene` key**
+> (namespaced-key convention; `ai-profile-enrichment` owns `aiEnrichment`, `code-fingerprinting` owns
+> `codeStyleFingerprint`).
 
 ## Problem
 

@@ -41,7 +41,7 @@ exists because the UI presented synthetic evidence as measured fact.
 | 01 | [`security-and-multitenancy`](../phase-1/01-security-and-multitenancy/spec.md) | 1/18 | — | Blocks 7 plans directly. Canonical tenant cutover shipped 2026-07-27 (`organization_id` `NOT NULL` on all seven tenant-private tables, `drizzle/0081`). Only leftover: `TENANT_READ_MODE` still defaults to `legacy` and no contract migration drops the legacy columns. |
 | 02 | [`production-infrastructure`](../phase-1/02-production-infrastructure/spec.md) | 2/17 | 01 | Backup cron and off-site copy need production SSH — not more code. |
 | 03 | [`legal-and-compliance`](../phase-1/03-legal-and-compliance/spec.md) | 0/17 | — | Hard deletion + external-AI disclosure. Must precede any production MiniMax traffic (`20`). |
-| 04 | [`project-hygiene`](../phase-1/04-project-hygiene/spec.md) | 0/8 | — | Removed fabricated `Math.random()` evidence. Header still says `partially-implemented` with zero open tasks — see Divergences. |
+| 04 | [`project-hygiene`](../phase-1/04-project-hygiene/spec.md) | 0/8 | — | **Closed 2026-07-28.** Fabricated `Math.random()` evidence removed; real GitHub signals plus an on-screen "estimated" label. |
 
 ## Wave 1 — shell and design foundation (05–07)
 
@@ -61,13 +61,13 @@ hosts → package registries → community platforms → credential/decision-gat
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 08 | [`gitlab-integration`](../phase-1/08-gitlab-integration/spec.md) | 0/9 | — | |
-| 09 | [`codeberg-integration`](../phase-1/09-codeberg-integration/spec.md) | 0/8 | — | |
+| 08 | [`gitlab-integration`](../phase-1/08-gitlab-integration/spec.md) | 0/9 | — | **Closed 2026-07-28**: `GITLAB_TOKEN` is documented in `.env.example`. |
+| 09 | [`codeberg-integration`](../phase-1/09-codeberg-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: both Codeberg env vars documented. |
 | 10 | [`sourcehut-integration`](../phase-1/10-sourcehut-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
-| 11 | [`npm-registry-integration`](../phase-1/11-npm-registry-integration/spec.md) | 0/8 | — | |
+| 11 | [`npm-registry-integration`](../phase-1/11-npm-registry-integration/spec.md) | 0/8 | — | **Closed 2026-07-28**: search runs on `registry.npmjs.org`, not npms.io. |
 | 12 | [`huggingface-integration`](../phase-1/12-huggingface-integration/spec.md) | 1/7 | — | Remaining item is explicitly optional. |
-| 13 | [`stack-overflow-integration`](../phase-1/13-stack-overflow-integration/spec.md) | 0/10 | — | |
-| 14 | [`lobsters-integration`](../phase-1/14-lobsters-integration/spec.md) | 0/6 | — | |
+| 13 | [`stack-overflow-integration`](../phase-1/13-stack-overflow-integration/spec.md) | 0/10 | — | **Closed 2026-07-28**: env documented and quota exhaustion logged. |
+| 14 | [`lobsters-integration`](../phase-1/14-lobsters-integration/spec.md) | 0/6 | — | **Closed 2026-07-28**: JSON-only by decision; scraping enrichment is a closed non-goal. |
 | 15 | [`hashnode-integration`](../phase-1/15-hashnode-integration/spec.md) | 1/8 | — | Paused on a paid-API vendor decision (decided: paused). |
 | 16 | [`bluesky-integration`](../phase-1/16-bluesky-integration/spec.md) | 0/6 | — | Ships without credentials. |
 | 17 | [`producthunt-integration`](../phase-1/17-producthunt-integration/spec.md) | 0/6 | — | Wired but dormant until a token is provisioned. |
@@ -97,7 +97,7 @@ mutations on top; none of them may create a competing organization model.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 26 | [`team-accounts`](../phase-1/26-team-accounts/spec.md) | 0/9 | 01 | Settings / switcher / seat UX. Header still says `pending` with 9/9 tasks done. |
+| 26 | [`team-accounts`](../phase-1/26-team-accounts/spec.md) | 0/9 | 01 | **Closed 2026-07-28.** Switcher, Team settings and the full `api/organizations/` surface verified live. One known follow-up stays out of scope: a hook-ordering race can leave a fresh sign-up's session with `active_organization_id: null`. |
 | 27 | [`shared-resources`](../phase-1/27-shared-resources/spec.md) | 10/0 | 01, 26 | Its header carries a "do not implement until…" note — re-read it before starting; the tenant-context half of the dependency is now satisfied. |
 | 28 | [`activity-feed`](../phase-1/28-activity-feed/spec.md) | 7/0 | 01, 26, 27 | Append-only organization events over the mutations added by `26`/`27`. |
 
@@ -168,19 +168,42 @@ measure.
 These are the reasons a review pass is worth doing at all. None of them is fixed by this
 document; each is a claim to verify against `src/`.
 
-**15 plans report a non-closed status with zero open tasks.** Either the status line is stale
-or the checklist is lying. Both are cheap to resolve and expensive to leave:
+**15 plans reported a non-closed status with zero open tasks. Seven are now resolved.**
 
-`04-project-hygiene`, `05-design-modernization`, `06-responsive-mobile-design`,
-`13-stack-overflow-integration`, `08-gitlab-integration`, `09-codeberg-integration`,
-`11-npm-registry-integration`, `14-lobsters-integration`, `23-ai-profile-enrichment`,
-`24-code-fingerprinting`, `26-team-accounts`, `32-unified-timeline`, `34-rss-feeds`,
+Closed on 2026-07-28 after verifying each claim against `src/` — in every case the checklist was
+right and the status line was stale, and in five of them `tasks.md` already said `implemented`
+while `spec.md` and `plan.md` had been left behind:
+
+- `04-project-hygiene` — the fabrication is gone: the estimator is `djb2`-seeded and deterministic,
+  real signals come from `src/lib/github/repo-signals.ts` via
+  `src/routes/api/builders/$builderId/hygiene.ts`, and the card labels the fallback on screen as
+  "Estimated from profile signals — not real repo data".
+- `08-gitlab-integration`, `09-codeberg-integration`, `13-stack-overflow-integration` — the declared
+  gap was undocumented env vars. `GITLAB_TOKEN`, `CODEBERG_API_URL`, `CODEBERG_TOKEN` and
+  `STACKOVERFLOW_API_KEY` are all in `.env.example`, and StackOverflow's quota is no longer silent
+  (`warnIfQuotaLow` → `stackoverflow_quota_low`).
+- `11-npm-registry-integration` — search migrated off `api.npms.io` to
+  `registry.npmjs.org/-/v1/search` on 2026-07-25; the reality check still described the old
+  dependency.
+- `14-lobsters-integration` — every scoped task verified, including "no scraping dependency": no
+  `cheerio`/`linkedom`/`jsdom` in `package.json`.
+- `26-team-accounts` — the header said "no Team UI or organization runtime exists" while
+  `OrganizationSwitcher.tsx`, `settings/team.tsx` and the whole `api/organizations/` surface
+  (invitations, members, switch, transfer-ownership, deletion) were live. This one mattered beyond
+  itself: seven plans declare a dependency on `26`, so a `pending` header there made half the
+  backlog look blocked. Its `tasks.md` also used the status word `done`, which
+  `conventions.md` does not define.
+
+Still open, and worth the same treatment: `05-design-modernization`, `06-responsive-mobile-design`,
+`23-ai-profile-enrichment`, `24-code-fingerprinting`, `32-unified-timeline`, `34-rss-feeds`,
 `44-public-landing-pages`, `47-audit-accessibility`.
 
-Two are the most suspicious of the set: `24-code-fingerprinting`'s header says "v2 AI analysis
-of real repo code is pending" and `23-ai-profile-enrichment`'s says "claim-triggered
-auto-refresh deferred" — yet neither has an unchecked box representing that gap. A deferred
-scope with no open task is invisible work.
+Two of those eight are the most suspicious of the set: `24-code-fingerprinting`'s header says "v2 AI
+analysis of real repo code is pending" and `23-ai-profile-enrichment`'s says "claim-triggered
+auto-refresh deferred" — yet neither has an unchecked box representing that gap. A deferred scope
+with no open task is invisible work. A third is worth a look for the opposite reason:
+`44-public-landing-pages` claims `public_radars` is not in `schema.ts`, but `db:audit-schema` lists
+`public_radars` among its unclassified tables, so the table appears to exist now.
 
 **3 plans claim a closed status while carrying open tasks:** `40-ai-sourcing-sprints` (1),
 `41-stealth-scraping` (9), `19-indiehackers-integration` (2). All three are explained in their

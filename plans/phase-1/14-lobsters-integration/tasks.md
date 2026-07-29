@@ -1,6 +1,6 @@
 # Tasks: Lobsters Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28 against `src/`; see `spec.md`)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: JSON-only connector shipped and default-active. One optional

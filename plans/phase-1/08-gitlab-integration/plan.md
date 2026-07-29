@@ -1,11 +1,11 @@
 # Plan: GitLab Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/lib/sources/gitlab.ts` ships the top-starred-projects sampling
 > strategy (unauth search API is impossible — 401). Wired into `src/lib/search.ts`, UI, and
-> `src/lib/score.ts`. Remaining work is small: token-gated real search + env docs.
+> `src/lib/score.ts`. Token-gated real search and `.env.example` docs both landed 2026-07-25; nothing remains.
 
 ## Executed phases (record)
 

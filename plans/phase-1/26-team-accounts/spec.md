@@ -1,13 +1,18 @@
 # Feature: Team Account Experience
 
-> **Status**: `pending`
+> **Status**: `implemented` (2026-07-22; verified against `src/` 2026-07-28)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md)
 > **Blocks**: [`shared-resources`](../27-shared-resources/spec.md), [`activity-feed`](../28-activity-feed/spec.md),
 > [`stripe-billing-platform`](../29-stripe-billing-platform/spec.md)
-> **Reality check**: no Team UI or organization runtime exists. The previous plan proposed custom
-> organization tables, one organization per user, bearer-style invite acceptance, and a nullable
-> `plans.organizationId`; those decisions are superseded by the approved Better Auth multi-org,
-> organization-entitlement, tenant-context, and RLS foundation.
+> **Reality check (verified 2026-07-28)**: the Team UI and organization runtime this plan scoped are
+> live. `src/modules/dashboard/components/OrganizationSwitcher.tsx` (rendered by the shell's
+> `ContextTopbar.tsx`), Team settings at `src/routes/_dashboard/settings/team.tsx`, and the
+> organization API surface under `src/routes/api/organizations/` — `invitations/`, `members/`,
+> `switch.ts`, `team.ts`, `transfer-ownership.ts`, `transfer-ownership-preview.ts`, `deletion/` —
+> all exist, with `transferOwnership` in `src/shared/lib/auth/organization-lifecycle.ts`. The plan
+> consumes the Better Auth multi-org, organization-entitlement, tenant-context and RLS foundation
+> from `01`; it never created competing organization tables, one-org membership, or
+> `plans.organizationId`. One known follow-up is deliberately out of scope — see `tasks.md`.
 
 ## Purpose
 

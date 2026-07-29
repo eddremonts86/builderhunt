@@ -1,10 +1,10 @@
 # Plan: Stack Overflow Integration
 
-> **Status**: `partially-implemented`
+> **Status**: `implemented` (verified 2026-07-28)
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: `src/lib/sources/stackoverflow.ts` shipped with a per-tag
-> top-answerers strategy. Remaining: env docs and quota observability.
+> top-answerers strategy. Env docs and quota observability both landed 2026-07-25.
 
 ## Executed phases (record)
 
