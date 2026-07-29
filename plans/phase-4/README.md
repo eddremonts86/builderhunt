@@ -1,4 +1,4 @@
-# Fase 2 — feature backlog
+# Fase 4 — feature backlog
 
 Fourteen plans: ten derived from [`new-plans.md`](./new-plans.md) on 2026-07-24, three
 candidate-side career plans added 2026-07-27, and one infrastructure plan
@@ -15,7 +15,7 @@ runtime logs remain English. (This is a deliberate exception to
 [`conventions.md`](../_meta/conventions.md) rule 9, recorded here so nobody "fixes" it.)
 
 These live one directory deeper than the phase-1 plans, so cross-plan links are
-`../../phase-1/<plan>/spec.md` for phase-1 and `../<plan>/spec.md` for a fase-2 sibling.
+`../../phase-1/<plan>/spec.md` for phase-1 and `../<plan>/spec.md` for a fase-4 sibling.
 
 Read [`../_meta/app-reality.md`](../_meta/app-reality.md),
 [`../_meta/security-policy.md`](../_meta/security-policy.md),
@@ -33,7 +33,7 @@ no co-located test paths; every task carries `Files:`/`Do:`/`Verify:`). **14/14 
 
 Three defects were systemic — present in every plan, and none of them the plan author's fault:
 
-- **105 broken cross-plan links.** Phase-2 plans moved a directory deeper; every link to a phase-1
+- **105 broken cross-plan links.** Phase-4 plans moved a directory deeper; every link to a phase-1
   plan still read `../../<plan>/`. None resolved. Fixed.
 - **119 dead test paths.** The test tree was unified under `tests/{unit,e2e,regression}` on
   2026-07-27 and `vitest.config.ts` now includes ONLY `tests/unit/**`. Every plan specified
@@ -326,7 +326,7 @@ across four plans. This is a refactor to schedule, not something to bury inside 
 ## Repo defects found in passing
 
 Found while verifying, **not fixed** (this was a documentation pass). Each is real and independent
-of any phase-2 plan:
+of any phase-4 plan:
 
 - `.github/workflows/quality.yml:248` runs `pnpm vitest run src/shared/lib/billing/real-provider.test.ts`,
   which does not exist. It is the only real step in the `stripe-sandbox-certification` job.

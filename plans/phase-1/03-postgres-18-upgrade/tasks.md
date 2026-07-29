@@ -495,7 +495,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     NULL constraints in `pg_constraint`), mirroring the existing CHECK/FK two-step, and note that
     Drizzle cannot express it — so it goes in a hand-written migration as a documented divergence
     from the snapshot, the same way `ON DELETE SET NULL (col)` already does in
-    [`saved-search-health`](../../phase-2/saved-search-health/spec.md).
+    [`saved-search-health`](../../phase-4/saved-search-health/spec.md).
   - Verify: the section names both statements and the lock each one takes.
 
 - [ ] **Add the PG18 observability surface to the runbook and turn on lock-failure logging**

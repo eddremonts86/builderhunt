@@ -22,7 +22,7 @@ forced upgrade and must not be sold as one. The actual case is narrower:
 3. **The pgvector version is unpinned.** `pgvector/pgvector:pg16` floats.
    [`../README.md`](../../phase-2/README.md) (lines 209–211) already reasons about *specific* pgvector 0.8.5
    behaviour (`ef = max(ef_search, limit)`), and
-   [`look-alike-sourcing`](../../phase-2/look-alike-sourcing/plan.md) depends on it. That assumption is
+   [`look-alike-sourcing`](../../phase-4/look-alike-sourcing/plan.md) depends on it. That assumption is
    currently accidental. Pinning `0.8.5-pg18` makes a load-bearing claim enforced instead of lucky.
 4. **A version mismatch is silent.** `pnpm db:up` no-ops when a container named
    `workspace-postgres` is already running (`package.json:23`) — a cluster this repo does not

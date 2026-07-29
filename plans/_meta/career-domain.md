@@ -1,9 +1,9 @@
 # Career-domain contract
 
 Binding for the three candidate-side plans in fase 2:
-[`job-opportunities-workspace`](../phase-2/job-opportunities-workspace/spec.md) →
-[`ai-cv-generation-and-tailoring`](../phase-2/ai-cv-generation-and-tailoring/spec.md) →
-[`delegated-job-applications`](../phase-2/delegated-job-applications/spec.md).
+[`job-opportunities-workspace`](../phase-4/job-opportunities-workspace/spec.md) →
+[`ai-cv-generation-and-tailoring`](../phase-4/ai-cv-generation-and-tailoring/spec.md) →
+[`delegated-job-applications`](../phase-4/delegated-job-applications/spec.md).
 
 Written 2026-07-27. This existed only as prose repeated inside three specs, which is how contracts
 drift. It lives here so there is one copy to change.

@@ -1,4 +1,4 @@
-# Fase 3 — segmentación, personalización y operación interna
+# Fase 2 — segmentación, personalización y operación interna
 
 > **Idioma excepcional**: esta fase está escrita en español por petición expresa del propietario
 > del producto para poder compartirla con el equipo hispanohablante. El código, los nombres de

@@ -1,4 +1,4 @@
-# Phase 4 — bounded reads, one table system
+# Phase 3 — bounded reads, one table system
 
 Every list in BuilderHunt is built independently and every read loads whatever the database
 returns. This phase makes both uniform: one table shell with one interaction model, and no read
@@ -83,5 +83,5 @@ whole stack on one real surface before 08–12 repeat it.
 
 ## Language
 
-Plan files are English, per [`../_meta/conventions.md`](../_meta/conventions.md) rule 9. Phase 3's
+Plan files are English, per [`../_meta/conventions.md`](../_meta/conventions.md) rule 9. Phase 2's
 Spanish is a documented one-off for sharing with a Spanish-speaking team and does not extend here.
