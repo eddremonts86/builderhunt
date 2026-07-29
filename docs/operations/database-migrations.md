@@ -102,3 +102,34 @@ Steps:
 
 
 
+
+## Expand/contract for `NOT NULL` on a populated table (PG18)
+
+Adding `NOT NULL` to a column that already has rows historically meant
+`ALTER TABLE … ALTER COLUMN … SET NOT NULL`, which takes an
+`ACCESS EXCLUSIVE` lock for the duration of a full table scan. On a
+populated table that lock is a write freeze. PG18 stores `NOT NULL`
+constraints in `pg_constraint` (same as `CHECK` and `FK`), so the
+two-step pattern is available:
+
+```sql
+-- 1. Add the constraint NOT VALID. Takes AccessExclusiveLock for
+--    a fast catalog-only mutation, no table scan, instant on
+--    large tables.
+alter table foo
+  add constraint foo_bar_not_null check (bar is not null) not valid;
+
+-- 2. Validate it in a separate statement. The validation holds
+--    only a ShareUpdateExclusiveLock — concurrent reads and
+--    writes are allowed.
+alter table foo validate constraint foo_bar_not_null;
+```
+
+**Drizzle cannot express this directly.** The `text('bar').notNull()`
+modifier emits a plain `SET NOT NULL` in the generated migration. For
+a populated table, hand-write the migration as the two statements
+above and add it to `drizzle/meta/_journal.json` + the SHA-256 pair in
+`drizzle/migration-hashes.json` alongside the snapshot the next
+`drizzle-kit generate` emits. The expand/contract sequence is the
+same shape used today for adding a `CHECK` or `FK` to a populated
+table; `NOT NULL` joins that family on PG18.

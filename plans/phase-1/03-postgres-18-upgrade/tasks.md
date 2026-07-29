@@ -513,7 +513,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
   - Verify: either the plans match the pre-drop timing on the seeded database, or spec.md §3C
     carries the recorded reason the index stays.
 
-- [ ] **Document `NOT NULL ... NOT VALID` as the sanctioned expand step**
+- [x] **Document `NOT NULL ... NOT VALID` as the sanctioned expand step**
   - Files: `docs/operations/database-migrations.md`
   - Do: in the expand/contract sequence, specify that adding a `NOT NULL` to a populated table uses
     a named constraint added `NOT VALID` and validated in a separate statement (PG18 stores NOT
