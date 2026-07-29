@@ -439,7 +439,7 @@ test('no interview table can hold audio, by column or by object key', async () =
 test('a report can be generated deterministically with AI switched off, and says so', async () => {
   const event = await createInterviewEvent()
   const started = await startSession(event.eventId)
-  await harness.owner.api!.post(`/api/interviews/${event.eventId}/segments`, {
+  const seededSegments = await harness.owner.api!.post(`/api/interviews/${event.eventId}/segments`, {
     data: {
       segments: [
         { providerSegmentId: 'rep-1:0:0', sequence: 0, speakerEstimate: 'speaker_a', text: 'How did you handle the migration?', startsMs: 0, endsMs: 3000, confidence: 0.9 },
@@ -447,6 +447,9 @@ test('a report can be generated deterministically with AI switched off, and says
       ],
     },
   })
+  // Asserted, not discarded: an unchecked seeding write means every assertion below runs against an
+  // interview with no transcript, and fails for a reason that reads as unrelated.
+  expect(seededSegments.status(), await seededSegments.text()).toBeLessThan(400)
   const finished = await act(event.eventId, { action: 'finish', expectedVersion: started.version, providerBilledSeconds: 0, providerRequestId: null })
   expect(finished.status()).toBeLessThan(400)
 

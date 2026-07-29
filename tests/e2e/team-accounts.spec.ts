@@ -1,6 +1,6 @@
 import { test, expect, type Page, type BrowserContext } from 'playwright/test'
-import postgres from 'postgres'
 import { loadHarnessEnv } from './harness/load-env'
+import { observerSql } from './harness/observer-sql'
 import { dismissOverlays, gotoHydrated, waitForHydration } from './harness/browser'
 
 // This spec file runs as a plain Node process, not through vite/vitest —
@@ -60,7 +60,7 @@ async function goto(page: Page, url: string) {
  * signed-up test user.
  */
 async function markEmailVerified(email: string) {
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const sql = observerSql()
   try {
     await sql`update auth_users set email_verified = true where email = ${email}`
   } finally {
@@ -152,7 +152,7 @@ async function createTeam(page: Page, teamName: string) {
  * (stripe-billing-platform, still pending).
  */
 async function seedTeamEntitlement(teamName: string, seatLimit: number) {
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const sql = observerSql()
   try {
     await sql`
       insert into organization_entitlements (organization_id, tier, status, seat_limit)

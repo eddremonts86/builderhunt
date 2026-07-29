@@ -168,7 +168,17 @@ async function completeInterview(): Promise<Interview> {
   })
   expect(started.status(), await started.text()).toBeLessThan(400)
 
-  await harness.owner.api!.post(`/api/interviews/${event.id}/segments`, {
+  /*
+   * No batch-level `idempotencyKey`: the request schema is `.strict()` and has no such field —
+   * idempotency is per segment, via `onConflictDoNothing` on `providerSegmentId`.
+   *
+   * And the status is asserted, which is the part that mattered. This call sent that key, was refused
+   * with 400, and nobody noticed because the result was discarded — so every test downstream ran
+   * against an interview with no transcript. Two of them failed for reasons that read as unrelated:
+   * retention "deleted" nothing because there was nothing, and the export had no candidate words to
+   * exclude. An unchecked write in a fixture is a silent precondition.
+   */
+  const seeded = await harness.owner.api!.post(`/api/interviews/${event.id}/segments`, {
     data: {
       segments: [{
         providerSegmentId: `priv:${uniqueId('p').slice(-6)}:0`,
@@ -179,9 +189,9 @@ async function completeInterview(): Promise<Interview> {
         endsMs: 4000,
         confidence: 0.93,
       }],
-      idempotencyKey: `priv-${event.id}`,
     },
   })
+  expect(seeded.status(), await seeded.text()).toBeLessThan(400)
 
   const [session] = await harness.sql<{ id: string }[]>`
     select id from interview_sessions where event_id = ${event.id}
@@ -233,11 +243,15 @@ test('an ungranted attendee sees the meeting and not the transcript', async () =
   const interview = await completeInterview()
 
   // They are on the attendee list, so the event itself is legitimately theirs to see.
-  const [participant] = await harness.sql<{ access_granted: boolean }[]>`
-    select access_granted from event_participants
+  const [participant] = await harness.sql<{ access_granted: boolean; material_access_granted: boolean }[]>`
+    select access_granted, material_access_granted from event_participants
     where event_id = ${interview.eventId} and user_id = ${attendee.userId!}
   `
-  expect(participant?.access_granted, 'an internal attendee starts ungranted').toBe(false)
+  // Two different acts, two different columns. Being on the attendee list is what `access_granted`
+  // records, and an internal colleague legitimately gets it; being handed the candidate's material is
+  // `material_access_granted`, and nothing grants that implicitly.
+  expect(participant?.access_granted, 'an internal attendee can see the event').toBe(true)
+  expect(participant?.material_access_granted, 'an internal attendee starts ungranted').toBe(false)
 
   for (const endpoint of [
     `/api/interviews/${interview.eventId}/report`,
@@ -259,7 +273,7 @@ test('an ungranted attendee sees the meeting and not the transcript', async () =
 test('a granted participant reads the material and still cannot drive the session', async () => {
   const interview = await completeInterview()
   await harness.sql`
-    update event_participants set access_granted = true
+    update event_participants set material_access_granted = true
     where event_id = ${interview.eventId} and user_id = ${attendee.userId!}
   `
 
@@ -278,6 +292,63 @@ test('a granted participant reads the material and still cannot drive the sessio
     select state from interview_sessions where id = ${interview.sessionId}
   `
   expect(row?.state).toBe('live')
+})
+
+test('the owner grants material access on purpose, and can take it back', async () => {
+  const interview = await completeInterview()
+  const [participant] = await harness.sql<{ id: string }[]>`
+    select id from event_participants
+    where event_id = ${interview.eventId} and user_id = ${attendee.userId!}
+  `
+  expect(participant?.id, 'the attendee is on the event').toBeTruthy()
+  const endpoint = `/api/interviews/${interview.eventId}/participants/${participant!.id}`
+
+  // Before the grant, the attendee is on the attendee list and cannot read the material.
+  expect((await attendee.api!.get(`/api/interviews/${interview.eventId}/brief`)).status()).toBe(404)
+
+  const granted = await harness.owner.api!.patch(endpoint, { data: { materialAccessGranted: true } })
+  expect(granted.status(), await granted.text()).toBe(200)
+  expect((await granted.json()).participant).toMatchObject({ materialAccessGranted: true })
+  expect((await attendee.api!.get(`/api/interviews/${interview.eventId}/brief`)).status()).toBe(200)
+
+  // Revocable, and the material goes back out of reach — a grant that could not be undone would make
+  // one wrong click permanent.
+  const revoked = await harness.owner.api!.patch(endpoint, { data: { materialAccessGranted: false } })
+  expect(revoked.status(), await revoked.text()).toBe(200)
+  expect((await attendee.api!.get(`/api/interviews/${interview.eventId}/brief`)).status()).toBe(404)
+})
+
+test('nobody but the owner can hand out the material', async () => {
+  const interview = await completeInterview()
+  const [attendeeRow] = await harness.sql<{ id: string }[]>`
+    select id from event_participants
+    where event_id = ${interview.eventId} and user_id = ${attendee.userId!}
+  `
+  const endpoint = `/api/interviews/${interview.eventId}/participants/${attendeeRow!.id}`
+
+  // A granted participant reads the material; sharing it onward is not theirs to do. 403 rather than
+  // 404, because they can already see the interview and pretending otherwise reads as a bug.
+  await harness.sql`
+    update event_participants set material_access_granted = true
+    where id = ${attendeeRow!.id}
+  `
+  const byParticipant = await attendee.api!.patch(endpoint, { data: { materialAccessGranted: true } })
+  expect(byParticipant.status(), await byParticipant.text()).toBe(403)
+
+  // An organization admin is not a participant, so the interview does not exist as far as they know.
+  const byAdmin = await admin.api!.patch(endpoint, { data: { materialAccessGranted: true } })
+  expect(byAdmin.status(), await byAdmin.text()).toBe(404)
+
+  // Another tenant's member, likewise — and the refusal must not differ from the admin's, or the
+  // difference itself would say an interview lives at this id.
+  const byStranger = await stranger.api!.patch(endpoint, { data: { materialAccessGranted: true } })
+  expect(byStranger.status()).toBe(404)
+
+  // None of the refusals moved the flag off what the owner set.
+  const [after] = await harness.sql<{ material_access_granted: boolean }[]>`
+    select material_access_granted from event_participants where id = ${attendeeRow!.id}
+  `
+  expect(after?.material_access_granted).toBe(true)
 })
 
 test('an organization admin with no participation has no path in', async () => {
@@ -365,6 +436,11 @@ test('retention deletes objects before rows, and a dry run changes nothing', asy
     data: { dryRun: false },
   })
   expect(real.status(), await real.text()).toBeLessThan(400)
+  // A pass that reports success while every tenant's transaction aborted is how a broken retention
+  // worker stays invisible: it deleted nothing for a missing privilege and still answered `ok: true`.
+  const realBody = (await real.json()) as { ok: boolean; failedTenants: string[] }
+  expect(realBody.failedTenants, 'no tenant failed the pass').toEqual([])
+  expect(realBody.ok, 'the pass reports its own success honestly').toBe(true)
 
   const afterReal = await harness.sql<{ count: number }[]>`
     select count(*)::int as count from transcript_segments where session_id = ${interview.sessionId}

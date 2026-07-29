@@ -1,6 +1,6 @@
 import { test, expect } from 'playwright/test'
-import postgres from 'postgres'
 import { loadHarnessEnv } from './harness/load-env'
+import { observerSql } from './harness/observer-sql'
 
 // Same rationale as team-accounts.spec.ts: this file runs as a plain Node
 // process, not through vite/vitest, so nothing auto-loads `.env` here.
@@ -39,7 +39,7 @@ test('a fresh sign-up session has a non-null active organization immediately', a
   })
   expect(response.ok()).toBe(true)
 
-  const sql = postgres(process.env.DATABASE_URL!, { max: 1 })
+  const sql = observerSql()
   try {
     const [session] = await sql`
       select s.active_organization_id as "activeOrganizationId"

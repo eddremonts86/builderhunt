@@ -13,6 +13,7 @@
  */
 import type { TenantPrincipal } from '../authorization/permissions'
 import { isLiveMode } from './stripe-client'
+import { getAvailableCreditBalance } from './credits'
 
 export interface BillingCustomerSummaryDto {
   hasStripeCustomer: boolean
@@ -66,6 +67,7 @@ export interface BillingRefundSummaryDto {
 export interface BillingSummaryDto {
   customer: BillingCustomerSummaryDto | null
   subscription: BillingSubscriptionSummaryDto | null
+  creditBalanceUnits: number
   activeCreditGrants: BillingCreditGrantSummaryDto[]
   recentRefunds: BillingRefundSummaryDto[]
   recentTermsAcceptances: BillingTermsAcceptanceSummaryDto[]
@@ -129,6 +131,16 @@ export interface OrganizationBillingSummaryDto {
   grace: BillingGraceStateDto
   seats: BillingSeatsDto
   customer: BillingCustomerSummaryDto | null
+  /**
+   * The spendable balance, from `getAvailableCreditBalance` — the same function the reservation layer
+   * consults, deliberately, so the two cannot disagree.
+   *
+   * `activeCreditGrants` below already carries the parts, and a client could sum them. It should not
+   * have to: a summary that makes the caller derive the number invites a second implementation of
+   * "what can I spend", and the moment it drifts the UI offers an action the reservation then refuses.
+   * Reserved units are already absent here, because reserving decrements `remainingUnits`.
+   */
+  creditBalanceUnits: number
   activeCreditGrants: BillingCreditGrantSummaryDto[]
   recentRefunds: BillingRefundSummaryDto[]
   recentTermsAcceptances: BillingTermsAcceptanceSummaryDto[]
@@ -233,17 +245,19 @@ export async function getBillingSummary(principal: TenantPrincipal): Promise<Bil
   const livemode = isLiveMode()
 
   return withTenantContext(principal, async (tx) => {
-    const [customer, subscription, activeCreditGrants, recentRefunds, recentTermsAcceptances] = await Promise.all([
+    const [customer, subscription, activeCreditGrants, recentRefunds, recentTermsAcceptances, creditBalanceUnits] = await Promise.all([
       repo.findBillingCustomer(tx, principal.organizationId, livemode),
       repo.findActiveBillingSubscription(tx, principal.organizationId, livemode),
       repo.listActiveBillingCreditGrants(tx, principal.organizationId),
       repo.listBillingRefunds(tx, principal.organizationId),
       repo.listBillingTermsAcceptances(tx, principal.organizationId),
+      getAvailableCreditBalance(tx, principal.organizationId),
     ])
 
     return {
       customer: toBillingCustomerSummaryDto(customer),
       subscription: toBillingSubscriptionSummaryDto(subscription),
+      creditBalanceUnits,
       activeCreditGrants: activeCreditGrants.map(toBillingCreditGrantSummaryDto),
       recentRefunds: recentRefunds.map(toBillingRefundSummaryDto),
       recentTermsAcceptances: recentTermsAcceptances.map(toBillingTermsAcceptanceSummaryDto),
@@ -274,7 +288,7 @@ export async function getOrganizationBillingSummary(principal: TenantPrincipal):
 
   const [summary, seats] = await Promise.all([
     withTenantContext(principal, async (tx) => {
-      const [policy, period, subscription, customer, activeCreditGrants, recentRefunds, recentTermsAcceptances, savedSearches, savedBuilders] = await Promise.all([
+      const [policy, period, subscription, customer, activeCreditGrants, recentRefunds, recentTermsAcceptances, savedSearches, savedBuilders, creditBalanceUnits] = await Promise.all([
         entitlementsRepo.getOrganizationEntitlement(tx, principal.organizationId),
         entitlementsRepo.getOrganizationEntitlementPeriod(tx, principal.organizationId),
         repo.findFullActiveBillingSubscription(tx, principal.organizationId, livemode),
@@ -284,8 +298,11 @@ export async function getOrganizationBillingSummary(principal: TenantPrincipal):
         repo.listBillingTermsAcceptances(tx, principal.organizationId),
         savedQueriesRepo.countSavedQueries(tx, principal.organizationId),
         organizationBuildersRepo.countOrganizationBuilders(tx, principal.organizationId),
+        // Same helper the reservation layer uses, so the number a client acts on and the number that
+        // authorizes the spend are one value rather than two implementations of the same idea.
+        getAvailableCreditBalance(tx, principal.organizationId),
       ])
-      return { policy, period, subscription, customer, activeCreditGrants, recentRefunds, recentTermsAcceptances, savedSearches, savedBuilders }
+      return { creditBalanceUnits, policy, period, subscription, customer, activeCreditGrants, recentRefunds, recentTermsAcceptances, savedSearches, savedBuilders }
     }),
     getSeatUsage(principal),
   ])
@@ -303,6 +320,7 @@ export async function getOrganizationBillingSummary(principal: TenantPrincipal):
     grace: toBillingGraceStateDto(summary.subscription),
     seats: { limit: seats.limit, used: seats.used },
     customer: toBillingCustomerSummaryDto(summary.customer),
+    creditBalanceUnits: summary.creditBalanceUnits,
     activeCreditGrants: summary.activeCreditGrants.map(toBillingCreditGrantSummaryDto),
     recentRefunds: summary.recentRefunds.map(toBillingRefundSummaryDto),
     recentTermsAcceptances: summary.recentTermsAcceptances.map(toBillingTermsAcceptanceSummaryDto),
