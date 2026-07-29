@@ -11,6 +11,7 @@ import { can } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { builderIdentities, builderListItems, builderLists, organizationBuilders } from '../db/schema'
 import { SharedResourceError } from '../shared-resources/contracts'
+import { emitActivity } from './activity'
 import { randomId } from '~/lib/utils'
 
 // ── Lists ───────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ export async function createBuilderListForPrincipal(
   if (!can(principal, 'resource:create')) {
     throw new SharedResourceError('forbidden', 'Not allowed to create a builder list', 403)
   }
-  return createBuilderList(transaction, {
+  const created = await createBuilderList(transaction, {
     id: randomId(),
     organizationId: principal.organizationId,
     createdByUserId: principal.userId,
@@ -86,6 +87,14 @@ export async function createBuilderListForPrincipal(
     description: input.description ?? null,
     visibility: input.visibility,
   })
+  if (created) {
+    await emitActivity(transaction, principal, {
+      type: 'builder_list_created',
+      targetKey: created.id,
+      metadata: { listId: created.id, listName: created.name, visibility: created.visibility },
+    })
+  }
+  return created
 }
 
 export async function createBuilderList(
@@ -109,6 +118,11 @@ export async function deleteBuilderListForPrincipal(
   })) {
     throw new SharedResourceError('forbidden', 'Not allowed to delete this builder list', 403)
   }
+  await emitActivity(transaction, principal, {
+    type: 'builder_list_deleted',
+    targetKey: list.id,
+    metadata: { listId: list.id, listName: list.name },
+  })
   await transaction.delete(builderLists).where(eq(builderLists.id, listId))
 }
 
@@ -190,6 +204,13 @@ export async function addItemToListForPrincipal(
     })
     .onConflictDoNothing({ target: [builderListItems.listId, builderListItems.builderIdentityId] })
     .returning()
+  if (inserted[0]) {
+    await emitActivity(transaction, principal, {
+      type: 'builder_list_item_added',
+      targetKey: `${listId}:${builderIdentityId}`,
+      metadata: { listId, listName: list.name, builderIdentityId },
+    })
+  }
   return inserted[0] ?? null
 }
 
@@ -206,6 +227,26 @@ export async function removeItemFromListForPrincipal(
     visibility: list.visibility === 'organization' ? 'organization' : 'private',
   })) {
     throw new SharedResourceError('forbidden', 'Not allowed to remove from this builder list', 403)
+  }
+  // Read the item BEFORE deleting so the activity metadata has the
+  // builder identity. The metadata is a snapshot, not a live
+  // reference — a future schema migration cannot resurrect a
+  // hard-deleted item just to break this emit.
+  const [item] = await transaction
+    .select({ builderIdentityId: builderListItems.builderIdentityId })
+    .from(builderListItems)
+    .where(and(eq(builderListItems.id, itemId), eq(builderListItems.listId, listId)))
+    .limit(1)
+  if (item) {
+    await emitActivity(transaction, principal, {
+      type: 'builder_list_item_removed',
+      targetKey: `${listId}:${item.builderIdentityId}`,
+      metadata: {
+        listId,
+        listName: list.name,
+        builderIdentityId: item.builderIdentityId,
+      },
+    })
   }
   await transaction.delete(builderListItems).where(and(
     eq(builderListItems.id, itemId),

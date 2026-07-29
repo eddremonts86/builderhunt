@@ -4,6 +4,7 @@ import { alerts, alertTriggers } from '../db/schema'
 import type { TenantPrincipal } from '../authorization/permissions'
 import { findVisibleSavedQueryById } from './saved-queries'
 import { SharedResourceError } from '../shared-resources/contracts'
+import { emitActivity } from './activity'
 
 export interface AlertTriggerRecord {
   id: string
@@ -97,6 +98,18 @@ export async function createOrganizationAlertFromQueryForPrincipal(
     triggerConditions: input.triggerConditions,
     enabled: true,
   }).returning()
+  if (row) {
+    await emitActivity(transaction, principal, {
+      type: 'alert_created',
+      targetKey: row.id,
+      metadata: {
+        alertId: row.id,
+        alertName: row.name,
+        source: 'shared_query',
+        queryId: sourceQuery.id,
+      },
+    })
+  }
   return row ?? null
 }
 

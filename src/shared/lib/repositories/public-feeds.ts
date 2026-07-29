@@ -19,7 +19,8 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto'
 import { and, eq, isNull } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
-import { feedCapabilities, type feedCapabilities as feedCapabilitiesTable } from '../db/schema'
+import { feedCapabilities, savedQueries, type feedCapabilities as feedCapabilitiesTable } from '../db/schema'
+import { emitActivity } from './activity'
 
 /**
  * The DB handle the repository operates on. Defaults to the
@@ -65,7 +66,7 @@ export interface CreatedCapability {
 export async function createFeedCapability(
   organizationId: string,
   queryId: string,
-  options: { expiresAt?: Date | null; db?: FeedCapabilityDb } = {},
+  options: { expiresAt?: Date | null; db?: FeedCapabilityDb; mintedByUserId?: string } = {},
 ): Promise<CreatedCapability> {
   const db = options.db ?? publicDb
   const id = newCapabilityId()
@@ -88,6 +89,20 @@ export async function createFeedCapability(
       expiresAt: feedCapabilities.expiresAt,
     })
   if (!row) throw new Error('Failed to mint feed capability')
+  const [query] = await db
+    .select({ name: savedQueries.name })
+    .from(savedQueries)
+    .where(eq(savedQueries.id, queryId))
+    .limit(1)
+  await emitActivityAsOrganization(db, organizationId, options.mintedByUserId, {
+    type: 'feed_capability_minted',
+    targetKey: row.id,
+    metadata: {
+      capabilityId: row.id,
+      queryId: row.queryId,
+      queryName: query?.name ?? '(unknown)',
+    },
+  })
   return {
     id: row.id,
     capability: token,
@@ -147,9 +162,27 @@ export async function resolveFeedCapability(
 export async function revokeFeedCapability(
   organizationId: string,
   capabilityId: string,
-  options: { db?: FeedCapabilityDb } = {},
+  options: { db?: FeedCapabilityDb; revokedByUserId?: string } = {},
 ): Promise<boolean> {
   const db = options.db ?? publicDb
+  const [existing] = await db
+    .select({
+      id: feedCapabilities.id,
+      queryId: feedCapabilities.queryId,
+      revokedAt: feedCapabilities.revokedAt,
+    })
+    .from(feedCapabilities)
+    .where(and(
+      eq(feedCapabilities.id, capabilityId),
+      eq(feedCapabilities.organizationId, organizationId),
+    ))
+    .limit(1)
+  if (!existing || existing.revokedAt) return false
+  const [query] = await db
+    .select({ name: savedQueries.name })
+    .from(savedQueries)
+    .where(eq(savedQueries.id, existing.queryId))
+    .limit(1)
   const result = await db
     .update(feedCapabilities)
     .set({ revokedAt: new Date() })
@@ -159,7 +192,46 @@ export async function revokeFeedCapability(
       isNull(feedCapabilities.revokedAt),
     ))
     .returning({ id: feedCapabilities.id })
+  if (result.length > 0) {
+    await emitActivityAsOrganization(db, organizationId, options.revokedByUserId, {
+      type: 'feed_capability_revoked',
+      targetKey: capabilityId,
+      metadata: {
+        capabilityId,
+        queryId: existing.queryId,
+        queryName: query?.name ?? '(unknown)',
+      },
+    })
+  }
   return result.length > 0
+}
+
+/**
+ * Emit an activity event in the public-DB context, where the
+ * RLS policy needs `app.organization_id` to be set. This wraps
+ * the emit in a `set_config` so the activity row is owned by
+ * the same org as the capability. It is used only by the
+ * capability mint/revoke paths, which (unlike saved-query /
+ * list paths) do not have a TenantPrincipal in hand.
+ */
+async function emitActivityAsOrganization(
+  db: FeedCapabilityDb,
+  organizationId: string,
+  userId: string | undefined,
+  input: {
+    type: import('../activity/contracts').ActivityEventType
+    targetKey: string
+    metadata: Record<string, unknown>
+  },
+): Promise<void> {
+  const { sql: sqlTag } = await import('drizzle-orm')
+  await db.execute(sqlTag`select set_config('app.organization_id', ${organizationId}, true)`)
+  await emitActivity(db as never, {
+    userId: userId ?? '',
+    organizationId,
+    role: 'owner',
+    requestId: '',
+  }, input)
 }
 
 /**

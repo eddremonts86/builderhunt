@@ -4,6 +4,7 @@ import { can } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import { savedQueries } from '../db/schema'
 import { SharedResourceError } from '../shared-resources/contracts'
+import { emitActivity } from './activity'
 import { randomId } from '~/lib/utils'
 
 export interface CreateSavedQueryInput {
@@ -204,6 +205,18 @@ export async function changeSavedQueryVisibilityForPrincipal(
     .set({ visibility, updatedAt: new Date() })
     .where(eq(savedQueries.id, queryId))
     .returning()
+  if (updated) {
+    await emitActivity(transaction, principal, {
+      type: 'saved_query_visibility_changed',
+      targetKey: updated.id,
+      metadata: {
+        queryId: updated.id,
+        queryName: updated.name,
+        from: existing.visibility,
+        to: updated.visibility,
+      },
+    })
+  }
   return updated
 }
 
@@ -220,6 +233,11 @@ export async function deleteSavedQueryForPrincipal(
   })) {
     throw new SharedResourceError('forbidden', 'Not allowed to delete this saved query', 403)
   }
+  await emitActivity(transaction, principal, {
+    type: 'saved_query_deleted',
+    targetKey: existing.id,
+    metadata: { queryId: existing.id, queryName: existing.name },
+  })
   await transaction.delete(savedQueries).where(eq(savedQueries.id, queryId))
 }
 
@@ -239,7 +257,7 @@ export async function createSavedQueryForPrincipal(
   if (!can(principal, 'resource:create')) {
     throw new SharedResourceError('forbidden', 'Not allowed to create a saved query', 403)
   }
-  return createSavedQuery(transaction, {
+  const created = await createSavedQuery(transaction, {
     id: randomId(),
     organizationId: principal.organizationId,
     createdByUserId: principal.userId,
@@ -249,6 +267,18 @@ export async function createSavedQueryForPrincipal(
     language: input.language,
     country: input.country,
   })
+  if (created) {
+    await emitActivity(transaction, principal, {
+      type: 'saved_query_created',
+      targetKey: created.id,
+      metadata: {
+        queryId: created.id,
+        queryName: created.name,
+        visibility: 'private',
+      },
+    })
+  }
+  return created
 }
 
 // re-export to keep the count(*) and the sql tag available to tests

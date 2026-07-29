@@ -44,6 +44,14 @@ beforeAll(async () => {
       createdAt: new Date(), visibility: 'organization',
     },
   ])
+  // The activity emit inside create/revoke runs against the
+  // organization_activity table, which is RLS-forced and
+  // requires app.organization_id. Set it on the connection
+  // globally for this test file; the repository's
+  // emitActivityAsOrganization helper resets it to whichever
+  // org is minting.
+  const { sql } = await import('drizzle-orm')
+  await db.execute(sql`select set_config('app.organization_id', 'pf-org-1', false)`)
 }, 60_000)
 
 afterAll(async () => {

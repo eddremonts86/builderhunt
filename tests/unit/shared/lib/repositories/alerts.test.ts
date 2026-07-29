@@ -33,6 +33,9 @@ interface CapturedInsert {
 
 function makeFakeTx() {
   const captured: CapturedInsert = { values: {}, returningCalled: false }
+  // The fake tx accepts any insert (alerts, organizationActivity)
+  // and records the most recent one. emitActivity uses
+  // onConflictDoNothing, so the mock has to support that chain.
   const tx = {
     insert: () => ({
       values: (v: Record<string, unknown>) => ({
@@ -41,6 +44,9 @@ function makeFakeTx() {
           captured.returningCalled = true
           return [{ ...v }]
         },
+        onConflictDoNothing: () => ({
+          returning: async () => [{ ...captured.values }],
+        }),
       }),
     }),
   } as never

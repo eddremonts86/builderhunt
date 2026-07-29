@@ -88,7 +88,7 @@ export async function emitActivity(
     .insert(organizationActivity)
     .values({
       organizationId: principal.organizationId,
-      actorUserId: principal.userId,
+      actorUserId: principal.userId || null,
       type: input.type,
       version: def.version,
       targetKey: input.targetKey,
@@ -112,7 +112,9 @@ export interface ActivityRowDTO {
   id: string
   type: ActivityEventType
   version: number
-  actorUserId: string
+  /** Nullable: system actions (e.g. capability mint) have no
+   *  TenantPrincipal. A null actor renders as "System" in the UI. */
+  actorUserId: string | null
   targetKey: string
   metadata: Record<string, unknown>
   occurredAt: string

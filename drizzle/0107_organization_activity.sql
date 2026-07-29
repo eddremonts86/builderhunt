@@ -27,7 +27,7 @@
 CREATE TABLE IF NOT EXISTS "organization_activity" (
   "id" uuid PRIMARY KEY DEFAULT uuidv7(),
   "organization_id" text NOT NULL,
-  "actor_user_id" text NOT NULL,
+  "actor_user_id" text,
   "type" text NOT NULL,
   "version" integer NOT NULL,
   "target_key" text NOT NULL,

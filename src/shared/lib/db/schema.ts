@@ -746,7 +746,7 @@ export const organizationPlanChanges = pgTable(
   {
     id: text('id').primaryKey(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     fromTier: text('from_tier'),
     toTier: text('to_tier').notNull(),
     reason: text('reason'),
@@ -1138,7 +1138,7 @@ export const billingCheckoutAttempts = pgTable(
   {
     id: text('id').primaryKey(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     livemode: boolean('livemode').notNull(),
     action: text('action').notNull(),
     catalogKey: text('catalog_key').notNull(),
@@ -1635,7 +1635,7 @@ export const billingTermsAcceptances = pgTable(
   {
     id: text('id').primaryKey(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     termsVersion: text('terms_version').notNull(),
     privacyVersion: text('privacy_version').notNull(),
     commercialAction: text('commercial_action').notNull(),
@@ -3081,7 +3081,7 @@ export const organizationActivity = pgTable(
   {
     id: uuid('id').primaryKey().default(sql`uuidv7()`),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
-    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    actorUserId: text('actor_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
     type: text('type').notNull(),
     version: integer('version').notNull(),
     targetKey: text('target_key').notNull(),
