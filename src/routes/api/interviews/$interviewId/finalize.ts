@@ -4,6 +4,7 @@ import { finalize } from '~/lib/interviews/report-service'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { rateLimit } from '~/shared/lib/rate-limit'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { findSessionByEvent } from '~/shared/lib/repositories/interviews'
 import { emitSecurityAudit } from '~/shared/lib/security/audit'
 import { consoleSecurityAuditSink } from '~/shared/lib/security/audit-sink'
@@ -53,6 +54,10 @@ export const Route = createFileRoute('/api/interviews/$interviewId/finalize')({
           }
 
           const report = await withTenantContext(principal, async (transaction) => {
+            // Finalizing is a write, so the owner alone — membership in the organization is not a
+            // relationship to this interview. `null` becomes the same 404 as a missing interview.
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context?.isOwner) return null
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,

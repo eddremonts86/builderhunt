@@ -810,6 +810,66 @@ try {
   }
   if (workerCandidateWrite !== 'denied') throw new Error('worker was able to rewrite candidate data')
 
+  /*
+   * Credit writes: the app role must borrow the worker role, and borrowing must not widen scope.
+   *
+   * `drizzle/0028` grants the app role SELECT only on the credit tables, so `goLive`'s reservation
+   * INSERT failed with 42501 for every interview — invisibly, because unit tests run as the migration
+   * superuser and `.env` pointed at `postgres` until 2026-07-29. `drizzle/0098` makes the app role a
+   * *member* of the worker role so the write can happen in the caller's transaction (atomicity), and
+   * these three assertions are the reason that is safe rather than equivalent to granting the table.
+   */
+  let creditWriteUnelevated = 'allowed'
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_credit_reservations (id, organization_id, operation, rate_card_version, idempotency_key, maximum_units, state, heartbeat_at, deadline_at)
+        values ('rls-unelevated', 'org-a', 'interview_live_transcription', 1, 'rls-unelevated-key', 1, 'reserved', now(), now() + interval '1 hour')
+      `
+    })
+  } catch (error) {
+    // The code matters: any other failure is a broken test, not a denied write.
+    creditWriteUnelevated = error?.code === '42501' ? 'denied' : `unexpected:${error?.code}`
+  }
+  if (creditWriteUnelevated !== 'denied') {
+    throw new Error('app role wrote a credit reservation without elevating — 0028\'s SELECT-only grant is gone')
+  }
+
+  const creditWriteElevated = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`set local role builderhunt_worker`
+    const rows = await transaction`
+      insert into billing_credit_reservations (id, organization_id, operation, rate_card_version, idempotency_key, maximum_units, state, heartbeat_at, deadline_at)
+      values ('rls-elevated', 'org-a', 'interview_live_transcription', 1, 'rls-elevated-key', 1, 'reserved', now(), now() + interval '1 hour')
+      returning id
+    `
+    await transaction`reset role`
+    // Same transaction, and the app role is back: this is what makes it atomic with the caller's
+    // other writes rather than a second connection that can be left half-applied.
+    const afterReset = await transaction`select has_table_privilege('billing_credit_reservations', 'INSERT') as can`
+    if (afterReset[0].can !== false) throw new Error('reset role did not drop the elevated privilege')
+    return rows.length
+  })
+  if (creditWriteElevated !== 1) throw new Error('elevated credit write did not insert')
+
+  let creditWriteCrossTenant = 'allowed'
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`set local role builderhunt_worker`
+      await transaction`
+        insert into billing_credit_reservations (id, organization_id, operation, rate_card_version, idempotency_key, maximum_units, state, heartbeat_at, deadline_at)
+        values ('rls-cross', 'org-b', 'interview_live_transcription', 1, 'rls-cross-key', 1, 'reserved', now(), now() + interval '1 hour')
+      `
+    })
+  } catch (error) {
+    creditWriteCrossTenant = error?.code === '42501' ? 'denied' : `unexpected:${error?.code}`
+  }
+  if (creditWriteCrossTenant !== 'denied') {
+    throw new Error('elevating to the worker role let the app write another organization\'s credits')
+  }
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
@@ -819,6 +879,9 @@ try {
     claimSubjectIsolation: subjectClaims.map((row) => row.id),
     crossSubjectClaimInsert: 'denied',
     authProductAccess: 'denied',
+    creditWriteUnelevated: 'denied',
+    creditWriteElevated: 'inserted',
+    creditWriteCrossTenant: 'denied',
     workerMissingContext: 'denied',
     workerTenantIsolation: workerAlerts.map((row) => row.id),
     workerCrossTenantInsert: 'denied',

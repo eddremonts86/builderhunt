@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { editReport, generateReport } from '~/lib/interviews/report-service'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { interviewReportContentSchema } from '~/shared/lib/interviews'
@@ -63,6 +64,18 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           const requested = url.searchParams.get('version')
 
           const result = await withTenantContext(principal, async (transaction) => {
+            /*
+             * Authorize before reading. This route returned the report to any member of the
+             * organization — the transcript of a candidate's interview — because membership was the
+             * only check: `requireTenantPrincipal` proves the tenant, not a relationship to *this*
+             * interview. An organization admin got it too.
+             *
+             * `briefContextForEvent` answers null unless the caller owns the interview or was
+             * explicitly handed access (`event_participants.access_granted`), and null becomes the
+             * same 404 as a missing interview so the response cannot confirm one exists.
+             */
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context) return null
             const scope = { organizationId: principal.organizationId, eventId: params.interviewId }
             const versions = await listReportVersions(transaction, scope)
             if (requested === 'versions') return { kind: 'list' as const, versions }
@@ -72,6 +85,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
             return { kind: 'one' as const, report, versions }
           })
 
+          if (!result) return Response.json({ error: 'not_found' }, { status: 404 })
           if (result.kind === 'list') {
             return Response.json({
               versions: result.versions.map((row) => ({
@@ -117,6 +131,10 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           }
 
           const outcome = await withTenantContext(principal, async (transaction) => {
+            // Writes are the owner's alone: a granted participant reads the material and does not
+            // author it. Same `null` -> 404 as above rather than a 403.
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context?.isOwner) return null
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -172,6 +190,10 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           }
 
           const report = await withTenantContext(principal, async (transaction) => {
+            // Writes are the owner's alone: a granted participant reads the material and does not
+            // author it. Same `null` -> 404 as above rather than a 403.
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context?.isOwner) return null
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,

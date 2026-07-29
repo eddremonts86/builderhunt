@@ -687,6 +687,13 @@
       "when": 1785268590461,
       "tag": "0097_scheduling_busy_ranges",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1785268591461,
+      "tag": "0098_credit_write_role_membership",
+      "breakpoints": true
     }
   ]
 }

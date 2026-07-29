@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { BriefServiceError, editBrief } from '~/lib/interviews/brief-service'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { interviewBriefContentSchema, sourceManifestEntrySchema } from '~/shared/lib/interviews'
 import { activateBriefVersion, findBriefVersion, listBriefVersions } from '~/shared/lib/repositories/interviews'
@@ -47,6 +48,17 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/$versio
         try {
           const principal = await requireTenantPrincipal(request)
 
+          /*
+           * Authorize before touching the brief. `requireTenantPrincipal` proves the tenant, not a
+           * relationship to *this* interview, so without this any colleague — or an organization
+           * admin — could read a candidate's brief. `briefContextForEvent` answers null unless the
+           * caller owns it or holds `event_participants.access_granted`, and null is reported as the
+           * same 404 as a missing interview so the response cannot confirm one exists.
+           */
+          const authorized = await withTenantContext(principal, (transaction) =>
+            briefContextForEvent(transaction, principal, params.interviewId))
+          if (!authorized) return Response.json({ error: 'not_found' }, { status: 404 })
+
           // `versions` as a literal path segment: the list is a different resource from a version, and
           // giving it its own route file would duplicate every guard in this one.
           if (params.version === 'versions') {
@@ -90,6 +102,17 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/$versio
           const principal = await requireTenantPrincipal(request)
           const version = parseVersion(params.version)
           if (version === null) return Response.json({ error: 'invalid_input' }, { status: 400 })
+
+          /*
+           * Authorize before touching the brief. `requireTenantPrincipal` proves the tenant, not a
+           * relationship to *this* interview, so without this any colleague — or an organization
+           * admin — could read a candidate's brief. `briefContextForEvent` answers null unless the
+           * caller owns it. A granted participant reads the brief but does not rewrite it, so this one
+           * requires ownership. Reported as 404 rather than 403, as everywhere else here.
+           */
+          const authorized = await withTenantContext(principal, (transaction) =>
+            briefContextForEvent(transaction, principal, params.interviewId))
+          if (!authorized?.isOwner) return Response.json({ error: 'not_found' }, { status: 404 })
 
           const parsed = patchBriefRequestSchema.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) {
@@ -158,6 +181,17 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/$versio
           const principal = await requireTenantPrincipal(request)
           const version = parseVersion(params.version)
           if (version === null) return Response.json({ error: 'invalid_input' }, { status: 400 })
+
+          /*
+           * Authorize before touching the brief. `requireTenantPrincipal` proves the tenant, not a
+           * relationship to *this* interview, so without this any colleague — or an organization
+           * admin — could read a candidate's brief. `briefContextForEvent` answers null unless the
+           * caller owns it. A granted participant reads the brief but does not rewrite it, so this one
+           * requires ownership. Reported as 404 rather than 403, as everywhere else here.
+           */
+          const authorized = await withTenantContext(principal, (transaction) =>
+            briefContextForEvent(transaction, principal, params.interviewId))
+          if (!authorized?.isOwner) return Response.json({ error: 'not_found' }, { status: 404 })
 
           const brief = await withTenantContext(principal, (transaction) => activateBriefVersion(transaction, {
             organizationId: principal.organizationId,

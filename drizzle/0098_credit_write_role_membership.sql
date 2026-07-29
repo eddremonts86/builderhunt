@@ -1,0 +1,36 @@
+-- Let the app role *borrow* the worker role for credit writes, without owning the privilege.
+--
+-- The problem: reserving credits is a user-initiated action (an organizer presses "go live"), so it
+-- runs inside the acting user's `builderhunt_app` transaction. But 0028 deliberately grants that role
+-- SELECT only on the four credit tables — reservations, grants, allocations, ledger entries — because
+-- a role that answers requests from the internet must not be able to mint balance. The result was
+-- `permission denied for table billing_credit_reservations` (42501) on every go-live, which no test
+-- caught: unit tests run as the migration superuser, and `.env`'s DATABASE_URL was `postgres` until
+-- 2026-07-29, so both bypassed GRANTs entirely.
+--
+-- Why membership rather than the alternatives:
+--
+--   * `GRANT INSERT, UPDATE` to builderhunt_app would let *any* query from the web runtime write to
+--     the money tables, silently and forever. That is exactly what 0028 refused.
+--   * Doing the write on a separate worker connection loses atomicity: the reservation and the
+--     session state transition share one transaction today, so a failed transition rolls the
+--     reservation back. Split them and a failed transition leaves an orphaned reservation consuming
+--     the customer's balance.
+--   * A SECURITY DEFINER function would have to reimplement, in PL/pgSQL, the earliest-expiry grant
+--     locking, the unit slicing across grants, the allocation upserts and the ledger entry — money
+--     logic duplicated in two languages, with two sets of tests to keep from diverging.
+--
+-- Membership gives a fourth option: the write happens in the *same* transaction, so atomicity holds,
+-- and the app role still cannot write by default. It must say `SET LOCAL ROLE builderhunt_worker`
+-- explicitly, which is one greppable line rather than an invisible table privilege — see
+-- `withCreditWriteRole` in `src/shared/lib/billing/credit-write-role.ts`, the only place allowed to
+-- do it.
+--
+-- Scope is not widened by the elevation: 0028's worker policies on these tables all filter on
+-- `current_setting('app.organization_id')`, which the tenant context has already set. So the
+-- elevated write can only touch the acting organization's rows — the elevation supplies the verb,
+-- RLS keeps the boundary.
+--
+-- `SET LOCAL` is transaction-scoped: it reverts on COMMIT or ROLLBACK even if the code forgets to
+-- RESET, so a leaked elevation cannot outlive the statement that opened it.
+GRANT builderhunt_worker TO builderhunt_app;

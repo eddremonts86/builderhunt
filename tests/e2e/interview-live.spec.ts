@@ -216,12 +216,14 @@ test('a session starts, pauses, resumes and finishes, and the version moves each
   // the report was written synchronously inside the request that ended the interview.
   expect((await finished.json() as SessionEnvelope).session.state).toBe('processing')
 
-  const [row] = await harness.sql<{ state: string; started_at: Date | null; ended_at: Date | null }[]>`
-    select state, started_at, ended_at from interview_sessions where event_id = ${event.eventId}
+  const [row] = await harness.sql<{ state: string; started_at: Date | null; finished_at: Date | null }[]>`
+    select state, started_at, finished_at from interview_sessions where event_id = ${event.eventId}
   `
   expect(row?.state).toBe('processing')
-  // A completed session with no end time would make every duration and every settlement wrong.
-  expect(row?.ended_at).not.toBeNull()
+  // A finished session with no end time would make every duration and every settlement wrong.
+  // The column is `finished_at`; this asked for `ended_at`, which has never existed on any table,
+  // so the query itself errored and the assertion never ran.
+  expect(row?.finished_at).not.toBeNull()
 })
 
 test('a stale version loses, and the state does not move', async () => {

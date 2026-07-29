@@ -392,6 +392,10 @@
     "0097_scheduling_busy_ranges": {
       "sql": "2c4e5872968148e3be5e2d3e94a1583809ff219ef3d6c787a95b5235b646b279",
       "snapshot": "67a90aa8cae1bd598cc192000e29f30f687e8a42c8ddf259edbfee4a8b14dfac"
+    },
+    "0098_credit_write_role_membership": {
+      "sql": "d8cb813c129c3488646493aadcfcf659ff38a87d41a9fe1ac1f5aa741d2ecf78",
+      "snapshot": "67a90aa8cae1bd598cc192000e29f30f687e8a42c8ddf259edbfee4a8b14dfac"
     }
   }
 }

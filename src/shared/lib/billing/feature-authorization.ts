@@ -35,6 +35,7 @@ const CATALOG_TIERS: ReadonlySet<string> = new Set<CatalogTier>(['free', 'pro', 
 function isCatalogTier(value: string): value is CatalogTier {
   return CATALOG_TIERS.has(value)
 }
+import { withCreditWriteRole } from './credit-write-role'
 import {
   extendReservation as extendReservationRaw,
   releaseReservation as releaseReservationRaw,
@@ -164,7 +165,7 @@ export async function reserveCredits(
   }
 
   try {
-    const result = await reserveCreditsRaw(transaction, {
+    const result = await withCreditWriteRole(transaction, () => reserveCreditsRaw(transaction, {
       reservationId: input.reservationId,
       organizationId: principal.organizationId,
       operation: input.operation,
@@ -172,7 +173,7 @@ export async function reserveCredits(
       idempotencyKey: input.idempotencyKey,
       maximumUnits: rateCard.maxUnits,
       maxDurationSeconds: rateCard.maxDurationSeconds,
-    })
+    }))
 
     // Record the acting seat's credit units into seat_usage_daily on every reservation — always,
     // regardless of enforcement mode (this is the counter, not the gate). `pool_drain` is emitted
@@ -233,12 +234,12 @@ export async function extendReservation(
   input: ExtendReservationInput,
 ): Promise<FeatureReservationResult> {
   try {
-    const result = await extendReservationRaw(transaction, {
+    const result = await withCreditWriteRole(transaction, () => extendReservationRaw(transaction, {
       organizationId: principal.organizationId,
       reservationId: input.reservationId,
       additionalMaximumUnits: input.additionalMaximumUnits,
       idempotencyKey: input.idempotencyKey,
-    })
+    }))
     return { reservation: result.reservation, allocations: result.allocations }
   } catch (error) {
     if (error instanceof ReservationError && error.code === 'insufficient_credits') {
@@ -259,13 +260,13 @@ export async function settleReservation(
   principal: TenantPrincipal,
   input: SettleReservationInput,
 ): Promise<FeatureReservationResult> {
-  const result = await settleReservationRaw(transaction, {
+  const result = await withCreditWriteRole(transaction, () => settleReservationRaw(transaction, {
     organizationId: principal.organizationId,
     reservationId: input.reservationId,
     actualUnits: input.actualUnits,
     idempotencyKey: input.idempotencyKey,
     settlementGraceSeconds: 60,
-  })
+  }))
   return { reservation: result.reservation, allocations: result.allocations }
 }
 
@@ -281,12 +282,12 @@ export async function releaseReservation(
   principal: TenantPrincipal,
   input: ReleaseReservationInput,
 ): Promise<FeatureReservationResult> {
-  const result = await releaseReservationRaw(transaction, {
+  const result = await withCreditWriteRole(transaction, () => releaseReservationRaw(transaction, {
     organizationId: principal.organizationId,
     reservationId: input.reservationId,
     idempotencyKey: input.idempotencyKey,
     reason: input.reason,
-  })
+  }))
   return { reservation: result.reservation, allocations: result.allocations }
 }
 
