@@ -1,101 +1,87 @@
-# Fase 3 — segmentación, personalización y operación interna
+# Phase 4 — bounded reads, one table system
 
-> **Idioma excepcional**: esta fase está escrita en español por petición expresa del propietario
-> del producto para poder compartirla con el equipo hispanohablante. El código, los nombres de
-> contratos, las migraciones, los tests, los commits y los logs de implementación seguirán en inglés.
+Every list in BuilderHunt is built independently and every read loads whatever the database
+returns. This phase makes both uniform: one table shell with one interaction model, and no read
+path anywhere that can return an unbounded result set.
 
-## Objetivo de la fase
+## Why this phase exists
 
-Convertir BuilderHunt de una experiencia única para todos en una plataforma que entiende el
-objetivo principal de cada persona, guía su primera activación y prioriza la información relevante,
-sin confundir personalización con autorización.
+An audit of `src/` found **50 request-serving list reads with no `.limit()`**, plus 13 worker
+scans and 11 scalar aggregates. `listPlatformUsersWithPlans` returns every user in the system;
+`src/routes/api/sprints/$sprintId/results.ts:82-85` reads every result for a sprint, then
+filters, sorts and slices **in memory** behind a base64 *offset* it calls a cursor. They work
+today because the tables are small. Each is a latent incident, and it costs twice — once in
+Postgres, again in a browser holding thousands of rows in a React list.
 
-La taxonomía propuesta para el MVP es:
+Meanwhile 19 surfaces render tabular data, only 5 with `<table>`, exactly 1 with sorting
+(`src/modules/search/components/SearchPage.tsx`) and 0 with keyboard navigation.
 
-- `hiring`: founders, responsables de contratación y recruiters que buscan builders.
-- `investing`: inversores, scouts y analistas que buscan builders, equipos o proyectos.
-- `building`: builders/developers que quieren reclamar, enriquecer y distribuir su perfil.
-- `other`: salida explícita para casos todavía no comprendidos.
+## Non-negotiable principles
 
-`user` no se usa como segmento porque no describe un trabajo ni una necesidad: todos los
-anteriores son usuarios.
+1. **Nothing loads a whole result set.** Every read declares one of three mechanisms — page,
+   model-bounded, or batch — and a CI gate fails the build when it declares none.
+2. **The default page is 50 rows**, exported once from `TABLE_PAGE_SIZE`. No route literals it.
+3. **Partial data changes what is correct, not just what is fast.** Sorting 50 of 214 rows in the
+   browser and calling it "sorted by score" is wrong, so filter, sort and group execute in SQL.
+4. **Every sort is a total order.** A tiebreaker column is appended to every `ORDER BY`, or a
+   50-row page boundary landing inside a tie duplicates or drops rows.
+5. **Keyset, never `OFFSET`.** `OFFSET` is O(offset) and shifts under concurrent writes.
+6. **A column is only sortable when an index backs it.** Enforced by a unit test and an `EXPLAIN`
+   assertion, not by discipline.
+7. **A client never names a database column.** Sort and filter ids resolve through a per-table
+   allowlist; an unknown id is a 400, not a query.
+8. **Rows are virtualized**, so a 5,000-row scrollback costs the same DOM as 50.
+9. **Table state lives in the URL** via `validateSearch`, so a filtered view is a link.
 
-## Principios no negociables
+## The three mechanisms
 
-1. `user_segment` personaliza mensajes y prioridades; nunca concede permisos.
-2. `organization_role` mantiene `owner | admin | member` y protege recursos del workspace.
-3. `platform_role` protege las herramientas internas de BuilderHunt.
-4. plan y entitlement controlan acceso comercial; tampoco sustituyen permisos.
-5. `submitSegmentsResponseSchema` no participa en esta fase: pertenece al envío de segmentos de
-   transcripción de entrevistas en `src/shared/lib/interview-api.ts`.
-6. La personalización debe producir diferencias útiles de workflow, no solo cambiar títulos.
-7. Toda afirmación de mercado debe clasificarse como evidencia, inferencia o hipótesis.
+"Paginate everything" is the right instinct and the wrong instruction for about a third of those
+50 reads: a deletion must cover every row, an accounting export must be complete, and a worker
+must process every enabled alert. So the rule is that every read declares its bound.
 
-## Planes
-
-| Orden | Plan | Resultado |
+| Mechanism | For | Shape |
 |---|---|---|
-| 1 | [`01-investigacion-icp`](./01-investigacion-icp/spec.md) | ICPs y buyer personas validados |
-| 2 | [`02-segmentacion-usuarios`](./02-segmentacion-usuarios/spec.md) | Contrato, persistencia, settings y analítica |
-| 3 | [`03-onboarding-segmentado`](./03-onboarding-segmentado/spec.md) | Activación diferente por objetivo |
-| 4 | [`04-dashboard-personalizado`](./04-dashboard-personalizado/spec.md) | Presets de widgets y acciones por segmento |
-| 5 | [`05-roles-internos-plataforma`](./05-roles-internos-plataforma/spec.md) | RBAC interno auditable y de mínimo privilegio |
-| 6 | [`06-landing-segmentada`](./06-landing-segmentada/spec.md) | Mensajes y páginas de conversión por ICP |
+| **Page** | anything feeding a list UI that grows with usage | keyset cursor, `LIMIT 50`, `PageResult` |
+| **Model-bounded** | maximum fixed by the data model (the 3 rows of `public_surface_indexing`, a user's organizations, seats for one org-day) | `.limit(n)` plus a comment naming why n is the ceiling |
+| **Batch** | must cover everything (`hardDeleteAccountSubject`, `getAccountingExport`, the 13 worker scans) | chunked cursor loop, never materialising the set |
 
-## Dependencias
+Scalar aggregates (`sumSettledUnitsSince`, `getPlatformAccountMetrics`) are exempt by nature —
+they return a number, not rows.
 
-```mermaid
-flowchart LR
-  R["01 Investigación ICP"] --> S["02 Segmentación"]
-  S --> O["03 Onboarding"]
-  S --> D["04 Dashboard"]
-  R --> L["06 Landing"]
-  S --> L
-  P["05 Roles internos"]
+## Plans
+
+Small and sequential. Plans 01–02 change no product behaviour; 03–06 are additive; 07 proves the
+whole stack on one real surface before 08–12 repeat it.
+
+| Order | Plan | Result |
+|---|---|---|
+| 1 | [`01-read-path-audit`](./01-read-path-audit/spec.md) | Every unbounded read found, classified, and measurable by a script |
+| 2 | [`02-table-query-contract`](./02-table-query-contract/spec.md) | `ColumnDef`, `TableQuery`, `PageResult`, URL codec, signed cursor |
+| 3 | [`03-keyset-pagination`](./03-keyset-pagination/spec.md) | Server-side filter/sort/group with a tenant-safe keyset page builder |
+| 4 | [`04-sort-indexes`](./04-sort-indexes/spec.md) | An index behind every sortable column, guarded by a test |
+| 5 | [`05-table-shell`](./05-table-shell/spec.md) | One ARIA grid: keyboard, selection, grouping, four states |
+| 6 | [`06-row-virtualization`](./06-row-virtualization/spec.md) | Flat DOM cost, and a focused cell that survives scrolling |
+| 7 | [`07-first-surface-sprint-results`](./07-first-surface-sprint-results/spec.md) | Real pagination end to end on one surface, plus the shared e2e spec |
+| 8 | [`08-migrate-admin-surfaces`](./08-migrate-admin-surfaces/spec.md) | 7 admin/account surfaces on the shell |
+| 9 | [`09-migrate-platform-content`](./09-migrate-platform-content/spec.md) | Changelog, roadmap, blog library — test ids preserved |
+| 10 | [`10-migrate-tenant-surfaces`](./10-migrate-tenant-surfaces/spec.md) | Users, refunds, disputes, team, sprints, alerts |
+| 11 | [`11-migrate-search`](./11-migrate-search/spec.md) | Search on the shell, semantic ranking preserved |
+| 12 | [`12-bounded-reads-sweep`](./12-bounded-reads-sweep/spec.md) | The reads with no table UI: bounded or batched |
+| 13 | [`13-pagination-ci-gates`](./13-pagination-ci-gates/spec.md) | The gate turns red on a new unbounded read |
+
+## Dependency waves
+
+```
+01 ────────────────────────────────────────► 12 ──┐
+02 ──► 03 ──► 04 ──┐                              │
+02 ──► 05 ──► 06 ──┴──► 07 ──► 08 ──┬─────────────┼──► 13
+                                    ├── 09 ───────┤
+                                    ├── 10 ──► 11 ┘
 ```
 
-Roles internos puede ejecutarse independientemente, pero por riesgo de seguridad debe tener su
-propia revisión y despliegue. Landing puede empezar con prototipos después de investigación, pero la
-persistencia de la selección y el handoff a signup dependen del contrato de segmentación.
+01 and 02 can start in parallel. 08, 09 and 10 are independent of each other once 07 lands.
 
-## Orden recomendado de entrega
+## Language
 
-### Ola A — aprender antes de construir
-
-- ejecutar entrevistas y pruebas de mensaje;
-- decidir la taxonomía definitiva;
-- establecer baseline de signup, activación y retención.
-
-### Ola B — fuente de verdad
-
-- crear el contrato compartido y persistencia;
-- exponer lectura/escritura autenticada;
-- añadir configuración y eventos de analítica.
-
-### Ola C — activación y adquisición
-
-- publicar landing segmentada detrás de feature flag;
-- desplegar onboarding v2 por cohortes;
-- comparar activación contra el onboarding actual.
-
-### Ola D — valor recurrente
-
-- convertir el dashboard actual en un compositor de widgets;
-- activar presets progresivamente;
-- conservar personalización manual y fallback.
-
-### Ola E — operación interna
-
-- migrar la allowlist administrativa a permisos internos;
-- desplegar en modo sombra y luego enforcement;
-- conservar un mecanismo de emergencia documentado.
-
-## Criterio global de éxito
-
-- existe una única fuente de verdad para el segmento;
-- cada segmento tiene un evento de activación observable;
-- landing → signup → onboarding → activación puede atribuirse de extremo a extremo;
-- cambiar de segmento no pierde datos ni cambia permisos;
-- los usuarios sin segmento conservan una experiencia completa;
-- las rutas internas rechazan en servidor a quien no tenga permiso;
-- todos los cambios pasan tests, build, controles de tenancy y smoke tests reales.
+Plan files are English, per [`../_meta/conventions.md`](../_meta/conventions.md) rule 9. Phase 3's
+Spanish is a documented one-off for sharing with a Spanish-speaking team and does not extend here.

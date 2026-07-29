@@ -7,6 +7,7 @@ import {
   suggestFollowups,
 } from '~/lib/interviews/suggestion-service'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { interviewFollowupSuggestionSchema } from '~/shared/lib/interviews'
@@ -59,6 +60,15 @@ export const Route = createFileRoute('/api/interviews/$interviewId/suggestions')
         try {
           const principal = await requireTenantPrincipal(request)
           const suggestions = await withTenantContext(principal, async (transaction) => {
+            /*
+             * Authorize before reading, even though RLS already decides *visibility*.
+             *
+             * RLS returning nothing became `200 {suggestions: []}`, which tells another tenant its
+             * request was fine. The row filter and the status are different questions: the policy
+             * protects the data, this protects the answer.
+             */
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context) return 'not_found' as const
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -68,6 +78,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/suggestions')
             // participant reads them and nobody else does.
             return listRecordedSuggestions(transaction, principal, session.id)
           })
+          if (suggestions === 'not_found') return Response.json({ error: 'not_found' }, { status: 404 })
+          // A relationship but no session yet is a legitimate empty answer.
           if (!suggestions) return Response.json({ suggestions: [] }, { status: 200 })
           return Response.json({ suggestions: suggestions.map(toSuggestionDto) })
         } catch (error) {

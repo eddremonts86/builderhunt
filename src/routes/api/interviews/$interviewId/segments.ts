@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { appendSegments, SessionServiceError } from '~/lib/interviews/session-service'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
+import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { SPEAKER_ESTIMATES } from '~/shared/lib/interviews'
@@ -98,6 +99,10 @@ export const Route = createFileRoute('/api/interviews/$interviewId/segments')({
         try {
           const principal = await requireTenantPrincipal(request)
           const segments = await withTenantContext(principal, async (transaction) => {
+            // Same as the suggestions read: RLS protects the rows, this protects the status. An empty
+            // 200 to another tenant is an answer it should not get.
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context) return 'not_found' as const
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -112,6 +117,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/segments')({
             })
           })
 
+          if (segments === 'not_found') return Response.json({ error: 'not_found' }, { status: 404 })
+          // A relationship but no session yet is a legitimate empty answer.
           if (!segments) return Response.json({ segments: [] }, { status: 200 })
           return Response.json({ segments: segments.map(toSegmentDto) })
         } catch (error) {

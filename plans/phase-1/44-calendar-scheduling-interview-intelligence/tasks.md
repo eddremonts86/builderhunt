@@ -2432,3 +2432,53 @@ Not fixed here — it predates this program and deserves its own work.
     rollback. Mark tasks/status implemented only from evidence.
   - Verify: no unchecked task, no waived acceptance criterion, no unresolved high/critical finding,
     and all production flags intended for general availability are enabled intentionally.
+
+## Phase 13 — the interview-material access model (found 2026-07-29 by running the suite as the real roles)
+
+Three findings from one root cause: `event_participants.access_granted` means two different things to
+the two halves of the codebase, and the interview half reads it as "was handed the candidate's
+material". They are ordered because **fixing the second without the first turns a latent disclosure
+into a live one** — today a participant cannot reach the material at all, which is the only reason the
+first finding is not already exploitable.
+
+- [ ] **Separate calendar visibility from interview-material access**
+  - Files: `drizzle/00XX_material_access.sql` (new — number from the then-current head),
+    `drizzle/meta/_journal.json`, `drizzle/meta/00XX_snapshot.json`, `src/shared/lib/db/schema.ts`,
+    `src/shared/lib/repositories/calendar.ts` (`hasGrantedParticipation`),
+    `src/lib/calendar/service.ts` (the participant insert)
+  - Do: Add `event_participants.material_access_granted boolean NOT NULL DEFAULT false` and point
+    `hasGrantedParticipation` at it. Leave `access_granted` exactly as it is — it is calendar
+    visibility, six tests in `tests/unit/lib/calendar` depend on internal participants getting it, and
+    `src/lib/calendar/service.ts:216` is right to grant it. Add the RLS policies for the new column in
+    the same migration.
+  - Verify: `pnpm exec playwright test tests/e2e/interview-privacy.spec.ts` passes "an ungranted
+    attendee sees the meeting and not the transcript" — the attendee still sees the event and gets 404
+    on brief/report/suggestions. `pnpm exec vitest run tests/unit/lib/calendar` stays 113/113.
+  - Why it matters: `service.ts` sets `accessGranted: Boolean(participant.userId)`, so adding a
+    colleague to an interview invite hands them the predicate that
+    `brief-context.ts` uses to release the brief, the report, the suggestions and the transcript. Its
+    own comment states the intent — "being on the attendee list is not the same act as being handed
+    the interview material" — and the column does not honour it.
+
+- [ ] **Let a granted participant reach the material at all**
+  - Files: `drizzle/00XX_invitation_participant_read.sql` (new), `drizzle/meta/_journal.json`,
+    `drizzle/meta/00XX_snapshot.json`
+  - Do: Add an RLS policy on `scheduling_invitations` allowing SELECT to a user who holds
+    `material_access_granted` on the invitation's `booked_event_id`. Only after the task above, so the
+    predicate being widened is the explicit grant and not "was invited to the meeting".
+  - Verify: `tests/e2e/interview-privacy.spec.ts`'s "a granted participant reads the material and
+    still cannot drive the session" passes — 200 on the brief, ≥400 on the session write.
+  - Why it matters: `scheduling_invitations` has one app policy, `app_owner_all`, requiring
+    `owner_user_id = app.user_id`. `briefContextForEvent` starts with an inner join against that
+    table, so it returns null at `if (!row)` before it ever evaluates `isGrantedParticipant`. The
+    branch that exists to admit participants is unreachable.
+
+- [ ] **Add a way to grant material access on purpose**
+  - Files: `src/routes/api/interviews/$interviewId/participants/$participantId.ts` (new),
+    `src/shared/lib/repositories/calendar.ts`, `tests/unit/security/interview-material-grant.test.ts` (new)
+  - Do: An owner-only endpoint that sets `material_access_granted` for one participant of one
+    interview, emitting a security audit event. Nothing in `src/routes/` writes that column today.
+  - Verify: the new test proves the owner can grant, a granted participant cannot grant, an
+    organization admin cannot grant, and the audit event carries no candidate data.
+  - Why it matters: with the first task done, the only way to share material is a direct SQL update —
+    which is how the e2e suite does it. The feature has no user-facing path.
