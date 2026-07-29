@@ -5,7 +5,15 @@
 services:
   db:
     profiles: ['standalone']
-    image: pgvector/pgvector:pg16
+    # Image MUST stay a `pgvector/pgvector:*` image — migration 0013 runs
+    # `CREATE EXTENSION vector` and a plain `postgres:18*` image makes the
+    # whole chain roll back. Pinned to the 0.8.5-pg18 tag (not the
+    # floating `pg18`) because the README reasons about 0.8.5-specific
+    # HNSW behaviour, and floating tags drift. Bumped from `pg16` on
+    # 2026-07-29 by the postgres-18-upgrade plan; the previous pg16
+    # volume is NOT readable on 18 — see deploy-runbook.md and
+    # `pnpm db:up` requires `--profile standalone down -v` first.
+    image: pgvector/pgvector:0.8.5-pg18
     container_name: builderhunt-db
     # Dev only: default max_connections=100 has been exhausted more than
     # once by the combination of a running dev server + drizzle-kit +
@@ -18,8 +26,13 @@ services:
       POSTGRES_DB: builderhunt
     ports:
       - '5432:5432'
+    # PG18+ requires the mount at /var/lib/postgresql (not /var/lib/postgresql/data).
+    # The new image's entrypoint refuses to start if it sees /var/lib/postgresql/data
+    # already populated — see https://github.com/docker-library/postgres/issues/37.
+    # The data is still under .../data inside the volume; the mount just has to point
+    # one level up so `pg_upgrade --link` has somewhere to put a new cluster.
     volumes:
-      - builderhunt_postgres_data:/var/lib/postgresql/data
+      - builderhunt_postgres_data:/var/lib/postgresql
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 5s
