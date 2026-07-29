@@ -30,15 +30,35 @@ completed backfill must write nothing.
 ## pgvector (semantic-search plan)
 
 The `builder_embeddings` table requires the Postgres `vector` extension. Local dev's
-`docker-compose.yml` already runs `pgvector/pgvector:pg16` (same Postgres 16 major as before —
-the existing data volume is compatible, no export/import needed).
+`docker-compose.yml` runs `pgvector/pgvector:0.8.5-pg18` (pinned, not the floating `pg18` tag —
+see `postgres-18-upgrade` for why). **The image MUST stay a `pgvector/pgvector:*` image**:
+a plain `postgres:18*` image does not ship the `vector` extension and `drizzle/0013`'s
+`CREATE EXTENSION vector` rolls back the entire migration chain.
+
+**Local dev — fresh checkout or a previously-Postgres-16 checkout (2026-07-29)**: the
+PG16 data volume is not readable on PG18 (different on-disk format, no `pg_upgrade` path
+across the Docker volume boundary). One-shot reset, before `pnpm db:up`:
+
+```sh
+pnpm db:down
+docker volume rm builderhunt_builderhunt_postgres_data
+pnpm db:up
+pnpm deploy:db
+pnpm db:seed:admin   # sets the platform admin row
+```
+
+A plain `pnpm db:up` against a PG16 volume silently no-ops when a `workspace-postgres`
+container is running (its image is outside this repo's control), so that cluster's
+major version is whatever your environment ships.
 
 **Before applying this feature's migration in production**: the managed Postgres resource
 (Coolify, on Hetzner) must also run a pgvector-enabled image or have the extension installed.
 Steps:
 1. Take a fresh encrypted backup and verify a restore rehearsal succeeds (standard gate above).
-2. Switch the Coolify Postgres resource's image to `pgvector/pgvector:pg16`. The data volume
-   persists across the image swap since the Postgres major version is unchanged.
+2. Switch the Coolify Postgres resource's image to a `pgvector/pgvector:*` image pinned at
+   the same minor as the local dev target. **The data volume does NOT persist across a
+   Postgres major bump** — go through the cutover runbook
+   (`docs/operations/deploy-runbook.md` → "PostgreSQL 16 → 18 cutover"), not a bare image swap.
 3. Confirm `CREATE EXTENSION IF NOT EXISTS vector;` succeeds, then apply this plan's migration.
 
 If the extension is missing, the app fails soft: `/api/search/semantic` returns

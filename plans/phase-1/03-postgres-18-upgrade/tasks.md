@@ -180,7 +180,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     keeps proving the code runs on production's current version, which is the whole point until
     Phase 4.
 
-- [ ] **Document the local reset (the PG16 volume is not readable by PG18)**
+- [x] **Document the local reset (the PG16 volume is not readable by PG18)**
   - Files: `docs/operations/deploy-runbook.md`, `docs/operations/database-migrations.md`
   - Do: add the reset recipe — `docker compose --profile standalone down -v` → `pnpm db:up` →
     `pnpm deploy:db` → `pnpm db:seed:admin` (note the second colon; `package.json:46`) — and a
