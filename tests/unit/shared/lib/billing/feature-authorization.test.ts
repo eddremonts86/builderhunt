@@ -43,6 +43,7 @@ import {
   reserveCredits,
   settleReservation,
 } from '~/shared/lib/billing/feature-authorization'
+import { tenantTransaction } from '../../../helpers/tenant-transaction'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -76,7 +77,7 @@ async function seedSubscription(organizationId: string, tier: 'pro' | 'pro_max' 
 
 async function seedGrant(organizationId: string, units: number): Promise<string> {
   const grantId = uniqueId('grant')
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, organizationId, (tx) => grantCredits(tx, {
     grantId, ledgerEntryId: uniqueId('entry'), organizationId, source: 'promotional',
     units, expiresAt: new Date(Date.now() + 30 * 86_400_000), idempotencyKey: uniqueId('idem'),
   }))
@@ -86,7 +87,7 @@ async function seedGrant(organizationId: string, units: number): Promise<string>
 /** A paid-source grant (unlike `seedGrant`'s `promotional` default) — makes the org a "payer" for `findEarliestPaidGrantCreatedAt`/the G6 first-payer window. */
 async function seedPaidGrant(organizationId: string, units: number): Promise<string> {
   const grantId = uniqueId('grant')
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, organizationId, (tx) => grantCredits(tx, {
     grantId, ledgerEntryId: uniqueId('entry'), organizationId, source: 'pack',
     units, expiresAt: new Date(Date.now() + 30 * 86_400_000), idempotencyKey: uniqueId('idem'),
   }))
@@ -117,34 +118,34 @@ afterEach(() => {
 describe('checkEntitlement', () => {
   it('rejects an unknown feature', async () => {
     const principal = await freshPrincipal()
-    const result = await db.transaction((tx) => checkEntitlement(tx, principal, { feature: 'not_a_real_feature' }))
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'not_a_real_feature' }))
     expect(result).toEqual({ allowed: false, reason: 'unknown_feature' })
   })
 
   it('rejects an organization with no subscription for a tier-gated feature', async () => {
     const principal = await freshPrincipal()
-    const result = await db.transaction((tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
     expect(result).toEqual({ allowed: false, reason: 'no_subscription' })
   })
 
   it('rejects a subscription whose tier is below the feature\'s minimum', async () => {
     const principal = await freshPrincipal()
     await seedSubscription(principal.organizationId, 'pro')
-    const result = await db.transaction((tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
     expect(result).toEqual({ allowed: false, reason: 'tier_too_low' })
   })
 
   it('allows a subscription that meets the feature\'s minimum tier', async () => {
     const principal = await freshPrincipal()
     await seedSubscription(principal.organizationId, 'pro_max')
-    const result = await db.transaction((tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
     expect(result).toEqual({ allowed: true })
   })
 
   it('treats team the same as pro_max for a pro_max-gated feature', async () => {
     const principal = await freshPrincipal()
     await seedSubscription(principal.organizationId, 'team')
-    const result = await db.transaction((tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => checkEntitlement(tx, principal, { feature: 'ai_sourcing_sprint' }))
     expect(result).toEqual({ allowed: true })
   })
 })
@@ -153,7 +154,7 @@ describe('reserveCredits (feature layer)', () => {
   it('throws insufficient_entitlement before ever touching the credit ledger', async () => {
     const principal = await freshPrincipal()
     await seedGrant(principal.organizationId, 1000) // plenty of credits, but no subscription at all
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))).rejects.toMatchObject({ code: 'insufficient_entitlement' })
   })
@@ -161,7 +162,7 @@ describe('reserveCredits (feature layer)', () => {
   it('throws insufficient_credits when entitled but the organization has no balance', async () => {
     const principal = await freshPrincipal()
     await seedSubscription(principal.organizationId, 'pro_max')
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))).rejects.toMatchObject({ code: 'insufficient_credits' })
   })
@@ -170,7 +171,7 @@ describe('reserveCredits (feature layer)', () => {
     const principal = await freshPrincipal()
     await seedSubscription(principal.organizationId, 'pro_max')
     await seedGrant(principal.organizationId, 1000)
-    const result = await db.transaction((tx) => reserveCredits(tx, principal, {
+    const result = await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
     expect(result.reservation.maximumUnits).toBe(50) // RATE_CARDS.ai_sourcing_sprint.maxUnits
@@ -191,11 +192,11 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
 
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
     // Second reservation pushes this seat to 100 units against a 50-unit cap — still not flagged/blocked, solo seat.
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).resolves.toBeDefined()
     expect(insert).not.toHaveBeenCalled()
@@ -210,7 +211,7 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
     const { incrementSeatUsage } = await import('~/shared/lib/repositories/seat-usage')
     const otherSeatUserId = uniqueId('user')
     await db.insert(authUsers).values({ id: otherSeatUserId, name: otherSeatUserId, email: `${otherSeatUserId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
-    await db.transaction((tx) => incrementSeatUsage(tx, {
+    await tenantTransaction(db, principal.organizationId, (tx) => incrementSeatUsage(tx, {
       id: uniqueId('seat-usage'), organizationId: principal.organizationId, userId: otherSeatUserId,
       day: todayUtc(), action: 'messages', count: 1, creditUnits: 10,
     }))
@@ -218,10 +219,10 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // First reservation (50 units) already exceeds the 50-unit cap is false (== cap, not over); second pushes to 100, over cap.
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).resolves.toBeDefined() // observe mode: never throws, however over cap
 
@@ -243,7 +244,7 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
     const { incrementSeatUsage, getSeatUsage } = await import('~/shared/lib/repositories/seat-usage')
     const otherSeatUserId = uniqueId('user')
     await db.insert(authUsers).values({ id: otherSeatUserId, name: otherSeatUserId, email: `${otherSeatUserId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
-    await db.transaction((tx) => incrementSeatUsage(tx, {
+    await tenantTransaction(db, principal.organizationId, (tx) => incrementSeatUsage(tx, {
       id: uniqueId('seat-usage'), organizationId: principal.organizationId, userId: otherSeatUserId,
       day: todayUtc(), action: 'messages', count: 1, creditUnits: 10,
     }))
@@ -251,16 +252,16 @@ describe('reserveCredits — per-seat credit sub-budget + pool_drain (abuse-and-
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // First reservation brings this seat to exactly 50 (== cap, not over) — must succeed.
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
 
     // Second reservation would push this seat to 100 (> 50 cap) in a multi-seat org — must block BEFORE reserving.
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).rejects.toMatchObject({ code: 'blocked' })
 
-    const seatUsageAfterBlock = await db.transaction((tx) => getSeatUsage(tx, principal.organizationId, principal.userId, todayUtc(), 'messages'))
+    const seatUsageAfterBlock = await tenantTransaction(db, principal.organizationId, (tx) => getSeatUsage(tx, principal.organizationId, principal.userId, todayUtc(), 'messages'))
     expect(seatUsageAfterBlock?.creditUnits).toBe(50) // unchanged — the blocked attempt never reserved or recorded anything
   })
 })
@@ -277,10 +278,10 @@ describe('reserveCredits — first-payer credit-consumption cap + credit_spend_v
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // Two reservations of 50 units each (100 total) — well over the 50-unit cap, but never applies once outside the window.
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).resolves.toBeDefined()
     expect(insert).not.toHaveBeenCalled()
@@ -295,11 +296,11 @@ describe('reserveCredits — first-payer credit-consumption cap + credit_spend_v
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // First reservation reaches exactly the cap (== 50, not over) — must succeed, no signal yet.
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
     // Second reservation pushes the window total to 100 (> 50 cap) — observe mode never throws.
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).resolves.toBeDefined()
 
@@ -321,12 +322,12 @@ describe('reserveCredits — first-payer credit-consumption cap + credit_spend_v
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // First reservation reaches exactly the cap (== 50) — must succeed.
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))
 
     // Second reservation would push the window total to 100 (> 50 cap) — must block BEFORE reserving.
-    await expect(db.transaction((tx) => reserveCredits(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }, deps))).rejects.toMatchObject({ code: 'blocked' })
   })
@@ -341,7 +342,7 @@ describe('fake feature/provider integration — no provider call before reservat
     let providerCalled = false
     const fakeProvider = () => { providerCalled = true }
 
-    await db.transaction(async (tx) => {
+    await tenantTransaction(db, principal.organizationId, async (tx) => {
       // A feature implementation would look exactly like this: reserve first, provider call only after.
       expect(providerCalled).toBe(false)
       await reserveCredits(tx, principal, {
@@ -362,7 +363,7 @@ describe('fake feature/provider integration — no provider call before reservat
     const fakeProvider = () => { providerCalled = true }
 
     async function fakeFeature() {
-      await db.transaction(async (tx) => {
+      await tenantTransaction(db, principal.organizationId, async (tx) => {
         await reserveCredits(tx, principal, {
           reservationId: uniqueId('reservation'), operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
         })
@@ -382,7 +383,7 @@ describe('fake feature/provider integration — no provider call before reservat
     let providerUnitsProcessed = 0
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
     providerUnitsProcessed += 50 // simulated provider work done under the initial reservation
@@ -390,7 +391,7 @@ describe('fake feature/provider integration — no provider call before reservat
     // Simulated long-running operation needs more budget than remains (60 - 50 = 10 available).
     let stoppedOnExtendFailure = false
     try {
-      await db.transaction((tx) => extendReservation(tx, principal, {
+      await tenantTransaction(db, principal.organizationId, (tx) => extendReservation(tx, principal, {
         reservationId, additionalMaximumUnits: 40, idempotencyKey: uniqueId('idem'),
       }))
       providerUnitsProcessed += 40 // must never execute
@@ -404,7 +405,7 @@ describe('fake feature/provider integration — no provider call before reservat
     expect(stoppedOnExtendFailure).toBe(true)
     expect(providerUnitsProcessed).toBe(50) // only the initially-reserved work happened, nothing from the failed extension
 
-    await db.transaction((tx) => releaseReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => releaseReservation(tx, principal, {
       reservationId, idempotencyKey: uniqueId('idem'), reason: 'operation stopped after failed extension',
     }))
   })
@@ -417,21 +418,21 @@ describe('refundUsage', () => {
     const grantId = await seedGrant(principal.organizationId, 100)
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
     }))
     // semantic_search_query rate card maxUnits is 5.
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 5, idempotencyKey: uniqueId('idem'),
     }))
 
-    const beforeRefund = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
-    const refund = await db.transaction((tx) => refundUsage(tx, principal, {
+    const beforeRefund = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const refund = await tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 3, reason: 'downstream provider call was itself refunded', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-1',
     }))
     expect(refund.refundedUnits).toBe(3)
 
-    const afterRefund = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const afterRefund = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
     expect(afterRefund!.remainingUnits).toBe(beforeRefund!.remainingUnits + 3)
   })
 
@@ -441,23 +442,23 @@ describe('refundUsage', () => {
     const grantId = await seedGrant(principal.organizationId, 100)
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 5, idempotencyKey: uniqueId('idem'),
     }))
 
     const refundIdempotencyKey = uniqueId('idem')
-    await db.transaction((tx) => refundUsage(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey, providerEvidenceReference: 'evidence-2',
     }))
-    const afterFirst = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const afterFirst = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
 
-    await db.transaction((tx) => refundUsage(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 2, reason: 'refund', idempotencyKey: refundIdempotencyKey, providerEvidenceReference: 'evidence-2',
     }))
-    const afterSecond = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const afterSecond = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
 
     expect(afterSecond!.remainingUnits).toBe(afterFirst!.remainingUnits)
   })
@@ -468,14 +469,14 @@ describe('refundUsage', () => {
     await seedGrant(principal.organizationId, 100)
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 3, idempotencyKey: uniqueId('idem'),
     }))
 
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 4, reason: 'over-refund attempt', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-3',
     }))).rejects.toMatchObject({ code: 'invalid_state' })
   })
@@ -486,11 +487,11 @@ describe('refundUsage', () => {
     await seedGrant(principal.organizationId, 100)
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
     }))
 
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 1, reason: 'not settled yet', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-4',
     }))).rejects.toMatchObject({ code: 'invalid_state' })
   })
@@ -501,14 +502,14 @@ describe('refundUsage', () => {
     await seedGrant(principal.organizationId, 100)
     const reservationId = uniqueId('reservation')
 
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'semantic_search_query', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 3, idempotencyKey: uniqueId('idem'),
     }))
 
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 1, reason: 'no evidence', idempotencyKey: uniqueId('idem'), providerEvidenceReference: '   ',
     }))).rejects.toMatchObject({ code: 'invalid_state' })
   })
@@ -520,10 +521,10 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
     await seedSubscription(principal.organizationId, 'pro_max')
     const grantId = await seedGrant(principal.organizationId, 1000)
     const reservationId = uniqueId('reservation')
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 10, idempotencyKey: uniqueId('idem'),
     }))
 
@@ -533,18 +534,18 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // First refund reaches exactly the 3-unit cap — must succeed.
-    await db.transaction((tx) => refundUsage(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 3, reason: 'partial refund 1', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-cap-1',
     }, deps))
 
-    const beforeBlockedAttempt = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const beforeBlockedAttempt = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
 
     // Second refund would push the rolling total to 4 (> 3 cap) — must block BEFORE crediting anything.
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 1, reason: 'partial refund 2', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-cap-2',
     }, deps))).rejects.toMatchObject({ code: 'blocked' })
 
-    const afterBlockedAttempt = await db.transaction((tx) => findCreditGrant(tx, principal.organizationId, grantId))
+    const afterBlockedAttempt = await tenantTransaction(db, principal.organizationId, (tx) => findCreditGrant(tx, principal.organizationId, grantId))
     expect(afterBlockedAttempt!.remainingUnits).toBe(beforeBlockedAttempt!.remainingUnits) // unchanged — the blocked attempt never credited anything
   })
 
@@ -553,10 +554,10 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
     await seedSubscription(principal.organizationId, 'pro_max')
     await seedGrant(principal.organizationId, 1000)
     const reservationId = uniqueId('reservation')
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 20, idempotencyKey: uniqueId('idem'),
     }))
 
@@ -565,7 +566,7 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
     // 11/20 = 0.55 > the default 0.5 ratio threshold.
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 11, reason: 'large refund', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-ratio',
     }, deps))).resolves.toBeDefined()
 
@@ -582,10 +583,10 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
     await seedSubscription(principal.organizationId, 'pro_max')
     await seedGrant(principal.organizationId, 1000)
     const reservationId = uniqueId('reservation')
-    await db.transaction((tx) => reserveCredits(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => reserveCredits(tx, principal, {
       reservationId, operation: 'ai_sourcing_sprint', idempotencyKey: uniqueId('idem'),
     }))
-    await db.transaction((tx) => settleReservation(tx, principal, {
+    await tenantTransaction(db, principal.organizationId, (tx) => settleReservation(tx, principal, {
       reservationId, actualUnits: 20, idempotencyKey: uniqueId('idem'),
     }))
 
@@ -595,7 +596,7 @@ describe('refundUsage — refund-farming cap + refund_farming signal (abuse-and-
 
     const insert = vi.fn()
     const deps = { insert, sink: { write: vi.fn() } }
-    await expect(db.transaction((tx) => refundUsage(tx, principal, {
+    await expect(tenantTransaction(db, principal.organizationId, (tx) => refundUsage(tx, principal, {
       settlementId: reservationId, units: 11, reason: 'large refund', idempotencyKey: uniqueId('idem'), providerEvidenceReference: 'evidence-ratio-enforce',
     }, deps))).resolves.toBeDefined()
 

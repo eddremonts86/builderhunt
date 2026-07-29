@@ -10,6 +10,7 @@ import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
+import { tenantTransaction } from '../../../helpers/tenant-transaction'
 
 const mocks = vi.hoisted(() => ({
   requireTenantPrincipal: vi.fn(),
@@ -116,9 +117,13 @@ beforeAll(async () => {
   const disposable = await createDisposableTestDatabase('interview_report_routes')
   db = disposable.db
   drop = disposable.drop
+  // Mirrors the real `withTenantContext`: it sets `app.organization_id` before the callback, and every
+  // RLS policy on a tenant-private table reads it. A bare `db.transaction` here made the mock a
+  // weaker thing than the function it stands in for, which surfaced the moment credit writes began
+  // elevating to a role RLS applies to.
   mocks.withTenantContext.mockImplementation(
     (_principal: TenantPrincipal, operation: (tx: unknown) => Promise<unknown>) =>
-      db.transaction((tx) => operation(tx)),
+      tenantTransaction(db, ORG, (tx: unknown) => operation(tx)),
   )
 
   await db.insert(schema.organizations).values({ id: ORG, name: 'Org', slug: ORG })
@@ -146,6 +151,26 @@ beforeAll(async () => {
     timezone: 'UTC', allDay: false, busy: true,
   }).returning({ id: schema.calendarEvents.id })
   eventId = event.id
+
+  /*
+   * The invitation behind the event, which is what makes it an interview.
+   *
+   * These routes authorize through `briefContextForEvent`, and that walks back from the event to its
+   * invitation — no invitation means a personal calendar entry, not an interview, and the answer is
+   * 404. Seeding only the event made every case here a 404 the moment the report routes started
+   * authorizing at all, which is the correct answer to the data this file was describing.
+   */
+  await db.insert(schema.schedulingInvitations).values({
+    organizationId: ORG, ownerUserId: OWNER, roleTitle: 'Engineer', roleContext: 'Backend',
+    durationMinutes: 45, timezone: 'UTC', modality: 'remote_call', policyVersion: 'v1',
+    bookedEventId: eventId,
+  })
+
+  // A colleague explicitly handed access, which is what `access_granted` means. Without this row the
+  // PARTICIPANT cases below are testing a stranger, not a participant, and every one of them is a 404.
+  await db.insert(schema.eventParticipants).values({
+    organizationId: ORG, eventId, eventOwnerUserId: OWNER, userId: PARTICIPANT, role: 'attendee', accessGranted: true,
+  })
 }, 180_000)
 
 afterAll(async () => { await drop() })

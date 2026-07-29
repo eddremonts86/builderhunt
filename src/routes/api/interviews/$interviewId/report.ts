@@ -131,10 +131,18 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           }
 
           const outcome = await withTenantContext(principal, async (transaction) => {
-            // Writes are the owner's alone: a granted participant reads the material and does not
-            // author it. Same `null` -> 404 as above rather than a 403.
+            /*
+             * Writes are the owner's alone: a granted participant reads the material and does not
+             * author it. Two different refusals, deliberately:
+             *
+             *   - no relationship at all -> `null` -> 404, so the response cannot confirm that an
+             *     interview exists;
+             *   - a granted participant -> 403, because they can already read it. Answering 404 to
+             *     someone who just fetched the thing is a lie that reads as a bug.
+             */
             const context = await briefContextForEvent(transaction, principal, params.interviewId)
-            if (!context?.isOwner) return null
+            if (!context) return null
+            if (!context.isOwner) return 'not_owner' as const
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -147,6 +155,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           })
 
           if (!outcome) return Response.json({ error: 'not_found' }, { status: 404 })
+          if (outcome === 'not_owner') return Response.json({ error: 'not_owner' }, { status: 403 })
           if (outcome.kind === 'no_transcript') {
             return Response.json({ error: 'no_transcript' }, { status: 409 })
           }
@@ -190,10 +199,18 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           }
 
           const report = await withTenantContext(principal, async (transaction) => {
-            // Writes are the owner's alone: a granted participant reads the material and does not
-            // author it. Same `null` -> 404 as above rather than a 403.
+            /*
+             * Writes are the owner's alone: a granted participant reads the material and does not
+             * author it. Two different refusals, deliberately:
+             *
+             *   - no relationship at all -> `null` -> 404, so the response cannot confirm that an
+             *     interview exists;
+             *   - a granted participant -> 403, because they can already read it. Answering 404 to
+             *     someone who just fetched the thing is a lie that reads as a bug.
+             */
             const context = await briefContextForEvent(transaction, principal, params.interviewId)
-            if (!context?.isOwner) return null
+            if (!context) return null
+            if (!context.isOwner) return 'not_owner' as const
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -207,6 +224,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
           })
 
           if (!report) return Response.json({ error: 'not_found' }, { status: 404 })
+          if (report === 'not_owner') return Response.json({ error: 'not_owner' }, { status: 403 })
           await emitSecurityAudit({
             organizationId: principal.organizationId,
             actorUserId: principal.userId,

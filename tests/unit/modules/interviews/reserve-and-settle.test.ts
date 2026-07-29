@@ -22,6 +22,7 @@ import {
   authorizeContextualQuestion,
   withInterviewCredits,
 } from '~/modules/interviews/billing'
+import { tenantTransaction } from '../../helpers/tenant-transaction'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -87,7 +88,7 @@ async function seedSubscription(tier: 'pro' | 'free') {
 }
 
 async function seedCredits(units: number) {
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, ORG, (tx) => grantCredits(tx, {
     grantId: uniqueId('grant'),
     ledgerEntryId: uniqueId('entry'),
     organizationId: ORG,
@@ -113,7 +114,7 @@ describe('no provider request starts before a reservation exists', () => {
     const reservationId = uniqueId('res')
     let stateWhenProviderRan: string | null = null
 
-    await db.transaction((tx) => withInterviewCredits(
+    await tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'brief', reservationId, idempotencyKey: uniqueId('idem') },
@@ -135,7 +136,7 @@ describe('no provider request starts before a reservation exists', () => {
     await seedCredits(100)
     let called = false
 
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'brief', reservationId: uniqueId('res'), idempotencyKey: uniqueId('idem') },
@@ -151,7 +152,7 @@ describe('no provider request starts before a reservation exists', () => {
   it('never calls the provider when there are no credits', async () => {
     let called = false
 
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'brief', reservationId: uniqueId('res'), idempotencyKey: uniqueId('idem') },
@@ -170,7 +171,7 @@ describe('settlement records what the provider actually billed', () => {
     await seedCredits(100)
     const reservationId = uniqueId('res')
 
-    const outcome = await db.transaction((tx) => withInterviewCredits(
+    const outcome = await tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'report', reservationId, idempotencyKey: uniqueId('idem') },
@@ -191,7 +192,7 @@ describe('settlement records what the provider actually billed', () => {
     await seedCredits(100)
     const reservationId = uniqueId('res')
 
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'brief', reservationId, idempotencyKey: uniqueId('idem') },
@@ -204,7 +205,7 @@ describe('settlement records what the provider actually billed', () => {
   it('rejects a non-integer or negative actual', async () => {
     await seedCredits(100)
     for (const actualUnits of [-1, 1.5]) {
-      await expect(db.transaction((tx) => withInterviewCredits(
+      await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
         tx as never,
         principal,
         { operation: 'brief', reservationId: uniqueId('res'), idempotencyKey: uniqueId('idem') },
@@ -222,7 +223,7 @@ describe('a failed provider does not leave a charge behind', () => {
     // The error is caught *inside* the transaction, so it commits. This is the caller that the
     // release path exists for: a worker that fails one interview and keeps the rest of its
     // bookkeeping would otherwise leave a hold standing until the grace window expired.
-    const caught = await db.transaction(async (tx) => {
+    const caught = await tenantTransaction(db, ORG, async (tx) => {
       try {
         await withInterviewCredits(
           tx as never,
@@ -247,7 +248,7 @@ describe('a failed provider does not leave a charge behind', () => {
     await seedCredits(100)
     const reservationId = uniqueId('res')
 
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'brief', reservationId, idempotencyKey: uniqueId('idem') },
@@ -266,7 +267,7 @@ describe('long-running work extends its own budget', () => {
     await seedCredits(400)
     const reservationId = uniqueId('res')
 
-    const outcome = await db.transaction((tx) => withInterviewCredits(
+    const outcome = await tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'transcriptionPerMinute', reservationId, idempotencyKey: uniqueId('idem') },
@@ -290,7 +291,7 @@ describe('long-running work extends its own budget', () => {
     await seedCredits(180)
     const reservationId = uniqueId('res')
 
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'transcriptionPerMinute', reservationId, idempotencyKey: uniqueId('idem') },
@@ -307,7 +308,7 @@ describe('long-running work extends its own budget', () => {
 
   it('rejects a non-positive extension', async () => {
     await seedCredits(400)
-    await expect(db.transaction((tx) => withInterviewCredits(
+    await expect(tenantTransaction(db, ORG, (tx) => withInterviewCredits(
       tx as never,
       principal,
       { operation: 'transcriptionPerMinute', reservationId: uniqueId('res'), idempotencyKey: uniqueId('idem') },
@@ -321,7 +322,7 @@ describe('long-running work extends its own budget', () => {
 
 describe('contextual questions are gated by two conditions, not one', () => {
   it('allows a paid tier with a live transcription', async () => {
-    await expect(db.transaction((tx) =>
+    await expect(tenantTransaction(db, ORG, (tx) =>
       authorizeContextualQuestion(tx as never, principal, { transcriptionReservationActive: true })))
       .resolves.toBeUndefined()
   })
@@ -329,21 +330,21 @@ describe('contextual questions are gated by two conditions, not one', () => {
   it('refuses a paid tier with no live transcription', async () => {
     // The check that stops the question endpoint being used as a free general-purpose model between
     // interviews. Tier alone would allow it.
-    await expect(db.transaction((tx) =>
+    await expect(tenantTransaction(db, ORG, (tx) =>
       authorizeContextualQuestion(tx as never, principal, { transcriptionReservationActive: false })))
       .rejects.toMatchObject({ name: 'InterviewBillingError', code: 'transcription_not_active' })
   })
 
   it('refuses an unsubscribed organization even with a live transcription', async () => {
     await freshOrganization('none')
-    await expect(db.transaction((tx) =>
+    await expect(tenantTransaction(db, ORG, (tx) =>
       authorizeContextualQuestion(tx as never, principal, { transcriptionReservationActive: true })))
       .rejects.toMatchObject({ code: 'insufficient_entitlement' })
   })
 
   it('reserves nothing', async () => {
     const before = await db.select().from(billingCreditReservations)
-    await db.transaction((tx) =>
+    await tenantTransaction(db, ORG, (tx) =>
       authorizeContextualQuestion(tx as never, principal, { transcriptionReservationActive: true }))
     const after = await db.select().from(billingCreditReservations)
     expect(after.length, 'included means included — no hold, no ledger entry').toBe(before.length)

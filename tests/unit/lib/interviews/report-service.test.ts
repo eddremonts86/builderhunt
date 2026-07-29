@@ -27,6 +27,7 @@ const {
   listReportVersions,
 } = await import('~/shared/lib/repositories/interviews')
 const { AIParseError, AIProviderError } = await import('~/shared/lib/ai/errors')
+import { tenantTransaction } from '../../helpers/tenant-transaction'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -99,7 +100,7 @@ beforeEach(async () => {
   await db.delete(schema.billingLedgerEntries)
   await db.delete(schema.billingCreditReservations)
   await db.delete(schema.billingCreditGrants)
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, ORG, (tx) => grantCredits(tx, {
     grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId: ORG,
     source: 'promotional', units: 100, expiresAt: FAR_FUTURE(), idempotencyKey: uniqueId('idem'),
   }))
@@ -116,7 +117,7 @@ beforeEach(async () => {
 })
 
 async function seedBrief() {
-  await db.transaction((tx) => insertBriefVersion(tx as never, {
+  await tenantTransaction(db, ORG, (tx) => insertBriefVersion(tx as never, {
     organizationId: ORG, eventId, ownerUserId: OWNER,
     content: briefContent, evidenceManifest: [{ id: 'doc:1', kind: 'document', label: 'cv.pdf' }],
     provider: 'mistral', model: 'mistral-medium-2604', promptVersion: '1',
@@ -174,7 +175,7 @@ function goodProvider(calls: { count: number }, overrides: Record<string, unknow
   }
 }
 
-const generate = (overrides: Record<string, unknown> = {}) => db.transaction(async (tx) => service.generateReport(
+const generate = (overrides: Record<string, unknown> = {}) => tenantTransaction(db, ORG, async (tx) => service.generateReport(
   tx as never,
   principal,
   { session: await currentSession(), now: NOW, complete: goodProvider({ count: 0 }) as never, ...overrides },
@@ -204,7 +205,7 @@ describe('generating a report', () => {
   it('refuses a caller who does not own the interview', async () => {
     await seedBrief()
     await seedSegments()
-    await expect(db.transaction(async (tx) => service.generateReport(tx as never, principal, {
+    await expect(tenantTransaction(db, ORG, async (tx) => service.generateReport(tx as never, principal, {
       session: await currentSession({ ownerUserId: OTHER }), now: NOW, complete: goodProvider({ count: 0 }) as never,
     }))).rejects.toMatchObject({ code: 'not_owner' })
   })
@@ -329,7 +330,7 @@ describe('the template path', () => {
     await db.delete(schema.billingCreditAllocations)
     await db.delete(schema.billingLedgerEntries)
     await db.delete(schema.billingCreditGrants)
-    await db.transaction((tx) => grantCredits(tx, {
+    await tenantTransaction(db, ORG, (tx) => grantCredits(tx, {
       grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId: ORG,
       source: 'promotional', units: 1, expiresAt: FAR_FUTURE(), idempotencyKey: uniqueId('idem'),
     }))
@@ -400,7 +401,7 @@ describe('editing', () => {
   }
 
   const edit = (content: unknown, expectedVersion = 1, actor = principal) =>
-    db.transaction(async (tx) => service.editReport(tx as never, actor, {
+    tenantTransaction(db, ORG, async (tx) => service.editReport(tx as never, actor, {
       session: await currentSession(), expectedVersion, content, now: NOW,
     }))
 
@@ -425,7 +426,7 @@ describe('editing', () => {
 
   it('refuses a non-owner', async () => {
     const { ids } = await generated()
-    await expect(db.transaction(async (tx) => service.editReport(tx as never, principal, {
+    await expect(tenantTransaction(db, ORG, async (tx) => service.editReport(tx as never, principal, {
       session: await currentSession({ ownerUserId: OTHER }), expectedVersion: 1, content: reportContent(ids),
     }))).rejects.toMatchObject({ code: 'not_owner' })
   })
@@ -481,7 +482,7 @@ describe('finalizing', () => {
   }
 
   const finalize = (expectedVersion = 1) =>
-    db.transaction(async (tx) => service.finalize(tx as never, principal, {
+    tenantTransaction(db, ORG, async (tx) => service.finalize(tx as never, principal, {
       session: await currentSession(), expectedVersion, now: NOW,
     }))
 
@@ -500,7 +501,7 @@ describe('finalizing', () => {
 
   it('refuses a stale version', async () => {
     const ids = await generated()
-    await db.transaction(async (tx) => service.editReport(tx as never, principal, {
+    await tenantTransaction(db, ORG, async (tx) => service.editReport(tx as never, principal, {
       session: await currentSession(), expectedVersion: 1, content: reportContent(ids), now: NOW,
     }))
     // Someone else replaced the draft this caller was looking at.
@@ -512,14 +513,14 @@ describe('finalizing', () => {
     await finalize()
     // A finalized report is the record. Editing it would change what a decision was made from, after the
     // fact.
-    await expect(db.transaction(async (tx) => service.editReport(tx as never, principal, {
+    await expect(tenantTransaction(db, ORG, async (tx) => service.editReport(tx as never, principal, {
       session: await currentSession(), expectedVersion: 1, content: reportContent(ids), now: NOW,
     }))).rejects.toMatchObject({ code: 'already_final' })
   })
 
   it('refuses a non-owner', async () => {
     await generated()
-    await expect(db.transaction(async (tx) => service.finalize(tx as never, principal, {
+    await expect(tenantTransaction(db, ORG, async (tx) => service.finalize(tx as never, principal, {
       session: await currentSession({ ownerUserId: OTHER }), expectedVersion: 1,
     }))).rejects.toMatchObject({ code: 'not_owner' })
   })
@@ -530,18 +531,18 @@ describe('finalizing', () => {
     // for the race the service check cannot see: two clients both read `draft`, both pass, and only one
     // UPDATE may win. Reaching the repository directly is the only way to exercise it.
     await generated()
-    await db.transaction((tx) => finalizeReport(tx as never, {
+    await tenantTransaction(db, ORG, (tx) => finalizeReport(tx as never, {
       organizationId: ORG, eventId, version: 1, finalizedAt: NOW,
     }))
 
     const secondAt = new Date(NOW.getTime() + 60_000)
-    await expect(db.transaction((tx) => finalizeReport(tx as never, {
+    await expect(tenantTransaction(db, ORG, (tx) => finalizeReport(tx as never, {
       organizationId: ORG, eventId, version: 1, finalizedAt: secondAt,
     }))).rejects.toMatchObject({ code: 'version_conflict' })
 
     // And the recorded time is the first one. Without the predicate the second write would silently move
     // when the decision was made.
-    const latest = await db.transaction((tx) => findLatestReport(tx as never, { organizationId: ORG, eventId }))
+    const latest = await tenantTransaction(db, ORG, (tx) => findLatestReport(tx as never, { organizationId: ORG, eventId }))
     expect(latest?.finalizedAt).toEqual(NOW)
   })
 
@@ -555,11 +556,11 @@ describe('versions', () => {
     await seedBrief()
     const ids = await seedSegments()
     await generate()
-    await db.transaction(async (tx) => service.editReport(tx as never, principal, {
+    await tenantTransaction(db, ORG, async (tx) => service.editReport(tx as never, principal, {
       session: await currentSession(), expectedVersion: 1, content: reportContent(ids), now: NOW,
     }))
 
-    const versions = await db.transaction((tx) => listReportVersions(tx as never, {
+    const versions = await tenantTransaction(db, ORG, (tx) => listReportVersions(tx as never, {
       organizationId: ORG, eventId,
     }))
     expect(versions.map((row) => row.version)).toEqual([2, 1])
@@ -571,7 +572,7 @@ describe('versions', () => {
     await seedBrief()
     await seedSegments()
     await generate()
-    const latest = await db.transaction((tx) => findLatestReport(tx as never, { organizationId: ORG, eventId }))
+    const latest = await tenantTransaction(db, ORG, (tx) => findLatestReport(tx as never, { organizationId: ORG, eventId }))
     expect(latest?.version).toBe(1)
     expect(latest?.status).toBe('draft')
   })

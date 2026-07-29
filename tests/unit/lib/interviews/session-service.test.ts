@@ -12,6 +12,7 @@
 import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { tenantTransaction } from '../../helpers/tenant-transaction'
 
 const mockEnv = vi.hoisted(() => ({
   INTERVIEW_TRANSCRIPTION_ENABLED: 'true' as 'true' | 'false',
@@ -151,7 +152,7 @@ async function resetBillingAndSessions() {
 }
 
 async function grantUnits(organizationId: string, units: number) {
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, organizationId, (tx) => grantCredits(tx, {
     grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId,
     source: 'promotional', units, expiresAt: FAR_FUTURE(), idempotencyKey: uniqueId('idem'),
   }))
@@ -184,8 +185,17 @@ async function withdrawConsent() {
     .where(eq(schema.privacyConsents.invitationId, invitationId))
 }
 
+/*
+ * Two helpers, not one with a hardcoded organization: RLS reads `app.organization_id`, and this file
+ * drives two tenants — `principal` (ORG) and `poorPrincipal` (POOR_ORG, the organization with no
+ * credits). Setting ORG for a POOR_ORG call would have made the "insufficient credits" test write
+ * under the funded tenant, which either fails WITH CHECK or, worse, passes while asserting nothing.
+ */
 const tx = <T>(work: (transaction: never) => Promise<T>): Promise<T> =>
-  db.transaction((transaction) => work(transaction as never))
+  tenantTransaction(db, ORG, (transaction) => work(transaction as never))
+
+const poorTx = <T>(work: (transaction: never) => Promise<T>): Promise<T> =>
+  tenantTransaction(db, POOR_ORG, (transaction) => work(transaction as never))
 
 /** Walks the session to `live` and returns it, so each test starts from the state it cares about. */
 async function toLive() {
@@ -466,11 +476,11 @@ describe('the reservation lifecycle', () => {
     await acceptConsent(poorInvitationId, POOR_ORG)
     await grantUnits(POOR_ORG, 500)
     const poorContext = { ...context, eventId: poorEventId, invitationId: poorInvitationId }
-    const started = await tx((t) => service.startSession(t, poorPrincipal, poorContext, { now: NOW }))
-    const ready = await tx((t) => service.markSessionReady(t, poorPrincipal, {
+    const started = await poorTx((t) => service.startSession(t, poorPrincipal, poorContext, { now: NOW }))
+    const ready = await poorTx((t) => service.markSessionReady(t, poorPrincipal, {
       eventId: poorEventId, invitationId: poorInvitationId, expectedVersion: started.version,
     }))
-    await expect(tx((t) => service.goLive(t, poorPrincipal, {
+    await expect(poorTx((t) => service.goLive(t, poorPrincipal, {
       eventId: poorEventId, invitationId: poorInvitationId, expectedVersion: ready.version, now: NOW,
     }))).rejects.toMatchObject({ code: 'not_entitled' })
   })
@@ -550,7 +560,7 @@ describe('the reservation lifecycle', () => {
   it('survives a settlement that already happened', async () => {
     const live = await toLive()
     // The reservation is settled out from under the service, as a crashed retry would leave it.
-    await db.transaction((t) => settleReservation(t as never, principal, {
+    await tenantTransaction(db, ORG, (t) => settleReservation(t as never, principal, {
       reservationId: service.sessionReservationId(live.session.id),
       actualUnits: 5,
       idempotencyKey: 'external-settle',

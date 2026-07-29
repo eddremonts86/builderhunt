@@ -57,7 +57,8 @@ export const Route = createFileRoute('/api/interviews/$interviewId/finalize')({
             // Finalizing is a write, so the owner alone — membership in the organization is not a
             // relationship to this interview. `null` becomes the same 404 as a missing interview.
             const context = await briefContextForEvent(transaction, principal, params.interviewId)
-            if (!context?.isOwner) return null
+            if (!context) return null
+            if (!context.isOwner) return 'not_owner' as const
             const session = await findSessionByEvent(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -70,6 +71,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/finalize')({
           })
 
           if (!report) return Response.json({ error: 'not_found' }, { status: 404 })
+          if (report === 'not_owner') return Response.json({ error: 'not_owner' }, { status: 403 })
 
           await emitSecurityAudit({
             organizationId: principal.organizationId,

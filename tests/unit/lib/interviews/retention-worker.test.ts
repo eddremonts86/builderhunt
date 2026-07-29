@@ -9,6 +9,7 @@
  */
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { tenantTransaction } from '../../helpers/tenant-transaction'
 
 const mockEnv = vi.hoisted(() => ({
   INTERVIEW_CONSENT_RETENTION_MONTHS: 24,
@@ -360,12 +361,12 @@ describe('a dry run changes nothing', () => {
 
 describe('stale reservations', () => {
   async function seedStaleReservation(deadlineAt: Date) {
-    await db.transaction((tx) => grantCredits(tx, {
+    await tenantTransaction(db, ORG_A, (tx) => grantCredits(tx, {
       grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId: ORG_A,
       source: 'promotional', units: 500, expiresAt: FUTURE, idempotencyKey: uniqueId('idem'),
     }))
     const reservationId = uniqueId('res')
-    await db.transaction((tx) => reserveCredits(
+    await tenantTransaction(db, ORG_A, (tx) => reserveCredits(
       tx as never,
       { organizationId: ORG_A, userId: OWNER_A, role: 'owner', requestId: 'r' } as never,
       { reservationId, operation: 'interview_live_transcription', idempotencyKey: uniqueId('k') },

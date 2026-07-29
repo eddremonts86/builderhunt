@@ -30,6 +30,7 @@ const { generateBrief, editBrief, buildFallbackBrief, BriefServiceError } = awai
 const { assembleBriefEvidence } = await import('~/lib/interviews/evidence')
 const { listBriefVersions } = await import('~/shared/lib/repositories/interviews')
 const { AIParseError, AIProviderError } = await import('~/shared/lib/ai/errors')
+import { tenantTransaction } from '../../helpers/tenant-transaction'
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
@@ -143,7 +144,7 @@ beforeEach(async () => {
   await db.delete(schema.candidateLinks)
   mockEnv.SENSITIVE_AI_ENABLED = 'true'
   capturedManifest = []
-  await db.transaction((tx) => grantCredits(tx, {
+  await tenantTransaction(db, ORG, (tx) => grantCredits(tx, {
     grantId: uniqueId('grant'), ledgerEntryId: uniqueId('entry'), organizationId: ORG,
     source: 'promotional', units: 200, expiresAt: FAR_FUTURE(), idempotencyKey: uniqueId('idem'),
   }))
@@ -194,7 +195,7 @@ async function seedImportedLink(url = 'https://someone.dev/', text = 'Built a ca
   return link.id
 }
 
-const run = (overrides: Record<string, unknown> = {}) => db.transaction((tx) => generateBrief(
+const run = (overrides: Record<string, unknown> = {}) => tenantTransaction(db, ORG, (tx) => generateBrief(
   tx as never,
   principal,
   {
@@ -399,7 +400,7 @@ describe('editing', () => {
     const generated = await run()
     if (generated.kind !== 'generated') throw new Error('expected a generated brief')
 
-    const edited = await db.transaction((tx) => editBrief(tx as never, principal, {
+    const edited = await tenantTransaction(db, ORG, (tx) => editBrief(tx as never, principal, {
       eventId,
       expectedVersion: generated.brief.version,
       content: { ...generated.brief.content, candidateSummary: 'Corrected.' },
@@ -418,7 +419,7 @@ describe('editing', () => {
     const generated = await run()
     if (generated.kind !== 'generated') throw new Error('expected a generated brief')
 
-    await expect(db.transaction((tx) => editBrief(tx as never, principal, {
+    await expect(tenantTransaction(db, ORG, (tx) => editBrief(tx as never, principal, {
       eventId, expectedVersion: generated.brief.version + 5,
       content: generated.brief.content, evidenceManifest: generated.brief.evidenceManifest,
     }))).rejects.toMatchObject({ name: 'BriefServiceError', code: 'version_conflict' })

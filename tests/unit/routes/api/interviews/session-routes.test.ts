@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
+import { tenantTransaction } from '../../../helpers/tenant-transaction'
 
 /**
  * Route tests for the live-session, token and segment APIs (plan:
@@ -177,9 +178,13 @@ beforeAll(async () => {
   db = disposable.db
   drop = disposable.drop
 
+  // Mirrors the real `withTenantContext`: it sets `app.organization_id` before the callback, and every
+  // RLS policy on a tenant-private table reads it. A bare `db.transaction` here made the mock a
+  // weaker thing than the function it stands in for, which surfaced the moment credit writes began
+  // elevating to a role RLS applies to.
   mocks.withTenantContext.mockImplementation(
     (_principal: TenantPrincipal, operation: (tx: unknown) => Promise<unknown>) =>
-      db.transaction((tx) => operation(tx)),
+      tenantTransaction(db, ORG, (tx: unknown) => operation(tx)),
   )
 
   await db.insert(schema.organizations).values({ id: ORG, name: 'Org', slug: ORG })

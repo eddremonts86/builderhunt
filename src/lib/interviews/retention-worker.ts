@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { getStorageProvider } from '~/lib/storage/provider'
 import { releaseReservation } from '~/shared/lib/billing/feature-authorization'
 import { workerDb } from '~/shared/lib/db/worker-db'
@@ -187,7 +188,22 @@ async function releaseStaleReservations(
       continue
     }
     try {
-      await db.transaction((tx) => releaseReservation(
+      await db.transaction(async (tx) => {
+        /*
+         * Set the tenant on the transaction, not only on the principal.
+         *
+         * The principal below carries the organization for the *application's* filtering, but RLS
+         * reads `app.organization_id` from the session, and this worker runs as `builderhunt_worker`
+         * — a role the policies apply to. Without this line the release matched zero rows in
+         * production while reporting success locally, because the developer's connection was the
+         * owner and ignored RLS. The sweep would have silently stopped releasing abandoned
+         * reservations, leaving customers' credits held indefinitely.
+         *
+         * `true` scopes it to this transaction, so one reservation's tenant cannot leak into the
+         * next iteration's.
+         */
+        await tx.execute(sql`select set_config('app.organization_id', ${reservation.organizationId}, true)`)
+        return releaseReservation(
         tx as never,
         // A worker has no session. The principal exists only to carry the tenant the reservation belongs
         // to, which is what keeps the release inside that organization's own ledger.
@@ -198,7 +214,8 @@ async function releaseStaleReservations(
           // Deterministic, so a re-run of the same pass replays instead of releasing twice.
           idempotencyKey: `retention:release:${reservation.id}`,
         },
-      ))
+        )
+      })
       result.reservationsReleased += 1
     } catch (error) {
       // Already closed by whoever owned it is the common case and not a failure worth alarming on; anything
