@@ -154,6 +154,31 @@ soft('production env template has critical keys', () => {
   return missing.length ? `missing keys: ${missing.join(', ')}` : ''
 })
 
+check('local DATABASE_URL uses a least-privilege role', () => {
+  // The one divergence that makes local testing worthless: `.env`'s DATABASE_URL pointing at
+  // `postgres`. A superuser ignores every GRANT and every RLS policy, so the app appears to work
+  // locally and in unit tests while the same request fails in production under `builderhunt_app`.
+  //
+  // That is not hypothetical. It hid `permission denied for table billing_credit_reservations` in
+  // the interview go-live path — 0028 grants the app role SELECT only on the credit tables — and it
+  // only surfaced when the e2e harness started connecting as the real roles. `pnpm deploy:db` warns
+  // about this, but a warning nobody reads is not a gate.
+  const envFile = join(ROOT, '.env')
+  if (!existsSync(envFile)) return // nothing to check on a machine without a local env
+  const line = readFileSync(envFile, 'utf8').split('\n').find((l) => l.startsWith('DATABASE_URL='))
+  if (!line) return
+  const role = decodeURIComponent(new URL(line.slice('DATABASE_URL='.length)).username)
+  if (!role.startsWith('builderhunt_')) {
+    throw new Error(
+      `.env DATABASE_URL connects as "${role}" — use builderhunt_app so local runs enforce the same `
+        + 'GRANTs and RLS as production (see .env.example, then run `pnpm deploy:db` to sync the password)',
+    )
+  }
+  if (role === 'builderhunt_owner' || role.includes('migration')) {
+    throw new Error(`.env DATABASE_URL connects as "${role}" — the runtime identity must not be the owner`)
+  }
+})
+
 // ── summary ──────────────────────────────────────────────────────────────────
 header('summary')
 for (const r of results) {
