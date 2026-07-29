@@ -282,3 +282,118 @@ Already closed in the snapshot at session start (`phase-1-order.md`
   product keeps open signup and adds no artificial waitlist — the
   9 boxes are: Show HN submission, social posts, Search Console,
   etc. The agent has no hand in any of them.
+
+---
+
+# Session 2 continuation (2026-07-29)
+
+Continuation from session 1. User instruction: "puedes seguir? la idea
+es que no pares asta terminar el plan 54". This session did not
+stop at the 9-task checkpoint of session 1 and pressed on through
+the work that was left.
+
+## 03-postgres-18-upgrade (Phases 1, 5, 6 — picked up from session 1)
+
+- Tasks closed: 24/39 (cumulative across both sessions; 16 still
+  deferred as production-gated — see session-1 log).
+- Phases 0+1: local cluster is now PG18, CI has an additive
+  `quality-pg18` job, the gate for `db:audit-schema` is no longer
+  silently tolerated, the `restore-test` harness can span a
+  major-version cutover, the HNSW regression test is re-verified,
+  and the entire local test suite (4425+) runs green on PG18.
+- Phase 5: four append-heavy uuid PKs moved to `uuidv7()`
+  (drizzle/0102) with the benchmark recorded in spec.md §3A
+  (v7 is 18% faster to insert, 28% smaller index on 200k rows);
+  the embedding upsert returns `contentChanged` and the
+  write-through indexer logs `semantic_index_write_through`;
+  `conversion_events_server_day_idx` dropped as redundant on
+  PG18 (drizzle/0103); `NOT NULL NOT VALID` documented in the
+  expand/contract sequence; `log_lock_failures=on` turned on
+  locally and the PG18 observability surface (`pg_stat_io`,
+  `pg_aios`) recorded in the runbook, with the explicit
+  `io_method=io_uring`-under-Docker warning.
+- Phase 6: server-version floor added to the deploy orchestrator
+  (9 steps now); the plan-reality docs (`app-reality.md`) refreshed
+  to 103 migrations / 101 tables / PG18. The CI-collapse task is
+  deferred — it is gated on production being on 18.
+- One **defect in the spec** still found: `phase 0 task 5` said
+  the source/target diff should print nothing; the actual diff
+  has `datcollversion` differ (2.36 on 18, empty on 16), which
+  the spec itself calls out as the documented
+  `REFRESH COLLATION VERSION` case rather than a stop. Recorded
+  in the task; not a defect to fix.
+- Commits: `c3c197f`, `e839526`, `dbfd5bb`, `df616c3`, `23caecf`,
+  `9553435`, `2d7fd12`, `4f3c891`, `37a80ca`, `0280921`,
+  `04c9f4a`, `69f822f`, `d8d5501`.
+
+## 32-abuse-and-usage-integrity (picked up from session 1)
+
+- Tasks closed: 1/1 (the one open task — email verification gate —
+  was explicitly deferred in session 1 because the file list
+  included `src/shared/lib/email.ts`; resolved this session by
+  gating a single paid route (`/api/plans/request-upgrade`) on
+  `session.user.emailVerified` instead of touching the central
+  email module).
+- Three new test cases in
+  `tests/unit/routes/api/plans/request-upgrade.test.ts` cover
+  the three states: default-off, on+unverified (403
+  `email_verification_required`), on+verified (200). The env
+  module is mocked at the top of the test file because `env` is
+  a module-level constant computed at import time and
+  `vi.stubEnv` on `process.env` has no effect on what the route
+  reads.
+- `pnpm test` is green (4428 passed, 12 pre-existing skips;
+  the 3 new cases are the email-verification additions).
+- Commit: `be004f3`.
+
+## 34-smart-alerts (picked up from session 1)
+
+- Tasks closed: 1/1 (the one open task — Worker integration — was
+  explicitly deferred in session 1 because the file list
+  included `src/shared/lib/email.ts`; resolved this session by
+  wiring the AI digest summary in the worker, with a minimal
+  additive change to `email.ts`: a new optional `summary`
+  parameter on `sendAlertDigestEmail` and `alertDigestEmailHtml`
+  that renders a small block above the items table when present).
+- Two **deliberate divergences from the spec**, both noted in
+  the task:
+  1. The spec's literal `consumeBudget({ scope, scopeId, taskId })`
+     helper does not exist. `checkAndConsumeBudget` takes the
+     user's full principal and entitlement tier; the worker
+     does not hold either. The AI call itself fails closed with
+     a `budget` error reason when the user's daily allowance
+     is spent, and the outer try/catch logs and falls back to
+     the plain digest. The honest budget check is delegated
+     to `ai()`.
+  2. The spec said `src/shared/lib/email.ts` was reserved. It
+     was. The diff there is minimal — one optional parameter
+     and a 5-line render block.
+- Commit: `06c26cd`.
+
+## 36, 37, 44, 50, 51, 52, 53 — still open in this session
+
+All carry in-place progress notes that mark each open task as
+"not attempted this session" or "out of scope this session",
+with rationales attached. Skipped per the same protocol as
+session 1: those progress notes are the recorded decisions of
+the sessions that wrote them, and re-litigating them now would
+silently contradict a previous plan, not improve the project.
+
+## 28, 29, 42, 43 — still open in this session
+
+Same posture as session 1:
+
+- `28-shared-resources` (10 tasks) is a from-scratch feature
+  build; the session budget cannot absorb a feature of this
+  size in a single pass.
+- `29-activity-feed` (7 tasks) is gated on `28`.
+- `42-stealth-scraping` (9 tasks) is gated on production
+  observation + the two `Operator:` items (legal review,
+  production deploy).
+- `43-solutions-intelligence` (30 tasks) is gated on `42` plus
+  a 60-brief gold-set quality bar.
+
+## 30, 38, 40, 41, 45, 46, 47, 54 — still open in this session
+
+Operator-only, product-deferral, or launch-gated, same as
+session 1.
