@@ -173,6 +173,7 @@ import { Route as ApiInterviewsInterviewIdFinalizeRouteImport } from './routes/a
 import { Route as ApiCalendarEventsEventIdRouteImport } from './routes/api/calendar/events/$eventId'
 import { Route as ApiCalendarAvailabilityOverridesRouteImport } from './routes/api/calendar/availability/overrides'
 import { Route as ApiBuildersClaimVerifyRouteImport } from './routes/api/builders/claim/verify'
+import { Route as ApiBuildersBuilderIdViewsRouteImport } from './routes/api/builders/$builderId/views'
 import { Route as ApiBuildersBuilderIdTimelineRouteImport } from './routes/api/builders/$builderId/timeline'
 import { Route as ApiBuildersBuilderIdSynergyRouteImport } from './routes/api/builders/$builderId/synergy'
 import { Route as ApiBuildersBuilderIdNotesRouteImport } from './routes/api/builders/$builderId/notes'
@@ -1102,6 +1103,12 @@ const ApiBuildersClaimVerifyRoute = ApiBuildersClaimVerifyRouteImport.update({
   path: '/api/builders/claim/verify',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBuildersBuilderIdViewsRoute =
+  ApiBuildersBuilderIdViewsRouteImport.update({
+    id: '/views',
+    path: '/views',
+    getParentRoute: () => ApiBuildersBuilderIdRoute,
+  } as any)
 const ApiBuildersBuilderIdTimelineRoute =
   ApiBuildersBuilderIdTimelineRouteImport.update({
     id: '/timeline',
@@ -1721,6 +1728,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
+  '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -1960,6 +1968,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
+  '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2204,6 +2213,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/notes': typeof ApiBuildersBuilderIdNotesRoute
   '/api/builders/$builderId/synergy': typeof ApiBuildersBuilderIdSynergyRoute
   '/api/builders/$builderId/timeline': typeof ApiBuildersBuilderIdTimelineRoute
+  '/api/builders/$builderId/views': typeof ApiBuildersBuilderIdViewsRoute
   '/api/builders/claim/verify': typeof ApiBuildersClaimVerifyRoute
   '/api/calendar/availability/overrides': typeof ApiCalendarAvailabilityOverridesRoute
   '/api/calendar/events/$eventId': typeof ApiCalendarEventsEventIdRoute
@@ -2447,6 +2457,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
+    | '/api/builders/$builderId/views'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -2686,6 +2697,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
+    | '/api/builders/$builderId/views'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -2929,6 +2941,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/notes'
     | '/api/builders/$builderId/synergy'
     | '/api/builders/$builderId/timeline'
+    | '/api/builders/$builderId/views'
     | '/api/builders/claim/verify'
     | '/api/calendar/availability/overrides'
     | '/api/calendar/events/$eventId'
@@ -4318,6 +4331,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersClaimVerifyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/builders/$builderId/views': {
+      id: '/api/builders/$builderId/views'
+      path: '/views'
+      fullPath: '/api/builders/$builderId/views'
+      preLoaderRoute: typeof ApiBuildersBuilderIdViewsRouteImport
+      parentRoute: typeof ApiBuildersBuilderIdRoute
+    }
     '/api/builders/$builderId/timeline': {
       id: '/api/builders/$builderId/timeline'
       path: '/timeline'
@@ -5069,6 +5089,7 @@ interface ApiBuildersBuilderIdRouteChildren {
   ApiBuildersBuilderIdNotesRoute: typeof ApiBuildersBuilderIdNotesRoute
   ApiBuildersBuilderIdSynergyRoute: typeof ApiBuildersBuilderIdSynergyRoute
   ApiBuildersBuilderIdTimelineRoute: typeof ApiBuildersBuilderIdTimelineRoute
+  ApiBuildersBuilderIdViewsRoute: typeof ApiBuildersBuilderIdViewsRoute
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute: typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   ApiBuildersBuilderIdEvidenceIndexRoute: typeof ApiBuildersBuilderIdEvidenceIndexRoute
 }
@@ -5083,6 +5104,7 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
   ApiBuildersBuilderIdNotesRoute: ApiBuildersBuilderIdNotesRoute,
   ApiBuildersBuilderIdSynergyRoute: ApiBuildersBuilderIdSynergyRoute,
   ApiBuildersBuilderIdTimelineRoute: ApiBuildersBuilderIdTimelineRoute,
+  ApiBuildersBuilderIdViewsRoute: ApiBuildersBuilderIdViewsRoute,
   ApiBuildersBuilderIdEvidenceEvidenceIdRoute:
     ApiBuildersBuilderIdEvidenceEvidenceIdRoute,
   ApiBuildersBuilderIdEvidenceIndexRoute:
