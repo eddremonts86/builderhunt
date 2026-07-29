@@ -58,7 +58,8 @@ test.beforeAll(async () => {
     },
   })
   await seedActiveSubscription(harness)
-  await grantInterviewCredits(harness, 500)
+  // Each interview this file completes reserves the rate card's 180-unit ceiling; 500 covered two.
+  await grantInterviewCredits(harness, 6000)
   const second = await addSecondOrganization(harness)
   stranger = second.principal
   strangerOrganizationId = second.organization.organizationId

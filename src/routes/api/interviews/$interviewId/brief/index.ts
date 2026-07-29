@@ -43,6 +43,13 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/')({
         try {
           const principal = await requireTenantPrincipal(request)
           const result = await withTenantContext(principal, async (transaction) => {
+            /*
+             * Authorize first. The queries below scope by `principal.organizationId`, so another
+             * tenant found nothing and got `200 {brief: null}` — no data crossed, but the status told
+             * a stranger the request was fine. The POST on this route already guarded; the GET did not.
+             */
+            const context = await briefContextForEvent(transaction, principal, params.interviewId)
+            if (!context) return null
             const active = await findActiveBrief(transaction, {
               organizationId: principal.organizationId,
               eventId: params.interviewId,
@@ -54,6 +61,9 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/')({
             return { active, latest }
           })
 
+          // No relationship to this interview is a 404, the same answer as one that does not exist.
+          if (!result) return Response.json({ error: 'not_found' }, { status: 404 })
+          // A relationship but no brief written yet is a legitimate empty answer.
           if (!result.latest) return Response.json({ brief: null, latestVersion: null }, { status: 200 })
 
           return Response.json({

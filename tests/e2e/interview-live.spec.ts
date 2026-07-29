@@ -64,7 +64,19 @@ test.beforeAll(async () => {
     },
   })
   await seedActiveSubscription(harness)
-  await grantInterviewCredits(harness, 500)
+  /*
+   * Enough for the whole file, computed rather than guessed.
+   *
+   * Every `goLive` reserves the rate card's ceiling — `maxUnits` is 180, a three-hour bound, not a
+   * price — and this file starts a session about 19 times. 500 units covered two of them, so from the
+   * third onwards every test failed with 402. It passed before only because the reservation INSERT was
+   * dying on a permission error and never charged anything: the credit ceiling became visible the
+   * moment reservations started working.
+   *
+   * 6000 is 19 x 180 plus room for the retries a flake would add, in a disposable database where the
+   * number costs nothing.
+   */
+  await grantInterviewCredits(harness, 6000)
   colleague = await addMember(harness, 'member')
 })
 
@@ -220,10 +232,21 @@ test('a session starts, pauses, resumes and finishes, and the version moves each
     select state, started_at, finished_at from interview_sessions where event_id = ${event.eventId}
   `
   expect(row?.state).toBe('processing')
-  // A finished session with no end time would make every duration and every settlement wrong.
-  // The column is `finished_at`; this asked for `ended_at`, which has never existed on any table,
-  // so the query itself errored and the assertion never ran.
-  expect(row?.finished_at).not.toBeNull()
+  /*
+   * `finished_at` is NULL here, and that is the invariant rather than a gap.
+   *
+   * `interview_sessions_finished_check` is an equivalence, not an implication:
+   *   (state IN ('finalized','failed','abandoned')) = (finished_at IS NOT NULL)
+   * so `processing` — which is where `finish` leaves a session, pending the report — must have no end
+   * time, and writing one would violate the constraint.
+   *
+   * This assertion asked for `ended_at`, a column that never existed on any table, so the query
+   * errored and it never ran. Corrected to `finished_at` it then demanded NOT NULL, which would have
+   * meant "fixing" the service to break a schema invariant. Settlement does not depend on it either:
+   * it bills `providerBilledSeconds`, not a difference between timestamps.
+   */
+  expect(row?.finished_at).toBeNull()
+  expect(row?.started_at).not.toBeNull()
 })
 
 test('a stale version loses, and the state does not move', async () => {
@@ -344,13 +367,19 @@ test('segments persist in sequence, and a replayed batch does not duplicate them
       { providerSegmentId: 'req-1:0:0', sequence: 0, speakerEstimate: 'speaker_a', text: 'Tell me about the Rust work.', startsMs: 0, endsMs: 2500, confidence: 0.94 },
       { providerSegmentId: 'req-1:1:1', sequence: 1, speakerEstimate: 'speaker_b', text: 'I rewrote the ingest pipeline.', startsMs: 2600, endsMs: 6000, confidence: 0.91 },
     ],
-    idempotencyKey: `seg-${event.eventId}-1`,
   }
 
   const first = await harness.owner.api!.post(`/api/interviews/${event.eventId}/segments`, { data: batch })
   expect(first.status(), await first.text()).toBeLessThan(400)
 
-  // The same batch again — a reconnecting capture client replays what it could not acknowledge.
+  /*
+   * The same batch again — a reconnecting capture client replays what it could not acknowledge.
+   *
+   * No batch-level `idempotencyKey`: the request schema is `.strict()` and has none, because
+   * idempotency is per segment. `onConflictDoNothing` on `providerSegmentId` is what makes the
+   * outbox's resend a no-op, so replaying the identical batch is the real test of it. Sending a key
+   * the endpoint never accepted made every one of these a 400.
+   */
   const replay = await harness.owner.api!.post(`/api/interviews/${event.eventId}/segments`, { data: batch })
   expect(replay.status(), await replay.text()).toBeLessThan(400)
 
@@ -378,7 +407,6 @@ test('segments are refused once the session is finished', async () => {
   const late = await harness.owner.api!.post(`/api/interviews/${event.eventId}/segments`, {
     data: {
       segments: [{ providerSegmentId: 'late:0:0', sequence: 0, speakerEstimate: 'unknown', text: 'after the fact', startsMs: 0, endsMs: 1000, confidence: null }],
-      idempotencyKey: `late-${event.eventId}`,
     },
   })
   expect(late.status(), 'a completed session is closed to writes').toBeGreaterThanOrEqual(400)
@@ -417,7 +445,6 @@ test('a report can be generated deterministically with AI switched off, and says
         { providerSegmentId: 'rep-1:0:0', sequence: 0, speakerEstimate: 'speaker_a', text: 'How did you handle the migration?', startsMs: 0, endsMs: 3000, confidence: 0.9 },
         { providerSegmentId: 'rep-1:1:1', sequence: 1, speakerEstimate: 'speaker_b', text: 'Backfilled in batches with a version column.', startsMs: 3100, endsMs: 9000, confidence: 0.9 },
       ],
-      idempotencyKey: `rep-${event.eventId}`,
     },
   })
   const finished = await act(event.eventId, { action: 'finish', expectedVersion: started.version, providerBilledSeconds: 0, providerRequestId: null })
@@ -428,9 +455,13 @@ test('a report can be generated deterministically with AI switched off, and says
   })
   // Either a deterministic fallback (the point of having one) or an explicit refusal. What must not
   // happen is a 500, or a report that presents a template as model output.
-  expect([200, 402, 409, 503]).toContain(generated.status())
+  //
+  // 201 is the success status this route actually returns — `report-routes.test.ts` asserts it
+  // directly. This list omitted it, so the one outcome the test exists to describe was the one it
+  // rejected.
+  expect([200, 201, 402, 409, 503]).toContain(generated.status())
 
-  if (generated.status() === 200) {
+  if (generated.status() === 200 || generated.status() === 201) {
     const [row] = await harness.sql<{ provider: string | null; model: string | null }[]>`
       select provider, model from interview_reports where event_id = ${event.eventId}
       order by version desc limit 1
