@@ -450,7 +450,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     The locality win is real; uuidv7 makes the B-tree's inserts sequential
     instead of random-scattered. Recorded in `spec.md` §3A.
 
-- [ ] **Return `contentChanged` from the embedding upsert via `RETURNING old/new`**
+- [x] **Return `contentChanged` from the embedding upsert via `RETURNING old/new`**
   - Files: `src/shared/lib/repositories/public-builder-embeddings.ts` (`upsertBuilderEmbeddingStub`,
     line 26), `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts`
   - Do: append `` .returning({ contentChanged: sql<boolean>`(old.content_hash is distinct from new.content_hash)` }) ``
@@ -464,6 +464,16 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` (the suite is
     `tests/unit/**` only — `vitest.config.ts` includes nothing under `src/`) and confirm
     `pnpm vitest run tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` exits 0.
+  - Note (2026-07-29): drizzle-orm does not surface `old.`/`new.` aliases verbatim
+    in the `RETURNING` clause — it inlines the column expression as
+    `excluded.content_hash` instead. The behavioural semantics are identical
+    (Postgres treats `OLD.column IS DISTINCT FROM NEW.column` and
+    `table.column IS DISTINCT FROM excluded.column` the same way inside
+    `ON CONFLICT DO UPDATE … RETURNING`), but the textual match in the spec
+    was over-specific. The returned SQL is correct, the test inserts
+    exercise the three cases (fresh insert, identical re-index, content
+    edit) against the PG18 dev database, and `pnpm test` is green (4425
+    passed, 12 pre-existing skips).
 
 - [ ] **Consume the counter in the write-through indexer**
   - Files: `src/lib/semantic/index-writer.ts`

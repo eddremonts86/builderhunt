@@ -22,9 +22,16 @@ export interface UpsertBuilderEmbeddingStubInput {
  * Only resets `embedding`/`embeddedAt` to NULL (marking it pending re-embed)
  * when the incoming `contentHash` differs from what's stored — unchanged
  * profiles are never re-sent to the embedding provider.
+ *
+ * Returns whether the row's `content_hash` actually changed as a result of
+ * the upsert, so the write-through indexer can log per-batch churn without
+ * re-reading the row. `TRUE` for a fresh insert (the existing row's hash is
+ * `NULL`, which `IS DISTINCT FROM` a non-null value), `TRUE` after a content
+ * edit, `FALSE` for an identical re-index. See
+ * `plans/phase-1/03-postgres-18-upgrade/spec.md` §3B.
  */
-export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingStubInput): Promise<void> {
-  await publicDb
+export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingStubInput): Promise<boolean> {
+  const rows = await publicDb
     .insert(builderEmbeddings)
     .values({
       id: randomId(),
@@ -45,6 +52,8 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
         embeddedAt: sql`case when ${builderEmbeddings.contentHash} = excluded.content_hash then ${builderEmbeddings.embeddedAt} else null end`,
       },
     })
+    .returning({ contentChanged: sql<boolean>`${builderEmbeddings.contentHash} is distinct from excluded.content_hash` })
+  return rows[0]?.contentChanged ?? true
 }
 
 export interface PendingBuilderEmbedding {
