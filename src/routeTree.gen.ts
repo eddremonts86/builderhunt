@@ -44,6 +44,7 @@ import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
 import { Route as ApiQueriesIndexRouteImport } from './routes/api/queries/index'
 import { Route as ApiOrganizationsIndexRouteImport } from './routes/api/organizations/index'
+import { Route as ApiListsIndexRouteImport } from './routes/api/lists/index'
 import { Route as ApiInterviewsIndexRouteImport } from './routes/api/interviews/index'
 import { Route as ApiIncidentsIndexRouteImport } from './routes/api/incidents/index'
 import { Route as ApiConsentIndexRouteImport } from './routes/api/consent/index'
@@ -82,6 +83,7 @@ import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/s
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
 import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
 import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
+import { Route as ApiListsListIdRouteImport } from './routes/api/lists/$listId'
 import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprint/match'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
@@ -156,6 +158,7 @@ import { Route as DashboardInterviewsInterviewIdIndexRouteImport } from './route
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
 import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
+import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
 import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
@@ -223,6 +226,7 @@ import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/ab
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as DashboardInterviewsInterviewIdLiveRouteImport } from './routes/_dashboard/interviews/$interviewId/live'
 import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
+import { Route as ApiListsListIdItemsIndexRouteImport } from './routes/api/lists/$listId/items/index'
 import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
@@ -240,6 +244,7 @@ import { Route as ApiOrganizationsInvitationsInvitationIdAcceptRouteImport } fro
 import { Route as ApiMeBuilderBuilderIdRestrictProcessingRouteImport } from './routes/api/me/builder/$builderId/restrict-processing'
 import { Route as ApiMeBuilderBuilderIdEvidenceProvenanceRouteImport } from './routes/api/me/builder/$builderId/evidence-provenance'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio'
+import { Route as ApiListsListIdItemsItemIdRouteImport } from './routes/api/lists/$listId/items/$itemId'
 import { Route as ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport } from './routes/api/interviews/$interviewId/participants/$participantId'
 import { Route as ApiInterviewsInterviewIdBriefVersionRouteImport } from './routes/api/interviews/$interviewId/brief/$version'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
@@ -423,6 +428,11 @@ const ApiQueriesIndexRoute = ApiQueriesIndexRouteImport.update({
 const ApiOrganizationsIndexRoute = ApiOrganizationsIndexRouteImport.update({
   id: '/api/organizations/',
   path: '/api/organizations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiListsIndexRoute = ApiListsIndexRouteImport.update({
+  id: '/api/lists/',
+  path: '/api/lists/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiInterviewsIndexRoute = ApiInterviewsIndexRouteImport.update({
@@ -618,6 +628,11 @@ const ApiOgExploreRoute = ApiOgExploreRouteImport.update({
 const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
   id: '/api/og/blog',
   path: '/api/og/blog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiListsListIdRoute = ApiListsListIdRouteImport.update({
+  id: '/api/lists/$listId',
+  path: '/api/lists/$listId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFingerprintMatchRoute = ApiFingerprintMatchRouteImport.update({
@@ -1005,6 +1020,11 @@ const ApiSchedulingInvitationsInvitationIdRoute =
     path: '/api/scheduling/invitations/$invitationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiQueriesIdVisibilityRoute = ApiQueriesIdVisibilityRouteImport.update({
+  id: '/api/queries/$id/visibility',
+  path: '/api/queries/$id/visibility',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
   id: '/api/queries/$id/share',
   path: '/api/queries/$id/share',
@@ -1390,6 +1410,12 @@ const ApiPublicSchedulingInvitationIdIndexRoute =
     path: '/api/public/scheduling/$invitationId/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiListsListIdItemsIndexRoute =
+  ApiListsListIdItemsIndexRouteImport.update({
+    id: '/items/',
+    path: '/items/',
+    getParentRoute: () => ApiListsListIdRoute,
+  } as any)
 const ApiInterviewsInterviewIdBriefIndexRoute =
   ApiInterviewsInterviewIdBriefIndexRouteImport.update({
     id: '/api/interviews/$interviewId/brief/',
@@ -1491,6 +1517,12 @@ const ApiMeBuilderClaimsClaimIdPortfolioRoute =
     id: '/api/me/builder-claims/$claimId/portfolio',
     path: '/api/me/builder-claims/$claimId/portfolio',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiListsListIdItemsItemIdRoute =
+  ApiListsListIdItemsItemIdRouteImport.update({
+    id: '/items/$itemId',
+    path: '/items/$itemId',
+    getParentRoute: () => ApiListsListIdRoute,
   } as any)
 const ApiInterviewsInterviewIdParticipantsParticipantIdRoute =
   ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport.update({
@@ -1635,6 +1667,7 @@ export interface FileRoutesByFullPath {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -1673,6 +1706,7 @@ export interface FileRoutesByFullPath {
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
   '/api/interviews/': typeof ApiInterviewsIndexRoute
+  '/api/lists/': typeof ApiListsIndexRoute
   '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
@@ -1746,6 +1780,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -1778,6 +1813,7 @@ export interface FileRoutesByFullPath {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/interviews/$interviewId/participants/$participantId': typeof ApiInterviewsInterviewIdParticipantsParticipantIdRoute
+  '/api/lists/$listId/items/$itemId': typeof ApiListsListIdItemsItemIdRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -1795,6 +1831,7 @@ export interface FileRoutesByFullPath {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -1875,6 +1912,7 @@ export interface FileRoutesByTo {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -1913,6 +1951,7 @@ export interface FileRoutesByTo {
   '/api/consent': typeof ApiConsentIndexRoute
   '/api/incidents': typeof ApiIncidentsIndexRoute
   '/api/interviews': typeof ApiInterviewsIndexRoute
+  '/api/lists': typeof ApiListsIndexRoute
   '/api/organizations': typeof ApiOrganizationsIndexRoute
   '/api/queries': typeof ApiQueriesIndexRoute
   '/api/recommendations': typeof ApiRecommendationsIndexRoute
@@ -1986,6 +2025,7 @@ export interface FileRoutesByTo {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
@@ -2018,6 +2058,7 @@ export interface FileRoutesByTo {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/interviews/$interviewId/participants/$participantId': typeof ApiInterviewsInterviewIdParticipantsParticipantIdRoute
+  '/api/lists/$listId/items/$itemId': typeof ApiListsListIdItemsItemIdRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -2035,6 +2076,7 @@ export interface FileRoutesByTo {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/lists/$listId/items': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -2120,6 +2162,7 @@ export interface FileRoutesById {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
@@ -2158,6 +2201,7 @@ export interface FileRoutesById {
   '/api/consent/': typeof ApiConsentIndexRoute
   '/api/incidents/': typeof ApiIncidentsIndexRoute
   '/api/interviews/': typeof ApiInterviewsIndexRoute
+  '/api/lists/': typeof ApiListsIndexRoute
   '/api/organizations/': typeof ApiOrganizationsIndexRoute
   '/api/queries/': typeof ApiQueriesIndexRoute
   '/api/recommendations/': typeof ApiRecommendationsIndexRoute
@@ -2231,6 +2275,7 @@ export interface FileRoutesById {
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
+  '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
@@ -2263,6 +2308,7 @@ export interface FileRoutesById {
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
   '/api/interviews/$interviewId/participants/$participantId': typeof ApiInterviewsInterviewIdParticipantsParticipantIdRoute
+  '/api/lists/$listId/items/$itemId': typeof ApiListsListIdItemsItemIdRoute
   '/api/me/builder-claims/$claimId/portfolio': typeof ApiMeBuilderClaimsClaimIdPortfolioRouteWithChildren
   '/api/me/builder/$builderId/evidence-provenance': typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   '/api/me/builder/$builderId/restrict-processing': typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -2280,6 +2326,7 @@ export interface FileRoutesById {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
   '/api/me/builder-claims/$claimId/portfolio/publish': typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
@@ -2364,6 +2411,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -2402,6 +2450,7 @@ export interface FileRouteTypes {
     | '/api/consent/'
     | '/api/incidents/'
     | '/api/interviews/'
+    | '/api/lists/'
     | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
@@ -2475,6 +2524,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
@@ -2507,6 +2557,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
     | '/api/interviews/$interviewId/participants/$participantId'
+    | '/api/lists/$listId/items/$itemId'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2524,6 +2575,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
+    | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2604,6 +2656,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -2642,6 +2695,7 @@ export interface FileRouteTypes {
     | '/api/consent'
     | '/api/incidents'
     | '/api/interviews'
+    | '/api/lists'
     | '/api/organizations'
     | '/api/queries'
     | '/api/recommendations'
@@ -2715,6 +2769,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
@@ -2747,6 +2802,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
     | '/api/interviews/$interviewId/participants/$participantId'
+    | '/api/lists/$listId/items/$itemId'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -2764,6 +2820,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence'
     | '/api/interviews/$interviewId/brief'
+    | '/api/lists/$listId/items'
     | '/api/public/scheduling/$invitationId'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -2848,6 +2905,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
     | '/api/onboarding/complete'
@@ -2886,6 +2944,7 @@ export interface FileRouteTypes {
     | '/api/consent/'
     | '/api/incidents/'
     | '/api/interviews/'
+    | '/api/lists/'
     | '/api/organizations/'
     | '/api/queries/'
     | '/api/recommendations/'
@@ -2959,6 +3018,7 @@ export interface FileRouteTypes {
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
     | '/api/queries/$id/share'
+    | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
@@ -2991,6 +3051,7 @@ export interface FileRouteTypes {
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
     | '/api/interviews/$interviewId/participants/$participantId'
+    | '/api/lists/$listId/items/$itemId'
     | '/api/me/builder-claims/$claimId/portfolio'
     | '/api/me/builder/$builderId/evidence-provenance'
     | '/api/me/builder/$builderId/restrict-processing'
@@ -3008,6 +3069,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
+    | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
     | '/api/me/builder-claims/$claimId/portfolio/publish'
@@ -3054,6 +3116,7 @@ export interface RootRouteChildren {
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
   ApiFingerprintMatchRoute: typeof ApiFingerprintMatchRoute
+  ApiListsListIdRoute: typeof ApiListsListIdRouteWithChildren
   ApiOgBlogRoute: typeof ApiOgBlogRoute
   ApiOgExploreRoute: typeof ApiOgExploreRoute
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
@@ -3081,6 +3144,7 @@ export interface RootRouteChildren {
   ApiConsentIndexRoute: typeof ApiConsentIndexRoute
   ApiIncidentsIndexRoute: typeof ApiIncidentsIndexRoute
   ApiInterviewsIndexRoute: typeof ApiInterviewsIndexRoute
+  ApiListsIndexRoute: typeof ApiListsIndexRoute
   ApiOrganizationsIndexRoute: typeof ApiOrganizationsIndexRoute
   ApiQueriesIndexRoute: typeof ApiQueriesIndexRoute
   ApiRecommendationsIndexRoute: typeof ApiRecommendationsIndexRoute
@@ -3140,6 +3204,7 @@ export interface RootRouteChildren {
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
   ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
+  ApiQueriesIdVisibilityRoute: typeof ApiQueriesIdVisibilityRoute
   ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
@@ -3428,6 +3493,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOrganizationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/lists/': {
+      id: '/api/lists/'
+      path: '/api/lists'
+      fullPath: '/api/lists/'
+      preLoaderRoute: typeof ApiListsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/interviews/': {
       id: '/api/interviews/'
       path: '/api/interviews'
@@ -3692,6 +3764,13 @@ declare module '@tanstack/react-router' {
       path: '/api/og/blog'
       fullPath: '/api/og/blog'
       preLoaderRoute: typeof ApiOgBlogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/lists/$listId': {
+      id: '/api/lists/$listId'
+      path: '/api/lists/$listId'
+      fullPath: '/api/lists/$listId'
+      preLoaderRoute: typeof ApiListsListIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/fingerprint/match': {
@@ -4212,6 +4291,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSchedulingInvitationsInvitationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/queries/$id/visibility': {
+      id: '/api/queries/$id/visibility'
+      path: '/api/queries/$id/visibility'
+      fullPath: '/api/queries/$id/visibility'
+      preLoaderRoute: typeof ApiQueriesIdVisibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/queries/$id/share': {
       id: '/api/queries/$id/share'
       path: '/api/queries/$id/share'
@@ -4681,6 +4767,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicSchedulingInvitationIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/lists/$listId/items/': {
+      id: '/api/lists/$listId/items/'
+      path: '/items'
+      fullPath: '/api/lists/$listId/items/'
+      preLoaderRoute: typeof ApiListsListIdItemsIndexRouteImport
+      parentRoute: typeof ApiListsListIdRoute
+    }
     '/api/interviews/$interviewId/brief/': {
       id: '/api/interviews/$interviewId/brief/'
       path: '/api/interviews/$interviewId/brief'
@@ -4799,6 +4892,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/me/builder-claims/$claimId/portfolio'
       preLoaderRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/api/lists/$listId/items/$itemId': {
+      id: '/api/lists/$listId/items/$itemId'
+      path: '/items/$itemId'
+      fullPath: '/api/lists/$listId/items/$itemId'
+      preLoaderRoute: typeof ApiListsListIdItemsItemIdRouteImport
+      parentRoute: typeof ApiListsListIdRoute
     }
     '/api/interviews/$interviewId/participants/$participantId': {
       id: '/api/interviews/$interviewId/participants/$participantId'
@@ -5114,6 +5214,20 @@ const ApiBuildersBuilderIdRouteChildren: ApiBuildersBuilderIdRouteChildren = {
 const ApiBuildersBuilderIdRouteWithChildren =
   ApiBuildersBuilderIdRoute._addFileChildren(ApiBuildersBuilderIdRouteChildren)
 
+interface ApiListsListIdRouteChildren {
+  ApiListsListIdItemsItemIdRoute: typeof ApiListsListIdItemsItemIdRoute
+  ApiListsListIdItemsIndexRoute: typeof ApiListsListIdItemsIndexRoute
+}
+
+const ApiListsListIdRouteChildren: ApiListsListIdRouteChildren = {
+  ApiListsListIdItemsItemIdRoute: ApiListsListIdItemsItemIdRoute,
+  ApiListsListIdItemsIndexRoute: ApiListsListIdItemsIndexRoute,
+}
+
+const ApiListsListIdRouteWithChildren = ApiListsListIdRoute._addFileChildren(
+  ApiListsListIdRouteChildren,
+)
+
 interface ApiOrganizationsDeletionRouteChildren {
   ApiOrganizationsDeletionImmediateRoute: typeof ApiOrganizationsDeletionImmediateRoute
 }
@@ -5277,6 +5391,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
   ApiFingerprintMatchRoute: ApiFingerprintMatchRoute,
+  ApiListsListIdRoute: ApiListsListIdRouteWithChildren,
   ApiOgBlogRoute: ApiOgBlogRoute,
   ApiOgExploreRoute: ApiOgExploreRoute,
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
@@ -5306,6 +5421,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiConsentIndexRoute: ApiConsentIndexRoute,
   ApiIncidentsIndexRoute: ApiIncidentsIndexRoute,
   ApiInterviewsIndexRoute: ApiInterviewsIndexRoute,
+  ApiListsIndexRoute: ApiListsIndexRoute,
   ApiOrganizationsIndexRoute: ApiOrganizationsIndexRoute,
   ApiQueriesIndexRoute: ApiQueriesIndexRoute,
   ApiRecommendationsIndexRoute: ApiRecommendationsIndexRoute,
@@ -5368,6 +5484,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
   ApiQueriesIdShareRoute: ApiQueriesIdShareRoute,
+  ApiQueriesIdVisibilityRoute: ApiQueriesIdVisibilityRoute,
   ApiSchedulingInvitationsInvitationIdRoute:
     ApiSchedulingInvitationsInvitationIdRouteWithChildren,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,

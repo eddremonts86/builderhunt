@@ -729,6 +729,20 @@
       "when": 1785334689045,
       "tag": "0103_drop_redundant_conversion_events_index",
       "breakpoints": true
+    },
+    {
+      "idx": 104,
+      "version": "7",
+      "when": 1785338405973,
+      "tag": "0104_shared_resources_saved_query_visibility",
+      "breakpoints": true
+    },
+    {
+      "idx": 105,
+      "version": "7",
+      "when": 1785338649080,
+      "tag": "0105_builder_lists",
+      "breakpoints": true
     }
   ]
 }
