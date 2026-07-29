@@ -523,7 +523,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     [`saved-search-health`](../../phase-4/saved-search-health/spec.md).
   - Verify: the section names both statements and the lock each one takes.
 
-- [ ] **Add the PG18 observability surface to the runbook and turn on lock-failure logging**
+- [x] **Add the PG18 observability surface to the runbook and turn on lock-failure logging**
   - Files: `docs/operations/deploy-runbook.md`, `docker-compose.yml`
   - Do: document `pg_stat_io` and `pg_aios` as the before/after evidence for DB work; add
     `-c log_lock_failures=on` to the compose `command:` (and the equivalent in the Coolify

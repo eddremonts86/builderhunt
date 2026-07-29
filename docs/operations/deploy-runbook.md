@@ -217,3 +217,37 @@ IP ban of whichever host runs it. Before setting it `true` in production:
 | `migration-hashes.json` mismatch in CI/preflight | new migration added without regenerating manifest | `node scripts/db/verify-migration-integrity.mjs --write`, bump the count in `migration-integrity.test.ts`, commit |
 | Semantic search returns 503 / keyword fallback | pgvector extension missing | switch the DB resource to `pgvector/pgvector:pg16`, re-run `pnpm deploy:db` |
 | Scrapers do nothing | `ENRICHMENT_ENABLED=false` or worker role can't log in | set enrichment env; confirm orchestrator step 6 green |
+
+## PG18 observability — `pg_stat_io` and `pg_aios`
+
+PG18 ships two system views that did not exist on PG16 and that the
+DB work in `plans/phase-1/03-postgres-18-upgrade` reads and writes
+through:
+
+- `pg_stat_io` — per-backend, per-context, per-operation I/O
+  counters (`reads`, `read_bytes`, `writes`, `write_bytes`,
+  `extends`, `hits`, `evictions`, `fsyncs`, …). Snapshot with
+  `select * from pg_stat_io` before and after a backfill, an
+  index rebuild, or any operation you want to characterise.
+- `pg_aios` — currently in-flight asynchronous I/O. Always
+  returns zero or one row: zero when the cluster is idle, one
+  while a backend is inside `aio_write`/`aio_read`. Cheap to
+  poll.
+
+Both are read-only and require no grants beyond `pg_read_all_stats`
+(or the `pg_stat_io` / `pg_aios` views are already world-readable on
+the runtime role in this repo).
+
+**`log_lock_failures=on`** is set on the local `docker-compose.yml`
+container command and should be set the same way on the Coolify
+Postgres resource. With it on, a migration that loses a lock race
+logs a `WARNING: … lock timeout` line with the table and lock mode,
+instead of timing out silently. The setting is a session-startup
+GUC, so the orchestrator's connection picks it up; the dev container
+picks it up from the compose `command:` array.
+
+**Never set `io_method=io_uring` under Docker.** The default
+seccomp profile blocks the `io_uring_setup` syscall and a container
+that tries to set it dies immediately. The default `io_method=worker`
+is correct for Docker; the `io_uring` value is a Linux-host only
+optimisation.
