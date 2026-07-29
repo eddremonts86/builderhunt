@@ -428,6 +428,10 @@
     "0106_feed_capabilities": {
       "sql": "766845141acdf4db00d6c14b7077ffcd06bb39963a21ec1522d1750ce49f7bc1",
       "snapshot": "1209c7744d128fdc739b64641e9868fa0017467c0663d826143fcf3857c987d7"
+    },
+    "0107_organization_activity": {
+      "sql": "d21c10992ed5ed0d806487b3fb36e031003bcade5bf023f5d19577d85bc41009",
+      "snapshot": "25d5ae1d8ceba2bdea796d8cd6701e031c6627533a0f92e4953c25109408cde5"
     }
   }
 }

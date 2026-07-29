@@ -1,0 +1,129 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.organization_activity": {
+      "name": "organization_activity",
+      "schema": "public",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "uuidv7()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "target_key": {
+          "name": "target_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "organization_activity_idempotency_key_unique": {
+          "name": "organization_activity_idempotency_key_unique",
+          "columns": ["idempotency_key"],
+          "isUnique": true
+        },
+        "organization_activity_org_id_desc_idx": {
+          "name": "organization_activity_org_id_desc_idx",
+          "columns": ["organization_id", "occurred_at", "id"],
+          "isUnique": false,
+          "order": "desc"
+        },
+        "organization_activity_expires_idx": {
+          "name": "organization_activity_expires_idx",
+          "columns": ["expires_at"],
+          "isUnique": false,
+          "where": "expires_at IS NOT NULL"
+        }
+      },
+      "foreignKeys": {
+        "organization_activity_organization_id_organizations_id_fk": {
+          "name": "organization_activity_organization_id_organizations_id_fk",
+          "tableFrom": ["public", "organization_activity"],
+          "tableTo": ["public", "organizations"],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "organization_activity_actor_user_id_auth_users_id_fk": {
+          "name": "organization_activity_actor_user_id_auth_users_id_fk",
+          "tableFrom": ["public", "organization_activity"],
+          "tableTo": ["public", "auth_users"],
+          "columnsFrom": ["actor_user_id"],
+          "columnsTo": ["id"],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "organization_activity_type_known": {
+          "name": "organization_activity_type_known",
+          "value": "type in ('saved_query_created','saved_query_visibility_changed','saved_query_deleted','builder_list_created','builder_list_item_added','builder_list_item_removed','builder_list_deleted','alert_created','feed_capability_minted','feed_capability_revoked')"
+        }
+      }
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

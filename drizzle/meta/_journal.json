@@ -750,6 +750,13 @@
       "when": 1785340000000,
       "tag": "0106_feed_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 107,
+      "version": "7",
+      "when": 1785342000000,
+      "tag": "0107_organization_activity",
+      "breakpoints": true
     }
   ]
 }

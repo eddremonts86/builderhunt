@@ -3065,3 +3065,39 @@ export const feedCapabilities = pgTable(
     index('feed_capabilities_query_idx').on(table.queryId),
   ],
 )
+
+/**
+ * Plan 29 (activity-feed) task 2 — organization activity log.
+ *
+ * Denormalized event log, not the security audit. An event is a
+ * row that says "actor X did Y to target Z at time T" — nothing
+ * more, nothing less. Metadata is a versioned jsonb the contract
+ * in `activity/contracts.ts` validates at emit time. The feed
+ * paginates by (occurred_at desc, id desc); the composite index
+ * is the only thing standing between 10k rows and a 5s query.
+ */
+export const organizationActivity = pgTable(
+  'organization_activity',
+  {
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    actorUserId: text('actor_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    type: text('type').notNull(),
+    version: integer('version').notNull(),
+    targetKey: text('target_key').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull(),
+    idempotencyKey: text('idempotency_key').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: false }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: false }),
+  },
+  (table) => [
+    unique('organization_activity_idempotency_key_unique').on(table.idempotencyKey),
+    index('organization_activity_org_id_desc_idx').on(sql`${table.organizationId}, ${table.occurredAt} DESC, ${table.id} DESC`),
+    index('organization_activity_expires_idx').on(table.expiresAt).where(sql`${table.expiresAt} IS NOT NULL`),
+    check('organization_activity_type_known', sql`${table.type} in (
+      'saved_query_created','saved_query_visibility_changed','saved_query_deleted',
+      'builder_list_created','builder_list_item_added','builder_list_item_removed','builder_list_deleted',
+      'alert_created','feed_capability_minted','feed_capability_revoked'
+    )`),
+  ],
+)
