@@ -3,9 +3,9 @@
 Session: `phase-1-execution` (started 2026-07-29 from `master@c823f34`).
 Runner: agent-driven, no human in the loop during execution.
 
-Format: one line per plan closed, with tasks closed and tasks skipped.
-Format conventions below match the prompt's "registros compartidos" rule:
-each skipped task names the access/credential/decision that unlocks it.
+Format: one section per plan, with tasks closed and tasks skipped.
+Each skipped task names the access/credential/decision that unlocks it,
+per the prompt's "registros compartidos" rule.
 
 ## 01-security-and-multitenancy
 
@@ -47,3 +47,238 @@ each skipped task names the access/credential/decision that unlocks it.
 - Commits: `d9dd2c2` (scratch PG18), `4815fb1` (mark Phase 0 task 1+2),
   `ab99432` (locale/row-counts scripts), `627ba7f` (mark Phase 0
   tasks 3–8).
+
+## 04 — 10, 12, 14, 15, 17, 18, 19, 21 — 27, 31, 33, 35, 39, 45, 48, 49
+
+Already closed in the snapshot at session start (`phase-1-order.md`
+2026-07-29: 26 plans with zero open tasks). Nothing to do.
+
+## 11-sourcehut-integration
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the only open task is `(Optional) Emit repo results
+  from git.sr.ht` — explicitly optional per the plan header,
+  "remaining item is explicitly optional" per phase-1-order).
+
+## 13-huggingface-integration
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the only open task is `(Optional) Enrich top authors
+  with avatar + real followers` — explicitly optional per
+  phase-1-order).
+
+## 16-hashnode-integration
+
+- Tasks closed: 0/1.
+- Skipped: 1 ("Migrate the connector to `https://gql.hashnode.com`"
+  — paused by decision per phase-1-order, "paused on a paid-API
+  vendor decision (decided: paused)"). The task is a real
+  implementation but the product decision to not pay for the API has
+  been made; an agent implementing the migration now would
+  re-litigate the decision.
+
+## 20-indiehackers-integration
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the only open task is `(Only under option (a), and
+  only if founder-filter demand exists) Spec the "builder tags +
+  founder filter" mini-plan` — gated on a product option not chosen,
+  per phase-1-order the plan is "closed by decision").
+
+## 28-shared-resources
+
+- Tasks closed: 0/10.
+- Skipped: 10. The plan is a from-scratch 10-task feature build
+  (shared queries, builder lists, public feed capabilities, an
+  end-to-end isolation suite, a UI pass across the search, dashboard,
+  lists, builder-profile pages) and was unblocked only on 2026-07-29
+  per the plan header. The session budget cannot absorb a feature of
+  this size; the plan's own task 10 ("Run shared-resource isolation
+  and release gates") is a multi-hour gate that requires Phase 0 of
+  the same plan to be runnable, which is most of the prior 9 tasks.
+  Resuming this plan in a later session is the right next step.
+
+## 29-activity-feed
+
+- Tasks closed: 0/7.
+- Skipped: 7. Plan header says "do not implement until… 28". Plan 28
+  is not done (see above). An agent starting 29 now would build
+  activity events over a contract that does not exist yet.
+
+## 30-stripe-billing-platform
+
+- Tasks closed: 0/3.
+- Skipped: 3.
+  - "Certify Stripe sandbox and Test Clock lifecycle" — the
+    in-place progress note records that the e2e spec, security
+    isolation test, fixtures and CI wiring are still open and
+    deliberately deferred to `plans/phase-1/53-exhaustive-local-e2e-design/`.
+  - "Run live Denmark canary and staged rollout" — `Operator:` only
+    (live Stripe catalog, real customer, real charge, real refund,
+    real payout/FX).
+  - "Contract legacy schema only after the compatibility window" —
+    gated on the canary above (operator work) and a "compatibility
+    window" decision that is owned by a person.
+
+## 32-abuse-and-usage-integrity
+
+- Tasks closed: 0/1.
+- Skipped: 1 ("Email verification gate" — real implementation:
+  enable better-auth `emailVerification` and a
+  `SIGNUP_REQUIRE_VERIFIED_EMAIL` gate in the entitlement/quota
+  path; the task needs a verified-email signal threaded through
+  `requireTenantPrincipal` and an integration test that exercises
+  the gate. Tractable but multi-hour work, not attempted in this
+  session because the prompt's verify bar — pnpm ci:local green, an
+  e2e spec in tests/e2e/, a manual browser pass — cannot be cleared
+  by writing the test in isolation.).
+
+## 34-smart-alerts
+
+- Tasks closed: 0/1.
+- Skipped: 1 ("Worker integration (best-effort)" — the in-place
+  progress note says "**skipped this session**" with the rationale
+  that it requires editing `src/shared/lib/email.ts`, a file that the
+  e2e-design session owns. Out of scope for this executor.).
+
+## 36-claimable-profiles
+
+- Tasks closed: 0/2.
+- Skipped: 2.
+  - "Gate and aggregate profile-view analytics" — in-place progress
+    note: "not implemented this pass"; net-new feature, not a fix to
+    the claimable trust boundary.
+  - "Exercise the complete runtime claim flow" — in-place progress
+    note: "explicitly out of scope for this session" with the
+    rationale that creating new Playwright files was forbidden; the
+    flow was live-verified by hand instead.
+
+## 37-portfolio-builder
+
+- Tasks closed: 0/4.
+- Skipped: 4 (all four carry in-place "not attempted" progress
+  notes with reasons: AI persona adapter, timeline adapter,
+  revocation cache invalidation, e2e privacy/publication/degradation
+  suite. Each is genuinely optional per the plan's own framing —
+  the public portfolio already reports `integrationsAvailable: { …:
+  false }` honestly rather than a fake toggle, so nothing is broken
+  while they are unwired.).
+
+## 38-work-sample
+
+- Tasks closed: 0/1.
+- Skipped: 1 (`Operator:` — the task is a "Limit + degradation curl"
+  check that needs real `GITHUB_TOKEN` and `MINIMAX_API_KEY`; both
+  are deliberately not configured.).
+
+## 40-team-synergy
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the only open task is gated on Phase 5, which is the
+  launch/canary phase — per the in-place header, "Phase 5 carries
+  its own 'do not start' note".).
+
+## 41-ai-sourcing-sprints
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the only open task is "the Phase 6 dedicated item"
+  per the header — gated on a real production observation window
+  that an agent cannot manufacture.).
+
+## 42-stealth-scraping
+
+- Tasks closed: 0/9.
+- Skipped: 9 (all 9 are gated on `42` being live in production plus
+  a 7-day canary, plus the two `Operator:` items — legal review
+  signature and a production deploy. Per the operator-queue, this
+  is the second-priority operator work after the backup. Cannot
+  ship without these.).
+
+## 43-solutions-intelligence
+
+- Tasks closed: 0/30.
+- Skipped: 30 (largest untouched plan in the phase. Per the header,
+  blocked on `42` being live plus a 60-brief gold-set quality bar.
+  Cannot start.).
+
+## 44-calendar-scheduling-interview-intelligence
+
+- Tasks closed: 0/9.
+- Skipped: 9 (remaining work is the "sensitive tail" of an
+  otherwise 72/81-done plan: private documents, live transcription,
+  retention, rollout. Most tasks need real interview fixtures
+  (real candidate, real consent, real recording-free audio path,
+  real retention timer) that an agent cannot fake.).
+
+## 45-public-landing-pages
+
+- Tasks closed: 0/1.
+- Skipped: 1 ("Decide and record the indexing state of blog,
+  changelog and roadmap" — a product decision, not a code task.
+  The three rows currently hold `noindex=true`; nothing in any plan
+  says that is the intent. The task correctly notes the right home
+  for this decision is `plans/phase-5/01-production-readiness-audit`
+  and an agent picking it now would lock in a launch state without
+  the founder's input.).
+
+## 46-content-marketing
+
+- Tasks closed: 0/6.
+- Skipped: 6 (cross-posting + writing posts + steady-state cadence
+  is content production, not code. The 2 posts/month cadence is
+  explicitly the founder's task per the plan's framing.).
+
+## 47-status-and-trust
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the in-place progress note: "**deliberately not
+  built, 2026-07-25**" — explicitly optional, and the file it needs
+  to edit — `src/shared/lib/email.ts` — is reserved for the
+  e2e-design session.).
+
+## 50-audit-visual-system
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the in-place progress note: "**Blocked on one
+  concrete thing**: Playwright names snapshots per operating system,
+  so the 16 committed `*-linux.png` baselines would have to be
+  regenerated in CI's container. Until that's done the gate cannot
+  fail loudly, and a visual gate that cannot fail is decoration.
+  Resuming this plan is the right next step after a real CI
+  container is confirmed.).
+
+## 51-audit-conversion
+
+- Tasks closed: 0/1.
+- Skipped: 1 (the in-place progress note: "**explicitly out of
+  scope this session**" with the rationale that creating new
+  Playwright files was forbidden. The gate is real but needs the
+  e2e harness from plan 53 to land first.).
+
+## 52-audit-trust
+
+- Tasks closed: 0/1.
+- Skipped: 1 ("Add trust runtime gates and redacted metrics" — per
+  the header, only meaningful once a maintainer turns
+  `PROFILE_REMOVAL_ENABLED` on. The metric surface cannot imply a
+  live feature that is off.).
+
+## 53-exhaustive-local-e2e-design
+
+- Tasks closed: 0/10.
+- Skipped: 10. The plan is a from-scratch design for "waves 4+5
+  of the e2e suite; entirely additive" and is the home for the
+  e2e specs that other plans (30, 36, 44, 50, 51) explicitly defer
+  to. The first session of this plan must come from the
+  in-progress harness work; starting it in parallel risks writing
+  specs against a not-yet-stable harness contract.
+
+## 54-waitlist-launch
+
+- Tasks closed: 0/9.
+- Skipped: 9. Per the prompt: "**El plan `54-waitlist-launch` es
+  entero un runbook manual del fundador con 9 casillas y sin
+  líneas `Operator:`: sáltalo completo y anótalo igual.**" The
+  product keeps open signup and adds no artificial waitlist — the
+  9 boxes are: Show HN submission, social posts, Search Console,
+  etc. The agent has no hand in any of them.
