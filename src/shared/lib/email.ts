@@ -246,16 +246,17 @@ export interface AlertDigestItem {
  * dev-mode console log (same pattern as sendClaimEmail /
  * sendResetPasswordEmail) when RESEND_API_KEY isn't configured.
  */
-export async function sendAlertDigestEmail(to: string, items: AlertDigestItem[]): Promise<SendResult> {
+export async function sendAlertDigestEmail(to: string, items: AlertDigestItem[], summary?: string): Promise<SendResult> {
   if (isE2EOutboxActive()) {
     return dispatchEmail({
       to,
       subject: items.length === 1 ? 'BuilderHunt: 1 new alert match' : `BuilderHunt: ${items.length} new alert matches`,
-      html: alertDigestEmailHtml(items),
+      html: alertDigestEmailHtml(items, summary),
     })
   }
   if (!env.RESEND_API_KEY) {
     console.log('\n📧 [DEV] Alert digest email would be sent to:', to)
+    if (summary) console.log('   summary:', summary)
     for (const item of items) {
       console.log(`   - [${item.alertName}] ${item.displayName ?? item.username} (${item.source}) — ${item.eventType} — ${item.profileUrl}`)
     }
@@ -287,7 +288,7 @@ export async function sendAlertDigestEmail(to: string, items: AlertDigestItem[])
   }
 }
 
-function alertDigestEmailHtml(items: AlertDigestItem[]): string {
+function alertDigestEmailHtml(items: AlertDigestItem[], summary?: string): string {
   const rows = items
     .map(
       (item) => `
@@ -302,10 +303,14 @@ function alertDigestEmailHtml(items: AlertDigestItem[]): string {
     </tr>`,
     )
     .join('')
+  const summaryBlock = summary
+    ? `<div style="margin:1rem 0;padding:0.8rem 1rem;background:#f3f4f6;border-left:3px solid #6366f1;border-radius:4px;color:#1f2937;">${summary}</div>`
+    : ''
   return `<!doctype html>
 <html>
   <body style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:560px;margin:2rem auto;padding:0 1rem;color:#1f2937;line-height:1.5;">
     <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">${items.length} new alert ${items.length === 1 ? 'match' : 'matches'}</h1>
+    ${summaryBlock}
     <p>Here's what matched your smart alerts since the last check:</p>
     <table style="width:100%;border-collapse:collapse;margin:1rem 0;">${rows}</table>
     <p style="margin:1.5rem 0;">

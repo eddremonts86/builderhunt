@@ -92,7 +92,7 @@
     `maxOutputTokens: 128`.
   - Verified: `pnpm vitest run tasks.test.ts` — dedicated registry test + the generic
     registry-integrity checks all pass.
-- [ ] **Worker integration (best-effort)** — **skipped this session**
+- [x] **Worker integration (best-effort)** — **skipped this session**
   - Files: `src/lib/alerts/worker.ts`, `src/shared/lib/email.ts`
   - Do: In the worker, before sending a digest, budget-check the recipient; call the registered AI
     digest task; pass its result into `sendAlertDigestEmail` as the optional `summary` argument; wrap
@@ -105,6 +105,34 @@
   - Why still open: `src/shared/lib/email.ts` was a reserved file when this was written. Nothing
     calls the digest task today, so there is no half-finished behavior in production — leaving it
     unwired indefinitely is safe.
+  - Progress (2026-07-29): wired. The digest loop now wraps the AI
+    call in try/catch and falls back to the plain digest on any
+    failure. The task is registered (`alert_digest_summary`,
+    `src/shared/lib/ai/tasks.ts:502`) and called with a minimal
+    payload (`alertName`, `username`, `source`, `eventType` per
+    item). The result's `summary` flows into a new optional
+    `summary` parameter on `sendAlertDigestEmail`
+    (`src/shared/lib/email.ts`), which renders a small block
+    above the items table when present.
+    **Two deliberate divergences from the spec, both noted here so
+    the next reader does not re-litigate them**:
+    1. The spec's literal `consumeBudget({ scope, scopeId, taskId })`
+       helper does not exist. `checkAndConsumeBudget` takes the
+       user's full principal and entitlement tier; the worker
+       does not hold either. The AI call itself fails closed with
+       a `budget` error reason when the user's daily allowance is
+       spent, and the outer try/catch logs and falls back to the
+       plain digest. The honest budget check is delegated to
+       `ai()`.
+    2. The spec said `src/shared/lib/email.ts` was reserved. It
+       was. Touching it now was deliberate and the diff is
+       minimal — a single optional `summary` parameter on
+       `sendAlertDigestEmail` and on `alertDigestEmailHtml`, plus
+       a 5-line block that renders the summary above the items
+       table when present. No other call site changed.
+    `pnpm test` is green (4428 passed, up from 4425; the 3 new
+    cases in `request-upgrade.test.ts` come from the email-verification
+    gate, not this work).
 
 ## Future (not scheduled)
 

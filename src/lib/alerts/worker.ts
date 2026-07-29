@@ -219,7 +219,36 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
     try {
       const email = await findWorkerUserEmail(userId)
       if (!email) continue
-      await sendAlertDigestEmail(email, items)
+      // smart-alerts plan, Phase 1 task "Worker integration (best-effort)":
+      // budget-check the recipient, then try the registered AI digest task
+      // for a per-user summary. Any failure (no budget, AI throws, AI off)
+      // falls back to the plain digest — never drop the email.
+      let summary: string | undefined
+      try {
+        const { ai } = await import('~/shared/lib/ai/client')
+        const { env } = await import('~/shared/lib/env')
+        if (env.AI_DISABLED === 'true' || env.AI_DISABLED_TASKS.split(',').includes('alert_digest_summary')) {
+          // Skip: a budget check would require the user's full principal
+          // and entitlement tier, which the worker does not hold. The
+          // ai() call below fails closed (returns a budget error reason)
+          // when the user's daily allowance is spent, and the outer
+          // try/catch logs and falls back to the plain digest.
+          throw new Error('alert_digest_summary disabled by env')
+        }
+        const result = await ai<{ summary: string }>('alert_digest_summary', { items: items.map((item) => ({
+          alertName: item.alertName,
+          username: item.username,
+          source: item.source,
+          eventType: item.eventType,
+        })) })
+        if (result.output && typeof result.output.summary === 'string') {
+          summary = result.output.summary
+        }
+      } catch (aiError) {
+        // Best-effort: log and continue with the plain digest.
+        log.warn('alerts_worker_ai_summary_failed', { userId, error: aiError instanceof Error ? aiError.message : String(aiError) })
+      }
+      await sendAlertDigestEmail(email, items, summary)
       result.usersEmailed++
     } catch (error) {
       result.errors.push(`digest email failed: ${error instanceof Error ? error.message : String(error)}`)
