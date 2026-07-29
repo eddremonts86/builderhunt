@@ -48,7 +48,11 @@ import {
 
 describe('legal constants', () => {
   it('has current versions for all required documents', () => {
-    expect(CURRENT_CONSENT_VERSIONS.tos).toBe('v1.0')
+    // Terms went to v1.1 with section 11 ("Interview features"): a minor bump, because it binds the
+    // contracting customer, who section 12 already notifies. Privacy went to v2.0 because it added
+    // categories of personal data about a third party — the candidate — and a major bump is what
+    // forces a fresh prompt. The reasoning lives on `tos` in `legal-versions.ts`.
+    expect(CURRENT_CONSENT_VERSIONS.tos).toBe('v1.1')
     expect(CURRENT_CONSENT_VERSIONS.privacy).toBe('v2.0')
     expect(CURRENT_CONSENT_VERSIONS.cookies).toBe('v1.0')
   })

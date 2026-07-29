@@ -313,12 +313,16 @@ describe('authentication and the tenant boundary', () => {
   it('refuses an organization admin who is not a participant', async () => {
     await toLive()
     // Admin manages seats and billing. That is not the same act as reading what a candidate said.
+    //
+    // 404, not 403: the route answers a non-owner exactly as it answers an absent interview, so a
+    // colleague cannot distinguish "not allowed" from "does not exist". See the comment above the
+    // `isOwner` check in `session.ts` — the discrimination itself was the leak.
     const response = await callSession(
       { action: 'pause', expectedVersion: 3 },
       principal({ userId: ADMIN, role: 'admin' }),
     )
-    expect(response.status).toBe(403)
-    expect((await response.json()).error).toBe('not_owner')
+    expect(response.status).toBe(404)
+    expect((await response.json()).error).toBe('not_found')
   })
 })
 
