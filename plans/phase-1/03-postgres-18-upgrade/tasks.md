@@ -148,7 +148,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
 
 ## Phase 1 — Dev + CI onto PG18 (no PG18-only SQL)
 
-- [ ] **Bump the local Postgres image and pin pgvector**
+- [x] **Bump the local Postgres image and pin pgvector**
   - Files: `docker-compose.yml` (line 8)
   - Do: `image: pgvector/pgvector:pg16` → `image: pgvector/pgvector:0.8.5-pg18`. Leave the
     `command: ['postgres', '-c', 'max_connections=200']`, the `pg_isready` healthcheck and the
@@ -163,7 +163,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     reports `18.x` and
     `… -tAc "select extversion from pg_extension where extname='vector'"` reports `0.8.5`.
 
-- [ ] **Add a second, DB-only CI job on pg18 (do not matrix the monolithic job)**
+- [x] **Add a second, DB-only CI job on pg18 (do not matrix the monolithic job)**
   - Files: `.github/workflows/quality.yml`
   - Do: pin the existing `quality` job's `postgres` service to `pgvector/pgvector:0.8.5-pg16`
     (line 16 — pinning the floating tag is itself part of this plan), then add a **new** job, e.g.

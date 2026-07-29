@@ -13,7 +13,12 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: pgvector/pgvector:pg16
+        # Pinned to the same major as production (still pg16 until the
+        # postgres-18-upgrade plan's Phase 4 cutover lands) so this leg keeps
+        # proving the code runs on the version that is actually deployed. The
+        # matching `quality-pg18` job below exercises the same code against
+        # `pgvector/pgvector:0.8.5-pg18` ahead of that cutover.
+        image: pgvector/pgvector:0.8.5-pg16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -194,6 +199,90 @@ jobs:
           name: lighthouse-reports
           path: tests/artifacts/lighthouse/
           retention-days: 14
+
+  # Phase 1 of the postgres-18-upgrade plan: a second, DB-only CI job on pg18.
+  # This is intentionally NOT a `strategy.matrix` on the `quality` job — that
+  # job also runs Playwright, `pnpm build`, the a11y gate and Lighthouse,
+  # none of which differ by Postgres major, and matrixing it doubles them all.
+  # The pg18 job runs only the version-sensitive steps against the same
+  # fixtures as pg16, with the same `env:` block verbatim. The pg16 leg
+  # remains the source of truth for "code runs on production's current
+  # version" until Phase 4 of the plan lands.
+  quality-pg18:
+    name: Quality (pg18)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.5-pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: builderhunt_security_test_ci_pg18
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      DATABASE_MIGRATION_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+      APP_URL: http://localhost:3000
+      VITE_APP_URL: http://localhost:3000
+      BETTER_AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:migration-integrity
+      - run: pnpm exec drizzle-kit check
+      - run: pnpm test:migrations:local
+      - run: node scripts/db/prepare-rls-fixture.mjs
+      - name: Verify exact runtime roles and RLS
+        env:
+          RLS_TEST_APP_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          RLS_TEST_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          RLS_TEST_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          RLS_TEST_CAPABILITY_URL: postgresql://builderhunt_capability:test-capability-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          RLS_TEST_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+        run: pnpm test:rls:local
+      - name: Two-tenant API/worker/privacy isolation (real routes, exact roles)
+        env:
+          OWNER_SEED_URL: postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          DATABASE_URL: postgresql://builderhunt_app:test-app-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          DATABASE_AUTH_URL: postgresql://builderhunt_auth:test-auth-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          DATABASE_WORKER_URL: postgresql://builderhunt_worker:test-worker-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+          DATABASE_PLATFORM_URL: postgresql://builderhunt_platform:test-platform-password@127.0.0.1:5432/builderhunt_security_test_ci_pg18
+        run: pnpm test:api-isolation:local
+      - name: Restore rehearsal
+        run: |
+          PGPASSWORD=postgres createdb -h 127.0.0.1 -U postgres builderhunt_security_test_ci_pg18_restore
+          RESTORE_TEST_SOURCE_URL=postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18 \
+          RESTORE_TEST_TARGET_URL=postgresql://postgres:postgres@127.0.0.1:5432/builderhunt_security_test_ci_pg18_restore \
+          pnpm db:restore-test
+      - run: pnpm security:boundaries
+      - run: pnpm test
 
   # Optional, additive certification of the real Stripe-backed BillingProvider
   # (src/shared/lib/billing/real-provider.ts) against Stripe's actual test-mode API — never a
