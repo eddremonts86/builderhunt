@@ -34,7 +34,7 @@ reproduce this plan's three most dangerous claims against a live PG18 cluster. E
 literal output it produced. If a claim does *not* reproduce, correct `spec.md` — never keep an
 unearned claim, and never skip the task because the reasoning "is obviously right".
 
-- [ ] **Stand up a scratch PG18 cluster and provision it from migrations**
+- [x] **Stand up a scratch PG18 cluster and provision it from migrations**
   - Files: none (throwaway compose override or a bare `docker run`)
   - Do: run `pgvector/pgvector:0.8.5-pg18` on a scratch volume and port (e.g. 5433) — the
     `pgvector/pgvector` image is mandatory, not a convenience. Then point `DATABASE_MIGRATION_URL`
@@ -52,7 +52,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     **A warning at step 3 means the image lacks pgvector — stop and fix the image.** Step 3 is
     soft, so it will not fail the run; step 4 will, one step later, after rolling back everything.
 
-- [ ] **Confirm the migration role is a superuser (the RLS-restore precondition)**
+- [x] **Confirm the migration role is a superuser (the RLS-restore precondition)**
   - Files: none
   - Do: `psql "$DATABASE_MIGRATION_URL" -tAc "select rolsuper, rolbypassrls from pg_roles where rolname = current_user"`
   - Verify: output is `t|t` (or at minimum `rolsuper = t`). **If it is not, stop** — a data-only
