@@ -206,7 +206,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     to quote: that figure is from 2026-07-23 and the script now has ~102 `record()` call sites.
     Also: no new warnings from `drizzle-kit migrate` or from postgres.js on 18.
 
-- [ ] **Re-verify the HNSW plan-shape regression test on PG18**
+- [x] **Re-verify the HNSW plan-shape regression test on PG18**
   - Files: `tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts` (read; edit only
     if PG18 changes the plan text it matches). Note the suite is `tests/unit/**` only —
     `vitest.config.ts` includes nothing under `src/`, and there are zero co-located test files.
@@ -219,7 +219,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     breaks, fix the assertion — never the query shape, which is load-bearing (see the doc comment
     at `src/shared/lib/repositories/public-builder-embeddings.ts:86-100`).
 
-- [ ] **Rehearse the restore harness against a PG18 target**
+- [x] **Rehearse the restore harness against a PG18 target**
   - Files: none
   - Do: create an empty scratch PG18 database, then
     `RESTORE_TEST_SOURCE_URL=<pg16> RESTORE_TEST_TARGET_URL=<pg18 scratch> pnpm db:restore-test`.

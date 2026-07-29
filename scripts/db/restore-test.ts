@@ -6,7 +6,7 @@ import { assertRestoreTestTargets } from '../../src/shared/lib/db/restore-policy
 const sourceUrl = process.env.RESTORE_TEST_SOURCE_URL
 const targetUrl = process.env.RESTORE_TEST_TARGET_URL
 if (!sourceUrl || !targetUrl) throw new Error('RESTORE_TEST_SOURCE_URL and RESTORE_TEST_TARGET_URL are required')
-assertRestoreTestTargets(sourceUrl, targetUrl)
+assertRestoreTestTargets(sourceUrl, targetUrl, { allowCrossHost: process.env.RESTORE_TEST_ALLOW_CROSS_HOST === 'true' })
 
 const sourceChecksum = await seedAndChecksumBillingFixture(sourceUrl)
 const sourceMigrationCount = await countMigrations(sourceUrl)
