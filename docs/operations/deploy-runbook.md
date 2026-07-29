@@ -45,13 +45,14 @@ every deploy; it never drops, resets, or `push`es — existing data is preserved
 | Step | What it does | Failure behavior |
 |------|--------------|------------------|
 | 1 wait-for-db | retries `SELECT 1` on `DATABASE_MIGRATION_URL` | fails after `DEPLOY_DB_WAIT_ATTEMPTS` (default 30 × 2s) |
-| 2 create-db | `scripts/db/create-db.ts` (idempotent `CREATE DATABASE`) | fatal |
-| 3 extensions | `CREATE EXTENSION IF NOT EXISTS vector` | **soft** — warns; app keyword-falls-back if pgvector image not set |
-| 4 migrate | `drizzle-kit migrate` (creates roles/tables/RLS/grants) | fatal |
-| 5 provision roles | `ALTER ROLE builderhunt_* … PASSWORD` from each set `DATABASE_*_URL` | fatal |
-| 6 verify logins | connects as each provisioned role, `SELECT 1` | fatal (catches password/env mismatch before users do) |
-| 7 seed admin | `scripts/db/seed-admin.ts` (idempotent upsert) | **soft** — warns; deploy stays healthy |
-| 8 sync content | `scripts/db/sync-platform-content.ts` — upserts `content/changelog/*.md` and `content/roadmap/*.md` into the `changelog` / `roadmap_items` tables | **soft** — warns; the public pages keep the rows they already had |
+| 2 pg-major floor | reads `current_setting('server_version_num')` and requires `>= DEPLOY_DB_MIN_PG_MAJOR` (default 18) | fatal — points at the runbook cutover section so the operator knows where to look |
+| 3 create-db | `scripts/db/create-db.ts` (idempotent `CREATE DATABASE`) | fatal |
+| 4 extensions | `CREATE EXTENSION IF NOT EXISTS vector` | **soft** — warns; app keyword-falls-back if pgvector image not set |
+| 5 migrate | `drizzle-kit migrate` (creates roles/tables/RLS/grants) | fatal |
+| 6 provision roles | `ALTER ROLE builderhunt_* … PASSWORD` from each set `DATABASE_*_URL` | fatal |
+| 7 verify logins | connects as each provisioned role, `SELECT 1` | fatal (catches password/env mismatch before users do) |
+| 8 seed admin | `scripts/db/seed-admin.ts` (idempotent upsert) | **soft** — warns; deploy stays healthy |
+| 9 sync content | `scripts/db/sync-platform-content.ts` — upserts `content/changelog/*.md` and `content/roadmap/*.md` into the `changelog` / `roadmap_items` tables | **soft** — warns; the public pages keep the rows they already had |
 
 Flags: `--dry-run` (print the plan, no mutations, no connections), `--skip-seed`,
 `--skip-content`. Secrets (role passwords) are never printed.

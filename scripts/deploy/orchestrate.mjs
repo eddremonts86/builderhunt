@@ -182,6 +182,39 @@ function ensureDatabaseExists() {
   ok('database present')
 }
 
+/**
+ * Floor check on the Postgres major version. `current_setting('server_version_num')`
+ * returns the packed numeric form (18.4 → 180004) so comparing against
+ * `MAJOR * 10000` reads as the major and ignores the minor. The floor is
+ * read directly from `process.env.DEPLOY_DB_MIN_PG_MAJOR` (not `src/shared/lib/env.ts`)
+ * because it is ops-only and must not enter the runtime env contract.
+ *
+ * The error message points at the runbook cutover section so the next
+ * operator who hits it knows where to look.
+ */
+async function assertPostgresMajor(migrationUrl) {
+  step('Verifying Postgres major version meets the deployment floor')
+  const minMajor = Number.parseInt(process.env.DEPLOY_DB_MIN_PG_MAJOR ?? '18', 10)
+  if (DRY_RUN) {
+    info(`would read current_setting('server_version_num') and require >= ${minMajor}.*`)
+    return
+  }
+  const sql = postgres(migrationUrl, { max: 1, prepare: false })
+  try {
+    const [row] = await sql`select current_setting('server_version_num')::int as num`
+    const major = Math.floor(row.num / 10000)
+    if (major < minMajor) {
+      fail(
+        `PostgreSQL ${major}.x detected at ${redactUrl(migrationUrl)}, but this build requires >= ${minMajor}.x. ` +
+          `See docs/operations/deploy-runbook.md → "PostgreSQL 16 → 18 cutover" (postgres-18-upgrade plan, Phase 4).`,
+      )
+    }
+    ok(`PostgreSQL ${row.num} (major ${major}) — floor ${minMajor} met`)
+  } finally {
+    await sql.end({ timeout: 5 })
+  }
+}
+
 async function ensureExtensions(migrationUrl) {
   step('Ensuring required Postgres extensions')
   const extensions = ['vector'] // pgvector — required by builder_embeddings (semantic search)
@@ -365,6 +398,7 @@ async function main() {
   info(`migration identity: ${migrationRole} @ ${redactUrl(migrationUrl)}`)
 
   await waitForDatabase(migrationUrl)
+  await assertPostgresMajor(migrationUrl)
   ensureDatabaseExists()
   await ensureExtensions(migrationUrl)
   runMigrations()

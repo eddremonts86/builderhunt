@@ -535,7 +535,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
 
 ## Phase 6 — Enforce the floor
 
-- [ ] **Add a server-version assertion to the deploy orchestrator**
+- [x] **Add a server-version assertion to the deploy orchestrator**
   - Files: `scripts/deploy/orchestrate.mjs`
   - Do: new step between `waitForDatabase` / "Waiting for database" (`orchestrate.mjs:149-150`) and
     `ensureDatabaseExists` / "Ensuring database exists" (`:176`), called from `main()` at `:367`:
