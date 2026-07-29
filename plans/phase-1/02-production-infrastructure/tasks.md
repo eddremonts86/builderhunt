@@ -52,9 +52,23 @@
     handler, since `psql` exiting early on `ON_ERROR_STOP` before consuming all of stdin is
     expected, not a bug) and cleaned the duplicate row, then reran for a clean pass.
 
-- [ ] **Install + verify the backup cron on the VPS** — *not done; needs production SSH
-  access this session doesn't have. Procedure fully documented in `docs/runbook.md` §2,
-  ready to run once access is available.*
+- [ ] **Install + verify the backup cron on the VPS**
+  - Files: `scripts/ops/builderhunt-backup-sync.sh` (the version-controlled copy of what belongs at
+    `/usr/local/bin/builderhunt-backup-sync.sh`), `docs/runbook.md` (§3 cron table)
+  - Do: Confirm Coolify's 03:00 scheduled backup is enabled on the `builderhunt-db` resource (custom
+    format, 30 backups / 30 days / 10 GB cap). Copy `builderhunt-backup-sync.sh` to
+    `/usr/local/bin/` on the VPS and install the 03:30 root cron entry that runs it. Do not edit the
+    script only on the box — the copy in this repo is the source.
+  - Verify: `crontab -l` on the VPS shows the 03:30 entry; `ls -la /data/coolify/backups/` shows a
+    dump newer than the last 03:00; then prove the dump is restorable, not merely present, with
+    `pnpm db:restore-drill --file /path/to/that/dump` (a throwaway fresh cluster — the runbook is
+    explicit that a backup nobody has restored is not a backup).
+  - Operator: needs root SSH on the Hetzner VPS. An agent cannot do this and must not mark it done;
+    the sync script's 03:30 half also depends on the Storage Box task below being paid for.
+  - Note (2026-07-28): `docs/runbook.md` §3 already lists the 03:30 rsync under "What runs today",
+    while `docs/operations/external-services-register.md` §7 still marks the Storage Box
+    `⬜ outstanding`. One of the two is wrong. Establish which before trusting either, and fix the
+    loser in the same change.
 
 ## Phase 2 — Runbook + hygiene
 
@@ -114,5 +128,19 @@
 
 ## Phase 5 — Fast-follows (post-launch, not blocking, untouched)
 
-- [ ] **Off-site backup copy** — not started; genuinely a fast-follow per the plan's own
-  framing ("post-launch, not blocking"). Left as-is.
+- [ ] **Off-site backup copy**
+  - Files: `docs/operations/external-services-register.md` (§7), `scripts/ops/builderhunt-backup-sync.sh`,
+    `docs/runbook.md` (§3)
+  - Do: Contract the Hetzner Storage Box (~€4/month), put its credentials on the VPS, and point the
+    03:30 rsync at it. Then reconcile §7's `⬜ outstanding` marker and the runbook's "What runs
+    today" table so both describe the same reality.
+  - Verify: after one 03:30 run, the newest dump exists on the Storage Box and not only in
+    `/data/coolify/backups/`; restore *from the off-site copy* with
+    `pnpm db:restore-drill --file <path to the off-site dump>` and confirm it passes. A copy that
+    has never been restored from proves nothing.
+  - Operator: needs a paid subscription decision (~€4/month) plus root SSH. §7 frames the gate as
+    "before real candidate data", so this stops being a fast-follow the moment interviews carry a
+    real candidate's documents.
+  - Priority note: this plan's own framing calls it "post-launch, not blocking". That was written
+    before `44-calendar-scheduling-interview-intelligence` put candidate CVs and transcripts in the
+    database. Re-read §7's gate before deferring it again.

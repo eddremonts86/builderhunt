@@ -114,8 +114,13 @@
     not performed.
 
 - [ ] **Make visual and structural checks required in CI**
-  - Files: `.github/workflows/quality.yml`
-  - Do: Run the visual suite in CI and upload the diff on failure the way `a11y-results` is today.
+  - Files: `.github/workflows/quality.yml`, `tests/e2e/visual/**` (the committed `*-linux.png` baselines)
+  - Do: Generate the Linux snapshot baselines once inside the CI environment (or the matching
+    Playwright container), commit the `*-linux.png` files, then add the `pnpm test:visual` step to the
+    workflow and upload the diff artifact on failure the way `a11y-results` does today.
+  - Verify: `pnpm test:visual` passes in CI on a run where nothing changed, and fails with an
+    uploaded diff artifact when a deliberate one-pixel change is pushed. Both directions matter — a
+    visual gate that cannot fail is decoration.
   - **Blocked on one concrete thing**: Playwright names snapshots per operating system, so the 16
     committed baselines are `*-darwin.png` and Linux CI has none to compare against. A missing
     baseline is written and the test fails, so wiring this in now would fail every job until the
@@ -125,4 +130,8 @@
 
 - [ ] **Verify production and close the audit**
   - Files: `docs/visual-system.md`
-  - Do: Compare the deployed app against the baseline once, record the result, and close the audit.
+  - Do: Compare the deployed app against the committed baselines once, record the result, and close
+    the audit.
+  - Verify: `pnpm test:visual` run against the deployed URL reports zero unexpected diffs, and
+    `docs/visual-system.md` records the date, the commit and any accepted difference with its reason.
+  - Operator: needs a deployed release to compare against.

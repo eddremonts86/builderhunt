@@ -57,14 +57,13 @@
   - Verify: live in-browser end-to-end — loaded the real claim's draft, edited the headline, saved, published, viewed the live public page, confirmed the copy-link button and view-live link both point at the real published URL.
 
 - [ ] **Integrate AI persona as an optional read-only adapter** — not attempted
-  - Reason: the owner draft route already reports `integrationsAvailable: { aiPersona: false }` honestly rather than a fake toggle. Wiring the real `ai-profile-enrichment` artifact parsing is separable, genuinely optional per the plan's own framing, and not reached this pass.
-
-- [ ] **Integrate timeline without making it a hard dependency** — not attempted, same reason as above (`integrationsAvailable.timeline: false` reported honestly)
   - Files: `src/shared/lib/portfolio-integrations.ts`, `tests/unit/shared/lib/portfolio-integrations.test.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`
-  - Do: When `ai-profile-enrichment` exists and owner opted in, parse the existing `metadata.aiEnrichment` artifact with its exported schema and expose only summary/focus/strengths/provenance. Never invoke `profile-enrich` from a public request; omit invalid, stale-policy-disabled, or absent artifacts.
-  - Verify: `pnpm test -- tests/unit/shared/lib/portfolio-integrations.test.ts`; run with no AI files/config and with valid/invalid fixture artifacts.
+  - Do: When `ai-profile-enrichment` exists and the owner opted in, parse the existing `metadata.aiEnrichment` artifact with its exported schema and expose only summary/focus/strengths/provenance. Never invoke `profile-enrich` from a public request; omit invalid, stale-policy-disabled, or absent artifacts.
+  - Verify: `pnpm test -- tests/unit/shared/lib/portfolio-integrations.test.ts`; run with no AI files/config present, and again with valid and with invalid fixture artifacts.
+  - Reason still open: the owner draft route already reports `integrationsAvailable: { aiPersona: false }` honestly rather than a fake toggle, so nothing is broken while this is unwired. It is separable and genuinely optional per the plan's own framing.
+  - Note (2026-07-28): this task previously had no `Files`/`Do`/`Verify` of its own, while the task below it carried a body describing `metadata.aiEnrichment` under a *timeline* title — and duplicated the real timeline task after it. The body belonged here; the duplicate has been removed.
 
-- [ ] **Integrate timeline without making it a hard dependency**
+- [ ] **Integrate timeline without making it a hard dependency** — not attempted (`integrationsAvailable.timeline: false` is reported honestly, so nothing is broken while it is unwired)
   - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
   - Do: Render public events only when owner opted in and unified-timeline is available. Preserve its lazy cache/degradation. If summary UI is exposed, call `timeline-summary` local-first through Chrome built-in AI; use the authenticated MiniMax proxy fallback and hide the control when neither tier is usable.
   - Verify: `pnpm test -- tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`; exercise Chrome-available, authenticated proxy fallback, unavailable, and dependency-absent states.

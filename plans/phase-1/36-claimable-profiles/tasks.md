@@ -76,11 +76,16 @@
   - Deviation: no admin console UI to browse/list claims (out of scope for this pass — the plan only asked for the API + revocation mechanics, not a browsing surface).
 
 - [ ] **Gate and aggregate profile-view analytics** — not implemented this pass
-  - Reason: this is a genuinely separate, net-new feature (a view-tracking write path plus a consent gate plus an owner-only aggregate endpoint), not a fix to the vulnerability that motivated the rest of this plan. `builder_profile_views` exists in schema but no route writes to it today (confirmed dead via research agent). Left for a future pass; not blocking anything else in this plan.
+  - Files: `src/shared/lib/db/schema.ts` (`builder_profile_views`, already defined), `src/shared/lib/repositories/builder-profile-views.ts` (new), `src/routes/api/builders/$builderId/views.ts` (new), `tests/unit/security/builder-profile-views-isolation.test.ts` (new)
+  - Do: Write one view row per authenticated viewer per profile per day (the table is keyed on `user_id`, so it is a presence record, not a counter). Gate the write behind the viewer's consent — no row for a viewer who has not consented — and never write for anonymous requests. Expose an aggregate endpoint readable only by the verified owner of the claimed profile, returning counts and never viewer identities.
+  - Verify: `pnpm vitest run tests/unit/security/builder-profile-views-isolation.test.ts` proves a non-owner receives 403, the owner receives counts with no viewer identity in the payload, and no row is written for an anonymous or non-consenting viewer. Then `pnpm test:rls:local` still passes, since the table is tenant-private.
+  - Reason still open: this is a net-new feature (write path + consent gate + owner-only aggregate), not a fix to the vulnerability that motivated the rest of this plan. `builder_profile_views` exists in the schema but no route writes to it today. Nothing else in this plan is blocked by it.
 
 - [ ] **Exercise the complete runtime claim flow** — explicitly out of scope for this session
-  - Files: `tests/e2e/claimable-profiles.spec.ts`, `playwright.config.ts`
-  - Reason: this session's standing instructions forbid creating new tests/e2e/Playwright test files. The equivalent flow (start → challenge → real external API check → verify → revoke) was live-verified by hand instead (see notes above) — real HTTP calls against the dev server, real Postgres rows, and a real (unmodified) public GitHub profile, not a mock.
+  - Files: `tests/e2e/claimable-profiles.spec.ts` (new), `playwright.config.ts`
+  - Do: Write one Playwright spec covering the full claim lifecycle against the running app: start a claim, receive the challenge, satisfy it against a real external profile, verify, then revoke — asserting after revocation that the public profile no longer reports a verified claim. Use the existing `tests/e2e/harness` fixtures for the disposable database and seeded roles rather than a new bootstrap.
+  - Verify: `pnpm exec playwright test tests/e2e/claimable-profiles.spec.ts` passes twice consecutively from a clean state (`pnpm test:e2e:repeat` is the repo's own guard against a flaky new spec).
+  - Reason still open: the standing instruction at the time forbade creating new Playwright files. The same flow was live-verified by hand instead — real HTTP against the dev server, real Postgres rows, and a real unmodified public GitHub profile, not a mock — so the behavior is proven; what is missing is the regression guard.
 
 ## What wasn't written (and why)
 

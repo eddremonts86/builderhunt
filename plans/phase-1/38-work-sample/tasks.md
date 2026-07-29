@@ -133,7 +133,19 @@
     data-not-instructions rule text is present.
   - Verified: `pnpm vitest run tasks.test.ts` green (18 tests, 0 skipped).
 - [ ] **Limit + degradation curls** — **blocked on real credentials, not code**
-  - Files: none (verification task)
+  - Files: `src/routes/api/builders/$builderId/work-sample/analyze.ts` (the endpoint under test —
+    no file changes expected; this task produces evidence, not code)
+  - Do: With real `GITHUB_TOKEN` and `MINIMAX_API_KEY` configured, run the analyze endpoint 5 times
+    within an hour for one builder and 12 times within a day, recording each response. Then set
+    `AI_DISABLED_TASKS` to include this task and confirm `POST` is refused while `GET` still serves
+    previously stored analyses.
+  - Verify: request 5 returns `429` (the 4/hour rate limit), request 12 returns `429` (the 11/day
+    budget), and with the task in `AI_DISABLED_TASKS` the `POST` returns the disabled response while
+    the `GET` list still returns stored rows. Attach the sanitized responses to the plan.
+  - Operator: needs real `GITHUB_TOKEN` and `MINIMAX_API_KEY`. Neither is configured, and the
+    endpoint's kill-switch check runs *before* the budget and rate-limit checks, so without keys
+    every request short-circuits at `503 unavailable` and these paths cannot be reached at all. An
+    agent cannot fake this and must not mark it done.
   - Why not done: the analyze endpoint's kill-switch check (`GITHUB_TOKEN`/
     `MINIMAX_API_KEY` missing → 503 `unavailable`) runs before the budget/rate-limit
     checks, so without real keys configured in this environment every request short-

@@ -86,9 +86,13 @@
 - [x] **Instrument the baseline without changing UX** (folded into the hero/explore/signup tasks below — same commits)
 
 - [ ] **Collect and approve the real baseline** — not started, by design
-  - Reason: requires ≥14 real days and ≥1,000 real eligible sessions in production. Nothing to do
-    here until `CONVERSION_EVENTS_ENABLED=true` is deployed and that window elapses.
-    `docs/conversion-baseline.md` §4 states this explicitly rather than inventing a number.
+  - Files: `docs/conversion-baseline.md` (§4 is where the numbers go)
+  - Do: Deploy with `CONVERSION_EVENTS_ENABLED=true`, let it run, then write the measured
+    signup-conversion rate into §4 with the exact window it covers and the session count behind it.
+  - Verify: §4 states a number, its date range and its eligible-session count, and the count is
+    ≥1,000 over ≥14 days. Anything less is not a baseline and must not be recorded as one.
+  - Operator: needs ≥14 days of real production traffic and ≥1,000 eligible sessions. No agent can
+    shorten this, and inventing a plausible number is the specific failure §4 exists to prevent.
 
 - [x] **Expose the guest-value path in the hero without coercion**
   - Files: `src/modules/landing/components/HomePage.tsx`
@@ -151,13 +155,23 @@
   - Verify: `pnpm vitest run tests/unit/shared/lib/conversion-variant.test.ts` — 5/5 passing.
 
 - [ ] **Add conversion browser smoke and CI gate** — explicitly out of scope this session
-  - Reason: `tests/regression/test-conversion.mjs` (Playwright) is barred by this session's standing
-    no-new-e2e-files rule, and wiring `.github/workflows/quality.yml` requires the user's explicit
-    go-ahead per the standing CI/CD-edit rule. Every piece of logic this task would smoke-test is
-    instead covered by real unit/integration tests (56 new tests across 9 files) plus the live
-    browser walkthrough documented above.
+  - Files: `tests/regression/test-conversion.mjs` (new), `package.json` (a `test:conversion` script),
+    `.github/workflows/quality.yml`
+  - Do: Write the browser smoke that walks the guest-value path to signup and asserts each
+    conversion event fires once, add it as `pnpm test:conversion`, and add that step to the quality
+    workflow.
+  - Verify: `pnpm test:conversion` passes locally and fails when an event is removed from the hero
+    path; then the CI job runs it and the workflow is red on that same deliberate removal.
+  - Reason still open: the standing rule at the time barred new Playwright files, and editing the CI
+    workflow needs the maintainer's go-ahead. Every piece of logic this would smoke-test is already
+    covered by unit and integration tests (56 across 9 files) plus a live browser walkthrough, so
+    this is a regression guard, not new coverage.
 
 - [ ] **Run controlled rollout and record the decision** — not started, by design
-  - Reason: requires the completed baseline window above as a prerequisite, plus real production
-    traffic to stage 10%/50%/100%. Nothing to decide yet — `docs/conversion-baseline.md` is the
-    living document this will update once collection starts.
+  - Files: `docs/conversion-baseline.md`
+  - Do: With the baseline recorded, stage the change to 10%, then 50%, then 100%, recording the
+    measured rate at each stage, and write the keep-or-revert decision with its reasoning.
+  - Verify: `docs/conversion-baseline.md` shows a rate per stage against the same baseline window and
+    an explicit decision. A rollout with no recorded decision is an untracked change.
+  - Operator: depends on the baseline task above and on real production traffic; the keep-or-revert
+    call is the maintainer's.

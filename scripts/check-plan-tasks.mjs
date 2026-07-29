@@ -2,7 +2,15 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 // Keeps plan files followable *literally*, which is the property that makes them safe for an agent
-// to execute without supplying judgement of its own. Two mechanical checks:
+// to execute without supplying judgement of its own. Four mechanical checks:
+//
+//   0. Every open task carries `Files`, `Do` and `Verify`. The field that gets dropped is always
+//      `Verify`, and a task nobody can verify is a task nobody can tell is finished — which is
+//      precisely where a weaker model reports success. Checked tasks are exempt: 243 of them are
+//      narrative records of finished work, and reformatting those would destroy evidence.
+//   0b. No `- [ ]` checkbox under a "future work" heading. 42 had four, each needing a new approval
+//      or specification first; a checkbox there reads as pending work to every reader and invites
+//      building scope nobody approved.
 //
 //   1. No plan names a path under a directory tree the repo has retired. All tests moved under
 //      tests/{unit,e2e,regression} on 2026-07-27, and eleven task files went on naming
@@ -58,9 +66,57 @@ function walk(dir) {
   }
 }
 
+// Open checklist items, with the indented body that belongs to each.
+function openTasks(lines) {
+  const tasks = []
+  let cur = null
+  lines.forEach((line, i) => {
+    const m = /^- \[([ x])\] (.*)$/.exec(line)
+    if (m) {
+      if (cur) tasks.push(cur)
+      cur = m[1] === ' ' ? { line: i + 1, title: m[2], body: [] } : null
+    } else if (cur) {
+      if (line.startsWith('#')) {
+        tasks.push(cur)
+        cur = null
+      } else cur.body.push(line)
+    }
+  })
+  if (cur) tasks.push(cur)
+  return tasks
+}
+
+// A field name at the start of a body line, allowing "Verify (RED):" and "Verify (2026-07-22):".
+const hasField = (body, name) =>
+  new RegExp(String.raw`^\s*[-*]?\s*\**${name}\**[^:\n]{0,40}:`, 'im').test(body)
+
+const SCOPE_HEADING = /future work|not part of th|out of scope|optional follow|won'?t do|non-goals/i
+
 function check(file) {
   const rel = file.slice(ROOT.length + 1)
   const lines = readFileSync(file, 'utf8').split('\n')
+
+  if (/(^|\/)tasks?\.md$/.test(rel)) {
+    for (const task of openTasks(lines)) {
+      const body = task.body.join('\n')
+      const missing = ['Files', 'Do', 'Verif(?:y|ication)'].filter((f) => !hasField(body, f))
+      if (missing.length) {
+        const names = missing.map((f) => (f.startsWith('Verif') ? 'Verify' : f)).join(', ')
+        fail(
+          `${rel}:${task.line} open task is missing ${names} — "${task.title.replace(/\*\*/g, '').slice(0, 60)}"`,
+        )
+      }
+    }
+    // A checkbox under a "future work" heading reads as pending work to every reader, human or
+    // agent, and invites building scope nobody approved. Those belong in a prose list.
+    let heading = ''
+    lines.forEach((line, i) => {
+      if (line.startsWith('#')) heading = line
+      if (line.startsWith('- [ ]') && SCOPE_HEADING.test(heading)) {
+        fail(`${rel}:${i + 1} checkbox under "${heading.trim().slice(0, 48)}" — make it a prose list item`)
+      }
+    })
+  }
 
   lines.forEach((line, i) => {
     for (const { pattern, replacement } of RETIRED_TREES) {
@@ -93,4 +149,7 @@ if (failed) {
   process.exit(1)
 }
 
-console.log('OK: no plan names a retired test tree, and every `pnpm` script a plan runs exists')
+console.log(
+  'OK: every open task carries Files/Do/Verify, no checkbox sits under a future-work heading,\n' +
+    '    no plan names a retired test tree, and every `pnpm` script a plan runs exists',
+)

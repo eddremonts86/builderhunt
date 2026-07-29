@@ -94,12 +94,17 @@
     registry-integrity checks all pass.
 - [ ] **Worker integration (best-effort)** — **skipped this session**
   - Files: `src/lib/alerts/worker.ts`, `src/shared/lib/email.ts`
-  - Why skipped: `src/shared/lib/email.ts` is a reserved file for this session (standing
-    instruction). The task is registered and safe to leave unregistered-from-the-worker
-    indefinitely — nothing calls it, so there's no half-finished behavior in prod. A future
-    session with `email.ts` in scope can wire it per the original plan (budget-check the
-    recipient, call the task, pass `summary?` into `sendAlertDigestEmail`, try/catch to a
-    plain digest on any failure).
+  - Do: In the worker, before sending a digest, budget-check the recipient; call the registered AI
+    digest task; pass its result into `sendAlertDigestEmail` as the optional `summary` argument; wrap
+    the whole call in try/catch so any failure falls back to the plain digest rather than dropping
+    the email. The task itself is already registered — this only wires the worker to it.
+  - Verify: `pnpm vitest run tests/unit/lib/alerts` passes with a case that asserts the plain digest
+    still sends when the AI task throws, and one that asserts `summary` reaches
+    `sendAlertDigestEmail` when it resolves. Then trigger the worker route locally and confirm one
+    email lands in the dev outbox with the summary block present.
+  - Why still open: `src/shared/lib/email.ts` was a reserved file when this was written. Nothing
+    calls the digest task today, so there is no half-finished behavior in production — leaving it
+    unwired indefinitely is safe.
 
 ## Future (not scheduled)
 

@@ -219,11 +219,20 @@
   - Verify: authenticated browser member/admin flows and anonymous profile inspection.
 
 - [ ] **Update legal and product copy**
-  - Files: privacy policy, terms, crawler information route, README/source claims, consent
-    versions if required by the approved legal review.
-  - Do: categories, purpose, basis, source, retention, rights, contact, user agent,
-    and precise public-data wording.
-  - Verify: link check, browser render, and written approval recorded in source register.
+  - Files: `src/routes/_landing/legal/privacy.tsx`, `src/routes/_landing/legal/terms.tsx`,
+    `src/routes/_landing/crawler.tsx` (new — the public page the crawler's user agent points at),
+    `README.md`, `src/shared/lib/legal-versions.ts` (only if the approved legal review requires a
+    consent-version bump), `docs/operations/public-enrichment-source-register.md`
+  - Do: State on the privacy page the categories collected, the purpose, the lawful basis, the
+    source, the retention period, the data-subject rights and the contact route. Publish the crawler
+    page naming the exact user agent and how to request exclusion. Correct any README or product
+    claim that implies more than public-data collection. Use the precise public-data wording from the
+    approved review — never "stealth", evasion, or guaranteed access.
+  - Verify: every legal page renders and its links resolve (`pnpm exec playwright test tests/e2e/public-content.spec.ts`
+    covers the legal surface); the crawler page is reachable anonymously; and the written approval is
+    recorded in `docs/operations/public-enrichment-source-register.md`.
+  - Operator: the wording needs a legal review signed off by a person; an agent may draft it but must
+    not record the approval.
 
 ## Phase 7 — Final verification and rollout
 
@@ -240,22 +249,36 @@
     enrichment_jobs/enrichment_evidence/builder_processing_restrictions — none exist yet).
 
 - [ ] **Run runtime adversarial matrix**
-  - Execute allowlisted success, blocked host, robots deny, challenge, 429, timeout,
-    overlap, crash/reclaim, restriction race, retention, export/delete, and kill-switch.
-  - Verify: save sanitized evidence with job IDs/log event IDs and contacted-host list.
+  - Files: `docs/operations/public-enrichment-source-register.md` (where the evidence is recorded —
+    this task produces evidence, not code)
+  - Do: Exercise each case against a running instance with enrichment enabled in a non-production
+    environment: an allowlisted host succeeding, a blocked host, a robots.txt denial, a challenge
+    response, a 429, a timeout, two overlapping jobs for one builder, a worker crash and reclaim, a
+    restriction arriving mid-job, retention expiry, an export and a delete request, and the kill
+    switch. Record the job ID and log event ID for each.
+  - Verify: all twelve cases produce the documented outcome, with sanitized evidence (job IDs, log
+    event IDs, and the list of hosts actually contacted) attached to the source register. Zero
+    blocked-host requests appear in the contacted-host list.
 
 - [ ] **Deploy dark**
+  - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
+  - Operator: needs a production deploy plus the Coolify environment. An agent must not enable this.
   - Do: deploy migration/code with `ENRICHMENT_ENABLED=false`; validate exact runtime
     roles, indexes, RLS, health, and zero enrichment network traffic.
   - Verify: production smoke without enabling customer behavior.
 
 - [ ] **Approve and run seven-day canary**
+  - Files: `docs/operations/public-enrichment-source-register.md` (the approval and the daily record)
+  - Operator: needs a human approval and seven days of elapsed time. Neither can be produced by an
+    agent, and the canary cannot be shortened.
   - Do: approved legal/source register; GitHub only; admin then internal users;
     manual jobs; batch 2.
   - Verify: spec SLOs, no critical policy/privacy/isolation incident, zero blocked-host
     requests, and zero overdue retention rows.
 
 - [ ] **Enable manual customer refresh**
+  - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
+  - Operator: turning this on for customers is a product decision that follows the canary approval.
   - Preconditions: every prior task complete and canary approved.
   - Do: expand audience without enabling scheduled refresh or new connectors.
   - Verify: one authorized production job reaches terminal state and renders attributed,

@@ -88,8 +88,35 @@ Every plan directory contains exactly three files:
   - Files: `src/path/to/file.ts`, `src/path/other.tsx`
   - Do: 1-4 lines of concrete instruction (schemas inline where non-obvious).
   - Verify: the command/check that proves it works (test name, curl, UI check).
+  - Operator: only when a person must run it — the access or decision required.
 ```
+
+`Files`, `Do` and `Verify` are mandatory on every **open** task, and `pnpm plans:check-tasks`
+fails without them. There is no exemption, because the field that gets dropped is always
+`Verify`, and a task nobody can verify is a task nobody can tell is finished. `Verify` may carry
+a parenthetical (`Verify (RED):`, `Verify (2026-07-22):`).
+
+Checked tasks are the historical record and may be narrative instead — 243 of them are, and
+rewriting finished work to satisfy a format would destroy evidence for no gain. The gate
+therefore only holds open tasks to the template: those are the ones someone is about to execute.
+
+`Operator` is the fourth, optional field, and it exists because some work genuinely cannot be
+done by an agent: it needs production SSH, a real credential, a legal approval, a decision, or
+elapsed time. Those tasks still get `Files`/`Do`/`Verify` — the person doing it needs them just
+as much — and `Operator` states plainly why an agent must stop and hand over. Writing a fake
+verification step for such a task is worse than leaving it blank, because it invites an agent to
+claim it passed.
+
+Do not use a `- [ ]` checkbox for anything that is not work you intend someone to do. Scope you
+have decided against, ideas awaiting a new specification, and follow-ups belonging to another
+plan go in a prose list under a clear heading. A checkbox reads as "pending" to every reader,
+inflates every count, and invites an agent to implement unapproved scope.
 
 Tasks are ordered so the feature is always shippable at any checkpoint (schema → lib+tests →
 API → UI → gating/polish). A competent dev (or agent) must be able to execute tasks.md
 top-to-bottom without reading anything else except the files it cites.
+
+**Paths and commands must be real.** A plan is only followable literally if every path it names
+sits in the tree that exists and every `pnpm` script it tells you to run is in `package.json`.
+When a tree moves, the plans that name it move with it in the same change —
+`pnpm plans:check-tasks` fails otherwise.

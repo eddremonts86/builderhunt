@@ -170,7 +170,16 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 
 ## Phase 6 — Security, rollout, and runtime evidence
 
-- [ ] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task. What
+- [ ] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task
+  - Files: `tests/unit/security/sprints-cross-organization.test.ts` (new)
+  - Do: Seed two organizations with one sprint each, then assert from the second organization's
+    principal that it can neither list, read, re-run nor export the first organization's sprint or
+    its results — through the real routes, not the service layer, so the tenant-context wiring is
+    part of what is under test. Include one direct-SQL check as the non-owner runtime role, so a
+    passing application layer cannot hide a missing RLS policy.
+  - Verify: `pnpm vitest run tests/unit/security/sprints-cross-organization.test.ts` passes, and
+    `pnpm test:api-isolation:local` still reports zero failures.
+  - What IS already covered, so this task is a gap in proof rather than in behavior: what
   IS covered: `sprints-shared.test.ts` rejects invalid sources/oversized input/unknown keys
   (Phase 1); the architecture-boundary test
   (`tests/unit/lib/sprints/service.test.ts`) proves every tenant route derives its principal via

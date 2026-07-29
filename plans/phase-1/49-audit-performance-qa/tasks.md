@@ -85,9 +85,15 @@
   - Note: this appeared twice in the plan as two separate open items; the duplicate is folded in.
 
 - [ ] **Add read-only production smoke and record the baseline**
-  - Files: `.github/workflows/quality.yml`, `docs/operations/`
+  - Files: `.github/workflows/quality.yml`, `docs/operations/performance-baseline.md` (new)
   - Do: Run the read-only smoke against the deployed app after a release and record the first
     measured numbers as the baseline the budgets are held against.
+  - Verify: `pnpm assets:check` passes against the recorded numbers, `pnpm test:lighthouse` produces
+    a report for the deployed URL, and `docs/operations/performance-baseline.md` states the date, the
+    commit and each measured number — so a later regression can be attributed to a change rather
+    than argued about.
+  - Operator: needs a deployed release to measure. The numbers must come from production, not from a
+    local run, or the baseline is meaningless.
 
 ## Summary for this pass (2026-07-26)
 

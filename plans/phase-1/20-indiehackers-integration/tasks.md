@@ -15,11 +15,11 @@
   **(a) skip permanently**, per this plan's own recommendation. Status headers updated in
   `spec.md`, `plan.md`, and this file to reflect the closure and point at the replacements.
 
-- [ ] **(Optional follow-up, not part of this plan) Spec the "builder tags + founder
-      filter" mini-plan** — only build if founder-filter demand is actually demonstrated
-      later; tracked builders already own `builders.metadata`, so a namespaced
-      `metadata.userTags` key + search filter would cover this with zero scraping. See
-      `plan.md` for the pointer.
+Not a task, and deliberately not a checkbox: the same mini-plan appears as an executable task
+below, and this paragraph is only the rationale for why it exists at all. Tracked builders already
+own `builders.metadata`, so a namespaced `metadata.userTags` key plus a search filter would cover
+the founder-filter idea with zero scraping — but only build it if that demand is actually
+demonstrated. See `plan.md` for the pointer.
 
 - [ ] **(Only under option (a), and only if founder-filter demand exists) Spec the
       "builder tags + founder filter" mini-plan**

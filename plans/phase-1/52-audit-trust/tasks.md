@@ -58,13 +58,27 @@
   - Verify: `pnpm vitest run tests/unit/lib/search.test.ts` and the full suite — all passing; `tsc --noEmit` clean across every touched file.
 
 - [ ] **Add trust runtime gates and redacted metrics** — not attempted
-- [ ] **Roll out source by source without weakening enforcement** — not attempted
+  - Files: `src/routes/api/admin/metrics/index.ts`, `src/shared/lib/repositories/profile-removal.ts`,
+    `tests/unit/security/profile-removal-metrics-redaction.test.ts` (new)
+  - Do: Expose removal-request counts by state and by source on the admin metrics endpoint, carrying
+    no requester identity, no email and no free-text reason — counts and states only. Refuse to serve
+    the block at all while `PROFILE_REMOVAL_ENABLED` is false, so the metric cannot imply a live
+    feature.
+  - Verify: `pnpm vitest run tests/unit/security/profile-removal-metrics-redaction.test.ts` asserts
+    the payload contains counts and no field that could identify a requester, and that the block is
+    absent when the flag is off. `pnpm security:route-coverage` still passes.
 
-Reason for the final two: `PROFILE_REMOVAL_ENABLED` already gates the whole feature (off by
-default everywhere, including production); a runtime readiness gate and a staged per-source
-rollout are meaningful only once there is a real decision to turn this on in production, which is
-a maintainer call, not something to script speculatively. The kill switch itself is the safety
-net until that decision is made.
+- [ ] **Roll out source by source without weakening enforcement** — not attempted
+  - Files: `docs/operations/` (the rollout record), `.env.production.example`
+    (`PROFILE_REMOVAL_ENABLED`)
+  - Do: Turn the flag on for one source at a time, and after each one confirm that suppression is
+    still enforced on every other source — the failure mode this guards against is a per-source
+    rollout quietly becoming a global exemption.
+  - Verify: after each source, `pnpm vitest run tests/unit/security` passes and a suppressed profile
+    from an already-enabled source is still absent from search and from the public profile route.
+  - Operator: turning `PROFILE_REMOVAL_ENABLED` on in production is a maintainer decision, and the
+    kill switch is the safety net until it is made. Both tasks above are meaningful only once that
+    decision exists — do not enable it to make a test pass.
 
 - [x] **Replace email-only builder verification with source proof** — done, but by an earlier
   plan in this same session (`claimable-profiles`, 2026-07-25/26), not by this pass
