@@ -86,25 +86,31 @@ export const resolvePublicRadar = createServerFn({ method: 'GET' })
     }
   })
 
+/**
+ * Feeds the SSR head of `/builders/$builderId`, which anonymous visitors and crawlers reach with no
+ * tenant context at all.
+ *
+ * It reads the published projection, not `builders`. `builders` is tenant-scoped and RLS-protected:
+ * as `builderhunt_app` with no `app.organization_id` set, every row is invisible, so this returned
+ * `null` for every builder and the route fell through to its "Builder not found" meta — no title, no
+ * `og:type`, no description, on every public profile page. It went unnoticed because the local
+ * `DATABASE_URL` was a superuser, which bypasses RLS; the e2e harness, running as the real role, is
+ * where it finally showed. `published_builder_profiles` is the surface a profile is deliberately
+ * published to, and it is what `/api/builders/$builderId` already serves anonymously — one source
+ * for the page and its meta rather than two that disagree.
+ */
 export const getPublicBuilder = createServerFn({ method: 'GET' })
   .validator(builderIdSchema)
   .handler(async ({ data: builderId }) => {
-    const [{ db }, { builders }, { eq }] = await Promise.all([
-      import('~/shared/lib/db/index'),
-      import('~/shared/lib/db/schema'),
-      import('drizzle-orm'),
-    ])
-    const [builder] = await db
-      .select({
-        id: builders.id,
-        username: builders.username,
-        displayName: builders.displayName,
-        bio: builders.bio,
-        avatarUrl: builders.avatarUrl,
-        source: builders.source,
-      })
-      .from(builders)
-      .where(eq(builders.id, builderId))
-
-    return builder ?? null
+    const { findPublishedBuilderProfile } = await import('~/shared/lib/repositories/public-builders')
+    const profile = await findPublishedBuilderProfile(builderId)
+    if (!profile) return null
+    return {
+      id: profile.id,
+      username: profile.username,
+      displayName: profile.displayName,
+      bio: profile.bio,
+      avatarUrl: profile.avatarUrl,
+      source: profile.source,
+    }
   })
