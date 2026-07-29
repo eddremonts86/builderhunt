@@ -192,7 +192,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     data, following the section end to end ends with `pnpm deploy:db` printing
     `━━━ deploy orchestration complete ✓ ━━━`.
 
-- [ ] **Run the whole gate on PG18**
+- [x] **Run the whole gate on PG18**
   - Files: none
   - Do: `pnpm test && pnpm type-check && pnpm lint && pnpm test:migration-integrity` and, against
     the PG18 dev cluster, `pnpm test:migrations:local`, `pnpm test:rls:local`,
