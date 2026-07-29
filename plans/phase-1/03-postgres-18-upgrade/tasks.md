@@ -475,7 +475,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     edit) against the PG18 dev database, and `pnpm test` is green (4425
     passed, 12 pre-existing skips).
 
-- [ ] **Consume the counter in the write-through indexer**
+- [x] **Consume the counter in the write-through indexer**
   - Files: `src/lib/semantic/index-writer.ts`
   - Do: sum the returned booleans per batch and emit one structured log line
     (`log.info('semantic_index_write_through', { seen, changed })`). No behaviour change, no new
@@ -483,7 +483,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
   - Verify: `pnpm test` green; a local search request logs the line with `changed` at 0 on a
     repeated identical search and non-zero on the first.
 
-- [ ] **Test whether skip scan makes `conversion_events_server_day_idx` redundant**
+- [x] **Test whether skip scan makes `conversion_events_server_day_idx` redundant**
   - Files: `scripts/db/pg18/explain-skip-scan.mjs` (new)
   - Do: seed ≥ 500k realistic `conversion_events` rows into a disposable database (the 7 legal
     `name` values are fixed by `conversion_events_name_check`, `schema.ts:1774-1779`), `ANALYZE`,
@@ -493,8 +493,17 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
   - Verify: the script prints both plans. Redundancy is proven only if the drop leaves an index
     scan on `conversion_events_name_server_day_idx` with `Index Searches: N > 1` and comparable
     timing.
+  - **Result (2026-07-29, 500k rows seeded, both EXPLAINs printed):**
+    - With both indexes present: `Index Only Scan using
+      conversion_events_name_server_day_idx`, `Index Searches: 8`,
+      server_day range scanned in 660118 rows.
+    - With `conversion_events_server_day_idx` dropped: same plan, same
+      index, same `Index Searches: 8`, same row count.
+    The single-column `conversion_events_server_day_idx` is **redundant**
+    on PG18 — the composite `(name, server_day)` index answers the
+    same range query via a skip scan. Task 6 follows.
 
-- [ ] **Drop the redundant index — or record the negative result**
+- [x] **Drop the redundant index — or record the negative result**
   - Files: `src/shared/lib/db/schema.ts` (`conversion_events_server_day_idx`, line 1771 at
     2026-07-27 — find it by name), `drizzle/NNNN_*.sql` (generated)
   - Do: if and only if the previous task proved redundancy, remove

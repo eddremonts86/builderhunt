@@ -1772,7 +1772,12 @@ export const conversionEvents = pgTable(
   },
   (table) => [
     uniqueIndex('conversion_events_identity_unique').on(table.sessionId, table.name, table.surface, table.variant),
-    index('conversion_events_server_day_idx').on(table.serverDay),
+    // Note (2026-07-29): the single-column `conversion_events_server_day_idx`
+    // was removed. PG18's planner answers `WHERE server_day BETWEEN $1 AND $2`
+    // via a skip scan on the composite `(name, server_day)` index with the
+    // same Index Searches count (8) and the same row count, so the single
+    // column is redundant. See `scripts/db/pg18/explain-skip-scan.mjs` and
+    // `plans/phase-1/03-postgres-18-upgrade/tasks.md` Phase 5 tasks 5+6.
     index('conversion_events_name_server_day_idx').on(table.name, table.serverDay),
     index('conversion_events_created_at_idx').on(table.createdAt),
     check(

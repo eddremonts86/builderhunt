@@ -1,0 +1,1 @@
+DROP INDEX "conversion_events_server_day_idx";

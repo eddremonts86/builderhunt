@@ -412,6 +412,10 @@
     "0102_uuidv7_pk": {
       "sql": "0257efbbff28c305717929e5216271672a63f760b7bf313569f696597d298da4",
       "snapshot": "91769ed163f4dfd7b720e30889d6835bb6cfbb00cd384876ca0267cccb716877"
+    },
+    "0103_drop_redundant_conversion_events_index": {
+      "sql": "407b622dee2702430b5b18e08ad3ab1cde3f129673041a3274ac5553ddb1ae46",
+      "snapshot": "11a36d8fd7af9e93eff775ef08749113f212575e93a966851f2cc6f3d71c84be"
     }
   }
 }

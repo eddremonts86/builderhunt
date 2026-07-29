@@ -722,6 +722,13 @@
       "when": 1785332714656,
       "tag": "0102_uuidv7_pk",
       "breakpoints": true
+    },
+    {
+      "idx": 103,
+      "version": "7",
+      "when": 1785334689045,
+      "tag": "0103_drop_redundant_conversion_events_index",
+      "breakpoints": true
     }
   ]
 }
