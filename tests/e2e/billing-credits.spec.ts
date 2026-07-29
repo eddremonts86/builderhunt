@@ -309,8 +309,19 @@ test('going live reserves the ceiling, and finishing settles it back down', asyn
     row.operation === 'interview_live_transcription' && row.state === 'reserved')
   expect(held, 'the reservation is open while the session runs').toHaveLength(1)
   expect(held[0].maximum_units).toBe(180)
-  // Held, not yet spent: the balance must not drop by the ceiling.
-  expect(await readCreditBalance(harness)).toBe(before)
+  /*
+   * The ceiling leaves the balance at reserve time, and the unused part comes back at settlement.
+   *
+   * This asserted the opposite — that a held reservation must not move the balance — and the ledger
+   * is deliberately the other way round: `reserveCredits` decrements `remainingUnits` on the grant,
+   * and `reservations.ts` says so where it settles ("already removed from remainingUnits at reserve
+   * time — consumption just marks it permanent, no further balance change"). Holding without
+   * decrementing would let a customer spend the same units twice while a session runs.
+   *
+   * What must not happen is the ceiling being *kept*, and the assertion at the end of this test is
+   * what pins that: only the 12 real minutes stay gone.
+   */
+  expect(await readCreditBalance(harness)).toBe(before - 180)
 
   // Twelve minutes of audio. Settled against what the provider says it billed, not the ceiling.
   const finished = await harness.owner.api!.post(`/api/interviews/${eventId}/session`, {

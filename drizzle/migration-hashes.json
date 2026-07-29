@@ -395,7 +395,7 @@
     },
     "0098_credit_write_role_membership": {
       "sql": "d8cb813c129c3488646493aadcfcf659ff38a87d41a9fe1ac1f5aa741d2ecf78",
-      "snapshot": "67a90aa8cae1bd598cc192000e29f30f687e8a42c8ddf259edbfee4a8b14dfac"
+      "snapshot": "13ff40c140c0832ff1fe0402206388e22ae72ebc3952b19aba95fd26c93a6f8b"
     }
   }
 }
