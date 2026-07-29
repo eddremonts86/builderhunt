@@ -776,12 +776,28 @@ try {
   }
   if (calendarCrossTenantInsert !== 'denied') throw new Error('cross-tenant calendar insert was allowed')
 
-  // The worker is org-scoped with no session user, and has no write path into candidate data.
+  /*
+   * The worker is org-scoped with no session user, and has no write path into candidate data.
+   *
+   * Asserted as a property, not as a row list. This was `assertIds(…, [fixtureEvent])`, which
+   * compares the whole list by strict equality — so the booking assertion above, which legitimately
+   * inserts a second `org-a` event to prove 0096's capability policy, turned this gate red on
+   * something that is not a leak. Worse, `order by id` over random UUIDs made the failure order
+   * vary between runs. What this gate is actually for is "the worker sees its organization and
+   * nothing else", so that is what it now checks: every visible row belongs to `org-a`, and the
+   * fixture event is among them — the second half is what stops an empty result passing as a green.
+   */
   const workerCalendar = await worker.begin(async (transaction) => {
     await transaction`select set_config('app.organization_id', 'org-a', true)`
-    return transaction`select id from calendar_events order by id`
+    return transaction`select id, organization_id from calendar_events order by id`
   })
-  assertIds(workerCalendar, ['bbbbbbbb-0000-4000-8000-00000000000a'], 'worker calendar scope')
+  const foreignRows = workerCalendar.filter((row) => row.organization_id !== 'org-a')
+  if (foreignRows.length > 0) {
+    throw new Error(`worker calendar scope failed: rows from another organization: ${JSON.stringify(foreignRows)}`)
+  }
+  if (!workerCalendar.some((row) => row.id === 'bbbbbbbb-0000-4000-8000-00000000000a')) {
+    throw new Error(`worker calendar scope failed: fixture event missing: ${JSON.stringify(workerCalendar.map((r) => r.id))}`)
+  }
 
   let workerCandidateWrite = 'allowed'
   try {
