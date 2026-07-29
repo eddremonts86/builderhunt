@@ -164,7 +164,8 @@ export const builderIdentities = pgTable(
 export const builderSourceSnapshots = pgTable(
   'builder_source_snapshots',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    // uuidv7 — append-heavy, see postgres-18-upgrade Phase 5 task 1.
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
     builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
     contentHash: text('content_hash').notNull(),
     payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
@@ -425,7 +426,8 @@ export const builderClaimRequests = pgTable('builder_claim_requests', {
 export const builderProfileViews = pgTable(
   'builder_profile_views',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    // uuidv7 — append-heavy, see postgres-18-upgrade Phase 5 task 1.
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
     builderId: text('builder_id').notNull().references(() => builders.id, { onDelete: 'cascade' }),
     viewerId: text('viewer_id').references(() => authUsers.id, { onDelete: 'set null' }),
     viewedAt: timestamp('viewed_at', { withTimezone: true }).defaultNow().notNull(),
@@ -712,7 +714,8 @@ export const migrationBackfillRuns = pgTable(
 export const migrationBackfillConflicts = pgTable(
   'migration_backfill_conflicts',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    // uuidv7 — append-heavy, see postgres-18-upgrade Phase 5 task 1.
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
     runName: text('run_name').notNull().references(() => migrationBackfillRuns.name, { onDelete: 'cascade' }),
     sourceTable: text('source_table').notNull(),
     sourceId: text('source_id').notNull(),
@@ -931,7 +934,8 @@ export const enrichmentJobs = pgTable(
 export const enrichmentEvidence = pgTable(
   'enrichment_evidence',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    // uuidv7 — append-heavy, see postgres-18-upgrade Phase 5 task 1.
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     jobId: text('job_id').notNull(),
     builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),

@@ -419,7 +419,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
 
 ## Phase 5 — Feature adoption (only after Phase 4 is observed)
 
-- [ ] **Switch four append-heavy uuid PKs to `uuidv7()`**
+- [x] **Switch four append-heavy uuid PKs to `uuidv7()`**
   - Files: `src/shared/lib/db/schema.ts`, `drizzle/NNNN_*.sql` (generated)
   - Do: locate the tables **by `export const` name**, not by line — the schema has 24
     `.defaultRandom()` columns as of 2026-07-27 and the line numbers move. Replace

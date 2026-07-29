@@ -408,6 +408,10 @@
     "0101_material_access_guard": {
       "sql": "ff24a591369ab642b57e35302ab54eea20ec63ce1fa8f387c06dfae1827ea90a",
       "snapshot": "446e0c6be738a5cd75e509e55471c76e53c3fe9dbbdf899bb2388e6af8f8db73"
+    },
+    "0102_uuidv7_pk": {
+      "sql": "0257efbbff28c305717929e5216271672a63f760b7bf313569f696597d298da4",
+      "snapshot": "91769ed163f4dfd7b720e30889d6835bb6cfbb00cd384876ca0267cccb716877"
     }
   }
 }
