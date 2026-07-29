@@ -84,16 +84,11 @@
     stops the deploy instead of being reported after it.
   - Note: this appeared twice in the plan as two separate open items; the duplicate is folded in.
 
-- [ ] **Add read-only production smoke and record the baseline**
-  - Files: `.github/workflows/quality.yml`, `docs/operations/performance-baseline.md` (new)
-  - Do: Run the read-only smoke against the deployed app after a release and record the first
-    measured numbers as the baseline the budgets are held against.
-  - Verify: `pnpm assets:check` passes against the recorded numbers, `pnpm test:lighthouse` produces
-    a report for the deployed URL, and `docs/operations/performance-baseline.md` states the date, the
-    commit and each measured number — so a later regression can be attributed to a change rather
-    than argued about.
-  - Operator: needs a deployed release to measure. The numbers must come from production, not from a
-    local run, or the baseline is meaningless.
+Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-07-29, deliberately not as a checkbox: numbers measured against a deployed release. It waits on a live
+deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
+work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
+
 
 ## Summary for this pass (2026-07-26)
 

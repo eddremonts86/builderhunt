@@ -68,17 +68,11 @@
     the payload contains counts and no field that could identify a requester, and that the block is
     absent when the flag is off. `pnpm security:route-coverage` still passes.
 
-- [ ] **Roll out source by source without weakening enforcement** — not attempted
-  - Files: `docs/operations/` (the rollout record), `.env.production.example`
-    (`PROFILE_REMOVAL_ENABLED`)
-  - Do: Turn the flag on for one source at a time, and after each one confirm that suppression is
-    still enforced on every other source — the failure mode this guards against is a per-source
-    rollout quietly becoming a global exemption.
-  - Verify: after each source, `pnpm vitest run tests/unit/security` passes and a suppressed profile
-    from an already-enabled source is still absent from search and from the public profile route.
-  - Operator: turning `PROFILE_REMOVAL_ENABLED` on in production is a maintainer decision, and the
-    kill switch is the safety net until it is made. Both tasks above are meaningful only once that
-    decision exists — do not enable it to make a test pass.
+Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-07-29, deliberately not as a checkbox: the maintainer's decision on `PROFILE_REMOVAL_ENABLED`. It waits on a live
+deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
+work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
+
 
 - [x] **Replace email-only builder verification with source proof** — done, but by an earlier
   plan in this same session (`claimable-profiles`, 2026-07-25/26), not by this pass

@@ -13,10 +13,18 @@
 > itself so a forgotten backfill could not take a release down; `TENANT_WRITE_MODE` is gone entirely
 > (every insert has always written both columns); and the `assessTenantReadiness` gate that demanded
 > a 24h zero-mismatch production window was removed, because it could never be satisfied.
-> Still **not** done, and the only reason this is not `implemented`: `TENANT_READ_MODE` still
-> defaults to `legacy` and `TENANT_CANONICAL_READY` to `false` (`src/shared/lib/env.ts`,
-> `.env.example`), so reads do not resolve canonically yet, and no contract migration has dropped the
-> legacy columns.
+> **Decided 2026-07-29 — `TENANT_READ_MODE` is not a pending migration.** It has exactly one consumer,
+> the saved-searches list in `src/routes/api/queries/index.ts`, where `legacy` shows what the member
+> saved and `canonical` shows the whole organization's. That was never a schema question but a product
+> one, and the owner's answer is: **saved searches are personal by default and shared explicitly** —
+> the model `28-shared-resources` specifies. So `legacy` is the correct default and stays, and the
+> sharing path is that plan's work, not a read-mode flip. `TENANT_CANONICAL_READY` stays `false` for
+> the same reason.
+>
+> Still **not** done, and now the only reason this is not `implemented`: no contract migration has
+> dropped the legacy columns — and that cannot happen until `plans`/`plan_requests` stop being read
+> and written by `src/shared/lib/repositories/platform-billing.ts` and
+> `src/shared/lib/repositories/account-privacy.ts`, which belongs to `30-stripe-billing-platform`.
 
 ## Problem
 

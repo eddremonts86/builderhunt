@@ -5,6 +5,11 @@ records plus the shared planning policy in [`_meta/`](./_meta/). Each plan is a 
 `spec.md` defines the outcome, `plan.md` defines the delivery sequence, and `tasks.md`
 is the executable checklist.
 
+[`phase-5/`](./phase-5/) is the MVP/Beta-to-production gate: it holds only the checks that cannot be
+performed before the product has been deployed and has run for a while. A task belongs there when no
+amount of engineering can close it sooner — it needs production to exist, clock time to pass, or a
+person to decide. "Hard" is not the criterion.
+
 Every directory in [`phase-1/`](./phase-1/) is prefixed with its position in the canonical
 build order, `01`–`54`. That number is the answer to "in what sequence would these plans be
 built from an empty repository, so no plan starts before its dependencies exist" — and it is

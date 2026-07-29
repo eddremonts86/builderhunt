@@ -128,10 +128,8 @@
     container), commit the `*-linux.png` files, then add the step. Until then the suite is opt-in
     via `pnpm test:visual` and excluded from the default run by its own projects.
 
-- [ ] **Verify production and close the audit**
-  - Files: `docs/visual-system.md`
-  - Do: Compare the deployed app against the committed baselines once, record the result, and close
-    the audit.
-  - Verify: `pnpm test:visual` run against the deployed URL reports zero unexpected diffs, and
-    `docs/visual-system.md` records the date, the commit and any accepted difference with its reason.
-  - Operator: needs a deployed release to compare against.
+Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-07-29, deliberately not as a checkbox: a deployed release to compare against. It waits on a live
+deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
+work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
+

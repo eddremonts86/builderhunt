@@ -9,8 +9,16 @@ The same number is the review order. Auditing plan-vs-reality top-to-bottom mean
 read a plan after the plans it builds on, so "this claims to be implemented" can be checked
 against a foundation you have already verified rather than assumed.
 
-**Snapshot: 2026-07-28.** 54 plans, 787 tasks, 627 done (79%), 160 open, 26 plans with zero
-open tasks. The jump from 748 to 787 is `03-postgres-18-upgrade` arriving from `phase-2` with 39
+**Snapshot: 2026-07-29.** 54 plans, 777 tasks, 627 done (80%), 150 open, 27 plans with zero
+open tasks.
+
+**Seven tasks left this phase on 2026-07-29** for `plans/phase-5/01-production-readiness-audit`. They
+were not unfinished work — their definitions contain the launch: a conversion baseline needs ≥14 days
+of real traffic and ≥1,000 sessions, a canary needs seven days, and performance and visual baselines
+have to be measured against a deployed release. Keeping them here meant this phase could never be
+answered "done", which hid the difference between *work remaining* and *time remaining*. Phase 1's bar
+is now reachable and honest: every piece of work done and verified in a green `pnpm ci:local`. Each
+origin plan (`42`, `49`, `50`, `51`, `52`) carries a pointer instead of a checkbox. The jump from 748 to 787 is `03-postgres-18-upgrade` arriving from `phase-2` with 39
 open tasks — the percentage fell without any work being undone. Regenerate the counts with the command in
 [`phase-1-queue.md`](./phase-1-queue.md).
 

@@ -267,22 +267,17 @@
     roles, indexes, RLS, health, and zero enrichment network traffic.
   - Verify: production smoke without enabling customer behavior.
 
-- [ ] **Approve and run seven-day canary**
-  - Files: `docs/operations/public-enrichment-source-register.md` (the approval and the daily record)
-  - Operator: needs a human approval and seven days of elapsed time. Neither can be produced by an
-    agent, and the canary cannot be shortened.
-  - Do: approved legal/source register; GitHub only; admin then internal users;
-    manual jobs; batch 2.
-  - Verify: spec SLOs, no critical policy/privacy/isolation incident, zero blocked-host
-    requests, and zero overdue retention rows.
+Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-07-29, deliberately not as a checkbox: a human approval plus seven days of elapsed time. It waits on a live
+deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
+work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
 
-- [ ] **Enable manual customer refresh**
-  - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
-  - Operator: turning this on for customers is a product decision that follows the canary approval.
-  - Preconditions: every prior task complete and canary approved.
-  - Do: expand audience without enabling scheduled refresh or new connectors.
-  - Verify: one authorized production job reaches terminal state and renders attributed,
-    non-expired evidence with redacted logs.
+
+Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-07-29, deliberately not as a checkbox: the canary's approval, which is a product decision. It waits on a live
+deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
+work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
+
 
 ## Future work — not part of this implementation
 

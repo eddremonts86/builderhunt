@@ -3,6 +3,11 @@
 > **Status**: `blocked`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md), [`team-accounts`](../27-team-accounts/spec.md)
 > **Blocks**: [`activity-feed`](../29-activity-feed/spec.md)
+> **Product decision (2026-07-29)**: saved searches are **personal by default and shared
+> explicitly**. This plan owns that sharing path. The alternative — flipping `TENANT_READ_MODE` to
+> `canonical` so every member sees every saved search in the organization — was considered and
+> rejected by the owner, so `01-security-and-multitenancy` keeps `legacy` as the correct default
+> rather than carrying it as a pending migration.
 > **Reality check**: saved queries, tracked builders, and notes are user-scoped today; no list tables
 > exist. The former design used nullable organization stamps and per-user builder snapshots. The
 > security foundation instead supplies mandatory tenant ownership, global builder identities,
