@@ -21,7 +21,7 @@
   - Do: Confirm saved queries/keyword/source associations, alerts, lists/items, organization builders, and notes have mandatory organization keys, candidate keys, composite tenant FKs, indexes, checks, and command policies. Add no competing nullable tenant model.
   - Verify: app-role SQL rejects A alert→B query and A item→B list; missing/A/B contexts pass the manifest RLS suite.
 
-- [ ] **Implement tenant saved-query repository**
+- [x] **Implement tenant saved-query repository**
   - Files: `src/shared/lib/repositories/saved-queries.ts`, `tests/unit/shared/lib/repositories/saved-queries.test.ts`, `src/shared/lib/authorization/permissions.ts`
   - Do: Accept `TenantTransaction` plus principal; list private creator rows and organization-visible rows only inside active organization; create/update/delete/change visibility via centralized permissions; maintain normalized keywords/sources atomically; return DTOs.
   - Verify: tests cover creator/member/admin/owner and tenant A/B for every operation, concurrent visibility change, and no global DB import.

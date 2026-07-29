@@ -416,6 +416,10 @@
     "0103_drop_redundant_conversion_events_index": {
       "sql": "407b622dee2702430b5b18e08ad3ab1cde3f129673041a3274ac5553ddb1ae46",
       "snapshot": "11a36d8fd7af9e93eff775ef08749113f212575e93a966851f2cc6f3d71c84be"
+    },
+    "0104_shared_resources_saved_query_visibility": {
+      "sql": "0a21cd641ef3be45b9e34da0f88905c85577ea0ceda464c0f18e4ed68192fb2d",
+      "snapshot": "fb2cd74e275e72cd80c64da89441e9b72edb75334092c78785aa826a58f40262"
     }
   }
 }

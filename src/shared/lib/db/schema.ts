@@ -285,10 +285,24 @@ export const savedQueries = pgTable(
     sources: jsonb('sources').$type<string[]>().default(['github']),
     language: text('language'),
     country: text('country'),
+    // Plan 28 task 3: organization-visible saved queries. Default is
+    // 'private' so a pre-existing row is correctly classified as
+    // owner-only — adding a default of 'organization' would have
+    // silently widened every pre-existing query's visibility on the
+    // migration run.
+    visibility: text('visibility').notNull().default('private'),
     createdAt: timestamp('created_at').defaultNow(),
+    updatedAt: timestamp('updated_at').defaultNow(),
   },
   (table) => ({
     organizationIdIdUnique: uniqueIndex('saved_queries_organization_id_id_unique').on(table.organizationId, table.id),
+    // Plan 28: list "rows the principal can see" with a single index.
+    // The (org, visibility, user) composite covers the most common
+    // query shape — a per-org list grouped by visibility, with the
+    // creator pinned to the second column so the planner can stop
+    // early when the user is the creator.
+    orgVisibilityCreatorIdx: index('saved_queries_org_visibility_creator_idx').on(table.organizationId, table.visibility, table.userId),
+    checkVisibility: check('saved_queries_visibility_check', sql`${table.visibility} in ('private', 'organization')`),
   }),
 )
 
