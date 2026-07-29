@@ -182,6 +182,18 @@ Measurement (Phase 5 task, not a claim): insert 200k rows into two clones of
 and compare `pg_relation_size` of the PK index plus wall time. If the difference is noise, the
 change still stands (it is free) but the plan records the negative result instead of pretending.
 
+**Result (2026-07-29, 200k rows, PG18 local):**
+
+| default | wall time | PK index size |
+| ------- | --------- | ------------- |
+| `gen_random_uuid()` | 562 ms | 8.40 MiB (8 806 400 B) |
+| `uuidv7()` | 458 ms | 6.04 MiB (6 332 416 B) |
+
+v7 is **~18 % faster** to insert and produces an index **~28 % smaller** on this dataset. The
+locality win is real, not noise: v7's timestamp prefix makes the B-tree's inserts sequential
+instead of random-scattered, so each row lands at the right edge of the index and no leaf page
+ever splits. Script: `scripts/db/pg18/bench-uuid-defaults.mjs`.
+
 ### B. `RETURNING old/new` in the embedding write-through path
 
 `upsertBuilderEmbeddingStub` (`src/shared/lib/repositories/public-builder-embeddings.ts:26`)

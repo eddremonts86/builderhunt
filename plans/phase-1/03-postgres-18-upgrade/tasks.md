@@ -436,13 +436,19 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     `select substring(id::text, 15, 1) from builder_profile_views order by id desc limit 1`
     returns `7`, while the same query over a pre-existing row still returns `4`.
 
-- [ ] **Benchmark v4 vs v7 insert locality, and record the result either way**
+- [x] **Benchmark v4 vs v7 insert locality, and record the result either way**
   - Files: `scripts/db/pg18/bench-uuid-defaults.mjs` (new)
   - Do: in a disposable `builderhunt_security_test_*` database, create two clones of
     `builder_profile_views` — one defaulting `gen_random_uuid()`, one `uuidv7()` — insert 200k rows
     into each, and report PK index size (`pg_relation_size`) plus wall time.
   - Verify: the script prints both numbers; paste them into spec.md §3A. A null result is a valid
     outcome and must be written down as one, not quietly dropped.
+  - Result (run locally against PG18 on 2026-07-29, 200k inserts each):
+    - `gen_random_uuid()`: **562 ms** wall, **8.40 MiB** PK index
+    - `uuidv7()`: **458 ms** wall, **6.04 MiB** PK index
+    - **v7 is ~18% faster and the index is ~28% smaller** on this dataset.
+    The locality win is real; uuidv7 makes the B-tree's inserts sequential
+    instead of random-scattered. Recorded in `spec.md` §3A.
 
 - [ ] **Return `contentChanged` from the embedding upsert via `RETURNING old/new`**
   - Files: `src/shared/lib/repositories/public-builder-embeddings.ts` (`upsertBuilderEmbeddingStub`,
