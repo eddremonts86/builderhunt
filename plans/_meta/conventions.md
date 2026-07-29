@@ -120,3 +120,23 @@ top-to-bottom without reading anything else except the files it cites.
 sits in the tree that exists and every `pnpm` script it tells you to run is in `package.json`.
 When a tree moves, the plans that name it move with it in the same change —
 `pnpm plans:check-tasks` fails otherwise.
+
+## What "done" requires (2026-07-29)
+
+A task may only be checked off when all three of these hold. This replaces "the unit tests pass"
+as the bar, because unit tests have repeatedly passed over behavior that was broken end to end.
+
+1. **`pnpm ci:local` is green — every step.** Not "green except e2e", not "that step was already
+   red". The only tolerated failure is a step the workflow itself marks `continue-on-error`
+   (today: `schema-audit`), and even that gets read rather than skipped. A red step is a hard
+   stop on any push: production is deployed from a green `master`, so a red local run means the
+   change is not ready to exist upstream.
+2. **An e2e spec exists in `tests/e2e/`** exercising the behavior through the real app — real
+   Postgres, real roles via the harness, real HTTP. A unit test proving a function returns the
+   right shape does not establish that a user can do the thing.
+3. **The behavior was exercised by hand in a browser** — the page loaded, the control clicked,
+   the response read — and the evidence recorded in the task's `Verify`. Tests encode what we
+   thought to check; the manual pass is what catches what we did not.
+
+Tasks carrying `Operator:` are the exception to (3) only in the sense that the person named there
+performs it, not that it is skipped.
