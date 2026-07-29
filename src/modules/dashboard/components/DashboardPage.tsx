@@ -7,7 +7,7 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
@@ -22,6 +22,7 @@ import { RecentBuildersWidget } from '~/modules/dashboard/ui/home/RecentBuilders
 import { SprintsWidget, type SprintListItem } from '~/modules/dashboard/ui/home/SprintsWidget'
 import { AlertsWidget, type AlertTrigger } from '~/modules/dashboard/ui/home/AlertsWidget'
 import { PlanUsageWidget, type PlanUsage } from '~/modules/dashboard/ui/home/PlanUsageWidget'
+import { SavedQueryVisibilityBadge, type SavedQueryVisibility } from '~/modules/dashboard/components/SavedQueryVisibilityBadge'
 import type { PlanTier } from '~/shared/lib/billing-shared'
 import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
 
@@ -42,6 +43,14 @@ interface SavedQuery {
   country?: string
   language?: string
   radarSlug?: string | null
+  /**
+   * Visibility of the saved query inside its organization.
+   * `private` is the creator-only default; `organization` is the
+   * team-shared state set via the visibility endpoint. The
+   * `createdByUserId` is what gates who can flip the value.
+   */
+  visibility?: SavedQueryVisibility
+  createdByUserId?: string
 }
 
 interface RecentBuilder {
@@ -72,6 +81,7 @@ interface HomeContext {
   error: string | null
   statsData: MetricWidgetProps[]
   onQueriesChanged: () => void
+  currentUserId: string
 }
 
 /**
@@ -196,7 +206,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
           <BentoTileList>
             <ul>
               {ctx.queries.map((q) => (
-                <SavedSearchRow key={q.id} query={q} onDeleted={ctx.onQueriesChanged} />
+                <SavedSearchRow key={q.id} query={q} onDeleted={ctx.onQueriesChanged} currentUserId={ctx.currentUserId} />
               ))}
             </ul>
           </BentoTileList>
@@ -271,6 +281,11 @@ export function DashboardPage() {
   const [planTier, setPlanTier] = React.useState<PlanTier | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  // The principal's id is what gates the visibility-flip action on a
+  // saved query: only the creator can flip private <-> organization.
+  // The dashboard fetches it once alongside the other top-level
+  // endpoints; the SavedSearchRow reads it from the bento context.
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null)
 
   const refetchQueries = React.useCallback(async () => {
     try {
@@ -306,12 +321,17 @@ export function DashboardPage() {
         if (!r.ok) return []
         return r.json()
       }).catch(() => []),
+      fetch('/api/auth/get-session', { credentials: 'include', signal }).then(async (r) => {
+        if (!r.ok) return null
+        return r.json()
+      }).catch(() => null),
     ])
-      .then(([s, q, r]) => {
+      .then(([s, q, r, sess]) => {
         if (signal.aborted) return
         setStats(s)
         setQueries(Array.isArray(q) ? q : [])
         setRecent(Array.isArray(r) ? r : [])
+        setCurrentUserId(sess?.user?.id ?? null)
         setLoading(false)
       })
       .catch((err) => {
@@ -397,8 +417,9 @@ export function DashboardPage() {
         ? { tier: planTier, savedSearches: queries.length, savedBuilders: stats?.totalBuilders ?? 0 }
         : null,
       onQueriesChanged: refetchQueries,
+      currentUserId: currentUserId ?? '',
     }),
-    [stats, queries, recent, sprints, triggers, planTier, error, statsData, refetchQueries],
+    [stats, queries, recent, sprints, triggers, planTier, error, statsData, refetchQueries, currentUserId],
   )
 
   React.useEffect(() => {
@@ -512,9 +533,11 @@ function truncate(text: string, max: number) {
 function SavedSearchRow({
   query,
   onDeleted,
+  currentUserId,
 }: {
   query: SavedQuery
   onDeleted: () => Promise<void> | void
+  currentUserId: string
 }) {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const [exporting, setExporting] = React.useState<'people' | 'resources' | null>(null)
@@ -523,6 +546,8 @@ function SavedSearchRow({
   const [deleting, setDeleting] = React.useState(false)
   const [radarSlug, setRadarSlug] = React.useState<string | null>(query.radarSlug ?? null)
   const [sharing, setSharing] = React.useState(false)
+  const [visibility, setVisibility] = React.useState<SavedQueryVisibility>(query.visibility ?? 'private')
+  const [changingVisibility, setChangingVisibility] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
@@ -634,6 +659,42 @@ function SavedSearchRow({
     }
   }
 
+  // Visibility flip is gated to the creator. The repository's
+  // `changeSavedQueryVisibilityForPrincipal` enforces the same rule
+  // server-side (resource:share on a creator-only-or-shared
+  // admin row); this gate just keeps the menu from offering an
+  // action that would 403.
+  const canChangeVisibility = query.createdByUserId === currentUserId
+
+  const toggleVisibility = async () => {
+    setMenuOpen(false)
+    setChangingVisibility(true)
+    const next: SavedQueryVisibility = visibility === 'organization' ? 'private' : 'organization'
+    try {
+      const res = await fetch(`/api/queries/${query.id}/visibility`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visibility: next }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `HTTP ${res.status}`)
+      }
+      setVisibility(next)
+      setExportMsg({
+        ok: true,
+        text: next === 'organization' ? 'Now shared with your team.' : 'Now private to you.',
+      })
+      setTimeout(() => setExportMsg(null), 4000)
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Could not change visibility.' })
+      setTimeout(() => setExportMsg(null), 5000)
+    } finally {
+      setChangingVisibility(false)
+    }
+  }
+
   const handleDelete = async () => {
     setDeleting(true)
     try {
@@ -661,7 +722,10 @@ function SavedSearchRow({
     <li className="p-4 hover:bg-bh-surface-2/30 transition-colors">
       <div className="flex flex-col gap-2 @sm:flex-row @sm:items-start @sm:justify-between @sm:gap-3">
         <div className="min-w-0 flex-1">
-          <p className="font-medium text-bh-text truncate" title={query.name}>{query.name}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-medium text-bh-text truncate" title={query.name}>{query.name}</p>
+            <SavedQueryVisibilityBadge visibility={visibility} />
+          </div>
           <p className="text-xs text-bh-text-muted truncate mt-0.5">
             {query.keywords.join(', ')} · {query.sources.length} source{query.sources.length === 1 ? '' : 's'}
             {query.country && ` · ${query.country}`}
@@ -730,6 +794,29 @@ function SavedSearchRow({
                 <li role="none">
                   <div className="my-1 border-t border-bh-border" />
                 </li>
+                {canChangeVisibility && (
+                  <li role="none">
+                    <button
+                      role="menuitem"
+                      onClick={toggleVisibility}
+                      disabled={changingVisibility}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      data-testid={`query-visibility-toggle-${query.id}`}
+                    >
+                      {visibility === 'organization' ? (
+                        <>
+                          <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                          Make private
+                        </>
+                      ) : (
+                        <>
+                          <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                          Share with team
+                        </>
+                      )}
+                    </button>
+                  </li>
+                )}
                 <li role="none">
                   <button
                     role="menuitem"
