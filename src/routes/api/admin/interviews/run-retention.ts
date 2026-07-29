@@ -66,7 +66,16 @@ export const Route = createFileRoute('/api/admin/interviews/run-retention')({
             },
           })
 
-          return Response.json({ ok: true, ...result })
+          // `ok` reports whether the pass actually kept its promise, and a pass in which every tenant
+          // failed answers 500. This route returned `ok: true` with HTTP 200 and every count at zero
+          // for a missing privilege on `privacy_consents` — one denied statement aborted each
+          // tenant's transaction, so nothing was ever purged, and neither cron nor a person reading
+          // the response had any way to notice.
+          const everyTenantFailed = result.tenants > 0 && result.failedTenants.length === result.tenants
+          return Response.json(
+            { ok: result.failedTenants.length === 0, ...result },
+            { status: everyTenantFailed ? 500 : 200 },
+          )
         } catch (error) {
           const response = platformAdminErrorResponse(error)
           if (response) return response

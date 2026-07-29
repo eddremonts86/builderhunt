@@ -220,16 +220,36 @@ export async function deleteExpiredInterviewData(
 
   // A much longer clock, and deliberately independent: the consent is the evidence that the processing was
   // lawful, and it is the one record still worth having after the data it covered is gone.
-  counts.privacyConsents = await deleteWhere(
-    transaction,
-    sql`delete from privacy_consents
-        where organization_id = ${scope} and decided_at <= ${params.consentCutoff.toISOString()}`,
-  )
+  counts.privacyConsents = await purgeExpiredConsents(transaction, scope, params.consentCutoff)
 
   return counts
 }
 
 /** `execute` returns no count in this driver, so the affected rows are counted explicitly. */
+/**
+ * Consent evidence is the one thing here that no role may DELETE — 0075 withheld the privilege from
+ * everyone on purpose, so that "the candidate withdrew" and "the row was removed" stay
+ * distinguishable. The purge therefore goes through `purge_expired_privacy_consents` (0099), which
+ * runs under the owning role and can only express "this tenant's evidence, older than X" — the
+ * window itself stays configuration (`INTERVIEW_CONSENT_RETENTION_MONTHS`, capped at 24 months by
+ * `env.ts`), since 24 months is a ceiling on retention and a shorter window is the stricter choice.
+ *
+ * Issuing the DELETE from here directly, as this function used to, is denied with 42501 — and since
+ * it shares a transaction with every other statement in the pass, that denial silently took the
+ * whole retention run with it while the endpoint still reported success.
+ */
+async function purgeExpiredConsents(
+  transaction: WorkerTransaction,
+  organizationId: string,
+  cutoff: Date,
+): Promise<number> {
+  const result = await transaction.execute(
+    sql`select purge_expired_privacy_consents(${organizationId}, ${cutoff.toISOString()}::timestamptz) as n`,
+  )
+  const rows = result as unknown as Array<{ n: number }>
+  return Number(rows[0]?.n ?? 0)
+}
+
 async function deleteWhere(transaction: WorkerTransaction, statement: ReturnType<typeof sql>): Promise<number> {
   const result = await transaction.execute(sql`with deleted as (${statement} returning 1) select count(*)::int as n from deleted`)
   const rows = result as unknown as Array<{ n: number }>

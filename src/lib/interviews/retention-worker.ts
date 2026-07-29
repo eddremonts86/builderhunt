@@ -132,17 +132,31 @@ export async function runInterviewRetentionWorker(
       }
 
       if (!dryRun) {
-        const counts = await db.transaction((tx) => deleteExpiredInterviewData(tx as never, {
-          organizationId,
-          now,
-          documentIds: deletedIds,
-          consentCutoff,
-          limit: rowLimit,
-        }))
+        const counts = await db.transaction(async (tx) => {
+          // Tenant context on the transaction, not only on the parameters. `transcript_segments`,
+          // `candidate_documents` and the rest are RLS-protected, this worker runs as
+          // `builderhunt_worker` — a role the policies apply to — and a DELETE with no
+          // `app.organization_id` matches zero rows while reporting success. The retention promise
+          // would quietly stop being kept. Same defect as the reservation release above.
+          await tx.execute(sql`select set_config('app.organization_id', ${organizationId}, true)`)
+          return deleteExpiredInterviewData(tx as never, {
+            organizationId,
+            now,
+            documentIds: deletedIds,
+            consentCutoff,
+            limit: rowLimit,
+          })
+        })
         addCounts(result.counts, counts)
       } else {
         // A dry run still needs numbers, so the same predicates are counted without deleting.
         const counts = await db.transaction(async (tx) => {
+          // Tenant context on the transaction, not only on the parameters. `transcript_segments`,
+          // `candidate_documents` and the rest are RLS-protected, this worker runs as
+          // `builderhunt_worker` — a role the policies apply to — and a DELETE with no
+          // `app.organization_id` matches zero rows while reporting success. The retention promise
+          // would quietly stop being kept. Same defect as the reservation release above.
+          await tx.execute(sql`select set_config('app.organization_id', ${organizationId}, true)`)
           const preview = await deleteExpiredInterviewData(tx as never, {
             organizationId, now, documentIds: deletedIds, consentCutoff, limit: rowLimit,
           })
@@ -156,8 +170,20 @@ export async function runInterviewRetentionWorker(
         addCounts(result.counts, counts)
       }
     } catch (error) {
-      // Ids only. Whatever went wrong, the message could name a document or a candidate.
-      console.error('interview retention failed for a tenant:', organizationId, (error as Error)?.name)
+      // The message may name a document or a candidate, so it is not logged. A PostgreSQL `code`,
+      // `table` and `constraint` name cannot: they are schema identifiers, and without them a
+      // failing retention pass is unauditable — this worker reported `ok: true` with every count
+      // at zero for a missing GRANT, and nothing in the output said so.
+      const detail = error as { name?: string; code?: string; table_name?: string; constraint_name?: string }
+      console.error(
+        'interview retention failed for a tenant:',
+        organizationId,
+        detail?.name,
+        detail?.code ?? '',
+        detail?.table_name ?? '',
+        detail?.constraint_name ?? '',
+        process.env.E2E_MODE === 'true' ? (error as Error)?.message : '',
+      )
       result.failedTenants.push(organizationId)
     }
   }
