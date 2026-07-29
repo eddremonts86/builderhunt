@@ -61,7 +61,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     (`grep -rn NOBYPASSRLS drizzle/*.sql` → 7 lines), with `builderhunt_owner` additionally
     `NOLOGIN` (`drizzle/0002_database_roles.sql:22`), so no application role can do this restore.
 
-- [ ] **DANGEROUS CLAIM 1 — reproduce the RLS zero-row restore against the live PG18 cluster**
+- [x] **DANGEROUS CLAIM 1 — reproduce the RLS zero-row restore against the live PG18 cluster**
   - Files: none
   - Do: seed at least one row into a `FORCE`d tenant table on the source (`saved_queries` is the
     canonical one — `schema.ts:276`, forced by `drizzle/0008_tenant_rls.sql`). Dump it
@@ -75,7 +75,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     If rows *do* land, the mitigation is wrong: stop, and correct `spec.md` §4 detail 2 before
     going further.
 
-- [ ] **DANGEROUS CLAIM 2 — reproduce the `drizzle.__drizzle_migrations` collision**
+- [x] **DANGEROUS CLAIM 2 — reproduce the `drizzle.__drizzle_migrations` collision**
   - Files: none
   - Do: on a *second* scratch PG18 target that has also been through `pnpm deploy:db`, repeat the
     data-only dump **without** `--schema=public`
@@ -86,7 +86,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     correct the spec rather than keeping an unearned claim — and check why, because a journal that
     silently merged is worse than one that collided.
 
-- [ ] **DANGEROUS CLAIM 3 — assert collation/locale parity between source and target cluster**
+- [x] **DANGEROUS CLAIM 3 — assert collation/locale parity between source and target cluster**
   - Files: `scripts/db/pg18/locale-check.mjs` (new)
   - Do: the script takes a URL in `argv[2]` and prints, one `key<TAB>value` per line:
     `datcollate`, `datctype`, `datlocprovider`, `daticulocale`, `datcollversion` from
@@ -107,7 +107,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     locale strings match, which is a `REFRESH COLLATION VERSION` decision, not an automatic stop —
     record it and decide explicitly.
 
-- [ ] **Add a row-count parity script**
+- [x] **Add a row-count parity script**
   - Files: `scripts/db/pg18/row-counts.mjs` (new)
   - Do: connect with a URL from `argv[2]`, `SELECT` an exact `count(*)` per table in schema
     `public` (enumerate from `information_schema.tables`, `table_type = 'BASE TABLE'`), print
@@ -118,7 +118,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     `psql "$PG16_URL" -tAc "select count(*) from information_schema.tables where table_schema='public' and table_type='BASE TABLE'"`.
     Cross-check that number against `pnpm db:audit-schema` (which also lists the public tables).
 
-- [ ] **Run the full dump/restore pipeline once, end to end**
+- [x] **Run the full dump/restore pipeline once, end to end**
   - Files: none (commands go into the runbook in Phase 2)
   - Do: from a one-shot `pgvector/pgvector:0.8.5-pg18` container — the client binaries must match
     the *newer* server, which is the supported direction:
@@ -135,7 +135,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     `builder_embeddings_hnsw_idx`. Record `ls -la /tmp/data.dump` (dump size) and the total wall
     time — that number is the write-freeze budget Phase 3 refines and Phase 4 spends.
 
-- [ ] **Assert RLS integrity on the restored target, not just row counts**
+- [x] **Assert RLS integrity on the restored target, not just row counts**
   - Files: none
   - Do: run the same postcondition `scripts/db/restore.ts:194` (`verifyRlsIntegrity`) applies —
     every table with `relrowsecurity` true must have at least one row in `pg_policies`:
