@@ -1,18 +1,30 @@
+// Public RSS feed — plan 28 (shared-resources) task 9.
+//
+// The path param is the capability id (NOT the saved query id).
+// The `?token=` is checked against the capability hash in
+// `feed_capabilities`. Without both, the feed is unreachable.
+//
+// Anti-enumeration:
+// - The id is a random 17-byte base64url handle, not a queryId.
+// - The token is a random 32-byte base64url handle.
+// - The DB stores only the SHA-256 of the token.
+// - The queryId is NEVER returned to the public surface (no
+//   <link> or <guid> leaks it).
+// - Every error path returns the same 404 — guessing ids and
+//   tokens is observably indistinguishable from "not found".
+//
+// Revocation / plan lapse / org deletion:
+// - revocation sets revoked_at, future resolves return null.
+// - org deletion cascades, so the capability row goes with it.
+// - query deletion cascades, same.
+
 import { createFileRoute } from '@tanstack/react-router'
 import { searchBuilders } from '~/lib/search'
 import { env } from '~/shared/lib/env'
-import { findCapabilitySavedQuery } from '~/shared/lib/repositories/public-feeds'
-import { verifyFeedCapability } from '~/shared/lib/security/feed-capability'
-
-/**
- * Public RSS feed for a saved search.
- * GET /api/feeds/:searchId.xml
- * - No auth required. The feed is intentionally public so users can share
- *   it with teammates or in their RSS reader.
- * - The data indexed is already public (sourced from public APIs).
- * - Cache-Control: 1h (RSS readers poll aggressively).
- * - Simple in-memory rate limit: 60 req/h per IP.
- */
+import { publicDb } from '~/shared/lib/db/client'
+import { savedQueries } from '~/shared/lib/db/schema'
+import { resolveFeedCapability } from '~/shared/lib/repositories/public-feeds'
+import { and, eq } from 'drizzle-orm'
 
 const RATE_BUCKET = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT = 60
@@ -70,7 +82,7 @@ interface BuilderForFeed {
 }
 
 function buildRssXml(opts: {
-  search: { id: string; name: string; keywords: string[] }
+  search: { name: string; keywords: string[] }
   builders: BuilderForFeed[]
   selfUrl: string
   siteUrl: string
@@ -82,6 +94,9 @@ function buildRssXml(opts: {
     .map((b) => {
       const title = `${b.displayName ?? b.username} — ${search.name}`
       const link = b.profileUrl
+      // GUIDs are derived from the builder id only (no queryId,
+      // no capabilityId) so the public feed cannot be correlated
+      // back to a tenant identifier.
       const guid = `builderhunt-builder-${b.id}`
       const pubDate = b.lastSeen ? rfc822(new Date(b.lastSeen)) : rfc822(new Date())
       const descParts: string[] = []
@@ -128,7 +143,7 @@ ${items}
 }
 
 function buildHtmlFallback(opts: {
-  search: { id: string; name: string; keywords: string[] }
+  search: { name: string; keywords: string[] }
   builders: BuilderForFeed[]
   selfUrl: string
   siteUrl: string
@@ -200,6 +215,22 @@ function buildHtmlFallback(opts: {
 </html>`
 }
 
+async function findSavedQueryForCapability(organizationId: string, queryId: string) {
+  const [query] = await publicDb
+    .select({
+      id: savedQueries.id,
+      name: savedQueries.name,
+      keywords: savedQueries.keywords,
+      sources: savedQueries.sources,
+      language: savedQueries.language,
+      country: savedQueries.country,
+    })
+    .from(savedQueries)
+    .where(and(eq(savedQueries.organizationId, organizationId), eq(savedQueries.id, queryId)))
+    .limit(1)
+  return query ?? null
+}
+
 export const Route = createFileRoute('/api/feeds/$searchId')({
   component: () => null,
   server: {
@@ -214,20 +245,35 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
             })
           }
 
-          const { searchId } = params
+          // The path param is renamed in semantics only — the file
+          // is still `$searchId.ts` so the route URL stays the same.
+          // What it carries is the capability id, not a saved query
+          // id; see the resolve call below.
+          const { searchId: capabilityId } = params
           const token = new URL(request.url).searchParams.get('token')
-          const capability = token && env.BETTER_AUTH_SECRET
-            ? verifyFeedCapability(token, searchId, env.BETTER_AUTH_SECRET)
-            : null
+          if (!capabilityId || !token) {
+            return new Response('Feed not found', {
+              status: 404,
+              headers: { 'Content-Type': 'text/plain' },
+            })
+          }
+
+          // Single resolve. Anti-enumeration: any failure — wrong
+          // id, wrong token, revoked, expired — returns the same
+          // null, and the route returns the same 404.
+          const capability = await resolveFeedCapability(capabilityId, token)
           if (!capability) {
             return new Response('Feed not found', {
               status: 404,
               headers: { 'Content-Type': 'text/plain' },
             })
           }
-          const search = await findCapabilitySavedQuery(capability.organizationId, searchId)
 
+          const search = await findSavedQueryForCapability(capability.organizationId, capability.queryId)
           if (!search) {
+            // The capability was valid but the underlying query is
+            // gone (deleted, or org deleted via cascade). Same
+            // 404 — the public surface must never reveal why.
             return new Response('Feed not found', {
               status: 404,
               headers: { 'Content-Type': 'text/plain' },
@@ -244,16 +290,14 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
           })
 
           const siteUrl = env.APP_URL.replace(/\/$/, '')
-          const selfUrl = `${siteUrl}/api/feeds/${searchId}?format=rss&token=${encodeURIComponent(token as string)}`
+          const selfUrl = `${siteUrl}/api/feeds/${capabilityId}?format=rss&token=${encodeURIComponent(token)}`
 
-          // Browsers (without an explicit RSS reader Accept) get HTML.
-          // RSS readers send application/rss+xml or */* — give them XML.
           const accept = request.headers.get('accept') ?? ''
           const wantsHtml = accept.includes('text/html') && !accept.includes('application/rss')
 
           if (wantsHtml) {
             const html = buildHtmlFallback({
-              search: { id: search.id, name: search.name, keywords: search.keywords },
+              search: { name: search.name, keywords: search.keywords },
               builders: results as BuilderForFeed[],
               selfUrl,
               siteUrl,
@@ -268,7 +312,7 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
           }
 
           const xml = buildRssXml({
-            search: { id: search.id, name: search.name, keywords: search.keywords },
+            search: { name: search.name, keywords: search.keywords },
             builders: results as BuilderForFeed[],
             selfUrl,
             siteUrl,

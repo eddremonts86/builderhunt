@@ -3033,3 +3033,35 @@ export const jobRuns = pgTable(
     check('job_runs_finished_check', sql`${table.finishedAt} is null or ${table.startedAt} is not null`),
   ],
 )
+
+/**
+ * Plan 28 (shared-resources) task 9 — public feed capabilities.
+ *
+ * A capability is a row in this table that points at a saved query
+ * inside the tenant. The id is the public surface (path param), the
+ * `capability_hash` is the server-side HMAC of the token the user
+ * carries in the URL. Without both, the feed endpoint returns 404.
+ *
+ * Revocation is soft (`revoked_at`); expiry is hard (`expires_at`,
+ * checked at resolve time). The composite FK to saved_queries has
+ * ON DELETE CASCADE, so deleting a query takes its capabilities
+ * with it; a capability can never outlive its target.
+ */
+export const feedCapabilities = pgTable(
+  'feed_capabilities',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    queryId: text('query_id').notNull().references(() => savedQueries.id, { onDelete: 'cascade' }),
+    capabilityHash: text('capability_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: false }).defaultNow().notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: false }),
+    revokedAt: timestamp('revoked_at', { withTimezone: false }),
+  },
+  (table) => [
+    unique('feed_capabilities_id_unique').on(table.id),
+    unique('feed_capabilities_capability_hash_unique').on(table.capabilityHash),
+    index('feed_capabilities_org_idx').on(table.organizationId),
+    index('feed_capabilities_query_idx').on(table.queryId),
+  ],
+)

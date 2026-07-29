@@ -1,0 +1,107 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.feed_capabilities": {
+      "name": "feed_capabilities",
+      "schema": "public",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "query_id": {
+          "name": "query_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "capability_hash": {
+          "name": "capability_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revoked_at": {
+          "name": "revoked_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "feed_capabilities_id_unique": {
+          "name": "feed_capabilities_id_unique",
+          "columns": ["id"],
+          "isUnique": true
+        },
+        "feed_capabilities_capability_hash_unique": {
+          "name": "feed_capabilities_capability_hash_unique",
+          "columns": ["capability_hash"],
+          "isUnique": true
+        },
+        "feed_capabilities_org_idx": {
+          "name": "feed_capabilities_org_idx",
+          "columns": ["organization_id"],
+          "isUnique": false
+        },
+        "feed_capabilities_query_idx": {
+          "name": "feed_capabilities_query_idx",
+          "columns": ["query_id"],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "feed_capabilities_organization_id_organizations_id_fk": {
+          "name": "feed_capabilities_organization_id_organizations_id_fk",
+          "tableFrom": ["public", "feed_capabilities"],
+          "tableTo": ["public", "organizations"],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "feed_capabilities_query_id_saved_queries_id_fk": {
+          "name": "feed_capabilities_query_id_saved_queries_id_fk",
+          "tableFrom": ["public", "feed_capabilities"],
+          "tableTo": ["public", "saved_queries"],
+          "columnsFrom": ["query_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {}
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

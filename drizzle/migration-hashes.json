@@ -424,6 +424,10 @@
     "0105_builder_lists": {
       "sql": "2a4bbe63093a28b4247aa6bbf3054477a6285588346bf1ad7346182f70129dbb",
       "snapshot": "16ac663514b815148ea8d6d26cb82db862163789aed89a2a1f48e7ea8bfebd36"
+    },
+    "0106_feed_capabilities": {
+      "sql": "766845141acdf4db00d6c14b7077ffcd06bb39963a21ec1522d1750ce49f7bc1",
+      "snapshot": "1209c7744d128fdc739b64641e9868fa0017467c0663d826143fcf3857c987d7"
     }
   }
 }

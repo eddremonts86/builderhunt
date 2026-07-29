@@ -743,6 +743,13 @@
       "when": 1785338649080,
       "tag": "0105_builder_lists",
       "breakpoints": true
+    },
+    {
+      "idx": 106,
+      "version": "7",
+      "when": 1785340000000,
+      "tag": "0106_feed_capabilities",
+      "breakpoints": true
     }
   ]
 }
