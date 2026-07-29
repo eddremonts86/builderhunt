@@ -36,7 +36,7 @@
   - Do: Resolve principal/context, validate inputs, call saved-query repository, map typed non-enumerating errors, return explicit DTOs, and emit redacted activity hook. Organization ID in body/query/header is rejected or ignored as data, never authority.
   - Verify: own/private/shared/role/A-B/spoofed-tenant/CSRF/rate tests pass using non-owner app role.
 
-- [ ] **Add list and item APIs through tenant repository**
+- [x] **Add list and item APIs through tenant repository**
   - Files: `src/routes/api/lists/index.ts`, `src/routes/api/lists/$listId.ts`, `src/routes/api/lists/$listId/items/index.ts`, `src/routes/api/lists/$listId/items/$itemId.ts`, `tests/unit/security/builder-list-api.test.ts`
   - Do: Add zod bodies for names/descriptions/visibility and canonical `builderIdentityId`; enforce active Team entitlement and permissions; return allowlisted DTOs and generic other-tenant/not-found behavior; rate-limit mutations by user+organization.
   - Verify: full role and A/B matrix, duplicate item, invalid identity, spoofed tenant, and plan lapse tests pass.
