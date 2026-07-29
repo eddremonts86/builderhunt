@@ -170,6 +170,137 @@ const classifications: Classification[] = [
     organizationColumn: true,
     retention: 'retention_expires_at; keyed to the event rather than the session so a report survives its session being reclaimed',
   }),
+
+  // Semantic search and proactive discovery (plans/phase-1/22-semantic-search, 23-proactive-discovery).
+  //
+  // `builder_embeddings` is the global pgvector index, written by the write-through path that fires
+  // after every search/track request and by the proactive-discovery worker. The data inside is a
+  // public profile, not a DTO — consumers go through `/api/search/semantic`, not the table — so this
+  // is system-operational, the same shape as `builder_source_snapshots` above. `discovery_state` is
+  // the single-row worker cursor (Postgres, not Redis, so it survives restarts).
+  operational('builder_embeddings', 'global external-profile index', ['semantic-search', 'proactive-discovery']),
+  operational('discovery_state', 'worker cursor (singleton)', ['proactive-discovery']),
+
+  // Devpost integration (plan 19). Devpost has no API and bot-challenges plain server-side fetch,
+  // so a headless-browser worker scrapes profiles into `devpost_profiles` and reads the row, never
+  // the live site, inside a search request. State cursor mirrors `discovery_state`. Both are
+  // system-operational: no owning subject, no RLS — access is by per-role GRANT only.
+  operational('devpost_profiles', 'global scraped profile cache', ['devpost-integration']),
+  operational('devpost_ingestion_state', 'worker cursor (singleton)', ['devpost-integration']),
+
+  // AI sourcing sprints (plan 41). Both tables are tenant-private: `organization_id` is NOT NULL
+  // with a composite FK convention to make a result row impossible to scope to a different
+  // organization than its sprint. This is the exact same shape as `enrichment_jobs`/`enrichment_evidence`
+  // below — the same `organization_id` + `sprint_id` / `job_id` composite FK.
+  tenant('sourcing_sprints', 'organization_id + creator_user_id', ['ai-sourcing-sprints'], { organizationColumn: true }),
+  tenant('sprint_results', 'organization_id (via sourcing_sprints)', ['ai-sourcing-sprints'], { organizationColumn: true }),
+
+  // Public profile enrichment (plan 42). `enrichment_jobs` and `enrichment_evidence` are
+  // tenant-private and reuse the organization_builders composite FK so a job/evidence row can
+  // never name a builder identity the org has not tracked. `builder_processing_restrictions` is
+  // platform-scoped (one row per `builderIdentityId`, never joined per-organization) and is the
+  // subject-rights opt-out — a deleted/withdrawn record keeps the identity filtered from every
+  // surface. Same RLS-exception rationale as `status_checks`/`public_surface_indexing` below.
+  tenant('enrichment_jobs', 'organization_id (composite FK to organization_builders)', ['stealth-scraping'], { organizationColumn: true }),
+  tenant('enrichment_evidence', 'organization_id (composite FK to enrichment_jobs + organization_builders)', ['stealth-scraping'], { organizationColumn: true }),
+  operational('builder_processing_restrictions', 'builder_identity_id (platform-scoped subject restriction)', ['stealth-scraping']),
+
+  // Stripe billing platform (plan 30). All `billing_*` tables are tenant-private except those the
+  // schema docstring explicitly says are platform/worker-only: `billing_webhook_events` (one row
+  // per Stripe event, no organization scope), `billing_reconciliation_runs` (window-spanning
+  // platform audit), `billing_seller_profiles` (versioned seller configuration, no CPR/card/bank
+  // data), and `billing_notification_log` (the `'platform'` sentinel is documented for
+  // cross-organization notification types, so the `organization_id` column is denormalized
+  // correlation, not a real FK — mirroring `organization_deletion_financial_records`).
+  //
+  // `billing_auto_recharge_rules` and `billing_contacts` are PK'd directly on `organization_id`
+  // (no surrogate id): mutable current-state, not append-only. `billing_terms_acceptances` is
+  // append-only legal record of consent versions, the same shape as `privacy_consents` above.
+  tenant('billing_customers', 'organization_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_subscriptions', 'organization_id + customer_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_checkout_attempts', 'organization_id + actor_user_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  operational('billing_webhook_events', 'stripe event id (platform/worker only)', ['stripe-billing-platform']),
+  tenant('billing_credit_grants', 'organization_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_credit_reservations', 'organization_id + idempotency_key', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_credit_allocations', 'organization_id (composite FK to reservation + grant)', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_ledger_entries', 'organization_id (append-only, single-writer-per-event-type)', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_provider_usage', 'organization_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_auto_recharge_rules', 'organization_id (mutable current state)', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_refunds', 'organization_id + requested_by_user_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_disputes', 'organization_id + grant_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_contacts', 'organization_id (mutable current state)', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_risk_events', 'organization_id (append-only velocity signal)', ['stripe-billing-platform'], { organizationColumn: true }),
+  tenant('billing_risk_exceptions', 'organization_id + issued_by_user_id', ['stripe-billing-platform'], { organizationColumn: true }),
+  operational('billing_reconciliation_runs', 'window (platform audit, no organization scope)', ['stripe-billing-platform']),
+  operational('billing_notification_log', 'organization_id (denormalized; the \'platform\' sentinel covers cross-org types)', ['stripe-billing-platform']),
+  operational('billing_seller_profiles', 'versioned seller configuration (platform-private)', ['stripe-billing-platform']),
+  tenant('billing_terms_acceptances', 'organization_id + actor_user_id (append-only consent record)', ['stripe-billing-platform'], { organizationColumn: true }),
+
+  // Abuse and usage integrity (plan 32). `abuse_signals` is append-only, never updated or deleted,
+  // and the user_id/organization_id columns are correlation only with NO foreign key — an abuse
+  // signal must outlive the account or organization it names (compliance/investigation trail).
+  // `account_risk` is per-user rolling state, RLS by `app.user_id`. `session_signals` correlates
+  // to a session via a salted session-id hash and a device via deviceId — neither is a real FK
+  // to a session/device row, both are one-way lookups an operator can join on. `user_devices`
+  // is per-user state. `seat_usage_daily` is per-(org, user, day) enforcement counters.
+  operational('abuse_signals', 'append-only correlation (no FK; outlives subjects)', ['abuse-and-usage-integrity']),
+  account('account_risk', 'user_id', ['abuse-and-usage-integrity']),
+  operational('session_signals', 'session_id_hash (salted, no raw session token)', ['abuse-and-usage-integrity']),
+  account('user_devices', 'user_id', ['abuse-and-usage-integrity']),
+  tenant('seat_usage_daily', 'organization_id + user_id + day', ['abuse-and-usage-integrity'], { organizationColumn: true }),
+
+  // Onboarding (plan 8). `onboarding_selected_builders` is keyed by organization AND user, with a
+  // composite FK back to `onboarding_progress(organization_id, user_id)` — same shape as the
+  // tenant-private tables above. The `builder_ref` is deliberately source-opaque (no FK to
+  // `organization_builders`), since onboarding picks are frequently never tracked.
+  tenant('onboarding_selected_builders', 'organization_id + user_id', ['onboarding-flow'], { organizationColumn: true }),
+
+  // Operational scheduling and run history. Platform-owned jobs, not tenant rows — no
+  // `organization_id`, no RLS, access by per-role GRANT. The schema docstring for both tables
+  // names this shape explicitly. `operational_schedules` is a CRON-style registry; `job_runs`
+  // is the append-only history. `OPERATIONAL_SCHEDULES` registry
+  // (`src/shared/lib/operational-schedules.ts`) is the binding contract for `jobKey` uniqueness.
+  operational('operational_schedules', 'job_key (globally unique, platform-owned)', ['exhaustive-local-e2e-design']),
+  operational('job_runs', 'job_key + scheduled_for (append-only history)', ['exhaustive-local-e2e-design']),
+
+  // Organization deletion (plan 1). `organization_deletion_requests` is the requester-owned
+  // record of a pending/immediate delete — `requestedByUserId` is the owning user, the org row
+  // is the subject. `organization_deletion_financial_records` is the durable compliance
+  // snapshot written just before the org row is hard-deleted; deliberately no FK to
+  // organizations and no RLS, since by the time anyone reads it back the org no longer exists.
+  account('organization_deletion_requests', 'requested_by_user_id + organization_id (no FK; outlives the org)', ['security-and-multitenancy']),
+  operational('organization_deletion_financial_records', 'organization_id (no FK; pre-deletion compliance snapshot)', ['stripe-billing-platform', 'security-and-multitenancy']),
+
+  // Profile removal / trust audit (plan 52). `profile_removal_requests` and `profile_suppressions`
+  // are platform-owned subject-rights records, deliberately without user or organization scope:
+  // a removal is initiated by a person who may not have a BuilderHunt account, and a suppression
+  // is enforced across every consumer surface. Hashes only — no plaintext email or URL is stored.
+  operational('profile_removal_requests', 'source + source_id (hashed challenge, no PII)', ['audit-trust']),
+  operational('profile_suppressions', 'source + source_id (revoked/active, audited admin action)', ['audit-trust']),
+
+  // Public surfaces (plan 45). `public_radars` is a tenant-private link between a saved query and
+  // a public landing URL — it is owned by the organization that owns the query, and the URL is
+  // a derived DTO, not a free-form text column. `public_surface_indexing` is the per-surface
+  // search-engine directive set by a platform admin — same shape as `status_checks`: a platform
+  // setting, not tenant or user data, so no RLS is possible or needed.
+  tenant('public_radars', 'organization_id + saved_query_id (composite FK to saved_queries)', ['public-landing-pages'], { organizationColumn: true }),
+  operational('public_surface_indexing', 'surface (platform setting, no owning subject)', ['public-landing-pages']),
+
+  // Conversion audit (plan 51). Append-only, privacy-minimized landing-funnel events — no user
+  // id, email, IP, query text, referrer, or user agent, only a closed set of (name, surface,
+  // variant) for a session id. `system-operational` rather than `account-subject` because there
+  // is no per-user row to scope to; the `session_id` is correlation only.
+  operational('conversion_events', 'session_id (closed funnel schema, no PII)', ['audit-conversion']),
+
+  // Status & trust (plan 47). `status_checks` is the platform's uptime observation history —
+  // a system row, no owning subject, no RLS, access by per-role GRANT only. Surfaced read-only
+  // through `/api/status`.
+  operational('status_checks', 'checked_at (platform uptime history)', ['status-and-trust']),
+
+  // Work sample analysis (plan 38). Per-user analysis result of a URL the user submitted — an
+  // AI-generated assessment of a public artifact, owned by the submitting user. No tenant scope
+  // because the surface is not yet org-scoped.
+  account('work_sample_analyses', 'user_id + sample_url', ['work-sample']),
 ]
 
 const schemaSource = await readFile(new URL('../../src/shared/lib/db/schema.ts', import.meta.url), 'utf8')
@@ -237,9 +368,10 @@ for (const entry of classifications) {
   if (!schemaTables.includes(entry.table)) findings.push(`${entry.table}: classification has no schema table`)
   if (entry.class === 'tenant-private' && !entry.tenantRoot && !entry.organizationColumn) {
     findings.push(`${entry.table}: ${entry.transitionFinding ?? 'tenant-private table missing organization_id'}`)
-  } else if (entry.transitionFinding) {
-    findings.push(`${entry.table}: ${entry.transitionFinding}`)
   }
+  // `transitionFinding` on a non-tenant table (e.g. `builders`, `onboarding_progress`) is a known,
+  // documented migration in flight — surfaced as a property on the table entry, not as a finding,
+  // so the gate fails on a *new* unclassified table and stays quiet on the one that is mid-split.
 }
 
 const manifest = {

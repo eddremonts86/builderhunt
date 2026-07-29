@@ -94,8 +94,7 @@ jobs:
       - run: pnpm security:route-coverage
       - run: pnpm security:route-client-boundary
       - run: pnpm security:provider-metering
-      - name: Tenant schema classification (informational until contract phase)
-        continue-on-error: true
+      - name: Tenant schema classification
         run: pnpm db:audit-schema
       - run: pnpm lint
       - run: pnpm type-check
