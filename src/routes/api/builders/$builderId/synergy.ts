@@ -15,12 +15,17 @@
  *  - otherwise                              → 200 { analysis, baseline, teamSize, cached }
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import {
   findOrganizationBuilderByIdentity,
   listOrganizationBuildersForTeamAggregate,
 } from '~/shared/lib/repositories/organization-builders'
+import {
+  findVisibleBuilderListById,
+  listItemsForList,
+} from '~/shared/lib/repositories/builder-lists'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import { checkAndConsumeBudget } from '~/shared/lib/ai/budget'
 import { getCached, setCached } from '~/shared/lib/ai/cache'
@@ -53,6 +58,18 @@ function toMetrics(fp: ReturnType<typeof generateFingerprint>): CodeStyleMetrics
 
 const TEAM_FETCH_LIMIT = 51 // one extra slot in case the candidate is itself tracked
 
+// Plan 40 (team-synergy) — accept either the principal's own tracked
+// team (default) or a specific org shortlist the principal is a member
+// of. The shortlist path is gated by the same principal-scoped
+// repository that /api/lists/* uses, so a probe by id cannot reach a
+// list from a different org.
+const TeamSourceBody = z.object({
+  teamSource: z.union([
+    z.literal('tracked'),
+    z.object({ orgListId: z.string().min(1).max(64) }),
+  ]).optional(),
+})
+
 function errorResponse(error: unknown, fallbackMessage: string) {
   if (error instanceof TenantAuthorizationError) {
     return Response.json({ error: error.message }, { status: error.status })
@@ -74,12 +91,60 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
           )
           if (!candidate) return Response.json({ error: 'Builder not found' }, { status: 404 })
 
-          const teamRows = await withTenantContext(principal, (tx) =>
-            listOrganizationBuildersForTeamAggregate(tx, principal.organizationId, TEAM_FETCH_LIMIT),
-          )
-          const teammates: TeamMemberRow[] = teamRows
-            .filter((row) => row.identityId !== params.builderId)
-            .slice(0, 50)
+          // Plan 40: teamSource selects the population to compare against.
+          // Default ('tracked') is the principal's tracked team;
+          // { orgListId: ... } uses a shortlist the principal can see.
+          let rawBody: unknown = {}
+          try {
+            rawBody = await request.json()
+          } catch {
+            // No body is fine — defaults to 'tracked'.
+          }
+          const parsedBody = TeamSourceBody.safeParse(rawBody)
+          if (!parsedBody.success) {
+            return Response.json({ error: 'invalid_team_source', issues: parsedBody.error.issues }, { status: 422 })
+          }
+          const teamSource = parsedBody.data?.teamSource ?? 'tracked'
+
+          const teammates: TeamMemberRow[] = await withTenantContext(principal, async (tx) => {
+            if (teamSource === 'tracked') {
+              const teamRows = await listOrganizationBuildersForTeamAggregate(
+                tx,
+                principal.organizationId,
+                TEAM_FETCH_LIMIT,
+              )
+              return teamRows
+                .filter((row) => row.identityId !== params.builderId)
+                .slice(0, 50)
+            }
+            // { orgListId } — membership is the visibility check on the
+            // list itself. A peer who can read the list can use it as
+            // a team source; a non-member gets 404 (anti-enumeration).
+            const list = await findVisibleBuilderListById(tx, principal, teamSource.orgListId)
+            if (!list) return []
+            const items = await listItemsForList(tx, principal, teamSource.orgListId)
+            // For each item, look up the org-side builder row to get
+            // the same shape `buildTeamAggregate` consumes.
+            const rows: TeamMemberRow[] = []
+            for (const item of items) {
+              if (item.builderIdentityId === params.builderId) continue
+              const org = await findOrganizationBuilderByIdentity(tx, principal.organizationId, item.builderIdentityId)
+              if (!org) continue
+              rows.push({
+                identityId: org.identityId,
+                language: org.language,
+                topics: org.topics,
+                followersCount: org.followersCount ?? null,
+                fingerprint: org.fingerprint,
+                aiFingerprintShare: org.aiFingerprintShare,
+                firstSeenAt: org.firstSeenAt,
+                lastSeenAt: org.lastSeenAt,
+                metadata: org.metadata,
+              })
+              if (rows.length >= 50) break
+            }
+            return rows
+          })
 
           if (teammates.length < 2) {
             return Response.json({ teamTooSmall: true })
