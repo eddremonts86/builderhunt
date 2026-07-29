@@ -300,11 +300,32 @@ const zodEnv = z.object({
     // minted for a different (test-mode) endpoint — or vice versa — is a
     // classic misconfiguration Stripe's own dashboard won't catch for you.
     // We can't verify the webhook secret's mode from its value alone (it's
-    // an opaque token), so this only catches the key/env-name mismatch: a
-    // live key outside NODE_ENV=production is never intentional here.
-    if (data.STRIPE_SECRET_KEY?.startsWith('sk_live_') && data.NODE_ENV !== 'production') {
-      context.addIssue({ code: 'custom', path: ['STRIPE_SECRET_KEY'], message: 'A live Stripe secret key must never be used outside NODE_ENV=production' })
-    }
+    // an opaque token), so the key/env-name mismatch is checked unconditionally
+    // below rather than here.
+  }
+
+  /*
+   * A live key outside production, checked whatever the billing flag says.
+   *
+   * This lived inside the `STRIPE_BILLING_ENABLED === 'true'` block above, which meant the one
+   * configuration it exists to catch slipped through: a `.env` carrying `sk_live_…` with
+   * `STRIPE_BILLING_ENABLED=false` never reached the check at all. That was the real state of this
+   * repo on 2026-07-29, and `pnpm stripe:provision` / `pnpm billing:check-readiness` load exactly
+   * that file (`tsx --env-file=.env`) — so running either would have created catalog objects
+   * against the live Stripe account from a developer's laptop.
+   *
+   * The flag gates whether billing is *used*. It must not gate whether a live credential is
+   * *allowed to be present*, because a key that is loaded is a key that can be used by the next
+   * line of code someone writes.
+   */
+  if (data.STRIPE_SECRET_KEY?.startsWith('sk_live_') && data.NODE_ENV !== 'production') {
+    context.addIssue({
+      code: 'custom',
+      path: ['STRIPE_SECRET_KEY'],
+      message:
+        'A live Stripe secret key must never be present outside NODE_ENV=production — remove it from '
+        + 'the local env file and use the sk_test_ key (production reads its own from Coolify)',
+    })
   }
 
   if (data.PROFILE_REMOVAL_ENABLED === 'true') {
