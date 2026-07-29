@@ -26,7 +26,7 @@
   - Do: Accept `TenantTransaction` plus principal; list private creator rows and organization-visible rows only inside active organization; create/update/delete/change visibility via centralized permissions; maintain normalized keywords/sources atomically; return DTOs.
   - Verify: tests cover creator/member/admin/owner and tenant A/B for every operation, concurrent visibility change, and no global DB import.
 
-- [ ] **Implement tenant builder-list repository**
+- [x] **Implement tenant builder-list repository**
   - Files: `src/shared/lib/repositories/builder-lists.ts`, `tests/unit/shared/lib/repositories/builder-lists.test.ts`
   - Do: Implement list/get/create/update/delete and add/remove item using canonical `builderIdentityId`, tenant composite FKs, creator/admin permissions, idempotent unique item insertion, and `trackedByOrganization`/allowed user attribution from organization tracking. Return no source snapshot/private artifact.
   - Verify: repository tests cover duplicate add, roles, deleted identity handling, A/B IDs, and DB rejection of cross-tenant parent references.

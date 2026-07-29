@@ -420,6 +420,10 @@
     "0104_shared_resources_saved_query_visibility": {
       "sql": "0a21cd641ef3be45b9e34da0f88905c85577ea0ceda464c0f18e4ed68192fb2d",
       "snapshot": "fb2cd74e275e72cd80c64da89441e9b72edb75334092c78785aa826a58f40262"
+    },
+    "0105_builder_lists": {
+      "sql": "2a4bbe63093a28b4247aa6bbf3054477a6285588346bf1ad7346182f70129dbb",
+      "snapshot": "16ac663514b815148ea8d6d26cb82db862163789aed89a2a1f48e7ea8bfebd36"
     }
   }
 }

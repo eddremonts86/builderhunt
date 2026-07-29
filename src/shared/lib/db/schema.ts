@@ -177,6 +177,62 @@ export const builderSourceSnapshots = pgTable(
   ],
 )
 
+// ---------------------------------------------------------------------------
+// Plan 28 — Shared Builder Lists
+//
+// A list is a tenant-owned collection of builders the organization
+// is tracking. Visibility follows the same private|organization
+// enum as `organization_builders`: a private list is the creator's
+// alone, an organization list is every member's. Items are pinned
+// to a canonical `builderIdentityId` (the same identity
+// `organization_builders` references) so a list can never name a
+// builder the organization has not tracked.
+// ---------------------------------------------------------------------------
+
+export const builderLists = pgTable(
+  'builder_lists',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    createdByUserId: text('created_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    visibility: text('visibility').notNull().default('private'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('builder_lists_org_visibility_creator_idx').on(table.organizationId, table.visibility, table.createdByUserId),
+    check('builder_lists_visibility_check', sql`${table.visibility} in ('private', 'organization')`),
+  ],
+)
+
+export const builderListItems = pgTable(
+  'builder_list_items',
+  {
+    id: text('id').primaryKey(),
+    // The composite FK (organization_id, builder_identity_id) requires
+    // a row in organization_builders first. A list item pointing at a
+    // builder the org has not tracked fails at the database, not at
+    // the application — a future feature that lifts the restriction
+    // would not silently let an untracked builder into a list.
+    listId: text('list_id').notNull().references(() => builderLists.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    createdByUserId: text('created_by_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('builder_list_items_list_builder_unique').on(table.listId, table.builderIdentityId),
+    index('builder_list_items_org_builder_idx').on(table.organizationId, table.builderIdentityId),
+    foreignKey({
+      columns: [table.organizationId, table.builderIdentityId],
+      foreignColumns: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
+      name: 'builder_list_items_org_builder_tracked_fk',
+    }),
+  ],
+)
+
 export const organizationBuilders = pgTable(
   'organization_builders',
   {
