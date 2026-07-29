@@ -1,6 +1,9 @@
 import { and, asc, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import { alerts, alertTriggers } from '../db/schema'
+import type { TenantPrincipal } from '../authorization/permissions'
+import { findVisibleSavedQueryById } from './saved-queries'
+import { SharedResourceError } from '../shared-resources/contracts'
 
 export interface AlertTriggerRecord {
   id: string
@@ -22,6 +25,17 @@ export interface CreateOrganizationAlertInput {
   frequency?: string
   deliveryChannel?: string
   triggerConditions: typeof alerts.$inferInsert.triggerConditions
+  /**
+   * Optional back-reference to the saved query this alert was
+   * created from. The composite FK on the table
+   * (`alerts(organization_id, query_id) → saved_queries(organization_id, id)`)
+   * is the tenant boundary: even if a caller spoofed a queryId from
+   * a different organization, PostgreSQL would reject the insert.
+   * Use `createOrganizationAlertFromQueryForPrincipal` (not this
+   * function) when the alert is being created from a shared query,
+   * so the visibility check is enforced before the FK even fires.
+   */
+  queryId?: string | null
 }
 
 export function listOrganizationAlerts(transaction: TenantTransaction, organizationId: string) {
@@ -39,6 +53,51 @@ export async function createOrganizationAlert(
     enabled: true,
   }).returning()
   return row
+}
+
+/**
+ * Create an alert that is tied to a saved query the principal can
+ * actually see. The principal-scoped `findVisibleSavedQueryById` is
+ * the tenant boundary — a caller who cannot read the query
+ * (private-and-not-yours, or cross-tenant) gets `not_found` (404,
+ * not 403) so probing ids cannot enumerate. Even if the visibility
+ * check were bypassed, the composite FK on the table would still
+ * reject any queryId that does not belong to the active
+ * organization.
+ *
+ * Keywords are copied from the source query into the new alert —
+ * the caller cannot inject arbitrary keywords. Sharing a query
+ * does not create an alert and does not deliver anything; the
+ * recipient must opt in explicitly via this function.
+ */
+export async function createOrganizationAlertFromQueryForPrincipal(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  input: {
+    name: string
+    queryId: string
+    frequency?: string
+    deliveryChannel?: string
+    triggerConditions: typeof alerts.$inferInsert.triggerConditions
+  },
+) {
+  const sourceQuery = await findVisibleSavedQueryById(transaction, principal, input.queryId)
+  if (!sourceQuery) {
+    throw new SharedResourceError('not_found', 'Saved query not accessible', 404)
+  }
+  const [row] = await transaction.insert(alerts).values({
+    id: crypto.randomUUID(),
+    organizationId: principal.organizationId,
+    userId: principal.userId,
+    queryId: sourceQuery.id,
+    name: input.name.trim(),
+    keywords: sourceQuery.keywords,
+    frequency: input.frequency ?? 'daily',
+    deliveryChannel: input.deliveryChannel ?? 'email',
+    triggerConditions: input.triggerConditions,
+    enabled: true,
+  }).returning()
+  return row ?? null
 }
 
 export async function findOrganizationAlert(

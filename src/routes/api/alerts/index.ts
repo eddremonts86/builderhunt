@@ -7,9 +7,11 @@ import { rateLimit } from '~/shared/lib/rate-limit'
 import { getOrganizationEntitlement } from '~/shared/lib/repositories/entitlements'
 import {
   createOrganizationAlert,
+  createOrganizationAlertFromQueryForPrincipal,
   deleteOrganizationAlert,
   listOrganizationAlerts,
 } from '~/shared/lib/repositories/organization-alerts'
+import { SharedResourceError, stripOrganizationAuthority } from '~/shared/lib/shared-resources/contracts'
 
 const CreateBody = z.object({
   name: z.string().min(1).max(100),
@@ -23,6 +25,16 @@ const CreateBody = z.object({
     keywords: z.array(z.string()).optional(),
     builderId: z.string().optional(),
   }),
+  /**
+   * Optional saved-query id this alert is being created from. When
+   * present, the principal-scoped repository:
+   *  - validates the query is visible to the caller
+   *  - copies the query's keywords into the alert
+   *  - sets the alert.queryId so the alert is tied to the source
+   * Sharing the query does NOT create an alert — the recipient must
+   * opt in explicitly via this body field.
+   */
+  queryId: z.string().min(1).max(128).optional(),
 })
 
 export const Route = createFileRoute('/api/alerts/')({
@@ -55,13 +67,35 @@ export const Route = createFileRoute('/api/alerts/')({
               { status: 429, headers: { 'Retry-After': String(Math.ceil(rl.resetMs / 1000)) } },
             )
           }
-          const parsed = CreateBody.safeParse(await request.json().catch(() => ({})))
+          const raw = await request.json().catch(() => ({}))
+          // stripOrganizationAuthority is the same guard every
+          // shared-resources route uses: a client-supplied
+          // organizationId is data, never authority, and is dropped
+          // before the principal-scoped repository decides anything.
+          const body = stripOrganizationAuthority(
+            (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>,
+          )
+          const parsed = CreateBody.safeParse(body)
           if (!parsed.success) {
             return Response.json({ error: 'Invalid alert', details: parsed.error.flatten() }, { status: 400 })
           }
           const row = await withTenantContext(principal, async (tx) => {
             const entitlement = await getOrganizationEntitlement(tx, principal.organizationId)
             if (!entitlement.paidActionsAllowed) return null
+            // When queryId is provided, take the principal-scoped
+            // path: it validates visibility, copies the source
+            // query's keywords, and threads queryId through the
+            // composite FK. Sharing a query alone creates no alert
+            // — only an explicit opt-in here does.
+            if (parsed.data.queryId) {
+              return createOrganizationAlertFromQueryForPrincipal(tx, principal, {
+                name: parsed.data.name,
+                queryId: parsed.data.queryId,
+                frequency: parsed.data.frequency,
+                deliveryChannel: parsed.data.deliveryChannel,
+                triggerConditions: parsed.data.triggerConditions,
+              })
+            }
             return createOrganizationAlert(tx, {
               id: randomId(),
               organizationId: principal.organizationId,
@@ -105,6 +139,9 @@ export const Route = createFileRoute('/api/alerts/')({
 })
 
 function alertErrorResponse(error: unknown, message: string) {
+  if (error instanceof SharedResourceError) {
+    return Response.json({ error: error.code, message: error.message }, { status: error.status })
+  }
   if (error instanceof TenantAuthorizationError) {
     return Response.json({ error: error.message }, { status: error.status })
   }
