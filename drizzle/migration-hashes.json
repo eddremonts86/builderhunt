@@ -396,6 +396,18 @@
     "0098_credit_write_role_membership": {
       "sql": "d8cb813c129c3488646493aadcfcf659ff38a87d41a9fe1ac1f5aa741d2ecf78",
       "snapshot": "13ff40c140c0832ff1fe0402206388e22ae72ebc3952b19aba95fd26c93a6f8b"
+    },
+    "0099_purge_expired_consents": {
+      "sql": "8511ed1c128ee24ff30b4981b1431b6932e3f69813f407effcd42f5b20503b55",
+      "snapshot": "a15940b25954c812cf8fff00764bc7ec3e43820edcaa0483977726e93724a3d6"
+    },
+    "0100_material_access": {
+      "sql": "9be4c82a5bf323cf69ebacc5cdf5d46cf44edefef4a0895685fa119fcd00db6f",
+      "snapshot": "efe4f7414b1976c69b0a41c05f5f4582a8d709ed07a8e1c1dfd1c9761af52756"
+    },
+    "0101_material_access_guard": {
+      "sql": "ff24a591369ab642b57e35302ab54eea20ec63ce1fa8f387c06dfae1827ea90a",
+      "snapshot": "446e0c6be738a5cd75e509e55471c76e53c3fe9dbbdf899bb2388e6af8f8db73"
     }
   }
 }

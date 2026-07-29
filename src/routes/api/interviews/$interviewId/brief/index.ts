@@ -24,7 +24,7 @@ import { briefContextForEvent } from '~/lib/interviews/brief-context'
  * ## Authorization is RLS, not a check in this handler
  *
  * `withTenantContext` pins `app.organization_id` and `app.user_id`, and `interview_briefs`' policies do
- * the rest: the owner, or a colleague with `event_participants.access_granted = true`, and nobody else
+ * the rest: the owner, or a colleague with `event_participants.material_access_granted = true`, and nobody else
  * — not even an organization admin. So "not yours" and "does not exist" produce the same empty read
  * here, which is the right answer for both: distinguishing them would tell a caller that an interview
  * exists and they cannot see it.

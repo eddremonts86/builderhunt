@@ -234,7 +234,7 @@ beforeAll(async () => {
 
   await db.insert(schema.eventParticipants).values({
     organizationId: ORG, eventId, eventOwnerUserId: OWNER, userId: PARTICIPANT,
-    role: 'attendee', accessGranted: true,
+    role: 'attendee', accessGranted: true, materialAccessGranted: true,
   })
 }, 180_000)
 

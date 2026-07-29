@@ -50,7 +50,7 @@ import { assertJsonRequest, assertSameOrigin, CrossOriginError } from '~/shared/
  * ## Authorization is RLS plus one thing RLS cannot express
  *
  * `withTenantContext` pins the tenant and user, and `interview_sessions`' policies decide visibility: the
- * owner, or a colleague with `event_participants.access_granted = true`. What they cannot express is that
+ * owner, or a colleague with `event_participants.material_access_granted = true`. What they cannot express is that
  * a granted participant may *read* and *heartbeat* but not transition — the policy allows a participant
  * only SELECT, so a transition would surface as an empty UPDATE rather than a refusal. The service names
  * it instead.

@@ -113,6 +113,48 @@ try {
   }
   if (!appBillingUpdateDenied) throw new Error('App role updated financial-state billing row')
 
+  // Interview material access is the event owner's to give. `event_participants_app_self_update`
+  // (0069) lets an attendee write their own row so they can RSVP, and the app role holds table-wide
+  // UPDATE, so without the trigger from 0101 a participant could set `material_access_granted` on
+  // themselves and read the candidate's transcript. RLS cannot express this — it is row-level, and
+  // this is the same row either way — so the trigger is the only thing standing there.
+  let selfGrantDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`select set_config('app.user_id', 'user-c', true)`
+      await transaction`
+        update event_participants set material_access_granted = true
+        where id = 'cccccccc-0000-4000-8000-00000000000a'
+      `
+    })
+  } catch (error) {
+    selfGrantDenied = error?.code === '42501'
+  }
+  if (!selfGrantDenied) throw new Error('A participant granted themselves interview material access')
+
+  // The same statement from the event owner must work, or the guard above would be indistinguishable
+  // from the feature being broken.
+  await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    await transaction`
+      update event_participants set material_access_granted = true
+      where id = 'cccccccc-0000-4000-8000-00000000000a'
+    `
+  })
+  const [ownerGranted] = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`
+      select material_access_granted from event_participants
+      where id = 'cccccccc-0000-4000-8000-00000000000a'
+    `
+  })
+  if (ownerGranted?.material_access_granted !== true) {
+    throw new Error('The event owner could not grant interview material access')
+  }
+
   // billing_checkout_attempts is the one owner-initiated table the app role CAN write —
   // but only within its own tenant, never a spoofed organization_id.
   let checkoutSpoofDenied = false

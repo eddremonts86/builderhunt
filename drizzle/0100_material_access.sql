@@ -1,0 +1,1 @@
+ALTER TABLE "event_participants" ADD COLUMN "material_access_granted" boolean DEFAULT false NOT NULL;

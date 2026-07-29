@@ -169,7 +169,7 @@ beforeAll(async () => {
   // A colleague explicitly handed access, which is what `access_granted` means. Without this row the
   // PARTICIPANT cases below are testing a stranger, not a participant, and every one of them is a 404.
   await db.insert(schema.eventParticipants).values({
-    organizationId: ORG, eventId, eventOwnerUserId: OWNER, userId: PARTICIPANT, role: 'attendee', accessGranted: true,
+    organizationId: ORG, eventId, eventOwnerUserId: OWNER, userId: PARTICIPANT, role: 'attendee', accessGranted: true, materialAccessGranted: true,
   })
 }, 180_000)
 

@@ -71,7 +71,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
              * interview. An organization admin got it too.
              *
              * `briefContextForEvent` answers null unless the caller owns the interview or was
-             * explicitly handed access (`event_participants.access_granted`), and null becomes the
+             * explicitly handed access (`event_participants.material_access_granted`), and null becomes the
              * same 404 as a missing interview so the response cannot confirm one exists.
              */
             const context = await briefContextForEvent(transaction, principal, params.interviewId)

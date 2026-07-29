@@ -79,6 +79,7 @@ const participantColumns = {
   role: eventParticipants.role,
   response: eventParticipants.response,
   accessGranted: eventParticipants.accessGranted,
+  materialAccessGranted: eventParticipants.materialAccessGranted,
   respondedAt: eventParticipants.respondedAt,
 } as const
 
@@ -559,12 +560,72 @@ export async function updateOwnParticipantResponse(
   return row ?? null
 }
 
+/**
+ * The event owner hands one participant the interview material, or takes it back.
+ *
+ * Scoped by `eventOwnerUserId` as well as the participant id, so the statement itself cannot reach a
+ * participant of somebody else's event even if a caller passed the wrong pair. The database says the
+ * same thing a third time — a trigger from `0101_material_access_guard` rejects any update to this
+ * column by anyone other than the event owner — because the column releases a candidate's transcript
+ * and one layer of authorization is not enough for that.
+ */
+export async function setParticipantMaterialAccess(
+  transaction: TenantTransaction,
+  params: {
+    organizationId: string
+    eventId: string
+    ownerUserId: string
+    participantId: string
+    granted: boolean
+  },
+) {
+  const [row] = await transaction
+    .update(eventParticipants)
+    .set({ materialAccessGranted: params.granted, updatedAt: new Date() })
+    .where(and(
+      eq(eventParticipants.organizationId, params.organizationId),
+      eq(eventParticipants.eventId, params.eventId),
+      eq(eventParticipants.eventOwnerUserId, params.ownerUserId),
+      eq(eventParticipants.id, params.participantId),
+    ))
+    .returning(participantColumns)
+  return row ?? null
+}
+
 /** Whether `userId` has explicit, access-granted participation — the read gate the RLS policy also enforces. */
 export async function hasGrantedParticipation(
   transaction: TenantTransaction,
   organizationId: string,
   eventId: string,
   userId: string,
+) {
+  return participationFlag(transaction, organizationId, eventId, userId, eventParticipants.accessGranted)
+}
+
+/**
+ * Whether `userId` was handed this interview's material — the brief, report, suggestions and
+ * transcript.
+ *
+ * Deliberately a different question from `hasGrantedParticipation`, which asks whether they may see
+ * the calendar event. Both used to read `access_granted`, and `src/lib/calendar/service.ts` grants
+ * that to every internal attendee, so adding a colleague to an interview invite handed them the
+ * candidate's transcript. The two callers wanted two predicates; now they have them.
+ */
+export async function hasGrantedMaterialAccess(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+  userId: string,
+) {
+  return participationFlag(transaction, organizationId, eventId, userId, eventParticipants.materialAccessGranted)
+}
+
+async function participationFlag(
+  transaction: TenantTransaction,
+  organizationId: string,
+  eventId: string,
+  userId: string,
+  flag: typeof eventParticipants.accessGranted | typeof eventParticipants.materialAccessGranted,
 ) {
   const [row] = await transaction
     .select({ id: eventParticipants.id })
@@ -573,7 +634,7 @@ export async function hasGrantedParticipation(
       eq(eventParticipants.organizationId, organizationId),
       eq(eventParticipants.eventId, eventId),
       eq(eventParticipants.userId, userId),
-      eq(eventParticipants.accessGranted, true),
+      eq(flag, true),
     ))
     .limit(1)
   return Boolean(row)

@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm'
 import type { TenantTransaction } from '~/shared/lib/db/client'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 import { calendarEvents, schedulingInvitations } from '~/shared/lib/db/schema'
-import { hasGrantedParticipation } from '~/shared/lib/repositories/calendar'
+import { hasGrantedMaterialAccess } from '~/shared/lib/repositories/calendar'
 
 /**
  * Resolves the role a brief is being prepared for.
@@ -46,7 +46,7 @@ export interface BriefContext {
   modality: string
   /** The caller owns the interview: the only relationship that may drive a session. */
   isOwner: boolean
-  /** A colleague explicitly handed access — `event_participants.access_granted`. Reads only. */
+  /** A colleague explicitly handed the material — `event_participants.material_access_granted`. Reads only. */
   isGrantedParticipant: boolean
 }
 
@@ -85,7 +85,7 @@ export async function briefContextForEvent(
   // handed the interview material, which is why the predicate is `access_granted` rather than membership.
   const isGrantedParticipant = isOwner
     ? true
-    : await hasGrantedParticipation(transaction, principal.organizationId, eventId, principal.userId)
+    : await hasGrantedMaterialAccess(transaction, principal.organizationId, eventId, principal.userId)
 
   // Neither means the caller has no relationship to this interview. Null rather than a 403, so "not
   // yours" and "does not exist" are the same answer — a 403 here would confirm that an interview exists.

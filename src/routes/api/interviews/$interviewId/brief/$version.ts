@@ -52,7 +52,7 @@ export const Route = createFileRoute('/api/interviews/$interviewId/brief/$versio
            * Authorize before touching the brief. `requireTenantPrincipal` proves the tenant, not a
            * relationship to *this* interview, so without this any colleague — or an organization
            * admin — could read a candidate's brief. `briefContextForEvent` answers null unless the
-           * caller owns it or holds `event_participants.access_granted`, and null is reported as the
+           * caller owns it or holds `event_participants.material_access_granted`, and null is reported as the
            * same 404 as a missing interview so the response cannot confirm one exists.
            */
           const authorized = await withTenantContext(principal, (transaction) =>

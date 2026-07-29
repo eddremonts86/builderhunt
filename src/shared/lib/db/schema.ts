@@ -2015,7 +2015,14 @@ export const eventParticipants = pgTable(
     displayName: text('display_name'),
     role: text('role').notNull(),
     response: text('response').notNull().default('needs_action'),
+    /** Calendar visibility: this attendee may see the event. `service.ts` grants it to any internal user. */
     accessGranted: boolean('access_granted').notNull().default(false),
+    /**
+     * Interview material: this attendee was handed the brief, report, suggestions and transcript.
+     * A separate act from being on the attendee list, and never granted implicitly — the event owner
+     * grants it per participant, enforced by a trigger in the migration that added this column.
+     */
+    materialAccessGranted: boolean('material_access_granted').notNull().default(false),
     respondedAt: timestamp('responded_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

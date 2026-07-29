@@ -2435,50 +2435,51 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 13 — the interview-material access model (found 2026-07-29 by running the suite as the real roles)
 
-Three findings from one root cause: `event_participants.access_granted` means two different things to
-the two halves of the codebase, and the interview half reads it as "was handed the candidate's
-material". They are ordered because **fixing the second without the first turns a latent disclosure
-into a live one** — today a participant cannot reach the material at all, which is the only reason the
-first finding is not already exploitable.
+Three findings from one root cause: `event_participants.access_granted` meant two different things to
+the two halves of the codebase, and the interview half read it as "was handed the candidate's
+material". Delivered 2026-07-29 in the order below, because fixing the second without the first would
+have turned a latent disclosure into a live one.
 
-- [ ] **Separate calendar visibility from interview-material access**
-  - Files: `drizzle/00XX_material_access.sql` (new — number from the then-current head),
-    `drizzle/meta/_journal.json`, `drizzle/meta/00XX_snapshot.json`, `src/shared/lib/db/schema.ts`,
-    `src/shared/lib/repositories/calendar.ts` (`hasGrantedParticipation`),
-    `src/lib/calendar/service.ts` (the participant insert)
-  - Do: Add `event_participants.material_access_granted boolean NOT NULL DEFAULT false` and point
-    `hasGrantedParticipation` at it. Leave `access_granted` exactly as it is — it is calendar
-    visibility, six tests in `tests/unit/lib/calendar` depend on internal participants getting it, and
-    `src/lib/calendar/service.ts:216` is right to grant it. Add the RLS policies for the new column in
-    the same migration.
-  - Verify: `pnpm exec playwright test tests/e2e/interview-privacy.spec.ts` passes "an ungranted
-    attendee sees the meeting and not the transcript" — the attendee still sees the event and gets 404
-    on brief/report/suggestions. `pnpm exec vitest run tests/unit/lib/calendar` stays 113/113.
-  - Why it matters: `service.ts` sets `accessGranted: Boolean(participant.userId)`, so adding a
-    colleague to an interview invite hands them the predicate that
-    `brief-context.ts` uses to release the brief, the report, the suggestions and the transcript. Its
-    own comment states the intent — "being on the attendee list is not the same act as being handed
-    the interview material" — and the column does not honour it.
+- [x] **Separate calendar visibility from interview-material access**
+  - `drizzle/0100_material_access.sql` adds `event_participants.material_access_granted boolean NOT
+    NULL DEFAULT false` (drizzle-generated, with its own snapshot). `access_granted` is untouched: it
+    is calendar visibility, `src/lib/calendar/service.ts:216` is right to grant it to internal
+    attendees, and six tests in `tests/unit/lib/calendar` depend on that.
+  - The single `hasGrantedParticipation` had two callers wanting two different questions, so it became
+    two functions in `src/shared/lib/repositories/calendar.ts`: `hasGrantedParticipation` (event
+    visibility, still `access_granted`, used by `src/lib/calendar/service.ts`) and
+    `hasGrantedMaterialAccess` (the new column, used by `src/lib/interviews/brief-context.ts`).
+    Pointing the shared function at the new column instead broke 5 calendar read-authorization tests —
+    the same conflation one level up.
+  - Verify (2026-07-29): `tests/unit/lib/calendar` 113/113; `tests/e2e/interview-privacy.spec.ts`
+    10/10, including "an ungranted attendee sees the meeting and not the transcript", which now asserts
+    both columns — `access_granted` true, `material_access_granted` false.
 
-- [ ] **Let a granted participant reach the material at all**
-  - Files: `drizzle/00XX_invitation_participant_read.sql` (new), `drizzle/meta/_journal.json`,
-    `drizzle/meta/00XX_snapshot.json`
-  - Do: Add an RLS policy on `scheduling_invitations` allowing SELECT to a user who holds
-    `material_access_granted` on the invitation's `booked_event_id`. Only after the task above, so the
-    predicate being widened is the explicit grant and not "was invited to the meeting".
-  - Verify: `tests/e2e/interview-privacy.spec.ts`'s "a granted participant reads the material and
-    still cannot drive the session" passes — 200 on the brief, ≥400 on the session write.
-  - Why it matters: `scheduling_invitations` has one app policy, `app_owner_all`, requiring
-    `owner_user_id = app.user_id`. `briefContextForEvent` starts with an inner join against that
-    table, so it returns null at `if (!row)` before it ever evaluates `isGrantedParticipant`. The
-    branch that exists to admit participants is unreachable.
+- [x] **Let a granted participant reach the material at all**
+  - `drizzle/0101_material_access_guard.sql` adds `scheduling_invitations_app_participant_select`,
+    admitting SELECT to a user holding `material_access_granted` on the invitation's `booked_event_id`.
+    `briefContextForEvent` opens with an inner join against that table, which had only
+    `app_owner_all`, so for anyone but the organizer it returned null at `if (!row)` and never reached
+    the branch that admits participants. That branch was dead code.
+  - The same migration adds a `BEFORE UPDATE` trigger rejecting any change to
+    `material_access_granted` by anyone but the event owner. Not in the original plan: RLS is
+    row-level, `event_participants_app_self_update` (0069) lets an attendee write their own row to
+    RSVP, and `builderhunt_app` holds table-wide UPDATE — so without the trigger a participant could
+    grant themselves a candidate's transcript.
+  - Verify (2026-07-29): "a granted participant reads the material and still cannot drive the session"
+    passes — 200 on the brief, ≥400 on the session write. `scripts/db/verify-rls-local.mjs` asserts the
+    trigger from both sides: the participant's self-grant is denied with 42501, and the owner's grant
+    succeeds (so the guard cannot pass by breaking the feature).
 
-- [ ] **Add a way to grant material access on purpose**
-  - Files: `src/routes/api/interviews/$interviewId/participants/$participantId.ts` (new),
-    `src/shared/lib/repositories/calendar.ts`, `tests/unit/security/interview-material-grant.test.ts` (new)
-  - Do: An owner-only endpoint that sets `material_access_granted` for one participant of one
-    interview, emitting a security audit event. Nothing in `src/routes/` writes that column today.
-  - Verify: the new test proves the owner can grant, a granted participant cannot grant, an
-    organization admin cannot grant, and the audit event carries no candidate data.
-  - Why it matters: with the first task done, the only way to share material is a direct SQL update —
-    which is how the e2e suite does it. The feature has no user-facing path.
+- [x] **Add a way to grant material access on purpose**
+  - `src/routes/api/interviews/$interviewId/participants/$participantId.ts` (PATCH, owner-only) with
+    `setParticipantMaterialAccess` in `src/shared/lib/repositories/calendar.ts`, scoped by
+    `eventOwnerUserId` as well as the participant id, and a `interview.material.access` audit event
+    carrying ids and the new state only.
+  - Deviation from the plan: the coverage is e2e (`tests/e2e/interview-privacy.spec.ts`) rather than
+    the `tests/unit/security/interview-material-grant.test.ts` named here. Unit tests run as the
+    migration superuser, which bypasses both GRANTs and RLS — that vantage point is what hid this
+    whole phase's root cause, and it would not have exercised the trigger or the new policy either.
+  - Verify (2026-07-29): "the owner grants material access on purpose, and can take it back" (grant →
+    brief 200, revoke → brief 404) and "nobody but the owner can hand out the material" (granted
+    participant 403, organization admin 404, other tenant 404, flag unchanged).
