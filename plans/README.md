@@ -17,22 +17,26 @@ also the order to walk when auditing plan-vs-reality.
 
 ## Read this first
 
-1. [`_meta/phase-1-order.md`](./_meta/phase-1-order.md) is the complete numbered index:
+1. [`_meta/operator-queue.md`](./_meta/operator-queue.md) — read this first if you are an agent
+   about to execute phase-1. Five tasks need a person (SSH, a €4/month subscription, two API keys,
+   a legal signature). Skip them, leave them unchecked, report them at the end. Nothing else in
+   phase-1 should make you stop and ask.
+2. [`_meta/phase-1-order.md`](./_meta/phase-1-order.md) is the complete numbered index:
    all 54 plans, their dependencies as numbers, live task counts, and the divergences
    between what a plan's status claims and what its checklist shows. It is the only index
    here that covers every plan on disk — the categorized sections further down this file
    predate `calendar-scheduling-interview-intelligence`, `exhaustive-local-e2e-design`, and
    `solutions-intelligence` and still omit them.
-2. [`_meta/app-reality.md`](./_meta/app-reality.md) is the source of truth for what is
+3. [`_meta/app-reality.md`](./_meta/app-reality.md) is the source of truth for what is
    already shipped and which architectural constraints exist.
-3. [`_meta/security-policy.md`](./_meta/security-policy.md) is binding for every plan that reads,
+4. [`_meta/security-policy.md`](./_meta/security-policy.md) is binding for every plan that reads,
    persists, shares, exports, deletes, or sends private data.
-4. [`_meta/ai-policy.md`](./_meta/ai-policy.md) is binding for every AI feature:
+5. [`_meta/ai-policy.md`](./_meta/ai-policy.md) is binding for every AI feature:
    Chrome built-in AI is the local-first default; MiniMax M3 is server-side for
    persisted, shared, background, embedding, and fallback work.
-5. [`_meta/conventions.md`](./_meta/conventions.md) defines when a plan is ready for
+6. [`_meta/conventions.md`](./_meta/conventions.md) defines when a plan is ready for
    implementation.
-6. Execute a plan's `tasks.md` from top to bottom. Re-check its dependency headers
+7. Execute a plan's `tasks.md` from top to bottom. Re-check its dependency headers
    immediately before starting because statuses can change independently.
 
 Status means:

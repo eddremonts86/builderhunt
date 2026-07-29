@@ -1,6 +1,7 @@
 # Feature: Tenant Activity Feed
 
-> **Status**: `blocked`
+> **Status**: `pending` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
+> mutations it records, but that plan is executable now, so this is sequencing rather than a hold
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md), [`team-accounts`](../27-team-accounts/spec.md), [`shared-resources`](../28-shared-resources/spec.md)
 > **Blocks**: nothing
 > **Reality check**: no event/audit table exists. The previous design resolved organizations from

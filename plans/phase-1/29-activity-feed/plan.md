@@ -1,6 +1,7 @@
 # Delivery Plan: Tenant Activity Feed
 
-> **Status**: `blocked`
+> **Status**: `pending` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
+> mutations it records, but that plan is executable now, so this is sequencing rather than a hold
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/plan.md), [`team-accounts`](../27-team-accounts/plan.md), [`shared-resources`](../28-shared-resources/plan.md)
 > **Blocks**: nothing
 > **Reality check**: event persistence and instrumentation do not exist; use canonical tenant

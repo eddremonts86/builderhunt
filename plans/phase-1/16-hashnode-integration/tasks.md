@@ -1,6 +1,9 @@
 # Tasks: Hashnode Integration
 
-> **Status**: `partially-implemented` (blocked on an external vendor decision, not on code)
+> **Status**: `partially-implemented` — executable. The legacy endpoint is dead and the task below
+> states the replacement in full: the new API has no `searchUsers`, so discovery goes through post
+> search plus author aggregation. No vendor decision gates that; the paid-API question was about a
+> *different*, richer integration that this plan does not scope.
 > **Depends on**: nothing
 > **Blocks**: nothing
 > **Reality check**: Connector + wiring shipped; id-prefix fix and env docs delivered
@@ -28,8 +31,7 @@
 
 ## Remaining
 
-- [ ] **NEEDS USER AWARENESS — Migrate the connector to `https://gql.hashnode.com`**
-      (genuinely blocked, not implemented — see finding below)
+- [ ] **Migrate the connector to `https://gql.hashnode.com`**
   - Files: `src/lib/sources/hashnode.ts`
   - Do: replace `HN_GQL` with `https://gql.hashnode.com`. The new API has no `searchUsers`;
     implement discovery as: query posts by the search term/tag (new-API post search),

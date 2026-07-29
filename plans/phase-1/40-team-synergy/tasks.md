@@ -1,6 +1,7 @@
 # Team Synergy — Candidate-vs-Team Fit Analysis (tasks)
 
-> **Status**: `implemented` (Phases 1-4; Phase 5 stays deferred per its own "do not start" note)
+> **Status**: `partially-implemented` (Phases 1–4 shipped; Phase 5 is open and executable as of
+> 2026-07-29 — the `team-accounts` blocker it waited on shipped 2026-07-22)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard — complete), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft — v1 heuristic only, v2 hasn't landed), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) (soft — complete), [`team-accounts`](../27-team-accounts/spec.md) (soft — complete)
 > **Blocks**: nothing
 > **Reality check (corrected 2026-07-25)**: builds on `src/shared/lib/tracked-builders.ts` (thin
@@ -126,15 +127,14 @@
   - Verify: `pnpm vitest run` — full suite green (2036/2036 passing, 14 new synergy tests, no
     regressions).
 
-## Phase 5 — Org lists (still not started)
+## Phase 5 — Org lists (open and unblocked)
 
 - [ ] **Org list as team source**
   - Files: `src/routes/api/builders/$builderId/synergy.ts`
   - Do: accept `{ teamSource: 'tracked' | { orgListId } }`; fetch org list rows (membership
     check via team-accounts helpers) and feed the same `buildTeamAggregate`.
   - Verify: org member gets an analysis against the shared list; non-member 403.
-  - **Note**: this plan's own header still says "blocked on team-accounts — do not start" —
-    `team-accounts` has since shipped (`done`, 2026-07-22), so the technical blocker is gone,
-    but this phase was left untouched per that explicit instruction rather than reinterpreted
-    unilaterally. `buildTeamAggregate` already accepts a plain row list, so Phase 5 is a small,
-    additive follow-up whenever a maintainer wants it — not a blocker for anything else.
+  - Note (2026-07-29): the "blocked on team-accounts — do not start" hold is lifted. That plan
+    shipped 2026-07-22, and `buildTeamAggregate` already accepts a plain row list, so this is a
+    small additive change. It was left untouched only because a past session would not
+    reinterpret an explicit instruction on its own; that instruction is now retired.

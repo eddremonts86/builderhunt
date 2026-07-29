@@ -3,10 +3,10 @@
 > **Status**: `implemented` (Phase 3's worker/email.ts integration sub-task skipped — see note)
 > **Depends on**: nothing (Phase 3 depends on [`ai-expansion`](../21-ai-expansion/spec.md))
 > **Blocks**: nothing hard — see spec.md header
-> **Reality check**: Phases 0–2 shipped and live-verified. Phase 3's task registration
-> shipped; its worker/`email.ts` integration is explicitly skipped this session (`email.ts`
-> is a reserved file for this session's scope) — registering the task alone is safe and
-> inert (nothing calls it yet), so this doesn't block calling the plan done.
+> **Reality check (updated 2026-07-29)**: Phases 0–2 shipped and live-verified. Phase 3's task
+> registration shipped; only the worker/`email.ts` wiring is open. It was skipped because `email.ts`
+> was a reserved file *for one past session* — that restriction was never a property of this plan and
+> does not apply now. The task carries its own Files/Do/Verify. **It is executable.**
 
 ## Phase 0 — Delivered (checked, with pointers)
 

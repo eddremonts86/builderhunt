@@ -123,3 +123,19 @@
     sign-in form submissions silently no-op'd — reproduced with a stale session, a cleared
     one, and a brand-new tab) — a pre-existing browser-automation/dev-server interaction
     issue unrelated to this feature's code, not a bug in the shipped feature itself.
+
+- [ ] **Decide and record the indexing state of blog, changelog and roadmap**
+  - Files: `src/shared/lib/seo/surfaces.ts`, `scripts/db/sync-platform-content.ts`,
+    `docs/operations/` (the record), `tests/unit/shared/lib/seo/surfaces.test.ts`
+  - Do: `public_surface_indexing` currently holds `noindex=true, nofollow=true` for all three
+    surfaces, so the blog, the changelog and the roadmap are excluded from search engines. Nothing in
+    any plan says that is intended and nothing turns it on. Decide the launch state, set the rows to
+    match, and write down which it is and why. If the answer is "noindex until launch", the change
+    that flips them belongs in `plans/phase-5/01-production-readiness-audit`, so add it there in the
+    same pass.
+  - Verify: `curl -s $APP_URL/blog | grep -i 'name="robots"'` shows the intended directive, and
+    `/robots.txt` agrees with it — the surfaces registry feeds both, so a disagreement means one of
+    them is not reading it.
+  - Why it matters: `46-content-marketing` exists to earn organic traffic. With these three surfaces
+    on `noindex` that work cannot pay off, and the failure is silent: nothing errors, the traffic just
+    never arrives.

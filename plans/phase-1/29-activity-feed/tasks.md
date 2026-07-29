@@ -1,10 +1,13 @@
 # Tasks: Tenant Activity Feed
 
-> **Status**: `blocked`
+> **Status**: `pending` — unblocked 2026-07-29. It still runs *after* `28-shared-resources`, whose
+> mutations it records, but that plan is executable now, so this is sequencing rather than a hold
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md), [`shared-resources`](../28-shared-resources/tasks.md)
 > **Blocks**: nothing
-> **Reality check**: implement only after canonical tenant transactions, activity/security-audit
-> separation, shared resource services, non-owner roles, RLS, and tenant A/B harness exist.
+> **Reality check (verified 2026-07-29)**: the prerequisites it listed — canonical tenant
+> transactions, activity/security-audit separation, non-owner roles, RLS, and the tenant A/B harness —
+> all exist. The one still to come is `28-shared-resources`'s services, whose mutations this plan
+> records, so run it after that plan and not before. That is an order, not a blocker.
 
 - [ ] **Define versioned event and redaction registry**
   - Files: `src/shared/lib/activity/contracts.ts`, `tests/unit/shared/lib/activity/contracts.test.ts`, `docs/architecture/activity-events.md`

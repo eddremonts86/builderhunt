@@ -9,8 +9,31 @@ The same number is the review order. Auditing plan-vs-reality top-to-bottom mean
 read a plan after the plans it builds on, so "this claims to be implemented" can be checked
 against a foundation you have already verified rather than assumed.
 
-**Snapshot: 2026-07-29.** 54 plans, 777 tasks, 627 done (80%), 150 open, 27 plans with zero
-open tasks.
+**Snapshot: 2026-07-29 (second pass).** 54 plans, 779 tasks, 627 done (80%), 152 open, 26 plans with
+zero open tasks.
+
+## Executable in order, 01 → 54
+
+Phase 1 is meant to be walked top to bottom by an agent without stopping to ask anything. As of
+2026-07-29 that holds, and here is what had to be true for it:
+
+- **No plan carries a `blocked` status.** `28-shared-resources` and `29-activity-feed` did. All six of
+  28's preconditions were verified met, and 29's only outstanding one is 28 itself — which is an order,
+  not a hold.
+- **No task says "do not start".** Four such holds were stale: 28's precondition list, 40's Phase 5
+  (whose blocker `27-team-accounts` shipped 2026-07-22), 34's `email.ts` "reserved file" (a rule that
+  belonged to one past session), and 16's "blocked on a vendor decision" (the task states the full
+  replacement path; the paid-API question was about a different, unscoped integration).
+- **No dependency points forward**, so walking the numbers satisfies every one. The single exception
+  is the documented `22`↔`23` cycle, and both are closed, so nothing waits on it. This is why the
+  legacy-column contraction moved from `01` to `30`: it cannot run until 30 retires `plans` and
+  `plan_requests`, and an agent walking in order reached it 29 plans too early.
+- **The five tasks a person must do carry `Operator:`** and are listed in
+  [`operator-queue.md`](./operator-queue.md). The protocol is: skip, leave unchecked, report at the
+  end. Never ask, never wait.
+
+Seven further tasks left the phase entirely on 2026-07-29 — their definitions contained the launch —
+and live in [`../phase-5/01-production-readiness-audit`](../phase-5/01-production-readiness-audit/spec.md).
 
 **Seven tasks left this phase on 2026-07-29** for `plans/phase-5/01-production-readiness-audit`. They
 were not unfinished work — their definitions contain the launch: a conversion baseline needs ≥14 days

@@ -63,9 +63,14 @@ Every plan directory contains exactly three files:
    `pnpm type-check` catches it instead of a reviewer),
    `OPERATIONAL_SCHEDULES` (`src/shared/lib/operational-schedules.ts`) — `jobKey` is globally
    unique and every new worker registers there, wrapped in `withJobRun({ jobKey })`,
-   and `SEO_SURFACES` (`src/shared/lib/seo/surfaces.ts`) — a governed registry whose
-   `DEFAULT_DIRECTIVES` fail closed to `noindex`, so a plan adding a public page that does not
-   register a surface ships that page silently unindexed.
+   and `SEO_SURFACES` (`src/shared/lib/seo/surfaces.ts`) — a governed registry of the three surfaces
+   an admin can toggle (`blog`, `changelog`, `roadmap`). Verified 2026-07-29: a public page outside
+   those three is **not** silently unindexed — `__root.tsx` emits `index, follow` for it, and
+   `DEFAULT_DIRECTIVES` (`noindex`) applies only to a registered surface with no row yet. The earlier
+   wording here claimed the opposite and would have sent someone hunting a problem that does not
+   exist. The real hazard is the other direction: all three surfaces currently hold
+   `noindex=true`, so blog/changelog/roadmap are excluded from search — see
+   `45-public-landing-pages`.
 
    **Allowance tables have a specific hazard.** An allowance that is also *advertised* (on
    `/pricing`, in `PLAN_PRICING.features`) must be keyed `Record<OrganizationTier, number>` and
@@ -106,6 +111,11 @@ elapsed time. Those tasks still get `Files`/`Do`/`Verify` — the person doing i
 as much — and `Operator` states plainly why an agent must stop and hand over. Writing a fake
 verification step for such a task is worse than leaving it blank, because it invites an agent to
 claim it passed.
+
+**What an agent does with one**: skip it, leave the box unchecked, and name it in the final report.
+Do not ask, do not wait, and do not check it because the code half is done. Phase 1 is meant to be
+executable top to bottom without a single question, and the current list of five such tasks —
+with who supplies what — is [`operator-queue.md`](./operator-queue.md).
 
 Do not use a `- [ ]` checkbox for anything that is not work you intend someone to do. Scope you
 have decided against, ideas awaiting a new specification, and follow-ups belonging to another

@@ -242,11 +242,31 @@ must include its tests and must not stage unrelated worktree changes.
   - Verify (2026-07-27): backfill dry-run then real run on a local DB → `saved_queries` 1 migrated/21 skipped, `alerts` 2 migrated, `onboarding_progress` 2 migrated, **0 conflicts, 0 orphans**, every surface reconciled; zero null `organization_id` across all 7 tables afterwards. `drizzle-kit check` clean; `verify-migrations-local` applies all 82 migrations twice, idempotent, on a disposable DB. Guard proven both ways on that DB: with a seeded orphan row it aborts with `Tenant cutover blocked: rows without an organization remain in saved_queries (1 rows) — run pnpm db:backfill:resources first`; with clean data it passes. Full `pnpm ci:local` green — 18 passed (migration integrity, drizzle-check, migrations, RLS, api-isolation, restore rehearsal, boundaries, route coverage, provider metering, lint, type-check, 3298 unit tests, dependency audit, build, a11y 44/44), 1 tolerated (`schema-audit`, `continue-on-error` in the workflow and failing before this change).
   - **Not done, needs the environment owner**: running `pnpm db:backfill:resources` against production behind a fresh restore point, and flipping `TENANT_READ_MODE`/`TENANT_CANONICAL_READY` surface by surface. Both are explicitly owner-gated by this plan's execution handoff.
 
-- [ ] **Contract legacy schema only after the compatibility window**
-  - Files: a new `drizzle/00XX_tenant_contract.sql` (the plan's original `0008` name is stale — numbering is past `0081`), `src/shared/lib/db/schema.ts`, `src/shared/lib/db/index.ts`, `src/shared/lib/migration/*`, `docs/operations/database-migrations.md`
-  - Do: In a separate release remove legacy per-user builder/tracking columns, user-keyed plan paths, redundant JSON relationship fields, and obsolete repositories only after fresh backup/restore, zero legacy access telemetry, and explicit maintainer approval. Use a new forward recovery migration for any failure; never edit applied migrations or restore owner credentials to runtime.
-  - Note (2026-07-27): the "dual-write/shadow code" half of this item is already done — `shadow-read.ts`, `dual-write.ts` and `migration-metrics.ts` were deleted with the cutover above. What remains is dropping the legacy `user_id` columns themselves, which stays blocked on the compatibility window and on production actually running in canonical read mode.
-  - Verify: fresh install and `0000`→latest upgrade produce identical schema fingerprints; code/search telemetry finds no legacy references; all security/static/build/runtime gates pass with only `builderhunt_app` in the web runtime.
+- [ ] **Classify the 45 unclassified tables**
+  - Files: `scripts/db/audit-schema.ts`, `plans/_meta/security-policy.md`
+  - Do: `pnpm db:audit-schema` reports 47 findings against 101 `pgTable`s, of which only 56 are
+    classified. Add an entry for each missing table with its data class, owner key, public DTO fields,
+    retention and owning plan — 19 `billing_*` tables, 5 abuse/risk tables (`abuse_signals`,
+    `account_risk`, `seat_usage_daily`, `session_signals`, `user_devices`) and 21 others
+    (`builder_embeddings`, `conversion_events`, `discovery_state`, `interview_*`, `candidate_*`,
+    `public_radars`, `public_surface_indexing`, …). Take each table's real owner from the plan that
+    created it, not a guess.
+  - Do (the other two findings): split `builders`' mixed global identity and private tracking, and
+    move `onboarding_progress`'s relationship IDs out of JSON into columns.
+  - Verify: `pnpm db:audit-schema` exits 0 with zero findings. Then remove its
+    `continue-on-error` from `.github/workflows/quality.yml`, so the next unclassified table fails CI
+    instead of being tolerated for months.
+  - Why it matters: `conventions.md` rule 4 requires every table to declare its data class, and
+    `security-policy.md` is binding for anything holding private data. 45 tables silently opted out,
+    including every credit and money table, because the gate is `continue-on-error` and nobody reads
+    a tolerated failure.
+
+The legacy-column contraction that used to sit here moved to
+[`30-stripe-billing-platform`](../30-stripe-billing-platform/tasks.md) on 2026-07-29. It cannot run
+before that plan: `plans` and `plan_requests` are still read and written by
+`src/shared/lib/repositories/platform-billing.ts` and `src/shared/lib/repositories/account-privacy.ts`,
+and 30 is what retires those paths. Keeping it here made phase-1 impossible to execute in order — an
+agent walking 01→54 reached it long before the work it depends on. Deliberately not a checkbox.
 
 - [x] **Make security policy a mandatory gate across the roadmap and CI**
   - Files: `plans/README.md`, `plans/_meta/conventions.md`, `plans/_meta/app-reality.md`, `plans/_meta/security-policy.md`, `.github/workflows/quality.yml`, `.github/CODEOWNERS`

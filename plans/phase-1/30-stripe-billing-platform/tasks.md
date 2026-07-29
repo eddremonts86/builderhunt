@@ -1747,3 +1747,15 @@ migration, dunning/recovery) implemented, tested, and committed.
   - Files: `docs/operations/stripe-live-rollout.md`, `docs/operations/stripe-live-readiness.md`, `.env.example`
   - Do: Verify live catalog read-only, enable webhook ingestion, then internal account, then one voluntary Danish customer, then percentage rollout. Observe successful charge, invoice, tax result, grant, refund, payout/FX facts, reconciliation, and rollback. Keep EU countries disabled.
   - Verify: readiness checklist and canary evidence are complete; rollback disables new mutations while reads/webhooks/refunds/reconciliation continue; only then set plan status `implemented` and unblock provider-backed interview rollout.
+
+## Phase 11 — retire the legacy plan tables (moved here 2026-07-29)
+
+- [ ] **Contract legacy schema only after the compatibility window**
+  - Files: a new `drizzle/00XX_tenant_contract.sql` (the plan's original `0008` name is stale — numbering is past `0081`), `src/shared/lib/db/schema.ts`, `src/shared/lib/db/index.ts`, `src/shared/lib/migration/*`, `docs/operations/database-migrations.md`
+  - Do: In a separate release remove legacy per-user builder/tracking columns, user-keyed plan paths, redundant JSON relationship fields, and obsolete repositories only after fresh backup/restore, zero legacy access telemetry, and explicit maintainer approval. Use a new forward recovery migration for any failure; never edit applied migrations or restore owner credentials to runtime.
+  - Note (2026-07-27): the "dual-write/shadow code" half of this item is already done — `shadow-read.ts`, `dual-write.ts` and `migration-metrics.ts` were deleted with the cutover above. What remains is dropping the legacy `user_id` columns themselves, which stays blocked on the compatibility window and on production actually running in canonical read mode.
+  - Verify: fresh install and `0000`→latest upgrade produce identical schema fingerprints; code/search telemetry finds no legacy references; all security/static/build/runtime gates pass with only `builderhunt_app` in the web runtime.
+  - Moved from `01-security-and-multitenancy` on 2026-07-29. It lives here because this plan is what
+    stops reading and writing `plans`/`plan_requests`; dropping the columns is the last step of that
+    retirement, not a separate schema exercise. Run it after this plan's other tasks, so the code no
+    longer touches the tables when they disappear.

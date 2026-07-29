@@ -1,10 +1,15 @@
 # Tasks: Shared Searches and Builder Lists
 
-> **Status**: `blocked`
+> **Status**: `pending` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md)
 > **Blocks**: [`activity-feed`](../29-activity-feed/tasks.md)
-> **Reality check**: do not implement until canonical tenant context, global builder identity,
-> organization tracking, entitlements, RLS, and Team organization-keyed cache are verified.
+> **Reality check (verified 2026-07-29 — the hold is lifted)**: this said "do not implement until
+> canonical tenant context, global builder identity, organization tracking, entitlements, RLS, and
+> Team organization-keyed cache are verified". All six were checked and hold: `withTenantContext`
+> (`src/shared/lib/db/tenant-context.ts`), the `builder_identities` and `organization_builders`
+> tables, `src/shared/lib/repositories/entitlements.ts`, RLS forced on 64 tables, and the
+> organization-keyed dashboard cache. `01` and `27` are closed apart from `01`'s legacy-column drop,
+> which touches nothing here. **Start at task 1.**
 
 - [ ] **Define shared-resource contracts and characterization tests**
   - Files: `src/shared/lib/shared-resources/contracts.ts`, `tests/unit/shared/lib/shared-resources/contracts.test.ts`, `tests/unit/security/shared-resources-characterization.test.ts`
