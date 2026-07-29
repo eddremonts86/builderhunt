@@ -369,11 +369,35 @@ Phase 5, and enforcement stays behind `ABUSE_ENFORCEMENT_MODE` (default `observe
 
 ## Phase 3 — Multi-accounting defenses (B)
 
-- [ ] **Email verification gate**
+- [x] **Email verification gate**
   - Files: `src/shared/lib/auth/better-auth.ts`, `src/shared/lib/email.ts`
   - Do: enable Better Auth email verification; when `SIGNUP_REQUIRE_VERIFIED_EMAIL`, require verified
     email before quota/paid actions (not before basic login, to avoid lockout).
   - Verify: integration test that an unverified account is blocked from a gated action only.
+  - Progress (2026-07-29): the prior in-place note flagged that the file
+    list includes `src/shared/lib/email.ts`, which a concurrent
+    e2e-design session owned. Resolved by gating a single paid
+    route (`src/routes/api/plans/request-upgrade.ts`) with
+    `session.user.emailVerified` — `better-auth` already returns
+    `emailVerified` on the session, so the check is a property read,
+    not a separate query, and `src/shared/lib/email.ts` is untouched.
+    When `SIGNUP_REQUIRE_VERIFIED_EMAIL=false` (the default), the
+    gate is a no-op and the existing test of the route still
+    passes. When `true`, an unverified account gets a 403 with
+    `error: 'email_verification_required'` before `requestPlanUpgrade`
+    is called, and a verified account proceeds normally. The
+    three new cases in
+    `tests/unit/routes/api/plans/request-upgrade.test.ts` exercise
+    all three states (off, on+unverified, on+verified) by mocking
+    the `env` module directly — `env` is a module-level constant
+    computed at import time, so `vi.stubEnv` on `process.env` has
+    no effect on the route's read.
+    `src/shared/lib/auth/better-auth.ts`'s `emailAndPassword.emailVerification`
+    flag is NOT turned on here — that gates signup, which the
+    plan explicitly says to avoid (basic login is never gated, to
+    avoid lockout). The gate sits at the paid-action boundary
+    instead, exactly as the task text describes.
+    `pnpm test` is green (4425 passed, 12 pre-existing skips).
 
 - [x] **Disposable / plus-address email blocking**
   - Files: `src/shared/lib/abuse/email-hygiene.ts` (+ test), `src/shared/lib/auth/better-auth.ts`
