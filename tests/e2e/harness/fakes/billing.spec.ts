@@ -6,9 +6,9 @@
  * E2E runner process.
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import {
   currentBillingScenario,

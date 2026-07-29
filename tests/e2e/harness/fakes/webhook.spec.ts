@@ -13,9 +13,9 @@
  */
 import { test, expect } from 'playwright/test'
 import Stripe from 'stripe'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { signStripeWebhook, stripeEventFixture } from './webhook'
 

@@ -7,9 +7,9 @@
  * `fetch` identity.
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { evaluateEgress, resolveAllowlist } from './_allowlist'
 import { EgressBlockedError, installEgressGuard, isEgressGuardInstalled, uninstallEgressGuard } from './egress'

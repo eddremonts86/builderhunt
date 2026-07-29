@@ -26,11 +26,11 @@
  */
 import { test, expect, type Page } from 'playwright/test'
 import postgres, { type Sql } from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 
 // Plain Node process — nothing auto-loads .env for the direct-DB admin
 // connection used by the harness teardown.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from './harness/cache'

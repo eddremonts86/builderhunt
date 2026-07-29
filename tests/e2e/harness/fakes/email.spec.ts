@@ -4,9 +4,9 @@
  * under `e2e/` run under the Playwright runner, same as isolation.spec.ts).
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import {
   installEmailFake,

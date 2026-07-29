@@ -20,13 +20,12 @@
  * does. Serial mode keeps the env-var scenario switches race-free.
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './load-env'
 
 // `.env` first, `.env.local` layered on top — the same precedence the app
 // under test uses, so the runner signs webhooks with the exact secret the
 // server verifies against.
-loadEnv({ path: '.env' })
-loadEnv({ path: '.env.local', override: true })
+loadHarnessEnv()
 
 import { e2eEnv } from './env'
 import { uniqueId } from './ids'

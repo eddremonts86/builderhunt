@@ -1,6 +1,6 @@
 import { test, expect, type Page, type BrowserContext } from 'playwright/test'
 import postgres from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 import { dismissOverlays, gotoHydrated, waitForHydration } from './harness/browser'
 
 // This spec file runs as a plain Node process, not through vite/vitest —
@@ -8,7 +8,7 @@ import { dismissOverlays, gotoHydrated, waitForHydration } from './harness/brows
 // so direct-DB seeding below would otherwise fall back to postgres's own
 // default connection (the OS user, no password) instead of the real local
 // database.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 /**
  * Real-browser coverage of the team-accounts release matrix: switch, create,

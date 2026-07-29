@@ -8,9 +8,9 @@
  * per the harness's no-arbitrary-waits rule).
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import {
   resetDiscoveryFakes,

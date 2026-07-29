@@ -2,9 +2,9 @@
  * Wave 1 Task 4 — AI-task fake unit tests (Playwright-run, node-only).
  */
 import { test, expect } from 'playwright/test'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { aiTaskScenarioFailureShape, resetAITaskScenario, setAITaskScenario } from './ai'
 

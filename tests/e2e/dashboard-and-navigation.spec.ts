@@ -26,10 +26,10 @@ import { test, expect as baseExpect, type Browser, type BrowserContext, type Pag
 // default under that contention. Still bounded, never a fixed delay.
 const expect = baseExpect.configure({ timeout: 15_000 })
 import postgres, { type Sql } from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 
 // Plain Node process — nothing auto-loads `.env` the way vite/vitest do.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace, redis } from './harness/cache'

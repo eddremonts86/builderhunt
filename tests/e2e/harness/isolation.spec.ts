@@ -14,11 +14,11 @@
  */
 import { test, expect } from 'playwright/test'
 import postgres from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './load-env'
 
 // Pure-Node spec — no vite/vitest to auto-load .env, so direct-DB
 // connection needs DATABASE_MIGRATION_URL.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import {
   acquireWorkerDatabase,

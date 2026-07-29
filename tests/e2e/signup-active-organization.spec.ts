@@ -1,10 +1,10 @@
 import { test, expect } from 'playwright/test'
 import postgres from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 
 // Same rationale as team-accounts.spec.ts: this file runs as a plain Node
 // process, not through vite/vitest, so nothing auto-loads `.env` here.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 function uniqueEmail(label: string): string {
   return `e2e-${label}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.test`

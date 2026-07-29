@@ -10,10 +10,10 @@
  */
 import { test, expect, type Browser, type Page } from 'playwright/test'
 import postgres, { type Sql } from 'postgres'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 
 // Pure-Node spec — no vite/vitest to auto-load .env.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from './harness/cache'
@@ -382,11 +382,15 @@ test.describe('ToS acceptance lifecycle', () => {
       await expect(modal).toBeHidden()
 
       // The acceptance is durable: recorded in user_consents…
+      //
+      // Asserted against the current version, never a literal. Pinning `'v1.0'` is what broke this
+      // when terms moved to v1.1 for the interview sections: the app correctly records what the user
+      // was shown, and the test was the only thing still claiming v1.0.
       const rows = await sql<{ version: string }[]>`
         select version from user_consents
         where user_id = ${tosUser.userId!} and document = 'tos'
       `
-      expect(rows.map((r) => r.version)).toContain('v1.0')
+      expect(rows.map((r) => r.version)).toContain(CURRENT_CONSENT_VERSIONS.tos)
 
       // …and a full reload no longer shows the modal.
       await page.reload()
@@ -397,7 +401,7 @@ test.describe('ToS acceptance lifecycle', () => {
     const status = await tosUser.api!.get('/api/consent')
     const body = await status.json()
     expect(body.needsAcceptance).not.toContain('tos')
-    expect(body.consents.tos).toBe('v1.0')
+    expect(body.consents.tos).toBe(CURRENT_CONSENT_VERSIONS.tos)
   })
 
   test('anonymous visitors are never blocked by the ToS modal', async ({ browser }) => {

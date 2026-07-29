@@ -14,9 +14,9 @@
 import { test, expect, type Browser, type Page } from 'playwright/test'
 import postgres, { type Sql } from 'postgres'
 import Redis from 'ioredis'
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from './harness/load-env'
 
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from './harness/cache'

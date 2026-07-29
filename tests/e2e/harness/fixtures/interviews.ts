@@ -24,7 +24,7 @@
  * email sender routes into the outbox and returns the whole link, which is the
  * only seam that exists, and the only one the candidate flow can use.
  */
-import { config as loadEnv } from 'dotenv'
+import { loadHarnessEnv } from '../load-env'
 import type { APIRequestContext } from 'playwright/test'
 import { request } from 'playwright/test'
 import postgres, { type Sql } from 'postgres'
@@ -33,7 +33,7 @@ import postgres, { type Sql } from 'postgres'
 // needs the five database URLs. Loading here rather than in each spec keeps the
 // import order from mattering: `e2eEnv()` reads `process.env` when it is called,
 // which is inside `startInterviewHarness`, long after this line has run.
-loadEnv({ path: '.env' })
+loadHarnessEnv()
 
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from '../cache'
 import { ensureFixedTimeEnv, fixedClockFromEnv, type FixedClock } from '../clock'
