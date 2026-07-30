@@ -202,10 +202,24 @@ async function checksumBillingFixture(client: ReturnType<typeof postgres>) {
 async function restore(source: string, target: string) {
   const sourceConfig = connectionConfig(source)
   const targetConfig = connectionConfig(target)
-  const dump = spawn(process.env.PG_DUMP_BIN ?? 'pg_dump', [
+  // `pg_dump` must match the server major version. The local dev
+  // environment has the app database inside a Docker container
+  // (pg18+); if the host's `pg_dump` is older (e.g. Homebrew pg16
+  // on macOS) it refuses with "server version mismatch" and the
+  // rehearsal reports a spurious failure. In that case we fall
+  // back to running `pg_dump` / `pg_restore` *inside* the container
+  // via `docker exec`, which always has the matching client.
+  //
+  // The override env vars `PG_DUMP_BIN` and `PG_RESTORE_BIN` win
+  // over this auto-detection so CI / prod can pin a specific
+  // pg-client image (e.g. `ghcr.io/example/pg18-client`) without
+  // needing Docker on the host.
+  const serverVersion = await detectServerMajorVersion(sourceConfig)
+  const { dumpBin, restoreBin } = await resolveClientBins(serverVersion, sourceConfig)
+  const dump = spawn(dumpBin, [
     '--format=custom', '--no-owner', '--no-acl', sourceConfig.database,
   ], { env: { ...process.env, ...sourceConfig.environment }, stdio: ['ignore', 'pipe', 'pipe'] })
-  const restoreProcess = spawn(process.env.PG_RESTORE_BIN ?? 'pg_restore', [
+  const restoreProcess = spawn(restoreBin, [
     '--clean', '--if-exists', '--no-owner', '--no-acl', '--exit-on-error', '--dbname', targetConfig.database,
   ], { env: { ...process.env, ...targetConfig.environment }, stdio: ['pipe', 'ignore', 'pipe'] })
   dump.stdout.pipe(restoreProcess.stdin)
@@ -215,6 +229,109 @@ async function restore(source: string, target: string) {
   ])
   if (dumpResult !== 0) throw new Error('pg_dump failed during restore rehearsal')
   if (restoreResult !== 0) throw new Error('pg_restore failed during restore rehearsal')
+}
+
+/**
+ * Read the server's `server_version_num` so we know which pg_dump
+ * major version we need. Returns `null` on failure — the caller
+ * then proceeds with the host's `pg_dump` and may surface a
+ * version-mismatch error from pg_dump itself, which is still
+ * more informative than a script-level guess.
+ */
+async function detectServerMajorVersion(config: ReturnType<typeof connectionConfig>): Promise<number | null> {
+  const probe = spawn('psql', [
+    '--no-psqlrc', '--no-align', '--tuples-only', '--command', 'show server_version_num',
+    config.database,
+  ], { env: { ...process.env, ...config.environment }, stdio: ['ignore', 'pipe', 'pipe'] })
+  let stdout = ''
+  let stderr = ''
+  probe.stdout?.on('data', (chunk) => { stdout += String(chunk) })
+  probe.stderr?.on('data', (chunk) => { stderr += String(chunk) })
+  const code: number = await new Promise((resolve) => probe.on('close', (c) => resolve(c ?? 1)))
+  if (code !== 0) return null
+  const trimmed = stdout.trim()
+  const num = Number.parseInt(trimmed, 10)
+  if (Number.isNaN(num)) return null
+  // `server_version_num` is YYYYMM (e.g. 180004 for 18.4). The major
+  // version is the first two digits.
+  return Math.floor(num / 10000)
+}
+
+/**
+ * Read the host's `pg_dump --version` and return its major version,
+ * or `null` if it cannot be determined.
+ */
+async function detectClientMajorVersion(bin: string): Promise<number | null> {
+  const probe = spawn(bin, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let stdout = ''
+  probe.stdout?.on('data', (chunk) => { stdout += String(chunk) })
+  const code: number = await new Promise((resolve) => probe.on('close', (c) => resolve(c ?? 1)))
+  if (code !== 0) return null
+  const match = /(\d+)(?:\.\d+)?/.exec(stdout)
+  return match ? Number.parseInt(match[1], 10) : null
+}
+
+/**
+ * Pick the `pg_dump` / `pg_restore` binaries the rehearsal should
+ * use. Priority:
+ *   1. Explicit `PG_DUMP_BIN` / `PG_RESTORE_BIN` env vars.
+ *   2. If the host's `pg_dump` is older than the server, fall
+ *      back to `docker exec` into the container named
+ *      `BUILDERHUNT_DB_CONTAINER` (default `builderhunt-db`).
+ *   3. Otherwise the host's `pg_dump` / `pg_restore`.
+ *
+ * In CI / prod, set `PG_DUMP_BIN` to a `pg_dump` whose major
+ * version matches the server and step 1 wins. In local dev with
+ * Docker, step 2 is automatic.
+ */
+async function resolveClientBins(
+  serverMajor: number | null,
+  config: ReturnType<typeof connectionConfig>,
+): Promise<{ dumpBin: string; restoreBin: string }> {
+  const explicitDump = process.env.PG_DUMP_BIN
+  const explicitRestore = process.env.PG_RESTORE_BIN
+  if (explicitDump && explicitRestore) {
+    return { dumpBin: explicitDump, restoreBin: explicitRestore }
+  }
+  if (serverMajor === null) {
+    return { dumpBin: explicitDump ?? 'pg_dump', restoreBin: explicitRestore ?? 'pg_restore' }
+  }
+  const hostDump = explicitDump ?? 'pg_dump'
+  const hostRestore = explicitRestore ?? 'pg_restore'
+  const hostDumpMajor = await detectClientMajorVersion(hostDump)
+  if (hostDumpMajor !== null && hostDumpMajor >= serverMajor) {
+    return { dumpBin: hostDump, restoreBin: hostRestore }
+  }
+  // Host client is too old. Try the Docker fallback.
+  const container = process.env.BUILDERHUNT_DB_CONTAINER ?? 'builderhunt-db'
+  if (await isDockerContainerRunning(container)) {
+    return {
+      dumpBin: explicitDump ?? dockerExecBin(container, 'pg_dump'),
+      restoreBin: explicitRestore ?? dockerExecBin(container, 'pg_restore'),
+    }
+  }
+  throw new Error(
+    `pg_dump major version (${hostDumpMajor ?? 'unknown'}) is older than the server ` +
+    `(major ${serverMajor}). Install postgresql-client-${serverMajor} or set PG_DUMP_BIN / ` +
+    `PG_RESTORE_BIN to a matching client.`,
+  )
+}
+
+function dockerExecBin(container: string, cmd: string): string {
+  // `spawn` passes the rest of the args after the binary name, so
+  // we wrap `docker exec` in a small shell that adds the container
+  // and the requested command.
+  return `docker exec ${container} ${cmd}`
+}
+
+async function isDockerContainerRunning(container: string): Promise<boolean> {
+  const probe = spawn('docker', ['inspect', '--type=container', container], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  return new Promise((resolve) => {
+    probe.on('error', () => resolve(false))
+    probe.on('close', (code) => resolve(code === 0))
+  })
 }
 
 function connectionConfig(value: string) {

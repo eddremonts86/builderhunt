@@ -2,7 +2,7 @@
 // Every function here uses `publicDb` directly — never `withTenantContext` —
 // since this table has no organizationId (public profile data, shared across
 // all users). See schema.ts's "Semantic Search" section comment.
-import { asc, cosineDistance, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, cosineDistance, eq, isNotNull, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { builderEmbeddings } from '../db/schema'
@@ -31,7 +31,23 @@ export interface UpsertBuilderEmbeddingStubInput {
  * `plans/phase-1/03-postgres-18-upgrade/spec.md` §3B.
  */
 export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingStubInput): Promise<boolean> {
-  const rows = await publicDb
+  // The RETURNING clause of an UPSERT cannot reference the `excluded`
+  // pseudo-table (it's only available in the SET clause). To return
+  // "did the content change", we read the existing content_hash FIRST
+  // (if any), then run the upsert, then compare the hash that was
+  // actually written. The read is bounded by the unique index on
+  // (source, source_id) so it is O(1).
+  const [existing] = await publicDb
+    .select({ contentHash: builderEmbeddings.contentHash })
+    .from(builderEmbeddings)
+    .where(
+      and(
+        eq(builderEmbeddings.source, input.source),
+        eq(builderEmbeddings.sourceId, input.sourceId),
+      ),
+    )
+    .limit(1)
+  await publicDb
     .insert(builderEmbeddings)
     .values({
       id: randomId(),
@@ -52,8 +68,11 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
         embeddedAt: sql`case when ${builderEmbeddings.contentHash} = excluded.content_hash then ${builderEmbeddings.embeddedAt} else null end`,
       },
     })
-    .returning({ contentChanged: sql<boolean>`${builderEmbeddings.contentHash} is distinct from excluded.content_hash` })
-  return rows[0]?.contentChanged ?? true
+  // TRUE when the row is new (no prior content_hash) or the hash
+  // actually changed. FALSE when we re-indexed the same content —
+  // the SET clause's guard kept the embedding/embeddedAt columns
+  // intact, so the indexer does not need to re-embed.
+  return existing === undefined || existing.contentHash !== input.contentHash
 }
 
 export interface PendingBuilderEmbedding {

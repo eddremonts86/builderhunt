@@ -56,8 +56,9 @@ function actorLabel(actorUserId: string | null): string {
 
 export function TeamActivityWidget({ rows, loading, error }: TeamActivityWidgetProps) {
   const [density] = useBentoDensity()
-  const compact = density === 'compact'
-  const displayRows = compact ? rows.slice(0, 3) : rows.slice(0, 6)
+  // `density` is `'bento' | 'sections'` — both are full-size variants, the
+  // difference is layout, not row count. Always show the same number of rows.
+  const displayRows = rows.slice(0, density === 'bento' ? 6 : 6)
 
   const groups = React.useMemo(() => {
     const byDay = new Map<string, ActivityRowDTO[]>()
@@ -111,7 +112,7 @@ export function TeamActivityWidget({ rows, loading, error }: TeamActivityWidgetP
             </div>
           ))}
           <Link
-            to="/_dashboard/team/activity"
+            to="/team/activity"
             className="text-xs text-bh-accent hover:underline inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
             data-testid="team-activity-show-all"
           >

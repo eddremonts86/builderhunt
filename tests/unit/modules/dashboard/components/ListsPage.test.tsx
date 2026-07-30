@@ -47,7 +47,7 @@ afterEach(() => {
   host.remove()
 })
 
-function renderLists(props: { initialLists: BuilderList[]; currentUser: { userId: string; role: 'owner' | 'admin' | 'member' } }) {
+function renderLists(props: { initialLists: BuilderList[]; currentUser: { userId: string; organizationId: string; role: 'owner' | 'admin' | 'member' } }) {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -100,13 +100,13 @@ function submitForm(form: HTMLFormElement) {
 
 describe('ListsPage', () => {
   it('renders the empty state when there are no lists', () => {
-    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
     expect(host.querySelector('[data-testid="lists-empty"]')).toBeTruthy()
   })
 
   it('renders a private list with the Private badge and a delete button for the creator', () => {
     const list = makeList({ name: 'My private list', visibility: 'private', createdByUserId: 'u-1' })
-    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
 
     const badge = host.querySelector(`[data-testid="list-visibility-badge-${list.id}"]`)
     expect(badge?.textContent).toContain('Private')
@@ -119,7 +119,7 @@ describe('ListsPage', () => {
       visibility: 'organization',
       createdByUserId: 'u-other',
     })
-    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', role: 'admin' } })
+    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'admin' } })
 
     const badge = host.querySelector(`[data-testid="list-visibility-badge-${list.id}"]`)
     expect(badge?.textContent).toContain('Team')
@@ -132,7 +132,7 @@ describe('ListsPage', () => {
       visibility: 'organization',
       createdByUserId: 'u-other',
     })
-    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', role: 'member' } })
+    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'member' } })
 
     expect(host.querySelector(`[data-testid="list-delete-${list.id}"]`)).toBeNull()
   })
@@ -143,13 +143,13 @@ describe('ListsPage', () => {
       visibility: 'private',
       createdByUserId: 'u-other',
     })
-    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [list], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
 
     expect(host.querySelector(`[data-testid="list-delete-${list.id}"]`)).toBeNull()
   })
 
   it('opens the create form when the New shortlist button is clicked', () => {
-    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
 
     const button = host.querySelector('[data-testid="new-list-button"]') as HTMLElement
     click(button)
@@ -170,7 +170,7 @@ describe('ListsPage', () => {
       } as Response
     })
 
-    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
 
     const button = host.querySelector('[data-testid="new-list-button"]') as HTMLElement
     click(button)
@@ -207,7 +207,7 @@ describe('ListsPage', () => {
       json: async () => ({ error: 'Upgrade to Pro' }),
     } as Response)
 
-    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', role: 'owner' } })
+    const host = renderLists({ initialLists: [], currentUser: { userId: 'u-1', organizationId: 'org-1', role:'owner' } })
 
     const button = host.querySelector('[data-testid="new-list-button"]') as HTMLElement
     click(button)

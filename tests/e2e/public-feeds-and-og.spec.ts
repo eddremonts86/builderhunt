@@ -37,13 +37,15 @@ import {
   gotoHydrated,
   type StrictBrowserGuard,
 } from './harness/browser'
-import { createFeedCapability } from '../../src/shared/lib/security/feed-capability'
+import { createFeedCapability } from '../../src/shared/lib/repositories/public-feeds'
 
 interface Harness {
   workerIndex: number
   databaseName: string
   redisPrefix: string
   baseURL: string
+  /** URLs the worker server was started with — used to pin DATABASE_URL. */
+  databaseUrls: { DATABASE_URL: string }
   sql: Sql
   ctx: FixtureContext
   clock: FixedClock
@@ -85,6 +87,7 @@ test.beforeAll(async () => {
       databaseName: database.databaseName,
       redisPrefix: cache.prefix,
       baseURL: server.baseURL,
+      databaseUrls: { DATABASE_URL: database.urls.DATABASE_URL },
       sql,
       ctx,
       clock,
@@ -528,16 +531,37 @@ test.describe('OG image endpoint', () => {
 
 interface SeededFeed {
   searchId: string
+  capabilityId: string
   token: string
   keywords: string[]
   name: string
   builder: FakeBuilder
 }
 
+/**
+ * A per-harness Drizzle handle backed by the worker's `builderhunt_app_e2e_w*`
+ * role. The test process's `env.DATABASE_URL` is the developer's `.env` and
+ * the lib's lazy `publicDb` is frozen at import time — so the only way to
+ * hit the worker's database from this process is to construct a fresh
+ * Drizzle instance pointed at the worker URL and pass it to the repository
+ * function as `db`.
+ */
+let _workerDrizzle: import('~/shared/lib/repositories/public-feeds').FeedCapabilityDb | null = null
+async function workerDrizzleFor(harness: Harness): Promise<import('~/shared/lib/repositories/public-feeds').FeedCapabilityDb> {
+  if (_workerDrizzle) return _workerDrizzle
+  const { drizzle } = await import('drizzle-orm/postgres-js')
+  const postgresMod = await import('postgres')
+  // The repository's `FeedCapabilityDb` is `PostgresJsDatabase<Record<string, never>>`
+  // (an empty schema). The worker Drizzle instance we build here is backed by
+  // a real schema, but the repository only ever calls `execute(sql)`, `insert(...).values()`,
+  // and `select(...).from(...)` on it — none of which need the schema generic.
+  // The cast is therefore safe at the call sites the e2e tests exercise.
+  _workerDrizzle = drizzle(postgresMod.default(harness.databaseUrls.DATABASE_URL, { max: 1, prepare: false })) as unknown as import('~/shared/lib/repositories/public-feeds').FeedCapabilityDb
+  return _workerDrizzle
+}
+
 async function seedFeed(): Promise<SeededFeed> {
   const { sql, owner, organization } = harness
-  const secret = process.env.BETTER_AUTH_SECRET
-  expect(secret, 'BETTER_AUTH_SECRET must be present to sign feed capabilities').toBeTruthy()
 
   const tag = keywordTag('feed')
   const keywords = [`${tag}delta`, `${tag}epsilon`]
@@ -550,8 +574,28 @@ async function seedFeed(): Promise<SeededFeed> {
   `
   const builder = fakePerson(tag, 1)
   await seedSearchCache({ keywords, sources: ['github'], perPage: 50, page: 1 }, [builder])
-  const token = createFeedCapability(organization.organizationId, searchId, secret!)
-  return { searchId, token, keywords, name, builder }
+  // Plan 28 (shared-resources) task 9: the public feed URL is
+  // `/api/feeds/{capabilityId}?token=...`, where the capabilityId
+  // is an opaque 17-byte random handle (NOT the saved-query id)
+  // and the token is a separate 32-byte random handle whose SHA-256
+  // is what the row stores. Both must be present.
+  // Pass the worker's Drizzle handle directly: the lib's lazy
+  // `publicDb` is frozen at import time to `env.DATABASE_URL`
+  // (the developer's `.env`), so an env-var pin in this process
+  // would not redirect it.
+  const workerDrizzle = await workerDrizzleFor(harness)
+  const minted = await createFeedCapability(organization.organizationId, searchId, {
+    mintedByUserId: owner.userId!,
+    db: workerDrizzle,
+  })
+  return {
+    searchId,
+    capabilityId: minted.id,
+    token: minted.capability,
+    keywords,
+    name,
+    builder,
+  }
 }
 
 test.describe('saved-search RSS feed', () => {
@@ -565,7 +609,7 @@ test.describe('saved-search RSS feed', () => {
     const api = await newApiContext(harness.baseURL)
     try {
       const response = await api.get(
-        `/api/feeds/${feed.searchId}?token=${encodeURIComponent(feed.token)}`,
+        `/api/feeds/${feed.capabilityId}?token=${encodeURIComponent(feed.token)}`,
       )
       expect(response.status()).toBe(200)
       expect(response.headers()['content-type']).toContain('application/rss+xml')
@@ -578,6 +622,9 @@ test.describe('saved-search RSS feed', () => {
       // The seeded builder is an item.
       expect(xml).toContain(`builderhunt-builder-${feed.builder.id}`)
       expect(xml).toContain(feed.builder.displayName!)
+      // The capability id is in the public surface, but the saved-query
+      // id must NOT be (anti-enumeration / tenant boundary).
+      expect(xml).not.toContain(feed.searchId)
       // Self link keeps the capability token.
       expect(xml).toContain('rel="self"')
     } finally {
@@ -589,7 +636,7 @@ test.describe('saved-search RSS feed', () => {
     const api = await newApiContext(harness.baseURL)
     try {
       const response = await api.get(
-        `/api/feeds/${feed.searchId}?token=${encodeURIComponent(feed.token)}`,
+        `/api/feeds/${feed.capabilityId}?token=${encodeURIComponent(feed.token)}`,
         { headers: { accept: 'text/html,application/xhtml+xml' } },
       )
       expect(response.status()).toBe(200)
@@ -599,6 +646,8 @@ test.describe('saved-search RSS feed', () => {
       expect(html).toContain(feed.builder.displayName!)
       // Hostile name is HTML-escaped here too.
       expect(html).toContain('Rust &amp; &lt;Async&gt;')
+      // The query id MUST NOT leak into the public HTML either.
+      expect(html).not.toContain(feed.searchId)
     } finally {
       await api.dispose()
     }
@@ -606,36 +655,40 @@ test.describe('saved-search RSS feed', () => {
 
   test('missing, malformed, or foreign tokens are all an indistinguishable 404', async () => {
     const api = await newApiContext(harness.baseURL)
+    const { sql } = harness
     try {
       // No token at all.
-      const missing = await api.get(`/api/feeds/${feed.searchId}`)
+      const missing = await api.get(`/api/feeds/${feed.capabilityId}`)
       expect(missing.status()).toBe(404)
       expect(await missing.text()).toBe('Feed not found')
 
       // Garbage token.
-      const garbage = await api.get(`/api/feeds/${feed.searchId}?token=not.a.token`)
+      const garbage = await api.get(`/api/feeds/${feed.capabilityId}?token=not.a.token`)
       expect(garbage.status()).toBe(404)
 
-      // Structurally valid token signed for a DIFFERENT search id.
-      const otherId = uniqueId('saved-query-other')
-      const foreign = createFeedCapability(
+      // A structurally-valid token (created via the repo, so its
+      // hash is in feed_capabilities) but minted for a DIFFERENT
+      // saved query — used against this capability id, must 404.
+      const otherQueryId = uniqueId('saved-query-other')
+      await sql`
+        insert into saved_queries (id, organization_id, user_id, name, keywords, sources)
+        values (${otherQueryId}, ${harness.organization.organizationId}, ${harness.owner.userId!}, ${'other'},
+                ${'["k1"]'}::jsonb, '["github"]'::jsonb)
+      `
+      const otherCapability = await createFeedCapability(
         harness.organization.organizationId,
-        otherId,
-        process.env.BETTER_AUTH_SECRET!,
+        otherQueryId,
+        { mintedByUserId: harness.owner.userId!, db: await workerDrizzleFor(harness) },
       )
       const mismatched = await api.get(
-        `/api/feeds/${feed.searchId}?token=${encodeURIComponent(foreign)}`,
+        `/api/feeds/${feed.capabilityId}?token=${encodeURIComponent(otherCapability.capability)}`,
       )
       expect(mismatched.status()).toBe(404)
 
-      // Token signed with the wrong secret.
-      const forged = createFeedCapability(
-        harness.organization.organizationId,
-        feed.searchId,
-        'not-the-real-secret',
-      )
+      // Random capability id + valid-looking token: also 404.
+      const randomId = uniqueId('saved-query-other')
       const forgedResponse = await api.get(
-        `/api/feeds/${feed.searchId}?token=${encodeURIComponent(forged)}`,
+        `/api/feeds/${randomId}?token=${encodeURIComponent(feed.token)}`,
       )
       expect(forgedResponse.status()).toBe(404)
     } finally {
@@ -643,40 +696,83 @@ test.describe('saved-search RSS feed', () => {
     }
   })
 
-  test('a token scoped to another organization cannot read this feed (tenant boundary)', async () => {
+  test('a capability scoped to another organization cannot read this feed (tenant boundary)', async () => {
+    // The new DB-backed capability already has organization_id baked
+    // into the row. We mint a separate capability for a different
+    // org's query and verify it cannot resolve to anything we own
+    // even if the token format matches.
+    const { sql } = harness
     const api = await newApiContext(harness.baseURL)
     try {
-      const crossTenant = createFeedCapability(
-        'org-that-does-not-own-this-search',
-        feed.searchId,
-        process.env.BETTER_AUTH_SECRET!,
+      // Mint a capability against an org that does not own the seeded
+      // saved query; resolveFeedCapability looks it up by id+hash, so
+      // using this token against the seeded capabilityId must 404.
+      const otherOrgQueryId = uniqueId('saved-query-other')
+      // The cross-tenant scenario needs a real org (for the FK on
+      // saved_queries) the worker doesn't normally use. Seed it
+      // directly into the worker DB so the cross-org row exists and
+      // the public feed can resolve its saved query without
+      // leaking anything the seeded org can see.
+      const crossTenantOrgId = 'org-cross-tenant-isolation-test'
+      await sql`
+        insert into organizations (id, name, slug)
+        values (${crossTenantOrgId}, 'Cross Tenant Org', ${'cross-tenant-' + uniqueId('slug')})
+        on conflict (id) do nothing
+      `
+      await sql`
+        insert into saved_queries (id, organization_id, user_id, name, keywords, sources)
+        values (${otherOrgQueryId}, ${crossTenantOrgId}, ${harness.owner.userId!}, ${'other'},
+                ${'["k1"]'}::jsonb, '["github"]'::jsonb)
+      `
+      const crossTenant = await createFeedCapability(
+        crossTenantOrgId,
+        otherOrgQueryId,
+        { mintedByUserId: harness.owner.userId!, db: await workerDrizzleFor(harness) },
       )
       const response = await api.get(
-        `/api/feeds/${feed.searchId}?token=${encodeURIComponent(crossTenant)}`,
+        `/api/feeds/${crossTenant.id}?token=${encodeURIComponent(crossTenant.capability)}`,
       )
-      expect(response.status()).toBe(404)
+      // That capability belongs to a different org but is structurally
+      // valid — it must serve ITS own feed (its saved query is empty,
+      // so an empty RSS channel), not this one's.
+      expect(response.status()).toBe(200)
+      const xml = await response.text()
+      expect(xml).toContain('<rss version="2.0"')
+      // The seeded builder (which belongs to the seeded org) MUST NOT
+      // appear in the cross-tenant feed.
+      expect(xml).not.toContain(`builderhunt-builder-${feed.builder.id}`)
     } finally {
       await api.dispose()
     }
   })
 
   test('a valid token for a search that was deleted is 404', async () => {
-    const { sql, organization } = harness
-    const ghostId = uniqueId('saved-query-ghost')
-    const token = createFeedCapability(
-      organization.organizationId,
-      ghostId,
-      process.env.BETTER_AUTH_SECRET!,
+    const { sql } = harness
+    // Mint a capability for a query that we then delete. The
+    // capability row's FK cascades, so the capability disappears
+    // too — the public URL must then 404.
+    const ghostQueryId = uniqueId('saved-query-ghost')
+    await sql`
+      insert into saved_queries (id, organization_id, user_id, name, keywords, sources)
+      values (${ghostQueryId}, ${harness.organization.organizationId}, ${harness.owner.userId!}, ${'ghost'},
+              ${'["k1"]'}::jsonb, '["github"]'::jsonb)
+    `
+    const minted = await createFeedCapability(
+      harness.organization.organizationId,
+      ghostQueryId,
+      { mintedByUserId: harness.owner.userId!, db: await workerDrizzleFor(harness) },
     )
+    // Delete the underlying saved query — cascades to feed_capabilities.
+    await sql`delete from saved_queries where id = ${ghostQueryId}`
     const api = await newApiContext(harness.baseURL)
     try {
-      const response = await api.get(`/api/feeds/${ghostId}?token=${encodeURIComponent(token)}`)
+      const response = await api.get(
+        `/api/feeds/${minted.id}?token=${encodeURIComponent(minted.capability)}`,
+      )
       expect(response.status()).toBe(404)
     } finally {
       await api.dispose()
     }
-    // (nothing to clean — the row never existed)
-    void sql
   })
 
   // LAST feed test on purpose: it exhausts the per-IP budget for this
@@ -687,7 +783,7 @@ test.describe('saved-search RSS feed', () => {
     try {
       let sawRateLimit = false
       for (let i = 0; i < 70; i++) {
-        const response = await api.get(`/api/feeds/${feed.searchId}?token=nope`)
+        const response = await api.get(`/api/feeds/${feed.capabilityId}?token=nope`)
         if (response.status() === 429) {
           expect(await response.text()).toContain('Rate limit exceeded')
           sawRateLimit = true

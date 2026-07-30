@@ -13,6 +13,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Lock, Plus, Trash2, Users } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { Input } from '~/components/ui/input'
+import { can, type TenantPrincipal } from '~/shared/lib/authorization/permissions'
 
 export interface BuilderList {
   id: string
@@ -27,6 +28,7 @@ export interface BuilderList {
 
 export interface CurrentUser {
   userId: string
+  organizationId: string
   role: 'owner' | 'admin' | 'member'
 }
 
@@ -36,9 +38,14 @@ export interface ListsPageProps {
 }
 
 function canDeleteList(list: BuilderList, currentUser: CurrentUser): boolean {
-  if (list.createdByUserId === currentUser.userId) return true
-  const elevated = currentUser.role === 'owner' || currentUser.role === 'admin'
-  return list.visibility === 'organization' && elevated
+  // The principal-scoped `can()` does the same check the API
+  // enforces, and the ratchet refuses raw role-string compares
+  // in dashboard UI — it stays the single source of truth.
+  const principal = currentUser as unknown as TenantPrincipal
+  return can(principal, 'resource:delete', {
+    creatorUserId: list.createdByUserId,
+    visibility: list.visibility,
+  })
 }
 
 export function ListsPage({ initialLists, currentUser }: ListsPageProps) {

@@ -334,7 +334,7 @@ export interface CreateBillingCheckoutAttemptInput {
 export interface BillingCheckoutAttemptRecord {
   id: string
   organizationId: string
-  actorUserId: string
+  actorUserId: string | null
   action: string
   catalogKey: string
   idempotencyKey: string
@@ -429,7 +429,7 @@ export async function findLatestBillingCheckoutAttempt(
 export interface BillingTermsAcceptanceRecord {
   id: string
   organizationId: string
-  actorUserId: string
+  actorUserId: string | null
   termsVersion: string
   privacyVersion: string
   commercialAction: string

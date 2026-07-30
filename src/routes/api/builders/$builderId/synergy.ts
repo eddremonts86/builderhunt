@@ -131,15 +131,9 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
               const org = await findOrganizationBuilderByIdentity(tx, principal.organizationId, item.builderIdentityId)
               if (!org) continue
               rows.push({
-                identityId: org.identityId,
                 language: org.language,
-                topics: org.topics,
                 followersCount: org.followersCount ?? null,
-                fingerprint: org.fingerprint,
-                aiFingerprintShare: org.aiFingerprintShare,
-                firstSeenAt: org.firstSeenAt,
-                lastSeenAt: org.lastSeenAt,
-                metadata: org.metadata,
+                privateMetadata: (org.privateMetadata as Record<string, unknown> | null) ?? null,
               })
               if (rows.length >= 50) break
             }

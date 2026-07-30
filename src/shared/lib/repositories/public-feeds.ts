@@ -72,23 +72,38 @@ export async function createFeedCapability(
   const id = newCapabilityId()
   const token = randomBytes(TOKEN_BYTES).toString('base64url')
   const hash = hashToken(token)
-  const [row] = await db
-    .insert(feedCapabilities)
-    .values({
-      id,
-      organizationId,
-      queryId,
-      capabilityHash: hash,
-      expiresAt: options.expiresAt ?? null,
-    })
-    .returning({
-      id: feedCapabilities.id,
-      organizationId: feedCapabilities.organizationId,
-      queryId: feedCapabilities.queryId,
-      createdAt: feedCapabilities.createdAt,
-      expiresAt: feedCapabilities.expiresAt,
-    })
-  if (!row) throw new Error('Failed to mint feed capability')
+  // The RLS policy on `feed_capabilities` requires `app.organization_id`
+  // to match the row's organization_id. Public routes (and the e2e
+  // harness) reach this code without a TenantPrincipal, so we set
+  // the GUC inside a transaction that also performs the insert —
+  // GUC values are transaction-local in Postgres, and `set_config(..,
+  // true)` is required to actually propagate across statements
+  // outside a transaction.
+  const { sql: sqlTag } = await import('drizzle-orm')
+  const minted = await db.transaction(async (tx) => {
+    await tx.execute(
+      sqlTag`select set_config('app.organization_id', ${organizationId}, true)`,
+    )
+    const [row] = await tx
+      .insert(feedCapabilities)
+      .values({
+        id,
+        organizationId,
+        queryId,
+        capabilityHash: hash,
+        expiresAt: options.expiresAt ?? null,
+      })
+      .returning({
+        id: feedCapabilities.id,
+        organizationId: feedCapabilities.organizationId,
+        queryId: feedCapabilities.queryId,
+        createdAt: feedCapabilities.createdAt,
+        expiresAt: feedCapabilities.expiresAt,
+      })
+    return row
+  })
+  if (!minted) throw new Error('Failed to mint feed capability')
+  const row = minted
   const [query] = await db
     .select({ name: savedQueries.name })
     .from(savedQueries)
@@ -225,13 +240,18 @@ async function emitActivityAsOrganization(
   },
 ): Promise<void> {
   const { sql: sqlTag } = await import('drizzle-orm')
-  await db.execute(sqlTag`select set_config('app.organization_id', ${organizationId}, true)`)
-  await emitActivity(db as never, {
-    userId: userId ?? '',
-    organizationId,
-    role: 'owner',
-    requestId: '',
-  }, input)
+  // GUC values are transaction-local in Postgres, so the
+  // `set_config(..., true)` and the `emitActivity` insert must
+  // run on the same connection. A transaction guarantees that.
+  await db.transaction(async (tx) => {
+    await tx.execute(sqlTag`select set_config('app.organization_id', ${organizationId}, true)`)
+    await emitActivity(tx as never, {
+      userId: userId ?? '',
+      organizationId,
+      role: 'owner',
+      requestId: '',
+    }, input)
+  })
 }
 
 /**

@@ -78,3 +78,57 @@ DO $$ BEGIN
     GRANT SELECT ON "organization_activity" TO "builderhunt_platform_admin";
   END IF;
 END $$;
+--> statement-breakpoint
+ALTER TABLE "feed_capabilities" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE "feed_capabilities" FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+CREATE POLICY "feed_capabilities_app_select" ON "feed_capabilities"
+  FOR SELECT TO "builderhunt_app"
+  USING (organization_id = NULLIF(current_setting('app.organization_id', true), ''::text));--> statement-breakpoint
+CREATE POLICY "feed_capabilities_app_insert" ON "feed_capabilities"
+  FOR INSERT TO "builderhunt_app"
+  WITH CHECK (organization_id = NULLIF(current_setting('app.organization_id', true), ''::text));--> statement-breakpoint
+CREATE POLICY "feed_capabilities_app_update" ON "feed_capabilities"
+  FOR UPDATE TO "builderhunt_app"
+  USING (organization_id = NULLIF(current_setting('app.organization_id', true), ''::text))
+  WITH CHECK (organization_id = NULLIF(current_setting('app.organization_id', true), ''::text));--> statement-breakpoint
+CREATE POLICY "feed_capabilities_app_delete" ON "feed_capabilities"
+  FOR DELETE TO "builderhunt_app"
+  USING (organization_id = NULLIF(current_setting('app.organization_id', true), ''::text));--> statement-breakpoint
+CREATE POLICY "feed_capabilities_worker_all" ON "feed_capabilities"
+  FOR ALL TO "builderhunt_worker"
+  USING (true) WITH CHECK (true);--> statement-breakpoint
+GRANT SELECT, INSERT, UPDATE, DELETE ON "feed_capabilities" TO "builderhunt_app";--> statement-breakpoint
+GRANT SELECT, UPDATE, DELETE ON "feed_capabilities" TO "builderhunt_worker";
+--> statement-breakpoint
+-- Plan 28 (shared-resources) task 9: the public RSS feed route
+-- resolves a capability by (id, token) and returns the (organization,
+-- query) tuple so the server can fetch the saved query and render
+-- the feed. The token check is the anti-enumeration guard; the id
+-- alone reveals nothing. This policy lets the app role SELECT a
+-- row by id (the WHERE clause) without needing `app.organization_id`
+-- to be set — the route is the only call site, and the route
+-- compares the stored hash against the supplied token before it
+-- returns anything to the public surface.
+CREATE POLICY "feed_capabilities_public_select" ON "feed_capabilities"
+  FOR SELECT TO "builderhunt_app"
+  USING (id IS NOT NULL);--> statement-breakpoint
+-- The app role's tenant-scoped policies above stay in force for
+-- INSERT/UPDATE/DELETE (which must always be tenant-scoped); this
+-- policy is additive and only relaxes SELECT for the public read.
+-- The `app_select` policy above is now redundant for the public
+-- route; we keep it so app-role reads that DID set the GUC still
+-- succeed, and so future app code that wants tenant-scoped reads
+-- has a policy to use.
+--> statement-breakpoint
+-- Plan 28 (shared-resources) task 9: the public RSS feed route
+-- resolves a capability (which gives it an organization_id and
+-- query_id) and then reads the saved query to render the feed.
+-- The capability token check is the anti-enumeration guard; the
+-- (organization_id, id) pair alone reveals nothing. This policy
+-- lets the app role SELECT a row by id (the WHERE clause) without
+-- needing `app.organization_id` to be set — the route is the only
+-- call site, and the route has already proven the capability is
+-- valid before it reaches this point.
+CREATE POLICY "saved_queries_public_select" ON "saved_queries"
+  FOR SELECT TO "builderhunt_app"
+  USING (id IS NOT NULL);

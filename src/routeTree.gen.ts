@@ -57,6 +57,7 @@ import { Route as DashboardSprintsIndexRouteImport } from './routes/_dashboard/s
 import { Route as DashboardSolutionsIndexRouteImport } from './routes/_dashboard/solutions/index'
 import { Route as DashboardSearchIndexRouteImport } from './routes/_dashboard/search/index'
 import { Route as DashboardMeIndexRouteImport } from './routes/_dashboard/me/index'
+import { Route as DashboardListsIndexRouteImport } from './routes/_dashboard/lists/index'
 import { Route as DashboardInterviewsIndexRouteImport } from './routes/_dashboard/interviews/index'
 import { Route as DashboardExportsIndexRouteImport } from './routes/_dashboard/exports/index'
 import { Route as DashboardDashboardIndexRouteImport } from './routes/_dashboard/dashboard/index'
@@ -78,6 +79,7 @@ import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/
 import { Route as ApiOrganizationsTeamRouteImport } from './routes/api/organizations/team'
 import { Route as ApiOrganizationsSwitchRouteImport } from './routes/api/organizations/switch'
 import { Route as ApiOrganizationsDeletionRouteImport } from './routes/api/organizations/deletion'
+import { Route as ApiOrganizationsActivityRouteImport } from './routes/api/organizations/activity'
 import { Route as ApiOnboardingStatusRouteImport } from './routes/api/onboarding/status'
 import { Route as ApiOnboardingSkipRouteImport } from './routes/api/onboarding/skip'
 import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboarding/complete'
@@ -115,11 +117,13 @@ import { Route as LandingLegalImprintRouteImport } from './routes/_landing/legal
 import { Route as LandingLegalCookiesRouteImport } from './routes/_landing/legal/cookies'
 import { Route as LandingChangelogSlugRouteImport } from './routes/_landing/changelog/$slug'
 import { Route as LandingBlogSlugRouteImport } from './routes/_landing/blog/$slug'
+import { Route as DashboardTeamActivityRouteImport } from './routes/_dashboard/team/activity'
 import { Route as DashboardSprintsNewRouteImport } from './routes/_dashboard/sprints/new'
 import { Route as DashboardSettingsTeamRouteImport } from './routes/_dashboard/settings/team'
 import { Route as DashboardSettingsSecurityRouteImport } from './routes/_dashboard/settings/security'
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
+import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
@@ -495,6 +499,11 @@ const DashboardMeIndexRoute = DashboardMeIndexRouteImport.update({
   path: '/me/',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardListsIndexRoute = DashboardListsIndexRouteImport.update({
+  id: '/lists/',
+  path: '/lists/',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardInterviewsIndexRoute =
   DashboardInterviewsIndexRouteImport.update({
     id: '/interviews/',
@@ -603,6 +612,12 @@ const ApiOrganizationsDeletionRoute =
   ApiOrganizationsDeletionRouteImport.update({
     id: '/api/organizations/deletion',
     path: '/api/organizations/deletion',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiOrganizationsActivityRoute =
+  ApiOrganizationsActivityRouteImport.update({
+    id: '/api/organizations/activity',
+    path: '/api/organizations/activity',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiOnboardingStatusRoute = ApiOnboardingStatusRouteImport.update({
@@ -791,6 +806,11 @@ const LandingBlogSlugRoute = LandingBlogSlugRouteImport.update({
   path: '/blog/$slug',
   getParentRoute: () => LandingRouteRoute,
 } as any)
+const DashboardTeamActivityRoute = DashboardTeamActivityRouteImport.update({
+  id: '/team/activity',
+  path: '/team/activity',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardSprintsNewRoute = DashboardSprintsNewRouteImport.update({
   id: '/sprints/new',
   path: '/sprints/new',
@@ -819,6 +839,11 @@ const DashboardSettingsBillingRoute =
     path: '/settings/billing',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
+const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
+  id: '/lists/$listId',
+  path: '/lists/$listId',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
 const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -1631,11 +1656,13 @@ export interface FileRoutesByFullPath {
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
+  '/lists/$listId': typeof DashboardListsListIdRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
+  '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
@@ -1673,6 +1700,7 @@ export interface FileRoutesByFullPath {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
@@ -1694,6 +1722,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof DashboardDashboardIndexRoute
   '/exports/': typeof DashboardExportsIndexRoute
   '/interviews/': typeof DashboardInterviewsIndexRoute
+  '/lists/': typeof DashboardListsIndexRoute
   '/me/': typeof DashboardMeIndexRoute
   '/search/': typeof DashboardSearchIndexRoute
   '/solutions/': typeof DashboardSolutionsIndexRoute
@@ -1877,10 +1906,12 @@ export interface FileRoutesByTo {
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
+  '/lists/$listId': typeof DashboardListsListIdRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
   '/settings/team': typeof DashboardSettingsTeamRoute
   '/sprints/new': typeof DashboardSprintsNewRoute
+  '/team/activity': typeof DashboardTeamActivityRoute
   '/blog/$slug': typeof LandingBlogSlugRoute
   '/changelog/$slug': typeof LandingChangelogSlugRoute
   '/legal/cookies': typeof LandingLegalCookiesRoute
@@ -1918,6 +1949,7 @@ export interface FileRoutesByTo {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
@@ -1939,6 +1971,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardDashboardIndexRoute
   '/exports': typeof DashboardExportsIndexRoute
   '/interviews': typeof DashboardInterviewsIndexRoute
+  '/lists': typeof DashboardListsIndexRoute
   '/me': typeof DashboardMeIndexRoute
   '/search': typeof DashboardSearchIndexRoute
   '/solutions': typeof DashboardSolutionsIndexRoute
@@ -2126,11 +2159,13 @@ export interface FileRoutesById {
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
+  '/_dashboard/lists/$listId': typeof DashboardListsListIdRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/_dashboard/settings/security': typeof DashboardSettingsSecurityRoute
   '/_dashboard/settings/team': typeof DashboardSettingsTeamRoute
   '/_dashboard/sprints/new': typeof DashboardSprintsNewRoute
+  '/_dashboard/team/activity': typeof DashboardTeamActivityRoute
   '/_landing/blog/$slug': typeof LandingBlogSlugRoute
   '/_landing/changelog/$slug': typeof LandingChangelogSlugRoute
   '/_landing/legal/cookies': typeof LandingLegalCookiesRoute
@@ -2168,6 +2203,7 @@ export interface FileRoutesById {
   '/api/onboarding/complete': typeof ApiOnboardingCompleteRoute
   '/api/onboarding/skip': typeof ApiOnboardingSkipRoute
   '/api/onboarding/status': typeof ApiOnboardingStatusRoute
+  '/api/organizations/activity': typeof ApiOrganizationsActivityRoute
   '/api/organizations/deletion': typeof ApiOrganizationsDeletionRouteWithChildren
   '/api/organizations/switch': typeof ApiOrganizationsSwitchRoute
   '/api/organizations/team': typeof ApiOrganizationsTeamRoute
@@ -2189,6 +2225,7 @@ export interface FileRoutesById {
   '/_dashboard/dashboard/': typeof DashboardDashboardIndexRoute
   '/_dashboard/exports/': typeof DashboardExportsIndexRoute
   '/_dashboard/interviews/': typeof DashboardInterviewsIndexRoute
+  '/_dashboard/lists/': typeof DashboardListsIndexRoute
   '/_dashboard/me/': typeof DashboardMeIndexRoute
   '/_dashboard/search/': typeof DashboardSearchIndexRoute
   '/_dashboard/solutions/': typeof DashboardSolutionsIndexRoute
@@ -2375,11 +2412,13 @@ export interface FileRouteTypes {
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
+    | '/lists/$listId'
     | '/settings/billing'
     | '/settings/privacy'
     | '/settings/security'
     | '/settings/team'
     | '/sprints/new'
+    | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -2417,6 +2456,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/activity'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
@@ -2438,6 +2478,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/exports/'
     | '/interviews/'
+    | '/lists/'
     | '/me/'
     | '/search/'
     | '/solutions/'
@@ -2621,10 +2662,12 @@ export interface FileRouteTypes {
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
+    | '/lists/$listId'
     | '/settings/privacy'
     | '/settings/security'
     | '/settings/team'
     | '/sprints/new'
+    | '/team/activity'
     | '/blog/$slug'
     | '/changelog/$slug'
     | '/legal/cookies'
@@ -2662,6 +2705,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/activity'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
@@ -2683,6 +2727,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/exports'
     | '/interviews'
+    | '/lists'
     | '/me'
     | '/search'
     | '/solutions'
@@ -2869,11 +2914,13 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
     | '/_dashboard/admin/users'
+    | '/_dashboard/lists/$listId'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
     | '/_dashboard/settings/security'
     | '/_dashboard/settings/team'
     | '/_dashboard/sprints/new'
+    | '/_dashboard/team/activity'
     | '/_landing/blog/$slug'
     | '/_landing/changelog/$slug'
     | '/_landing/legal/cookies'
@@ -2911,6 +2958,7 @@ export interface FileRouteTypes {
     | '/api/onboarding/complete'
     | '/api/onboarding/skip'
     | '/api/onboarding/status'
+    | '/api/organizations/activity'
     | '/api/organizations/deletion'
     | '/api/organizations/switch'
     | '/api/organizations/team'
@@ -2932,6 +2980,7 @@ export interface FileRouteTypes {
     | '/_dashboard/dashboard/'
     | '/_dashboard/exports/'
     | '/_dashboard/interviews/'
+    | '/_dashboard/lists/'
     | '/_dashboard/me/'
     | '/_dashboard/search/'
     | '/_dashboard/solutions/'
@@ -3122,6 +3171,7 @@ export interface RootRouteChildren {
   ApiOnboardingCompleteRoute: typeof ApiOnboardingCompleteRoute
   ApiOnboardingSkipRoute: typeof ApiOnboardingSkipRoute
   ApiOnboardingStatusRoute: typeof ApiOnboardingStatusRoute
+  ApiOrganizationsActivityRoute: typeof ApiOrganizationsActivityRoute
   ApiOrganizationsDeletionRoute: typeof ApiOrganizationsDeletionRouteWithChildren
   ApiOrganizationsSwitchRoute: typeof ApiOrganizationsSwitchRoute
   ApiOrganizationsTeamRoute: typeof ApiOrganizationsTeamRoute
@@ -3584,6 +3634,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardMeIndexRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/lists/': {
+      id: '/_dashboard/lists/'
+      path: '/lists'
+      fullPath: '/lists/'
+      preLoaderRoute: typeof DashboardListsIndexRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/interviews/': {
       id: '/_dashboard/interviews/'
       path: '/interviews'
@@ -3729,6 +3786,13 @@ declare module '@tanstack/react-router' {
       path: '/api/organizations/deletion'
       fullPath: '/api/organizations/deletion'
       preLoaderRoute: typeof ApiOrganizationsDeletionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/organizations/activity': {
+      id: '/api/organizations/activity'
+      path: '/api/organizations/activity'
+      fullPath: '/api/organizations/activity'
+      preLoaderRoute: typeof ApiOrganizationsActivityRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/onboarding/status': {
@@ -3990,6 +4054,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LandingBlogSlugRouteImport
       parentRoute: typeof LandingRouteRoute
     }
+    '/_dashboard/team/activity': {
+      id: '/_dashboard/team/activity'
+      path: '/team/activity'
+      fullPath: '/team/activity'
+      preLoaderRoute: typeof DashboardTeamActivityRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/sprints/new': {
       id: '/_dashboard/sprints/new'
       path: '/sprints/new'
@@ -4023,6 +4094,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/billing'
       fullPath: '/settings/billing'
       preLoaderRoute: typeof DashboardSettingsBillingRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/lists/$listId': {
+      id: '/_dashboard/lists/$listId'
+      path: '/lists/$listId'
+      fullPath: '/lists/$listId'
+      preLoaderRoute: typeof DashboardListsListIdRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/admin/users': {
@@ -5009,15 +5087,18 @@ interface DashboardRouteRouteChildren {
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
+  DashboardListsListIdRoute: typeof DashboardListsListIdRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
   DashboardSettingsSecurityRoute: typeof DashboardSettingsSecurityRoute
   DashboardSettingsTeamRoute: typeof DashboardSettingsTeamRoute
   DashboardSprintsNewRoute: typeof DashboardSprintsNewRoute
+  DashboardTeamActivityRoute: typeof DashboardTeamActivityRoute
   DashboardCalendarIndexRoute: typeof DashboardCalendarIndexRoute
   DashboardDashboardIndexRoute: typeof DashboardDashboardIndexRoute
   DashboardExportsIndexRoute: typeof DashboardExportsIndexRoute
   DashboardInterviewsIndexRoute: typeof DashboardInterviewsIndexRoute
+  DashboardListsIndexRoute: typeof DashboardListsIndexRoute
   DashboardMeIndexRoute: typeof DashboardMeIndexRoute
   DashboardSearchIndexRoute: typeof DashboardSearchIndexRoute
   DashboardSolutionsIndexRoute: typeof DashboardSolutionsIndexRoute
@@ -5041,15 +5122,18 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
+  DashboardListsListIdRoute: DashboardListsListIdRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
   DashboardSettingsSecurityRoute: DashboardSettingsSecurityRoute,
   DashboardSettingsTeamRoute: DashboardSettingsTeamRoute,
   DashboardSprintsNewRoute: DashboardSprintsNewRoute,
+  DashboardTeamActivityRoute: DashboardTeamActivityRoute,
   DashboardCalendarIndexRoute: DashboardCalendarIndexRoute,
   DashboardDashboardIndexRoute: DashboardDashboardIndexRoute,
   DashboardExportsIndexRoute: DashboardExportsIndexRoute,
   DashboardInterviewsIndexRoute: DashboardInterviewsIndexRoute,
+  DashboardListsIndexRoute: DashboardListsIndexRoute,
   DashboardMeIndexRoute: DashboardMeIndexRoute,
   DashboardSearchIndexRoute: DashboardSearchIndexRoute,
   DashboardSolutionsIndexRoute: DashboardSolutionsIndexRoute,
@@ -5397,6 +5481,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOnboardingCompleteRoute: ApiOnboardingCompleteRoute,
   ApiOnboardingSkipRoute: ApiOnboardingSkipRoute,
   ApiOnboardingStatusRoute: ApiOnboardingStatusRoute,
+  ApiOrganizationsActivityRoute: ApiOrganizationsActivityRoute,
   ApiOrganizationsDeletionRoute: ApiOrganizationsDeletionRouteWithChildren,
   ApiOrganizationsSwitchRoute: ApiOrganizationsSwitchRoute,
   ApiOrganizationsTeamRoute: ApiOrganizationsTeamRoute,

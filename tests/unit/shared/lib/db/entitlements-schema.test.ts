@@ -17,8 +17,13 @@ describe('organization entitlement schema', () => {
     ]))
   })
 
-  it('records both tenant and actor for plan changes', () => {
+  it('records tenant (required) and actor (optional) for plan changes', () => {
     expect(organizationPlanChanges.organizationId.notNull).toBe(true)
-    expect(organizationPlanChanges.actorUserId.notNull).toBe(true)
+    // actorUserId is nullable so system-driven plan changes
+    // (e.g. scheduled downgrades, billing-cycle resets) can
+    // record a tenant-attributed event without a human actor.
+    // Mirrors the convention plan 29 introduced on
+    // `organization_activity.actorUserId`.
+    expect(organizationPlanChanges.actorUserId.notNull).toBe(false)
   })
 })

@@ -15,6 +15,7 @@ import { ListsPage, type BuilderList } from '~/modules/dashboard/components/List
 
 interface ListIndexBeforeLoadContext {
   userId: string
+  organizationId: string
   role: 'owner' | 'admin' | 'member'
 }
 
@@ -27,12 +28,12 @@ export const Route = createFileRoute('/_dashboard/lists/')({
     // /api/lists is the source of truth for what the caller can do.
     // Default to 'member' — the API rejects anything stronger a
     // caller tries to do.
-    return { userId: user.userId, role: 'member' }
+    return { userId: user.userId, organizationId: user.activeOrganizationId, role: 'member' }
   },
   component: ListsIndexRoute,
 })
 
 function ListsIndexRoute() {
-  const { userId, role } = Route.useRouteContext() as unknown as ListIndexBeforeLoadContext
-  return <ListsPage initialLists={[]} currentUser={{ userId, role }} />
+  const { userId, organizationId, role } = Route.useRouteContext() as unknown as ListIndexBeforeLoadContext
+  return <ListsPage initialLists={[]} currentUser={{ userId, organizationId, role }} />
 }

@@ -136,16 +136,38 @@ interface WorkerDatabaseRecord {
 // needs to prove.
 const records = new Map<number, WorkerDatabaseRecord>()
 
+/** Lazily-constructed admin pool for existence probes. Same connection
+ *  string the worker creation uses. */
+let _admin: ReturnType<typeof postgres> | null = null
+function adminPool() {
+  if (_admin) return _admin
+  const adminUrl = process.env.DATABASE_MIGRATION_URL
+    ?? 'postgresql://postgres:postgres@localhost:5432/builderhunt'
+  _admin = postgres(adminUrl, { max: 1, prepare: false })
+  return _admin
+}
+
 export async function acquireWorkerDatabase(workerIndex: number): Promise<WorkerDatabase> {
   const existing = records.get(workerIndex)
   if (existing) {
-    return {
-      workerIndex: existing.workerIndex,
-      databaseName: existing.databaseName,
-      databaseUrl: existing.databaseUrl,
-      db: drizzle(postgres(existing.databaseUrl, { max: 5, prepare: false })),
-      urls: workerDatabaseUrls(existing.databaseName),
+    // The cached DB may have been dropped by an aborted prior run
+    // (the worker crashed before `afterAll` ran, or the operator
+    // cleaned the cluster manually). Treat a missing database as
+    // a fresh acquisition so the worker doesn't keep trying to
+    // open a connection to a non-existent cluster target.
+    const stillExists = await adminPool().unsafe(
+      `SELECT 1 FROM pg_database WHERE datname = '${existing.databaseName}'`,
+    ).then((rows) => rows.length > 0).catch(() => false)
+    if (stillExists) {
+      return {
+        workerIndex: existing.workerIndex,
+        databaseName: existing.databaseName,
+        databaseUrl: existing.databaseUrl,
+        db: drizzle(postgres(existing.databaseUrl, { max: 5, prepare: false })),
+        urls: workerDatabaseUrls(existing.databaseName),
+      }
     }
+    records.delete(workerIndex)
   }
   const created = await createE2EWorkerDatabase(workerIndex)
   records.set(workerIndex, {

@@ -427,11 +427,11 @@
     },
     "0106_feed_capabilities": {
       "sql": "766845141acdf4db00d6c14b7077ffcd06bb39963a21ec1522d1750ce49f7bc1",
-      "snapshot": "1209c7744d128fdc739b64641e9868fa0017467c0663d826143fcf3857c987d7"
+      "snapshot": "f90c34329ca526750221f12c3a56277a33f203c6c1c4640ee9fa5fe01dd9bb8b"
     },
     "0107_organization_activity": {
-      "sql": "272672d7afb63323f45b655fa9dee96d91e1027cb32fb85600412218d49e2c7c",
-      "snapshot": "25d5ae1d8ceba2bdea796d8cd6701e031c6627533a0f92e4953c25109408cde5"
+      "sql": "974a0fb729818e4c375dde567ef91c7062ce62dcb0e772d4cb5cc6c792368f55",
+      "snapshot": "7903eb3b2625c4750924a7eea726cd12139d1ea480e2b9d3da2598af47a710bc"
     }
   }
 }

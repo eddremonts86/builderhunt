@@ -107,7 +107,7 @@ export function readTimelineForPortfolio(
     if (out.length >= limit) break
     if (!raw || typeof raw !== 'object') continue
     const r = raw as Record<string, unknown>
-    if (typeof r.id !== 'string' || r.id.length > 64) continue
+    if (typeof r.id !== 'string' || r.id.length === 0 || r.id.length > 64) continue
     if (typeof r.occurredAt !== 'string') continue
     const occurred = new Date(r.occurredAt)
     if (Number.isNaN(occurred.getTime())) continue

@@ -68,12 +68,12 @@
   - Do: Render public events only when owner opted in and unified-timeline is available. Preserve its lazy cache/degradation. If summary UI is exposed, call `timeline-summary` local-first through Chrome built-in AI; use the authenticated MiniMax proxy fallback and hide the control when neither tier is usable.
   - Verify: `pnpm test -- tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`; exercise Chrome-available, authenticated proxy fallback, unavailable, and dependency-absent states.
 
-- [ ] **Wire revocation and state transitions to immediate visibility**
+- [x] **Wire revocation and state transitions to immediate visibility**
   - Files: `src/routes/api/admin/builder-claims/$claimId/revoke.ts`, `src/shared/lib/portfolio-cache.ts`, `tests/unit/routes/api/portfolio/$claimId.test.ts`
   - Do: Purge portfolio cache on claim revocation and all portfolio writes; public lookup must independently recheck active verification so stale cache cannot keep a revoked portfolio live.
   - Verify: `pnpm test -- 'tests/unit/routes/api/portfolio/$claimId.test.ts'`; warm cache, revoke claim, then assert the next public read is 404.
 
-- [ ] **Run end-to-end privacy, publication, and degradation checks**
+- [x] **Run end-to-end privacy, publication, and degradation checks**
   - Files: `tests/e2e/portfolio-builder.spec.ts`, `playwright.config.ts`
   - Do: Seed duplicate rows under one verified claim; save private draft, publish, inspect anonymous output/SEO, copy URL, unpublish, republish, revoke, and test both optional integrations absent and present. Assert hidden/unselected/private fields never appear.
   - Verify: `pnpm exec playwright test tests/e2e/portfolio-builder.spec.ts && pnpm test && pnpm build && pnpm lint && pnpm type-check`; run Lighthouse against the published fixture and require accessibility/SEO ≥ 95.
