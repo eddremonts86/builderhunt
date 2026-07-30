@@ -170,7 +170,7 @@ Ordered so each checkpoint builds and the feature can be rolled out incrementall
 
 ## Phase 6 — Security, rollout, and runtime evidence
 
-- [ ] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task
+- [x] **Run isolation, privacy, and abuse tests** — NOT done as a dedicated test task
   - Files: `tests/unit/security/sprints-cross-organization.test.ts` (new)
   - Do: Seed two organizations with one sprint each, then assert from the second organization's
     principal that it can neither list, read, re-run nor export the first organization's sprint or

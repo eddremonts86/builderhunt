@@ -1,6 +1,6 @@
 # Tasks: Shared Searches and Builder Lists
 
-> **Status**: `pending` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
+> **Status**: `done` — unblocked 2026-07-29 (was `blocked`; all six preconditions verified met)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/tasks.md), [`team-accounts`](../27-team-accounts/tasks.md)
 > **Blocks**: [`activity-feed`](../29-activity-feed/tasks.md)
 > **Reality check (verified 2026-07-29 — the hold is lifted)**: this said "do not implement until
@@ -41,22 +41,22 @@
   - Do: Add zod bodies for names/descriptions/visibility and canonical `builderIdentityId`; enforce active Team entitlement and permissions; return allowlisted DTOs and generic other-tenant/not-found behavior; rate-limit mutations by user+organization.
   - Verify: full role and A/B matrix, duplicate item, invalid identity, spoofed tenant, and plan lapse tests pass.
 
-- [ ] **Preserve tenant integrity when creating alerts from shared queries**
+- [x] **Preserve tenant integrity when creating alerts from shared queries**
   - Files: `src/routes/api/alerts/index.ts`, `src/shared/lib/repositories/alerts.ts`, `tests/unit/shared/lib/repositories/alerts.test.ts`, `tests/unit/security/shared-alerts.test.ts`
   - Do: Allow an authorized member to opt into their own alert from an organization-visible query; copy validated keywords while composite FK preserves organization. Sharing alone creates no alert/delivery. Query visibility/deletion follows documented snapshot retention.
   - Verify: A member opt-in sends only that recipient; no share email; A cannot reference B query; PostgreSQL rejects forged composite relation.
 
-- [ ] **Replace raw saved-query RSS access with a public feed capability**
+- [x] **Replace raw saved-query RSS access with a public feed capability**
   - Files: `src/shared/lib/db/schema.ts`, `src/shared/lib/repositories/public-feeds.ts`, `src/routes/api/feeds/$feedId.ts`, `plans/phase-1/35-rss-feeds/{spec,plan,tasks}.md`, `tests/unit/security/public-feed-capabilities.test.ts`
   - Do: Create a hashed/revocable/rotatable public feed capability or publication record referencing tenant query internally; resolve it under authorized service logic and emit a minimized public feed. Raw saved query IDs no longer grant public access; revocation/plan lapse/organization deletion behavior is explicit.
   - Verify: guessing query/list IDs returns no feed; valid capability exposes only approved results; rotation/revocation/tenant deletion/lapse tests pass without revealing tenant metadata.
 
-- [ ] **Build organization-scoped shared-resource UI**
+- [x] **Build organization-scoped shared-resource UI**
   - Files: `src/modules/search/components/SearchPage.tsx`, `src/modules/dashboard/components/DashboardPage.tsx`, `src/routes/_dashboard/lists/index.tsx`, `src/routes/_dashboard/lists/$listId.tsx`, `src/modules/dashboard/components/ListsPage.tsx`, `src/modules/dashboard/components/ListDetailPage.tsx`, `src/modules/search/components/PersonResultCard.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`
   - Do: Add private/organization visibility, creator attribution, lists/detail, canonical add-to-list, and permission-aware actions through Team's tenant query provider. Keep notes explicitly private. All query/cache/optimistic keys contain active organization and cancel on switch.
   - Verify: component/browser tests cover A→B switch with in-flight responses, role actions, canonical identity list add, duplicate notice, notes non-disclosure, keyboard/mobile/accessibility.
 
-- [ ] **Run shared-resource isolation and release gates**
+- [x] **Run shared-resource isolation and release gates**
   - Files: `tests/e2e/shared-resources.spec.ts`, `tests/unit/security/shared-resource-isolation.test.ts`, `docs/operations/shared-resources.md`, `.github/workflows/quality.yml`
   - Do: Seed A/B with multi-membership users; exercise queries, visibility, lists/items, alerts, feed capabilities, exports, switches, removal, plan lapse, stale tabs, direct SQL, and migration upgrade. Require foundation and Team security gates before deploy.
   - Verify: `pnpm test:security && pnpm test:rls && pnpm test:migrations:local && pnpm test:e2e -- tests/e2e/shared-resources.spec.ts && pnpm lint && pnpm type-check && pnpm test && pnpm build` passes.

@@ -129,7 +129,7 @@
 
 ## Phase 5 — Org lists (open and unblocked)
 
-- [ ] **Org list as team source**
+- [x] **Org list as team source**
   - Files: `src/routes/api/builders/$builderId/synergy.ts`
   - Do: accept `{ teamSource: 'tracked' | { orgListId } }`; fetch org list rows (membership
     check via team-accounts helpers) and feed the same `buildTeamAggregate`.
