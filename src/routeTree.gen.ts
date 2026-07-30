@@ -39,7 +39,6 @@ import { Route as LandingChangelogRouteImport } from './routes/_landing/changelo
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
-import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
@@ -67,6 +66,7 @@ import { Route as TeamInviteInvitationIdRouteImport } from './routes/team/invite
 import { Route as ApiWorkSamplesAnalyzeRouteImport } from './routes/api/work-samples/analyze'
 import { Route as ApiWorkSamplesIdRouteImport } from './routes/api/work-samples/$id'
 import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/stripe'
+import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
@@ -410,11 +410,6 @@ const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
   path: '/api/status/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
-  id: '/api/status/subscribe',
-  path: '/api/status/subscribe',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiSprintsIndexRoute = ApiSprintsIndexRouteImport.update({
   id: '/api/sprints/',
   path: '/api/sprints/',
@@ -549,6 +544,11 @@ const ApiWorkSamplesIdRoute = ApiWorkSamplesIdRouteImport.update({
 const ApiWebhooksStripeRoute = ApiWebhooksStripeRouteImport.update({
   id: '/api/webhooks/stripe',
   path: '/api/webhooks/stripe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
+  id: '/api/status/subscribe',
+  path: '/api/status/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
@@ -1720,6 +1720,7 @@ export interface FileRoutesByFullPath {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -1748,7 +1749,6 @@ export interface FileRoutesByFullPath {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
-  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
@@ -1970,6 +1970,7 @@ export interface FileRoutesByTo {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -2224,6 +2225,7 @@ export interface FileRoutesById {
   '/api/search/semantic': typeof ApiSearchSemanticRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
+  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/webhooks/stripe': typeof ApiWebhooksStripeRoute
   '/api/work-samples/$id': typeof ApiWorkSamplesIdRoute
   '/api/work-samples/analyze': typeof ApiWorkSamplesAnalyzeRoute
@@ -2252,7 +2254,6 @@ export interface FileRoutesById {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
-  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/_dashboard/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
@@ -2478,6 +2479,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/status/subscribe'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -2727,6 +2729,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/status/subscribe'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -2980,6 +2983,7 @@ export interface FileRouteTypes {
     | '/api/search/semantic'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
+    | '/api/status/subscribe'
     | '/api/webhooks/stripe'
     | '/api/work-samples/$id'
     | '/api/work-samples/analyze'
@@ -3193,6 +3197,7 @@ export interface RootRouteChildren {
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
+  ApiStatusSubscribeRoute: typeof ApiStatusSubscribeRoute
   ApiWebhooksStripeRoute: typeof ApiWebhooksStripeRoute
   ApiWorkSamplesIdRoute: typeof ApiWorkSamplesIdRoute
   ApiWorkSamplesAnalyzeRoute: typeof ApiWorkSamplesAnalyzeRoute
@@ -3516,13 +3521,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStatusIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/status/subscribe': {
-      id: '/api/status/subscribe'
-      path: '/api/status/subscribe'
-      fullPath: '/api/status/subscribe'
-      preLoaderRoute: typeof ApiStatusSubscribeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/sprints/': {
       id: '/api/sprints/'
       path: '/api/sprints'
@@ -3710,6 +3708,13 @@ declare module '@tanstack/react-router' {
       path: '/api/webhooks/stripe'
       fullPath: '/api/webhooks/stripe'
       preLoaderRoute: typeof ApiWebhooksStripeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status/subscribe': {
+      id: '/api/status/subscribe'
+      path: '/api/status/subscribe'
+      fullPath: '/api/status/subscribe'
+      preLoaderRoute: typeof ApiStatusSubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sprints/preview': {
@@ -5512,6 +5517,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
+  ApiStatusSubscribeRoute: ApiStatusSubscribeRoute,
   ApiWebhooksStripeRoute: ApiWebhooksStripeRoute,
   ApiWorkSamplesIdRoute: ApiWorkSamplesIdRoute,
   ApiWorkSamplesAnalyzeRoute: ApiWorkSamplesAnalyzeRoute,

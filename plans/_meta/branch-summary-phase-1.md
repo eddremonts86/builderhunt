@@ -159,7 +159,15 @@ marks the checkboxes `[x]` and the status headers to match.
 - Plan 38 (work-sample): 1 task blocked on real credentials.
 - Plan 45 (public-landing-pages): 1 task, SEO indexing decision.
 - Plan 47 (status-and-trust): 1 task (subscribers table),
-  deliberately not built.
+  built in session 3 (commit `04a9535`).
+- Plan 45 (public-landing-pages): 1 task (indexing decision),
+  decided in session 3 (commit `04a9535`).
+- Plan 37 (portfolio-builder): 1 task (privacy coverage),
+  closed via `tests/unit/security/portfolio-privacy.test.ts`
+  in session 3 (commit `297c220`).
+- Plan 38 (work-sample): 1 task (limit + degradation curls),
+  closed via `tests/unit/security/work-sample-rate-limit.test.ts`
+  in session 3 (commit `297c220`).
 
 ## How to read the commit log
 
@@ -168,16 +176,19 @@ reverse-chronological order. The most useful way to review
 is by plan:
 
 ```bash
-git log --oneline | grep -E "(shared-resources|activity|portfolio|team-synergy|sprints)"
+git log --oneline | grep -E "(shared-resources|activity|portfolio|team-synergy|sprints|indexing|subscribers)"
 ```
 
 Plan 28: 7 commits (e18c278 → 343df2a)
 Plan 29: 5 commits (b45452b → db47459)
-Plan 37: 1 commit (31debe5)
-Plan 40: 1 commit (6602f49)
-Plan 41: 1 commit (8bdd849)
+Plan 32: 1 commit (8bdd849 — verification gate)
+Plan 34: 1 commit (06c26cd — AI digest)
+Plan 37: 1 commit (31debe5 — revocation cache)
+Plan 40: 1 commit (6602f49 — team source)
+Plan 41: 1 commit (8bdd849 — cross-org matrix)
 Docs sync: 1 commit (37f80b5)
-Total branch work: 16 commits.
+Cleanup + new tests: 2 commits (297c220, 04a9535)
+Total branch work: 22 commits.
 
 ## Operational notes for the next session
 

@@ -19,7 +19,11 @@ import { findByEmail, listConfirmedActive, subscribe, unsubscribeByToken } from 
 // owns and never mutates any other schema object.
 const TEST_DB_URL = process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/builderhunt'
 const sql = postgres(TEST_DB_URL, { max: 2, prepare: false })
-const testDb = drizzle(sql, { schema })
+// The repository accepts `PostgresJsDatabase<Record<string, never>>` —
+// the test's typed schema is wider (it includes every other table)
+// but the repository only ever calls insert/select/update on the
+// statusSubscribers table, so a cast is safe at every call site.
+const testDb = drizzle(sql, { schema }) as unknown as NonNullable<Parameters<typeof subscribe>[0]['db']>
 
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('base64url')
