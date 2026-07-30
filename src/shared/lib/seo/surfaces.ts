@@ -53,11 +53,27 @@ export const SEO_SURFACE_DEFINITIONS: Record<SeoSurface, SeoSurfaceDefinition> =
 /**
  * What applies when the surface has no row yet, or when the lookup fails.
  *
- * Fails CLOSED — hidden. A database blip must not be the reason a page we chose
- * to keep out of the index gets crawled, and an un-indexed page is recoverable
- * while an indexed one takes weeks to walk back.
+ * **Decision (plan 45, 2026-07-30)**: launch with the blog, changelog and
+ * roadmap all set to `index, follow`. The blog exists to earn organic traffic
+ * (see `46-content-marketing`), the changelog is a product-transparency surface
+ * that buyers and integrators expect to find via search, and the roadmap is
+ * the public commitment page. Hiding any of them by default would silently
+ * defeat the purpose of those features — the failure is the absence of traffic,
+ * not a loud error.
+ *
+ * **Why the default is `index, follow` and not `noindex, nofollow`**: the
+ * fail-closed alternative (noindex) is the right call for a single
+ * high-stakes surface (e.g. an internal admin tool that must never leak), but
+ * the surfaces in this registry are public marketing/product pages whose
+ * default state in the product spec is "indexable". An admin who wants to
+ * hide one of them sets the row in the admin UI; a database blip that
+ * prevents that lookup falls back to the spec'd default. Operators who need
+ * a temporary "off" should set the row, not change this constant.
+ *
+ * See `docs/operations/seo-surfaces-indexing.md` for the full rationale and
+ * the operator runbook.
  */
-export const DEFAULT_DIRECTIVES: RobotsDirectives = { noindex: true, nofollow: true }
+export const DEFAULT_DIRECTIVES: RobotsDirectives = { noindex: false, nofollow: false }
 
 export function isSeoSurface(value: unknown): value is SeoSurface {
   return typeof value === 'string' && (SEO_SURFACES as readonly string[]).includes(value)

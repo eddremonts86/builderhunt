@@ -39,6 +39,7 @@ import { Route as LandingChangelogRouteImport } from './routes/_landing/changelo
 import { Route as DashboardAlertsRouteImport } from './routes/_dashboard/alerts'
 import { Route as ApiWorkSamplesIndexRouteImport } from './routes/api/work-samples/index'
 import { Route as ApiStatusIndexRouteImport } from './routes/api/status/index'
+import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsIndexRouteImport } from './routes/api/sprints/index'
 import { Route as ApiRoadmapIndexRouteImport } from './routes/api/roadmap/index'
 import { Route as ApiRecommendationsIndexRouteImport } from './routes/api/recommendations/index'
@@ -407,6 +408,11 @@ const ApiWorkSamplesIndexRoute = ApiWorkSamplesIndexRouteImport.update({
 const ApiStatusIndexRoute = ApiStatusIndexRouteImport.update({
   id: '/api/status/',
   path: '/api/status/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiStatusSubscribeRoute = ApiStatusSubscribeRouteImport.update({
+  id: '/api/status/subscribe',
+  path: '/api/status/subscribe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSprintsIndexRoute = ApiSprintsIndexRouteImport.update({
@@ -1742,6 +1748,7 @@ export interface FileRoutesByFullPath {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
@@ -2245,6 +2252,7 @@ export interface FileRoutesById {
   '/api/roadmap/': typeof ApiRoadmapIndexRoute
   '/api/sprints/': typeof ApiSprintsIndexRoute
   '/api/status/': typeof ApiStatusIndexRoute
+  '/api/status/subscribe': typeof ApiStatusSubscribeRoute
   '/api/work-samples/': typeof ApiWorkSamplesIndexRoute
   '/_dashboard/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
@@ -3506,6 +3514,13 @@ declare module '@tanstack/react-router' {
       path: '/api/status'
       fullPath: '/api/status/'
       preLoaderRoute: typeof ApiStatusIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/status/subscribe': {
+      id: '/api/status/subscribe'
+      path: '/api/status/subscribe'
+      fullPath: '/api/status/subscribe'
+      preLoaderRoute: typeof ApiStatusSubscribeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sprints/': {

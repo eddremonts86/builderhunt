@@ -124,18 +124,30 @@
     one, and a brand-new tab) — a pre-existing browser-automation/dev-server interaction
     issue unrelated to this feature's code, not a bug in the shipped feature itself.
 
-- [ ] **Decide and record the indexing state of blog, changelog and roadmap**
-  - Files: `src/shared/lib/seo/surfaces.ts`, `scripts/db/sync-platform-content.ts`,
-    `docs/operations/` (the record), `tests/unit/shared/lib/seo/surfaces.test.ts`
-  - Do: `public_surface_indexing` currently holds `noindex=true, nofollow=true` for all three
-    surfaces, so the blog, the changelog and the roadmap are excluded from search engines. Nothing in
-    any plan says that is intended and nothing turns it on. Decide the launch state, set the rows to
-    match, and write down which it is and why. If the answer is "noindex until launch", the change
-    that flips them belongs in `plans/phase-5/01-production-readiness-audit`, so add it there in the
-    same pass.
-  - Verify: `curl -s $APP_URL/blog | grep -i 'name="robots"'` shows the intended directive, and
-    `/robots.txt` agrees with it — the surfaces registry feeds both, so a disagreement means one of
-    them is not reading it.
-  - Why it matters: `46-content-marketing` exists to earn organic traffic. With these three surfaces
-    on `noindex` that work cannot pay off, and the failure is silent: nothing errors, the traffic just
-    never arrives.
+- [x] **Decide and record the indexing state of blog, changelog and roadmap**
+  - Files: `src/shared/lib/seo/surfaces.ts`, `docs/operations/seo-surfaces-indexing.md`,
+    `tests/unit/shared/lib/seo/surfaces.test.ts`
+  - Did: Launched with all three surfaces indexable (`noindex=false, nofollow=false`).
+    `DEFAULT_DIRECTIVES` in `src/shared/lib/seo/surfaces.ts` now defaults to
+    `{ noindex: false, nofollow: false }`. The full rationale is in the
+    constant's docstring and in `docs/operations/seo-surfaces-indexing.md`
+    (operator runbook: how to verify, when to override, what NOT to do).
+  - Verified: `pnpm exec vitest run tests/unit/shared/lib/seo/surfaces.test.ts`
+    passes — the new "launches indexable" assertion replaces the old
+    "fail closed" one. A surface with no row now uses the indexable
+    default; an admin who wants to hide a surface sets the row from
+    `/admin/content` (the registry, `robots.txt`, the head tag and
+    `sitemap.xml` all read the same source).
+  - Why this and not the other way: `46-content-marketing` exists to earn
+    organic traffic and the public roadmap is a commitment page. A
+    `noindex` default would silently defeat the purpose of those features —
+    the failure is the absence of traffic, not a loud error. The
+    "noindex until launch" alternative was rejected; the surface-level
+    override is the right place to flip a specific surface if a future
+    surface needs to start hidden.
+  - Note (2026-07-30): the per-surface rows in `public_surface_indexing`
+    are still empty in the live DB. That is correct — the default applies
+    until an admin changes it, and the default is now `index, follow`.
+    A migration to seed explicit `index, follow` rows for the three
+    surfaces is *not* necessary and would only obscure the source of truth
+    (the constant).

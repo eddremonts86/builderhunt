@@ -52,6 +52,7 @@ export const runtimeDb = lazyPostgresDb(() => env.DATABASE_URL)
 // Public repositories are the only non-tenant product code allowed to use this
 // surface. Private repositories must receive a TenantTransaction instead.
 export const publicDb = runtimeDb
+export type PublicDb = typeof publicDb
 export const platformDb = lazyPostgresDb(() => env.DATABASE_PLATFORM_URL ?? env.DATABASE_URL)
 export const accountDb = runtimeDb
 

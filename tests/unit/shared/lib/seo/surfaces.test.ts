@@ -36,10 +36,13 @@ describe('the surface registry', () => {
 })
 
 describe('the default directives', () => {
-  it('fail closed — a surface with no row, or a failed lookup, is hidden', () => {
-    // The whole point: a database blip must not be the reason a page we chose to
-    // keep out of the index gets crawled.
-    expect(DEFAULT_DIRECTIVES).toEqual({ noindex: true, nofollow: true })
+  it('launches indexable — blog, changelog, roadmap are all index, follow by default', () => {
+    // Decision (plan 45, 2026-07-30): the surfaces in this registry are public
+    // marketing/product pages whose product-spec default is "indexable". A
+    // noindex default would silently defeat plan 46 (content-marketing) and
+    // the public roadmap feature. The full rationale is in the constant's
+    // docstring and in `docs/operations/seo-surfaces-indexing.md`.
+    expect(DEFAULT_DIRECTIVES).toEqual({ noindex: false, nofollow: false })
   })
 })
 

@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { updatePlatformIncident } from '~/shared/lib/repositories/platform-content'
+import { listConfirmedActive } from '~/shared/lib/repositories/status-subscribers'
+import { sendIncidentStatusEmail } from '~/shared/lib/email'
 
 const UpdateBody = z.object({
   status: z.enum(['investigating', 'identified', 'monitoring', 'resolved']).optional(),
@@ -30,6 +32,31 @@ export const Route = createFileRoute('/api/admin/incidents/$id')({
           if (parsed.data.description !== undefined) update.description = parsed.data.description
 
           const updated = await updatePlatformIncident(params.id, update)
+          // Plan 47 (status-and-trust) Phase 2: if the admin just
+          // marked the incident resolved, send the resolution
+          // email to the public subscriber list. Best-effort.
+          if (parsed.data.status === 'resolved') {
+            try {
+              const subscribers = await listConfirmedActive()
+              const appUrl = (process.env.APP_URL ?? 'https://builderhunt.example').replace(/\/$/, '')
+              await Promise.allSettled(
+                subscribers.map((s) =>
+                  sendIncidentStatusEmail({
+                    to: s.email,
+                    manageSubscriptionUrl: `${appUrl}/status`,
+                    incidentId: params.id,
+                    incidentTitle: (updated as { title?: string } | null)?.title ?? 'Incident',
+                    incidentStatus: 'resolved',
+                    incidentSeverity: 'minor',
+                    incidentDescription: null,
+                    statusPageUrl: `${appUrl}/status`,
+                  }),
+                ),
+              )
+            } catch (err) {
+              console.error('status subscriber resolve notify failed:', err)
+            }
+          }
           await auditPlatformAdminAction(principal, {
             action: 'admin.incident.update',
             targetType: 'incident',

@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { randomId } from '~/lib/utils'
 import { createPlatformIncident, listPlatformIncidents } from '~/shared/lib/repositories/platform-content'
+import { listConfirmedActive } from '~/shared/lib/repositories/status-subscribers'
+import { sendIncidentStatusEmail } from '~/shared/lib/email'
 
 const CreateBody = z.object({
   title: z.string().min(1).max(200),
@@ -42,6 +44,31 @@ export const Route = createFileRoute('/api/admin/incidents/')({
             severity: parsed.data.severity,
             affectedComponents: parsed.data.affectedComponents,
           })
+          // Plan 47 (status-and-trust) Phase 2: notify the public
+          // subscriber list. Best-effort — if Resend is unset the
+          // helper no-ops, and an email failure does not roll back
+          // the incident (the incident is the source of truth, the
+          // email is a courtesy).
+          try {
+            const subscribers = await listConfirmedActive()
+            const appUrl = (process.env.APP_URL ?? 'https://builderhunt.example').replace(/\/$/, '')
+            await Promise.allSettled(
+              subscribers.map((s) =>
+                sendIncidentStatusEmail({
+                  to: s.email,
+                  manageSubscriptionUrl: `${appUrl}/status`,
+                  incidentId: id,
+                  incidentTitle: parsed.data.title,
+                  incidentStatus: 'investigating',
+                  incidentSeverity: parsed.data.severity,
+                  incidentDescription: parsed.data.description ?? null,
+                  statusPageUrl: `${appUrl}/status`,
+                }),
+              ),
+            )
+          } catch (err) {
+            console.error('status subscriber notify failed:', err)
+          }
           await auditPlatformAdminAction(principal, {
             action: 'admin.incident.create',
             targetType: 'incident',

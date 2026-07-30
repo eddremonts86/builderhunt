@@ -1229,3 +1229,66 @@ function interviewInvitationEmailHtml(input: {
 </html>`
 }
 
+
+// ---------------------------------------------------------------------------
+// Plan 47 (status-and-trust) Phase 2 — incident email to status subscribers.
+// ---------------------------------------------------------------------------
+
+/**
+ * Plain-text-only incident email. We deliberately avoid HTML here:
+ * the audience is a self-selected list of people who want a heads-up
+ * when the site is broken, not a marketing campaign, and plain text
+ * is the highest-deliverability, lowest-footgun format.
+ */
+export interface IncidentEmailInput {
+  to: string
+  /** A link the subscriber can hit to manage / unsubscribe. Because the
+   *  raw unsubscribe token is only ever stored as a hash, we cannot
+   *  recover the per-subscriber URL here; the route that triggers
+   *  the send passes a generic "manage subscription" link instead
+   *  (the subscriber re-confirms their email and gets a fresh
+   *  token). */
+  manageSubscriptionUrl: string
+  incidentId: string
+  incidentTitle: string
+  incidentStatus: 'investigating' | 'identified' | 'monitoring' | 'resolved'
+  incidentSeverity: 'minor' | 'major' | 'critical'
+  incidentDescription: string | null
+  /** The status page URL the subscriber can click to follow along. */
+  statusPageUrl: string
+}
+
+export async function sendIncidentStatusEmail(input: IncidentEmailInput): Promise<SendResult> {
+  const subject = (() => {
+    switch (input.incidentStatus) {
+      case 'resolved':
+        return `[Resolved] ${input.incidentTitle}`
+      case 'identified':
+        return `[Identified] ${input.incidentTitle}`
+      case 'monitoring':
+        return `[Monitoring] ${input.incidentTitle}`
+      case 'investigating':
+      default:
+        return `[Investigating] ${input.incidentTitle}`
+    }
+  })()
+  const statusText = input.incidentStatus === 'resolved' ? 'resolved' : 'is being investigated'
+  const duration = input.incidentStatus === 'resolved' ? '' : ' (we will email you again when it is resolved)'
+  const descriptionBlock = input.incidentDescription
+    ? `<p>${input.incidentDescription.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] ?? c))}</p>`
+    : ''
+  const html = [
+    `<p><strong>BuilderHunt status update</strong></p>`,
+    `<p>${input.incidentTitle.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] ?? c))} — ${statusText}${duration}.</p>`,
+    descriptionBlock,
+    `<p>Severity: ${input.incidentSeverity}</p>`,
+    `<p><a href="${input.statusPageUrl}">Follow along on the status page</a></p>`,
+    `<p style="color:#6b7280;font-size:0.85rem;">You are receiving this because you subscribed at /status. <a href="${input.manageSubscriptionUrl}">Manage subscription</a>.</p>`,
+  ].join('\n')
+  return dispatchEmail({
+    to: input.to,
+    subject,
+    html,
+    scenario: 'status_incident',
+  })
+}

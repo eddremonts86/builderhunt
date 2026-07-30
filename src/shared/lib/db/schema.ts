@@ -3101,3 +3101,39 @@ export const organizationActivity = pgTable(
     )`),
   ],
 )
+
+/**
+ * Plan 47 (status-and-trust) Phase 2: incident-email subscribers.
+ *
+ * System-operational, no owning subject. The row is keyed by the SHA-256
+ * of a random 32-byte token; the raw token only ever appears in the
+ * unsubscribe URL. Auto-confirmed on subscribe (the spec asked for
+ * plain-text emails on subscribe); a future double-opt-in upgrade adds
+ * a confirmation step that flips `confirmed_at` instead of inserting
+ * with it set.
+ */
+export const statusSubscribers = pgTable(
+  'status_subscribers',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    /** Lowercased copy of `email` for the UNIQUE index. The original casing is kept
+     *  for display in admin tooling (a real subscriber's address is what they typed). */
+    emailLower: text('email_lower').notNull(),
+    /** SHA-256 of the random unsubscribe token. The raw token is never stored. */
+    unsubscribeTokenHash: text('unsubscribe_token_hash').notNull(),
+    /** NULL until the subscriber has confirmed (auto-confirmed at subscribe time today;
+     *  reserved for the double-opt-in upgrade). Unconfirmed rows never receive email. */
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    /** Soft-cancel: when set, the row is hidden from the send list. Never deleted —
+     *  keeping the history helps answer "did we email this person?" audits. */
+    unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('status_subscribers_email_unique').on(table.emailLower),
+    index('status_subscribers_confirmed_idx')
+      .on(table.confirmedAt)
+      .where(sql`${table.unsubscribedAt} IS NULL`),
+  ],
+)

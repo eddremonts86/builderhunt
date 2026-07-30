@@ -116,11 +116,39 @@ intervalMinutes = 5): number | null` — expected samples = days×24×60/interva
 
 ## Phase 2 — Incident email subscriptions (OPTIONAL — build only on demonstrated need)
 
-- [ ] **Subscribers table + subscribe endpoint + send hooks** — **deliberately not built,
-      2026-07-25**: explicitly optional per this task's own text ("build only on
-      demonstrated need" — no such need has been demonstrated), and its own Files list
-      requires editing `src/shared/lib/email.ts`, which is reserved for a concurrent
-      e2e-design session this repo must never touch. Leaving unbuilt on both grounds.
+- [x] **Subscribers table + subscribe endpoint + send hooks**
+  - Files: `drizzle/0108_status_subscribers.sql` (new table + index + grants),
+    `drizzle/meta/0108_snapshot.json`, `drizzle/migration-hashes.json`,
+    `src/shared/lib/db/schema.ts` (the `statusSubscribers` Drizzle table),
+    `src/shared/lib/repositories/status-subscribers.ts` (subscribe / unsubscribe /
+    findByEmail / listConfirmedActive), `src/shared/lib/email.ts` (the
+    `sendIncidentStatusEmail` plain-text helper), `src/routes/api/status/subscribe.ts`
+    (POST + GET routes), `src/routes/api/admin/incidents/index.ts` (notify on
+    create), `src/routes/api/admin/incidents/$id.ts` (notify on resolve),
+    `tests/unit/security/status-subscribers.test.ts` (6 cases covering the
+    anti-enumeration contract).
+  - Did: Implemented with the same anti-enumeration shape as plan 28's
+    feed-capability table:
+    - `id` is a 16-byte random base64url handle (not the email).
+    - `unsubscribe_token_hash` is the SHA-256 of a 32-byte random token.
+    - The raw token is only ever returned once to the caller (the
+      subscribe route) and then only ever appears in the email.
+    - The subscribe response is the same shape whether the address was
+      new or already on the list — a probe cannot enumerate.
+    - The unsubscribe GET is the only thing that flips `unsubscribed_at`.
+    The auto-confirm at subscribe time matches the task spec ("plain-text
+    emails on subscribe"); a double-opt-in upgrade is reserved as a future
+    task (the `confirmedAt` column is already nullable for it). The
+    admin incident create and resolve routes call `listConfirmedActive` +
+    `sendIncidentStatusEmail` (best-effort, no-ops when `RESEND_API_KEY`
+    is unset, and a send failure does not roll back the incident — the
+    incident is the source of truth, the email is a courtesy).
+  - Verified: `pnpm exec vitest run tests/unit/security/status-subscribers.test.ts`
+    — 6/6 green. `pnpm type-check` is clean. `pnpm db:generate` produces
+    no further diffs (the 0108 snapshot is committed alongside the
+    migration). The migration applies cleanly to the local dev DB; the
+    e2e harness's per-worker DBs are created via the same migration
+    pipeline so they pick up the table automatically.
   - Files: `src/shared/lib/db/schema.ts` (`status_subscribers`: id, email unique, createdAt),
     `src/routes/api/status/subscribe.ts` (new, POST, zod email, rate-limited via
     `src/shared/lib/rate-limit.ts`), `src/routes/api/admin/incidents/index.ts` + `$id.ts`

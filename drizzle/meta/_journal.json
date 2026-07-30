@@ -757,6 +757,13 @@
       "when": 1785342000000,
       "tag": "0107_organization_activity",
       "breakpoints": true
+    },
+    {
+      "idx": 108,
+      "version": "7",
+      "when": 1785400000000,
+      "tag": "0108_status_subscribers",
+      "breakpoints": true
     }
   ]
 }

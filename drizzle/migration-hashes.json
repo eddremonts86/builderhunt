@@ -432,6 +432,10 @@
     "0107_organization_activity": {
       "sql": "974a0fb729818e4c375dde567ef91c7062ce62dcb0e772d4cb5cc6c792368f55",
       "snapshot": "7903eb3b2625c4750924a7eea726cd12139d1ea480e2b9d3da2598af47a710bc"
+    },
+    "0108_status_subscribers": {
+      "sql": "d3f4e0b3c91b17c348b9776184f184f3e9b048c6b69822290e3aca935a0a409d",
+      "snapshot": "dab6ae63dd8ee52124f1ea7d7935b07901f65d46471bedf2c5faaaa43e934e0a"
     }
   }
 }
