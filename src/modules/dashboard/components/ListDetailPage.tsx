@@ -14,6 +14,7 @@ import * as React from 'react'
 import { useNavigate, useParams } from '@tanstack/react-router'
 import { ArrowLeft, Lock, Trash2, Users, UserMinus } from 'lucide-react'
 import { Button } from '~/components/ui/button'
+import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
 
 export interface BuilderListDetail extends Record<string, unknown> {
   id: string
@@ -67,6 +68,8 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
   const [items, setItems] = React.useState<BuilderListItemDetail[]>(initialItems)
   const [removingId, setRemovingId] = React.useState<string | null>(null)
   const [loadError, setLoadError] = React.useState<string | null>(null)
+
+  useEntityBreadcrumbLabel(list.name)
 
   const load = React.useCallback(async () => {
     setLoadError(null)

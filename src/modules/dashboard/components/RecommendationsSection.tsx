@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Sparkles, ExternalLink, X, Search, ArrowRight } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { getSourcePresentation } from '~/shared/lib/source-presentation'
 
 interface Recommendation {
   builder: {
@@ -37,21 +38,6 @@ const STARTER_SUGGESTIONS = [
   'react performance',
   'python ML engineers',
 ]
-
-const SOURCE_LABELS: Record<string, string> = {
-  github: 'GitHub',
-  reddit: 'Reddit',
-  hn: 'Hacker News',
-  devto: 'DEV.to',
-  lobsters: 'Lobsters',
-  stackoverflow: 'Stack Overflow',
-  npm: 'npm',
-  huggingface: 'Hugging Face',
-  gitlab: 'GitLab',
-  codeberg: 'Codeberg',
-  hashnode: 'Hashnode',
-  sourcehut: 'SourceHut',
-}
 
 /**
  * "For you" section — surfaces builders adjacent to the user's saved
@@ -214,7 +200,9 @@ function RecommendationCard({
   onDismiss: () => void
 }) {
   const { builder, reasons, score } = rec
-  const sourceLabel = SOURCE_LABELS[builder.source] ?? builder.source
+  const presentation = getSourcePresentation(builder.source)
+  const sourceLabel = presentation?.label ?? builder.source
+  const profileUrl = presentation?.buildProfileUrl(builder.username) ?? null
   const reasonText = reasons.length > 0
     ? `matches ${reasons
         .slice(0, 2)
@@ -286,7 +274,7 @@ function RecommendationCard({
           <span className="px-2 py-0.5 text-[10px] font-semibold bg-bh-success/10 text-bh-success border border-bh-success/20 rounded-full shrink-0">
             Available
           </span>
-          <span className={`badge ${sourceBadgeColor(builder.source)} text-[10px] p-0 px-2 py-0.5`}>
+          <span className={`badge ${presentation?.badgeClassName ?? 'badge-neutral'} text-[10px] p-0 px-2 py-0.5`}>
             {sourceLabel}
           </span>
         </div>
@@ -302,58 +290,30 @@ function RecommendationCard({
       </div>
 
       <div className="mt-3.5">
-        <a
-          href={profileUrlFor(builder)}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary btn-sm w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-          data-event="recommendation_view"
-        >
-          View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-        </a>
+        {profileUrl ? (
+          <a
+            href={profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary btn-sm w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+            data-event="recommendation_view"
+          >
+            View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          </a>
+        ) : (
+          // No source ever reaches this: every SOURCE_NAMES member's registry entry builds a real
+          // URL from a non-empty username. This is only the shape for a malformed API response
+          // (empty username) — never a bare `href="#"` that looks clickable but does nothing.
+          <span
+            className="btn-secondary btn-sm w-full justify-center opacity-50 cursor-not-allowed"
+            title="No external profile URL available"
+          >
+            View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          </span>
+        )}
       </div>
     </article>
   )
-}
-
-function profileUrlFor(b: Recommendation['builder']): string {
-  // The recommendation API returns source/username but not profileUrl.
-  // We reconstruct it using the same mapping the search page uses.
-  const m: Record<string, (u: string) => string> = {
-    github: (u) => `https://github.com/${u}`,
-    gitlab: (u) => `https://gitlab.com/${u}`,
-    codeberg: (u) => `https://codeberg.org/${u}`,
-    hashnode: (u) => `https://hashnode.com/@${u}`,
-    sourcehut: (u) => `https://sr.ht/~${u}`,
-    hn: (u) => `https://news.ycombinator.com/user?id=${u}`,
-    reddit: (u) => `https://www.reddit.com/user/${u}`,
-    devto: (u) => `https://dev.to/${u}`,
-    lobsters: (u) => `https://lobste.rs/u/${u}`,
-    stackoverflow: (u) => `https://stackoverflow.com/users/${u}`,
-    npm: (u) => `https://www.npmjs.com/~${u}`,
-    huggingface: (u) => `https://huggingface.co/${u}`,
-  }
-  const fn = m[b.source]
-  return fn ? fn(b.username) : '#'
-}
-
-function sourceBadgeColor(source: string): string {
-  // Reuse the same badge color classes as the SearchPage source pills
-  const m: Record<string, string> = {
-    github: 'badge-github',
-    reddit: 'badge-reddit',
-    hn: 'badge-hn',
-    devto: 'badge-devto',
-    lobsters: 'badge-lobsters',
-    stackoverflow: 'badge-stackoverflow',
-    npm: 'badge-npm',
-    huggingface: 'badge-huggingface',
-    gitlab: 'badge-gitlab',
-    codeberg: 'badge-codeberg',
-    hashnode: 'badge-hashnode',
-    sourcehut: 'badge-sourcehut',
-  }
-  return m[source] ?? 'badge-neutral'
 }
 
 function WhyFooter({ recommendations }: { recommendations: Recommendation[] }) {

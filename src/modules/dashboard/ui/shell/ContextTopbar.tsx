@@ -1,9 +1,11 @@
 import * as React from 'react'
+import { Link } from '@tanstack/react-router'
 import { ChevronRight, PanelLeft } from 'lucide-react'
 import { OrganizationSwitcher } from '~/modules/dashboard/components/OrganizationSwitcher'
 import { UserMenu } from '~/modules/dashboard/components/UserMenu'
 import { ThemeToggle } from '~/shared/components/ThemeToggle'
 import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
+import type { BreadcrumbSegment } from './breadcrumbs'
 
 /**
  * The topbar, now contextual.
@@ -17,7 +19,7 @@ import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 export function ContextTopbar({
   crumbs, signingOut, onSignOut, pathname, onOpenNav,
 }: {
-  crumbs: string[]
+  crumbs: readonly BreadcrumbSegment[]
   signingOut: boolean
   onSignOut: () => void
   pathname: string
@@ -42,16 +44,22 @@ export function ContextTopbar({
         {crumbs.map((crumb, index) => {
           const last = index === crumbs.length - 1
           return (
-            <React.Fragment key={crumb}>
+            <React.Fragment key={`${index}:${crumb.label}`}>
               {index > 0 && (
                 <ChevronRight className="h-3.5 w-3.5 shrink-0 text-bh-text-dim" aria-hidden="true" />
               )}
-              <span
-                aria-current={last ? 'page' : undefined}
-                className={last ? 'truncate font-semibold text-bh-text' : 'truncate text-bh-text-dim'}
-              >
-                {crumb}
-              </span>
+              {!last && crumb.to ? (
+                <Link to={crumb.to} className="truncate text-bh-text-dim hover:text-bh-text hover:underline">
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span
+                  aria-current={last ? 'page' : undefined}
+                  className={last ? 'truncate font-semibold text-bh-text' : 'truncate text-bh-text-dim'}
+                >
+                  {crumb.label}
+                </span>
+              )}
             </React.Fragment>
           )
         })}

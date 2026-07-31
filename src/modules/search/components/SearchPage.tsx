@@ -10,7 +10,7 @@ import { Tooltip } from '~/shared/components/Tooltip'
 import { ai } from '~/shared/lib/ai/client'
 import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon, ProductHuntIcon, BlueskyIcon } from '~/modules/landing/components/BrandIcons'
+import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
 
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
@@ -68,23 +68,16 @@ const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 's
 /** Sources that are ON by default. Niche sources are opt-in. */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 
-const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }> = {
-  github: { label: 'GitHub', color: 'badge-github', Icon: GithubIcon },
-  reddit: { label: 'Reddit', color: 'badge-reddit', Icon: RedditIcon },
-  hn: { label: 'Hacker News', color: 'badge-hn', Icon: HackerNewsIcon },
-  devto: { label: 'DEV.to', color: 'badge-devto', Icon: DevToIcon },
-  lobsters: { label: 'Lobsters', color: 'badge-lobsters', Icon: LobstersIcon },
-  stackoverflow: { label: 'Stack Overflow', color: 'badge-stackoverflow', Icon: StackOverflowIcon },
-  npm: { label: 'npm', color: 'badge-npm', Icon: NpmIcon },
-  huggingface: { label: 'Hugging Face', color: 'badge-huggingface', Icon: HuggingFaceIcon },
-  gitlab: { label: 'GitLab', color: 'badge-gitlab', Icon: GitLabIcon },
-  codeberg: { label: 'Codeberg', color: 'badge-codeberg', Icon: CodebergIcon },
-  hashnode: { label: 'Hashnode', color: 'badge-hashnode', Icon: HashnodeIcon },
-  sourcehut: { label: 'SourceHut', color: 'badge-sourcehut', Icon: SourceHutIcon },
-  devpost: { label: 'Devpost', color: 'badge-devpost', Icon: DevpostIcon },
-  producthunt: { label: 'Product Hunt', color: 'badge-producthunt', Icon: ProductHuntIcon },
-  bluesky: { label: 'Bluesky', color: 'badge-bluesky', Icon: BlueskyIcon },
-}
+// Sourced from the one exhaustive registry (src/shared/lib/source-presentation.ts) — kept in this
+// file's own pre-existing `{label, color, Icon}` shape so none of this file's many call sites need
+// to change, while removing this file's own copy of the label/icon/badge table.
+const SOURCE_META: Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }> = Object.fromEntries(
+  ALL_SOURCES.map((source) => {
+    const presentation = SOURCE_PRESENTATION[source]
+    return [source, { label: presentation.label, color: presentation.badgeClassName, Icon: presentation.Icon }]
+  }),
+) as Record<Source, { label: string; color: string; Icon: React.ComponentType<{ className?: string; title?: string }> }>
+
 
 /* -------------------------------------------------------------------------- */
 /*  Constants                                                                  */

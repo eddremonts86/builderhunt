@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { Compass, Loader2, Sparkles } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { ai } from '~/shared/lib/ai/client'
+import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor, type SprintFilter } from '~/shared/lib/sprints-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
@@ -61,6 +62,8 @@ function SprintDossierPage() {
   const [refineHistory, setRefineHistory] = React.useState<RefineTurn[]>([])
   const [loading, setLoading] = React.useState(true)
   const [trackedIds, setTrackedIds] = React.useState<Set<string>>(new Set())
+
+  useEntityBreadcrumbLabel(sprint?.name ?? null)
 
   const load = React.useCallback(async (nextFilter: SprintFilter, nextSort: 'score' | 'date') => {
     setLoading(true)

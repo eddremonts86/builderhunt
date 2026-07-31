@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { GithubIcon, RedditIcon, HackerNewsIcon, DevToIcon, LobstersIcon, StackOverflowIcon, NpmIcon, HuggingFaceIcon, GitLabIcon, CodebergIcon, HashnodeIcon, SourceHutIcon, DevpostIcon, ProductHuntIcon, BlueskyIcon } from '~/modules/landing/components/BrandIcons'
+import { GithubIcon } from '~/modules/landing/components/BrandIcons'
+import { getSourcePresentation } from '~/shared/lib/source-presentation'
 
 export interface PersonCardData {
   id: string
@@ -14,24 +15,6 @@ export interface PersonCardData {
   country?: string | null
   topics?: string[]
   score?: number
-}
-
-const SOURCE_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  github: { label: 'GitHub', Icon: GithubIcon },
-  reddit: { label: 'Reddit', Icon: RedditIcon },
-  hn: { label: 'Hacker News', Icon: HackerNewsIcon },
-  devto: { label: 'DEV.to', Icon: DevToIcon },
-  lobsters: { label: 'Lobsters', Icon: LobstersIcon },
-  stackoverflow: { label: 'Stack Overflow', Icon: StackOverflowIcon },
-  npm: { label: 'npm', Icon: NpmIcon },
-  huggingface: { label: 'Hugging Face', Icon: HuggingFaceIcon },
-  gitlab: { label: 'GitLab', Icon: GitLabIcon },
-  codeberg: { label: 'Codeberg', Icon: CodebergIcon },
-  hashnode: { label: 'Hashnode', Icon: HashnodeIcon },
-  sourcehut: { label: 'SourceHut', Icon: SourceHutIcon },
-  devpost: { label: 'Devpost', Icon: DevpostIcon },
-  producthunt: { label: 'Product Hunt', Icon: ProductHuntIcon },
-  bluesky: { label: 'Bluesky', Icon: BlueskyIcon },
 }
 
 const numberFormatter = new Intl.NumberFormat('en-US')
@@ -79,7 +62,8 @@ function Initials({ name, size = 40 }: { name: string; size?: number }) {
 }
 
 export function PersonResultCard({ builder, actions }: { builder: PersonCardData; actions?: React.ReactNode }) {
-  const meta = SOURCE_META[builder.source] ?? { label: builder.source, Icon: GithubIcon }
+  const presentation = getSourcePresentation(builder.source)
+  const meta = presentation ?? { label: builder.source, Icon: GithubIcon }
   const initial = (builder.displayName ?? builder.username ?? '?').trim()
   return (
     <article

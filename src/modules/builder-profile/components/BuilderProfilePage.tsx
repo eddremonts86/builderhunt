@@ -12,6 +12,8 @@ import { PublicEvidenceCard } from '~/modules/builder-profile/components/PublicE
 import { BuilderTimeline } from '~/modules/builder-profile/components/BuilderTimeline'
 import { AddToListMenu } from '~/modules/builder-profile/components/AddToListMenu'
 import { Button, LinkButton, Textarea } from '~/components/ui'
+import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
+import { getSourcePresentation } from '~/shared/lib/source-presentation'
 
 const CLAIM_ERROR_MESSAGES: Record<string, string> = {
   unsupported_source: "This profile's source doesn't support automatic verification yet.",
@@ -71,6 +73,11 @@ export function BuilderProfilePage() {
   const [claimChallenge, setClaimChallenge] = React.useState<{ source: string; challenge: string; instructions: string } | null>(null)
   const [claimError, setClaimError] = React.useState<string | null>(null)
   const [trackedBuildersCount, setTrackedBuildersCount] = React.useState(0)
+
+  // No-op on the public /builders/$builderId route (no BreadcrumbProvider ancestor there); on the
+  // authenticated dashboard workspace this swaps the topbar's generic "Builder" crumb for the
+  // real name once it loads.
+  useEntityBreadcrumbLabel(builder?.displayName ?? builder?.username ?? null)
 
   // This page is public: anonymous visitors reach it from search engines and
   // shared links. The tenant-scoped calls below (notes, dashboard stats) can
@@ -568,19 +575,6 @@ export function BuilderProfilePage() {
 }
 
 function SourceBadge({ source }: { source: string }) {
-  const cls = source === 'github' ? 'badge-github'
-    : source === 'reddit' ? 'badge-reddit'
-    : source === 'hn' ? 'badge-hn'
-    : source === 'devto' ? 'badge-devto'
-    : source === 'lobsters' ? 'badge-lobsters'
-    : source === 'stackoverflow' ? 'badge-stackoverflow'
-    : source === 'npm' ? 'badge-npm'
-    : source === 'huggingface' ? 'badge-huggingface'
-    : source === 'gitlab' ? 'badge-gitlab'
-    : source === 'codeberg' ? 'badge-codeberg'
-    : source === 'hashnode' ? 'badge-hashnode'
-    : source === 'sourcehut' ? 'badge-sourcehut'
-    : 'badge'
-  const label = source === 'hn' ? 'Hacker News' : source
-  return <span className={cls}>{label}</span>
+  const presentation = getSourcePresentation(source)
+  return <span className={presentation?.badgeClassName ?? 'badge'}>{presentation?.label ?? source}</span>
 }

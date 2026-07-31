@@ -5,9 +5,11 @@ import { BackToTop } from '~/shared/components/BackToTop'
 import { ThemeProvider } from '~/shared/lib/theme/ThemeProvider'
 import { AreaPanel } from './AreaPanel'
 import { AreaRail } from './AreaRail'
+import { BreadcrumbProvider, useCurrentEntityBreadcrumbLabel } from './breadcrumb-context'
+import { resolveBreadcrumbSegments } from './breadcrumbs'
 import { ContextTopbar } from './ContextTopbar'
 import { MobileNavDrawer } from './MobileNavDrawer'
-import { breadcrumbFor, resolveActiveArea, visibleAreas } from './nav-config'
+import { resolveActiveArea, visibleAreas } from './nav-config'
 
 /**
  * Shell C — a 60px area rail, a 212px panel for the active area, and a
@@ -72,9 +74,10 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       .catch(() => setPlanRequestsCount(0))
   }, [isAdmin, location.pathname])
 
+  const entityLabel = useCurrentEntityBreadcrumbLabel()
   const areas = visibleAreas(isAdmin)
   const activeArea = resolveActiveArea(location.pathname, isAdmin)
-  const crumbs = breadcrumbFor(location.pathname, isAdmin)
+  const crumbs = resolveBreadcrumbSegments(location.pathname, isAdmin, entityLabel)
   const badges = React.useMemo(
     () => ({ unreadAlerts: unreadAlertsCount, planRequests: planRequestsCount }),
     [unreadAlertsCount, planRequestsCount],
@@ -132,7 +135,9 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <ThemeProvider>
-      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      <BreadcrumbProvider>
+        <DashboardLayoutInner>{children}</DashboardLayoutInner>
+      </BreadcrumbProvider>
     </ThemeProvider>
   )
 }
