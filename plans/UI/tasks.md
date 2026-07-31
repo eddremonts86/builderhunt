@@ -78,7 +78,7 @@
 
 ## Wave 3 — Calendar completion
 
-- [ ] **Extract a route-driven multi-view Calendar shell**
+- [x] **Extract a route-driven multi-view Calendar shell**
   - Files: `src/modules/calendar/components/CalendarPage.tsx`, `src/modules/calendar/components/CalendarView.tsx`, `src/modules/calendar/components/CalendarAgenda.tsx`, `src/routes/_dashboard/calendar/index.tsx`, `tests/unit/modules/calendar/components/CalendarView.test.tsx`
   - Do: Add month/week/day/list/today views, date navigation, bounded range fetching, timezone label/selector, search, validated URL state, lazy FullCalendar plugins, and accessible mobile agenda fallback.
   - Verify: restore view/date/search from a direct URL; desktop and 320 px snapshots cover all views; range requests stay bounded.
