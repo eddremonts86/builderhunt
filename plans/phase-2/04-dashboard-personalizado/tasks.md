@@ -11,7 +11,7 @@
   - Verify: cada widget actual aparece una sola vez.
 
 - [ ] **Crear registro y presets**
-  - Files: `src/modules/dashboard/ui/home/widget-registry.ts`, `src/modules/dashboard/ui/home/dashboard-presets.ts`, `src/modules/dashboard/ui/home/dashboard-presets.test.ts`
+  - Files: `src/modules/dashboard/ui/home/widget-registry.ts`, `src/modules/dashboard/ui/home/dashboard-presets.ts`, `tests/unit/modules/dashboard/ui/home/dashboard-presets.test.ts`
   - Do: contratos exhaustivos, general/hiring/investing/building y fallback.
   - Verify: unit tests para orden, IDs únicos, permiso y segmento desconocido.
 
@@ -26,12 +26,12 @@
   - Verify: HTTP tests por null/segment/role/entitlement.
 
 - [ ] **Implementar presets**
-  - Files: `src/modules/dashboard/ui/home/dashboard-presets.ts`, `src/modules/dashboard/ui/home/DashboardComposer.test.tsx`
+  - Files: `src/modules/dashboard/ui/home/dashboard-presets.ts`, `tests/unit/modules/dashboard/ui/home/DashboardComposer.test.tsx`
   - Do: configurar contenido/CTA y empty states honestos por segmento.
   - Verify: component tests y screenshots mobile/desktop por preset.
 
 - [ ] **Persistir overrides**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0086_dashboard_preferences.sql`, `src/routes/api/me/dashboard-preferences.ts`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0117_dashboard_preferences.sql`, `src/routes/api/me/dashboard-preferences.ts`
   - Do: guardar orden/visibilidad versionados, validar IDs y soportar reset.
   - Verify: tests de aislamiento, layout inválido y cambio de preset.
 

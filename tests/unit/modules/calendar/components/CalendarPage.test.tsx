@@ -236,6 +236,88 @@ describe('CalendarPage — layer toggles', () => {
   })
 })
 
+describe('CalendarPage — multi-view shell (plans/UI Wave 3)', () => {
+  it('defaults to month view and fetches a bounded range spanning the whole 6-week grid', async () => {
+    const { fetchFeed } = await renderPage([])
+    const [range] = fetchFeed.mock.calls[0]
+    // The 6-week grid for July 2027 starts Mon 2027-06-28 and ends Sun 2027-08-08 (exclusive).
+    expect(range.from.slice(0, 10)).toBe('2027-06-28')
+    expect(range.to.slice(0, 10)).toBe('2027-08-09')
+  })
+
+  it('switching to week view requests a 7-day range containing the active date', async () => {
+    const { fetchFeed } = await renderPage([])
+    await click(testId('calendar-view-week'))
+    const range = fetchFeed.mock.calls.at(-1)![0]
+    const spanDays = (new Date(range.to).getTime() - new Date(range.from).getTime()) / (24 * 60 * 60 * 1000)
+    expect(spanDays).toBe(7)
+    // 2027-07-15 is a Thursday; the week starts Monday 2027-07-12.
+    expect(range.from.slice(0, 10)).toBe('2027-07-12')
+  })
+
+  it('switching to day view requests exactly one day', async () => {
+    const { fetchFeed } = await renderPage([])
+    await click(testId('calendar-view-day'))
+    const range = fetchFeed.mock.calls.at(-1)![0]
+    expect(range.from.slice(0, 10)).toBe('2027-07-15')
+    expect(range.to.slice(0, 10)).toBe('2027-07-16')
+  })
+
+  it('switching to list view requests a bounded rolling window, not an unbounded one', async () => {
+    const { fetchFeed } = await renderPage([])
+    await click(testId('calendar-view-list'))
+    const range = fetchFeed.mock.calls.at(-1)![0]
+    const spanDays = (new Date(range.to).getTime() - new Date(range.from).getTime()) / (24 * 60 * 60 * 1000)
+    expect(spanDays).toBe(30)
+  })
+
+  it('"Today" returns the active date to the fixed `today` regardless of how far navigation moved', async () => {
+    const { fetchFeed } = await renderPage([])
+    await click(testId('calendar-next'))
+    await click(testId('calendar-next'))
+    await click(testId('calendar-today'))
+    const range = fetchFeed.mock.calls.at(-1)![0]
+    expect(range.from.slice(0, 10)).toBe('2027-06-28') // back to July 2027's own grid start
+  })
+
+  it('filters visible items by title client-side without re-fetching', async () => {
+    const { fetchFeed } = await renderPage([eventItem({ title: 'Rust standup' }), eventItem({ id: 'evt-2', title: 'Design review' })])
+    const callsBeforeSearch = fetchFeed.mock.calls.length
+
+    const search = testId('calendar-search-input') as HTMLInputElement
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
+    await act(async () => {
+      setter?.call(search, 'rust')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
+
+    expect(fetchFeed.mock.calls.length).toBe(callsBeforeSearch) // no network cost for a client-side filter
+    expect(testId('calendar-event-11111111-1111-4111-8111-111111111111')).toBeTruthy()
+    expect(maybeTestId('calendar-event-evt-2')).toBeNull()
+  })
+
+  it('is controllable: an external view/date/query prop drives rendering and onChange fires instead of internal state', async () => {
+    const fetchFeed = vi.fn(async () => ({ items: [], staleSources: [] }))
+    const onViewChange = vi.fn()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        <CalendarPage today={TODAY} fetchFeed={fetchFeed} view="week" onViewChange={onViewChange} />,
+      )
+    })
+    await flush()
+
+    expect(testId('calendar-view-week').getAttribute('aria-selected')).toBe('true')
+    await click(testId('calendar-view-day'))
+    expect(onViewChange).toHaveBeenCalledWith('day')
+    // Controlled: clicking did not flip the rendered tab locally, since the parent owns `view`.
+    expect(testId('calendar-view-week').getAttribute('aria-selected')).toBe('true')
+  })
+})
+
 describe('CalendarPage — stale sources', () => {
   it('warns in plain language and names the source', async () => {
     await renderPage([], ['calendar.reminder-delivery'])

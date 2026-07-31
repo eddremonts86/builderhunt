@@ -57,7 +57,7 @@
   - Files: `src/routes/_dashboard/alerts.tsx`,
     `src/shared/lib/repositories/organization-alerts.ts`,
     `src/shared/lib/table/capabilities/alerts.ts`
-  - Do: `listOrganizationAlerts` gains a cursor. The local `groupByAlert` helper (`alerts.tsx:107`)
+  - Do: `listOrganizationAlerts` gains a cursor. The local `groupByAlert` helper (`alerts.tsx:100`)
     is replaced by the shell's grouping, with aggregates from the server so a group count covers the
     **whole** group rather than the loaded part.
   - Verify: group counts compared before and after on the same data; where they differ, confirm the

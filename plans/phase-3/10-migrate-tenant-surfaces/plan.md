@@ -11,7 +11,7 @@
    client-side filter, and the inline edit row. If the `expansion` slot cannot carry that form, the
    shell needs work before five more surfaces depend on it.
 2. **The two billing queues**, which share a shape.
-3. **Team settings, sprints index, alerts** — alerts last, since it is 806 lines and brings
+3. **Team settings, sprints index, alerts** — alerts last, since it is 765 lines and brings
    grouping.
 
 Worst first again. The inline edit row is the single most likely thing to expose a shell

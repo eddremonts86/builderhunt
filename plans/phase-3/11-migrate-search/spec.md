@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `src/modules/search/components/SearchPage.tsx` is 1,731 lines — the largest component in the app. It is the only surface with existing infinite scroll (`SearchPage.tsx:399-449`, page-counting with `page`/`perPage`/`hasMore` and an `IntersectionObserver` at 200px `rootMargin`), the only one with client-side sorting (`sortBy` at line 157, applied at 496-504), and it appends into a growing array at line 423 with no virtualization. It has two backends: `/api/search/builders` and `/api/search/semantic`.
+> **Reality check**: `src/modules/search/components/SearchPage.tsx` is 1,666 lines — the largest component in the app. It is the only surface with existing infinite scroll (`SearchPage.tsx:395-441`, page-counting with `page`/`perPage`/`hasMore` and an `IntersectionObserver` at 200px `rootMargin`), the only one with client-side sorting (`sortBy` at line 152, applied at 488-497), and it appends into a growing array at line 418 with no virtualization. It has two backends: `/api/search/builders` and `/api/search/semantic`.
 
 ## Problem
 
@@ -22,7 +22,7 @@ exactly.
 - **Changing relevance or scoring.** The semantic pipeline's ranking is the product; this plan does
   not touch how results are ordered by relevance.
 - **Merging the two backends.** Keyword and semantic stay separate endpoints.
-- **Splitting the 1,731-line component.** Tempting and out of scope. Extracting the result list is
+- **Splitting the 1,666-line component.** Tempting and out of scope. Extracting the result list is
   in scope; refactoring the filter panel, source toggles and semantic mode switch is not.
 
 ## Semantic ranking as a pass-through
@@ -42,7 +42,7 @@ ranking or leak vector internals into the URL. Neither is acceptable, so it stay
 
 - `grep -n 'perPage\|hasMore\|IntersectionObserver' src/modules/search/components/SearchPage.tsx`
   returns nothing.
-- The client-side `sortBy` block (currently lines 157 and 496-504) is gone; sorting is a
+- The client-side `sortBy` block (currently lines 152 and 488-497) is gone; sorting is a
   `TableQuery`.
 - Semantic and keyword modes both paginate, and the first page of semantic results is **identical**
   to today's for the same query — asserted against a recorded fixture, not eyeballed.

@@ -147,6 +147,32 @@ function supportedTimezones(): string[] {
   return ['UTC', Intl.DateTimeFormat().resolvedOptions().timeZone]
 }
 
+// Matches Tailwind's `md` breakpoint (768px).
+const MOBILE_BREAKPOINT_PX = 768
+
+/**
+ * True below the `md` breakpoint. Deliberately renders exactly one of
+ * `CalendarView`/`CalendarAgenda` rather than both plus a CSS `hidden` class on the other: two
+ * copies of the same event's title in the DOM at once — one merely `display:none` — still match a
+ * plain-text query (`page.getByText(...)`), and `.first()` has no way to know which copy is the
+ * one actually on screen. Defaults to `false` (desktop) on the server and on first client render
+ * so hydration never has to reconcile a guess against the real viewport; `matchMedia` is guarded
+ * for jsdom, which does not implement it, so every existing component test keeps rendering the
+ * grid exactly as before.
+ */
+function useIsNarrowViewport(breakpointPx: number): boolean {
+  const [isNarrow, setIsNarrow] = useState(false)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia(`(max-width: ${breakpointPx - 1}px)`)
+    const update = () => setIsNarrow(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [breakpointPx])
+  return isNarrow
+}
+
 export function CalendarPage(props: CalendarPageProps = {}) {
   const fetchFeed = props.fetchFeed ?? defaultFetchFeed
   const createEventFn = props.createEvent ?? defaultCreateEvent
@@ -175,6 +201,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
 
   const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
   const timezoneOptions = useMemo(() => supportedTimezones(), [])
+  const isNarrowViewport = useIsNarrowViewport(MOBILE_BREAKPOINT_PX)
 
   const [items, setItems] = useState<CalendarFeedItemDto[]>([])
   const [staleSources, setStaleSources] = useState<string[]>([])
@@ -496,13 +523,13 @@ export function CalendarPage(props: CalendarPageProps = {}) {
               data-testid="calendar-search-input"
             />
           </div>
-          <label className="flex items-center gap-1.5 text-xs text-bh-text-muted">
-            <span data-testid="calendar-timezone-label">{timezone}</span>
+          <label className="flex min-w-0 items-center gap-1.5 text-xs text-bh-text-muted">
+            <span className="shrink-0">Timezone</span>
             <select
               aria-label="Display timezone"
               value={timezone}
               onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTimezone(e.target.value)}
-              className="h-8 rounded-md border border-bh-border bg-bh-surface px-2 text-xs"
+              className="h-8 w-32 truncate rounded-md border border-bh-border bg-bh-surface px-2 text-xs"
               data-testid="calendar-timezone-select"
             >
               {timezoneOptions.map((tz) => (
@@ -521,30 +548,22 @@ export function CalendarPage(props: CalendarPageProps = {}) {
             <div key={index} className="min-h-24 animate-pulse bg-bh-surface" />
           ))}
         </div>
+      ) : isNarrowViewport || view === 'list' ? (
+        // Below the `md` breakpoint the agenda always wins regardless of the selected view — a
+        // 42-cell month grid (or an hour-by-hour day grid) is not usable at 320px — and it is the
+        // desktop rendering of "list" too. Exactly one tree renders; see `useIsNarrowViewport`.
+        <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
       ) : (
-        <>
-          {/* Always the mobile fallback, regardless of the selected view: a 42-cell month grid (or an
-              hour-by-hour day grid) is not usable at 320px, and the agenda reads the same items. */}
-          <div className="md:hidden">
-            <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
-          </div>
-          <div className="hidden md:block">
-            {view === 'list' ? (
-              <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
-            ) : (
-              <CalendarView
-                days={days}
-                columns={columns}
-                weekdayLabels={weekdayLabels}
-                itemsByDay={itemsByDay}
-                isDimmed={dimPredicate}
-                viewLabel={viewLabel}
-                onDelete={handleDelete}
-                onSelectProjection={handleSelectProjection}
-              />
-            )}
-          </div>
-        </>
+        <CalendarView
+          days={days}
+          columns={columns}
+          weekdayLabels={weekdayLabels}
+          itemsByDay={itemsByDay}
+          isDimmed={dimPredicate}
+          viewLabel={viewLabel}
+          onDelete={handleDelete}
+          onSelectProjection={handleSelectProjection}
+        />
       )}
 
       {!loading && visibleItems.length === 0 && !loadError && view !== 'list' && (

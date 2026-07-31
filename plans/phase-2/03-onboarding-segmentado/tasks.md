@@ -6,12 +6,12 @@
 > **Reality check**: `src/shared/lib/onboarding.ts` y sus rutas son la base obligatoria.
 
 - [ ] **Definir state machine v2**
-  - Files: `src/shared/lib/onboarding-v2.ts`, `src/shared/lib/onboarding-v2.test.ts`
+  - Files: `src/shared/lib/onboarding-v2.ts`, `tests/unit/shared/lib/onboarding-v2.test.ts`
   - Do: modelar segmentos, step keys, transiciones, skip, resume y activaciones.
   - Verify: tests de cada transición válida/inválida y fallback general.
 
 - [ ] **Migrar progreso de onboarding**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0085_segmented_onboarding.sql`, `drizzle/migration-hashes.json`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0116_segmented_onboarding.sql`, `drizzle/migration-hashes.json`
   - Do: añadir flow version, step key y activación manteniendo compatibilidad v1.
   - Verify: DB desechable migra filas not-started/in-progress/completed/skipped sin pérdida.
 

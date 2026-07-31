@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: [`05-table-shell`](../05-table-shell/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: `src/modules/search/components/SearchPage.tsx` already appends pages into a growing array (`setResults((prev) => [...prev, ...newOnes])`, `SearchPage.tsx:423`) with no virtualization, so a long session accumulates unbounded DOM. The shell from plan 05 renders every loaded row.
+> **Reality check**: `src/modules/search/components/SearchPage.tsx` already appends pages into a growing array (`setResults((prev) => [...prev, ...newOnes.filter(…)])`, `SearchPage.tsx:418`) with no virtualization, so a long session accumulates unbounded DOM. The shell from plan 05 renders every loaded row.
 
 ## Problem
 

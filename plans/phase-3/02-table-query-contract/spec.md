@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: nothing
 > **Blocks**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md), [`05-table-shell`](../05-table-shell/spec.md)
-> **Reality check**: Two incompatible pagination shapes exist. `src/modules/search/components/SearchPage.tsx:399-449` counts pages (`page`/`perPage`/`hasMore`); `src/routes/api/sprints/$sprintId/results.ts` emits a base64 *offset*. Pure filter/sort helpers in `src/lib/sprints/results.ts` are the precedent for keeping model functions pure. HMAC token signing already exists at `src/shared/lib/security/feed-capability.ts:33`.
+> **Reality check**: Two incompatible pagination shapes exist. `src/modules/search/components/SearchPage.tsx:395-441` counts pages (`page`/`perPage`/`hasMore`); `src/routes/api/sprints/$sprintId/results.ts` emits a base64 *offset*. Pure filter/sort helpers in `src/lib/sprints/results.ts` are the precedent for keeping model functions pure. HMAC token signing already exists at `src/shared/lib/security/feed-capability.ts:33`.
 
 ## Problem
 

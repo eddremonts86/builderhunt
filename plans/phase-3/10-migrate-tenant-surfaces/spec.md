@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
 > **Blocks**: [`11-migrate-search`](../11-migrate-search/spec.md), [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: Six surfaces, each needing a new bounded read. `src/routes/_dashboard/admin/users.tsx:110` filters client-side over `listPlatformUsersWithPlans()`, which returns **every user in the system** with no limit. `RefundQueue.tsx` and `DisputeQueue.tsx` load an organization's whole queue after typing an organization id. `TeamSettingsPage.tsx`, `sprints/index.tsx` and `alerts.tsx` (806 lines) each read their full set.
+> **Reality check**: Six surfaces, each needing a new bounded read. `src/routes/_dashboard/admin/users.tsx:110` filters client-side over `listPlatformUsersWithPlans()`, which returns **every user in the system** with no limit. `RefundQueue.tsx` and `DisputeQueue.tsx` load an organization's whole queue after typing an organization id. `TeamSettingsPage.tsx`, `sprints/index.tsx` and `alerts.tsx` (765 lines) each read their full set.
 
 ## Problem
 
@@ -33,7 +33,7 @@ rather than wrapped.
 | `DisputeQueue` | Same shape as refunds, over `listDisputes`. |
 | `TeamSettingsPage` | `listOrganizationMembers` and `listPendingInvitations` gain cursors. Two grids, not one merged list. |
 | `sprints/index` | `listSprints` gains a cursor; sortable by last-run and status. |
-| `alerts` | `listOrganizationAlerts` gains a cursor. The existing `groupByAlert` helper (`alerts.tsx:107`) becomes the shell's grouping. |
+| `alerts` | `listOrganizationAlerts` gains a cursor. The existing `groupByAlert` helper (`alerts.tsx:100`) becomes the shell's grouping. |
 
 ## The inline edit row
 

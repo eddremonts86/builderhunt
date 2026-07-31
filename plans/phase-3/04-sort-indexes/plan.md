@@ -3,11 +3,11 @@
 > **Status**: `pending`
 > **Depends on**: [`03-keyset-pagination`](../03-keyset-pagination/spec.md)
 > **Blocks**: [`07-first-surface-sprint-results`](../07-first-surface-sprint-results/spec.md)
-> **Reality check**: One generated migration (`drizzle/0084`) plus one unit test. Reuses the 60 existing indexes wherever they already match.
+> **Reality check**: One generated migration (`drizzle/0115` at today's tip) plus one unit test. Reuses the 85 existing indexes wherever they already match.
 
 ## Sequence
 
-1. **Audit the existing 60 indexes against the capabilities' `sortable` sets.** Most tenant tables
+1. **Audit the existing 85 indexes against the capabilities' `sortable` sets.** Most tenant tables
    already carry `(organization_id, created_at)`, which covers the common default sort for free.
    Write down what is already covered before generating anything.
 2. **Declare only the missing indexes**, generate, regenerate the hash manifest.
@@ -25,7 +25,7 @@ the hardest kind of regression to notice.
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Index bloat: a composite per sortable column across 19 tables | Medium | Medium — write amplification and disk | Step 1 reuses existing composites; only genuinely missing indexes are added, and the list is reviewed before generating |
-| The migration is generated with an unintended schema diff | Medium | High — an accidental column change reaching production | Read `drizzle/0084_*.sql` before committing and confirm it is `CREATE INDEX` only; `pnpm test:migrations:local` rehearses it |
+| The migration is generated with an unintended schema diff | Medium | High — an accidental column change reaching production | Read the generated `drizzle/0115_*.sql` before committing and confirm it is `CREATE INDEX` only; `pnpm test:migrations:local` rehearses it |
 | Forgetting the hash manifest regeneration | **High** — it happened on `0082` and `0083` | Low — a red gate, caught locally | `verify-migration-integrity.mjs --write` is its own task with its own verify step |
 | A `NULLS LAST` mismatch makes an index unusable while the guard passes | Medium | Medium — a slow sort that looks guarded | The guard checks the modifier; plan 13's `EXPLAIN` assertion catches what the guard cannot |
 

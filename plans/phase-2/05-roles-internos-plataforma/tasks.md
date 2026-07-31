@@ -11,17 +11,17 @@
   - Verify: `rg "api/admin|_dashboard/admin" src/routes` no produce endpoints ausentes de la matriz.
 
 - [ ] **Definir roles y permisos**
-  - Files: `src/shared/lib/auth/platform-permissions.ts`, `src/shared/lib/auth/platform-permissions.test.ts`
+  - Files: `src/shared/lib/auth/platform-permissions.ts`, `tests/unit/shared/lib/auth/platform-permissions.test.ts`
   - Do: enums, bundles, deny-by-default y exhaustividad.
   - Verify: tests por cada rol/permiso y permiso desconocido.
 
 - [ ] **Crear tablas operacionales**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0087_platform_staff_roles.sql`, `drizzle/migration-hashes.json`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0118_platform_staff_roles.sql`, `drizzle/migration-hashes.json`
   - Do: assignments, append-only audit, constraints y grants platform-only.
   - Verify: DB desechable demuestra que app/tenant roles no pueden leer tablas.
 
 - [ ] **Implementar principal y guards**
-  - Files: `src/shared/lib/auth/platform-principal.ts`, `src/shared/lib/auth/platform-principal.test.ts`
+  - Files: `src/shared/lib/auth/platform-principal.ts`, `tests/unit/shared/lib/auth/platform-principal.test.ts`
   - Do: require principal/permission, bootstrap allowlist y protección último super admin.
   - Verify: 401/403/200, revocado, último admin y cache invalidation.
 

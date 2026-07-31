@@ -11,12 +11,12 @@
   - Verify: cada claim enlaza a feature real o se elimina.
 
 - [ ] **Crear configuración tipada de contenido**
-  - Files: `src/modules/landing/content/segment-pages.ts`, `src/modules/landing/content/segment-pages.test.ts`
+  - Files: `src/modules/landing/content/segment-pages.ts`, `tests/unit/modules/landing/content/segment-pages.test.ts`
   - Do: contenido exhaustivo sobre `UserSegment` y metadata.
   - Verify: tests de segmentos, links, CTA y claims obligatorios.
 
 - [ ] **Crear componentes compartidos**
-  - Files: `src/modules/landing/components/SegmentSelector.tsx`, `src/modules/landing/components/SegmentLandingPage.tsx`, `src/modules/landing/components/SegmentSelector.test.tsx`
+  - Files: `src/modules/landing/components/SegmentSelector.tsx`, `src/modules/landing/components/SegmentLandingPage.tsx`, `tests/unit/modules/landing/components/SegmentSelector.test.tsx`
   - Do: selector/tab accesible, secciones y CTA reutilizables.
   - Verify: keyboard, screen reader, no-JS y component tests.
 
@@ -48,4 +48,4 @@
 - [ ] **Ejecutar QA de lanzamiento**
   - Files: `docs/design/responsive-qa-checklist.md`, `docs/accessibility-verification.md`
   - Do: revisar navegadores, breakpoints, teclado, lectores, performance, copy legal y claims.
-  - Verify: `npm run build`, tests, Playwright, performance budget y smoke runtime.
+  - Verify: `pnpm build`, tests, Playwright, performance budget y smoke runtime.

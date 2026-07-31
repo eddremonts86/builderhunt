@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: [`10-migrate-tenant-surfaces`](../10-migrate-tenant-surfaces/spec.md)
 > **Blocks**: [`13-pagination-ci-gates`](../13-pagination-ci-gates/spec.md)
-> **Reality check**: `SearchPage.tsx` is 1,731 lines; its scroll loop is at 399-449 and its client sort at 157 and 496-504.
+> **Reality check**: `SearchPage.tsx` is 1,666 lines; its scroll loop is at 395-441 and its client sort at 152 and 488-497.
 
 - [ ] **Record today's ranking as a fixture before changing anything**
   - Files: `tests/e2e/fixtures/search-ranking.json`
@@ -36,8 +36,8 @@
 
 - [ ] **Move the result list onto the shell**
   - Files: `src/modules/search/components/SearchPage.tsx`
-  - Do: replace the result list with `DataTable`. Delete the `sortBy` state (line 157) and its
-    client-side application (496-504), and the `IntersectionObserver` loop (399-449) — but only
+  - Do: replace the result list with `DataTable`. Delete the `sortBy` state (line 152) and its
+    client-side application (488-497), and the `IntersectionObserver` loop (395-441) — but only
     after the shell's loop is in place, so scrolling is never broken in between. Leave the filter
     panel, source toggles and semantic mode switch alone; they are out of scope.
   - Verify: `grep -n 'perPage\|hasMore\|IntersectionObserver\|sortBy' src/modules/search/components/SearchPage.tsx`
