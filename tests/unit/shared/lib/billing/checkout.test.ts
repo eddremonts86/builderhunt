@@ -98,7 +98,7 @@ describe('createSubscriptionCheckout', () => {
   it('rejects when billing has never been configured (no seller profile recorded)', async () => {
     const principal = await freshOrgWithOwner()
 
-    await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db })))
+    await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db, authDb: db })))
       .rejects.toMatchObject({ code: 'billing_disabled' })
   })
 
@@ -112,7 +112,7 @@ describe('createSubscriptionCheckout', () => {
     it('creates a Checkout Session and records exactly one Stripe customer for the organization', async () => {
       const principal = await freshOrgWithOwner()
 
-      const result = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db }))
+      const result = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db, authDb: db }))
 
       expect(result.status).toBe('complete')
       expect(result.checkoutUrl).toMatch(/^https:\/\/checkout\.stripe\.test\//)
@@ -123,7 +123,7 @@ describe('createSubscriptionCheckout', () => {
       const principal = await freshOrgWithOwner()
       const input = baseInput()
 
-      await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db }))
+      await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db, authDb: db }))
 
       const attempt = await db.transaction((tx) => findBillingCheckoutAttemptByIdempotencyKey(tx, principal.organizationId, input.idempotencyKey))
       expect(attempt?.stripeCheckoutSessionId).toBeTruthy()
@@ -140,28 +140,28 @@ describe('createSubscriptionCheckout', () => {
     it('rejects a non-Denmark country', async () => {
       const principal = await freshOrgWithOwner()
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ country: 'US' }), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ country: 'US' }), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'country_not_allowed' })
     })
 
     it('rejects an unknown catalog key (spoofed price/tier cannot be smuggled in this way)', async () => {
       const principal = await freshOrgWithOwner()
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ catalogKey: 'not_a_real_key' }), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ catalogKey: 'not_a_real_key' }), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'unknown_catalog_key' })
     })
 
     it('rejects a successUrl outside this app\'s own origin (spoofed redirect)', async () => {
       const principal = await freshOrgWithOwner()
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ successUrl: 'https://evil.example.com/success' }), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ successUrl: 'https://evil.example.com/success' }), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'invalid_url' })
     })
 
     it('rejects a cancelUrl outside this app\'s own origin (spoofed redirect)', async () => {
       const principal = await freshOrgWithOwner()
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ cancelUrl: 'https://evil.example.com/cancel' }), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ cancelUrl: 'https://evil.example.com/cancel' }), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'invalid_url' })
     })
 
@@ -170,7 +170,7 @@ describe('createSubscriptionCheckout', () => {
       const appOrigin = new URL(env.APP_URL)
       const lookalike = `${appOrigin.protocol}//${appOrigin.host}.evil.com/success`
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ successUrl: lookalike }), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput({ successUrl: lookalike }), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'invalid_url' })
     })
 
@@ -184,7 +184,7 @@ describe('createSubscriptionCheckout', () => {
         stripeSubscriptionId: uniqueId('stripe-sub'), stripeStatus: 'active',
       }))
 
-      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db })))
+      await expect(db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db, authDb: db })))
         .rejects.toMatchObject({ code: 'subscription_exists' })
     })
 
@@ -192,8 +192,8 @@ describe('createSubscriptionCheckout', () => {
       const principal = await freshOrgWithOwner()
       const input = baseInput()
 
-      const first = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db }))
-      const second = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db }))
+      const first = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db, authDb: db }))
+      const second = await db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db, authDb: db }))
 
       expect(second).toEqual(first)
       expect(await provider.listForReconciliation('customers')).toHaveLength(1)
@@ -204,8 +204,8 @@ describe('createSubscriptionCheckout', () => {
       const input = baseInput()
 
       const [first, second] = await Promise.all([
-        db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db })),
-        db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db })),
+        db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db, authDb: db })),
+        db.transaction((tx) => createSubscriptionCheckout(tx, principal, input, { provider, sellerProfileDb: db, authDb: db })),
       ])
 
       expect(first.checkoutUrl).toBe(second.checkoutUrl)
@@ -216,7 +216,7 @@ describe('createSubscriptionCheckout', () => {
       const idempotencyKey = uniqueId('timeout-idem')
 
       await expect(db.transaction((tx) => createSubscriptionCheckout(
-        tx, principal, baseInput({ idempotencyKey }), { provider: new TimeoutProvider(), sellerProfileDb: db },
+        tx, principal, baseInput({ idempotencyKey }), { provider: new TimeoutProvider(), sellerProfileDb: db, authDb: db },
       ))).rejects.toBeInstanceOf(CheckoutError)
 
       const attempt = await db.transaction((tx) => findBillingCheckoutAttemptByIdempotencyKey(tx, principal.organizationId, idempotencyKey))
@@ -228,7 +228,7 @@ describe('createSubscriptionCheckout', () => {
       const idempotencyKey = uniqueId('missing-disclosure')
 
       await expect(db.transaction((tx) => createSubscriptionCheckout(
-        tx, principal, baseInput({ idempotencyKey, disclosures: { ...ALL_ACKNOWLEDGED, tax: false } }), { provider, sellerProfileDb: db },
+        tx, principal, baseInput({ idempotencyKey, disclosures: { ...ALL_ACKNOWLEDGED, tax: false } }), { provider, sellerProfileDb: db, authDb: db },
       ))).rejects.toMatchObject({ code: 'missing_disclosure' })
 
       const attempt = await db.transaction((tx) => findBillingCheckoutAttemptByIdempotencyKey(tx, principal.organizationId, idempotencyKey))
@@ -257,7 +257,7 @@ describe('getCheckoutReturnStatus', () => {
     const platformAdminId = uniqueId('platform-admin')
     await db.insert(authUsers).values({ id: platformAdminId, name: platformAdminId, email: `${platformAdminId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
     await createSellerProfileVersion(DENMARK_SELLER_PROFILE, platformAdminId, db)
-    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db }))
+    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db, authDb: db }))
 
     const result = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
 
@@ -284,7 +284,7 @@ describe('getCheckoutReturnStatus', () => {
     const platformAdminId = uniqueId('platform-admin')
     await db.insert(authUsers).values({ id: platformAdminId, name: platformAdminId, email: `${platformAdminId}@test.invalid`, emailVerified: true, createdAt: new Date(), updatedAt: new Date() })
     await createSellerProfileVersion(DENMARK_SELLER_PROFILE, platformAdminId, db)
-    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db }))
+    await db.transaction((tx) => createSubscriptionCheckout(tx, principal, baseInput(), { provider, sellerProfileDb: db, authDb: db }))
 
     const firstPoll = await db.transaction((tx) => getCheckoutReturnStatus(tx, principal, { provider }))
     expect(firstPoll).toEqual({ state: 'pending' })

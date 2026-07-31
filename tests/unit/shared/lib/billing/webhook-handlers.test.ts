@@ -184,7 +184,7 @@ describe('processStripeWebhookEvent — checkout session', () => {
     const sessionId = `cs_${uniqueId('session')}`
     await seedCheckoutAttempt(organizationId, userId, sessionId)
 
-    const result = await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed'), { db })
+    const result = await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed'), { db, authDb: db })
 
     expect(result.outcome).toBe('applied')
     const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
@@ -196,7 +196,7 @@ describe('processStripeWebhookEvent — checkout session', () => {
     const sessionId = `cs_${uniqueId('session')}`
     await seedCheckoutAttempt(organizationId, userId, sessionId)
 
-    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.expired'), { db })
+    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.expired'), { db, authDb: db })
 
     const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
     expect(attempt.status).toBe('expired')
@@ -208,8 +208,8 @@ describe('processStripeWebhookEvent — checkout session', () => {
     await seedCheckoutAttempt(organizationId, userId, sessionId)
 
     const event = checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed')
-    await processStripeWebhookEvent(event, { db })
-    const second = await processStripeWebhookEvent(event, { db })
+    await processStripeWebhookEvent(event, { db, authDb: db })
+    const second = await processStripeWebhookEvent(event, { db, authDb: db })
 
     expect(second.outcome).toBe('applied')
     const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
@@ -217,7 +217,7 @@ describe('processStripeWebhookEvent — checkout session', () => {
   })
 
   it('defers when no matching checkout attempt exists yet', async () => {
-    const result = await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), 'cs_never_seen', 'checkout.session.completed'), { db })
+    const result = await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), 'cs_never_seen', 'checkout.session.completed'), { db, authDb: db })
     expect(result.outcome).toBe('deferred')
   })
 })
@@ -233,7 +233,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
         subscriptionId, customerId: stripeCustomerId, status: 'active', created: 1780000000,
         priceId: SUBSCRIPTION_CATALOG.team_monthly.stripePriceId.test!,
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -257,7 +257,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
         subscriptionId, customerId: stripeCustomerId, status: 'active', created: 1780000000,
         priceId: SUBSCRIPTION_CATALOG.pro_max_monthly.stripePriceId.test!,
       }),
-      { db },
+      { db, authDb: db },
     )
 
     const entitlement = await readEntitlement(organizationId)
@@ -273,7 +273,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.created', {
         subscriptionId, customerId: stripeCustomerId, status: 'incomplete', created: 1780000000,
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(await readEntitlement(organizationId)).toBeNull()
@@ -289,7 +289,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
         subscriptionId, customerId: stripeCustomerId, status: 'past_due', created: Math.floor(new Date('2026-01-02T00:00:00Z').getTime() / 1000),
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -310,7 +310,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
         subscriptionId, customerId: stripeCustomerId, status: 'past_due', created: Math.floor(new Date('2026-01-01T00:00:00Z').getTime() / 1000),
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('ignored')
@@ -328,8 +328,8 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
     const t2 = Math.floor(new Date('2026-01-03T00:00:00Z').getTime() / 1000)
 
     // Deliver the NEWER event (t2) first, then the OLDER one (t1) — simulating out-of-order delivery.
-    await processStripeWebhookEvent(subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', { subscriptionId, customerId: stripeCustomerId, status: 'past_due', created: t2 }), { db })
-    const laterDeliveredOlderEvent = await processStripeWebhookEvent(subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', { subscriptionId, customerId: stripeCustomerId, status: 'active', created: t1 }), { db })
+    await processStripeWebhookEvent(subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', { subscriptionId, customerId: stripeCustomerId, status: 'past_due', created: t2 }), { db, authDb: db })
+    const laterDeliveredOlderEvent = await processStripeWebhookEvent(subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', { subscriptionId, customerId: stripeCustomerId, status: 'active', created: t1 }), { db, authDb: db })
 
     expect(laterDeliveredOlderEvent.outcome).toBe('ignored')
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
@@ -345,8 +345,8 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
     const event = subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
       subscriptionId, customerId: stripeCustomerId, status: 'past_due', created: Math.floor(new Date('2026-01-02T00:00:00Z').getTime() / 1000),
     })
-    const first = await processStripeWebhookEvent(event, { db })
-    const second = await processStripeWebhookEvent(event, { db })
+    const first = await processStripeWebhookEvent(event, { db, authDb: db })
+    const second = await processStripeWebhookEvent(event, { db, authDb: db })
 
     expect(first.outcome).toBe('applied')
     expect(second.outcome).toBe('applied')
@@ -365,7 +365,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
         subscriptionId, customerId: stripeCustomerId, status: 'active', created: Math.floor(new Date('2026-06-01T00:00:00Z').getTime() / 1000),
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('ignored')
@@ -378,7 +378,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.created', {
         subscriptionId: `sub_${uniqueId('sub')}`, customerId: 'cus_never_seen', status: 'active', created: 1780000000,
       }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('deferred')
   })
@@ -401,7 +401,7 @@ describe('processStripeWebhookEvent — subscription created/updated', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', {
         subscriptionId, customerId: stripeCustomerId, status: 'active', created: Math.floor(new Date('2026-01-10T00:00:00Z').getTime() / 1000),
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -424,7 +424,7 @@ describe('processStripeWebhookEvent — subscription deleted', () => {
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.deleted', {
         subscriptionId, customerId: stripeCustomerId, status: 'canceled', created: Math.floor(new Date('2026-01-02T00:00:00Z').getTime() / 1000),
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -447,7 +447,7 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
 
     const result = await processStripeWebhookEvent(
       invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -464,8 +464,8 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const invoiceId = `in_${uniqueId('invoice')}`
     const event = invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 })
 
-    await processStripeWebhookEvent(event, { db })
-    const second = await processStripeWebhookEvent(event, { db })
+    await processStripeWebhookEvent(event, { db, authDb: db })
+    const second = await processStripeWebhookEvent(event, { db, authDb: db })
 
     expect(second.outcome).toBe('applied')
     const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentReference, invoiceId)))
@@ -485,7 +485,7 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
 
     await processStripeWebhookEvent(
       invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, periodEnd: Math.floor(currentPeriodEnd.getTime() / 1000), created: Math.floor(currentPeriodStart.getTime() / 1000) }),
-      { db },
+      { db, authDb: db },
     )
 
     const [grant] = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.stripePaymentReference, invoiceId)))
@@ -499,8 +499,8 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
     const subscriptionId = await seedSubscription(organizationId, customerRow.id)
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1782592000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db, authDb: db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1782592000 }), { db, authDb: db })
 
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
     expect(grants).toHaveLength(2)
@@ -509,7 +509,7 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
   it('defers when the subscription has not been created yet (out-of-order delivery)', async () => {
     const result = await processStripeWebhookEvent(
       invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId: 'sub_never_seen', created: 1780000000 }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('deferred')
   })
@@ -520,15 +520,15 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const subscriptionId = `sub_${uniqueId('sub')}`
     const invoiceId = `in_${uniqueId('invoice')}`
 
-    const deferred = await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 }), { db })
+    const deferred = await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 }), { db, authDb: db })
     expect(deferred.outcome).toBe('deferred')
 
     await processStripeWebhookEvent(
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.created', { subscriptionId, customerId: stripeCustomerId, status: 'active', created: 1780000000 }),
-      { db },
+      { db, authDb: db },
     )
 
-    const retried = await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 }), { db })
+    const retried = await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId, subscriptionId, created: 1780000000 }), { db, authDb: db })
     expect(retried.outcome).toBe('applied')
 
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
@@ -543,11 +543,11 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const subscriptionId = await seedSubscription(organizationId, customerRow.id)
     const event = invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 })
 
-    await processStripeWebhookEvent(event, { db })
+    await processStripeWebhookEvent(event, { db, authDb: db })
     expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledTimes(1)
     expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledWith(`${userId}@test.invalid`, expect.any(Object))
 
-    await processStripeWebhookEvent(event, { db })
+    await processStripeWebhookEvent(event, { db, authDb: db })
     expect(emailMocks.sendBillingReceiptEmail).toHaveBeenCalledTimes(1)
   })
 
@@ -557,7 +557,7 @@ describe('processStripeWebhookEvent — invoice.paid', () => {
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
     const subscriptionId = await seedSubscription(organizationId, customerRow.id)
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.paid', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db, authDb: db })
 
     expect(emailMocks.sendBillingReceiptEmail).not.toHaveBeenCalled()
   })
@@ -572,7 +572,7 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
 
     const result = await processStripeWebhookEvent(
       invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -586,10 +586,10 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
     const subscriptionId = await seedSubscription(organizationId, customerRow.id)
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db, authDb: db })
     const [firstRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1790000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1790000000 }), { db, authDb: db })
     const [secondRow] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
 
     expect(secondRow.gracePeriodEndsAt?.getTime()).toBe(firstRow.gracePeriodEndsAt?.getTime())
@@ -601,10 +601,10 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
     const subscriptionId = await seedSubscription(organizationId, customerRow.id, { stripeStatus: 'past_due', providerSyncedAt: new Date('2026-01-01T00:00:00Z') })
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db, authDb: db })
     await processStripeWebhookEvent(
       subscriptionEvent(uniqueId('evt'), 'customer.subscription.updated', { subscriptionId, customerId: stripeCustomerId, status: 'active', created: Math.floor(new Date('2026-01-02T00:00:00Z').getTime() / 1000) }),
-      { db },
+      { db, authDb: db },
     )
 
     const [row] = await db.select().from(billingSubscriptions).where(eq(billingSubscriptions.stripeSubscriptionId, subscriptionId))
@@ -618,11 +618,11 @@ describe('processStripeWebhookEvent — invoice.payment_failed', () => {
     const customerRow = (await db.select().from(billingCustomers).where(eq(billingCustomers.stripeCustomerId, stripeCustomerId)))[0]
     const subscriptionId = await seedSubscription(organizationId, customerRow.id)
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1780000000 }), { db, authDb: db })
     expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledTimes(1)
     expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledWith(`${userId}@test.invalid`)
 
-    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1790000000 }), { db })
+    await processStripeWebhookEvent(invoiceEvent(uniqueId('evt'), 'invoice.payment_failed', { invoiceId: `in_${uniqueId('invoice')}`, subscriptionId, created: 1790000000 }), { db, authDb: db })
     expect(emailMocks.sendBillingPaymentFailedEmail).toHaveBeenCalledTimes(1)
   })
 })
@@ -635,7 +635,7 @@ describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
 
     const result = await processStripeWebhookEvent(
       checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment'),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -656,8 +656,8 @@ describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
     await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'credits', catalogKey: 'scale_1000' })
     const event = checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment')
 
-    await processStripeWebhookEvent(event, { db })
-    const second = await processStripeWebhookEvent(event, { db })
+    await processStripeWebhookEvent(event, { db, authDb: db })
+    const second = await processStripeWebhookEvent(event, { db, authDb: db })
 
     expect(second.outcome).toBe('applied')
     const grants = await db.select().from(billingCreditGrants).where(and(eq(billingCreditGrants.organizationId, organizationId), eq(billingCreditGrants.source, 'pack')))
@@ -669,7 +669,7 @@ describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
     const sessionId = `cs_${uniqueId('session')}`
     await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'subscription' })
 
-    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment'), { db })
+    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.completed', 1780000000, 'payment'), { db, authDb: db })
 
     const grants = await db.select().from(billingCreditGrants).where(eq(billingCreditGrants.organizationId, organizationId))
     expect(grants).toHaveLength(0)
@@ -680,7 +680,7 @@ describe('processStripeWebhookEvent — pack checkout (§8 task 1)', () => {
     const sessionId = `cs_${uniqueId('session')}`
     await seedCheckoutAttempt(organizationId, userId, sessionId, { action: 'credits', catalogKey: 'starter_300' })
 
-    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.expired', 1780000000, 'payment'), { db })
+    await processStripeWebhookEvent(checkoutSessionEvent(uniqueId('evt'), sessionId, 'checkout.session.expired', 1780000000, 'payment'), { db, authDb: db })
 
     const [attempt] = await db.select().from(billingCheckoutAttempts).where(eq(billingCheckoutAttempts.stripeCheckoutSessionId, sessionId))
     expect(attempt.status).toBe('expired')
@@ -695,7 +695,7 @@ describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)
     const paymentIntentId = `pi_${uniqueId('pi')}`
     await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
 
-    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.succeeded'), { db })
+    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.succeeded'), { db, authDb: db })
 
     expect(result.outcome).toBe('applied')
     const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
@@ -713,14 +713,14 @@ describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)
     await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
     const event = paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.succeeded')
 
-    const first = await processStripeWebhookEvent(event, { db })
+    const first = await processStripeWebhookEvent(event, { db, authDb: db })
     // The first delivery already cleared `pendingPaymentIntentId` on success, so a duplicate second
     // delivery of the SAME event can no longer resolve an organization for it — deferred, not
     // applied, but still safe: `resolveAutoRechargeTrigger`'s own pending-marker match means a
     // duplicate can never re-grant even if it WERE resolved. This is a known, documented tradeoff
     // (see webhook-handlers.ts's `handleAutoRechargePaymentIntentEvent` module comment), not a
     // correctness gap in the ledger.
-    const second = await processStripeWebhookEvent(event, { db })
+    const second = await processStripeWebhookEvent(event, { db, authDb: db })
 
     expect(first.outcome).toBe('applied')
     expect(second.outcome).toBe('deferred')
@@ -733,7 +733,7 @@ describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)
     const paymentIntentId = `pi_${uniqueId('pi')}`
     await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
 
-    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.requires_action'), { db })
+    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.requires_action'), { db, authDb: db })
 
     const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
     expect(rule.state).toBe('paused_needs_auth')
@@ -747,7 +747,7 @@ describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)
     const paymentIntentId = `pi_${uniqueId('pi')}`
     await seedAutoRechargeRule(organizationId, userId, paymentIntentId)
 
-    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.payment_failed'), { db })
+    await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), paymentIntentId, 'payment_intent.payment_failed'), { db, authDb: db })
 
     const [rule] = await db.select().from(billingAutoRechargeRules).where(eq(billingAutoRechargeRules.organizationId, organizationId))
     expect(rule.state).toBe('paused_failed')
@@ -756,7 +756,7 @@ describe('processStripeWebhookEvent — auto-recharge PaymentIntent (§8 task 2)
   })
 
   it('defers a PaymentIntent event with no matching pending auto-recharge rule', async () => {
-    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), 'pi_never_seen', 'payment_intent.succeeded'), { db })
+    const result = await processStripeWebhookEvent(paymentIntentEvent(uniqueId('evt'), 'pi_never_seen', 'payment_intent.succeeded'), { db, authDb: db })
     expect(result.outcome).toBe('deferred')
   })
 })
@@ -781,19 +781,19 @@ describe('processStripeWebhookEvent — deferred and ignored families', () => {
     'charge.dispute.funds_reinstated',
   ] as const)('reports %s as deferred, not silently ignored', async (type) => {
     const event = { id: uniqueId('evt'), type, created: 1780000000, livemode: false, api_version: '2026-06-24.dahlia', data: { object: { id: 'x', object: 'x' } } } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
-    const result = await processStripeWebhookEvent(event, { db })
+    const result = await processStripeWebhookEvent(event, { db, authDb: db })
     expect(result.outcome).toBe('deferred')
   })
 
   it.each(['charge.refunded', 'refund.created'] as const)('reports %s as ignored (informational only, no actionable state)', async (type) => {
     const event = { id: uniqueId('evt'), type, created: 1780000000, livemode: false, api_version: '2026-06-24.dahlia', data: { object: { id: 'x', object: 'x' } } } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
-    const result = await processStripeWebhookEvent(event, { db })
+    const result = await processStripeWebhookEvent(event, { db, authDb: db })
     expect(result.outcome).toBe('ignored')
   })
 
   it('reports a genuinely unrecognized event type as ignored', async () => {
     const event = { id: uniqueId('evt'), type: 'some.future.event.type', created: 1780000000, livemode: false, api_version: '2026-06-24.dahlia', data: { object: { id: 'x', object: 'x' } } } as unknown as Parameters<typeof processStripeWebhookEvent>[0]
-    const result = await processStripeWebhookEvent(event, { db })
+    const result = await processStripeWebhookEvent(event, { db, authDb: db })
     expect(result.outcome).toBe('ignored')
   })
 })
@@ -821,7 +821,7 @@ describe('processStripeWebhookEvent — refund status resolution (§8 task 4)', 
       stripeRefundId, state: 'pending',
     })
 
-    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db })
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db, authDb: db })
 
     expect(result.outcome).toBe('applied')
     const [refundRow] = await db.select().from(billingRefunds).where(eq(billingRefunds.stripeRefundId, stripeRefundId))
@@ -845,7 +845,7 @@ describe('processStripeWebhookEvent — refund status resolution (§8 task 4)', 
       stripeRefundId, state: 'pending',
     })
 
-    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'failed', 'refund.failed'), { db })
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'failed', 'refund.failed'), { db, authDb: db })
 
     expect(result.outcome).toBe('applied')
     const [refundRow] = await db.select().from(billingRefunds).where(eq(billingRefunds.stripeRefundId, stripeRefundId))
@@ -863,7 +863,7 @@ describe('processStripeWebhookEvent — refund status resolution (§8 task 4)', 
       stripeRefundId, state: 'succeeded',
     })
 
-    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db })
+    const result = await processStripeWebhookEvent(refundStatusEvent(uniqueId('evt'), stripeRefundId, 'succeeded', 'refund.updated'), { db, authDb: db })
 
     expect(result.outcome).toBe('applied')
     expect(result.detail).toMatch(/already succeeded/)
@@ -896,7 +896,7 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
   it('charge.dispute.created with no payment_intent on the object is ignored, not deferred', async () => {
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: uniqueId('dp'), status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('ignored')
   })
@@ -904,7 +904,7 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
   it('charge.dispute.created defers when no pack grant matches the disputed PaymentIntent', async () => {
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: uniqueId('dp'), payment_intent: 'pi_never_seen', status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('deferred')
   })
@@ -920,7 +920,7 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
         id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, reason: 'fraudulent', status: 'needs_response',
         evidence_details: { due_by: 1781000000 },
       }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -931,7 +931,7 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
   it('charge.dispute.updated defers when no dispute row exists yet for that Stripe dispute id', async () => {
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.updated', { id: uniqueId('dp'), status: 'warning_under_review' }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('deferred')
   })
@@ -943,12 +943,12 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
     const stripeDisputeId = uniqueId('dp')
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
 
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.updated', { id: stripeDisputeId, status: 'warning_under_review' }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -963,12 +963,12 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
     const stripeDisputeId = uniqueId('dp')
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
 
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'won' }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -983,12 +983,12 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
     const stripeDisputeId = uniqueId('dp')
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
 
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'lost' }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -1003,12 +1003,12 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
     const stripeDisputeId = uniqueId('dp')
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
 
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'warning_closed' }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')
@@ -1019,7 +1019,7 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
   it('charge.dispute.funds_reinstated defers when no dispute row exists yet', async () => {
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.funds_reinstated', { id: uniqueId('dp'), status: 'lost' }),
-      { db },
+      { db, authDb: db },
     )
     expect(result.outcome).toBe('deferred')
   })
@@ -1031,16 +1031,16 @@ describe('processStripeWebhookEvent — dispute resolution (§8 task 5)', () => 
     const stripeDisputeId = uniqueId('dp')
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.created', { id: stripeDisputeId, payment_intent: stripePaymentIntentId, amount: 2500, status: 'needs_response' }),
-      { db },
+      { db, authDb: db },
     )
     await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.closed', { id: stripeDisputeId, status: 'lost' }),
-      { db },
+      { db, authDb: db },
     )
 
     const result = await processStripeWebhookEvent(
       disputeEvent(uniqueId('evt'), 'charge.dispute.funds_reinstated', { id: stripeDisputeId, status: 'lost' }),
-      { db },
+      { db, authDb: db },
     )
 
     expect(result.outcome).toBe('applied')

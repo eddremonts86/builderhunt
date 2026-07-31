@@ -66,7 +66,7 @@ async function freshOrg(): Promise<string> {
 }
 
 function deps(now: Date, overrides: Record<string, unknown> = {}) {
-  return { worker: db, platform: db, now: () => now, ...overrides }
+  return { worker: db, platform: db, authDb: db, now: () => now, ...overrides }
 }
 
 describe('recordNotificationIfDue', () => {

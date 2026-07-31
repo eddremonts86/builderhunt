@@ -215,13 +215,22 @@ async function restore(source: string, target: string) {
   // pg-client image (e.g. `ghcr.io/example/pg18-client`) without
   // needing Docker on the host.
   const serverVersion = await detectServerMajorVersion(sourceConfig)
-  const { dumpBin, restoreBin } = await resolveClientBins(serverVersion, sourceConfig)
-  const dump = spawn(dumpBin, [
+  const { dump: dumpClient, restore: restoreClient } = await resolveClientBins(serverVersion, sourceConfig)
+  const dumpCommand = buildClientCommand(dumpClient, sourceConfig.environment, [
     '--format=custom', '--no-owner', '--no-acl', sourceConfig.database,
-  ], { env: { ...process.env, ...sourceConfig.environment }, stdio: ['ignore', 'pipe', 'pipe'] })
-  const restoreProcess = spawn(restoreBin, [
+  ])
+  const restoreCommand = buildClientCommand(restoreClient, targetConfig.environment, [
     '--clean', '--if-exists', '--no-owner', '--no-acl', '--exit-on-error', '--dbname', targetConfig.database,
-  ], { env: { ...process.env, ...targetConfig.environment }, stdio: ['pipe', 'ignore', 'pipe'] })
+  ])
+  const dump = spawn(dumpCommand.bin, dumpCommand.args, {
+    env: dumpCommand.env, stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  // `-i` on the restore side only: its stdin is a real pipe (the dump's stdout), which `docker exec`
+  // only forwards into the container process when told to keep stdin open. The dump side has no
+  // stdin to forward, so it does not need it.
+  const restoreProcess = spawn(restoreCommand.bin, restoreCommand.args, {
+    env: restoreCommand.env, stdio: ['pipe', 'ignore', 'pipe'],
+  })
   dump.stdout.pipe(restoreProcess.stdin)
   const [dumpResult, restoreResult] = await Promise.all([
     processResult(dump, 'pg_dump'),
@@ -284,30 +293,36 @@ async function detectClientMajorVersion(bin: string): Promise<number | null> {
  * version matches the server and step 1 wins. In local dev with
  * Docker, step 2 is automatic.
  */
+/** Either the host's own binary, or a program name to run inside a container via `docker exec`. */
+type ClientTarget = { mode: 'host'; bin: string } | { mode: 'docker'; container: string; bin: string }
+
 async function resolveClientBins(
   serverMajor: number | null,
   config: ReturnType<typeof connectionConfig>,
-): Promise<{ dumpBin: string; restoreBin: string }> {
+): Promise<{ dump: ClientTarget; restore: ClientTarget }> {
   const explicitDump = process.env.PG_DUMP_BIN
   const explicitRestore = process.env.PG_RESTORE_BIN
   if (explicitDump && explicitRestore) {
-    return { dumpBin: explicitDump, restoreBin: explicitRestore }
+    return { dump: { mode: 'host', bin: explicitDump }, restore: { mode: 'host', bin: explicitRestore } }
   }
   if (serverMajor === null) {
-    return { dumpBin: explicitDump ?? 'pg_dump', restoreBin: explicitRestore ?? 'pg_restore' }
+    return {
+      dump: { mode: 'host', bin: explicitDump ?? 'pg_dump' },
+      restore: { mode: 'host', bin: explicitRestore ?? 'pg_restore' },
+    }
   }
   const hostDump = explicitDump ?? 'pg_dump'
   const hostRestore = explicitRestore ?? 'pg_restore'
   const hostDumpMajor = await detectClientMajorVersion(hostDump)
   if (hostDumpMajor !== null && hostDumpMajor >= serverMajor) {
-    return { dumpBin: hostDump, restoreBin: hostRestore }
+    return { dump: { mode: 'host', bin: hostDump }, restore: { mode: 'host', bin: hostRestore } }
   }
   // Host client is too old. Try the Docker fallback.
   const container = process.env.BUILDERHUNT_DB_CONTAINER ?? 'builderhunt-db'
   if (await isDockerContainerRunning(container)) {
     return {
-      dumpBin: explicitDump ?? dockerExecBin(container, 'pg_dump'),
-      restoreBin: explicitRestore ?? dockerExecBin(container, 'pg_restore'),
+      dump: { mode: 'docker', container, bin: 'pg_dump' },
+      restore: { mode: 'docker', container, bin: 'pg_restore' },
     }
   }
   throw new Error(
@@ -317,11 +332,26 @@ async function resolveClientBins(
   )
 }
 
-function dockerExecBin(container: string, cmd: string): string {
-  // `spawn` passes the rest of the args after the binary name, so
-  // we wrap `docker exec` in a small shell that adds the container
-  // and the requested command.
-  return `docker exec ${container} ${cmd}`
+/**
+ * Turns a resolved client target into an actual spawn-able `{ bin, args, env }`. The docker-exec
+ * path forwards the PG* connection env vars via `-e` flags rather than the container's own
+ * environment — `spawn`'s `env` option only affects the local `docker` process, not what the
+ * remote `exec`'d process inside the container sees.
+ */
+function buildClientCommand(
+  target: ClientTarget,
+  connectionEnv: Record<string, string>,
+  pgArgs: string[],
+): { bin: string; args: string[]; env: NodeJS.ProcessEnv } {
+  if (target.mode === 'host') {
+    return { bin: target.bin, args: pgArgs, env: { ...process.env, ...connectionEnv } }
+  }
+  const envFlags = Object.entries(connectionEnv).flatMap(([key, value]) => ['-e', `${key}=${value}`])
+  return {
+    bin: 'docker',
+    args: ['exec', '-i', ...envFlags, target.container, target.bin, ...pgArgs],
+    env: process.env,
+  }
 }
 
 async function isDockerContainerRunning(container: string): Promise<boolean> {

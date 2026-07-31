@@ -120,6 +120,8 @@ export interface CreatePackCheckoutOptions {
   sellerProfileDb?: PostgresJsDatabase
   /** Overrides where `risk.ts`'s `recordPaymentFailure` writes its independent, always-committed risk event — defaults to the real `runtimeDb`; tests inject a disposable database. */
   riskDb?: PostgresJsDatabase
+  /** Test-only override for `findOrganizationOwnerEmail`'s auth-broker read — defaults to the real `authDb`. */
+  authDb?: PostgresJsDatabase
 }
 
 function assertAllowedReturnUrl(url: string, field: 'successUrl' | 'cancelUrl'): void {
@@ -184,7 +186,7 @@ export async function createPackCheckout(
     throw error
   }
 
-  await ensureBillingCustomer(transaction, principal, { provider })
+  await ensureBillingCustomer(transaction, principal, { provider, authDb: options.authDb })
   const customer = await findBillingCustomer(transaction, principal.organizationId, livemode)
   if (!customer) {
     throw new PackCheckoutError('Billing customer is unexpectedly missing after provisioning', 'provider_error')

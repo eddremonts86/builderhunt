@@ -14,6 +14,7 @@
  *   re-reads and returns the winner's row instead of throwing.
  */
 import { randomUUID } from 'node:crypto'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantPrincipal } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
 import {
@@ -42,6 +43,8 @@ function toDto(record: BillingCustomerRecord): BillingCustomerDto {
 
 export interface EnsureBillingCustomerOptions {
   provider: BillingProvider
+  /** Test-only override for `findOrganizationOwnerEmail`'s auth-broker read — defaults to the real `authDb`. */
+  authDb?: PostgresJsDatabase
 }
 
 /**
@@ -59,7 +62,7 @@ export async function ensureBillingCustomer(
   const existing = await findBillingCustomer(transaction, principal.organizationId, livemode)
   if (existing) return toDto(existing)
 
-  const ownerEmail = await findOrganizationOwnerEmail(transaction, principal.organizationId)
+  const ownerEmail = await findOrganizationOwnerEmail(principal.organizationId, options.authDb)
   if (!ownerEmail) {
     throw new CustomerProvisioningError(`Organization ${principal.organizationId} has no owner to bill`, 'no_owner')
   }

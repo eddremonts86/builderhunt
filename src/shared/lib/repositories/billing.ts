@@ -1,5 +1,7 @@
-import { and, desc, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { TenantTransaction } from '../db/client'
+import { authDb } from '../db/auth-db'
 import {
   authUsers,
   billingAutoRechargeRules,
@@ -76,24 +78,68 @@ export async function createBillingCustomer(
  * livemode)` turns the stripe-id detection order into a raised duplicate-key error instead of
  * `DO NOTHING`.
  */
+/**
+ * `drizzle/0028` grants `builderhunt_app` SELECT-only on `billing_customers` — the same
+ * "browser-facing role cannot mutate financial state directly" rule as the credit tables — while
+ * `builderhunt_worker` holds INSERT. This is the one call site that creates a customer row from a
+ * live, user-initiated checkout, so it elevates for exactly this statement using the `builderhunt_app`
+ * → `builderhunt_worker` membership `drizzle/0098` already grants (see
+ * `~/shared/lib/billing/credit-write-role.ts`'s `withCreditWriteRole` for the fuller reasoning — same
+ * mechanism, kept as its own local elevation here rather than imported, since that helper is
+ * deliberately scoped to the credit tables it names). Found missing 2026-07-31 exercising a real
+ * Stripe test-mode checkout live: every unit test runs as the migration superuser, which bypasses
+ * this grant entirely, so the gap was invisible until a real `builderhunt_app` connection tried it.
+ */
 export async function createBillingCustomerIfAbsent(
   transaction: TenantTransaction,
   input: CreateBillingCustomerInput,
 ): Promise<BillingCustomerRecord | null> {
-  const [row] = await transaction
-    .insert(billingCustomers)
-    .values(input)
-    .onConflictDoNothing()
-    .returning()
-  return row ?? null
+  // Explicit, not relying on the caller having already set it: the worker's INSERT policy's WITH
+  // CHECK is `organization_id = current_setting('app.organization_id')`, and re-asserting it here
+  // from `input.organizationId` — the row's actual destination — makes this function correct on its
+  // own terms rather than dependent on ambient transaction state the caller happens to have set up
+  // (in production `withTenantContext` already sets the same value, so this is a harmless re-set).
+  await transaction.execute(sql`select set_config('app.organization_id', ${input.organizationId}, true)`)
+  await transaction.execute(sql`set local role builderhunt_worker`)
+  try {
+    const [row] = await transaction
+      .insert(billingCustomers)
+      .values(input)
+      .onConflictDoNothing()
+      .returning()
+    return row ?? null
+  } finally {
+    try {
+      await transaction.execute(sql`reset role`)
+    } catch {
+      // Aborted transaction: the elevation dies with the rollback that is already coming.
+    }
+  }
 }
 
-/** The org's current owner's account email — the only email `billing/customers.ts` ever sends to Stripe (never candidate/product data). Returns null if the organization somehow has no owner row (should not happen given `organization_members_one_owner_unique`, but this is a read, not an invariant enforcement). */
+/**
+ * The org's current owner's account email — the only email `billing/customers.ts` ever sends to
+ * Stripe (never candidate/product data). Returns null if the organization somehow has no owner row
+ * (should not happen given `organization_members_one_owner_unique`, but this is a read, not an
+ * invariant enforcement).
+ *
+ * Queries `authDb` (the auth-broker connection) by default, not the caller's tenant/worker
+ * transaction: `organization_members` and `auth_users` are both auth-broker-owned tables that
+ * neither `builderhunt_app` nor `builderhunt_worker` has a grant on (only `builderhunt_auth` and
+ * `builderhunt_platform` do — see `drizzle/0010_worker_alert_policies.sql`,
+ * `drizzle/0012_platform_role.sql`). Running this join under either caller's role fails outright
+ * with `42501 permission denied for table auth_users` — found 2026-07-31 exercising a real Stripe
+ * test-mode checkout live, which every prior test missed because unit tests run as the migration
+ * superuser (see the RLS/GRANT blind spot documented throughout this repo's own test suite).
+ *
+ * `db` defaults to the real `authDb` singleton in production; tests inject a disposable database
+ * instead, the same dependency-injection pattern as `getCurrentSellerProfile`/`createFeedCapability`.
+ */
 export async function findOrganizationOwnerEmail(
-  transaction: TenantTransaction,
   organizationId: string,
+  db: PostgresJsDatabase = authDb,
 ): Promise<string | null> {
-  const [row] = await transaction
+  const [row] = await db
     .select({ email: authUsers.email })
     .from(organizationMembers)
     .innerJoin(authUsers, eq(organizationMembers.userId, authUsers.id))

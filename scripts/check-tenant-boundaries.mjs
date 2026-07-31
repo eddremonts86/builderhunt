@@ -34,6 +34,13 @@ const authDbAllowlist = new Set([
   // (abuse/linked-accounts.ts, plans/phase-1/32-abuse-and-usage-integrity/tasks.md Phase 3) — same exception
   // shape as the two files above, not a general auth-db opening.
   'src/shared/lib/repositories/auth-sessions-worker.ts',
+  // `findOrganizationOwnerEmail` joins `organization_members`/`auth_users` to resolve the one email
+  // Stripe checkout ever sends — both auth-broker-owned, neither builderhunt_app nor
+  // builderhunt_worker has a grant on them post auth-broker (drizzle/0007_auth_broker.sql;
+  // drizzle/0010_worker_alert_policies.sql grants the worker only `auth_users(id, email)`, not
+  // organization_members). Found 2026-07-31 exercising a real Stripe test-mode checkout live —
+  // every prior test ran as the migration superuser, which bypasses the missing grant entirely.
+  'src/shared/lib/repositories/billing.ts',
 ])
 // Global-public data/health surfaces are explicitly allowed to read the
 // unscoped runtime db directly (static or dynamic import) — they never

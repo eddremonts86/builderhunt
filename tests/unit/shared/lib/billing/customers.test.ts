@@ -51,7 +51,7 @@ describe('ensureBillingCustomer', () => {
   it('creates a Customer using the owner email, never any candidate/product data', async () => {
     const { principal, ownerEmail } = await freshOrgWithOwner()
 
-    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
+    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
 
     const stored = await db.transaction((tx) => findBillingCustomer(tx, principal.organizationId, false))
     expect(stored).not.toBeNull()
@@ -63,8 +63,8 @@ describe('ensureBillingCustomer', () => {
   it('is idempotent — a second call reuses the same Customer, never creating a second one', async () => {
     const { principal } = await freshOrgWithOwner()
 
-    const first = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
-    const second = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
+    const first = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
+    const second = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
     expect(second).toEqual(first)
 
     const rows = await provider.listForReconciliation('customers')
@@ -75,8 +75,8 @@ describe('ensureBillingCustomer', () => {
     const { principal } = await freshOrgWithOwner()
 
     const [first, second] = await Promise.all([
-      db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider })),
-      db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider })),
+      db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db })),
+      db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db })),
     ])
     expect(first).toEqual(second)
 
@@ -94,8 +94,8 @@ describe('ensureBillingCustomer', () => {
     // call succeeded but before the row was committed) by calling ensureBillingCustomer twice —
     // the second call still resolves the SAME provider customer because the operation key is
     // derived only from (organizationId, livemode), not a per-attempt random value.
-    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
-    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
+    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
+    await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
 
     const rows = await provider.listForReconciliation('customers')
     expect(rows).toHaveLength(1)
@@ -104,15 +104,15 @@ describe('ensureBillingCustomer', () => {
   it('throws a typed error when the organization has no owner', async () => {
     const principal = await freshOrgWithoutOwner()
 
-    await expect(db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider })))
+    await expect(db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db })))
       .rejects.toMatchObject({ code: 'no_owner' })
-    await expect(db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider })))
+    await expect(db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db })))
       .rejects.toBeInstanceOf(CustomerProvisioningError)
   })
 
   it('the DTO snapshot carries no sensitive fields — only livemode', async () => {
     const { principal } = await freshOrgWithOwner()
-    const result = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider }))
+    const result = await db.transaction((tx) => ensureBillingCustomer(tx, principal, { provider, authDb: db }))
     expect(Object.keys(result)).toEqual(['livemode'])
   })
 })

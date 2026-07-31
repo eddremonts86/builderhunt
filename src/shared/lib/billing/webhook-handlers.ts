@@ -88,6 +88,8 @@ export interface ProcessStripeWebhookEventOptions {
   livemode?: boolean
   /** Defaults to the real `workerDb` singleton — tests inject a disposable database. See `repositories/billing-worker.ts`'s module doc. */
   db?: PostgresJsDatabase | typeof workerDb
+  /** Test-only override for `findOrganizationOwnerEmail`'s auth-broker read (via `billingNotificationRecipients`, invoice.paid/payment_failed receipts) — defaults to the real `authDb`. */
+  authDb?: PostgresJsDatabase
 }
 
 export async function processStripeWebhookEvent(
@@ -110,9 +112,9 @@ export async function processStripeWebhookEvent(
       return handleSubscriptionDeleted(event, db)
 
     case 'invoice.paid':
-      return handleInvoicePaid(event, db)
+      return handleInvoicePaid(event, db, options.authDb)
     case 'invoice.payment_failed':
-      return handleInvoicePaymentFailed(event, db)
+      return handleInvoicePaymentFailed(event, db, options.authDb)
 
     case 'payment_intent.succeeded':
       return handleAutoRechargePaymentIntentEvent(event, 'succeeded', db)
@@ -549,7 +551,7 @@ async function handleSubscriptionDeleted(event: Stripe.Event, db: PostgresJsData
   }, db)
 }
 
-async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb, authDb?: PostgresJsDatabase): Promise<WebhookHandlerOutcome> {
   const invoice = event.data.object as Stripe.Invoice
   const stripeSubscriptionId = extractId(invoice.parent?.subscription_details?.subscription ?? null)
   if (!stripeSubscriptionId) {
@@ -602,7 +604,7 @@ async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | t
       // "delivery dedupe" requirement: `grantCredits`'s own idempotency check already tells us
       // definitively whether this is the first time this invoice was applied.
       if (!result.replayed) {
-        await sendInvoiceReceipt(tx, organizationId, invoice)
+        await sendInvoiceReceipt(tx, organizationId, invoice, authDb)
       }
       return {
         outcome: 'applied',
@@ -619,7 +621,7 @@ async function handleInvoicePaid(event: Stripe.Event, db: PostgresJsDatabase | t
   }, db)
 }
 
-async function handleInvoicePaymentFailed(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb): Promise<WebhookHandlerOutcome> {
+async function handleInvoicePaymentFailed(event: Stripe.Event, db: PostgresJsDatabase | typeof workerDb, authDb?: PostgresJsDatabase): Promise<WebhookHandlerOutcome> {
   const invoice = event.data.object as Stripe.Invoice
   const stripeSubscriptionId = extractId(invoice.parent?.subscription_details?.subscription ?? null)
   if (!stripeSubscriptionId) {
@@ -638,7 +640,7 @@ async function handleInvoicePaymentFailed(event: Stripe.Event, db: PostgresJsDat
     // billing contact exists (§9 task 4) — and, like the receipt above, sent at most once per grace
     // window, never on a duplicate/retried delivery.
     if (graceJustStarted) {
-      await sendPaymentFailedNotice(tx, organizationId)
+      await sendPaymentFailedNotice(tx, organizationId, authDb)
     }
     return {
       outcome: 'applied',
@@ -648,14 +650,14 @@ async function handleInvoicePaymentFailed(event: Stripe.Event, db: PostgresJsDat
 }
 
 /** §9 task 4: sends a receipt to the verified billing contact (if any) AND the owner — never only one, so an org without a separate contact still gets its receipt at the owner's own address. */
-async function sendInvoiceReceipt(tx: WorkerTransaction, organizationId: string, invoice: Stripe.Invoice): Promise<void> {
-  const recipients = await billingNotificationRecipients(tx, organizationId)
+async function sendInvoiceReceipt(tx: WorkerTransaction, organizationId: string, invoice: Stripe.Invoice, authDb?: PostgresJsDatabase): Promise<void> {
+  const recipients = await billingNotificationRecipients(tx, organizationId, authDb)
   const details = { description: `Payment received for invoice ${invoice.number ?? invoice.id}`, amountCents: invoice.amount_paid, currency: invoice.currency }
   await Promise.all(recipients.map((to) => sendBillingReceiptEmail(to, details)))
 }
 
 /** §9 task 4: "critical messages also reach owner" — payment failure always reaches the owner regardless of whether a separate billing contact is also notified. */
-async function sendPaymentFailedNotice(tx: WorkerTransaction, organizationId: string): Promise<void> {
-  const recipients = await billingNotificationRecipients(tx, organizationId)
+async function sendPaymentFailedNotice(tx: WorkerTransaction, organizationId: string, authDb?: PostgresJsDatabase): Promise<void> {
+  const recipients = await billingNotificationRecipients(tx, organizationId, authDb)
   await Promise.all(recipients.map((to) => sendBillingPaymentFailedEmail(to)))
 }

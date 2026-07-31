@@ -92,9 +92,13 @@ export async function recordNotificationIfDue(
 }
 
 /** The owner's account email, plus the verified billing contact's if one exists and differs — moved here (from `webhook-handlers.ts`) so both real webhook-driven sends and this sweep share one recipient-resolution rule instead of two copies. */
-export async function billingNotificationRecipients(tx: WorkerTransaction, organizationId: string): Promise<string[]> {
+export async function billingNotificationRecipients(
+  tx: WorkerTransaction,
+  organizationId: string,
+  authDbOverride?: PostgresJsDatabase,
+): Promise<string[]> {
   const [ownerEmail, contact] = await Promise.all([
-    findOrganizationOwnerEmail(tx, organizationId),
+    findOrganizationOwnerEmail(organizationId, authDbOverride),
     getVerifiedBillingContact(tx, organizationId),
   ])
   const recipients = new Set<string>()
@@ -107,6 +111,8 @@ export interface NotificationSweepDeps {
   now?: () => Date
   worker?: Parameters<typeof withWorkerOrganization>[2]
   platform?: PostgresJsDatabase | typeof platformDb
+  /** Test-only override for `findOrganizationOwnerEmail`'s auth-broker read — defaults to the real `authDb`. */
+  authDb?: PostgresJsDatabase
 }
 
 export interface NotificationSweepResult {
@@ -136,7 +142,7 @@ export async function runNotificationSweep(deps: NotificationSweepDeps = {}): Pr
 
   for (const { id: organizationId } of organizationRows) {
     await withWorkerOrganization(organizationId, async (transaction) => {
-      const recipients = await billingNotificationRecipients(transaction, organizationId)
+      const recipients = await billingNotificationRecipients(transaction, organizationId, deps.authDb)
       if (recipients.length === 0) return
 
       const grants = await listActiveBillingCreditGrants(transaction, organizationId)

@@ -136,6 +136,65 @@ try {
   }
   if (!appBillingUpdateDenied) throw new Error('App role updated financial-state billing row')
 
+  /*
+   * `createBillingCustomerIfAbsent`'s elevated insert (found 2026-07-31 exercising a real Stripe
+   * test-mode checkout live): the app role has no INSERT grant on `billing_customers` at all (the
+   * two assertions above), but a real user-initiated checkout still needs to create one on first
+   * use. `~/shared/lib/repositories/billing.ts` elevates via the same `builderhunt_app` →
+   * `builderhunt_worker` membership `0098` grants for credit writes — this asserts that elevation
+   * actually lands a real row, not just that the unelevated path is denied.
+   */
+  // livemode=true — the fixture's own 'billing-cust-a' already occupies (org-a, livemode=false)
+  // under `billing_customers_org_livemode_unique`.
+  const elevatedCustomerInsert = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`set local role builderhunt_worker`
+    const rows = await transaction`
+      insert into billing_customers (id, organization_id, livemode, stripe_customer_id, created_at, updated_at)
+      values ('rls-elevated-customer', 'org-a', true, 'cus_rls_elevated', now(), now())
+      returning id
+    `
+    await transaction`reset role`
+    return rows.length
+  })
+  if (elevatedCustomerInsert !== 1) throw new Error('Elevated billing_customers insert did not land')
+
+  let elevatedCustomerCrossTenant = 'allowed'
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`set local role builderhunt_worker`
+      await transaction`
+        insert into billing_customers (id, organization_id, livemode, stripe_customer_id, created_at, updated_at)
+        values ('rls-elevated-customer-cross', 'org-b', true, 'cus_rls_elevated_cross', now(), now())
+      `
+    })
+  } catch {
+    elevatedCustomerCrossTenant = 'denied'
+  }
+  if (elevatedCustomerCrossTenant !== 'denied') {
+    throw new Error('Elevating to the worker role let the app write another organization\'s billing_customers row')
+  }
+
+  /*
+   * `findOrganizationOwnerEmail` (found in the same live checkout session): `organization_members`
+   * and `auth_users` are both auth-broker-owned tables neither `builderhunt_app` nor
+   * `builderhunt_worker` can read — only `builderhunt_auth` (what `authDb` connects as) and
+   * `builderhunt_platform` can. This asserts the auth role can actually perform the exact join the
+   * repository function runs, and gets the real owner back, not just that the other two roles are
+   * denied it.
+   */
+  const ownerEmailViaAuth = await auth`
+    select au.email
+    from organization_members om
+    inner join auth_users au on om.user_id = au.id
+    where om.organization_id = 'org-a' and om.role = 'owner'
+    limit 1
+  `
+  if (ownerEmailViaAuth.length !== 1 || ownerEmailViaAuth[0].email !== 'a@test.invalid') {
+    throw new Error(`Auth-broker owner-email join failed: ${JSON.stringify(ownerEmailViaAuth)}`)
+  }
+
   // Interview material access is the event owner's to give. `event_participants_app_self_update`
   // (0069) lets an attendee write their own row so they can RSVP, and the app role holds table-wide
   // UPDATE, so without the trigger from 0101 a participant could set `material_access_granted` on
@@ -205,7 +264,9 @@ try {
     await transaction`select set_config('app.organization_id', 'org-a', true)`
     return transaction`select id from billing_customers order by id`
   })
-  assertIds(workerBillingA, ['billing-cust-a'], 'worker billing org-a isolation')
+  // Includes 'rls-elevated-customer': the elevated-insert assertion above already landed it in
+  // org-a before this section runs.
+  assertIds(workerBillingA, ['billing-cust-a', 'rls-elevated-customer'], 'worker billing org-a isolation')
   let workerBillingCrossTenantDenied = false
   try {
     await worker.begin(async (transaction) => {
@@ -1365,6 +1426,9 @@ try {
     billingTenantB: billingTenantB.map((row) => row.id),
     appBillingInsert: 'denied',
     appBillingUpdate: 'denied',
+    elevatedCustomerInsert: 'inserted',
+    elevatedCustomerCrossTenant: 'denied',
+    ownerEmailViaAuth: ownerEmailViaAuth[0].email,
     checkoutAttemptSpoof: 'denied',
     workerBillingMissingContext: 'denied',
     workerBillingTenantIsolation: workerBillingA.map((row) => row.id),

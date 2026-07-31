@@ -66,6 +66,8 @@ export interface CreateSubscriptionCheckoutOptions {
   provider: BillingProvider
   /** Overrides where `getCurrentSellerProfile` reads from — defaults to the real `platformDb` singleton in production; tests inject a disposable database, the same DI pattern `seller-profile.ts` itself already uses. */
   sellerProfileDb?: PostgresJsDatabase
+  /** Test-only override for `findOrganizationOwnerEmail`'s auth-broker read — defaults to the real `authDb`. */
+  authDb?: PostgresJsDatabase
 }
 
 function assertAllowedReturnUrl(url: string, field: 'successUrl' | 'cancelUrl'): void {
@@ -121,7 +123,7 @@ export async function createSubscriptionCheckout(
     throw new CheckoutError('An active subscription already exists for this organization', 'subscription_exists')
   }
 
-  await ensureBillingCustomer(transaction, principal, { provider })
+  await ensureBillingCustomer(transaction, principal, { provider, authDb: options.authDb })
   const customer = await findBillingCustomer(transaction, principal.organizationId, livemode)
   if (!customer) {
     throw new CheckoutError('Billing customer is unexpectedly missing after provisioning', 'provider_error')
