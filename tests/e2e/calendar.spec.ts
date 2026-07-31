@@ -548,3 +548,46 @@ test('the calendar create flow is usable at a 320px viewport', async ({ browser 
     await context.close()
   }
 })
+
+/**
+ * Availability settings, end to end. This is the only proof that the optimistic-versioned
+ * `PUT /api/calendar/availability` and the single-override `POST/DELETE .../overrides` endpoints
+ * agree with the editor through the real five-role connection — the unit suite injects the handlers.
+ *
+ * It is written to leave the shared owner's policy as it found it: it toggles a reminder channel
+ * (reversible, never accumulates rules) and adds then removes a uniquely-dated override, so a
+ * re-run does not clash with itself or drift the owner's weekly grid.
+ */
+test('an owner can edit availability and manage a date override through the UI', async ({ browser }) => {
+  const context = await browser.newContext({ storageState: harness.owner.storageState! })
+  const page = await context.newPage()
+  const guard = expectStrictBrowser(page)
+  for (let i = 0; i < 10; i++) guard.allowExpectedFailure(/status of (401|403|503)/)
+  // A far-future, run-varying date so overlapping runs never fight over the same override.
+  const overrideDate = new Date(Date.UTC(2029, 0, 1) + (Date.now() % (300 * 86_400_000))).toISOString().slice(0, 10)
+
+  try {
+    await gotoHydrated(page, `${harness.baseURL}/calendar`)
+    await dismissOverlays(page)
+
+    await page.getByTestId('calendar-availability-toggle').click()
+    await expect(page.getByTestId('availability-editor')).toBeVisible({ timeout: 20_000 })
+
+    // Toggle a default reminder channel and save under the loaded version.
+    await page.getByTestId('availability-reminder-channel-email').click()
+    await page.getByTestId('availability-save').click()
+    await expect(page.getByTestId('availability-saved')).toBeVisible({ timeout: 20_000 })
+
+    // Add a blocked-day override, confirm it lands, then remove it so the owner is left clean.
+    await page.getByTestId('availability-override-date').fill(overrideDate)
+    await page.getByTestId('availability-override-add').click()
+    await expect(page.getByText(new RegExp(`${overrideDate}.*Blocked`))).toBeVisible({ timeout: 20_000 })
+
+    await page.getByRole('button', { name: `Remove override for ${overrideDate}` }).click()
+    await expect(page.getByText(new RegExp(`${overrideDate}.*Blocked`))).toHaveCount(0, { timeout: 20_000 })
+  } finally {
+    guard.dispose()
+    await context.close()
+  }
+})
+

@@ -88,7 +88,7 @@
   - Do: Support timed/all-day, location/meeting URL, busy/free, participants, reminders, private notes, recurrence, exception scope, overlap warning, optimistic version conflict, cancellation, deletion, drag, and resize rollback.
   - Verify: component tests cover schema/errors/409 rollback; E2E creates, edits, moves, recurs, cancels, and deletes events at desktop and 320 px.
 
-- [ ] **Build availability and default-reminder settings**
+- [x] **Build availability and default-reminder settings**
   - Files: `src/modules/calendar/components/AvailabilityEditor.tsx`, `src/modules/calendar/components/CalendarPage.tsx`, `src/routes/api/calendar/availability/index.ts`, `src/routes/api/calendar/availability/overrides.ts`, `tests/unit/modules/calendar/components/AvailabilityEditor.test.tsx`
   - Do: Render versioned weekly windows, IANA timezone, duration, buffers, notice, horizon, blocked/custom overrides, and default reminder channels/offsets. Normalize compatible overlaps and explain conflicting ones.
   - Verify: first save, stale 409, DST boundary, overlap normalization, override create/delete, and another-user denial pass through real APIs.

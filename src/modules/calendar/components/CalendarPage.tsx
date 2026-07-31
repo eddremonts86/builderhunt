@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Plus, Search, X } from 'lucide-react'
+import { CalendarDays, Clock, Plus, Search, X } from 'lucide-react'
 import { Button, Input } from '~/components/ui'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
 import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
@@ -11,6 +11,7 @@ import {
 } from './CalendarView'
 import { EventEditor, type EventEditorSubmitMeta, type EventFormValue, type RecurrenceScope } from './EventEditor'
 import { EventDetails, type EventDetailView } from './EventDetails'
+import { AvailabilityEditor } from './AvailabilityEditor'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
@@ -304,6 +305,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [availabilityOpen, setAvailabilityOpen] = useState(false)
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventDto | null>(null)
   const [eventDetail, setEventDetail] = useState<EventDetailView | null>(null)
@@ -554,11 +556,25 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           </h1>
           <p className="mt-1 text-sm text-bh-text-muted">Your private schedule. Only you and people you invite can see these events.</p>
         </div>
-        <Button onClick={() => setFormOpen((open) => !open)} data-testid="calendar-new-event">
-          {formOpen ? <X className="mr-2 size-4" aria-hidden /> : <Plus className="mr-2 size-4" aria-hidden />}
-          {formOpen ? 'Close' : 'New event'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setAvailabilityOpen((open) => !open)} data-testid="calendar-availability-toggle">
+            <Clock className="mr-2 size-4" aria-hidden />
+            {availabilityOpen ? 'Hide availability' : 'Availability'}
+          </Button>
+          <Button onClick={() => setFormOpen((open) => !open)} data-testid="calendar-new-event">
+            {formOpen ? <X className="mr-2 size-4" aria-hidden /> : <Plus className="mr-2 size-4" aria-hidden />}
+            {formOpen ? 'Close' : 'New event'}
+          </Button>
+        </div>
       </header>
+
+      {availabilityOpen && (
+        <AvailabilityEditor
+          defaultTimezone={timezone}
+          timezoneOptions={timezoneOptions}
+          onClose={() => setAvailabilityOpen(false)}
+        />
+      )}
 
       {formOpen && (
         <EventEditor
