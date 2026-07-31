@@ -117,7 +117,7 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
     <div data-testid="list-detail-page">
       <button
         type="button"
-        onClick={() => navigate({ to: '/_dashboard/lists' as never })}
+        onClick={() => navigate({ to: '/lists' })}
         className="inline-flex items-center gap-1 text-sm text-bh-text-muted hover:text-bh-accent mb-4"
         data-testid="back-to-lists"
       >

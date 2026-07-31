@@ -8,6 +8,7 @@ import { OPERATIONAL_SCHEDULES, type OperationalScheduleDefinition } from '~/sha
 import {
   advanceScheduleAfterRun,
   listJobRuns,
+  listLatestJobRuns,
   listScheduleRegistry,
   redactedErrorCode,
   scheduledOccurrenceFor,
@@ -56,7 +57,7 @@ function definition(overrides: Partial<OperationalScheduleDefinition> = {}): Ope
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Test job',
-    sourceRoute: '/api/admin/alerts/run-worker',
+    sourceRoute: '/admin/operations?job=test.job',
     ...overrides,
   }
 }
@@ -270,6 +271,24 @@ describe('listJobRuns', () => {
   it('returns nothing for an empty key list instead of everything', async () => {
     await withJobRun({ jobKey: 'a.job', now: NOW, db }, async () => ({ processedCount: 1, failedCount: 0 }))
     expect(await listJobRuns([], { from: new Date(0), to: new Date('2099-01-01') }, db)).toEqual([])
+  })
+})
+
+describe('listLatestJobRuns', () => {
+  it('returns only the most recent run per key', async () => {
+    await withJobRun({ jobKey: 'a.job', now: new Date('2020-01-01T00:00:00.000Z'), db }, async () => ({ processedCount: 1, failedCount: 0 }))
+    await withJobRun({ jobKey: 'a.job', now: NOW, db }, async () => ({ processedCount: 2, failedCount: 0 }))
+    await withJobRun({ jobKey: 'b.job', now: NOW, db }, async () => ({ processedCount: 3, failedCount: 1 }))
+
+    const latest = await listLatestJobRuns(['a.job', 'b.job'], db)
+
+    expect(latest.get('a.job')?.processedCount).toBe(2)
+    expect(latest.get('b.job')?.processedCount).toBe(3)
+  })
+
+  it('omits a key with no runs rather than inventing a row', async () => {
+    const latest = await listLatestJobRuns(['never.run'], db)
+    expect(latest.has('never.run')).toBe(false)
   })
 })
 

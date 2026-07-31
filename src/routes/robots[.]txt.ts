@@ -1,20 +1,35 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { SITE_URL as SITE } from '~/shared/lib/site-url'
 import { SEO_SURFACE_DEFINITIONS, SEO_SURFACES } from '~/shared/lib/seo/surfaces'
+import { NAV_AREAS } from '~/modules/dashboard/ui/shell/nav-config'
+
+/** Public and not admin-toggleable. */
+const ALWAYS_ALLOWED = ['/', '/explore', '/builders/', '/status', '/legal/']
+
+/**
+ * A bare prefix (`/search`) blocks both the page itself and everything under it. Only widen to a
+ * trailing-slash form (`/builder/`) when the bare prefix would otherwise also swallow an allowed
+ * path — `/builder` is a literal prefix of the public `/builders/` profile route.
+ */
+function disallowPrefixFor(route: string): string {
+  const collidesWithAllowed = ALWAYS_ALLOWED.some((allowed) => allowed !== route && allowed.startsWith(route))
+  return collidesWithAllowed ? `${route}/` : route
+}
+
+// Every authenticated top-level area from the dashboard's own navigation registry, so a new area
+// added there is disallowed here automatically instead of relying on someone to remember this file.
+// `/status` is excluded — it is deliberately public (see ALWAYS_ALLOWED).
+const AUTHENTICATED_NAV_ROUTES = Array.from(new Set(NAV_AREAS.flatMap((area) => area.routes)))
+  .filter((route) => route !== '/status')
 
 /** Never crawlable by anyone — authenticated app, APIs, auth flows. */
 const ALWAYS_DISALLOWED = [
   '/api/',
   '/auth/',
-  '/dashboard/',
   '/_dashboard/',
-  '/settings/',
   '/onboarding/',
-  '/me/',
+  ...AUTHENTICATED_NAV_ROUTES.map(disallowPrefixFor),
 ]
-
-/** Public and not admin-toggleable. */
-const ALWAYS_ALLOWED = ['/', '/explore', '/builders/', '/status', '/legal/']
 
 /**
  * The AI crawlers we name explicitly. A named group REPLACES the `*` group for

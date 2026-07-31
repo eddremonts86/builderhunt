@@ -13,9 +13,10 @@ import { REMINDER_JOB_KEY } from '~/lib/calendar/reminder-worker'
  * label. The table stores only what actually changes at runtime — `enabled` and `nextRunAt`.
  *
  * `sourceRoute` is a **platform-admin route**, and the calendar feed shows it as a link. Every
- * entry here must therefore be a route that already authenticates as cron-or-platform-admin; the
- * registry is not an authorization boundary and must never point at something that is not
- * independently protected. `assertRegistryIsSafe` enforces the shape.
+ * entry must point at `/admin/operations?job=<jobKey>` — the one page that authenticates as
+ * platform-admin and can render a single job's own registry/run detail; it must never point at a
+ * POST-only worker endpoint, which a plain link click cannot invoke. `assertRegistryIsSafe`
+ * enforces the shape.
  */
 
 export type ScheduleScope = 'platform' | 'organization'
@@ -43,7 +44,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'UTC',
     scope: 'organization',
     label: 'Alert evaluation',
-    sourceRoute: '/api/admin/alerts/run-worker',
+    sourceRoute: '/admin/operations?job=alerts.evaluate',
   },
   {
     jobKey: 'sprints.execute',
@@ -51,7 +52,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'UTC',
     scope: 'organization',
     label: 'Sprint execution',
-    sourceRoute: '/api/admin/sprints/run-worker',
+    sourceRoute: '/admin/operations?job=sprints.execute',
   },
   {
     jobKey: 'enrichment.refresh',
@@ -59,7 +60,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Profile enrichment refresh',
-    sourceRoute: '/api/admin/enrichment/run-worker',
+    sourceRoute: '/admin/operations?job=enrichment.refresh',
   },
   {
     jobKey: 'discovery.crawl',
@@ -67,7 +68,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Builder discovery',
-    sourceRoute: '/api/admin/discovery/run-worker',
+    sourceRoute: '/admin/operations?job=discovery.crawl',
   },
   {
     jobKey: 'embeddings.backfill',
@@ -75,7 +76,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Embedding backfill',
-    sourceRoute: '/api/admin/embeddings/run-worker',
+    sourceRoute: '/admin/operations?job=embeddings.backfill',
   },
   {
     jobKey: 'legal.retention',
@@ -83,7 +84,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Legal retention sweep',
-    sourceRoute: '/api/admin/legal/run-worker',
+    sourceRoute: '/admin/operations?job=legal.retention',
   },
   {
     jobKey: 'billing.reconcile',
@@ -91,7 +92,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Billing reconciliation',
-    sourceRoute: '/api/admin/billing/run-worker',
+    sourceRoute: '/admin/operations?job=billing.reconcile',
   },
   {
     jobKey: RECURRENCE_JOB_KEY,
@@ -99,7 +100,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'UTC',
     scope: 'organization',
     label: 'Calendar recurrence materialization',
-    sourceRoute: '/api/admin/calendar/run-worker',
+    sourceRoute: `/admin/operations?job=${RECURRENCE_JOB_KEY}`,
   },
   {
     jobKey: REMINDER_JOB_KEY,
@@ -109,7 +110,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'UTC',
     scope: 'organization',
     label: 'Calendar reminder delivery',
-    sourceRoute: '/api/admin/calendar/run-reminders',
+    sourceRoute: `/admin/operations?job=${REMINDER_JOB_KEY}`,
   },
   {
     jobKey: 'status.snapshot',
@@ -117,7 +118,7 @@ export const OPERATIONAL_SCHEDULES: readonly OperationalScheduleDefinition[] = [
     timezone: 'UTC',
     scope: 'platform',
     label: 'Status snapshot',
-    sourceRoute: '/api/admin/status/snapshot',
+    sourceRoute: '/admin/operations?job=status.snapshot',
   },
 ]
 
@@ -141,12 +142,14 @@ export function assertRegistryIsSafe(schedules: readonly OperationalScheduleDefi
     if (seen.has(schedule.jobKey)) throw new ScheduleRegistryError(`Duplicate schedule key: ${schedule.jobKey}`)
     seen.add(schedule.jobKey)
 
-    // The feed renders `sourceRoute` as a link. Anything outside the admin namespace either is not
-    // a worker or is not protected by the cron-or-platform-admin guard those routes share.
-    if (!schedule.sourceRoute.startsWith('/api/admin/')) {
-      throw new ScheduleRegistryError(`Unsafe source route for ${schedule.jobKey}: ${schedule.sourceRoute}`)
+    // The feed renders `sourceRoute` as a link, so it must point at the one platform-admin page that
+    // can actually render it — `/admin/operations`, scoped to this job by its own `jobKey` — never a
+    // POST-only worker endpoint a plain `<a href>` click would just 405 against.
+    const expectedRoute = `/admin/operations?job=${schedule.jobKey}`
+    if (schedule.sourceRoute !== expectedRoute) {
+      throw new ScheduleRegistryError(`Unsafe source route for ${schedule.jobKey}: expected ${expectedRoute}, got ${schedule.sourceRoute}`)
     }
-    if (schedule.sourceRoute.includes('?') || schedule.sourceRoute.includes('..')) {
+    if (schedule.sourceRoute.includes('..')) {
       throw new ScheduleRegistryError(`Source route must be a plain path for ${schedule.jobKey}`)
     }
     if (!isValidTimeZone(schedule.timezone)) {

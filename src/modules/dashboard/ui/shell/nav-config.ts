@@ -13,8 +13,8 @@
  */
 
 import {
-  Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Compass, CreditCard,
-  Download, Gauge, Inbox, Layers, LayoutDashboard, Lightbulb, Mail, Map, Plus, RotateCcw,
+  Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
+  Download, Gauge, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plus, RotateCcw,
   Mic,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
 } from 'lucide-react'
@@ -86,10 +86,11 @@ export const NAV_AREAS: readonly NavArea[] = [
     id: 'pipeline',
     label: 'Pipeline',
     icon: Compass,
-    routes: ['/sprints', '/calendar', '/interviews'],
+    routes: ['/sprints', '/calendar', '/interviews', '/lists'],
     items: [
       { to: '/sprints', label: 'Sprints', icon: Compass, group: 'Pipeline', exact: true },
       { to: '/sprints/new', label: 'New sprint', icon: Plus, group: 'Pipeline' },
+      { to: '/lists', label: 'Shortlists', icon: ListChecks, group: 'Pipeline' },
       { to: '/calendar', label: 'Calendar', icon: CalendarDays, group: 'Schedule' },
       // Owned by Pipeline because that is where the calendar lives, and an interview *is* a calendar event
       // in this schema. Without an entry here the page existed but nothing linked to it, which is the state
@@ -114,10 +115,11 @@ export const NAV_AREAS: readonly NavArea[] = [
     id: 'workspace',
     label: 'Workspace',
     icon: Users,
-    routes: ['/settings', '/me', '/status'],
+    routes: ['/settings', '/me', '/status', '/team'],
     items: [
       { to: '/me', label: 'Account', icon: CircleUser, group: 'Account' },
       { to: '/settings/team', label: 'Team', icon: Users, group: 'Organization' },
+      { to: '/team/activity', label: 'Team activity', icon: History, group: 'Organization' },
       { to: '/settings/billing', label: 'Billing', icon: CreditCard, group: 'Organization', exact: true },
       { to: '/settings/privacy', label: 'Privacy', icon: Shield, group: 'Compliance' },
       { to: '/settings/security', label: 'Security', icon: ShieldCheck, group: 'Compliance' },
@@ -132,6 +134,7 @@ export const NAV_AREAS: readonly NavArea[] = [
     routes: ['/admin'],
     items: [
       { to: '/admin/metrics', label: 'Metrics', icon: Activity, group: 'Operations' },
+      { to: '/admin/operations', label: 'Operations', icon: Cog, group: 'Operations' },
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
       { to: '/admin/plan-requests', label: 'Plan requests', icon: Inbox, group: 'Operations', badge: 'planRequests' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },

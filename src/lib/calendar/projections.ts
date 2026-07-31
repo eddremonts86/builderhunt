@@ -206,7 +206,7 @@ export async function buildCalendarFeed(
         title: `Next check — ${alert.name}`,
         startsAt: iso(alert.nextEvaluationAt),
         endsAt: iso(new Date(alert.nextEvaluationAt.getTime() + MINIMUM_ITEM_DURATION_MS)),
-        safeSourceRoute: '/dashboard/alerts',
+        safeSourceRoute: '/alerts',
       })
     }
 
@@ -222,7 +222,7 @@ export async function buildCalendarFeed(
         title: `${bucket.matchCount} match${bucket.matchCount === 1 ? '' : 'es'} — ${bucket.alertName}`,
         startsAt: iso(bucketStart),
         endsAt: iso(new Date(bucketStart.getTime() + 24 * 60 * 60_000)),
-        safeSourceRoute: '/dashboard/alerts',
+        safeSourceRoute: '/alerts',
       })
     }
   }

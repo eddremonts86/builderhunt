@@ -249,6 +249,52 @@ async function closeRun(
     .where(eq(jobRuns.id, runId))
 }
 
+export interface LatestJobRun {
+  id: string
+  jobKey: string
+  scheduledFor: Date
+  startedAt: Date | null
+  finishedAt: Date | null
+  state: string
+  processedCount: number
+  failedCount: number
+  durationMs: number | null
+  errorCode: string | null
+}
+
+/**
+ * The most recent `job_runs` row per key, for the operator-facing status projection
+ * (`/admin/operations`). One bounded query per key rather than a window function: the registry is a
+ * handful of entries, and this keeps the query plain `ORDER BY … LIMIT 1` instead of introducing the
+ * first `DISTINCT ON` in this codebase for a call site that never needs more than ten keys.
+ */
+export async function listLatestJobRuns(jobKeys: string[], db: Db = workerDb): Promise<Map<string, LatestJobRun>> {
+  const rows = await Promise.all(
+    jobKeys.map((jobKey) =>
+      db
+        .select({
+          id: jobRuns.id,
+          jobKey: jobRuns.jobKey,
+          scheduledFor: jobRuns.scheduledFor,
+          startedAt: jobRuns.startedAt,
+          finishedAt: jobRuns.finishedAt,
+          state: jobRuns.state,
+          processedCount: jobRuns.processedCount,
+          failedCount: jobRuns.failedCount,
+          durationMs: jobRuns.durationMs,
+          errorCode: jobRuns.errorCode,
+        })
+        .from(jobRuns)
+        .where(eq(jobRuns.jobKey, jobKey))
+        .orderBy(desc(jobRuns.scheduledFor))
+        .limit(1),
+    ),
+  )
+  const latest = new Map<string, LatestJobRun>()
+  for (const [row] of rows) if (row) latest.set(row.jobKey, row)
+  return latest
+}
+
 export async function listJobRuns(
   jobKeys: string[],
   range: { from: Date; to: Date },

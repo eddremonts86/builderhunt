@@ -16,9 +16,11 @@ describe('resolveActiveArea', () => {
     ['/exports', 'signals'],
     ['/sprints', 'pipeline'],
     ['/calendar', 'pipeline'],
+    ['/lists', 'pipeline'],
     ['/alerts', 'signals'],
     ['/settings/team', 'workspace'],
     ['/settings/security', 'workspace'],
+    ['/team/activity', 'workspace'],
     ['/me', 'workspace'],
   ])('maps %s to the %s area', (pathname, expected) => {
     expect(resolveActiveArea(pathname, false).id).toBe(expected)

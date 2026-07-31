@@ -668,7 +668,7 @@ function deletionScheduledEmailHtml(gracePeriodEndDate: string): string {
     <p>We received a request to delete your BuilderHunt account. If you don't cancel it, your account and its
       associated data will be permanently deleted on <strong>${gracePeriodEndDate}</strong>.</p>
     <p style="margin:1.5rem 0;">
-      <a href="${SITE_URL}/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Sign in to cancel</a>
+      <a href="${SITE_URL}/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">Sign in to cancel</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">If you didn't request this, sign in and cancel it immediately from your privacy settings.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>
@@ -696,7 +696,7 @@ function exportReadyEmailHtml(): string {
     <h1 style="font-size:1.4rem;margin-bottom:0.5rem;">Your data export is ready</h1>
     <p>The data export you requested from BuilderHunt is ready to view.</p>
     <p style="margin:1.5rem 0;">
-      <a href="${SITE_URL}/dashboard/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
+      <a href="${SITE_URL}/settings/privacy" style="display:inline-block;padding:0.7rem 1.2rem;background:#6366f1;color:white;border-radius:6px;text-decoration:none;font-weight:600;">View my export</a>
     </p>
     <p style="color:#6b7280;font-size:0.85rem;">This export link expires 7 days after the request. Request a new one anytime from your privacy settings.</p>
     <p style="color:#9ca3af;font-size:0.8rem;">BuilderHunt — find active developers across the open web.</p>

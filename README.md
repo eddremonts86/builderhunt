@@ -368,6 +368,10 @@ pnpm db:seed:admin     # seed the default admin user (DEFAULT_ADMIN_EMAIL/PASSWO
 pnpm dev               # start the dev server on :3000
 ```
 
+See [`docs/operations/development.md`](docs/operations/development.md) for
+reaching an authenticated (and platform-admin) session in a real local
+browser without widening the app role's grants.
+
 <br />
 
 ## 🔐 Environment variables

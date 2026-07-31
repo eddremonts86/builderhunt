@@ -129,6 +129,7 @@ import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/adm
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
 import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
+import { Route as DashboardAdminOperationsRouteImport } from './routes/_dashboard/admin/operations'
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
@@ -153,6 +154,7 @@ import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users
 import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
 import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admin/plan-requests/index'
+import { Route as ApiAdminOperationsIndexRouteImport } from './routes/api/admin/operations/index'
 import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
 import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
 import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
@@ -873,6 +875,12 @@ const DashboardAdminPlanRequestsRoute =
     path: '/admin/plan-requests',
     getParentRoute: () => DashboardRouteRoute,
   } as any)
+const DashboardAdminOperationsRoute =
+  DashboardAdminOperationsRouteImport.update({
+    id: '/admin/operations',
+    path: '/admin/operations',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardAdminMetricsRoute = DashboardAdminMetricsRouteImport.update({
   id: '/admin/metrics',
   path: '/admin/metrics',
@@ -997,6 +1005,11 @@ const ApiAdminPlanRequestsIndexRoute =
     path: '/api/admin/plan-requests/',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminOperationsIndexRoute = ApiAdminOperationsIndexRouteImport.update({
+  id: '/api/admin/operations/',
+  path: '/api/admin/operations/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAdminMetricsIndexRoute = ApiAdminMetricsIndexRouteImport.update({
   id: '/api/admin/metrics/',
   path: '/api/admin/metrics/',
@@ -1672,6 +1685,7 @@ export interface FileRoutesByFullPath {
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
+  '/admin/operations': typeof DashboardAdminOperationsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -1843,6 +1857,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
+  '/api/admin/operations/': typeof ApiAdminOperationsIndexRoute
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
@@ -1925,6 +1940,7 @@ export interface FileRoutesByTo {
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
+  '/admin/operations': typeof DashboardAdminOperationsRoute
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -2095,6 +2111,7 @@ export interface FileRoutesByTo {
   '/api/admin/changelog': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics': typeof ApiAdminMetricsIndexRoute
+  '/api/admin/operations': typeof ApiAdminOperationsIndexRoute
   '/api/admin/plan-requests': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo': typeof ApiAdminSeoIndexRoute
@@ -2181,6 +2198,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/disputes': typeof DashboardAdminDisputesRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
+  '/_dashboard/admin/operations': typeof DashboardAdminOperationsRoute
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
@@ -2352,6 +2370,7 @@ export interface FileRoutesById {
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
+  '/api/admin/operations/': typeof ApiAdminOperationsIndexRoute
   '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
@@ -2437,6 +2456,7 @@ export interface FileRouteTypes {
     | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
+    | '/admin/operations'
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
@@ -2608,6 +2628,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
+    | '/api/admin/operations/'
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/seo/'
@@ -2690,6 +2711,7 @@ export interface FileRouteTypes {
     | '/admin/disputes'
     | '/admin/incidents'
     | '/admin/metrics'
+    | '/admin/operations'
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
@@ -2860,6 +2882,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog'
     | '/api/admin/incidents'
     | '/api/admin/metrics'
+    | '/api/admin/operations'
     | '/api/admin/plan-requests'
     | '/api/admin/roadmap'
     | '/api/admin/seo'
@@ -2945,6 +2968,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/disputes'
     | '/_dashboard/admin/incidents'
     | '/_dashboard/admin/metrics'
+    | '/_dashboard/admin/operations'
     | '/_dashboard/admin/plan-requests'
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
@@ -3116,6 +3140,7 @@ export interface FileRouteTypes {
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
+    | '/api/admin/operations/'
     | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/seo/'
@@ -3301,6 +3326,7 @@ export interface RootRouteChildren {
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
   ApiAdminMetricsIndexRoute: typeof ApiAdminMetricsIndexRoute
+  ApiAdminOperationsIndexRoute: typeof ApiAdminOperationsIndexRoute
   ApiAdminPlanRequestsIndexRoute: typeof ApiAdminPlanRequestsIndexRoute
   ApiAdminRoadmapIndexRoute: typeof ApiAdminRoadmapIndexRoute
   ApiAdminSeoIndexRoute: typeof ApiAdminSeoIndexRoute
@@ -4179,6 +4205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminPlanRequestsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/operations': {
+      id: '/_dashboard/admin/operations'
+      path: '/admin/operations'
+      fullPath: '/admin/operations'
+      preLoaderRoute: typeof DashboardAdminOperationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/metrics': {
       id: '/_dashboard/admin/metrics'
       path: '/admin/metrics'
@@ -4345,6 +4378,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/plan-requests'
       fullPath: '/api/admin/plan-requests/'
       preLoaderRoute: typeof ApiAdminPlanRequestsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/operations/': {
+      id: '/api/admin/operations/'
+      path: '/api/admin/operations'
+      fullPath: '/api/admin/operations/'
+      preLoaderRoute: typeof ApiAdminOperationsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/metrics/': {
@@ -5145,6 +5185,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminDisputesRoute: typeof DashboardAdminDisputesRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
+  DashboardAdminOperationsRoute: typeof DashboardAdminOperationsRoute
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
@@ -5180,6 +5221,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminDisputesRoute: DashboardAdminDisputesRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
+  DashboardAdminOperationsRoute: DashboardAdminOperationsRoute,
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
@@ -5641,6 +5683,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
   ApiAdminMetricsIndexRoute: ApiAdminMetricsIndexRoute,
+  ApiAdminOperationsIndexRoute: ApiAdminOperationsIndexRoute,
   ApiAdminPlanRequestsIndexRoute: ApiAdminPlanRequestsIndexRoute,
   ApiAdminRoadmapIndexRoute: ApiAdminRoadmapIndexRoute,
   ApiAdminSeoIndexRoute: ApiAdminSeoIndexRoute,

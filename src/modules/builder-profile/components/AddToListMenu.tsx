@@ -187,7 +187,7 @@ export function AddToListMenu({ builderIdentityId, lists, onAdded }: AddToListMe
 
           <div className="border-t border-bh-border mt-1 pt-1">
             <a
-              href="/dashboard/lists"
+              href="/lists"
               className="w-full text-left px-2 py-1.5 rounded hover:bg-bh-surface text-sm flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
               data-testid="add-to-list-manage"
             >

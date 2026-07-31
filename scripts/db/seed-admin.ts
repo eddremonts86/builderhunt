@@ -32,13 +32,16 @@ if (__NODE_ENV === 'production' && (!__adminEmailEnv || !__adminPasswordEnv)) {
 
 
 
-const DATABASE_URL = process.env.DATABASE_URL
+// `auth_users`/`auth_accounts` are auth-broker-only tables — the runtime app
+// role (`DATABASE_URL`) deliberately has no grant on them, so this must go
+// through the same privileged connection `authDb` uses in the app itself.
+const DATABASE_URL = process.env.DATABASE_AUTH_URL ?? process.env.DATABASE_URL
 const email = process.env.DEFAULT_ADMIN_EMAIL ?? 'edd_admin@local.com'
 const password = process.env.DEFAULT_ADMIN_PASSWORD ?? 'Passw0rd!234'
 const name = 'Admin'
 
 if (!DATABASE_URL) {
-  console.error('❌  DATABASE_URL is not set. Check your .env file.')
+  console.error('❌  DATABASE_AUTH_URL / DATABASE_URL is not set. Check your .env file.')
   process.exit(1)
 }
 

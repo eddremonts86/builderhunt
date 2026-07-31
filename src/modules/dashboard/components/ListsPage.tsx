@@ -249,7 +249,7 @@ export function ListsPage({ initialLists, currentUser }: ListsPageProps) {
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => navigate({ to: '/_dashboard/lists/$listId' as never, params: { listId: list.id } as never })}
+                      onClick={() => navigate({ to: '/lists/$listId', params: { listId: list.id } })}
                       className="font-semibold text-bh-text hover:text-bh-accent truncate text-left"
                       data-testid={`list-link-${list.id}`}
                     >

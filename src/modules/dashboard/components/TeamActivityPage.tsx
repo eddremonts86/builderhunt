@@ -86,7 +86,7 @@ export function TeamActivityPage({ initialRows, initialCursor }: TeamActivityPag
       <div>
         <button
           type="button"
-          onClick={() => navigate({ to: '/_dashboard' as never })}
+          onClick={() => navigate({ to: '/dashboard' })}
           className="inline-flex items-center gap-1 text-sm text-bh-text-muted hover:text-bh-accent mb-4"
         >
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />

@@ -15,7 +15,7 @@ function definition(overrides: Partial<OperationalScheduleDefinition> = {}): Ope
     timezone: 'Europe/Copenhagen',
     scope: 'platform',
     label: 'Test job',
-    sourceRoute: '/api/admin/alerts/run-worker',
+    sourceRoute: '/admin/operations?job=test.job',
     ...overrides,
   }
 }
@@ -41,11 +41,11 @@ describe('the shipped registry', () => {
     expect(findScheduleDefinition('nope.not.a.job')).toBeNull()
   })
 
-  it('points every entry at a route under the admin namespace', () => {
+  it('points every entry at its own job on the operations page', () => {
     for (const schedule of OPERATIONAL_SCHEDULES) {
-      // The calendar feed renders this as a link; anything outside /api/admin/ is not covered by
-      // the cron-or-platform-admin guard those routes share.
-      expect(schedule.sourceRoute.startsWith('/api/admin/')).toBe(true)
+      // The calendar feed renders this as a link; it must be the platform-admin page that can
+      // actually render a GET for it, scoped to this job, never a POST-only worker endpoint.
+      expect(schedule.sourceRoute).toBe(`/admin/operations?job=${schedule.jobKey}`)
     }
   })
 })
@@ -57,9 +57,9 @@ describe('assertRegistryIsSafe', () => {
   })
 
   it.each([
-    ['a route outside the admin namespace', '/api/calendar/events'],
-    ['a route with a query string', '/api/admin/alerts/run-worker?force=1'],
-    ['a traversal attempt', '/api/admin/../public/thing'],
+    ['a leftover worker-endpoint route', '/api/admin/alerts/run-worker'],
+    ['a route for a different job', '/admin/operations?job=other.job'],
+    ['a traversal attempt', '/admin/operations?job=../public/thing'],
   ])('rejects %s', (_label, sourceRoute) => {
     expect(() => assertRegistryIsSafe([definition({ sourceRoute })])).toThrow(ScheduleRegistryError)
   })
