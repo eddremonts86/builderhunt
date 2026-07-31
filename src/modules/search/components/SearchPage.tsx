@@ -170,20 +170,24 @@ export function SearchPage() {
    * applies for keyword mode. Rendered in the results header instead of the
    * raw (possibly long, natural-language) query text. */
   const [matchedKeywords, setMatchedKeywords] = React.useState<string[]>([])
-  const [plan, setPlan] = React.useState<'free' | 'pro' | 'team' | null>(null)
+  const [plan, setPlan] = React.useState<'free' | 'pro' | 'team' | 'pro_max' | null>(null)
   const aiCaps = useAICapabilities()
+  // Semantic search is a paid feature (Pro, Pro Max, Team). Pro Max carries the
+  // same semantic entitlement as Team; the server enforces the real gate, so
+  // this flag only chooses between the live toggle and the upgrade nudge below.
+  const semanticSearchAllowed = plan === 'pro' || plan === 'team' || plan === 'pro_max'
 
   React.useEffect(() => {
     fetch('/api/plans/me', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((data: { plan?: { plan?: 'free' | 'pro' | 'team' } } | null) => {
+      .then((data: { plan?: { plan?: 'free' | 'pro' | 'team' | 'pro_max' } } | null) => {
         if (data?.plan?.plan) setPlan(data.plan.plan)
       })
       .catch(() => {})
   }, [])
 
   const toggleSemanticMode = () => {
-    if (plan !== 'pro' && plan !== 'team') return
+    if (!semanticSearchAllowed) return
     const next = !semanticMode
     setSemanticMode(next)
     // Keeps the URL shareable/bookmarkable without fighting the router's
@@ -653,11 +657,11 @@ export function SearchPage() {
           {/* Semantic toggle (Plan: semantic-search) — hidden entirely when
               the AI platform is disabled or has no server tier configured;
               locked with a Pro pill until the plan is positively known to
-              be pro/team (fail-closed while /api/plans/me is loading, for
+              be pro/pro_max/team (fail-closed while /api/plans/me is loading, for
               anonymous visitors, and for free-plan users). */}
           {!aiCaps.disabled && aiCaps.serverAI && (
-            <Tooltip label={plan === 'pro' || plan === 'team' ? 'Semantic search — find builders by meaning, not just keywords' : 'Semantic search — upgrade to Pro to unlock'}>
-              {plan === 'pro' || plan === 'team' ? (
+            <Tooltip label={semanticSearchAllowed ? 'Semantic search — find builders by meaning, not just keywords' : 'Semantic search — upgrade to Pro to unlock'}>
+              {semanticSearchAllowed ? (
                 <button
                   type="button"
                   onClick={toggleSemanticMode}

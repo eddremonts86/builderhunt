@@ -23,7 +23,7 @@ import { SprintsWidget, type SprintListItem } from '~/modules/dashboard/ui/home/
 import { AlertsWidget, type AlertTrigger } from '~/modules/dashboard/ui/home/AlertsWidget'
 import { PlanUsageWidget, type PlanUsage } from '~/modules/dashboard/ui/home/PlanUsageWidget'
 import { SavedQueryVisibilityBadge, type SavedQueryVisibility } from '~/modules/dashboard/components/SavedQueryVisibilityBadge'
-import type { PlanTier } from '~/shared/lib/billing-shared'
+import type { OrganizationTier } from '~/shared/lib/billing-shared'
 import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
 
 interface Stats {
@@ -278,7 +278,7 @@ export function DashboardPage() {
   const [recent, setRecent] = React.useState<RecentBuilder[]>([])
   const [sprints, setSprints] = React.useState<SprintListItem[]>([])
   const [triggers, setTriggers] = React.useState<AlertTrigger[]>([])
-  const [planTier, setPlanTier] = React.useState<PlanTier | null>(null)
+  const [planTier, setPlanTier] = React.useState<OrganizationTier | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   // The principal's id is what gates the visibility-flip action on a
@@ -437,7 +437,7 @@ export function DashboardPage() {
       .catch(() => setTriggers([]))
     fetch('/api/plans/me', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((body: { plan?: { plan?: PlanTier } } | null) => setPlanTier(body?.plan?.plan ?? null))
+      .then((body: { plan?: { plan?: OrganizationTier } } | null) => setPlanTier(body?.plan?.plan ?? null))
       .catch(() => setPlanTier(null))
   }, [])
 

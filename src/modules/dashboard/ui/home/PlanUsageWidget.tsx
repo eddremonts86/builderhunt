@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import { Gauge } from 'lucide-react'
-import { PLAN_LIMITS, type PlanTier } from '~/shared/lib/billing-shared'
+import { PLAN_LIMITS, type OrganizationTier, type PlanTier } from '~/shared/lib/billing-shared'
 import { BentoTileHeader } from '~/modules/dashboard/ui/bento/Bento'
 
 /**
@@ -15,7 +15,7 @@ import { BentoTileHeader } from '~/modules/dashboard/ui/bento/Bento'
  */
 
 export interface PlanUsage {
-  tier: PlanTier
+  tier: OrganizationTier
   savedSearches: number
   savedBuilders: number
 }
@@ -45,7 +45,13 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
 }
 
 export function PlanUsageWidget({ usage }: { usage: PlanUsage }) {
-  const limits = PLAN_LIMITS[usage.tier]
+  // Pro Max carries no PLAN_LIMITS row of its own; it reads Team's, exactly as
+  // resolveLegacyPlanTier maps it on the server. Inlined here (a trivial one-way
+  // mapping) because that helper lives in a server-only module while this widget
+  // renders in the browser bundle. The `usage.tier` label below still shows the
+  // real tier (e.g. "pro_max"); only the limits lookup is collapsed to Team's.
+  const legacyTier: PlanTier = usage.tier === 'pro_max' ? 'team' : usage.tier
+  const limits = PLAN_LIMITS[legacyTier]
 
   return (
     <>
