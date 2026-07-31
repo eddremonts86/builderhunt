@@ -1,59 +1,43 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Loader2, Lock, Plus, X } from 'lucide-react'
+import { CalendarDays, Loader2, Plus, Search, X } from 'lucide-react'
 import { Button, Input, Label } from '~/components/ui'
 import { REMINDER_OFFSET_MINUTES } from '~/shared/lib/calendar'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
 import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
+import { CalendarAgenda } from './CalendarAgenda'
+import {
+  CalendarView,
+  isoDay,
+  type CalendarEventDto,
+  type CalendarFeedItemDto,
+} from './CalendarView'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
- * components").
+ * components"; plans/UI Wave 3 "Extract a route-driven multi-view Calendar shell").
  *
- * Renders a month grid and a create form over `/api/calendar/feed`, which merges the caller's own
- * events with read-only projections of background jobs and alerts (Phase 4 "Add calendar layer UI").
+ * Renders month/week/day/list views over `/api/calendar/feed`, which merges the caller's own events
+ * with read-only projections of background jobs and alerts (Phase 4 "Add calendar layer UI").
  *
  * It deliberately does NOT mount FullCalendar: the drag/resize interactions FullCalendar exists for
- * depend on the occurrence-materialization and reminder-rescheduling paths, so wiring it before
- * those are finished would produce a surface that looks interactive but silently drops edits. This
- * grid is honest about what currently works — read, create, cancel, delete.
+ * depend on the occurrence-materialization and reminder-rescheduling paths, and recurrence editing
+ * is still series-only server-side (see `lib/calendar/service.ts`'s `not_implemented` scope guard).
+ * Wiring FullCalendar before those are finished would produce a surface that looks interactive but
+ * silently drops edits, so month/week/day share the same hand-rolled grid (`CalendarView`) and list
+ * uses `CalendarAgenda` — both keep the same accessibility contract (dashed border + lock icon +
+ * `aria-label` for read-only projections, a real delete button for events).
  *
- * The editable/read-only split is carried by the DTO, not by this component's judgement: only
- * `kind === 'event'` items get a delete control, and every other kind renders with a dashed border
- * plus a lock icon. Shape and icon rather than colour alone, because the distinction is "you can
- * change this" versus "you cannot", which must survive greyscale and high-contrast rendering.
+ * `view`/`date`/`query` are optional and controlled: the route (`_dashboard/calendar/index.tsx`)
+ * drives them from validated URL search params so a view survives a refresh or a shared link.
+ * Left uncontrolled, they default to local state — this is what keeps this component testable
+ * without a router context.
  */
 
-interface CalendarEventDto {
-  kind: 'event'
-  editable: true
-  id: string
-  title: string
-  startsAt: string
-  endsAt: string
-  type: string
-  status: string
-  allDay: boolean
-  busy: boolean
-  version: number
-  location: string | null
-  meetingUrl: string | null
-  description: string | null
-}
+export type CalendarViewKey = 'month' | 'week' | 'day' | 'list'
 
-type CalendarFeedItemDto = CalendarEventDto | (ProjectionItem & { editable: false })
-
-interface CalendarFeedDto {
+export interface CalendarFeedDto {
   items: CalendarFeedItemDto[]
   staleSources: string[]
-}
-
-function isEventItem(item: CalendarFeedItemDto): item is CalendarEventDto {
-  return item.kind === 'event'
-}
-
-/** Projections carry no row id, so their React key is the source identity the feed already made unique. */
-function itemKey(item: CalendarFeedItemDto): string {
-  return isEventItem(item) ? item.id : `${item.kind}:${item.sourceId}`
 }
 
 export interface CalendarPageProps {
@@ -63,6 +47,13 @@ export interface CalendarPageProps {
   deleteEvent?: (id: string, version: number) => Promise<{ ok: boolean; error?: string }>
   /** Fixed "today" so the grid is deterministic under test. */
   today?: Date
+  /** Controlled view/date/search — see the route wrapper. Uncontrolled (local state) when omitted. */
+  view?: CalendarViewKey
+  date?: Date
+  query?: string
+  onViewChange?: (view: CalendarViewKey) => void
+  onDateChange?: (date: Date) => void
+  onQueryChange?: (query: string) => void
 }
 
 async function defaultFetchFeed(range: { from: string; to: string }, layers: CalendarLayerKey[]): Promise<CalendarFeedDto> {
@@ -113,23 +104,48 @@ function addMonths(date: Date, delta: number) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + delta, 1))
 }
 
+function addDays(date: Date, delta: number) {
+  const next = new Date(date)
+  next.setUTCDate(next.getUTCDate() + delta)
+  return next
+}
+
 /** Six full weeks starting on the Monday on or before the 1st, so the grid never reflows between months. */
 function monthGridDays(monthStart: Date): Date[] {
   const firstWeekday = (monthStart.getUTCDay() + 6) % 7
-  const gridStart = new Date(monthStart)
-  gridStart.setUTCDate(gridStart.getUTCDate() - firstWeekday)
-  return Array.from({ length: 42 }, (_, index) => {
-    const day = new Date(gridStart)
-    day.setUTCDate(gridStart.getUTCDate() + index)
-    return day
-  })
+  const gridStart = addDays(monthStart, -firstWeekday)
+  return Array.from({ length: 42 }, (_, index) => addDays(gridStart, index))
 }
 
-function isoDay(date: Date) {
-  return date.toISOString().slice(0, 10)
+/** The Monday on or before `date`, so a week always renders Mon–Sun regardless of which day it was opened on. */
+function startOfWeek(date: Date): Date {
+  const weekday = (date.getUTCDay() + 6) % 7
+  return addDays(date, -weekday)
+}
+
+function weekDays(weekStart: Date): Date[] {
+  return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index))
 }
 
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const LIST_WINDOW_DAYS = 30
+const VIEW_OPTIONS: ReadonlyArray<{ key: CalendarViewKey; label: string }> = [
+  { key: 'month', label: 'Month' },
+  { key: 'week', label: 'Week' },
+  { key: 'day', label: 'Day' },
+  { key: 'list', label: 'List' },
+]
+
+function supportedTimezones(): string[] {
+  // `Intl.supportedValuesOf` is unavailable in older engines and in some SSR runtimes; a two-entry
+  // fallback still lets the selector function, just without the full IANA list.
+  try {
+    if (typeof Intl.supportedValuesOf === 'function') return Intl.supportedValuesOf('timeZone')
+  } catch {
+    // fall through
+  }
+  return ['UTC', Intl.DateTimeFormat().resolvedOptions().timeZone]
+}
 
 export function CalendarPage(props: CalendarPageProps = {}) {
   const fetchFeed = props.fetchFeed ?? defaultFetchFeed
@@ -137,7 +153,29 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const deleteEventFn = props.deleteEvent ?? defaultDeleteEvent
   const today = useMemo(() => props.today ?? new Date(), [props.today])
 
-  const [monthStart, setMonthStart] = useState(() => startOfMonth(today))
+  const [localView, setLocalView] = useState<CalendarViewKey>('month')
+  const [localDate, setLocalDate] = useState<Date>(today)
+  const [localQuery, setLocalQuery] = useState('')
+  const view = props.view ?? localView
+  const activeDate = props.date ?? localDate
+  const query = props.query ?? localQuery
+
+  const setView = useCallback((next: CalendarViewKey) => {
+    if (props.onViewChange) props.onViewChange(next)
+    else setLocalView(next)
+  }, [props])
+  const setActiveDate = useCallback((next: Date) => {
+    if (props.onDateChange) props.onDateChange(next)
+    else setLocalDate(next)
+  }, [props])
+  const setQuery = useCallback((next: string) => {
+    if (props.onQueryChange) props.onQueryChange(next)
+    else setLocalQuery(next)
+  }, [props])
+
+  const [timezone, setTimezone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)
+  const timezoneOptions = useMemo(() => supportedTimezones(), [])
+
   const [items, setItems] = useState<CalendarFeedItemDto[]>([])
   const [staleSources, setStaleSources] = useState<string[]>([])
   const [layers, setLayers] = useState<CalendarLayerKey[]>(['events', 'jobs', 'alerts'])
@@ -155,13 +193,58 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const [description, setDescription] = useState('')
   const [reminderOffset, setReminderOffset] = useState<number | null>(30)
 
-  const days = useMemo(() => monthGridDays(monthStart), [monthStart])
-  const rangeFrom = days[0]
-  const rangeTo = useMemo(() => {
-    const end = new Date(days[days.length - 1])
-    end.setUTCDate(end.getUTCDate() + 1)
-    return end
-  }, [days])
+  // Every view resolves to a bounded [rangeFrom, rangeTo) plus the concrete day cells (if any) it
+  // renders — month/week/day are grids over `days`; list has no grid, just a rolling window.
+  const { days, rangeFrom, rangeTo, columns, weekdayLabels, dimPredicate, viewLabel } = useMemo(() => {
+    if (view === 'week') {
+      const weekStart = startOfWeek(activeDate)
+      const weekDaysList = weekDays(weekStart)
+      return {
+        days: weekDaysList,
+        rangeFrom: weekDaysList[0],
+        rangeTo: addDays(weekDaysList[6], 1),
+        columns: 7,
+        weekdayLabels: WEEKDAY_LABELS,
+        dimPredicate: undefined as ((d: Date) => boolean) | undefined,
+        viewLabel: 'Week view',
+      }
+    }
+    if (view === 'day') {
+      const dayStart = new Date(Date.UTC(activeDate.getUTCFullYear(), activeDate.getUTCMonth(), activeDate.getUTCDate()))
+      return {
+        days: [dayStart],
+        rangeFrom: dayStart,
+        rangeTo: addDays(dayStart, 1),
+        columns: 1,
+        weekdayLabels: [dayStart.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' })],
+        dimPredicate: undefined,
+        viewLabel: 'Day view',
+      }
+    }
+    if (view === 'list') {
+      const windowStart = new Date(Date.UTC(activeDate.getUTCFullYear(), activeDate.getUTCMonth(), activeDate.getUTCDate()))
+      return {
+        days: Array.from({ length: LIST_WINDOW_DAYS }, (_, index) => addDays(windowStart, index)),
+        rangeFrom: windowStart,
+        rangeTo: addDays(windowStart, LIST_WINDOW_DAYS),
+        columns: 0,
+        weekdayLabels: [] as string[],
+        dimPredicate: undefined,
+        viewLabel: 'List view',
+      }
+    }
+    const monthStart = startOfMonth(activeDate)
+    const monthDays = monthGridDays(monthStart)
+    return {
+      days: monthDays,
+      rangeFrom: monthDays[0],
+      rangeTo: addDays(monthDays[monthDays.length - 1], 1),
+      columns: 7,
+      weekdayLabels: WEEKDAY_LABELS,
+      dimPredicate: (d: Date) => d.getUTCMonth() !== monthStart.getUTCMonth(),
+      viewLabel: 'Month view',
+    }
+  }, [view, activeDate])
 
   // Every setState here happens after an await, never synchronously in the effect body — a
   // synchronous one would cascade an extra render on mount (react-hooks/set-state-in-effect).
@@ -203,14 +286,20 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     }
   }, [fetchFeed, rangeFrom, rangeTo, layers])
 
+  const visibleItems = useMemo(() => {
+    const trimmed = query.trim().toLowerCase()
+    if (!trimmed) return items
+    return items.filter((item) => item.title.toLowerCase().includes(trimmed))
+  }, [items, query])
+
   const itemsByDay = useMemo(() => {
     const map = new Map<string, CalendarFeedItemDto[]>()
-    for (const item of items) {
+    for (const item of visibleItems) {
       const key = item.startsAt.slice(0, 10)
       map.set(key, [...(map.get(key) ?? []), item])
     }
     return map
-  }, [items])
+  }, [visibleItems])
 
   function toggleLayer(key: CalendarLayerKey) {
     // Closing the detail panel on a layer change avoids showing details for an item that the new
@@ -259,7 +348,32 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     else setLoadError('We could not delete that event. Refresh and try again.')
   }
 
-  const monthLabel = monthStart.toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+  function handleSelectProjection(item: ProjectionItem) {
+    setSelectedProjection(item)
+  }
+
+  function step(delta: number) {
+    if (view === 'month') setActiveDate(addMonths(activeDate, delta))
+    else if (view === 'week') setActiveDate(addDays(activeDate, delta * 7))
+    else if (view === 'list') setActiveDate(addDays(activeDate, delta * LIST_WINDOW_DAYS))
+    else setActiveDate(addDays(activeDate, delta))
+  }
+
+  const rangeLabel = view === 'month'
+    ? startOfMonth(activeDate).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    : view === 'week'
+      ? `${days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} – ${days[days.length - 1].toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}`
+      : view === 'day'
+        ? days[0].toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+        : `Next ${LIST_WINDOW_DAYS} days from ${days[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+
+  const emptyMessage = layers.length === 0
+    // Distinguishing these matters: "nothing scheduled" when the user has simply switched every
+    // layer off would look like their data disappeared.
+    ? 'No layers selected. Turn one on to see your calendar.'
+    : query.trim()
+      ? `Nothing matches "${query.trim()}" in this range.`
+      : 'Nothing scheduled in this range yet. Create your first event to get started.'
 
   return (
     <div className="mx-auto w-full max-w-[1200px] px-4 py-8" data-testid="calendar-page">
@@ -343,10 +457,60 @@ export function CalendarPage(props: CalendarPageProps = {}) {
         <ProjectionDetails item={selectedProjection} onClose={() => setSelectedProjection(null)} />
       )}
 
-      <div className="mb-4 flex items-center justify-between">
-        <Button variant="secondary" size="sm" onClick={() => setMonthStart((m) => addMonths(m, -1))} data-testid="calendar-prev-month">Previous</Button>
-        <h2 className="text-lg font-medium" data-testid="calendar-month-label">{monthLabel}</h2>
-        <Button variant="secondary" size="sm" onClick={() => setMonthStart((m) => addMonths(m, 1))} data-testid="calendar-next-month">Next</Button>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-bh-border p-0.5" role="tablist" aria-label="Calendar view">
+          {VIEW_OPTIONS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              role="tab"
+              aria-selected={view === option.key}
+              onClick={() => setView(option.key)}
+              data-testid={`calendar-view-${option.key}`}
+              className={`rounded-md px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-bh-accent ${
+                view === option.key ? 'bg-bh-accent-soft text-bh-text' : 'text-bh-text-muted hover:text-bh-text'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1">
+          <Button variant="secondary" size="sm" onClick={() => step(-1)} data-testid="calendar-prev">Previous</Button>
+          <Button variant="secondary" size="sm" onClick={() => setActiveDate(today)} data-testid="calendar-today">Today</Button>
+          <Button variant="secondary" size="sm" onClick={() => step(1)} data-testid="calendar-next">Next</Button>
+        </div>
+
+        <h2 className="text-lg font-medium" data-testid="calendar-range-label">{rangeLabel}</h2>
+
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-bh-text-dim" aria-hidden />
+            <Input
+              value={query}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)}
+              placeholder="Search this range"
+              aria-label="Search calendar items"
+              className="w-48 pl-8"
+              data-testid="calendar-search-input"
+            />
+          </div>
+          <label className="flex items-center gap-1.5 text-xs text-bh-text-muted">
+            <span data-testid="calendar-timezone-label">{timezone}</span>
+            <select
+              aria-label="Display timezone"
+              value={timezone}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTimezone(e.target.value)}
+              className="h-8 rounded-md border border-bh-border bg-bh-surface px-2 text-xs"
+              data-testid="calendar-timezone-select"
+            >
+              {timezoneOptions.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+          </label>
+        </div>
       </div>
 
       {loadError && <p className="mb-4 text-sm text-bh-danger" data-testid="calendar-load-error">{loadError}</p>}
@@ -358,83 +522,34 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           ))}
         </div>
       ) : (
-        <div role="grid" aria-label="Month view" className="overflow-hidden rounded-xl border border-bh-border" data-testid="calendar-grid">
-          <div className="grid grid-cols-7 border-b border-bh-border bg-bh-surface-muted">
-            {WEEKDAY_LABELS.map((label) => (
-              <div key={label} className="px-2 py-2 text-center text-xs font-medium text-bh-text-muted">{label}</div>
-            ))}
+        <>
+          {/* Always the mobile fallback, regardless of the selected view: a 42-cell month grid (or an
+              hour-by-hour day grid) is not usable at 320px, and the agenda reads the same items. */}
+          <div className="md:hidden">
+            <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
           </div>
-          <div className="grid grid-cols-7 gap-px bg-bh-border">
-            {days.map((day) => {
-              const key = isoDay(day)
-              const dayItems = itemsByDay.get(key) ?? []
-              const inMonth = day.getUTCMonth() === monthStart.getUTCMonth()
-              return (
-                <div
-                  key={key}
-                  role="gridcell"
-                  data-testid={`calendar-day-${key}`}
-                  className={`min-h-24 bg-bh-surface p-1.5 ${inMonth ? '' : 'opacity-45'}`}
-                >
-                  <div className="mb-1 text-xs font-medium text-bh-text-muted">{day.getUTCDate()}</div>
-                  <ul className="space-y-1">
-                    {dayItems.map((item) => (
-                      <li key={itemKey(item)}>
-                        {isEventItem(item) ? (
-                          <div
-                            className={`group flex items-start justify-between gap-1 rounded border border-transparent px-1.5 py-1 text-xs ${
-                              item.status === 'cancelled' ? 'bg-bh-surface-2 line-through opacity-60' : 'bg-bh-accent-soft'
-                            }`}
-                            data-testid={`calendar-event-${item.id}`}
-                          >
-                            <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                            <button
-                              type="button"
-                              aria-label={`Delete ${item.title}`}
-                              onClick={() => handleDelete(item)}
-                              className="opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-                              data-testid={`calendar-delete-${item.id}`}
-                            >
-                              <X className="size-3" aria-hidden />
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedProjection(item)}
-                            // Dashed border + lock icon, not a colour swap: the difference being
-                            // encoded is "you can move this" versus "you cannot", which has to
-                            // survive greyscale and high-contrast rendering.
-                            className="flex w-full items-start gap-1 rounded border border-dashed border-bh-border-strong bg-bh-surface-2 px-1.5 py-1 text-left text-xs text-bh-text-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-bh-accent"
-                            data-testid={`calendar-projection-${item.kind}`}
-                            aria-label={`${item.title} — read-only, managed by the system`}
-                          >
-                            <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
-                            <span className="min-w-0 flex-1 truncate">
-                              {item.title}
-                              {/* Spelled out rather than implied by styling, so the constraint is
-                                  readable by a screen reader and in a printout. */}
-                              {item.estimateOnly ? ' (estimate)' : ''}
-                            </span>
-                          </button>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )
-            })}
+          <div className="hidden md:block">
+            {view === 'list' ? (
+              <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
+            ) : (
+              <CalendarView
+                days={days}
+                columns={columns}
+                weekdayLabels={weekdayLabels}
+                itemsByDay={itemsByDay}
+                isDimmed={dimPredicate}
+                viewLabel={viewLabel}
+                onDelete={handleDelete}
+                onSelectProjection={handleSelectProjection}
+              />
+            )}
           </div>
-        </div>
+        </>
       )}
 
-      {!loading && items.length === 0 && !loadError && (
+      {!loading && visibleItems.length === 0 && !loadError && view !== 'list' && (
         <p className="mt-6 text-center text-sm text-bh-text-muted" data-testid="calendar-empty">
-          {layers.length === 0
-            // Distinguishing these matters: "nothing scheduled" when the user has simply switched
-            // every layer off would look like their data disappeared.
-            ? 'No layers selected. Turn one on to see your calendar.'
-            : 'Nothing scheduled this month yet. Create your first event to get started.'}
+          {emptyMessage}
         </p>
       )}
     </div>
