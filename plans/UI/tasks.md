@@ -93,7 +93,7 @@
   - Do: Render versioned weekly windows, IANA timezone, duration, buffers, notice, horizon, blocked/custom overrides, and default reminder channels/offsets. Normalize compatible overlaps and explain conflicting ones.
   - Verify: first save, stale 409, DST boundary, overlap normalization, override create/delete, and another-user denial pass through real APIs.
 
-- [ ] **Build calendar notifications and unread navigation**
+- [x] **Build calendar notifications and unread navigation**
   - Files: `src/modules/calendar/components/CalendarNotifications.tsx`, `src/modules/calendar/components/CalendarPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `src/routes/api/calendar/notifications.ts`, `tests/unit/modules/calendar/components/CalendarNotifications.test.tsx`
   - Do: Add a keyboard-accessible drawer, unread badge, keyset pagination, mark-one/mark-all-visible read, event navigation, and redacted candidate-safe summaries.
   - Verify: shared-timestamp pagination does not skip/duplicate; foreign IDs remain unmarked; mobile focus trap and Escape behavior pass.

@@ -591,3 +591,33 @@ test('an owner can edit availability and manage a date override through the UI',
   }
 })
 
+/**
+ * The notifications drawer, against the real keyset-paginated feed endpoint. A fresh owner may have
+ * no deliveries, so this asserts the round-trip (open → the feed load settles with no error → the
+ * keyboard Escape contract closes it) rather than depending on notification data the worker would
+ * have to produce first.
+ */
+test('an owner can open and Escape-close the notifications drawer', async ({ browser }) => {
+  const context = await browser.newContext({ storageState: harness.owner.storageState! })
+  const page = await context.newPage()
+  const guard = expectStrictBrowser(page)
+  for (let i = 0; i < 10; i++) guard.allowExpectedFailure(/status of (401|403|503)/)
+
+  try {
+    await gotoHydrated(page, `${harness.baseURL}/calendar`)
+    await dismissOverlays(page)
+
+    await page.getByTestId('calendar-notifications-toggle').click()
+    await expect(page.getByTestId('calendar-notifications')).toBeVisible({ timeout: 20_000 })
+    // Wait for the real feed load to settle, then confirm it did not error.
+    await expect(page.getByTestId('calendar-notifications-loading')).toHaveCount(0, { timeout: 20_000 })
+    await expect(page.getByTestId('calendar-notifications-error')).toHaveCount(0)
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByTestId('calendar-notifications')).toHaveCount(0, { timeout: 20_000 })
+  } finally {
+    guard.dispose()
+    await context.close()
+  }
+})
+

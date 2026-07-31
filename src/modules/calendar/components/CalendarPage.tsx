@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Clock, Plus, Search, X } from 'lucide-react'
+import { Bell, CalendarDays, Clock, Plus, Search, X } from 'lucide-react'
 import { Button, Input } from '~/components/ui'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
 import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
 import { CalendarAgenda } from './CalendarAgenda'
 import {
   CalendarView,
+  isEventItem,
   type CalendarEventDto,
   type CalendarFeedItemDto,
 } from './CalendarView'
 import { EventEditor, type EventEditorSubmitMeta, type EventFormValue, type RecurrenceScope } from './EventEditor'
 import { EventDetails, type EventDetailView } from './EventDetails'
 import { AvailabilityEditor } from './AvailabilityEditor'
+import {
+  CalendarNotifications,
+  defaultLoadNotifications,
+  defaultMarkRead,
+  type MarkReadResult,
+  type NotificationsPage,
+} from './CalendarNotifications'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
@@ -48,6 +56,8 @@ export interface CalendarPageProps {
   updateEvent?: (id: string, body: unknown) => Promise<{ ok: boolean; error?: string }>
   deleteEvent?: (id: string, version: number, options?: { recurrenceScope?: RecurrenceScope; recurrenceId?: string }) => Promise<{ ok: boolean; error?: string }>
   loadEventDetail?: (id: string) => Promise<EventDetailView | null>
+  loadNotifications?: (cursor: string | null) => Promise<NotificationsPage>
+  markNotificationsRead?: (deliveryIds: string[]) => Promise<MarkReadResult>
   /** Fixed "today" so the grid is deterministic under test. */
   today?: Date
   /** Controlled view/date/search — see the route wrapper. Uncontrolled (local state) when omitted. */
@@ -272,6 +282,8 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const updateEventFn = props.updateEvent ?? defaultUpdateEvent
   const deleteEventFn = props.deleteEvent ?? defaultDeleteEvent
   const loadEventDetailFn = props.loadEventDetail ?? defaultLoadEventDetail
+  const loadNotificationsFn = props.loadNotifications ?? defaultLoadNotifications
+  const markNotificationsReadFn = props.markNotificationsRead ?? defaultMarkRead
   const today = useMemo(() => props.today ?? new Date(), [props.today])
 
   const [localView, setLocalView] = useState<CalendarViewKey>('month')
@@ -306,6 +318,8 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notificationUnread, setNotificationUnread] = useState(0)
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventDto | null>(null)
   const [eventDetail, setEventDetail] = useState<EventDetailView | null>(null)
@@ -407,6 +421,23 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     }
   }, [fetchFeed, rangeFrom, rangeTo, layers])
 
+  // Prime the bell badge with the unread count without opening the drawer. The drawer keeps this in
+  // sync afterwards via `onUnreadChange`; a failure here just leaves the badge at 0 rather than
+  // surfacing an error on a surface the user has not asked for.
+  useEffect(() => {
+    let cancelled = false
+    loadNotificationsFn(null)
+      .then((page) => {
+        if (!cancelled) setNotificationUnread(page.unreadCount)
+      })
+      .catch(() => {
+        // Non-critical: the badge simply stays hidden.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [loadNotificationsFn])
+
   const visibleItems = useMemo(() => {
     const trimmed = query.trim().toLowerCase()
     if (!trimmed) return items
@@ -472,6 +503,15 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     setEventDetail(null)
     setEditing(false)
     setActionError(null)
+  }
+
+  function handleNotificationNavigate(eventId: string) {
+    // Best-effort: open the event's detail panel if the notification's event is inside the range the
+    // calendar currently has loaded. If it is outside the visible window there is nothing to select,
+    // so we just close the drawer rather than fetch-and-jump to an off-screen date.
+    setNotificationsOpen(false)
+    const match = items.find((item) => isEventItem(item) && item.id === eventId)
+    if (match && isEventItem(match)) handleSelectEvent(match)
   }
 
   async function handleCancelEvent() {
@@ -557,6 +597,14 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           <p className="mt-1 text-sm text-bh-text-muted">Your private schedule. Only you and people you invite can see these events.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="secondary" onClick={() => setNotificationsOpen(true)} data-testid="calendar-notifications-toggle" aria-label={notificationUnread > 0 ? `Notifications, ${notificationUnread} unread` : 'Notifications'}>
+            <Bell className="size-4" aria-hidden />
+            {notificationUnread > 0 && (
+              <span className="ml-1 rounded-full bg-bh-accent px-1.5 text-xs font-medium text-bh-accent-contrast" data-testid="calendar-notifications-badge">
+                {notificationUnread}
+              </span>
+            )}
+          </Button>
           <Button variant="secondary" onClick={() => setAvailabilityOpen((open) => !open)} data-testid="calendar-availability-toggle">
             <Clock className="mr-2 size-4" aria-hidden />
             {availabilityOpen ? 'Hide availability' : 'Availability'}
@@ -567,6 +615,16 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           </Button>
         </div>
       </header>
+
+      {notificationsOpen && (
+        <CalendarNotifications
+          loadNotifications={loadNotificationsFn}
+          markRead={markNotificationsReadFn}
+          onClose={() => setNotificationsOpen(false)}
+          onNavigateEvent={handleNotificationNavigate}
+          onUnreadChange={setNotificationUnread}
+        />
+      )}
 
       {availabilityOpen && (
         <AvailabilityEditor
