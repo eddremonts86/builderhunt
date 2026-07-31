@@ -83,7 +83,7 @@
   - Do: Add month/week/day/list/today views, date navigation, bounded range fetching, timezone label/selector, search, validated URL state, lazy FullCalendar plugins, and accessible mobile agenda fallback.
   - Verify: restore view/date/search from a direct URL; desktop and 320 px snapshots cover all views; range requests stay bounded.
 
-- [ ] **Build complete event create, detail, and edit UI**
+- [x] **Build complete event create, detail, and edit UI**
   - Files: `src/modules/calendar/components/EventEditor.tsx`, `src/modules/calendar/components/EventDetails.tsx`, `src/modules/calendar/components/CalendarView.tsx`, `src/routes/api/calendar/events/$eventId.ts`, `tests/unit/modules/calendar/components/EventEditor.test.tsx`
   - Do: Support timed/all-day, location/meeting URL, busy/free, participants, reminders, private notes, recurrence, exception scope, overlap warning, optimistic version conflict, cancellation, deletion, drag, and resize rollback.
   - Verify: component tests cover schema/errors/409 rollback; E2E creates, edits, moves, recurs, cancels, and deletes events at desktop and 320 px.

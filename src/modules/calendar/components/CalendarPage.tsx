@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CalendarDays, Loader2, Plus, Search, X } from 'lucide-react'
-import { Button, Input, Label } from '~/components/ui'
-import { REMINDER_OFFSET_MINUTES } from '~/shared/lib/calendar'
+import { CalendarDays, Plus, Search, X } from 'lucide-react'
+import { Button, Input } from '~/components/ui'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
 import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
 import { CalendarAgenda } from './CalendarAgenda'
 import {
   CalendarView,
-  isoDay,
   type CalendarEventDto,
   type CalendarFeedItemDto,
 } from './CalendarView'
+import { EventEditor, type EventEditorSubmitMeta, type EventFormValue, type RecurrenceScope } from './EventEditor'
+import { EventDetails, type EventDetailView } from './EventDetails'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
@@ -44,7 +44,9 @@ export interface CalendarPageProps {
   /** Injected in tests; defaults to the real endpoints. */
   fetchFeed?: (range: { from: string; to: string }, layers: CalendarLayerKey[]) => Promise<CalendarFeedDto>
   createEvent?: (body: unknown) => Promise<{ ok: boolean; error?: string }>
-  deleteEvent?: (id: string, version: number) => Promise<{ ok: boolean; error?: string }>
+  updateEvent?: (id: string, body: unknown) => Promise<{ ok: boolean; error?: string }>
+  deleteEvent?: (id: string, version: number, options?: { recurrenceScope?: RecurrenceScope; recurrenceId?: string }) => Promise<{ ok: boolean; error?: string }>
+  loadEventDetail?: (id: string) => Promise<EventDetailView | null>
   /** Fixed "today" so the grid is deterministic under test. */
   today?: Date
   /** Controlled view/date/search — see the route wrapper. Uncontrolled (local state) when omitted. */
@@ -85,15 +87,105 @@ async function defaultCreateEvent(body: unknown) {
   return { ok: false as const, error: String(payload.error ?? 'invalid_input') }
 }
 
-async function defaultDeleteEvent(id: string, version: number) {
+async function defaultDeleteEvent(id: string, version: number, options?: { recurrenceScope?: RecurrenceScope; recurrenceId?: string }) {
   const response = await fetch(`/api/calendar/events/${id}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ version }),
+    body: JSON.stringify({ version, recurrenceScope: options?.recurrenceScope, recurrenceId: options?.recurrenceId }),
   })
   if (response.ok) return { ok: true as const }
   const payload = await response.json().catch(() => ({}))
   return { ok: false as const, error: String(payload.error ?? 'invalid_input') }
+}
+
+async function defaultUpdateEvent(id: string, body: unknown) {
+  const response = await fetch(`/api/calendar/events/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (response.ok) return { ok: true as const }
+  const payload = await response.json().catch(() => ({}))
+  return { ok: false as const, error: String(payload.error ?? 'invalid_input') }
+}
+
+async function defaultLoadEventDetail(id: string): Promise<EventDetailView | null> {
+  const response = await fetch(`/api/calendar/events/${id}`)
+  if (!response.ok) return null
+  const body = await response.json()
+  const participants: Array<Record<string, unknown>> = Array.isArray(body.participants) ? body.participants : []
+  return {
+    rrule: (body.event?.rrule as string | null) ?? null,
+    recurrenceUntil: (body.event?.recurrenceUntil as string | null) ?? null,
+    participants: participants.map((participant) => ({
+      id: String(participant.id),
+      displayName: (participant.displayName as string | null) ?? null,
+      externalEmail: (participant.externalEmail as string | null) ?? null,
+      role: participant.role as 'organizer' | 'attendee',
+      response: (participant.response as EventDetailView['participants'][number]['response']) ?? 'needs_action',
+      materialAccessGranted: Boolean(participant.materialAccessGranted),
+    })),
+  }
+}
+
+/** Map the editor's normalized value onto the strict `POST /api/calendar/events` body. */
+function toCreateBody(value: EventFormValue, meta: EventEditorSubmitMeta) {
+  return {
+    type: value.type,
+    title: value.title,
+    description: value.description ?? undefined,
+    location: value.location ?? undefined,
+    meetingUrl: value.meetingUrl ?? undefined,
+    startsAt: value.startsAt,
+    endsAt: value.endsAt,
+    timezone: value.timezone,
+    allDay: value.allDay,
+    busy: value.busy,
+    rrule: value.rrule ?? undefined,
+    recurrenceUntil: value.recurrenceUntil ?? undefined,
+    reminders: value.reminders,
+    participants: value.participants,
+    acknowledgeOverlapWarning: meta.acknowledgeOverlapWarning,
+  }
+}
+
+/**
+ * Map onto the strict `PATCH` envelope. The `patch` object carries only the scalar fields the route
+ * accepts — reminders, participants, and the recurrence rule are create-only server-side, so the
+ * editor hides them in edit mode and they never reach here.
+ */
+function toPatchBody(value: EventFormValue, meta: EventEditorSubmitMeta, version: number) {
+  return {
+    version,
+    recurrenceScope: meta.recurrenceScope,
+    acknowledgeOverlapWarning: meta.acknowledgeOverlapWarning,
+    patch: {
+      title: value.title,
+      description: value.description,
+      location: value.location,
+      meetingUrl: value.meetingUrl,
+      startsAt: value.startsAt,
+      endsAt: value.endsAt,
+      timezone: value.timezone,
+      allDay: value.allDay,
+      busy: value.busy,
+    },
+  }
+}
+
+function actionMessage(code?: string): string {
+  switch (code) {
+    case 'state_changed':
+      return 'This event changed since you opened it. Close and reopen it.'
+    case 'not_implemented':
+      return 'That change is not supported yet for a recurring series.'
+    case 'forbidden':
+      return 'You do not have permission to change this event.'
+    case 'not_found':
+      return 'This event no longer exists. Close and refresh your calendar.'
+    default:
+      return 'We could not complete that action. Refresh and try again.'
+  }
 }
 
 function startOfMonth(date: Date) {
@@ -176,7 +268,9 @@ function useIsNarrowViewport(breakpointPx: number): boolean {
 export function CalendarPage(props: CalendarPageProps = {}) {
   const fetchFeed = props.fetchFeed ?? defaultFetchFeed
   const createEventFn = props.createEvent ?? defaultCreateEvent
+  const updateEventFn = props.updateEvent ?? defaultUpdateEvent
   const deleteEventFn = props.deleteEvent ?? defaultDeleteEvent
+  const loadEventDetailFn = props.loadEventDetail ?? defaultLoadEventDetail
   const today = useMemo(() => props.today ?? new Date(), [props.today])
 
   const [localView, setLocalView] = useState<CalendarViewKey>('month')
@@ -210,15 +304,13 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [formOpen, setFormOpen] = useState(false)
-  const [formError, setFormError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
 
-  const [title, setTitle] = useState('')
-  const [date, setDate] = useState(isoDay(today))
-  const [startTime, setStartTime] = useState('09:00')
-  const [endTime, setEndTime] = useState('09:30')
-  const [description, setDescription] = useState('')
-  const [reminderOffset, setReminderOffset] = useState<number | null>(30)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEventDto | null>(null)
+  const [eventDetail, setEventDetail] = useState<EventDetailView | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [actionBusy, setActionBusy] = useState(false)
 
   // Every view resolves to a bounded [rangeFrom, rangeTo) plus the concrete day cells (if any) it
   // renders — month/week/day are grids over `days`; list has no grid, just a rolling window.
@@ -332,40 +424,90 @@ export function CalendarPage(props: CalendarPageProps = {}) {
     // Closing the detail panel on a layer change avoids showing details for an item that the new
     // filter no longer includes — a panel describing something not on screen reads as a bug.
     setSelectedProjection(null)
+    setSelectedEvent(null)
+    setEditing(false)
     setLayers((current) => (current.includes(key) ? current.filter((entry) => entry !== key) : [...current, key]))
   }
 
-  async function handleCreate(formEvent: React.FormEvent) {
-    formEvent.preventDefault()
-    setFormError(null)
-    setSaving(true)
-    try {
-      const result = await createEventFn({
-        type: 'personal',
-        title,
-        description: description || undefined,
-        startsAt: new Date(`${date}T${startTime}:00Z`).toISOString(),
-        endsAt: new Date(`${date}T${endTime}:00Z`).toISOString(),
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        allDay: false,
-        busy: true,
-        reminders: reminderOffset === null ? [] : [{ channel: 'in_app', offsetMinutes: reminderOffset }],
-        participants: [],
-        // The user has seen the grid; a personal overlap is theirs to allow.
-        acknowledgeOverlapWarning: true,
-      })
-      if (!result.ok) {
-        setFormError(result.error === 'slot_unavailable'
-          ? 'That time conflicts with an existing booking.'
-          : 'We could not save that event. Check the times and try again.')
-        return
-      }
+  async function submitCreate(value: EventFormValue, meta: EventEditorSubmitMeta) {
+    const result = await createEventFn(toCreateBody(value, meta))
+    if (result.ok) {
       setFormOpen(false)
-      setTitle('')
-      setDescription('')
       await load()
+    }
+    return result
+  }
+
+  async function submitEdit(value: EventFormValue, meta: EventEditorSubmitMeta) {
+    if (!selectedEvent) return { ok: false as const, error: 'not_found' }
+    const result = await updateEventFn(selectedEvent.id, toPatchBody(value, meta, selectedEvent.version))
+    if (result.ok) {
+      closeEventPanel()
+      await load()
+    }
+    return result
+  }
+
+  function handleSelectEvent(event: CalendarEventDto) {
+    // One panel at a time: opening an event closes the create form and any projection detail.
+    setFormOpen(false)
+    setSelectedProjection(null)
+    setEditing(false)
+    setActionError(null)
+    setSelectedEvent(event)
+    setEventDetail(null)
+    setDetailLoading(true)
+    // The feed DTO has the scalar fields; participants and the recurrence rule only come from the
+    // per-event detail endpoint, so fetch it lazily rather than bloating every feed row.
+    void loadEventDetailFn(event.id)
+      .then((detail) => setEventDetail(detail))
+      .catch(() => setEventDetail(null))
+      .finally(() => setDetailLoading(false))
+  }
+
+  function closeEventPanel() {
+    setSelectedEvent(null)
+    setEventDetail(null)
+    setEditing(false)
+    setActionError(null)
+  }
+
+  async function handleCancelEvent() {
+    if (!selectedEvent) return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      const result = await updateEventFn(selectedEvent.id, { version: selectedEvent.version, cancel: true })
+      if (result.ok) {
+        closeEventPanel()
+        await load()
+      } else {
+        setActionError(actionMessage(result.error))
+      }
     } finally {
-      setSaving(false)
+      setActionBusy(false)
+    }
+  }
+
+  async function handleDeleteScoped(scope?: RecurrenceScope) {
+    if (!selectedEvent) return
+    setActionBusy(true)
+    setActionError(null)
+    try {
+      // `series` re-materializes the whole series and needs no anchor; `this`/`following` pivot on
+      // the selected occurrence's id as the recurrence anchor.
+      const options = scope
+        ? { recurrenceScope: scope, ...(scope === 'series' ? {} : { recurrenceId: selectedEvent.id }) }
+        : undefined
+      const result = await deleteEventFn(selectedEvent.id, selectedEvent.version, options)
+      if (result.ok) {
+        closeEventPanel()
+        await load()
+      } else {
+        setActionError(actionMessage(result.error))
+      }
+    } finally {
+      setActionBusy(false)
     }
   }
 
@@ -419,63 +561,50 @@ export function CalendarPage(props: CalendarPageProps = {}) {
       </header>
 
       {formOpen && (
-        <form onSubmit={handleCreate} className="mb-6 rounded-xl border border-bh-border bg-bh-surface p-4" data-testid="calendar-event-form">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor="cal-title">Title</Label>
-              <Input id="cal-title" value={title} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)} required maxLength={200} data-testid="calendar-title-input" />
-            </div>
-            <div>
-              <Label htmlFor="cal-date">Date</Label>
-              <Input id="cal-date" type="date" value={date} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setDate(e.target.value)} required data-testid="calendar-date-input" />
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label htmlFor="cal-start">Starts</Label>
-                <Input id="cal-start" type="time" value={startTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setStartTime(e.target.value)} required data-testid="calendar-start-input" />
-              </div>
-              <div>
-                <Label htmlFor="cal-end">Ends</Label>
-                <Input id="cal-end" type="time" value={endTime} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEndTime(e.target.value)} required data-testid="calendar-end-input" />
-              </div>
-            </div>
-            <div className="sm:col-span-2">
-              <Label htmlFor="cal-description">Notes (private)</Label>
-              <textarea
-                id="cal-description"
-                className="w-full rounded-md border border-bh-border bg-bh-surface px-3 py-2 text-sm"
-                value={description}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setDescription(e.target.value)}
-                maxLength={5000}
-                rows={2}
-              />
-            </div>
-            <div>
-              <Label htmlFor="cal-reminder">Reminder</Label>
-              <select
-                id="cal-reminder"
-                className="h-9 w-full rounded-md border border-bh-border bg-bh-surface px-3 text-sm"
-                value={reminderOffset ?? ''}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setReminderOffset(e.target.value === '' ? null : Number(e.target.value))}
-                data-testid="calendar-reminder-select"
-              >
-                <option value="">No reminder</option>
-                {REMINDER_OFFSET_MINUTES.map((minutes) => (
-                  <option key={minutes} value={minutes}>
-                    {minutes === 0 ? 'At start time' : `${minutes} minutes before`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          {formError && <p className="mt-3 text-sm text-bh-danger" data-testid="calendar-form-error">{formError}</p>}
-          <div className="mt-4 flex justify-end">
-            <Button type="submit" disabled={saving} data-testid="calendar-save-event">
-              {saving && <Loader2 className="mr-2 size-4 animate-spin" aria-hidden />}
-              Save event
-            </Button>
-          </div>
-        </form>
+        <EventEditor
+          mode="create"
+          defaultTimezone={timezone}
+          timezoneOptions={timezoneOptions}
+          defaultDate={activeDate}
+          onSubmit={submitCreate}
+          onCancel={() => setFormOpen(false)}
+        />
+      )}
+
+      {selectedEvent && editing && (
+        <EventEditor
+          mode="edit"
+          defaultTimezone={timezone}
+          timezoneOptions={timezoneOptions}
+          isRecurring={Boolean(eventDetail?.rrule)}
+          initial={{
+            title: selectedEvent.title,
+            description: selectedEvent.description,
+            location: selectedEvent.location,
+            meetingUrl: selectedEvent.meetingUrl,
+            startsAt: selectedEvent.startsAt,
+            endsAt: selectedEvent.endsAt,
+            allDay: selectedEvent.allDay,
+            busy: selectedEvent.busy,
+            version: selectedEvent.version,
+          }}
+          onSubmit={submitEdit}
+          onCancel={() => setEditing(false)}
+        />
+      )}
+
+      {selectedEvent && !editing && (
+        <EventDetails
+          event={selectedEvent}
+          detail={eventDetail}
+          loadingDetail={detailLoading}
+          actionError={actionError}
+          busy={actionBusy}
+          onEdit={() => setEditing(true)}
+          onCancelEvent={handleCancelEvent}
+          onDelete={handleDeleteScoped}
+          onClose={closeEventPanel}
+        />
       )}
 
       <CalendarLayers active={layers} onToggle={toggleLayer} staleSources={staleSources} />
@@ -552,7 +681,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
         // Below the `md` breakpoint the agenda always wins regardless of the selected view — a
         // 42-cell month grid (or an hour-by-hour day grid) is not usable at 320px — and it is the
         // desktop rendering of "list" too. Exactly one tree renders; see `useIsNarrowViewport`.
-        <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} emptyMessage={emptyMessage} />
+        <CalendarAgenda days={days} itemsByDay={itemsByDay} onDelete={handleDelete} onSelectProjection={handleSelectProjection} onSelectEvent={handleSelectEvent} emptyMessage={emptyMessage} />
       ) : (
         <CalendarView
           days={days}
@@ -563,6 +692,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           viewLabel={viewLabel}
           onDelete={handleDelete}
           onSelectProjection={handleSelectProjection}
+          onSelectEvent={handleSelectEvent}
         />
       )}
 

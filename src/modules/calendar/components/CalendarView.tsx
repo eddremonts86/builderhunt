@@ -58,6 +58,8 @@ export interface CalendarViewProps {
   viewLabel: string
   onDelete: (event: CalendarEventDto) => void
   onSelectProjection: (item: ProjectionItem) => void
+  /** Opening an event's detail panel; optional so the grid renders standalone in isolation tests. */
+  onSelectEvent?: (event: CalendarEventDto) => void
 }
 
 export function CalendarView({
@@ -69,6 +71,7 @@ export function CalendarView({
   viewLabel,
   onDelete,
   onSelectProjection,
+  onSelectEvent,
 }: CalendarViewProps) {
   return (
     <div
@@ -110,7 +113,14 @@ export function CalendarView({
                         }`}
                         data-testid={`calendar-event-${item.id}`}
                       >
-                        <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                        <button
+                          type="button"
+                          onClick={() => onSelectEvent?.(item)}
+                          className="min-w-0 flex-1 truncate text-left focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-bh-accent"
+                          data-testid={`calendar-event-open-${item.id}`}
+                        >
+                          {item.title}
+                        </button>
                         <button
                           type="button"
                           aria-label={`Delete ${item.title}`}

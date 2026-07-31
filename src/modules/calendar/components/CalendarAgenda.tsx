@@ -16,6 +16,8 @@ export interface CalendarAgendaProps {
   itemsByDay: Map<string, CalendarFeedItemDto[]>
   onDelete: (event: Extract<CalendarFeedItemDto, { kind: 'event' }>) => void
   onSelectProjection: (item: Exclude<CalendarFeedItemDto, { kind: 'event' }>) => void
+  /** Opening an event's detail panel; optional so the agenda renders standalone in isolation tests. */
+  onSelectEvent?: (event: Extract<CalendarFeedItemDto, { kind: 'event' }>) => void
   emptyMessage: string
 }
 
@@ -27,7 +29,7 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'UTC' })
 }
 
-export function CalendarAgenda({ days, itemsByDay, onDelete, onSelectProjection, emptyMessage }: CalendarAgendaProps) {
+export function CalendarAgenda({ days, itemsByDay, onDelete, onSelectProjection, onSelectEvent, emptyMessage }: CalendarAgendaProps) {
   const daysWithItems = days.filter((day) => (itemsByDay.get(isoDay(day)) ?? []).length > 0)
 
   if (daysWithItems.length === 0) {
@@ -58,9 +60,14 @@ export function CalendarAgenda({ days, itemsByDay, onDelete, onSelectProjection,
                   <span className="w-16 shrink-0 tabular-nums text-xs text-bh-text-dim">{formatTime(item.startsAt)}</span>
                   {isEventItem(item) ? (
                     <>
-                      <span className={`min-w-0 flex-1 truncate ${item.status === 'cancelled' ? 'line-through opacity-60' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => onSelectEvent?.(item)}
+                        className={`min-w-0 flex-1 truncate text-left focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-bh-accent ${item.status === 'cancelled' ? 'line-through opacity-60' : ''}`}
+                        data-testid={`calendar-agenda-open-${item.id}`}
+                      >
                         {item.title}
-                      </span>
+                      </button>
                       <button
                         type="button"
                         aria-label={`Delete ${item.title}`}

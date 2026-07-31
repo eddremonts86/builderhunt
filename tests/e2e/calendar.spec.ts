@@ -473,3 +473,78 @@ test('an invitation-backed event type is reachable from the scheduling side', as
   `
   expect(row?.status, 'a fresh invitation starts as a draft').toBe('draft')
 })
+
+/**
+ * The event editor/detail UI, end to end (plans/UI Wave 3 "Build complete event create, detail, and
+ * edit UI"). The API paths are already covered above; this proves the browser form emits a body the
+ * create/patch routes accept and that the detail panel's delete actually removes the row.
+ *
+ * The events land on *today* via the editor's default date rather than a fixed instant, because the
+ * calendar page opens on the real current month with no test clock, so a fixed BASE-day event would
+ * fall outside the visible grid. They are `Free`, which skips the busy-overlap path entirely and so
+ * cannot flake against whatever the shared owner already has scheduled.
+ */
+test('an owner can create, edit and delete an event through the calendar UI', async ({ browser }) => {
+  const context = await browser.newContext({ storageState: harness.owner.storageState! })
+  const page = await context.newPage()
+  const guard = expectStrictBrowser(page)
+  for (let i = 0; i < 10; i++) guard.allowExpectedFailure(/status of (401|403|503)/)
+  const title = `E2E UI create ${Date.now()}`
+  const renamed = `${title} renamed`
+
+  try {
+    await gotoHydrated(page, `${harness.baseURL}/calendar`)
+    await dismissOverlays(page)
+
+    await page.getByTestId('calendar-new-event').click()
+    await page.getByTestId('event-editor-title').fill(title)
+    await page.getByTestId('event-editor-busy').selectOption('free')
+    await page.getByTestId('event-editor-start').fill('02:00')
+    await page.getByTestId('event-editor-end').fill('02:30')
+    await page.getByTestId('event-editor-submit').click()
+
+    await expect(page.getByRole('button', { name: title, exact: true })).toBeVisible({ timeout: 20_000 })
+
+    // Open the detail panel, edit through it, and confirm the rename reaches the grid.
+    await page.getByRole('button', { name: title, exact: true }).click()
+    await expect(page.getByTestId('event-details')).toBeVisible()
+    await page.getByTestId('event-details-edit').click()
+    await page.getByTestId('event-editor-title').fill(renamed)
+    await page.getByTestId('event-editor-submit').click()
+    await expect(page.getByRole('button', { name: renamed, exact: true })).toBeVisible({ timeout: 20_000 })
+
+    // Delete it from the detail panel; the row leaves the grid.
+    await page.getByRole('button', { name: renamed, exact: true }).click()
+    await page.getByTestId('event-details-delete').click()
+    await expect(page.getByRole('button', { name: renamed, exact: true })).toHaveCount(0, { timeout: 20_000 })
+  } finally {
+    guard.dispose()
+    await context.close()
+  }
+})
+
+test('the calendar create flow is usable at a 320px viewport', async ({ browser }) => {
+  const context = await browser.newContext({ storageState: harness.owner.storageState!, viewport: { width: 320, height: 720 } })
+  const page = await context.newPage()
+  const guard = expectStrictBrowser(page)
+  for (let i = 0; i < 10; i++) guard.allowExpectedFailure(/status of (401|403|503)/)
+  const title = `E2E UI mobile ${Date.now()}`
+
+  try {
+    await gotoHydrated(page, `${harness.baseURL}/calendar`)
+    await dismissOverlays(page)
+
+    await page.getByTestId('calendar-new-event').click()
+    await page.getByTestId('event-editor-title').fill(title)
+    await page.getByTestId('event-editor-busy').selectOption('free')
+    await page.getByTestId('event-editor-start').fill('03:00')
+    await page.getByTestId('event-editor-end').fill('03:30')
+    await page.getByTestId('event-editor-submit').click()
+
+    // Below the md breakpoint the agenda fallback renders; the event's title button carries it.
+    await expect(page.getByRole('button', { name: title, exact: true })).toBeVisible({ timeout: 20_000 })
+  } finally {
+    guard.dispose()
+    await context.close()
+  }
+})
