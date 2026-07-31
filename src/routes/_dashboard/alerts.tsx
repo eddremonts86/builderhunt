@@ -19,7 +19,7 @@
  */
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Bell, BellOff, Bookmark, Check, Clock, Inbox, Pause, Play, Plus, Radar, Trash2, X } from 'lucide-react'
+import { Bell, BellOff, Check, Clock, Inbox, Pause, Play, Plus, Radar, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
 // From `alerts-shared`, never `alerts`: the latter imports `node:crypto` and
@@ -27,6 +27,7 @@ import { formatDistanceToNow } from '~/shared/lib/format'
 // and which crashes this page at runtime.
 import { readAlertMatchPayload, type AlertMatchPayload } from '~/shared/lib/alerts-shared'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
+import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
 
@@ -75,14 +76,6 @@ const EVENT_LABELS: Record<string, string> = {
   keyword_match: 'Matched your keywords',
   any_activity: 'New activity',
 }
-
-/** `POST /api/builders/track`'s source enum. Bluesky/Devpost/Product Hunt can
- *  appear in a match but are not trackable yet, so their Track button is
- *  disabled with a reason rather than failing with a 400 on click. */
-const TRACKABLE_SOURCES = new Set([
-  'github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow',
-  'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'sourcehut',
-])
 
 export const Route = createFileRoute('/_dashboard/alerts')({
   beforeLoad: async () => {
@@ -176,9 +169,11 @@ function AlertsInboxPage() {
   const [frequency, setFrequency] = React.useState<'hourly' | 'daily' | 'weekly'>('daily')
   const [markingAll, setMarkingAll] = React.useState(false)
   const [togglingId, setTogglingId] = React.useState<string | null>(null)
-  const [trackingId, setTrackingId] = React.useState<string | null>(null)
-  const [trackedKeys, setTrackedKeys] = React.useState<Set<string>>(new Set())
-  const [trackError, setTrackError] = React.useState<string | null>(null)
+  // Keyed by `${source}:${sourceId}` → the organization-builder id, populated only by a track
+  // that happens in this session (there is no endpoint yet returning the id for a match that was
+  // already tracked in an earlier session, so those still show "Track & open" — a pre-existing
+  // gap, not a regression from this component now being able to open the workspace at all).
+  const [trackedRowIds, setTrackedRowIds] = React.useState<Map<string, string>>(new Map())
 
   const load = React.useCallback(async () => {
     try {
@@ -299,47 +294,9 @@ function AlertsInboxPage() {
     await load()
   }
 
-  /** Tracks a matched person straight from the inbox. `/api/builders/track`
-   *  upserts the identity, so nothing needs to exist beforehand. */
-  const trackMatch = async (triggerId: string, match: AlertMatchPayload) => {
-    setTrackingId(triggerId)
-    setTrackError(null)
-    try {
-      const res = await fetch('/api/builders/track', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source: match.source,
-          sourceId: match.sourceId,
-          username: match.username,
-          profileUrl: match.profileUrl,
-          displayName: match.displayName ?? null,
-          avatarUrl: match.avatarUrl ?? null,
-          bio: match.bio ?? null,
-          language: match.language ?? null,
-          country: match.country ?? null,
-          followersCount: match.followersCount ?? null,
-          topics: match.topics ?? [],
-          score: match.score,
-        }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (res.status === 402) {
-        setTrackError(data.error ?? 'You have reached your plan limit for tracked builders.')
-        return
-      }
-      if (!res.ok) {
-        setTrackError(data.error ?? 'Could not track this builder.')
-        return
-      }
-      setTrackedKeys((prev) => new Set(prev).add(`${match.source}:${match.sourceId}`))
-    } catch {
-      setTrackError('Could not track this builder.')
-    } finally {
-      setTrackingId(null)
-    }
-  }
+  const onMatchTracked = React.useCallback((match: AlertMatchPayload, organizationBuilderId: string) => {
+    setTrackedRowIds((prev) => new Map(prev).set(`${match.source}:${match.sourceId}`, organizationBuilderId))
+  }, [])
 
   const unread = triggers.filter((t) => !t.readAt).length
   const hasAlerts = userAlerts.length > 0
@@ -630,10 +587,6 @@ function AlertsInboxPage() {
               )}
             </div>
 
-            {trackError && (
-              <p className="text-sm text-bh-danger mb-3" data-testid="alert-track-error">{trackError}</p>
-            )}
-
             {groups.length === 0 ? (
               <div className="card text-center py-12" data-testid="alerts-empty">
                 <Inbox className="w-8 h-8 text-bh-text-dim mx-auto mb-3" aria-hidden="true" />
@@ -678,9 +631,8 @@ function AlertsInboxPage() {
                         <MatchRow
                           key={t.id}
                           trigger={t}
-                          tracked={trackedKeys}
-                          trackingId={trackingId}
-                          onTrack={trackMatch}
+                          trackedRowIds={trackedRowIds}
+                          onTracked={onMatchTracked}
                           onMarkRead={markRead}
                         />
                       ))}
@@ -696,11 +648,10 @@ function AlertsInboxPage() {
   )
 }
 
-function MatchRow({ trigger, tracked, trackingId, onTrack, onMarkRead }: {
+function MatchRow({ trigger, trackedRowIds, onTracked, onMarkRead }: {
   trigger: Trigger
-  tracked: Set<string>
-  trackingId: string | null
-  onTrack: (triggerId: string, match: AlertMatchPayload) => void
+  trackedRowIds: Map<string, string>
+  onTracked: (match: AlertMatchPayload, organizationBuilderId: string) => void
   onMarkRead: (id: string) => void
 }) {
   const match = readAlertMatchPayload(trigger.payload)
@@ -762,8 +713,7 @@ function MatchRow({ trigger, tracked, trackingId, onTrack, onMarkRead }: {
   }
 
   const trackKey = `${match.source}:${match.sourceId}`
-  const isTracked = tracked.has(trackKey)
-  const canTrack = TRACKABLE_SOURCES.has(match.source)
+  const trackedRowId = trackedRowIds.get(trackKey) ?? null
 
   return (
     // The row itself is the card, with `flatten-nested-card` stripping the
@@ -786,18 +736,27 @@ function MatchRow({ trigger, tracked, trackingId, onTrack, onMarkRead }: {
           <PersonResultCard builder={toCardData(trigger.id, match)} />
         </div>
         <div className="flex flex-row-reverse items-center justify-between gap-2 shrink-0 border-t border-bh-border/60 pt-2 lg:flex-col lg:items-end lg:justify-center lg:gap-1.5 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-3 lg:self-stretch">
-          <Button
-            type="button"
-            onClick={() => onTrack(trigger.id, match)}
-            disabled={isTracked || !canTrack || trackingId === trigger.id}
-            variant={isTracked ? 'primary' : 'secondary'}
-            size="sm"
-            title={canTrack ? undefined : `Tracking ${match.source} builders isn't supported yet`}
-            data-testid={`alert-track-${trigger.id}`}
-          >
-            <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
-            {isTracked ? 'Tracked' : trackingId === trigger.id ? 'Tracking…' : 'Track'}
-          </Button>
+          <BuilderResultActions
+            builder={{
+              id: trigger.id,
+              source: match.source,
+              sourceId: match.sourceId,
+              username: match.username,
+              displayName: match.displayName ?? match.name,
+              avatarUrl: match.avatarUrl ?? null,
+              bio: match.bio ?? null,
+              profileUrl: match.profileUrl,
+              followersCount: match.followersCount ?? null,
+              language: match.language ?? null,
+              country: match.country ?? null,
+              topics: match.topics ?? [],
+              score: match.score,
+              tracked: trackedRowId !== null,
+              trackedRowId,
+            }}
+            from="/alerts"
+            onTracked={(organizationBuilderId) => onTracked(match, organizationBuilderId)}
+          />
           {meta}
         </div>
       </>

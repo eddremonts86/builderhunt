@@ -50,6 +50,10 @@ interface Recommendation {
     avatarUrl: string | null
     bio: string | null
     source: string
+    // Every candidate here was already filtered to exclude tracked builders (see `savedKey`
+    // below), so `sourceId` is included purely to let the client call POST /api/builders/track
+    // directly — it is never used to imply anything about tracked state.
+    sourceId: string
     followersCount: number | null
     topics: string[]
   }
@@ -235,6 +239,7 @@ export const Route = createFileRoute('/api/recommendations/')({
                 avatarUrl: null,
                 bio: b.bio ?? null,
                 source: b.source,
+                sourceId: b.sourceId,
                 followersCount: b.followersCount ?? null,
                 topics: b.topics ?? [],
               },

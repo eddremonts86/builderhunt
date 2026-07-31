@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { Sparkles, ExternalLink, X, Search, ArrowRight } from 'lucide-react'
+import { Sparkles, X, Search, ArrowRight } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { getSourcePresentation } from '~/shared/lib/source-presentation'
 
 interface Recommendation {
@@ -11,6 +12,7 @@ interface Recommendation {
     avatarUrl: string | null
     bio: string | null
     source: string
+    sourceId: string
     followersCount: number | null
     topics: string[]
   }
@@ -202,7 +204,6 @@ function RecommendationCard({
   const { builder, reasons, score } = rec
   const presentation = getSourcePresentation(builder.source)
   const sourceLabel = presentation?.label ?? builder.source
-  const profileUrl = presentation?.buildProfileUrl(builder.username) ?? null
   const reasonText = reasons.length > 0
     ? `matches ${reasons
         .slice(0, 2)
@@ -290,27 +291,22 @@ function RecommendationCard({
       </div>
 
       <div className="mt-3.5">
-        {profileUrl ? (
-          <a
-            href={profileUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn-secondary btn-sm w-full justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
-            data-event="recommendation_view"
-          >
-            View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-          </a>
-        ) : (
-          // No source ever reaches this: every SOURCE_NAMES member's registry entry builds a real
-          // URL from a non-empty username. This is only the shape for a malformed API response
-          // (empty username) — never a bare `href="#"` that looks clickable but does nothing.
-          <span
-            className="btn-secondary btn-sm w-full justify-center opacity-50 cursor-not-allowed"
-            title="No external profile URL available"
-          >
-            View <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-          </span>
-        )}
+        <BuilderResultActions
+          builder={{
+            id: builder.id,
+            source: builder.source,
+            sourceId: builder.sourceId,
+            username: builder.username,
+            displayName: builder.displayName,
+            avatarUrl: builder.avatarUrl,
+            bio: builder.bio,
+            profileUrl: '',
+            followersCount: builder.followersCount,
+            topics: builder.topics,
+            score,
+          }}
+          className="[&>div]:w-full [&_button]:flex-1 [&_a]:flex-1"
+        />
       </div>
     </article>
   )

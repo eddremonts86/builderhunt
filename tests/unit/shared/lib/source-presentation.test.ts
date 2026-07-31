@@ -47,9 +47,9 @@ describe('SOURCE_PRESENTATION', () => {
     expect(url).toMatch(/^https:\/\//)
   })
 
-  describe('buildProfileUrl safety', () => {
+  describe('buildProfileUrl safety — single-segment sources (Hacker News)', () => {
     it.each(['', '   '])('rejects an empty or blank handle %j', (handle) => {
-      expect(SOURCE_PRESENTATION.github.buildProfileUrl(handle)).toBeNull()
+      expect(SOURCE_PRESENTATION.hn.buildProfileUrl(handle)).toBeNull()
     })
 
     it.each([
@@ -58,8 +58,9 @@ describe('SOURCE_PRESENTATION', () => {
       'foo?redirect=https://evil.com',
       'foo#@evil.com',
       'https://evil.com',
+      'foo/bar',
     ])('rejects a handle that could otherwise escape the profile path: %j', (handle) => {
-      expect(SOURCE_PRESENTATION.github.buildProfileUrl(handle)).toBeNull()
+      expect(SOURCE_PRESENTATION.hn.buildProfileUrl(handle)).toBeNull()
     })
 
     it('never returns a URL pointing at a different host than the source owns', () => {
@@ -72,6 +73,40 @@ describe('SOURCE_PRESENTATION', () => {
         if (url === null) continue
         expect(new URL(url).hostname).not.toBe('evil.example.com')
       }
+    })
+  })
+
+  describe('buildProfileUrl safety — repo-style handles (github/gitlab/codeberg/sourcehut)', () => {
+    it.each(['github', 'gitlab', 'codeberg', 'sourcehut'] as const)(
+      '%s accepts a real owner/repo handle safely',
+      (source) => {
+        const presentation = SOURCE_PRESENTATION[source]
+        const url = presentation.buildProfileUrl('ClickHouse/ClickHouse')
+        expect(url).not.toBeNull()
+        expect(url).toContain('ClickHouse/ClickHouse')
+      },
+    )
+
+    it.each(['github', 'gitlab', 'codeberg', 'sourcehut'] as const)(
+      '%s still rejects a traversal attempt hidden inside a multi-segment handle',
+      (source) => {
+        expect(SOURCE_PRESENTATION[source].buildProfileUrl('foo/../../evil.com')).toBeNull()
+        expect(SOURCE_PRESENTATION[source].buildProfileUrl('../evil.com')).toBeNull()
+      },
+    )
+
+    it.each(['github', 'gitlab', 'codeberg', 'sourcehut'] as const)(
+      '%s still rejects a query or fragment delimiter',
+      (source) => {
+        expect(SOURCE_PRESENTATION[source].buildProfileUrl('foo?redirect=https://evil.com')).toBeNull()
+        expect(SOURCE_PRESENTATION[source].buildProfileUrl('foo#@evil.com')).toBeNull()
+      },
+    )
+
+    it('never returns a URL whose host escapes github.com even with a crafted multi-segment handle', () => {
+      const url = SOURCE_PRESENTATION.github.buildProfileUrl('https://evil.com')
+      expect(url).not.toBeNull()
+      expect(new URL(url!).hostname).toBe('github.com')
     })
   })
 })

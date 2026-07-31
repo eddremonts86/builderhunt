@@ -5,6 +5,7 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { ai } from '~/shared/lib/ai/client'
 import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
 import { PersonResultCard, type PersonCardData } from '~/modules/search/components/PersonResultCard'
+import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
 import { sprintProgressPercent, type QueryVariant, type SprintCursor, type SprintFilter } from '~/shared/lib/sprints-shared'
 import { Input, Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '~/components/ui'
 import { Button } from '~/components/ui/button'
@@ -61,7 +62,10 @@ function SprintDossierPage() {
   const [refining, setRefining] = React.useState(false)
   const [refineHistory, setRefineHistory] = React.useState<RefineTurn[]>([])
   const [loading, setLoading] = React.useState(true)
-  const [trackedIds, setTrackedIds] = React.useState<Set<string>>(new Set())
+  // Keyed by this sprint result's own item id → the organization-builder id, populated only by a
+  // track that happens in this session — /api/sprints/:id/results reports `tracked` but not the
+  // row id for a builder already tracked in an earlier session (same gap as the alerts inbox).
+  const [trackedRowIds, setTrackedRowIds] = React.useState<Map<string, string>>(new Map())
 
   useEntityBreadcrumbLabel(sprint?.name ?? null)
 
@@ -126,25 +130,8 @@ function SprintDossierPage() {
     }
   }
 
-  const track = async (item: ResultItem) => {
-    const res = await fetch('/api/builders/track', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source: item.source,
-        sourceId: item.sourceId,
-        username: item.profile.username,
-        displayName: item.profile.displayName ?? null,
-        avatarUrl: item.profile.avatarUrl ?? null,
-        bio: item.profile.bio ?? null,
-        profileUrl: item.profile.profileUrl,
-        followersCount: item.profile.followersCount ?? null,
-        topics: item.profile.topics,
-        score: item.score,
-      }),
-    })
-    if (res.ok) setTrackedIds((prev) => new Set(prev).add(item.id))
+  const onItemTracked = (itemId: string, organizationBuilderId: string) => {
+    setTrackedRowIds((prev) => new Map(prev).set(itemId, organizationBuilderId))
   }
 
   return (
@@ -256,22 +243,32 @@ function SprintDossierPage() {
                   topics: item.profile.topics,
                   score: item.score,
                 }
-                const isTracked = item.tracked || trackedIds.has(item.id)
+                const trackedRowId = trackedRowIds.get(item.id) ?? null
                 return (
                   <li key={item.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <PersonResultCard builder={cardData} />
                     </div>
-                    <Button
-                      type="button"
-                      onClick={() => track(item)}
-                      disabled={isTracked}
-                      variant="secondary"
-                      className="px-3 py-2 text-xs shrink-0"
-                      data-testid={`sprint-track-${item.id}`}
-                    >
-                      {isTracked ? 'Tracked' : 'Track'}
-                    </Button>
+                    <BuilderResultActions
+                      builder={{
+                        id: item.id,
+                        source: item.source,
+                        sourceId: item.sourceId,
+                        username: item.profile.username,
+                        displayName: item.profile.displayName,
+                        avatarUrl: item.profile.avatarUrl,
+                        bio: item.profile.bio,
+                        profileUrl: item.profile.profileUrl,
+                        followersCount: item.profile.followersCount,
+                        topics: item.profile.topics,
+                        score: item.score,
+                        tracked: item.tracked || trackedRowId !== null,
+                        trackedRowId,
+                      }}
+                      from={`/sprints/${sprintId}`}
+                      onTracked={(organizationBuilderId) => onItemTracked(item.id, organizationBuilderId)}
+                      className="shrink-0"
+                    />
                   </li>
                 )
               })}

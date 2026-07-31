@@ -95,7 +95,11 @@ export function BuilderResultActions({ builder, from, onTracked, className }: Bu
           displayName: builder.displayName ?? null,
           avatarUrl: builder.avatarUrl ?? null,
           bio: builder.bio ?? null,
-          profileUrl: builder.profileUrl,
+          // Prefer the registry-built URL — the server's own track endpoint validates profileUrl
+          // against the exact same per-source host allowlist, so a caller that never had a real
+          // profileUrl to hand us (Recommendations doesn't get one from its own API) still submits
+          // a value that will pass rather than a blank string that fails schema validation.
+          profileUrl: externalUrl ?? builder.profileUrl,
           followersCount: builder.followersCount ?? null,
           language: builder.language ?? null,
           country: builder.country ?? null,

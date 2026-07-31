@@ -60,15 +60,24 @@ function hostMatches(hostname: string, allowed: string): boolean {
   return hostname === allowed || hostname.endsWith(`.${allowed}`)
 }
 
-/** Every `buildProfileUrl` in this table is one of these — a fixed base plus one path/query segment holding the handle. */
-function profileUrlBuilder(host: string, format: (encodedHandle: string) => string) {
+/**
+ * Every `buildProfileUrl` in this table is one of these — a fixed base plus one path/query segment
+ * holding the handle. `allowSlash` exists because the code-hosting sources (github/gitlab/codeberg/
+ * sourcehut) also produce `kind: 'repo'` results whose "username" is a real `owner/repo` pair — a
+ * blanket ban on `/` rejected e.g. `ClickHouse/ClickHouse`, which is both a legitimate handle and a
+ * real, safe path under that source's own host. Each segment is still individually percent-encoded
+ * and `..` is always rejected, so this never allows path traversal or a segment that reintroduces a
+ * `/`, `?`, or `#` of its own.
+ */
+function profileUrlBuilder(host: string, format: (encodedHandle: string) => string, options: { allowSlash?: boolean } = {}) {
   return (usernameOrHandle: string): string | null => {
     const handle = usernameOrHandle.trim()
-    // A handle with a path separator or query/fragment delimiter could otherwise make `format`
-    // produce a URL that no longer targets this source's own profile path — reject rather than
-    // silently truncate or redirect.
-    if (!handle || /[/?#]/.test(handle)) return null
-    const candidate = format(encodeURIComponent(handle))
+    if (!handle || /[?#]/.test(handle)) return null
+    if (!options.allowSlash && handle.includes('/')) return null
+    const segments = handle.split('/').filter(Boolean)
+    if (segments.length === 0 || segments.includes('..') || segments.includes('.')) return null
+
+    const candidate = format(segments.map(encodeURIComponent).join('/'))
     let parsed: URL
     try {
       parsed = new URL(candidate)
@@ -89,7 +98,7 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     badgeClassName: 'badge-github',
     trackable: true,
     dormantReason: null,
-    buildProfileUrl: profileUrlBuilder('github.com', (h) => `https://github.com/${h}`),
+    buildProfileUrl: profileUrlBuilder('github.com', (h) => `https://github.com/${h}`, { allowSlash: true }),
   },
   gitlab: {
     source: 'gitlab',
@@ -98,7 +107,7 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     badgeClassName: 'badge-gitlab',
     trackable: true,
     dormantReason: null,
-    buildProfileUrl: profileUrlBuilder('gitlab.com', (h) => `https://gitlab.com/${h}`),
+    buildProfileUrl: profileUrlBuilder('gitlab.com', (h) => `https://gitlab.com/${h}`, { allowSlash: true }),
   },
   codeberg: {
     source: 'codeberg',
@@ -107,7 +116,7 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     badgeClassName: 'badge-codeberg',
     trackable: true,
     dormantReason: null,
-    buildProfileUrl: profileUrlBuilder('codeberg.org', (h) => `https://codeberg.org/${h}`),
+    buildProfileUrl: profileUrlBuilder('codeberg.org', (h) => `https://codeberg.org/${h}`, { allowSlash: true }),
   },
   sourcehut: {
     source: 'sourcehut',
@@ -116,7 +125,7 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     badgeClassName: 'badge-sourcehut',
     trackable: true,
     dormantReason: null,
-    buildProfileUrl: profileUrlBuilder('sr.ht', (h) => `https://sr.ht/~${h}`),
+    buildProfileUrl: profileUrlBuilder('sr.ht', (h) => `https://sr.ht/~${h}`, { allowSlash: true }),
   },
   hn: {
     source: 'hn',
