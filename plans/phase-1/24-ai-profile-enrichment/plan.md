@@ -1,6 +1,7 @@
 # AI Profile Enrichment — Developer Persona Card (plan)
 
-> **Status**: `partially-implemented` (Phases 1, 2, 4 shipped 2026-07-20; Phase 3 claim-hook deferred, see tasks.md)
+> **Status**: `implemented` (Phases 1, 2, 4 shipped 2026-07-20; Phase 3 claim-hook shipped
+> 2026-07-25 — corrected 2026-07-31, this line said "deferred" long after it shipped)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (Phases 1–3 of the AI Platform: registry, cache, budget, `minimaxChat`)
 > **Blocks**: nothing
 > **Reality check**: Builds on `BuilderProfilePage.tsx`, the claim verify flow (`src/routes/api/builders/claim/verify.ts`), and `builders.metadata` jsonb. Owns the `metadata.aiEnrichment` key. No schema migration needed.

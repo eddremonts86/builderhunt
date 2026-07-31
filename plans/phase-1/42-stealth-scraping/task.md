@@ -208,10 +208,14 @@
 ## Phase 6 — UI and copy
 
 - [x] **Build `PublicEvidenceCard`**
-  - Files: `src/modules/builder-profile/components/PublicEvidenceCard.tsx` and test
+  - Files: `src/modules/builder-profile/components/PublicEvidenceCard.tsx`, `tests/unit/modules/builder-profile/components/PublicEvidenceCard.test.tsx`
   - Do: all spec states, bounded polling, source/observation/expiry, explanation,
     role-gated review, accessible loading/status/error announcements.
   - Verify: component state matrix, keyboard flow, and no polling after terminal/unmount.
+  - Reality check (2026-07-31): the test file this task cited never existed on disk. Written now
+    (6 cases: unavailable→renders nothing, idle-empty prompt, active-job disables refresh, refresh
+    POSTs and reloads, 409 processing_restricted→restricted state, review item Accept
+    PATCHes `{resolution:'accepted'}` and reloads). All 6 pass.
 
 - [x] **Wire builder profile**
   - File: `src/modules/builder-profile/components/BuilderProfilePage.tsx`

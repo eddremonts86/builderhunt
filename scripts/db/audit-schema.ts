@@ -50,6 +50,24 @@ const classifications: Classification[] = [
   operational('migration_backfill_runs', 'migration owner', ['security-and-multitenancy']),
   operational('migration_backfill_conflicts', 'migration run', ['security-and-multitenancy']),
 
+  // Shared resources and activity feed (plans 28-shared-resources, 29-activity-feed).
+  //
+  // `builder_lists`/`builder_list_items` are tenant-private, same composite-FK shape as
+  // `organization_builders`: a list item cannot name a builder identity the organization has not
+  // tracked. `feed_capabilities` is tenant-private too — `capability_hash` (SHA-256 of the bearer
+  // token) is the only secret, never the row id, so listing/expiring a capability does not require
+  // handing back anything an attacker could replay. `organization_activity` is the append-only
+  // event log the dashboard's Team Activity widget reads.
+  tenant('builder_lists', 'organization_id + created_by_user_id', ['shared-resources'], { organizationColumn: true }),
+  tenant('builder_list_items', 'organization_id (composite FK to organization_builders); list_id -> builder_lists', ['shared-resources'], { organizationColumn: true }),
+  tenant('feed_capabilities', 'organization_id + query_id (capability_hash is the only bearer secret, never the id)', ['shared-resources'], { organizationColumn: true }),
+  tenant('organization_activity', 'organization_id + actor_user_id (append-only event log)', ['activity-feed'], { organizationColumn: true }),
+
+  // Status subscribers (plan 47-status-and-trust, Phase 2). System-operational, no owning subject —
+  // same anti-enumeration shape as `feed_capabilities`: the row is keyed by the SHA-256 of a random
+  // unsubscribe token, the raw token only ever appears once, in the unsubscribe URL.
+  operational('status_subscribers', 'email_lower (unsubscribe_token_hash is the only bearer secret)', ['status-and-trust']),
+
   // Calendar and scheduling (plans/phase-1/44-calendar-scheduling-interview-intelligence).
   //
   // Classified ahead of the rest of the unclassified set — roughly fifty tables across billing,

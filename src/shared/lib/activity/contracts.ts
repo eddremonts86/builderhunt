@@ -54,16 +54,26 @@ const sensitiveCanaries = [
   /@/,
 ]
 
-function noSensitiveCanaries(input: unknown): boolean {
+// `builderIdentityId` is always `sha256(source + '\0' + sourceId)` — a 64-char hex digest that is a
+// public, derived, non-secret routing key (it already appears in the builder profile URL). It falls
+// squarely inside the "long opaque token" canary below, which flagged every single
+// `builder_list_item_added`/`builder_list_item_removed` event and made adding a builder to a
+// shortlist fail with a 500 every time, for every user — found live while verifying the RLS fix for
+// `builder_lists`/`builder_list_items`. Exempted by field name rather than loosening the regex, so a
+// genuinely leaked token under any other key is still caught.
+const CANARY_EXEMPT_KEYS = new Set(['builderIdentityId'])
+
+function noSensitiveCanaries(input: unknown, key?: string): boolean {
   if (typeof input === 'string') {
+    if (key && CANARY_EXEMPT_KEYS.has(key)) return true
     for (const re of sensitiveCanaries) {
       if (re.test(input)) return false
     }
     return true
   }
-  if (Array.isArray(input)) return input.every(noSensitiveCanaries)
+  if (Array.isArray(input)) return input.every((value) => noSensitiveCanaries(value, key))
   if (input && typeof input === 'object') {
-    return Object.values(input).every(noSensitiveCanaries)
+    return Object.entries(input).every(([entryKey, value]) => noSensitiveCanaries(value, entryKey))
   }
   return true
 }

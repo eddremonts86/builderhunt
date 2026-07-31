@@ -559,10 +559,26 @@ function SavedSearchRow({
   }, [])
 
   const runUrl = `/search?q=${encodeURIComponent(query.keywords.join(' '))}`
-  const feedToken = typeof (query as typeof query & { feedToken?: unknown }).feedToken === 'string'
-    ? (query as typeof query & { feedToken: string }).feedToken
-    : ''
-  const rssUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/api/feeds/${query.id}?format=rss&token=${encodeURIComponent(feedToken)}`
+  const [feedUrl, setFeedUrl] = React.useState<string | null>(null)
+
+  // Feed links need a real `feed_capabilities` token, which only exists once minted — there is no
+  // stable URL to build ahead of time. Mint once on first use and cache it for the rest of this
+  // component's lifetime.
+  const ensureFeedUrl = async () => {
+    if (feedUrl) return feedUrl
+    const res = await fetch(`/api/queries/${query.id}/feed-capability`, {
+      method: 'POST',
+      credentials: 'include',
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      throw new Error(err.error ?? `HTTP ${res.status}`)
+    }
+    const data = await res.json()
+    const absolute = `${typeof window !== 'undefined' ? window.location.origin : ''}${data.url}`
+    setFeedUrl(absolute)
+    return absolute
+  }
 
   const handleExport = async (kind: 'people' | 'resources') => {
     setExporting(kind)
@@ -603,11 +619,34 @@ function SavedSearchRow({
   const copyRss = async () => {
     setMenuOpen(false)
     try {
-      await navigator.clipboard.writeText(rssUrl)
+      const url = await ensureFeedUrl()
+      await navigator.clipboard.writeText(url)
       setExportMsg({ ok: true, text: 'RSS feed URL copied to clipboard' })
       setTimeout(() => setExportMsg(null), 4000)
-    } catch {
-      setExportMsg({ ok: false, text: 'Copy failed — RSS URL: ' + rssUrl })
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Failed to create feed link' })
+      setTimeout(() => setExportMsg(null), 6000)
+    }
+  }
+
+  const openInFeedly = async () => {
+    setMenuOpen(false)
+    try {
+      const url = await ensureFeedUrl()
+      window.open(`https://feedly.com/i/subscription/feed/${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Failed to create feed link' })
+      setTimeout(() => setExportMsg(null), 6000)
+    }
+  }
+
+  const openInInoreader = async () => {
+    setMenuOpen(false)
+    try {
+      const url = await ensureFeedUrl()
+      window.open(`https://www.inoreader.com/?add_feed=${encodeURIComponent(url)}`, '_blank', 'noopener,noreferrer')
+    } catch (e) {
+      setExportMsg({ ok: false, text: e instanceof Error ? e.message : 'Failed to create feed link' })
       setTimeout(() => setExportMsg(null), 6000)
     }
   }
@@ -828,28 +867,24 @@ function SavedSearchRow({
                   </button>
                 </li>
                 <li role="none">
-                  <a
+                  <button
                     role="menuitem"
-                    href={`https://feedly.com/i/subscription/feed/${encodeURIComponent(rssUrl)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={openInFeedly}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
                     Open in Feedly
-                  </a>
+                  </button>
                 </li>
                 <li role="none">
-                  <a
+                  <button
                     role="menuitem"
-                    href={`https://www.inoreader.com/?add_feed=${encodeURIComponent(rssUrl)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    onClick={openInInoreader}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded text-sm text-bh-text hover:bg-bh-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   >
                     <ExternalLink className="w-3.5 h-3.5 text-bh-text-dim" aria-hidden="true" />
                     Open in Inoreader
-                  </a>
+                  </button>
                 </li>
                 <li role="none">
                   <div className="my-1 border-t border-bh-border" />

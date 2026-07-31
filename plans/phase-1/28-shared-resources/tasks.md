@@ -17,9 +17,13 @@
   - Verify: contract/characterization tests pass and reject unknown/private ORM/provider fields.
 
 - [x] **Verify normalized tenant schema and RLS for shared resources**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` foundation migrations, `tests/unit/security/shared-resource-schema.test.ts`, `tests/unit/security/rls.test.ts`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/` foundation migrations, `tests/unit/security/shared-resource-schema.test.ts`, `scripts/db/verify-rls-local.mjs`
   - Do: Confirm saved queries/keyword/source associations, alerts, lists/items, organization builders, and notes have mandatory organization keys, candidate keys, composite tenant FKs, indexes, checks, and command policies. Add no competing nullable tenant model.
   - Verify: app-role SQL rejects A alert→B query and A item→B list; missing/A/B contexts pass the manifest RLS suite.
+  - Reality check (2026-07-31): the `tests/unit/security/rls.test.ts` this task cited never existed
+    — RLS needs a live DB connection under distinct per-role credentials, which is exactly what
+    `scripts/db/verify-rls-local.mjs` (run via `pnpm test:rls:local`) already provides; a mocked vitest
+    unit test would bypass the grants/RLS it's meant to prove. Citation corrected to the real file.
 
 - [x] **Implement tenant saved-query repository**
   - Files: `src/shared/lib/repositories/saved-queries.ts`, `tests/unit/shared/lib/repositories/saved-queries.test.ts`, `src/shared/lib/authorization/permissions.ts`

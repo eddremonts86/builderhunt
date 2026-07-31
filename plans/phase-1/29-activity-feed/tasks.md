@@ -15,9 +15,12 @@
   - Verify: one test per type/version/formatter/redaction plus unknown/email/token/note/query/prompt payload rejection passes.
 
 - [x] **Add tenant activity schema, RLS, grants, and indexes**
-  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `tests/unit/security/activity-schema.test.ts`, `tests/unit/security/rls.test.ts`
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/`, `tests/unit/security/activity-schema.test.ts`, `scripts/db/verify-rls-local.mjs`
   - Do: Add organization activity table with candidate key, idempotency uniqueness, checked type/version, actor FK, keyset index, live-target composite FKs where applicable, force-RLS, app insert/select only, and worker bounded-delete policy. Keep security audit separate and unreadable to ordinary app feed queries.
   - Verify: app-role missing/A/B contexts, update denial, duplicate idempotency, cross-tenant target, and worker-grant tests pass.
+  - Reality check (2026-07-31): the `tests/unit/security/rls.test.ts` this task cited never existed —
+    same correction as `shared-resources` task 2: RLS needs a live per-role DB connection, which is
+    `scripts/db/verify-rls-local.mjs` (`pnpm test:rls:local`), not a mockable vitest unit test.
 
 - [x] **Implement transaction-bound activity repository**
   - Files: `src/shared/lib/repositories/activity.ts`, `tests/unit/shared/lib/repositories/activity.test.ts`

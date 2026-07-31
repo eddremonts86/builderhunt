@@ -90,8 +90,8 @@ exists because the UI presented synthetic evidence as measured fact.
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 01 | [`security-and-multitenancy`](../phase-1/01-security-and-multitenancy/spec.md) | 1/18 | — | Blocks 7 plans directly. Canonical tenant cutover shipped 2026-07-27 (`organization_id` `NOT NULL` on all seven tenant-private tables, `drizzle/0081`). Only leftover: `TENANT_READ_MODE` still defaults to `legacy` and no contract migration drops the legacy columns. |
-| 02 | [`production-infrastructure`](../phase-1/02-production-infrastructure/spec.md) | 2/17 | 01 | Backup cron and off-site copy need production SSH — not more code. |
+| 01 | [`security-and-multitenancy`](../phase-1/01-security-and-multitenancy/spec.md) | 0/19 | — | Blocks 7 plans directly. Canonical tenant cutover shipped 2026-07-27 (`organization_id` `NOT NULL` on all seven tenant-private tables, `drizzle/0081`). Only leftover: `TENANT_READ_MODE` still defaults to `legacy` and no contract migration drops the legacy columns. (Reality check 2026-07-31: was 1/18 — "Classify the 45 unclassified tables" is now `[x]`, done 2026-07-31 in the same phase-1 audit's fix pass.) |
+| 02 | [`production-infrastructure`](../phase-1/02-production-infrastructure/spec.md) | 3/16 | 01 | Backup cron, log rotation, and off-site copy need production SSH — not more code. (Reality check 2026-07-31: was 2/17; the log-rotation task's own text says "not executed" but its checkbox was `[x]` — recounted as `[~]` in tasks.md, which moves it into Open.) |
 | 03 | [`postgres-18-upgrade`](../phase-1/03-postgres-18-upgrade/spec.md) | 39/0 | — (ordered, see below) | Moved here from `phase-2` on 2026-07-28. Its own case for going early: the cutover cost is a function of data size and of how many tenants are writing, and today nobody is billed, so this is the cheapest this will ever be. Phases 0–4 contain zero PG18-only SQL — images, docs, rehearsal, cutover. Every image must be a `pgvector/pgvector:*` one. |
 | 04 | [`legal-and-compliance`](../phase-1/04-legal-and-compliance/spec.md) | 0/17 | — | Hard deletion + external-AI disclosure. Must precede any production MiniMax traffic (`21`). |
 | 05 | [`project-hygiene`](../phase-1/05-project-hygiene/spec.md) | 0/8 | — | **Closed 2026-07-28.** Fabricated `Math.random()` evidence removed; real GitHub signals plus an on-screen "estimated" label. |
@@ -183,15 +183,15 @@ why they are last among the feature plans rather than first among the ambitious 
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 42 | [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md) | 9/30 | 01, 04 | Directory name is legacy: the feature is **Public Profile Enrichment** and must never claim evasion. Code complete, `ENRICHMENT_ENABLED=false`; needs deploy-dark → 7-day canary → approval. Uses `task.md`/`implementation_plan.md` instead of the trio. |
-| 43 | [`solutions-intelligence`](../phase-1/43-solutions-intelligence/spec.md) | 30/0 | 01, 21, 30, 42 | Blocked on `42` being live plus a 60-brief gold-set quality bar. Largest untouched plan. |
+| 42 | [`stealth-scraping`](../phase-1/42-stealth-scraping/spec.md) | 3/30 | 01, 04 | Directory name is legacy: the feature is **Public Profile Enrichment** and must never claim evasion. Code complete, `ENRICHMENT_ENABLED=false`; needs deploy-dark → 7-day canary → approval. Uses `task.md`/`implementation_plan.md` instead of the trio. (Reality check 2026-07-31: recounted `task.md`'s checkboxes — was 9/30.) |
+| 43 | [`solutions-intelligence`](../phase-1/43-solutions-intelligence/spec.md) | 27/3 | 01, 21, 30, 42 | Blocked on `42` being live plus a 60-brief gold-set quality bar. Still `implementation authorized: no`. (Reality check 2026-07-31: 3 Phase-1 prep tasks are real, shipped work with cited files — `src/shared/lib/solutions/contracts.ts`, `src/shared/lib/solutions/config.ts`, and the non-provider product shell `src/modules/solutions/*` + `src/routes/_dashboard/solutions/index.tsx` — though tasks.md's own checkboxes for them stay unchecked pending formal authorization. Was 30/0, "Largest untouched plan", which undercounted this.) |
 | 44 | [`calendar-scheduling-interview-intelligence`](../phase-1/44-calendar-scheduling-interview-intelligence/spec.md) | 9/69 | 01, 21, 30 | Was the biggest plan in the backlog; now 69 of 78 tasks are done. Remaining work is the sensitive tail: private documents, live transcription, retention, rollout. |
 
 ## Wave 9 — public surface and content (45–47)
 
 | # | Plan | Open/Done | Deps | Note |
 |--:|------|----------:|------|------|
-| 45 | [`public-landing-pages`](../phase-1/45-public-landing-pages/spec.md) | 0/13 | — | SEO surface largely live; **no public radars** (`public_radars` is not in `schema.ts`). Blocks `46` and `54`. |
+| 45 | [`public-landing-pages`](../phase-1/45-public-landing-pages/spec.md) | 0/14 | — | SEO surface largely live; **public radars are built** (`publicRadars` in `schema.ts`, table `public_radars`, `drizzle/0054`). Blocks `46` and `54`. (Reality check 2026-07-31: was 0/13, "no public radars — not in schema.ts", both stale.) |
 | 46 | [`content-marketing`](../phase-1/46-content-marketing/spec.md) | 6/11 | 45 | |
 | 47 | [`status-and-trust`](../phase-1/47-status-and-trust/spec.md) | 1/15 | — | Missing uptime *history* and incident subscriptions; the leftover is optional and touches a reserved file. |
 
@@ -254,12 +254,15 @@ Still open, and worth the same treatment: `06-design-modernization`, `07-respons
 Two of those eight are the most suspicious of the set: `25-code-fingerprinting`'s header says "v2 AI
 analysis of real repo code is pending" and `24-ai-profile-enrichment`'s says "claim-triggered
 auto-refresh deferred" — yet neither has an unchecked box representing that gap. A deferred scope
-with no open task is invisible work. A third is worth a look for the opposite reason:
-`45-public-landing-pages` claims `public_radars` is not in `schema.ts`, but `db:audit-schema` lists
-`public_radars` among its unclassified tables, so the table appears to exist now.
+with no open task is invisible work.
+
+**Reality check (2026-07-31)**: `24-ai-profile-enrichment` and `45-public-landing-pages` are now
+corrected at the source (`tasks.md`/`plan.md`/`spec.md` for `24`; `spec.md` and this file's `45`
+row above for `45`) — Phase 3 shipped 2026-07-25, and `public_radars` genuinely exists in
+`schema.ts`. `25-code-fingerprinting` was not investigated in this pass.
 
 **3 plans claim a closed status while carrying open tasks:** `41-ai-sourcing-sprints` (1),
-`42-stealth-scraping` (9), `20-indiehackers-integration` (2). All three are explained in their
+`42-stealth-scraping` (3), `20-indiehackers-integration` (2). All three are explained in their
 headers (dedicated Phase 6 item, human-decision canary, optional follow-ups), so the counts are
 honest — but the status word alone is misleading.
 

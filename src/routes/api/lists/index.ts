@@ -17,7 +17,10 @@ import { SharedResourceError, stripOrganizationAuthority, VisibilitySchema } fro
 
 const CreateBody = z.object({
   name: z.string().min(1).max(120),
-  description: z.string().max(500).optional(),
+  // The dashboard form sends `null` for "no description" (matching the nullable DB column and the
+  // repository's `input.description ?? null`), not `undefined` — `.optional()` alone rejected that
+  // and every list creation with a blank description field failed with a 422.
+  description: z.string().max(500).nullable().optional(),
   visibility: VisibilitySchema,
 })
 

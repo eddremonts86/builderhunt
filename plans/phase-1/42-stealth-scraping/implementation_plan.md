@@ -80,6 +80,17 @@ Deliverables:
 Checkpoint: fresh migration, upgrade migration, migration-integrity checks, exact-role
 RLS A/B/missing-context suite, and lease concurrency integration tests pass.
 
+Reality check (2026-07-31): the lease concurrency integration test never existed on disk. Written
+now as `tests/unit/shared/lib/repositories/enrichment-worker.test.ts`, following the same
+real-database pattern as `interview-documents.test.ts`'s `leaseDocumentsForScan` suite — a real
+disposable Postgres database, two `claimDueEnrichmentJobs` calls raced via `Promise.all` against
+four seeded queued jobs. Required adding an optional `{ db }` override to `claimDueEnrichmentJobs`
+(mirroring the same seam `createFeedCapability`/`runActivityRetention`/`withWorkerOrganization`
+already use) so the test could point it at the disposable database instead of the module-level
+`workerDb` singleton. 3 cases, all pass three times in a row with no flake: no job double-claimed
+under concurrency, a not-yet-due job is not claimed, and `limit` is respected when more jobs are
+due.
+
 ## Phase 2 — Pure validation and entity resolution
 
 Files:

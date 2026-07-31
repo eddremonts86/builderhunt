@@ -239,7 +239,7 @@ step security-route-coverage pnpm security:route-coverage
 # page threw "Buffer is not defined". Type-check, lint, 4236 tests and a production build all passed.
 step security-route-client-boundary pnpm security:route-client-boundary
 step security-provider-metering pnpm security:provider-metering
-step_soft schema-audit pnpm db:audit-schema
+step schema-audit pnpm db:audit-schema
 step lint pnpm lint
 step type-check pnpm type-check
 step unit-tests pnpm test

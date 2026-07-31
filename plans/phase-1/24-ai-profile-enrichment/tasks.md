@@ -10,11 +10,12 @@ is no longer the live write path for newly tracked builders (security-and-multit
 tracking to `organization_builders`/`builder_identities`). Delivered instead against
 `organization_builders.privateMetadata.aiEnrichment`, keyed by the requesting org's own
 tracked-builder row — same jsonb-merge discipline (never overwrites the whole column), same
-schemas/thresholds/cache TTL as spec'd. Phase 3 (claim-triggered auto-refresh) is deferred: a
-verified claim is global (`builder_claims`, keyed by `builder_identity_id`, not org-scoped), and
-`published_builder_profiles` has no jsonb metadata column to attach an artifact to without a
-schema migration — out of scope for this pass. Revisit once `portfolio-builder` needs its own
-`published_builder_profiles` metadata column anyway.
+schemas/thresholds/cache TTL as spec'd. Phase 3 (claim-triggered auto-refresh) was originally
+deferred for this reason — a verified claim is global (`builder_claims`, keyed by
+`builder_identity_id`, not org-scoped), and `published_builder_profiles` had no jsonb metadata
+column to attach an artifact to without a schema migration — but shipped 2026-07-25 once that was
+worked through; see Phase 3 below. (Reality check 2026-07-31: this note still said "is deferred"
+after the fact — corrected.)
 
 Ordered so the app ships cleanly after every checkbox.
 
@@ -78,7 +79,7 @@ team: 200 }`; `maxOutputTokens: 512`; system prompt per spec (objective,
   - Verify: Claimed-owner curl regenerates (new `enrichedAt`); non-owner non-admin gets 403;
     6th refresh in an hour gets 429.
 
-## Phase 3 — Claim hook (DEFERRED — see adaptation note above)
+## Phase 3 — Claim hook (shipped 2026-07-25 — see adaptation note above for why it was initially deferred)
 
 - [x] **Trigger enrichment on successful claim**
   - Files: `src/routes/api/builders/claim/verify.ts` (or the claim lib it delegates to)

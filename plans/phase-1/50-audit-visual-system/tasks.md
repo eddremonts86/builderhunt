@@ -25,13 +25,20 @@
 - [x] **Capture a deterministic visual inventory and baseline** — done (2026-07-27)
   - Files: `tests/e2e/visual/public-surfaces.spec.ts`, `tests/e2e/visual/*-snapshots/`,
     `playwright.config.ts`, `package.json`
-  - Eight public routes at desktop and mobile, 16 baselines. Determinism comes from three pins:
-    the harness's `installFixedBrowserClock`, `prefers-reduced-motion` emulation plus zeroed
+  - Six public routes at desktop and mobile, 12 baselines (`/changelog` and `/roadmap` were dropped
+    after 2026-07-27 — both were mid-rewrite to read editorial content from `content/` at request
+    time, so a pinned baseline would fail on every run for a reason unrelated to the design system;
+    see the code comment in `public-surfaces.spec.ts`). Determinism comes from three pins: the
+    harness's `installFixedBrowserClock`, `prefers-reduced-motion` emulation plus zeroed
     animation/transition durations, and `document.fonts.ready` before every capture.
     `maxDiffPixelRatio` is 0.01. Public routes only, deliberately — no session means no seeded
     fixtures, so a diff means the design changed rather than the data did.
   - Verify (2026-07-27): generated with `--update-snapshots`, then a second bare
-    `pnpm test:visual` run produced 16/16 passes and no diff.
+    `pnpm test:visual` run produced 16/16 passes and no diff (against the eight-route set that
+    existed at the time).
+  - Verify (2026-07-31): the committed baselines had drifted from real content growth (legal pages
+    grew, pricing's mobile layout changed) — 5 of 12 failed on a bare `pnpm test:visual` run.
+    Regenerated with `--update-snapshots`; a second bare run now produces 12/12 passes and no diff.
 
 - [x] **Define the semantic token contract without forced overrides**
   - Files: `docs/visual-system.md` (new)

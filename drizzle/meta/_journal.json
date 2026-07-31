@@ -764,6 +764,27 @@
       "when": 1785400000000,
       "tag": "0108_status_subscribers",
       "breakpoints": true
+    },
+    {
+      "idx": 109,
+      "version": "7",
+      "when": 1785489618387,
+      "tag": "0109_builder_lists_grants",
+      "breakpoints": true
+    },
+    {
+      "idx": 110,
+      "version": "7",
+      "when": 1785491251588,
+      "tag": "0110_public_select_policies_backfill",
+      "breakpoints": true
+    },
+    {
+      "idx": 111,
+      "version": "7",
+      "when": 1785491769078,
+      "tag": "0111_builder_claims_public_portfolio_select",
+      "breakpoints": true
     }
   ]
 }

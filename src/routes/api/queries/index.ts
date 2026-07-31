@@ -6,7 +6,6 @@ import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
 import { resolveTenantReadMode } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
-import { createFeedCapability } from '~/shared/lib/security/feed-capability'
 import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import {
   countSavedQueries,
@@ -40,11 +39,6 @@ export const Route = createFileRoute('/api/queries/')({
           const radarSlugs = await listPublicRadarSlugsForSavedQueryIds(queries.map((query) => query.id))
           return Response.json(queries.map((query) => ({
             ...query,
-            feedToken: createFeedCapability(
-              principal.organizationId,
-              query.id,
-              env.BETTER_AUTH_SECRET as string,
-            ),
             radarSlug: radarSlugs.get(query.id) ?? null,
           })))
         } catch (error) {

@@ -165,6 +165,7 @@ import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/spri
 import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
 import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
+import { Route as ApiQueriesIdFeedCapabilityRouteImport } from './routes/api/queries/$id/feed-capability'
 import { Route as ApiPrivacyProfileRemovalVerifyRouteImport } from './routes/api/privacy/profile-removal/verify'
 import { Route as ApiOrganizationsMembersMemberIdRouteImport } from './routes/api/organizations/members/$memberId'
 import { Route as ApiOrganizationsInvitationsMineRouteImport } from './routes/api/organizations/invitations/mine'
@@ -227,6 +228,7 @@ import { Route as ApiAdminBillingConfigurationRouteImport } from './routes/api/a
 import { Route as ApiAdminBillingAccountingExportRouteImport } from './routes/api/admin/billing/accounting-export'
 import { Route as ApiAdminAnalyticsRunRetentionRouteImport } from './routes/api/admin/analytics/run-retention'
 import { Route as ApiAdminAlertsRunWorkerRouteImport } from './routes/api/admin/alerts/run-worker'
+import { Route as ApiAdminActivityRunRetentionRouteImport } from './routes/api/admin/activity/run-retention'
 import { Route as ApiAdminAbuseClustersRouteImport } from './routes/api/admin/abuse/clusters'
 import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_dashboard/settings/billing/return'
 import { Route as DashboardInterviewsInterviewIdLiveRouteImport } from './routes/_dashboard/interviews/$interviewId/live'
@@ -1061,6 +1063,12 @@ const ApiQueriesIdShareRoute = ApiQueriesIdShareRouteImport.update({
   path: '/api/queries/$id/share',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiQueriesIdFeedCapabilityRoute =
+  ApiQueriesIdFeedCapabilityRouteImport.update({
+    id: '/api/queries/$id/feed-capability',
+    path: '/api/queries/$id/feed-capability',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPrivacyProfileRemovalVerifyRoute =
   ApiPrivacyProfileRemovalVerifyRouteImport.update({
     id: '/verify',
@@ -1418,6 +1426,12 @@ const ApiAdminAlertsRunWorkerRoute = ApiAdminAlertsRunWorkerRouteImport.update({
   path: '/api/admin/alerts/run-worker',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminActivityRunRetentionRoute =
+  ApiAdminActivityRunRetentionRouteImport.update({
+    id: '/api/admin/activity/run-retention',
+    path: '/api/admin/activity/run-retention',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminAbuseClustersRoute = ApiAdminAbuseClustersRouteImport.update({
   id: '/api/admin/abuse/clusters',
   path: '/api/admin/abuse/clusters',
@@ -1753,6 +1767,7 @@ export interface FileRoutesByFullPath {
   '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
+  '/api/admin/activity/run-retention': typeof ApiAdminActivityRunRetentionRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
@@ -1815,6 +1830,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
+  '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
@@ -2003,6 +2019,7 @@ export interface FileRoutesByTo {
   '/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
+  '/api/admin/activity/run-retention': typeof ApiAdminActivityRunRetentionRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
@@ -2065,6 +2082,7 @@ export interface FileRoutesByTo {
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
+  '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
@@ -2258,6 +2276,7 @@ export interface FileRoutesById {
   '/_dashboard/interviews/$interviewId/live': typeof DashboardInterviewsInterviewIdLiveRoute
   '/_dashboard/settings/billing/return': typeof DashboardSettingsBillingReturnRoute
   '/api/admin/abuse/clusters': typeof ApiAdminAbuseClustersRoute
+  '/api/admin/activity/run-retention': typeof ApiAdminActivityRunRetentionRoute
   '/api/admin/alerts/run-worker': typeof ApiAdminAlertsRunWorkerRoute
   '/api/admin/analytics/run-retention': typeof ApiAdminAnalyticsRunRetentionRoute
   '/api/admin/billing/accounting-export': typeof ApiAdminBillingAccountingExportRoute
@@ -2320,6 +2339,7 @@ export interface FileRoutesById {
   '/api/organizations/invitations/mine': typeof ApiOrganizationsInvitationsMineRoute
   '/api/organizations/members/$memberId': typeof ApiOrganizationsMembersMemberIdRoute
   '/api/privacy/profile-removal/verify': typeof ApiPrivacyProfileRemovalVerifyRoute
+  '/api/queries/$id/feed-capability': typeof ApiQueriesIdFeedCapabilityRoute
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
@@ -2512,6 +2532,7 @@ export interface FileRouteTypes {
     | '/interviews/$interviewId/live'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
+    | '/api/admin/activity/run-retention'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
@@ -2574,6 +2595,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
+    | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
@@ -2762,6 +2784,7 @@ export interface FileRouteTypes {
     | '/interviews/$interviewId/live'
     | '/settings/billing/return'
     | '/api/admin/abuse/clusters'
+    | '/api/admin/activity/run-retention'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
@@ -2824,6 +2847,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
+    | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
@@ -3016,6 +3040,7 @@ export interface FileRouteTypes {
     | '/_dashboard/interviews/$interviewId/live'
     | '/_dashboard/settings/billing/return'
     | '/api/admin/abuse/clusters'
+    | '/api/admin/activity/run-retention'
     | '/api/admin/alerts/run-worker'
     | '/api/admin/analytics/run-retention'
     | '/api/admin/billing/accounting-export'
@@ -3078,6 +3103,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/mine'
     | '/api/organizations/members/$memberId'
     | '/api/privacy/profile-removal/verify'
+    | '/api/queries/$id/feed-capability'
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
@@ -3216,6 +3242,7 @@ export interface RootRouteChildren {
   ApiStatusIndexRoute: typeof ApiStatusIndexRoute
   ApiWorkSamplesIndexRoute: typeof ApiWorkSamplesIndexRoute
   ApiAdminAbuseClustersRoute: typeof ApiAdminAbuseClustersRoute
+  ApiAdminActivityRunRetentionRoute: typeof ApiAdminActivityRunRetentionRoute
   ApiAdminAlertsRunWorkerRoute: typeof ApiAdminAlertsRunWorkerRoute
   ApiAdminAnalyticsRunRetentionRoute: typeof ApiAdminAnalyticsRunRetentionRoute
   ApiAdminBillingAccountingExportRoute: typeof ApiAdminBillingAccountingExportRoute
@@ -3266,6 +3293,7 @@ export interface RootRouteChildren {
   ApiOrganizationsInvitationsInvitationIdRoute: typeof ApiOrganizationsInvitationsInvitationIdRouteWithChildren
   ApiOrganizationsInvitationsMineRoute: typeof ApiOrganizationsInvitationsMineRoute
   ApiOrganizationsMembersMemberIdRoute: typeof ApiOrganizationsMembersMemberIdRoute
+  ApiQueriesIdFeedCapabilityRoute: typeof ApiQueriesIdFeedCapabilityRoute
   ApiQueriesIdShareRoute: typeof ApiQueriesIdShareRoute
   ApiQueriesIdVisibilityRoute: typeof ApiQueriesIdVisibilityRoute
   ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
@@ -4403,6 +4431,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiQueriesIdShareRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/queries/$id/feed-capability': {
+      id: '/api/queries/$id/feed-capability'
+      path: '/api/queries/$id/feed-capability'
+      fullPath: '/api/queries/$id/feed-capability'
+      preLoaderRoute: typeof ApiQueriesIdFeedCapabilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/privacy/profile-removal/verify': {
       id: '/api/privacy/profile-removal/verify'
       path: '/verify'
@@ -4835,6 +4870,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/alerts/run-worker'
       fullPath: '/api/admin/alerts/run-worker'
       preLoaderRoute: typeof ApiAdminAlertsRunWorkerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/activity/run-retention': {
+      id: '/api/admin/activity/run-retention'
+      path: '/api/admin/activity/run-retention'
+      fullPath: '/api/admin/activity/run-retention'
+      preLoaderRoute: typeof ApiAdminActivityRunRetentionRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/abuse/clusters': {
@@ -5536,6 +5578,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiStatusIndexRoute: ApiStatusIndexRoute,
   ApiWorkSamplesIndexRoute: ApiWorkSamplesIndexRoute,
   ApiAdminAbuseClustersRoute: ApiAdminAbuseClustersRoute,
+  ApiAdminActivityRunRetentionRoute: ApiAdminActivityRunRetentionRoute,
   ApiAdminAlertsRunWorkerRoute: ApiAdminAlertsRunWorkerRoute,
   ApiAdminAnalyticsRunRetentionRoute: ApiAdminAnalyticsRunRetentionRoute,
   ApiAdminBillingAccountingExportRoute: ApiAdminBillingAccountingExportRoute,
@@ -5589,6 +5632,7 @@ const rootRouteChildren: RootRouteChildren = {
     ApiOrganizationsInvitationsInvitationIdRouteWithChildren,
   ApiOrganizationsInvitationsMineRoute: ApiOrganizationsInvitationsMineRoute,
   ApiOrganizationsMembersMemberIdRoute: ApiOrganizationsMembersMemberIdRoute,
+  ApiQueriesIdFeedCapabilityRoute: ApiQueriesIdFeedCapabilityRoute,
   ApiQueriesIdShareRoute: ApiQueriesIdShareRoute,
   ApiQueriesIdVisibilityRoute: ApiQueriesIdVisibilityRoute,
   ApiSchedulingInvitationsInvitationIdRoute:

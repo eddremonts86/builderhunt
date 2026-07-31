@@ -1,9 +1,10 @@
 # Team Synergy — Candidate-vs-Team Fit Analysis (plan)
 
-> **Status**: `pending`
+> **Status**: `partially-implemented` (Phases 1–5 shipped per `tasks.md`; this header and spec.md's
+> were never updated to match — corrected 2026-07-31)
 > **Depends on**: [`ai-expansion`](../21-ai-expansion/spec.md) (hard), [`code-fingerprinting`](../25-code-fingerprinting/spec.md) (soft), [`ai-profile-enrichment`](../24-ai-profile-enrichment/spec.md) (soft), [`team-accounts`](../27-team-accounts/spec.md) (soft)
 > **Blocks**: nothing
-> **Reality check**: no synergy code exists. Reads (never writes) `builders.metadata.codeStyleFingerprint` and `.aiEnrichment`; falls back to `generateFingerprint` from `src/shared/lib/code-style.ts` for members without stored artifacts. Ephemeral by design — no schema changes anywhere in this plan.
+> **Reality check (2026-07-31)**: `src/routes/api/builders/$builderId/synergy.ts` is real and shipped, including Phase 5's org-list team source. Reads (never writes) `builders.metadata.codeStyleFingerprint` and `.aiEnrichment`; falls back to `generateFingerprint` from `src/shared/lib/code-style.ts` for members without stored artifacts. Ephemeral by design — no schema changes anywhere in this plan.
 
 ## Scope decision (recorded)
 
@@ -37,10 +38,14 @@ bio/topics, tier `server-only`, TTL 86 400, allowances `{ free: 0, pro: 0, team:
 `TeamFitCard.tsx` on the builder profile page with all five states (result / degraded /
 too-small / plan-gated / loading).
 
-### Phase 5 — Team-accounts hookup (deferred until that plan ships)
+### Phase 5 — Team-accounts hookup
 
 Accept an org list id as the team source; `buildTeamAggregate` already takes a row list, so
-this is endpoint plumbing only. Explicitly out of the first release.
+this is endpoint plumbing only.
+
+Shipped 2026-07-29 (commit `6602f49`) — the "deferred until team-accounts ships" hold was lifted
+once that plan shipped 2026-07-22, per `tasks.md`'s own note. This section previously still said
+"deferred," corrected 2026-07-31.
 
 ## Risks
 

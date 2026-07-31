@@ -54,13 +54,36 @@ try {
   const afterCommit = await app`select id from organization_builders`
   if (afterCommit.length !== 0) throw new Error('Pooled tenant context leaked after commit')
 
-  const claimMissing = await app`select id from builder_claims`
-  if (claimMissing.length !== 0) throw new Error('Missing user context exposed builder claims')
+  // `builder_claims_public_portfolio_select` (0111) additively lets the app role read *verified*
+  // claims with no `app.user_id` context at all — the public portfolio page's anonymous read. This
+  // must not leak a step further: a claim still pending its owner's verification stays invisible
+  // with no context, same as before 0111.
+  const claimMissingNoContext = await app`select id from builder_claims order by id`
+  assertIds(claimMissingNoContext, ['claim-a', 'claim-b'], 'anonymous public portfolio read (verified only)')
+  const pendingClaimLeaked = claimMissingNoContext.some((row) => row.id === 'claim-pending')
+  if (pendingClaimLeaked) throw new Error('Anonymous read exposed a pending (unverified) builder claim')
+  // user-a owns claim-a and, via 0111's additive public policy, also sees claim-b — claim-b is
+  // verified and therefore publicly readable by anyone, which is the intended behavior now, not a
+  // subject-isolation leak. claim-pending must stay invisible: it belongs to a different subject
+  // and is not verified.
   const subjectClaims = await app.begin(async (transaction) => {
     await transaction`select set_config('app.user_id', 'user-a', true)`
     return transaction`select id from builder_claims order by id`
   })
-  assertIds(subjectClaims, ['claim-a'], 'claim subject isolation')
+  assertIds(subjectClaims, ['claim-a', 'claim-b'], 'claim subject read + public verified read')
+
+  const otherSubjectSeesPending = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-a', true)`
+    return transaction`select id from builder_claims where id = 'claim-pending'`
+  })
+  if (otherSubjectSeesPending.length !== 0) throw new Error("A non-owner read another subject's pending claim")
+
+  const pendingOwnerSeesOwnClaim = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-pending-claimant', true)`
+    return transaction`select id from builder_claims where id = 'claim-pending'`
+  })
+  if (pendingOwnerSeesOwnClaim.length !== 1) throw new Error("The pending claim's own subject could not read their own claim")
+
   let crossSubjectClaimDenied = false
   try {
     await app.begin(async (transaction) => {
@@ -912,12 +935,418 @@ try {
     throw new Error('elevating to the worker role let the app write another organization\'s credits')
   }
 
+  // ── Stripe billing platform (plan 30) — the remaining 16 of 19 billing_* tables ──────────────────
+  //
+  // Found 2026-07-31: only billing_customers, billing_checkout_attempts, and
+  // billing_credit_reservations had any live-role assertion here, and the latter two only for their
+  // write-permission shape, never ordinary SELECT isolation. The team had already found and fixed
+  // this exact class of bug twice by hand (credit reservations, reconciliation) with no automated
+  // gate to have caught either. Each table below gets the isolation/permission shape its own grants
+  // actually specify — asymmetric ones (ledger's no-UPDATE-ever, refunds' WITH CHECK, seller
+  // profiles denying even the worker) are the ones worth measuring, not a copy-pasted default.
+
+  const tenantIsolation = async (table, idsA, idsB) => {
+    const missing = await app`select id from ${app(table)}`
+    if (missing.length !== 0) throw new Error(`Missing context exposed ${table}`)
+    const scoped = (organizationId) => app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+      return transaction`select id from ${transaction(table)} order by id`
+    })
+    const [rowsA, rowsB] = await Promise.all([scoped('org-a'), scoped('org-b')])
+    assertIds(rowsA, idsA, `${table} org-a isolation`)
+    assertIds(rowsB, idsB, `${table} org-b isolation`)
+  }
+
+  await tenantIsolation('billing_subscriptions', ['sub-a'], ['sub-b'])
+  let appSubscriptionWriteDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_subscriptions set stripe_status = 'hacked' where id = 'sub-a'`
+    })
+  } catch (error) {
+    appSubscriptionWriteDenied = error?.code === '42501'
+  }
+  if (!appSubscriptionWriteDenied) throw new Error('App role updated a billing_subscriptions row (app is SELECT-only)')
+
+  await tenantIsolation('billing_credit_grants', ['grant-a'], ['grant-b'])
+  let appCreditGrantWriteDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_credit_grants set remaining_units = 0 where id = 'grant-a'`
+    })
+  } catch (error) {
+    appCreditGrantWriteDenied = error?.code === '42501'
+  }
+  if (!appCreditGrantWriteDenied) throw new Error('App role updated a billing_credit_grants row (app is SELECT-only)')
+
+  // Distinct fixture ids from the 'rls-unelevated'/'rls-elevated'/'rls-cross' rows the role-elevation
+  // test above creates itself — this is the ordinary SELECT-isolation case that test never covered.
+  // The role-elevation credit-write assertions above already inserted 'rls-elevated' into org-a
+  // ('rls-unelevated' and 'rls-cross' were both denied and never landed) — this section runs after
+  // them, so org-a's expected set includes it alongside the pre-seeded fixture row.
+  await tenantIsolation('billing_credit_reservations', ['credit-res-a', 'rls-elevated'], ['credit-res-b'])
+
+  await tenantIsolation('billing_credit_allocations', ['alloc-a'], ['alloc-b'])
+  let appCreditAllocationInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_credit_allocations (id, organization_id, reservation_id, grant_id, allocated_units)
+        values ('alloc-hack', 'org-a', 'credit-res-a', 'grant-a', 1)
+      `
+    })
+  } catch (error) {
+    appCreditAllocationInsertDenied = error?.code === '42501'
+  }
+  if (!appCreditAllocationInsertDenied) throw new Error('App role inserted a billing_credit_allocations row (app is SELECT-only)')
+
+  await tenantIsolation('billing_ledger_entries', ['ledger-a'], ['ledger-b'])
+  // Append-only for EVERY role, including the worker that writes it — a compensating entry is the
+  // only correction this ledger allows, never an edit to a posted one.
+  let workerLedgerUpdateDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_ledger_entries set units_delta = 0 where id = 'ledger-a'`
+    })
+  } catch (error) {
+    workerLedgerUpdateDenied = error?.code === '42501'
+  }
+  if (!workerLedgerUpdateDenied) throw new Error('Worker role updated a billing_ledger_entries row (the ledger is append-only for every role)')
+
+  await tenantIsolation('billing_provider_usage', ['provider-usage-a'], ['provider-usage-b'])
+  let appProviderUsageInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_provider_usage (id, organization_id, operation, units, estimated_cost_cents)
+        values ('usage-hack', 'org-a', 'interview_live_transcription', 1, 10)
+      `
+    })
+  } catch (error) {
+    appProviderUsageInsertDenied = error?.code === '42501'
+  }
+  if (!appProviderUsageInsertDenied) throw new Error('App role inserted a billing_provider_usage row (app is SELECT-only)')
+
+  // PK is organization_id — one row per org. Reversed permission shape from most tables here: the
+  // owning app role can self-service INSERT/UPDATE its own row, and the worker may only UPDATE
+  // (never INSERT — the row always originates from the owner's own settings page).
+  const autoRechargeOwner = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select organization_id from billing_auto_recharge_rules`
+  })
+  if (autoRechargeOwner.length !== 1 || autoRechargeOwner[0].organization_id !== 'org-a') {
+    throw new Error('App role could not read its own billing_auto_recharge_rules row')
+  }
+  // An UPDATE whose WHERE targets a row the RLS policy filters out is not an error — it is a
+  // silent 0-row no-op, same as any other UPDATE that matches nothing. The signal to check is the
+  // affected-row count, not a thrown exception (that only fires when the whole table grant is
+  // missing, which is not this case — the app role legitimately has UPDATE here, just row-scoped).
+  const autoRechargeCrossTenantUpdate = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    const rows = await transaction`update billing_auto_recharge_rules set enabled = true where organization_id = 'org-b' returning organization_id`
+    return rows.length
+  })
+  if (autoRechargeCrossTenantUpdate !== 0) throw new Error('App role updated another organization\'s billing_auto_recharge_rules row')
+  let workerAutoRechargeInsertDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`insert into billing_auto_recharge_rules (organization_id, owner_user_id) values ('org-worker-hack', 'user-a')`
+    })
+  } catch (error) {
+    workerAutoRechargeInsertDenied = error?.code === '42501'
+  }
+  if (!workerAutoRechargeInsertDenied) throw new Error('Worker role inserted a billing_auto_recharge_rules row (worker is UPDATE-only)')
+
+  await tenantIsolation('billing_refunds', ['refund-a'], ['refund-b'])
+  // The fixture rows are already 'succeeded' with a real stripe_refund_id — a shape the app role's
+  // own INSERT WITH CHECK would reject. This is the app role actually exercising that CHECK: the
+  // correct shape (pending, no stripe_refund_id) succeeds for its own org and is denied cross-org;
+  // the wrong shape is denied even for its own org.
+  const refundAppInsert = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    const rows = await transaction`
+      insert into billing_refunds (id, organization_id, requested_by_user_id, idempotency_key, policy_decision, amount_cents, state)
+      values ('refund-app-a', 'org-a', 'user-a', 'app-insert-a', 'full_unused_pack', 100, 'pending')
+      returning id
+    `
+    return rows.length
+  })
+  if (refundAppInsert !== 1) throw new Error('App role could not insert a correctly-shaped billing_refunds row for its own org')
+  let refundWrongShapeDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_refunds (id, organization_id, requested_by_user_id, idempotency_key, policy_decision, amount_cents, state, stripe_refund_id)
+        values ('refund-wrong-shape', 'org-a', 'user-a', 'app-insert-wrong', 'full_unused_pack', 100, 'succeeded', 're_should_not_insert')
+      `
+    })
+  } catch (error) {
+    refundWrongShapeDenied = error?.code === '42501'
+  }
+  if (!refundWrongShapeDenied) throw new Error('App role inserted a billing_refunds row outside the pending/no-stripe-id WITH CHECK shape')
+  let refundCrossTenantInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_refunds (id, organization_id, requested_by_user_id, idempotency_key, policy_decision, amount_cents, state)
+        values ('refund-cross', 'org-b', 'user-a', 'app-insert-cross', 'full_unused_pack', 100, 'pending')
+      `
+    })
+  } catch (error) {
+    refundCrossTenantInsertDenied = error?.code === '42501'
+  }
+  if (!refundCrossTenantInsertDenied) throw new Error('App role inserted a billing_refunds row under a spoofed organization')
+
+  await tenantIsolation('billing_disputes', ['dispute-a'], ['dispute-b'])
+  let appDisputeInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`
+        insert into billing_disputes (id, organization_id, stripe_dispute_id, stripe_payment_intent_id, amount_cents, stripe_status)
+        values ('dispute-hack', 'org-a', 'dp_hack', 'pi_hack', 100, 'won')
+      `
+    })
+  } catch (error) {
+    appDisputeInsertDenied = error?.code === '42501'
+  }
+  if (!appDisputeInsertDenied) throw new Error('App role inserted a billing_disputes row (app is SELECT-only)')
+  // Platform reviews disputes but does not resolve them directly — only the worker (driven by the
+  // Stripe webhook) updates outcome, so a platform operator cannot silently mark one 'won'.
+  let platformDisputeUpdateDenied = false
+  try {
+    await platform`update billing_disputes set outcome = 'won' where id = 'dispute-a'`
+  } catch (error) {
+    platformDisputeUpdateDenied = error?.code === '42501'
+  }
+  if (!platformDisputeUpdateDenied) throw new Error('Platform role updated a billing_disputes row (platform is SELECT-only here)')
+
+  // PK is organization_id, same shape as billing_auto_recharge_rules: owner self-service, worker
+  // read-only (verification email delivery is app-role work, not a worker sweep).
+  const contactOwner = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select organization_id from billing_contacts`
+  })
+  if (contactOwner.length !== 1 || contactOwner[0].organization_id !== 'org-a') {
+    throw new Error('App role could not read its own billing_contacts row')
+  }
+  let workerContactUpdateDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_contacts set status = 'pending' where organization_id = 'org-a'`
+    })
+  } catch (error) {
+    workerContactUpdateDenied = error?.code === '42501'
+  }
+  if (!workerContactUpdateDenied) throw new Error('Worker role updated a billing_contacts row (worker is SELECT-only)')
+
+  await tenantIsolation('billing_risk_events', ['risk-event-a'], ['risk-event-b'])
+  let appRiskEventCrossTenantInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`insert into billing_risk_events (id, organization_id, event_type) values ('risk-event-cross', 'org-b', 'card_rotation')`
+    })
+  } catch (error) {
+    appRiskEventCrossTenantInsertDenied = error?.code === '42501'
+  }
+  if (!appRiskEventCrossTenantInsertDenied) throw new Error('App role inserted a billing_risk_events row under a spoofed organization')
+  let appRiskEventUpdateDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update billing_risk_events set detail = 'edited' where id = 'risk-event-a'`
+    })
+  } catch (error) {
+    appRiskEventUpdateDenied = error?.code === '42501'
+  }
+  if (!appRiskEventUpdateDenied) throw new Error('App role updated a billing_risk_events row (append-only for every role)')
+
+  // Only a platform operator can issue or lift a risk exception — neither the app nor the worker
+  // role can grant itself relief from its own velocity block.
+  await tenantIsolation('billing_risk_exceptions', ['risk-exc-a'], ['risk-exc-b'])
+  let workerRiskExceptionInsertDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`insert into billing_risk_exceptions (id, organization_id, reason, issued_by_user_id, expires_at) values ('risk-exc-hack', 'org-a', 'self-issued', 'user-a', now() + interval '1 day')`
+    })
+  } catch (error) {
+    workerRiskExceptionInsertDenied = error?.code === '42501'
+  }
+  if (!workerRiskExceptionInsertDenied) throw new Error('Worker role issued a billing_risk_exceptions row (only platform may issue exceptions)')
+  // Platform's insert/update policies here are ALSO organization-scoped (unlike most tables above,
+  // where platform access — where granted at all — is unconditional) — a platform operator issues
+  // an exception for a specific tenant, so the GUC must be set the same way the app/worker roles do.
+  const platformRiskExceptionInsert = await platform.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`
+      insert into billing_risk_exceptions (id, organization_id, reason, issued_by_user_id, expires_at)
+      values ('risk-exc-platform', 'org-a', 'platform issued', 'user-a', now() + interval '1 day')
+      returning id
+    `
+  })
+  if (platformRiskExceptionInsert.length !== 1) throw new Error('Platform role could not issue a billing_risk_exceptions row')
+
+  // billing_webhook_events / billing_reconciliation_runs / billing_seller_profiles: system-operational,
+  // no organization_id, no RLS at all — the app role is denied at the GRANT level (there is no row to
+  // filter), and this is a deliberate positive control that worker/platform see every row with no scoping.
+  let appWebhookEventsDenied = false
+  try {
+    await app`select id from billing_webhook_events`
+  } catch (error) {
+    appWebhookEventsDenied = error?.code === '42501'
+  }
+  if (!appWebhookEventsDenied) throw new Error('App role accessed billing_webhook_events (system-operational, no app grant)')
+  const workerWebhookEvents = await worker`select id from billing_webhook_events`
+  if (workerWebhookEvents.length !== 1 || workerWebhookEvents[0].id !== 'webhook-a') {
+    throw new Error(`Worker role could not read billing_webhook_events (${JSON.stringify(workerWebhookEvents)})`)
+  }
+  let platformWebhookInsertDenied = false
+  try {
+    await platform`insert into billing_webhook_events (id, livemode, stripe_event_id, api_version, object_type, event_type, payload_encrypted) values ('webhook-platform-hack', false, 'evt_hack', '2024-01-01', 'invoice', 'invoice.paid', 'x')`
+  } catch (error) {
+    platformWebhookInsertDenied = error?.code === '42501'
+  }
+  if (!platformWebhookInsertDenied) throw new Error('Platform role inserted a billing_webhook_events row (platform is SELECT/UPDATE only)')
+
+  let appReconciliationDenied = false
+  try {
+    await app`select id from billing_reconciliation_runs`
+  } catch (error) {
+    appReconciliationDenied = error?.code === '42501'
+  }
+  if (!appReconciliationDenied) throw new Error('App role accessed billing_reconciliation_runs (system-operational, no app grant)')
+  const workerReconciliation = await worker`select id from billing_reconciliation_runs`
+  if (workerReconciliation.length !== 1 || workerReconciliation[0].id !== 'recon-a') {
+    throw new Error(`Worker role could not read billing_reconciliation_runs (${JSON.stringify(workerReconciliation)})`)
+  }
+  let workerReconciliationUpdateDenied = false
+  try {
+    await worker`update billing_reconciliation_runs set result = 'mismatches_found' where id = 'recon-a'`
+  } catch (error) {
+    workerReconciliationUpdateDenied = error?.code === '42501'
+  }
+  if (!workerReconciliationUpdateDenied) throw new Error('Worker role updated a billing_reconciliation_runs row (worker is SELECT/INSERT only, runs are immutable once written)')
+  const platformReconciliation = await platform`select id from billing_reconciliation_runs`
+  if (platformReconciliation.length !== 1) throw new Error('Platform role could not read billing_reconciliation_runs')
+
+  // No FK on organization_id — 'platform' is the documented cross-organization sentinel. The
+  // interesting property is the OR-branch itself: a worker scoped to org-a sees ITS OWN
+  // organization's rows plus every 'platform'-tagged row, never org-b's.
+  let appNotificationLogDenied = false
+  try {
+    await app`select id from billing_notification_log`
+  } catch (error) {
+    appNotificationLogDenied = error?.code === '42501'
+  }
+  if (!appNotificationLogDenied) throw new Error('App role accessed billing_notification_log (system-operational, no app grant)')
+  const workerNotificationsOrgA = await worker.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select id from billing_notification_log order by id`
+  })
+  assertIds(workerNotificationsOrgA, ['notif-org-a', 'notif-platform'], 'billing_notification_log worker org-a + platform sentinel')
+  const workerNotificationsOrgB = await worker.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-b', true)`
+    return transaction`select id from billing_notification_log order by id`
+  })
+  assertIds(workerNotificationsOrgB, ['notif-platform'], 'billing_notification_log worker org-b sees only the platform sentinel')
+  const platformNotifications = await platform`select id from billing_notification_log order by id`
+  assertIds(platformNotifications, ['notif-org-a', 'notif-platform'], 'billing_notification_log platform sees every row unconditionally')
+
+  // Platform-private seller configuration. Both app AND worker are denied — unlike every other
+  // table above, the worker is not trusted here either, since this is the seller-of-record
+  // configuration that determines whose name appears on every receipt.
+  let appSellerProfilesDenied = false
+  try {
+    await app`select id from billing_seller_profiles`
+  } catch (error) {
+    appSellerProfilesDenied = error?.code === '42501'
+  }
+  if (!appSellerProfilesDenied) throw new Error('App role accessed billing_seller_profiles')
+  let workerSellerProfilesDenied = false
+  try {
+    await worker`select id from billing_seller_profiles`
+  } catch (error) {
+    workerSellerProfilesDenied = error?.code === '42501'
+  }
+  if (!workerSellerProfilesDenied) throw new Error('Worker role accessed billing_seller_profiles (platform-private, worker is not trusted here either)')
+  const platformSellerProfiles = await platform`select version from billing_seller_profiles`
+  if (platformSellerProfiles.length !== 1) throw new Error('Platform role could not read billing_seller_profiles')
+  let platformSellerProfileUpdateDenied = false
+  try {
+    await platform`update billing_seller_profiles set legal_name = 'hacked' where version = 999999`
+  } catch (error) {
+    platformSellerProfileUpdateDenied = error?.code === '42501'
+  }
+  if (!platformSellerProfileUpdateDenied) throw new Error('Platform role updated a billing_seller_profiles row (profiles are versioned insert-only, never edited)')
+
+  await tenantIsolation('billing_terms_acceptances', ['terms-a'], ['terms-b'])
+  let appTermsCrossTenantInsertDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`insert into billing_terms_acceptances (id, organization_id, actor_user_id, terms_version, privacy_version, commercial_action) values ('terms-cross', 'org-b', 'user-a', 'v1', 'v1', 'checkout_credits')`
+    })
+  } catch (error) {
+    appTermsCrossTenantInsertDenied = error?.code === '42501'
+  }
+  if (!appTermsCrossTenantInsertDenied) throw new Error('App role inserted a billing_terms_acceptances row under a spoofed organization')
+  let workerTermsInsertDenied = false
+  try {
+    await worker.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`insert into billing_terms_acceptances (id, organization_id, actor_user_id, terms_version, privacy_version, commercial_action) values ('terms-worker-hack', 'org-a', 'user-a', 'v1', 'v1', 'checkout_credits')`
+    })
+  } catch (error) {
+    workerTermsInsertDenied = error?.code === '42501'
+  }
+  if (!workerTermsInsertDenied) throw new Error('Worker role inserted a billing_terms_acceptances row (only the app role records a live consent)')
+
+  // No FK on organization_id (the organization is already gone by the time this row exists), and
+  // the sharpest permission split of any table here: the worker that writes this row cannot read it
+  // back, and the app role — which never touches financial records post-deletion — is denied
+  // outright. Only platform, auditing after the fact, can read it.
+  let appDeletionRecordsDenied = false
+  try {
+    await app`select id from organization_deletion_financial_records`
+  } catch (error) {
+    appDeletionRecordsDenied = error?.code === '42501'
+  }
+  if (!appDeletionRecordsDenied) throw new Error('App role accessed organization_deletion_financial_records')
+  const workerDeletionInsert = await worker`
+    insert into organization_deletion_financial_records (id, organization_id, organization_name, deletion_type, livemode)
+    values ('financial-record-worker', 'org-deleted-worker', 'Deleted Org Worker', 'immediate', false)
+    returning id
+  `
+  if (workerDeletionInsert.length !== 1) throw new Error('Worker role could not insert an organization_deletion_financial_records row')
+  let workerDeletionSelectDenied = false
+  try {
+    await worker`select id from organization_deletion_financial_records`
+  } catch (error) {
+    workerDeletionSelectDenied = error?.code === '42501'
+  }
+  if (!workerDeletionSelectDenied) throw new Error('Worker role read organization_deletion_financial_records back after writing it (write-only, by design)')
+  const platformDeletionRecords = await platform`select id from organization_deletion_financial_records order by id`
+  assertIds(platformDeletionRecords, ['financial-record-a', 'financial-record-worker'], 'organization_deletion_financial_records platform sees every row, no tenant filter exists')
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
     tenantB: tenantB.map((row) => row.id),
     crossTenantInsert: 'denied',
     poolReuse: 'clean',
+    anonymousPublicClaimRead: claimMissingNoContext.map((row) => row.id),
+    pendingClaimAnonymousRead: 'denied',
     claimSubjectIsolation: subjectClaims.map((row) => row.id),
     crossSubjectClaimInsert: 'denied',
     authProductAccess: 'denied',

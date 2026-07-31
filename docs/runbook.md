@@ -90,6 +90,7 @@ This table is just the operational cadence in one place:
 | Every 5 min | `curl -fsS -X POST -H "x-cron-secret: $CRON_SECRET" https://builderhunt.dev/api/admin/status/snapshot` |
 | Hourly | `.../api/admin/devpost/run-worker` (dark in prod — see `plans/phase-1/19-devpost-integration`) |
 | Per-plan cadence | `.../api/admin/discovery/run-worker`, `.../api/admin/enrichment/run-worker`, `.../api/admin/embeddings/run-worker`, `.../api/admin/alerts/run-worker`, `.../api/admin/billing/run-worker`, `.../api/admin/legal/run-worker`, `.../api/admin/sprints/run-worker` |
+| Daily | `.../api/admin/activity/run-retention` — sweeps expired `organization_activity` rows (plan 29 task 6) |
 
 Every `run-worker` endpoint accepts either a platform-admin session or
 `x-cron-secret: $CRON_SECRET` / `Authorization: Bearer $CRON_SECRET` (`tryCronPrincipal`) — the

@@ -54,7 +54,8 @@ try {
     insert into auth_users (id, name, email, email_verified, created_at, updated_at)
     values
       ('user-a', 'A', 'a@test.invalid', true, now(), now()),
-      ('user-b', 'B', 'b@test.invalid', true, now(), now())
+      ('user-b', 'B', 'b@test.invalid', true, now(), now()),
+      ('user-pending-claimant', 'Pending Claimant', 'pending-claimant@test.invalid', true, now(), now())
     on conflict (id) do nothing
   `
   await owner`
@@ -83,7 +84,8 @@ try {
     insert into builder_identities (id, source, source_id, username, profile_url, created_at, updated_at)
     values
       ('identity-a', 'github', 'a', 'a', 'https://github.com/a', now(), now()),
-      ('identity-b', 'github', 'b', 'b', 'https://github.com/b', now(), now())
+      ('identity-b', 'github', 'b', 'b', 'https://github.com/b', now(), now()),
+      ('identity-pending', 'github', 'pending-claim', 'pending-claim', 'https://github.com/pending-claim', now(), now())
     on conflict (source, source_id) do nothing
   `
   await owner`
@@ -100,7 +102,8 @@ try {
       id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, created_at
     ) values
       ('claim-a', 'identity-a', 'user-a', 'email', 'a@test.invalid', 'verified', now()),
-      ('claim-b', 'identity-b', 'user-b', 'email', 'b@test.invalid', 'verified', now())
+      ('claim-b', 'identity-b', 'user-b', 'email', 'b@test.invalid', 'verified', now()),
+      ('claim-pending', 'identity-pending', 'user-pending-claimant', 'email', 'pending@test.invalid', 'pending', now())
     on conflict (id) do nothing
   `
   await owner`
@@ -271,6 +274,159 @@ try {
     insert into document_extractions (id, organization_id, document_id, parser, parser_version, content_sha256, retention_expires_at)
     values ('ffffffff-0000-4000-8000-00000000000b', 'org-a', 'ffffffff-0000-4000-8000-00000000000a',
             'pdf', 'v1', repeat('b', 64), now() + interval '180 days')
+    on conflict (id) do nothing
+  `
+
+  // Stripe billing platform (plan 30) — the audit on 2026-07-31 found 16 of the 19 billing_* tables
+  // had no live-role RLS test at all (only billing_customers, billing_checkout_attempts, and
+  // billing_credit_reservations were exercised, and the latter two only for their write-permission
+  // shape, not ordinary SELECT isolation). Seeded here, in FK dependency order, so the verifier can
+  // assert against pre-existing rows the same way it already does for billing_customers.
+  await owner`
+    insert into billing_subscriptions (
+      id, organization_id, customer_id, livemode, catalog_key, tier, "interval", catalog_version,
+      stripe_subscription_id, stripe_status
+    ) values
+      ('sub-a', 'org-a', 'billing-cust-a', false, 'pro_monthly', 'pro', 'monthly', 1, 'sub_test_a', 'active'),
+      ('sub-b', 'org-b', 'billing-cust-b', false, 'pro_monthly', 'pro', 'monthly', 1, 'sub_test_b', 'active')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_credit_grants (
+      id, organization_id, source, original_units, remaining_units, state, expires_at
+    ) values
+      ('grant-a', 'org-a', 'pack', 1000, 1000, 'active', now() + interval '365 days'),
+      ('grant-b', 'org-b', 'pack', 1000, 1000, 'active', now() + interval '365 days')
+    on conflict (id) do nothing
+  `
+  // Distinct ids from the ad-hoc 'rls-unelevated'/'rls-elevated'/'rls-cross' rows the verifier
+  // inserts itself to prove the 0098 role-elevation write path — these are pre-seeded read fixtures.
+  await owner`
+    insert into billing_credit_reservations (
+      id, organization_id, operation, rate_card_version, idempotency_key, maximum_units, state,
+      deadline_at
+    ) values
+      ('credit-res-a', 'org-a', 'interview_live_transcription', 1, 'fixture-res-a', 10, 'reserved', now() + interval '1 hour'),
+      ('credit-res-b', 'org-b', 'interview_live_transcription', 1, 'fixture-res-b', 10, 'reserved', now() + interval '1 hour')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_credit_allocations (
+      id, organization_id, reservation_id, grant_id, allocated_units
+    ) values
+      ('alloc-a', 'org-a', 'credit-res-a', 'grant-a', 5),
+      ('alloc-b', 'org-b', 'credit-res-b', 'grant-b', 5)
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_ledger_entries (
+      id, organization_id, entry_type, grant_id, reservation_id, units_delta, source_idempotency_key
+    ) values
+      ('ledger-a', 'org-a', 'grant', 'grant-a', null, 1000, 'fixture-ledger-a'),
+      ('ledger-b', 'org-b', 'grant', 'grant-b', null, 1000, 'fixture-ledger-b')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_provider_usage (
+      id, organization_id, operation, reservation_id, units, estimated_cost_cents
+    ) values
+      ('provider-usage-a', 'org-a', 'interview_live_transcription', 'credit-res-a', 1, 10),
+      ('provider-usage-b', 'org-b', 'interview_live_transcription', 'credit-res-b', 1, 10)
+    on conflict (id) do nothing
+  `
+  // PK is organization_id itself — one row per org, no surrogate id.
+  await owner`
+    insert into billing_auto_recharge_rules (organization_id, owner_user_id, enabled, state)
+    values ('org-a', 'user-a', false, 'inactive'), ('org-b', 'user-b', false, 'inactive')
+    on conflict (organization_id) do nothing
+  `
+  // Seeded as already 'succeeded' with a real stripe_refund_id — a row that would fail the app
+  // role's own INSERT `WITH CHECK` (pending + null stripe_refund_id), so the read-isolation fixture
+  // cannot be mistaken for proof that the write-shape check works. The verifier proves that
+  // separately with its own ad-hoc insert, same pattern as billing_checkout_attempts.
+  await owner`
+    insert into billing_refunds (
+      id, organization_id, requested_by_user_id, idempotency_key, policy_decision, amount_cents,
+      stripe_refund_id, state
+    ) values
+      ('refund-a', 'org-a', 'user-a', 'fixture-refund-a', 'full_unused_pack', 500, 're_test_a', 'succeeded'),
+      ('refund-b', 'org-b', 'user-b', 'fixture-refund-b', 'full_unused_pack', 500, 're_test_b', 'succeeded')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_disputes (
+      id, organization_id, grant_id, stripe_dispute_id, stripe_payment_intent_id, amount_cents,
+      stripe_status
+    ) values
+      ('dispute-a', 'org-a', 'grant-a', 'dp_test_a', 'pi_test_a', 500, 'warning_needs_response'),
+      ('dispute-b', 'org-b', 'grant-b', 'dp_test_b', 'pi_test_b', 500, 'warning_needs_response')
+    on conflict (id) do nothing
+  `
+  // PK is organization_id itself, same shape as billing_auto_recharge_rules.
+  await owner`
+    insert into billing_contacts (organization_id, email, status, set_by_user_id)
+    values ('org-a', 'billing-a@test.invalid', 'verified', 'user-a'), ('org-b', 'billing-b@test.invalid', 'verified', 'user-b')
+    on conflict (organization_id) do nothing
+  `
+  await owner`
+    insert into billing_risk_events (id, organization_id, event_type, detail)
+    values
+      ('risk-event-a', 'org-a', 'payment_failure', 'fixture'),
+      ('risk-event-b', 'org-b', 'payment_failure', 'fixture')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_risk_exceptions (id, organization_id, reason, issued_by_user_id, expires_at)
+    values
+      ('risk-exc-a', 'org-a', 'fixture exception', 'user-a', now() + interval '30 days'),
+      ('risk-exc-b', 'org-b', 'fixture exception', 'user-b', now() + interval '30 days')
+    on conflict (id) do nothing
+  `
+  // System-operational: no organization_id at all. One row is enough to prove the app role has no
+  // grant whatsoever, and that worker/platform see it with no tenant scoping to prove.
+  await owner`
+    insert into billing_webhook_events (
+      id, livemode, stripe_event_id, api_version, object_type, event_type, payload_encrypted
+    ) values ('webhook-a', false, 'evt_test_a', '2024-01-01', 'invoice', 'invoice.paid', 'encrypted-fixture')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into billing_reconciliation_runs (id, window_start, window_end, counts_checked)
+    values ('recon-a', now() - interval '1 day', now(), '{}')
+    on conflict (id) do nothing
+  `
+  // No FK on organization_id — 'platform' is the documented cross-organization sentinel, not a real
+  // organizations.id. One row scoped to org-a, one using the sentinel, so the verifier can pin the
+  // policy's `org = current_setting(...) OR org = 'platform'` OR-branch precisely.
+  await owner`
+    insert into billing_notification_log (id, organization_id, notification_type, window_key)
+    values
+      ('notif-org-a', 'org-a', 'credit_expiry_30', 'fixture-window-org-a'),
+      ('notif-platform', 'platform', 'reconciliation_mismatch', 'fixture-window-platform')
+    on conflict (id) do nothing
+  `
+  // Platform-private, no organization scope at all — the app and worker roles have zero grant here.
+  await owner`
+    insert into billing_seller_profiles (
+      version, legal_name, public_business_address, establishment_country, support_email,
+      statement_descriptor, effective_at, created_by_user_id
+    ) values (999999, 'Fixture Seller', 'Fixture Address', 'US', 'support@test.invalid', 'FIXTURE', now(), 'user-a')
+    on conflict (version) do nothing
+  `
+  await owner`
+    insert into billing_terms_acceptances (id, organization_id, actor_user_id, terms_version, privacy_version, commercial_action)
+    values
+      ('terms-a', 'org-a', 'user-a', 'v1', 'v1', 'checkout_subscription'),
+      ('terms-b', 'org-b', 'user-b', 'v1', 'v1', 'checkout_subscription')
+    on conflict (id) do nothing
+  `
+  // Deliberately not FK'd to organizations — by the time this row exists the organization it
+  // describes has already been hard-deleted, which is why the id is a plain string that was never a
+  // real org.
+  await owner`
+    insert into organization_deletion_financial_records (
+      id, organization_id, organization_name, deletion_type, livemode
+    ) values ('financial-record-a', 'org-deleted-a', 'Deleted Org A', 'scheduled', false)
     on conflict (id) do nothing
   `
 

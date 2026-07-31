@@ -28,6 +28,7 @@ const publicAllowlist = new Map([
   ['src/routes/api/analytics/conversion.ts', 'fires from anonymous landing/explore/signup pages by design; validates a closed event schema server-side and never reads/returns tenant or account data'],
   ['src/routes/api/privacy/profile-removal.ts', 'deliberately unauthenticated — the person requesting removal need not have a BuilderHunt account; IP+profile rate-limited, and possessing the returned challenge is the only thing the verify step accepts as authorization'],
   ['src/routes/api/privacy/profile-removal/verify.ts', 'deliberately unauthenticated — matching the caller-supplied challenge against its stored hash IS the authorization check (see profile-removal.ts); rate-limited per (ip, requestId)'],
+  ['src/routes/api/status/subscribe.ts', 'deliberately unauthenticated public subscribe/unsubscribe form; IP rate-limited, anti-enumeration response shape, and the unsubscribe GET is itself the authorization check (token hash match)'],
 ])
 
 const guardPatterns = [

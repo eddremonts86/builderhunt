@@ -30,7 +30,7 @@ this phase touches.
 ## Phase 1 — Dashboard shell (blocks: every other authenticated page's nav)
 
 - [x] **Rebuild `DashboardLayout` topbar for narrow viewports**
-  - Files: `src/modules/dashboard/ui/shell/DashboardLayout.tsx`
+  - Files: `src/modules/dashboard/ui/shell/MobileNavDrawer.tsx`, `src/modules/dashboard/ui/shell/ContextTopbar.tsx` (Reality check 2026-07-31: `DashboardLayout.tsx` itself was superseded by an unrelated later "two-level nav shell" rewrite — it now only composes `AreaRail`/`AreaPanel`/`MobileNavDrawer`/`ContextTopbar` from `nav-config.ts` rather than containing this task's collapse logic directly. The feature is still real and still responsive below `lg`; only the file citation was wrong.)
   - Do: below `md` (768px), collapse `Search`/`Sprints`/`Exports`/`Alerts` into the Phase 0-decided
     pattern (hamburger/sheet by default); keep `Dashboard`'s home-anchor pill, `OrganizationSwitcher`,
     and `UserMenu` always visible and always reachable without opening a second menu first. Remove

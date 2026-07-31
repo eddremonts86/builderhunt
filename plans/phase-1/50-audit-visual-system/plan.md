@@ -52,7 +52,7 @@ smoke at mobile and desktop sizes after merge.
 | Static contract | No prohibited raw color/radius/shadow/`!important` in audited files.                     |
 | Primitive unit  | Variant, size, focus, disabled/loading, and reduced-motion tests pass.                   |
 | Structure       | No page overflow; same-row cards ≤1 px delta; controls ±1 px of token height.            |
-| Visual          | Every committed Chromium snapshot is within 0.2% diff.                                   |
+| Visual          | Every committed Chromium snapshot is within 1% diff (`maxDiffPixelRatio: 0.01` — see spec.md). |
 | Accessibility   | Existing keyboard/focus/contrast tests remain green after visual changes.                |
 | Runtime         | Production mobile/desktop screenshots, local fonts, theme metadata, and navigation pass. |
 

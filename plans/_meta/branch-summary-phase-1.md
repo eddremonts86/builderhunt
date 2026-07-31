@@ -93,7 +93,9 @@ as `/api/lists/*`.
 `8bdd849` `test(sprints): cross-organization isolation matrix` —
 5 tests covering application-layer tenant boundary on
 `sourcing_sprints` (RLS verified separately by
-`tests/unit/security/rls.test.ts`).
+`scripts/db/verify-rls-local.mjs`, run via `pnpm test:rls:local` —
+`tests/unit/security/rls.test.ts` was cited here and in two other
+plans' tasks.md but never existed; corrected 2026-07-31).
 
 ### Bugfix
 

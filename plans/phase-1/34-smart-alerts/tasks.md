@@ -92,8 +92,8 @@
     `maxOutputTokens: 128`.
   - Verified: `pnpm vitest run tasks.test.ts` — dedicated registry test + the generic
     registry-integrity checks all pass.
-- [x] **Worker integration (best-effort)** — **skipped this session**
-  - Files: `src/lib/alerts/worker.ts`, `src/shared/lib/email.ts`
+- [x] **Worker integration (best-effort)**
+  - Files: `src/lib/alerts/worker.ts`, `src/shared/lib/email.ts`, `tests/unit/lib/alerts/worker.test.ts`
   - Do: In the worker, before sending a digest, budget-check the recipient; call the registered AI
     digest task; pass its result into `sendAlertDigestEmail` as the optional `summary` argument; wrap
     the whole call in try/catch so any failure falls back to the plain digest rather than dropping
@@ -102,9 +102,12 @@
     still sends when the AI task throws, and one that asserts `summary` reaches
     `sendAlertDigestEmail` when it resolves. Then trigger the worker route locally and confirm one
     email lands in the dev outbox with the summary block present.
-  - Why still open: `src/shared/lib/email.ts` was a reserved file when this was written. Nothing
-    calls the digest task today, so there is no half-finished behavior in production — leaving it
-    unwired indefinitely is safe.
+  - Reality check (2026-07-31): the wiring existed but called `ai('alert_digest_summary', ...)` —
+    underscores — against a task registered as `'alert-digest-summary'` (hyphens), so every call
+    silently no-opped through the plain-digest fallback and the AI summary never fired for any user.
+    Fixed the id mismatch and wrote `tests/unit/lib/alerts/worker.test.ts` (the file this task had
+    always cited as its verification but that never actually existed on disk) with the exact two
+    cases specified above, plus a third for the `AI_DISABLED_TASKS` kill switch. All 3 pass.
   - Progress (2026-07-29): wired. The digest loop now wraps the AI
     call in try/catch and falls back to the plain digest on any
     failure. The task is registered (`alert_digest_summary`,

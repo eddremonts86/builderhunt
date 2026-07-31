@@ -1,4 +1,5 @@
 import { and, eq, sql } from 'drizzle-orm'
+import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import type { EnrichmentEvidencePayload, EnrichmentTarget } from '~/lib/enrichment/types'
 import { withWorkerOrganization } from './alerts-worker'
 import { enrichmentEvidence, enrichmentJobs, builderIdentities, organizationBuilders } from '../db/schema'
@@ -23,8 +24,10 @@ export interface ClaimedEnrichmentJob {
 export async function claimDueEnrichmentJobs(
   limit: number,
   leaseSeconds: number,
+  options: { db?: PostgresJsDatabase } = {},
 ): Promise<ClaimedEnrichmentJob[]> {
-  return workerDb.transaction(async (tx) => {
+  const db = options.db ?? workerDb
+  return db.transaction(async (tx) => {
     const due = await tx.execute(sql`
       select id, organization_id, builder_identity_id, requested_connectors, submitted_urls, attempt_count
       from enrichment_jobs

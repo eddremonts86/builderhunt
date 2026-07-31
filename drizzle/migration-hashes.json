@@ -436,6 +436,18 @@
     "0108_status_subscribers": {
       "sql": "d3f4e0b3c91b17c348b9776184f184f3e9b048c6b69822290e3aca935a0a409d",
       "snapshot": "dab6ae63dd8ee52124f1ea7d7935b07901f65d46471bedf2c5faaaa43e934e0a"
+    },
+    "0109_builder_lists_grants": {
+      "sql": "ac87f41b058957ba246faf9ad25a22c9ba33f6caf0ec896a5b53f9f8b3d9a009",
+      "snapshot": "37139790fd6f71d7f83c0cf719301dd2b75bb802e75b118defce418047fe06cf"
+    },
+    "0110_public_select_policies_backfill": {
+      "sql": "fc20c5c55bc912ca73132d5d69f5b0f75a0c49fcc7319d92faa2be3108ed2dce",
+      "snapshot": "79069a712773ab45d96968846671b39571b59958ee31186bb38459c6f1b77ef2"
+    },
+    "0111_builder_claims_public_portfolio_select": {
+      "sql": "8719fda911c51612914f7322d7b3d87b9ef2b139b88c598c2a4714b35601121f",
+      "snapshot": "4556c8474bbca279e119f69d48d66cd31b4837ee04d3dd53afe2393585af517d"
     }
   }
 }

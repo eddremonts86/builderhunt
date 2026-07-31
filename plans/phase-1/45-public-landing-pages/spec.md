@@ -8,7 +8,9 @@
 > `/explore` with meta + `ItemList` JSON-LD (`src/routes/_landing/explore/index.tsx`), PNG OG
 > images (`src/routes/api/og/explore.tsx`, resvg), `sitemap.xml`/`robots.txt` routes, site-wide
 > `WebSite`+`Organization` JSON-LD (`src/routes/__root.tsx:75-94`), `/pricing`, `/blog`.
-> **No public radars** (`public_radars` is not in `schema.ts`).
+> **Public radars are built** (`publicRadars` pgTable, `src/shared/lib/db/schema.ts:376`, per
+> `tasks.md`'s "Schema: `public_radars` table" task — this line said "not built" long after it
+> shipped; corrected 2026-07-31).
 
 ## Problem
 
@@ -58,9 +60,8 @@ Every public page indexable with correct meta/OG/structured data, a complete sit
 2. **Blog posts have no OG image**: `src/routes/_landing/blog/$slug.tsx:13-25` sets
    `og:title/description/type/url` but no `og:image` (grep confirms), and the only OG
    generator is `api/og/explore.tsx`. Shared posts render without preview images.
-3. **Public radars not built**: the spec's `/r/$id` shareable saved-search pages and the
-   `public_radars` table do not exist (`_meta/app-reality.md`: not in schema). This remains
-   the one genuinely new feature in this plan — opt-in, private by default.
+3. **Public radars are built**: the `public_radars` table exists (`src/shared/lib/db/schema.ts:376`)
+   per `tasks.md`. This line said "not built" long after that shipped; corrected 2026-07-31.
 
 ## Public radars design (phase 2)
 

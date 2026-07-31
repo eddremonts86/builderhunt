@@ -227,15 +227,15 @@ export async function runAlertsWorker(): Promise<AlertsWorkerResult> {
       try {
         const { ai } = await import('~/shared/lib/ai/client')
         const { env } = await import('~/shared/lib/env')
-        if (env.AI_DISABLED === 'true' || env.AI_DISABLED_TASKS.split(',').includes('alert_digest_summary')) {
+        if (env.AI_DISABLED === 'true' || env.AI_DISABLED_TASKS.split(',').includes('alert-digest-summary')) {
           // Skip: a budget check would require the user's full principal
           // and entitlement tier, which the worker does not hold. The
           // ai() call below fails closed (returns a budget error reason)
           // when the user's daily allowance is spent, and the outer
           // try/catch logs and falls back to the plain digest.
-          throw new Error('alert_digest_summary disabled by env')
+          throw new Error('alert-digest-summary disabled by env')
         }
-        const result = await ai<{ summary: string }>('alert_digest_summary', { items: items.map((item) => ({
+        const result = await ai<{ summary: string }>('alert-digest-summary', { items: items.map((item) => ({
           alertName: item.alertName,
           username: item.username,
           source: item.source,

@@ -106,7 +106,9 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
           }
           const teamSource = parsedBody.data?.teamSource ?? 'tracked'
 
-          const teammates: TeamMemberRow[] = await withTenantContext(principal, async (tx) => {
+          // null is the "list not visible to this principal" sentinel — distinct from an empty
+          // (but real) team, so a bad/foreign orgListId returns 404, not a silent teamTooSmall.
+          const teammates: TeamMemberRow[] | null = await withTenantContext(principal, async (tx) => {
             if (teamSource === 'tracked') {
               const teamRows = await listOrganizationBuildersForTeamAggregate(
                 tx,
@@ -121,7 +123,7 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
             // list itself. A peer who can read the list can use it as
             // a team source; a non-member gets 404 (anti-enumeration).
             const list = await findVisibleBuilderListById(tx, principal, teamSource.orgListId)
-            if (!list) return []
+            if (!list) return null
             const items = await listItemsForList(tx, principal, teamSource.orgListId)
             // For each item, look up the org-side builder row to get
             // the same shape `buildTeamAggregate` consumes.
@@ -139,6 +141,10 @@ export const Route = createFileRoute('/api/builders/$builderId/synergy')({
             }
             return rows
           })
+
+          if (teammates === null) {
+            return Response.json({ error: 'Builder list not found' }, { status: 404 })
+          }
 
           if (teammates.length < 2) {
             return Response.json({ teamTooSmall: true })
