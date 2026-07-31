@@ -121,6 +121,13 @@ export const BuilderListDeletedMetadata = z.object({
   listName: z.string().min(1).max(120),
 }).strict().refine(noSensitiveCanaries, { message: 'metadata contains a sensitive canary' })
 
+export const BuilderListUpdatedMetadata = z.object({
+  listId: z.string().min(1).max(64),
+  listName: z.string().min(1).max(120),
+  visibility: z.enum(['private', 'organization']),
+  visibilityChanged: z.boolean(),
+}).strict().refine(noSensitiveCanaries, { message: 'metadata contains a sensitive canary' })
+
 export const AlertCreatedMetadata = z.object({
   alertId: z.string().min(1).max(64),
   alertName: z.string().min(1).max(120),
@@ -204,6 +211,17 @@ export const ACTIVITY_EVENTS = {
     target: 'soft',
     metadata: BuilderListDeletedMetadata,
     format: (m: z.infer<typeof BuilderListDeletedMetadata>) => `Deleted shortlist "${m.listName}"`,
+    retentionDays: 365,
+  },
+  builder_list_updated: {
+    type: 'builder_list_updated',
+    version: 1,
+    criticality: 'transaction_critical',
+    target: 'hard',
+    metadata: BuilderListUpdatedMetadata,
+    format: (m: z.infer<typeof BuilderListUpdatedMetadata>) => m.visibilityChanged
+      ? `Changed "${m.listName}" to ${m.visibility === 'organization' ? 'team-visible' : 'private'}`
+      : `Updated shortlist "${m.listName}"`,
     retentionDays: 365,
   },
   alert_created: {

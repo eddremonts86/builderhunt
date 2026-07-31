@@ -105,6 +105,70 @@ export async function createBuilderList(
   return list
 }
 
+export interface UpdateBuilderListInput {
+  expectedVersion: number
+  name?: string
+  description?: string | null
+  visibility?: 'private' | 'organization'
+}
+
+/**
+ * Versioned rename/description/visibility edit (plans/UI/tasks.md Wave 2 "Shortlist metadata and
+ * visibility editing"). Same permission shape as delete — creator, or an elevated (owner/admin)
+ * member of an organization-visible list — since narrowing a shared list's visibility to private
+ * or renaming it out from under the team is exactly the kind of change a plain member should not
+ * make unilaterally.
+ *
+ * Throws `SharedResourceError('version_conflict', …, 409)` when `expectedVersion` no longer
+ * matches — the UPDATE's own WHERE clause is the single source of truth for that, not a separate
+ * read-then-compare, so a race between two concurrent edits can never both "succeed".
+ */
+export async function updateBuilderListForPrincipal(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  listId: string,
+  input: UpdateBuilderListInput,
+) {
+  const list = await findVisibleBuilderListById(transaction, principal, listId)
+  if (!list) throw new SharedResourceError('not_found', 'Builder list not found', 404)
+  if (!can(principal, 'resource:update', {
+    creatorUserId: list.createdByUserId,
+    visibility: list.visibility === 'organization' ? 'organization' : 'private',
+  })) {
+    throw new SharedResourceError('forbidden', 'Not allowed to edit this builder list', 403)
+  }
+
+  const visibilityChanged = input.visibility !== undefined && input.visibility !== list.visibility
+  const [updated] = await transaction
+    .update(builderLists)
+    .set({
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+      version: sql`${builderLists.version} + 1`,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(builderLists.id, listId), eq(builderLists.version, input.expectedVersion)))
+    .returning()
+
+  if (!updated) {
+    throw new SharedResourceError('version_conflict', 'This shortlist changed while you were editing. Reload to see the newer version.', 409)
+  }
+
+  await emitActivity(transaction, principal, {
+    type: 'builder_list_updated',
+    targetKey: updated.id,
+    metadata: {
+      listId: updated.id,
+      listName: updated.name,
+      visibility: updated.visibility,
+      visibilityChanged,
+    },
+  })
+
+  return updated
+}
+
 export async function deleteBuilderListForPrincipal(
   transaction: TenantTransaction,
   principal: TenantPrincipal,

@@ -98,6 +98,14 @@ try {
     on conflict (organization_id, builder_identity_id) do nothing
   `
   await owner`
+    insert into builder_lists (
+      id, organization_id, created_by_user_id, name, description, visibility, version, created_at, updated_at
+    ) values
+      ('list-a', 'org-a', 'user-a', 'List A', null, 'private', 1, now(), now()),
+      ('list-b', 'org-b', 'user-b', 'List B', null, 'private', 1, now(), now())
+    on conflict (id) do nothing
+  `
+  await owner`
     insert into builder_claims (
       id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, created_at
     ) values

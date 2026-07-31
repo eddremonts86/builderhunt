@@ -1402,6 +1402,36 @@ try {
   const platformDeletionRecords = await platform`select id from organization_deletion_financial_records order by id`
   assertIds(platformDeletionRecords, ['financial-record-a', 'financial-record-worker'], 'organization_deletion_financial_records platform sees every row, no tenant filter exists')
 
+  // plans/UI/tasks.md Wave 2 "Shortlist metadata and visibility editing" added the first UPDATE
+  // ever issued against builder_lists — 0109_builder_lists_grants.sql only granted SELECT/INSERT/
+  // DELETE to builderhunt_app because nothing updated this table at the time. Found here (not by a
+  // unit test, which runs as the migration superuser and would have shown the write as "successful"
+  // for the wrong reason) by running the actual repository function against this exact role.
+  const [renamedListA] = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`
+      update builder_lists set name = 'List A (renamed)', version = version + 1
+      where id = 'list-a' and version = 1
+      returning id, name, version
+    `
+  })
+  if (!renamedListA || renamedListA.name !== 'List A (renamed)' || renamedListA.version !== 2) {
+    throw new Error('App role could not UPDATE its own tenant\'s builder_lists row')
+  }
+
+  // A cross-tenant UPDATE's WHERE clause matches 0 rows under RLS — the same "no such row from
+  // here" shape as every other cross-tenant access in this file — so the real assertion is that
+  // org-b's row is untouched, not that the statement itself throws.
+  await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    await transaction`update builder_lists set name = 'hijacked' where id = 'list-b'`
+  })
+  const listBUnchanged = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-b', true)`
+    return transaction`select name from builder_lists where id = 'list-b'`
+  })
+  if (listBUnchanged[0]?.name !== 'List B') throw new Error("Cross-tenant UPDATE reached another organization's builder_lists row")
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
@@ -1460,6 +1490,8 @@ try {
     availabilityPolicyAdminRead: 'denied',
     availabilityPolicyForeignWrite: 'denied',
     workerCandidateWrite: 'denied',
+    appBuilderListUpdate: renamedListA.name,
+    appBuilderListCrossTenantUpdate: 'no-op (0 rows under RLS)',
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end(), capability?.end()].filter(Boolean))

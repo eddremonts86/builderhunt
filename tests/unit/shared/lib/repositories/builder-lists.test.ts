@@ -11,6 +11,7 @@ import {
   listItemsForList,
   listVisibleBuilderLists,
   removeItemFromListForPrincipal,
+  updateBuilderListForPrincipal,
 } from '~/shared/lib/repositories/builder-lists'
 import { SharedResourceError } from '~/shared/lib/shared-resources/contracts'
 
@@ -158,5 +159,81 @@ describe('builder lists tenant repository (plan 28 task 4)', () => {
     const after = await db.transaction((tx) =>
       findVisibleBuilderListById(tx, principal('bl-u-a', 'bl-org-a', 'owner'), id))
     expect(after).toBeNull()
+  })
+
+  describe('updateBuilderListForPrincipal', () => {
+    it('renames, updates description and visibility, and bumps the version', async () => {
+      const created = (await db.transaction((tx) => createBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), {
+        name: 'original name',
+        description: 'original description',
+        visibility: 'private',
+      })))!
+      expect(created.version).toBe(1)
+
+      const updated = await db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), created.id, {
+        expectedVersion: created.version,
+        name: 'renamed',
+        description: 'new description',
+        visibility: 'organization',
+      }))
+      expect(updated.name).toBe('renamed')
+      expect(updated.description).toBe('new description')
+      expect(updated.visibility).toBe('organization')
+      expect(updated.version).toBe(2)
+    })
+
+    it('rejects a stale expectedVersion with a 409 version_conflict', async () => {
+      const created = (await db.transaction((tx) => createBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), {
+        name: 'versioned',
+        description: null,
+        visibility: 'private',
+      })))!
+      await db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), created.id, {
+        expectedVersion: created.version,
+        name: 'first edit',
+      }))
+
+      await expect(
+        db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), created.id, {
+          expectedVersion: created.version, // stale — the first edit already bumped it to 2
+          name: 'second edit',
+        })),
+      ).rejects.toMatchObject({ code: 'version_conflict', status: 409 })
+    })
+
+    it('a plain member cannot edit a private list they did not create', async () => {
+      const created = (await db.transaction((tx) => createBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), {
+        name: 'private list',
+        description: null,
+        visibility: 'private',
+      })))!
+      await expect(
+        db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-b', 'bl-org-a', 'member'), created.id, {
+          expectedVersion: created.version,
+          name: 'hijacked',
+        })),
+      ).rejects.toBeInstanceOf(SharedResourceError)
+    })
+
+    it('a plain member cannot edit an organization-visible list either — only creator or an elevated member', async () => {
+      const created = (await db.transaction((tx) => createBuilderListForPrincipal(tx, principal('bl-u-a', 'bl-org-a', 'owner'), {
+        name: 'shared list',
+        description: null,
+        visibility: 'organization',
+      })))!
+      await expect(
+        db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-b', 'bl-org-a', 'member'), created.id, {
+          expectedVersion: created.version,
+          name: 'hijacked',
+        })),
+      ).rejects.toBeInstanceOf(SharedResourceError)
+
+      // An elevated (owner/admin) member of the same org CAN, even though they didn't create it.
+      const byAdmin = await db.transaction((tx) => updateBuilderListForPrincipal(tx, principal('bl-u-b', 'bl-org-a', 'admin'), created.id, {
+        expectedVersion: created.version,
+        name: 'edited by admin',
+      }))
+      expect(byAdmin.name).toBe('edited by admin')
+    })
   })
 })

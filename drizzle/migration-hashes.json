@@ -448,6 +448,18 @@
     "0111_builder_claims_public_portfolio_select": {
       "sql": "8719fda911c51612914f7322d7b3d87b9ef2b139b88c598c2a4714b35601121f",
       "snapshot": "4556c8474bbca279e119f69d48d66cd31b4837ee04d3dd53afe2393585af517d"
+    },
+    "0112_builder_lists_version": {
+      "sql": "d43240f3a5497b44e46e7d3c62976e229672f5ed40ad3c72380223b2bea7696b",
+      "snapshot": "001302e3d699f677cf5ef786060297333fdedca3ad1b922dcc278024dd23aba1"
+    },
+    "0113_organization_activity_builder_list_updated": {
+      "sql": "34a8b2059b1a85005f262fa7bd4dbc3675d60ee5860c78c913a1de09cf2a4406",
+      "snapshot": "8cce89ee6a0c3cc68025fbfeb1c8254d90a591d33dafc11a4d3a43aeac97fc0a"
+    },
+    "0114_builder_lists_update_grant": {
+      "sql": "b705e5c535a3d5e8f9e22d2584eb1e81f6feeb13b3741621719984a6125870e4",
+      "snapshot": "a7c37cb6ed049a60f142dbe30e210ef3f4a1d393801f4a43bc61884eb419b3ce"
     }
   }
 }

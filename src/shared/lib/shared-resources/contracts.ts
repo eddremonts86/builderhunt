@@ -136,6 +136,7 @@ export type SharedResourceErrorCode =
   | 'invalid_identity'
   | 'rate_limited'
   | 'plan_lapsed'
+  | 'version_conflict'
 
 export class SharedResourceError extends Error {
   constructor(

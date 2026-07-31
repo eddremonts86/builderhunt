@@ -276,7 +276,12 @@ test.describe('crawler surfaces', () => {
       expect(body).toContain('User-agent: *')
       expect(body).toContain('Allow: /explore')
       expect(body).toContain('Disallow: /api/')
-      expect(body).toContain('Disallow: /dashboard/')
+      // Bare, not `/dashboard/` — plans/UI/tasks.md Wave 1 fixed this to actually block the real
+      // route (`/dashboard`, no trailing slash); the old trailing-slash form never matched it, and
+      // every other authenticated top-level area (derived from the nav registry) is covered too.
+      expect(body).toContain('Disallow: /dashboard')
+      expect(body).toContain('Disallow: /search')
+      expect(body).toContain('Disallow: /admin')
       expect(body).toContain('User-agent: GPTBot')
       expect(body).toContain(`Sitemap: ${canonicalOrigin()}/sitemap.xml`)
     } finally {

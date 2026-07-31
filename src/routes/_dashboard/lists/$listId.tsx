@@ -11,7 +11,6 @@ import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import {
   ListDetailPage,
   type BuilderListDetail,
-  type BuilderListItemDetail,
 } from '~/modules/dashboard/components/ListDetailPage'
 
 interface ListDetailBeforeLoadContext {
@@ -41,6 +40,7 @@ function ListDetailRoute() {
     name: '',
     description: null,
     visibility: 'private',
+    version: 1,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   }

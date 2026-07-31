@@ -1,20 +1,20 @@
 /**
- * List detail page — plan 28 (shared-resources) task 8.
+ * List detail page — plan 28 (shared-resources) task 8; edit dialog added by
+ * plans/UI/tasks.md Wave 2 "Shortlist metadata and visibility editing".
  *
- * Shows the members of a builder shortlist and lets a member of the
- * owning organization remove entries. The page is read-only for the
- * list metadata (name, description, visibility are set at create
- * time on the index page; editing those is a future task). Removing
- * an item is allowed for any organization member when the list is
- * organization-visible, and for the creator at any visibility — the
- * server endpoint at `/api/lists/:id/items/:itemId` enforces the
- * real boundary.
+ * Shows the members of a builder shortlist and lets an authorized member edit
+ * its metadata or remove entries. Both actions share the same permission
+ * shape as the server (`resource:update` — creator, or an elevated owner/admin
+ * member of an organization-visible list), computed by `canEditList` below so
+ * the button a viewer sees always matches what `/api/lists/:id` will actually
+ * accept.
  */
 import * as React from 'react'
 import { useNavigate, useParams, useLocation, Link } from '@tanstack/react-router'
-import { ArrowLeft, Lock, Search, Trash2, Users, UserMinus } from 'lucide-react'
-import { Button } from '~/components/ui/button'
+import { AlertTriangle, ArrowLeft, Lock, Pencil, Search, Trash2, Users, UserMinus } from 'lucide-react'
+import { Button, Dialog, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '~/components/ui'
 import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
+import { can, type TenantPrincipal } from '~/shared/lib/authorization/permissions'
 import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 
 export interface BuilderListDetail extends Record<string, unknown> {
@@ -24,6 +24,7 @@ export interface BuilderListDetail extends Record<string, unknown> {
   name: string
   description: string | null
   visibility: 'private' | 'organization'
+  version: number
   createdAt: string
   updatedAt: string
 }
@@ -51,16 +52,30 @@ export interface ListDetailPageProps {
   currentUser: { userId: string; role: 'owner' | 'admin' | 'member' }
 }
 
+function toPrincipal(list: BuilderListDetail, currentUser: { userId: string; role: 'owner' | 'admin' | 'member' }): TenantPrincipal {
+  return { userId: currentUser.userId, organizationId: list.organizationId, role: currentUser.role, requestId: 'client' }
+}
+
+/** Same check the server's `resource:update`/`resource:delete` boundary makes — creator always, or an elevated (owner/admin) member when the list is organization-visible. A plain member of a shared list can see it but not edit or remove from it. */
+function canEditList(
+  list: BuilderListDetail,
+  currentUser: { userId: string; role: 'owner' | 'admin' | 'member' },
+): boolean {
+  return can(toPrincipal(list, currentUser), 'resource:update', {
+    creatorUserId: list.createdByUserId,
+    visibility: list.visibility === 'organization' ? 'organization' : 'private',
+  })
+}
+
 function canRemoveFromList(
   list: BuilderListDetail,
   _item: BuilderListItemDetail,
   currentUser: { userId: string; role: 'owner' | 'admin' | 'member' },
 ): boolean {
-  // Creator can always remove their own list's items.
-  if (list.createdByUserId === currentUser.userId) return true
-  // Organization-visible lists: any member can curate.
-  if (list.visibility === 'organization') return true
-  return false
+  return can(toPrincipal(list, currentUser), 'resource:delete', {
+    creatorUserId: list.createdByUserId,
+    visibility: list.visibility === 'organization' ? 'organization' : 'private',
+  })
 }
 
 export function ListDetailPage({ initialList, initialItems, currentUser }: ListDetailPageProps) {
@@ -119,7 +134,67 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
     }
   }
 
+  const [editOpen, setEditOpen] = React.useState(false)
+  const [editName, setEditName] = React.useState(list.name)
+  const [editDescription, setEditDescription] = React.useState(list.description ?? '')
+  const [editVisibility, setEditVisibility] = React.useState<'private' | 'organization'>(list.visibility)
+  const [editSaving, setEditSaving] = React.useState(false)
+  const [editError, setEditError] = React.useState<string | null>(null)
+  const [editConflict, setEditConflict] = React.useState(false)
+
+  const openEdit = () => {
+    setEditName(list.name)
+    setEditDescription(list.description ?? '')
+    setEditVisibility(list.visibility)
+    setEditError(null)
+    setEditConflict(false)
+    setEditOpen(true)
+  }
+
+  const saveEdit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setEditSaving(true)
+    setEditError(null)
+    setEditConflict(false)
+    try {
+      const res = await fetch(`/api/lists/${listId}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          expectedVersion: list.version,
+          name: editName.trim(),
+          description: editDescription.trim() || null,
+          visibility: editVisibility,
+        }),
+      })
+      if (res.status === 409) {
+        setEditConflict(true)
+        return
+      }
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setEditError(body.message ?? 'Could not save changes. Please try again.')
+        return
+      }
+      setList(body as BuilderListDetail)
+      setEditOpen(false)
+    } catch {
+      setEditError('Could not save changes. Please try again.')
+    } finally {
+      setEditSaving(false)
+    }
+  }
+
+  const reloadAfterConflict = async () => {
+    await load()
+    setEditConflict(false)
+    setEditOpen(false)
+  }
+
   const isShared = list.visibility === 'organization'
+  const canEdit = canEditList(list, currentUser)
+  const visibilityWillChange = editVisibility !== list.visibility
 
   return (
     <div data-testid="list-detail-page">
@@ -147,11 +222,90 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
             {isShared ? <Users className="w-3 h-3" aria-hidden="true" /> : <Lock className="w-3 h-3" aria-hidden="true" />}
             {isShared ? 'Team' : 'Private'}
           </span>
+          {canEdit && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={openEdit}
+              className="ml-auto"
+              data-testid="list-edit-open"
+            >
+              <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              Edit
+            </Button>
+          )}
         </div>
         {list.description && (
           <p className="text-sm text-bh-text-muted">{list.description}</p>
         )}
       </header>
+
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} title="Edit shortlist">
+        <form onSubmit={saveEdit} className="space-y-4" data-testid="list-edit-form">
+          <div>
+            <label htmlFor="list-edit-name" className="block text-xs font-medium text-bh-text-muted mb-1">Name</label>
+            <Input
+              id="list-edit-name"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+              maxLength={120}
+              data-testid="list-edit-name"
+            />
+          </div>
+          <div>
+            <label htmlFor="list-edit-description" className="block text-xs font-medium text-bh-text-muted mb-1">Description</label>
+            <Textarea
+              id="list-edit-description"
+              value={editDescription}
+              onChange={(e) => setEditDescription(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              data-testid="list-edit-description"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-bh-text-muted mb-1">Visibility</label>
+            <Select value={editVisibility} onValueChange={(v) => setEditVisibility(v as 'private' | 'organization')}>
+              <SelectTrigger data-testid="list-edit-visibility">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="private">Private — only you</SelectItem>
+                <SelectItem value="organization">Team — anyone in your organization</SelectItem>
+              </SelectContent>
+            </Select>
+            {visibilityWillChange && (
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-bh-warning" role="alert" data-testid="list-edit-visibility-warning">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" aria-hidden="true" />
+                {editVisibility === 'organization'
+                  ? 'Making this shortlist team-visible lets any member of your organization see and manage its builders.'
+                  : 'Making this shortlist private hides it from your team — members who could see it will lose access immediately.'}
+              </p>
+            )}
+          </div>
+
+          {editConflict && (
+            <p className="text-xs text-bh-danger" role="alert" data-testid="list-edit-conflict">
+              This shortlist changed while you were editing.{' '}
+              <button type="button" className="underline font-medium" onClick={reloadAfterConflict}>
+                Reload to see the newer version
+              </button>.
+            </p>
+          )}
+          {editError && (
+            <p className="text-xs text-bh-danger" role="alert">{editError}</p>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button type="submit" variant="primary" size="sm" disabled={editSaving || editName.trim().length === 0} data-testid="list-edit-save">
+              {editSaving ? 'Saving…' : 'Save changes'}
+            </Button>
+          </div>
+        </form>
+      </Dialog>
 
       {loadError && (
         <p className="text-sm text-bh-danger mb-4" role="alert">{loadError}</p>

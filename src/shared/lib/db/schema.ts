@@ -198,6 +198,10 @@ export const builderLists = pgTable(
     name: text('name').notNull(),
     description: text('description'),
     visibility: text('visibility').notNull().default('private'),
+    // Optimistic concurrency for the rename/description/visibility PATCH (plans/UI/tasks.md Wave 2
+    // "Shortlist metadata and visibility editing") — same shape as every other versioned resource
+    // in this schema (e.g. interview_sessions, calendar_availability_policies).
+    version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -3097,6 +3101,7 @@ export const organizationActivity = pgTable(
     check('organization_activity_type_known', sql`${table.type} in (
       'saved_query_created','saved_query_visibility_changed','saved_query_deleted',
       'builder_list_created','builder_list_item_added','builder_list_item_removed','builder_list_deleted',
+      'builder_list_updated',
       'alert_created','feed_capability_minted','feed_capability_revoked'
     )`),
   ],
