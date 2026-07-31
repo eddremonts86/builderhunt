@@ -168,7 +168,14 @@ export function ExportsPage() {
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm text-bh-text truncate">{b.displayName ?? b.username}</p>
+                  <LinkComponent
+                    to="/builder/$builderId"
+                    params={{ builderId: b.id }}
+                    className="font-medium text-sm text-bh-text truncate hover:text-bh-accent hover:underline block"
+                    data-testid={`tracked-builder-open-${b.id}`}
+                  >
+                    {b.displayName ?? b.username}
+                  </LinkComponent>
                   <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
                     <span className={`badge badge-${b.source} text-[10px] px-1.5 py-0 shrink-0`}>{b.source}</span>
                     <p className="text-xs text-bh-text-muted truncate">
