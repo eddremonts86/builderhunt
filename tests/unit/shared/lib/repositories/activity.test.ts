@@ -3,7 +3,7 @@
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
-import { authUsers, organizations, organizationMembers, organizationActivity } from '~/shared/lib/db/schema'
+import { authUsers, organizations, organizationMembers, organizationActivity, builderLists, savedQueries, alerts } from '~/shared/lib/db/schema'
 import { emitActivity, listActivity } from '~/shared/lib/repositories/activity'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 
@@ -190,5 +190,105 @@ describe('listActivity', () => {
     const row = result.rows.find((r) => r.targetKey === 'q-fmt')
     expect(row).toBeTruthy()
     expect(row!.display).toBe('Created search "fmt test"')
+  })
+
+  it('resolves targetHref from validated metadata, never from targetKey', async () => {
+    await db.insert(builderLists).values({
+      id: 'list-href-1',
+      organizationId: 'act-org-1',
+      createdByUserId: 'act-user-1',
+      name: 'Mine',
+      description: null,
+      visibility: 'private',
+    })
+    await db.transaction(async (tx) => {
+      // targetKey is the composite `${listId}:${builderIdentityId}` idempotency
+      // input, not a route id — the href must come from metadata.listId only.
+      await emitActivity(tx, principal, {
+        type: 'builder_list_item_added',
+        targetKey: 'list-href-1:some-builder-identity',
+        metadata: { listId: 'list-href-1', listName: 'Mine', builderIdentityId: 'some-builder-identity' },
+      })
+    })
+    const result = await db.transaction(async (tx) => listActivity(tx, principal))
+    const row = result.rows.find((r) => r.targetKey === 'list-href-1:some-builder-identity')
+    expect(row?.targetHref).toBe('/lists/list-href-1')
+  })
+
+  it('never links a private list owned by another member', async () => {
+    await db.insert(builderLists).values({
+      id: 'list-href-2',
+      organizationId: 'act-org-1',
+      createdByUserId: 'act-user-2',
+      name: 'Not mine',
+      description: null,
+      visibility: 'private',
+    })
+    await db.transaction(async (tx) => {
+      const otherPrincipal: TenantPrincipal = { userId: 'act-user-2', organizationId: 'act-org-1', role: 'member', requestId: 'r-3' }
+      await emitActivity(tx, otherPrincipal, {
+        type: 'builder_list_created',
+        targetKey: 'list-href-2',
+        metadata: { listId: 'list-href-2', listName: 'Not mine', visibility: 'private' },
+      })
+    })
+    const result = await db.transaction(async (tx) => listActivity(tx, principal))
+    const row = result.rows.find((r) => r.targetKey === 'list-href-2')
+    expect(row?.targetHref).toBeNull()
+  })
+
+  it('never links a deleted list — the row no longer resolves', async () => {
+    await db.transaction(async (tx) => {
+      await emitActivity(tx, principal, {
+        type: 'builder_list_deleted',
+        targetKey: 'list-never-existed',
+        metadata: { listId: 'list-never-existed', listName: 'Gone' },
+      })
+    })
+    const result = await db.transaction(async (tx) => listActivity(tx, principal))
+    const row = result.rows.find((r) => r.targetKey === 'list-never-existed')
+    expect(row?.targetHref).toBeNull()
+  })
+
+  it('resolves a saved-query href to a re-runnable search URL', async () => {
+    await db.insert(savedQueries).values({
+      id: 'query-href-1',
+      organizationId: 'act-org-1',
+      userId: 'act-user-1',
+      name: 'Rust people',
+      keywords: ['rust', 'systems'],
+      sources: ['github'],
+      visibility: 'private',
+    })
+    await db.transaction(async (tx) => {
+      await emitActivity(tx, principal, {
+        type: 'saved_query_created',
+        targetKey: 'query-href-1',
+        metadata: { queryId: 'query-href-1', queryName: 'Rust people', visibility: 'private' },
+      })
+    })
+    const result = await db.transaction(async (tx) => listActivity(tx, principal))
+    const row = result.rows.find((r) => r.targetKey === 'query-href-1')
+    expect(row?.targetHref).toBe(`/search?q=${encodeURIComponent('rust systems')}`)
+  })
+
+  it('resolves an alert href for any org member regardless of who created it', async () => {
+    await db.insert(alerts).values({
+      id: 'alert-href-1',
+      organizationId: 'act-org-1',
+      userId: 'act-user-2',
+      name: 'Go radar',
+      keywords: ['go'],
+    })
+    await db.transaction(async (tx) => {
+      await emitActivity(tx, principal, {
+        type: 'alert_created',
+        targetKey: 'alert-href-1',
+        metadata: { alertId: 'alert-href-1', alertName: 'Go radar', source: 'manual' },
+      })
+    })
+    const result = await db.transaction(async (tx) => listActivity(tx, principal))
+    const row = result.rows.find((r) => r.targetKey === 'alert-href-1')
+    expect(row?.targetHref).toBe('/alerts')
   })
 })

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   requireTenantPrincipal: vi.fn(),
   withTenantContext: vi.fn(),
   listActivity: vi.fn(),
+  resolveActorDisplayNames: vi.fn(),
 }))
 
 vi.mock('~/shared/lib/auth/tenant-principal', () => ({
@@ -30,6 +31,10 @@ vi.mock('~/shared/lib/repositories/activity', () => ({
   listActivity: mocks.listActivity,
 }))
 
+vi.mock('~/shared/lib/auth/organization-lifecycle', () => ({
+  resolveActorDisplayNames: mocks.resolveActorDisplayNames,
+}))
+
 const { Route } = await import('~/routes/api/organizations/activity')
 const { SharedResourceError } = await import('~/shared/lib/shared-resources/contracts')
 
@@ -47,6 +52,7 @@ beforeEach(() => {
   mocks.requireTenantPrincipal.mockResolvedValue(principal)
   mocks.withTenantContext.mockImplementation(async (_p, cb) => cb({} as never))
   mocks.listActivity.mockResolvedValue({ rows: [], nextCursor: null })
+  mocks.resolveActorDisplayNames.mockResolvedValue(new Map())
 })
 
 describe('GET /api/organizations/activity', () => {
@@ -87,6 +93,46 @@ describe('GET /api/organizations/activity', () => {
     expect(body.rows).toHaveLength(1)
     expect(body.rows[0].display).toBe('Created search "rust"')
     expect(body.nextCursor).toEqual({ before: occurredAt.toISOString(), id: 'row-1' })
+  })
+
+  it('attaches actorDisplayName from resolveActorDisplayNames, scoped to the principal\'s organization', async () => {
+    const occurredAt = new Date('2026-07-29T15:00:00Z')
+    mocks.listActivity.mockResolvedValue({
+      rows: [
+        {
+          id: 'row-1',
+          type: 'saved_query_created',
+          version: 1,
+          actorUserId: 'u-1',
+          actorDisplayName: null,
+          targetKey: 'q-1',
+          metadata: { queryId: 'q-1', queryName: 'rust', visibility: 'private' },
+          occurredAt: occurredAt.toISOString(),
+          display: 'Created search "rust"',
+          targetHref: null,
+        },
+        {
+          id: 'row-2',
+          type: 'saved_query_created',
+          version: 1,
+          actorUserId: 'u-former',
+          actorDisplayName: null,
+          targetKey: 'q-2',
+          metadata: { queryId: 'q-2', queryName: 'go', visibility: 'private' },
+          occurredAt: occurredAt.toISOString(),
+          display: 'Created search "go"',
+          targetHref: null,
+        },
+      ],
+      nextCursor: null,
+    })
+    // u-former is deliberately absent — simulates a member who has since left the org.
+    mocks.resolveActorDisplayNames.mockResolvedValue(new Map([['u-1', 'Ada Lovelace']]))
+    const response = await call('https://app.test/api/organizations/activity')
+    const body = await response.json()
+    expect(mocks.resolveActorDisplayNames).toHaveBeenCalledWith('org-1', ['u-1', 'u-former'])
+    expect(body.rows[0].actorDisplayName).toBe('Ada Lovelace')
+    expect(body.rows[1].actorDisplayName).toBeNull()
   })
 
   it('returns 403 when the activity error is a SharedResourceError (forbidden)', async () => {

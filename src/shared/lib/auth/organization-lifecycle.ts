@@ -955,6 +955,41 @@ export async function listOrganizationMembers(organizationId: string): Promise<O
   return rows.map((row) => ({ ...row, role: row.role as OrganizationRole }))
 }
 
+/**
+ * Actor names for the activity feed (plans/UI/tasks.md Wave 2 "Make Team
+ * Activity human and navigable") — same authDb rationale as
+ * `listOrganizationMembers`: the tenant `organization_activity` repository
+ * has no grant on `auth_users`/`organization_members` post auth-broker
+ * (drizzle/0007_auth_broker.sql), so name resolution happens here instead.
+ *
+ * Deliberately scoped to *current* members of `organizationId` — this is
+ * the allowlist. A user who has since left the organization resolves to
+ * nothing (the caller renders "Former member"), never a name looked up
+ * unconditionally by id, which would leak a name across organizations for
+ * an id an attacker merely guessed at.
+ */
+export async function resolveActorDisplayNames(
+  organizationId: string,
+  actorUserIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = Array.from(new Set(actorUserIds))
+  if (uniqueIds.length === 0) return new Map()
+  const [{ and, eq, inArray }, { authDb }, schema] = await Promise.all([
+    import('drizzle-orm'),
+    import('../db/auth-db'),
+    import('../db/schema'),
+  ])
+  const { organizationMembers, authUsers } = schema
+
+  const rows = await authDb
+    .select({ userId: organizationMembers.userId, name: authUsers.name })
+    .from(organizationMembers)
+    .innerJoin(authUsers, eq(authUsers.id, organizationMembers.userId))
+    .where(and(eq(organizationMembers.organizationId, organizationId), inArray(organizationMembers.userId, uniqueIds)))
+
+  return new Map(rows.map((row) => [row.userId, row.name]))
+}
+
 /** Pending invitations only — accepted/rejected/canceled ones aren't actionable from Team settings. */
 export async function listPendingInvitations(organizationId: string): Promise<InvitationRecord[]> {
   const [{ and, eq }, { authDb }, schema] = await Promise.all([

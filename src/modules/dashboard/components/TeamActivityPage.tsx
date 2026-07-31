@@ -43,14 +43,15 @@ export function TeamActivityPage({ initialRows, initialCursor }: TeamActivityPag
   // response can never overwrite a fresh one.
   const requestIdRef = React.useRef(0)
 
-  const loadMore = React.useCallback(async () => {
-    if (!state.cursor || state.loading) return
+  const fetchPage = React.useCallback(async (before: { before: string; id: string } | null) => {
     const id = ++requestIdRef.current
     setState((s) => ({ ...s, loading: true, error: null }))
     try {
       const params = new URLSearchParams()
-      params.set('before', state.cursor.before)
-      params.set('id', state.cursor.id)
+      if (before) {
+        params.set('before', before.before)
+        params.set('id', before.id)
+      }
       params.set('limit', String(PAGE_SIZE))
       const res = await fetch(`/api/organizations/activity?${params.toString()}`, {
         credentials: 'include',
@@ -71,7 +72,7 @@ export function TeamActivityPage({ initialRows, initialCursor }: TeamActivityPag
       }
       setState((s) => ({
         ...s,
-        rows: [...s.rows, ...data.rows],
+        rows: before ? [...s.rows, ...data.rows] : data.rows,
         cursor: data.nextCursor,
         loading: false,
       }))
@@ -79,7 +80,21 @@ export function TeamActivityPage({ initialRows, initialCursor }: TeamActivityPag
       if (id !== requestIdRef.current) return
       setState((s) => ({ ...s, loading: false, error: e instanceof Error ? e.message : 'Failed to load' }))
     }
-  }, [state.cursor, state.loading])
+  }, [])
+
+  // The route always hands this component an empty initial page (see
+  // team/activity.tsx's own comment) so an A→B org switch — which remounts
+  // this component — always starts from a real fetch, never a stale SSR
+  // snapshot from the previous organization.
+  React.useEffect(() => {
+    void fetchPage(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const loadMore = React.useCallback(() => {
+    if (!state.cursor || state.loading) return
+    return fetchPage(state.cursor)
+  }, [state.cursor, state.loading, fetchPage])
 
   return (
     <div data-testid="team-activity-page" className="space-y-6">

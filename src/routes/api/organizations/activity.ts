@@ -15,6 +15,7 @@
 
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
+import { resolveActorDisplayNames } from '~/shared/lib/auth/organization-lifecycle'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { listActivity } from '~/shared/lib/repositories/activity'
@@ -56,8 +57,16 @@ export const Route = createFileRoute('/api/organizations/activity')({
           const result = await withTenantContext(principal, (tx) =>
             listActivity(tx, principal, { before, limit: parsed.data.limit }),
           )
+          const actorIds = result.rows
+            .map((row) => row.actorUserId)
+            .filter((id): id is string => id !== null)
+          const namesByUserId = await resolveActorDisplayNames(principal.organizationId, actorIds)
+          const rows = result.rows.map((row) => ({
+            ...row,
+            actorDisplayName: row.actorUserId ? namesByUserId.get(row.actorUserId) ?? null : null,
+          }))
           return Response.json({
-            rows: result.rows,
+            rows,
             // Serialize the cursor the same way the contracts
             // consume it. The client must pass both `before` and
             // `id` on the next request.

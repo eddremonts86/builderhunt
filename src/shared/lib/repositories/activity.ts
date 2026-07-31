@@ -21,10 +21,11 @@
 // - retention is the worker's job, not the app's. RLS allows
 //   DELETE only for the worker role.
 
-import { and, desc, eq, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, lt, or } from 'drizzle-orm'
 import type { TenantPrincipal } from '../authorization/permissions'
+import { can } from '../authorization/permissions'
 import type { TenantTransaction } from '../db/client'
-import { organizationActivity } from '../db/schema'
+import { alerts, builderLists, organizationActivity, savedQueries } from '../db/schema'
 import {
   ACTIVITY_EVENTS,
   getEventDefinition,
@@ -115,11 +116,45 @@ export interface ActivityRowDTO {
   /** Nullable: system actions (e.g. capability mint) have no
    *  TenantPrincipal. A null actor renders as "System" in the UI. */
   actorUserId: string | null
+  /**
+   * Resolved separately from this repository (see
+   * `resolveActorDisplayNames` in `auth/organization-lifecycle.ts`) because
+   * `auth_users`/`organization_members` are auth-broker-owned tables this
+   * tenant repository has no grant on. Always `null` coming out of
+   * `listActivity`; the API route fills it in. `null` here means "unknown
+   * or no longer a member" — the UI renders "Former member", not a blank.
+   */
+  actorDisplayName: string | null
   targetKey: string
   metadata: Record<string, unknown>
   occurredAt: string
   /** The pre-rendered line the UI shows. */
   display: string
+  /**
+   * Server-derived navigation target, or `null` if the underlying row was
+   * deleted or the viewing principal cannot read it (e.g. another member's
+   * private shortlist). Never built from `targetKey` — that field is an
+   * idempotency-hash input (sometimes a composite like `${listId}:${builderIdentityId}`),
+   * not a validated route id. Only list/search/alert event types resolve a
+   * target at all; everything else is always `null`.
+   */
+  targetHref: string | null
+}
+
+/** Event types whose `metadata.listId` names a `builder_lists` row. */
+const BUILDER_LIST_HREF_TYPES = new Set<ActivityEventType>([
+  'builder_list_created',
+  'builder_list_updated',
+  'builder_list_item_added',
+  'builder_list_item_removed',
+])
+
+/** Event types whose `metadata.queryId` names a `saved_queries` row. */
+const SAVED_QUERY_HREF_TYPES = new Set<ActivityEventType>(['saved_query_created', 'saved_query_visibility_changed'])
+
+function stringField(metadata: Record<string, unknown>, key: string): string | null {
+  const value = metadata[key]
+  return typeof value === 'string' && value.length > 0 ? value : null
 }
 
 export interface ListActivityResult {
@@ -176,17 +211,99 @@ export async function listActivity(
     type: isKnownEventType(r.type) ? r.type : ('saved_query_created' as ActivityEventType),
     version: r.version,
     actorUserId: r.actorUserId,
+    actorDisplayName: null,
     targetKey: r.targetKey,
     metadata: r.metadata,
     occurredAt: r.occurredAt.toISOString(),
     display: isKnownEventType(r.type)
       ? (ACTIVITY_EVENTS[r.type] as { format: (m: unknown) => string }).format(r.metadata)
       : r.type,
+    targetHref: null,
   }))
+  await attachTargetHrefs(transaction, principal, dtos)
   const last = slice[slice.length - 1]
   return {
     rows: dtos,
     nextCursor: hasMore && last ? { occurredAt: last.occurredAt.toISOString(), id: last.id } : null,
+  }
+}
+
+/**
+ * Resolves `targetHref` for list/search/alert event types in place. Batches
+ * one lookup per underlying table rather than one per row — a 50-row page
+ * touches at most three tables. Every candidate id comes from validated
+ * `metadata` fields (`listId`/`queryId`/`alertId`), never from `targetKey`.
+ */
+async function attachTargetHrefs(
+  transaction: TenantTransaction,
+  principal: TenantPrincipal,
+  dtos: ActivityRowDTO[],
+): Promise<void> {
+  const listIds = new Set<string>()
+  const queryIds = new Set<string>()
+  const alertIds = new Set<string>()
+  for (const row of dtos) {
+    if (BUILDER_LIST_HREF_TYPES.has(row.type)) {
+      const id = stringField(row.metadata, 'listId')
+      if (id) listIds.add(id)
+    } else if (SAVED_QUERY_HREF_TYPES.has(row.type)) {
+      const id = stringField(row.metadata, 'queryId')
+      if (id) queryIds.add(id)
+    } else if (row.type === 'alert_created') {
+      const id = stringField(row.metadata, 'alertId')
+      if (id) alertIds.add(id)
+    }
+  }
+
+  const [listRows, queryRows, alertRows] = await Promise.all([
+    listIds.size > 0
+      ? transaction
+          .select({ id: builderLists.id, createdByUserId: builderLists.createdByUserId, visibility: builderLists.visibility })
+          .from(builderLists)
+          .where(and(eq(builderLists.organizationId, principal.organizationId), inArray(builderLists.id, [...listIds])))
+      : Promise.resolve([]),
+    queryIds.size > 0
+      ? transaction
+          .select({ id: savedQueries.id, userId: savedQueries.userId, visibility: savedQueries.visibility, keywords: savedQueries.keywords })
+          .from(savedQueries)
+          .where(and(eq(savedQueries.organizationId, principal.organizationId), inArray(savedQueries.id, [...queryIds])))
+      : Promise.resolve([]),
+    alertIds.size > 0
+      ? transaction
+          .select({ id: alerts.id })
+          .from(alerts)
+          .where(and(eq(alerts.organizationId, principal.organizationId), inArray(alerts.id, [...alertIds])))
+      : Promise.resolve([]),
+  ])
+  const listsById = new Map(listRows.map((r) => [r.id, r]))
+  const queriesById = new Map(queryRows.map((r) => [r.id, r]))
+  const alertIdsFound = new Set(alertRows.map((r) => r.id))
+
+  for (const row of dtos) {
+    if (BUILDER_LIST_HREF_TYPES.has(row.type)) {
+      const listId = stringField(row.metadata, 'listId')
+      const list = listId ? listsById.get(listId) : undefined
+      if (!list) continue
+      const visible = can(principal, 'resource:read', {
+        creatorUserId: list.createdByUserId,
+        visibility: list.visibility === 'organization' ? 'organization' : 'private',
+      })
+      row.targetHref = visible ? `/lists/${listId}` : null
+    } else if (SAVED_QUERY_HREF_TYPES.has(row.type)) {
+      const queryId = stringField(row.metadata, 'queryId')
+      const query = queryId ? queriesById.get(queryId) : undefined
+      if (!query) continue
+      const visible = can(principal, 'resource:read', {
+        creatorUserId: query.userId,
+        visibility: query.visibility === 'organization' ? 'organization' : 'private',
+      })
+      if (!visible) continue
+      const q = query.keywords.join(' ').trim()
+      row.targetHref = q ? `/search?q=${encodeURIComponent(q)}` : '/search'
+    } else if (row.type === 'alert_created') {
+      const alertId = stringField(row.metadata, 'alertId')
+      row.targetHref = alertId && alertIdsFound.has(alertId) ? '/alerts' : null
+    }
   }
 }
 

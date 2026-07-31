@@ -15,10 +15,14 @@ export interface ActivityRowDTO {
   type: string
   version: number
   actorUserId: string | null
+  /** Resolved server-side, scoped to current org members. `null` means "no longer a member" when `actorUserId` is set, or "system" when it is not. */
+  actorDisplayName: string | null
   targetKey: string
   metadata: Record<string, unknown>
   occurredAt: string
   display: string
+  /** Server-authorized navigation target, or `null` if the row's target was deleted or the viewer cannot read it. Never derived from `targetKey` on the client. */
+  targetHref: string | null
 }
 
 export interface TeamActivityWidgetProps {
@@ -45,13 +49,14 @@ function formatTime(iso: string): string {
 }
 
 /**
- * Resolves an actor id to a display name. The widget does not
- * own user-name lookup; it falls back to a stable short id so
- * a missing name does not break the layout.
+ * The API route resolves `actorDisplayName` from current organization
+ * membership (see `resolveActorDisplayNames`) — this widget never looks up
+ * a name itself. A null actor is a system action; a non-null actor with no
+ * resolved name is someone who has since left the organization.
  */
-function actorLabel(actorUserId: string | null): string {
+function actorLabel(actorUserId: string | null, actorDisplayName: string | null): string {
   if (!actorUserId) return 'System'
-  return actorUserId.length > 8 ? `${actorUserId.slice(0, 8)}…` : actorUserId
+  return actorDisplayName ?? 'Former member'
 }
 
 export function TeamActivityWidget({ rows, loading, error }: TeamActivityWidgetProps) {
@@ -102,10 +107,20 @@ export function TeamActivityWidget({ rows, loading, error }: TeamActivityWidgetP
                     <span className="text-[10px] tabular-nums text-bh-text-dim shrink-0 w-12">
                       {formatTime(row.occurredAt)}
                     </span>
-                    <span className="font-mono text-[10px] text-bh-text-dim shrink-0 w-16 truncate">
-                      {actorLabel(row.actorUserId)}
+                    <span className="text-[10px] text-bh-text-dim shrink-0 w-16 truncate">
+                      {actorLabel(row.actorUserId, row.actorDisplayName)}
                     </span>
-                    <span className="text-bh-text truncate flex-1">{row.display}</span>
+                    {row.targetHref ? (
+                      <a
+                        href={row.targetHref}
+                        className="text-bh-text truncate flex-1 hover:text-bh-accent hover:underline"
+                        data-testid="team-activity-row-link"
+                      >
+                        {row.display}
+                      </a>
+                    ) : (
+                      <span className="text-bh-text truncate flex-1">{row.display}</span>
+                    )}
                   </li>
                 ))}
               </ul>
