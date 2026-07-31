@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { useParams, Link } from '@tanstack/react-router'
+import { useParams, useSearch, Link } from '@tanstack/react-router'
 import { ArrowLeft, ExternalLink, Code, Save, BadgeCheck, Sparkles, Users, Lock, FileText } from 'lucide-react'
+import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 import { HygieneCard } from '~/shared/components/HygieneCard'
 import { CodeStyleCard } from '~/shared/components/CodeStyleCard'
 import { OutreachCopilot } from '~/modules/builder-profile/components/OutreachCopilot'
@@ -59,9 +60,21 @@ interface Note {
   createdAt: string
 }
 
+/** A safe `from` resolves to one of a handful of known prefixes — label it by where it actually goes rather than a generic "Back". */
+function backLabelFor(from: string): string {
+  if (from === '/alerts' || from.startsWith('/alerts?')) return 'Back to alerts'
+  if (from.startsWith('/sprints/')) return 'Back to sprint'
+  if (from.startsWith('/lists/')) return 'Back to shortlist'
+  return 'Back to search'
+}
+
 export function BuilderProfilePage() {
   const params = useParams({ strict: false }) as { builderId?: string }
   const builderId = params.builderId
+  // `strict: false` because this component also renders on the public /builders/$builderId route,
+  // which declares no search schema at all — an absent `from` there is the normal case, not a bug.
+  const search = useSearch({ strict: false }) as { from?: string }
+  const safeFrom = resolveSafeBuilderFrom(search.from)
   const [builder, setBuilder] = React.useState<Builder | null>(null)
   const [notes, setNotes] = React.useState<Note[]>([])
   const [loading, setLoading] = React.useState(true)
@@ -229,10 +242,11 @@ export function BuilderProfilePage() {
   return (
     <div className="p-8 max-w-5xl mx-auto">
       <Link
-        to="/search"
+        to={safeFrom}
         className="flex items-center gap-2 text-bh-text-muted hover:text-bh-text text-sm mb-6 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded"
+        data-testid="builder-back-link"
       >
-        <ArrowLeft className="w-4 h-4" /> Back to search
+        <ArrowLeft className="w-4 h-4" /> {backLabelFor(safeFrom)}
       </Link>
 
       <div className="card rounded-3xl bg-bh-surface border-bh-border shadow-sm mb-6">

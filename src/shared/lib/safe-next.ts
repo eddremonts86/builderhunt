@@ -35,3 +35,39 @@ export function parseSafeNext(raw: string | undefined | null): string | null {
     return null
   }
 }
+
+/**
+ * `from` continuity for the builder workspace (plans/UI/tasks.md Wave 2 "Preserve safe origin
+ * context on builder pages") — several legitimate origins instead of `parseSafeNext`'s exactly one,
+ * so it gets its own allowlist rather than widening that function's single-purpose contract.
+ * Reuses the same URL-normalization technique: resolving against a fixed dummy origin uses the
+ * platform's own parser to collapse percent-encoding, `..`, and backslash tricks consistently.
+ */
+const ALLOWED_BUILDER_FROM_EXACT = new Set(['/search', '/alerts'])
+const ALLOWED_BUILDER_FROM_PREFIXES = ['/sprints/', '/lists/'] as const
+
+export const DEFAULT_BUILDER_FROM = '/search'
+
+export function parseSafeBuilderFrom(raw: string | undefined | null): string | null {
+  if (!raw) return null
+  if (!/^\/(?!\/)/.test(raw)) return null
+
+  let url: URL
+  try {
+    url = new URL(raw, 'https://internal.invalid')
+  } catch {
+    return null
+  }
+  const path = url.pathname
+
+  const isAllowed = ALLOWED_BUILDER_FROM_EXACT.has(path)
+    || ALLOWED_BUILDER_FROM_PREFIXES.some((prefix) => path.startsWith(prefix) && path.length > prefix.length)
+  if (!isAllowed) return null
+
+  return `${path}${url.search}`
+}
+
+/** Resolves an untrusted `from` query value to a safe origin the builder workspace understands, or `DEFAULT_BUILDER_FROM`. */
+export function resolveSafeBuilderFrom(raw: string | undefined | null): string {
+  return parseSafeBuilderFrom(raw) ?? DEFAULT_BUILDER_FROM
+}

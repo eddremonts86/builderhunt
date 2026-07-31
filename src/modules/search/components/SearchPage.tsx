@@ -4,12 +4,14 @@ import {
   TrendingUp, Save, Lightbulb, ChevronDown, Sparkles, RotateCcw, MapPin,
   Users, BookMarked, Star, GitFork, Loader2, Lock, Wand2,
 } from 'lucide-react'
-import { useSearch } from '@tanstack/react-router'
+import { useLocation, useSearch } from '@tanstack/react-router'
 import { Input, Button, Dialog, ScoreRing, getScoreBreakdown } from '~/components/ui'
 import { Tooltip } from '~/shared/components/Tooltip'
 import { ai } from '~/shared/lib/ai/client'
 import { AIUnavailableError } from '~/shared/lib/ai/errors'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
+import { BuilderResultActions } from '~/modules/search/components/BuilderResultActions'
+import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
 
 /* -------------------------------------------------------------------------- */
@@ -559,54 +561,14 @@ export function SearchPage() {
     }
   }
 
-  /* Track / untrack a builder */
-  const [trackingIds, setTrackingIds] = React.useState<Set<string>>(new Set())
-  const handleToggleTrack = async (builder: Builder) => {
-    if (trackingIds.has(builder.id)) return
-    setTrackingIds((prev) => new Set(prev).add(builder.id))
-    const wasTracked = builder.tracked ?? false
-    setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, tracked: !wasTracked } : b)))
-    try {
-      if (wasTracked) {
-        if (!builder.trackedRowId) throw new Error('Missing tracked row id')
-        const res = await fetch(`/api/builders/${builder.trackedRowId}`, { method: 'DELETE', credentials: 'include' })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, trackedRowId: undefined } : b)))
-      } else {
-        const res = await fetch('/api/builders/track', {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            source: builder.source,
-            sourceId: builder.sourceId,
-            username: builder.username,
-            displayName: builder.displayName,
-            avatarUrl: builder.avatarUrl,
-            bio: builder.bio,
-            profileUrl: builder.profileUrl,
-            followersCount: builder.followersCount,
-            language: builder.language,
-            country: builder.country,
-            topics: builder.topics,
-            score: builder.score,
-            metadata: builder.metadata,
-          }),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const data: { id: string } = await res.json()
-        setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, trackedRowId: data.id } : b)))
-      }
-    } catch {
-      setResults((prev) => prev.map((b) => (b.id === builder.id ? { ...b, tracked: wasTracked } : b)))
-    } finally {
-      setTrackingIds((prev) => {
-        const next = new Set(prev)
-        next.delete(builder.id)
-        return next
-      })
-    }
-  }
+  /* Track a builder — actual request/error/loading state now lives in the shared
+     BuilderResultActions contract; this only reconciles the two local result arrays once it
+     succeeds, since a card can come from either `results` or the pre-search `featured` list. */
+  const handleTracked = React.useCallback((builderId: string, organizationBuilderId: string) => {
+    const patch = (b: Builder) => (b.id === builderId ? { ...b, tracked: true, trackedRowId: organizationBuilderId } : b)
+    setResults((prev) => prev.map(patch))
+    setFeatured((prev) => prev.map(patch))
+  }, [])
 
   /* ---------------------------------------------------------------------- */
 
@@ -904,8 +866,7 @@ export function SearchPage() {
           featured={featured}
           onPickQuery={(q) => { setQuery(q); runSearch(q) }}
           onClearRecent={clearRecent}
-          onToggleTrack={handleToggleTrack}
-          trackingIds={trackingIds}
+          onTracked={handleTracked}
         />
       )}
 
@@ -1053,8 +1014,7 @@ export function SearchPage() {
                 <BuilderResultCard
                   builder={builder}
                   query={query}
-                  onToggleTrack={handleToggleTrack}
-                  tracking={trackingIds.has(builder.id)}
+                  onTracked={handleTracked}
                 />
               </li>
             ))}
@@ -1122,15 +1082,13 @@ function LandingState({
   featured,
   onPickQuery,
   onClearRecent,
-  onToggleTrack,
-  trackingIds,
+  onTracked,
 }: {
   recent: string[]
   featured: Builder[]
   onPickQuery: (q: string) => void
   onClearRecent: () => void
-  onToggleTrack: (b: Builder) => void
-  trackingIds: Set<string>
+  onTracked: (builderId: string, organizationBuilderId: string) => void
 }) {
   return (
     <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-2">
@@ -1147,8 +1105,7 @@ function LandingState({
                   <PersonResultCard
                     builder={b}
                     query={FEATURED_QUERY}
-                    onToggleTrack={onToggleTrack}
-                    tracking={trackingIds.has(b.id)}
+                    onTracked={onTracked}
                   />
                 </li>
               ))}
@@ -1276,11 +1233,11 @@ function NoResults({ query, onTryPopular }: { query: string; onTryPopular: (q: s
   )
 }
 
-function BuilderResultCard({ builder, query, onToggleTrack, tracking }: { builder: Builder; query: string; onToggleTrack: (b: Builder) => void; tracking: boolean }) {
+function BuilderResultCard({ builder, query, onTracked }: { builder: Builder; query: string; onTracked: (builderId: string, organizationBuilderId: string) => void }) {
   if (builder.kind === 'repo') {
     return <ResourceResultCard builder={builder} query={query} />
   }
-  return <PersonResultCard builder={builder} query={query} onToggleTrack={onToggleTrack} tracking={tracking} />
+  return <PersonResultCard builder={builder} query={query} onTracked={onTracked} />
 }
 
 /* -------------------------------------------------------------------------- */
@@ -1335,7 +1292,9 @@ function getMatchHighlights(builder: Builder, query: string): {
 /* -------------------------------------------------------------------------- */
 /*  PersonResultCard — compact single-line                                   */
 /* -------------------------------------------------------------------------- */
-function PersonResultCard({ builder, query, onToggleTrack, tracking }: { builder: Builder; query: string; onToggleTrack: (b: Builder) => void; tracking: boolean }) {
+function PersonResultCard({ builder, query, onTracked }: { builder: Builder; query: string; onTracked: (builderId: string, organizationBuilderId: string) => void }) {
+  const location = useLocation()
+  const from = resolveSafeBuilderFrom(`${location.pathname}${location.searchStr}`)
   const meta = SOURCE_META[builder.source]
   const { topics: matchedTopics, terms: matchedTerms, fields } = getMatchHighlights(builder, query)
   const lastSeenMs = getLastSeenMs(builder)
@@ -1397,28 +1356,11 @@ function PersonResultCard({ builder, query, onToggleTrack, tracking }: { builder
                   breakdown={getScoreBreakdown(builder)}
                 />
               )}
-              <Button
-                type="button"
-                onClick={() => onToggleTrack(builder)}
-                disabled={tracking}
-                variant={builder.tracked ? 'primary' : 'secondary'}
-                size="sm"
-                className="rounded-full"
-                title={builder.tracked ? 'Remove from your tracked builders' : 'Track this builder'}
-                data-testid={`track-button-${builder.id}`}
-              >
-                <Bookmark className="w-3 h-3" aria-hidden="true" />
-                {builder.tracked ? 'Tracked' : 'Track'}
-              </Button>
-              <a
-                href={builder.profileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary btn-sm rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent"
-                title="Open profile"
-              >
-                View <ExternalLink className="w-3 h-3" aria-hidden="true" />
-              </a>
+              <BuilderResultActions
+                builder={builder}
+                from={from}
+                onTracked={(organizationBuilderId) => onTracked(builder.id, organizationBuilderId)}
+              />
             </div>
           </div>
 
