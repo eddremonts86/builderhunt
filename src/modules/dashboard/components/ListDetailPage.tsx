@@ -11,10 +11,11 @@
  * real boundary.
  */
 import * as React from 'react'
-import { useNavigate, useParams } from '@tanstack/react-router'
-import { ArrowLeft, Lock, Trash2, Users, UserMinus } from 'lucide-react'
+import { useNavigate, useParams, useLocation, Link } from '@tanstack/react-router'
+import { ArrowLeft, Lock, Search, Trash2, Users, UserMinus } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { useEntityBreadcrumbLabel } from '~/modules/dashboard/ui/shell/breadcrumb-context'
+import { resolveSafeBuilderFrom } from '~/shared/lib/safe-next'
 
 export interface BuilderListDetail extends Record<string, unknown> {
   id: string
@@ -34,6 +35,8 @@ export interface BuilderListItemDetail {
   builderIdentityId: string
   createdByUserId: string
   createdAt: string
+  /** The tenant-scoped id `/builder/$builderId` navigates by — never `builderIdentityId`, which is global. */
+  organizationBuilderId?: string | null
   /** Optional denormalized display fields the API may surface for UX. */
   displayName?: string | null
   username?: string | null
@@ -64,6 +67,8 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
   const params = useParams({ strict: false }) as { listId?: string }
   const listId = params.listId ?? initialList.id
   const navigate = useNavigate()
+  const location = useLocation()
+  const from = resolveSafeBuilderFrom(`${location.pathname}${location.searchStr}`)
   const [list, setList] = React.useState<BuilderListDetail>(initialList)
   const [items, setItems] = React.useState<BuilderListItemDetail[]>(initialItems)
   const [removingId, setRemovingId] = React.useState<string | null>(null)
@@ -156,20 +161,35 @@ export function ListDetailPage({ initialList, initialItems, currentUser }: ListD
         <div className="card p-8 text-center" data-testid="list-empty">
           <UserMinus className="w-8 h-8 mx-auto text-bh-text-dim mb-2" aria-hidden="true" />
           <p className="text-bh-text-muted">No builders in this shortlist yet.</p>
-          <p className="text-sm text-bh-text-dim mt-2">
+          <p className="text-sm text-bh-text-dim mt-2 mb-4">
             Add builders from search results or the alerts inbox.
           </p>
+          <Link to="/search" className="btn-secondary btn-sm inline-flex items-center gap-1.5" data-testid="list-empty-search-cta">
+            <Search className="w-3.5 h-3.5" aria-hidden="true" />
+            Search builders
+          </Link>
         </div>
       ) : (
         <ul className="space-y-2" data-testid="list-items">
           {items.map((item) => {
             const canRemove = canRemoveFromList(list, item, currentUser)
+            const label = item.displayName ?? item.username ?? item.builderIdentityId
             return (
               <li key={item.id} className="card p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <div className="font-semibold text-sm truncate">
-                    {item.displayName ?? item.username ?? item.builderIdentityId}
-                  </div>
+                  {item.organizationBuilderId ? (
+                    <Link
+                      to="/builder/$builderId"
+                      params={{ builderId: item.organizationBuilderId }}
+                      search={{ from }}
+                      className="font-semibold text-sm truncate text-bh-text hover:text-bh-accent hover:underline block"
+                      data-testid={`list-item-open-${item.id}`}
+                    >
+                      {label}
+                    </Link>
+                  ) : (
+                    <div className="font-semibold text-sm truncate">{label}</div>
+                  )}
                   {item.username && item.displayName && (
                     <div className="text-xs text-bh-text-muted">@{item.username}</div>
                   )}

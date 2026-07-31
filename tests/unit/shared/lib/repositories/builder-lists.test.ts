@@ -116,6 +116,14 @@ describe('builder lists tenant repository (plan 28 task 4)', () => {
     expect(items).toHaveLength(1)
   })
 
+  it('listItemsForList includes the organization-builder id and display fields the workspace link needs', async () => {
+    const items = await db.transaction((tx) => listItemsForList(tx, principal('bl-u-a', 'bl-org-a', 'owner'), listIdA))
+    expect(items[0].organizationBuilderId).toBe('bl-ob-1')
+    expect(items[0].username).toBe('u1')
+    expect(items[0].displayName).toBe('U1')
+    expect(items[0].source).toBe('github')
+  })
+
   it('peer cannot add to a list they cannot see (not_found, not forbidden)', async () => {
     // B is a peer. They cannot read listIdA → cannot add to it.
     await expect(

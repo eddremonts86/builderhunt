@@ -145,7 +145,35 @@ export async function listItemsForList(
   // the visibility check is on the list, not the item row.
   const list = await findVisibleBuilderListById(transaction, principal, listId)
   if (!list) throw new SharedResourceError('not_found', 'Builder list not found', 404)
-  return transaction.select().from(builderListItems)
+  // Joined with organization_builders for the id `/builder/$builderId` actually navigates by
+  // (never `builderIdentityId`, which is global and not tenant-scoped) and with builder_identities
+  // for the display fields the row needs — plans/UI/tasks.md Wave 2 "Connect shortlist members to
+  // the builder workspace". The composite FK on builder_list_items guarantees both joins always
+  // find a row, so neither is left/optional here.
+  return transaction
+    .select({
+      id: builderListItems.id,
+      listId: builderListItems.listId,
+      organizationId: builderListItems.organizationId,
+      builderIdentityId: builderListItems.builderIdentityId,
+      createdByUserId: builderListItems.createdByUserId,
+      createdAt: builderListItems.createdAt,
+      organizationBuilderId: organizationBuilders.id,
+      username: builderIdentities.username,
+      displayName: builderIdentities.displayName,
+      avatarUrl: builderIdentities.avatarUrl,
+      source: builderIdentities.source,
+      profileUrl: builderIdentities.profileUrl,
+    })
+    .from(builderListItems)
+    .innerJoin(
+      organizationBuilders,
+      and(
+        eq(organizationBuilders.organizationId, builderListItems.organizationId),
+        eq(organizationBuilders.builderIdentityId, builderListItems.builderIdentityId),
+      ),
+    )
+    .innerJoin(builderIdentities, eq(builderIdentities.id, builderListItems.builderIdentityId))
     .where(and(eq(builderListItems.listId, listId), eq(builderListItems.organizationId, principal.organizationId)))
     .orderBy(desc(builderListItems.createdAt))
 }
