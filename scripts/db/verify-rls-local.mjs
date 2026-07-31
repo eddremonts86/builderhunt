@@ -1323,12 +1323,14 @@ try {
     appDeletionRecordsDenied = error?.code === '42501'
   }
   if (!appDeletionRecordsDenied) throw new Error('App role accessed organization_deletion_financial_records')
-  const workerDeletionInsert = await worker`
+  // No `returning id` here deliberately — `RETURNING` needs SELECT on the table to read the new row
+  // back, which the worker does not have (INSERT only). That distinction is what the very next
+  // assertion measures; asking for it here would turn "worker cannot read this table" into "worker
+  // cannot insert into this table", which is a different property and the wrong one to break on.
+  await worker`
     insert into organization_deletion_financial_records (id, organization_id, organization_name, deletion_type, livemode)
     values ('financial-record-worker', 'org-deleted-worker', 'Deleted Org Worker', 'immediate', false)
-    returning id
   `
-  if (workerDeletionInsert.length !== 1) throw new Error('Worker role could not insert an organization_deletion_financial_records row')
   let workerDeletionSelectDenied = false
   try {
     await worker`select id from organization_deletion_financial_records`
