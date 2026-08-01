@@ -127,7 +127,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: unchanged observations do not create duplicates; changed, deleted, stale, and restricted
     sources produce the expected version/projection.
 
-- [ ] **Implement reversible identity linking**
+- [x] **Implement reversible identity linking**
   - Files: `src/shared/lib/human-identity/*` (new),
     `src/shared/lib/repositories/human-profiles.ts` (new), admin review UI/routes
   - Do: Auto-link only verified claims, explicit cross-links, or reviewed deterministic evidence;
