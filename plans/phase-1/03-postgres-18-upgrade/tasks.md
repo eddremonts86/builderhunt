@@ -2,6 +2,10 @@
 
 > **Status**: `in progress — Phase 5 ran ahead of its gate; Phases 2-4 are now on the critical path`
 
+> **Depends on**: nothing — but see [`spec.md`](./spec.md) §1: tasks in Phase 5 and 6 must not be executed before Phase 4 is complete and observed.
+> **Blocks**: nothing today; Phase 4 is the gate for any other plan's use of PG18-only SQL.
+> **Reality check** (re-verified 2026-07-27): `docker-compose.yml:8`, `.github/workflows/quality.yml:16` and `docs/operations/deploy-runbook.md:87` all pin `pgvector/pgvector:pg16`. `pnpm deploy:db` ([`scripts/deploy/orchestrate.mjs`](../../../scripts/deploy/orchestrate.mjs), 8 steps) is the only sanctioned provisioning path and has no version check (`grep -rn server_version src/ scripts/ drizzle/` → 0). Restore rehearsal exists (`pnpm db:restore-test`) and a roles-first restore path exists (`pnpm db:restore`, `scripts/db/roles.sql`, `docs/operations/database-restore.md`); the daily local backup ([`scripts/db/backup.ts:56`](../../../scripts/db/backup.ts)) still dumps with `--no-owner --no-acl` and is not usable as an upgrade vehicle.
+
 ## ⚠️ Ordering violation, found 2026-08-01
 
 Phase 5 is titled "**only after Phase 4 is observed**" and this file's header says Phase 5 and 6
@@ -34,9 +38,6 @@ already applied in local and CI databases, editing them changes their drizzle co
 time-ordering those append-heavy tables chose is the whole point of Phase 5's benchmark task.
 
 Maintainer decision, 2026-08-01: **do this plan's cutover first, then merge.**
-> **Depends on**: nothing — but see [`spec.md`](./spec.md) §1: tasks in Phase 5 and 6 must not be executed before Phase 4 is complete and observed.
-> **Blocks**: nothing today; Phase 4 is the gate for any other plan's use of PG18-only SQL.
-> **Reality check** (re-verified 2026-07-27): `docker-compose.yml:8`, `.github/workflows/quality.yml:16` and `docs/operations/deploy-runbook.md:87` all pin `pgvector/pgvector:pg16`. `pnpm deploy:db` ([`scripts/deploy/orchestrate.mjs`](../../../scripts/deploy/orchestrate.mjs), 8 steps) is the only sanctioned provisioning path and has no version check (`grep -rn server_version src/ scripts/ drizzle/` → 0). Restore rehearsal exists (`pnpm db:restore-test`) and a roles-first restore path exists (`pnpm db:restore`, `scripts/db/roles.sql`, `docs/operations/database-restore.md`); the daily local backup ([`scripts/db/backup.ts:56`](../../../scripts/db/backup.ts)) still dumps with `--no-owner --no-acl` and is not usable as an upgrade vehicle.
 
 Every task below is executable top-to-bottom.
 
