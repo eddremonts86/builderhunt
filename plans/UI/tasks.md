@@ -217,7 +217,7 @@
   - Do: Fetch and render the bounded funnel, retention window, variant breakdown, and insufficient-data state; link anomalous API-error or conversion states to the appropriate operations/content page.
   - Verify: empty, insufficient, healthy, and degraded fixtures render without fabricating rates.
 
-- [ ] **Render redacted removal operations metrics**
+- [x] **Render redacted removal operations metrics**
   - Files: `src/routes/api/admin/metrics/trust.ts`, `src/routes/_dashboard/admin/metrics.tsx`, `src/shared/lib/repositories/profile-removals.ts`, `tests/unit/routes/admin/metrics.test.tsx`
   - Do: Add bounded counts by removal state/source and aging buckets, with small-cohort suppression and Operations links for overdue work. Exclude identity, URLs, request text, evidence, and arbitrary metadata.
   - Verify: empty/suppressed/healthy/overdue fixtures render; DTO snapshot and platform-admin negative tests prove redaction.

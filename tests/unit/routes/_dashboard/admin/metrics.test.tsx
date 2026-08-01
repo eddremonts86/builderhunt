@@ -37,8 +37,18 @@ const METRICS_RESPONSE = {
   server: { nodeVersion: 'v1', platform: 'darwin', pid: 1, memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 } },
 }
 
-function emptyConversionMetrics() {
-  const zero = { numerator: 0, denominator: 0, rate: null, ci95: null, insufficientSample: true }
+interface TestConversionRate {
+  numerator: number
+  denominator: number
+  rate: number | null
+  ci95: [number, number] | null
+  insufficientSample: boolean
+  numeratorEvent: string
+  denominatorEvent: string
+}
+
+function emptyConversionMetrics(): Record<string, TestConversionRate> {
+  const zero = { numerator: 0, denominator: 0, rate: null as number | null, ci95: null as [number, number] | null, insufficientSample: true }
   return {
     landing_to_signup: { ...zero, numeratorEvent: 'signup_complete', denominatorEvent: 'landing_view' },
     hero_signup_ctr: { ...zero, numeratorEvent: 'hero_signup_click', denominatorEvent: 'landing_view' },
@@ -49,7 +59,10 @@ function emptyConversionMetrics() {
   }
 }
 
-function mockFetchRouter(conversionByVariant: { baseline: unknown; treatment: unknown } | 'error' = { baseline: emptyConversionResponse('baseline'), treatment: emptyConversionResponse('treatment') }): void {
+function mockFetchRouter(
+  conversionByVariant: { baseline: unknown; treatment: unknown } | 'error' = { baseline: emptyConversionResponse('baseline'), treatment: emptyConversionResponse('treatment') },
+  removal: unknown | 'error' = emptyRemovalMetrics(),
+): void {
   vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.includes('/api/admin/metrics/conversion')) {
@@ -57,12 +70,29 @@ function mockFetchRouter(conversionByVariant: { baseline: unknown; treatment: un
       const variant = url.includes('variant=treatment') ? 'treatment' : 'baseline'
       return jsonResponse(conversionByVariant[variant])
     }
+    if (url.includes('/api/admin/metrics/trust')) {
+      if (removal === 'error') return jsonResponse({ error: 'Forbidden' }, false, 403)
+      return jsonResponse(removal)
+    }
     return jsonResponse(METRICS_RESPONSE)
   })
 }
 
 function emptyConversionResponse(variant: 'baseline' | 'treatment') {
   return { start: '2027-01-01', end: '2027-01-15', variant, metrics: emptyConversionMetrics() }
+}
+
+function emptyRemovalMetrics() {
+  return {
+    totalRequests: 0,
+    byStatus: { pending: 0, verified: 0, rejected: 0, expired: 0 },
+    bySource: [],
+    otherSourcesCount: 0,
+    pendingAging: { underOneDay: 0, oneToSevenDays: 0, sevenToThirtyDays: 0, overThirtyDays: 0 },
+    overduePendingCount: 0,
+    activeSuppressions: 0,
+    generatedAt: '2027-01-01T00:00:00.000Z',
+  }
 }
 
 async function render() {
@@ -132,5 +162,73 @@ describe('AdminMetricsPage — conversion funnel', () => {
 
     expect(testId('metrics-conversion-error')).not.toBeNull()
     expect((testId('metrics-conversion-operations-link') as HTMLAnchorElement).textContent).toContain('Check Operations')
+  })
+})
+
+describe('AdminMetricsPage — removal operations', () => {
+  it('shows an honest empty state when no removal requests exist', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(undefined, emptyRemovalMetrics())
+    await render()
+
+    expect(testId('metrics-removal-empty')?.textContent).toContain('No removal requests recorded yet')
+  })
+
+  it('folds a small-cohort source into "Other" instead of naming it', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(undefined, {
+      ...emptyRemovalMetrics(),
+      totalRequests: 3,
+      byStatus: { pending: 3, verified: 0, rejected: 0, expired: 0 },
+      bySource: [],
+      otherSourcesCount: 3,
+      pendingAging: { underOneDay: 3, oneToSevenDays: 0, sevenToThirtyDays: 0, overThirtyDays: 0 },
+    })
+    await render()
+
+    const bySource = testId('metrics-removal-by-source')
+    expect(bySource?.textContent).not.toMatch(/gitlab|github/i)
+    expect(testId('metrics-removal-other-sources')?.textContent).toContain('3')
+  })
+
+  it('renders a healthy pipeline with named sources and no overdue banner', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(undefined, {
+      ...emptyRemovalMetrics(),
+      totalRequests: 6,
+      byStatus: { pending: 1, verified: 4, rejected: 0, expired: 1 },
+      bySource: [{ source: 'github', count: 6 }],
+      pendingAging: { underOneDay: 1, oneToSevenDays: 0, sevenToThirtyDays: 0, overThirtyDays: 0 },
+      activeSuppressions: 4,
+    })
+    await render()
+
+    expect(testId('metrics-removal-by-source')?.textContent).toContain('github')
+    expect(testId('metrics-removal-overdue')).toBeNull()
+    expect(testId('metrics-removal')?.textContent).toContain('4 active suppressions')
+  })
+
+  it('flags an overdue pending backlog and links to Operations', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(undefined, {
+      ...emptyRemovalMetrics(),
+      totalRequests: 2,
+      byStatus: { pending: 2, verified: 0, rejected: 0, expired: 0 },
+      pendingAging: { underOneDay: 0, oneToSevenDays: 0, sevenToThirtyDays: 1, overThirtyDays: 1 },
+      overduePendingCount: 2,
+    })
+    await render()
+
+    expect(testId('metrics-removal-overdue')?.textContent).toContain('2 pending requests')
+    expect((testId('metrics-removal-overdue-link') as HTMLAnchorElement).textContent).toContain('check Operations')
+  })
+
+  it('shows a degraded state and links to Operations when the trust API errors', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter(undefined, 'error')
+    await render()
+
+    expect(testId('metrics-removal-error')).not.toBeNull()
+    expect((testId('metrics-removal-operations-link') as HTMLAnchorElement).textContent).toContain('Check Operations')
   })
 })

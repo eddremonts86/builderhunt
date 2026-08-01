@@ -15,6 +15,7 @@ import { randomUUID } from 'node:crypto'
 import { and, desc, eq, isNull, lt, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
+import { platformDb } from '../db/platform-db'
 import { workerDb, type WorkerTransaction } from '../db/worker-db'
 import { builders, organizations, profileRemovalRequests, profileSuppressions } from '../db/schema'
 
@@ -165,6 +166,99 @@ export async function revokeSuppression(
     .where(and(eq(profileSuppressions.id, id), isNull(profileSuppressions.revokedAt)))
     .returning({ id: profileSuppressions.id })
   return rows.length > 0
+}
+
+/**
+ * A removal request or an active suppression is itself sensitive: below this count, breaking a
+ * total down by `source` (or status) risks re-identifying the one or two people behind it — e.g.
+ * "1 pending request from devpost" combined with public knowledge of who recently asked to be
+ * removed. Mirrors `conversion-events.ts`'s `MIN_SAMPLE_FOR_CI` in spirit (a named, documented
+ * threshold below which a real number becomes a redaction), not in mechanism — that one nulls a
+ * confidence interval; this one folds the small bucket into "other" instead of naming it.
+ */
+const MIN_COHORT_FOR_SOURCE_DISCLOSURE = 5
+
+export interface RemovalOperationsMetrics {
+  totalRequests: number
+  byStatus: Record<RemovalRequestStatus, number>
+  /** Only sources whose own request count meets `MIN_COHORT_FOR_SOURCE_DISCLOSURE` are named — the
+   * rest are folded into `otherSourcesCount` so their existence is visible without their identity. */
+  bySource: Array<{ source: string; count: number }>
+  otherSourcesCount: number
+  /** Aging buckets for requests still `pending` — how long they have been waiting, not who they are. */
+  pendingAging: {
+    underOneDay: number
+    oneToSevenDays: number
+    sevenToThirtyDays: number
+    overThirtyDays: number
+  }
+  /** Still `pending` past their own `expiresAt` — the scheduled sweep (`expireStaleRemovalRequests`)
+   * should have moved these to `expired` by now and hasn't; a real operational backlog, not
+   * identity-bearing on its own, so never suppressed regardless of size. */
+  overduePendingCount: number
+  activeSuppressions: number
+  generatedAt: string
+}
+
+/**
+ * Bounded, redacted aggregate for the Admin Metrics "removal operations" section
+ * (plans/UI/tasks.md Wave 5 "Render redacted removal operations metrics"). Never returns a
+ * `sourceId`, `normalizedProfileUrl(Hash)`, `requesterEmailHash`, `challengeHash`, or any other
+ * per-request field — only counts.
+ */
+export async function getRemovalOperationsMetrics(now: Date = new Date(), db: PostgresJsDatabase | typeof platformDb = platformDb): Promise<RemovalOperationsMetrics> {
+  const requests = await db.select({
+    status: profileRemovalRequests.status,
+    source: profileRemovalRequests.source,
+    createdAt: profileRemovalRequests.createdAt,
+    expiresAt: profileRemovalRequests.expiresAt,
+  }).from(profileRemovalRequests)
+
+  const byStatus: Record<RemovalRequestStatus, number> = { pending: 0, verified: 0, rejected: 0, expired: 0 }
+  const bySourceCounts = new Map<string, number>()
+  const pendingAging = { underOneDay: 0, oneToSevenDays: 0, sevenToThirtyDays: 0, overThirtyDays: 0 }
+  let overduePendingCount = 0
+
+  const oneDayMs = 24 * 60 * 60 * 1000
+  for (const row of requests) {
+    const status = row.status as RemovalRequestStatus
+    byStatus[status] = (byStatus[status] ?? 0) + 1
+    bySourceCounts.set(row.source, (bySourceCounts.get(row.source) ?? 0) + 1)
+
+    if (status === 'pending') {
+      const ageMs = now.getTime() - row.createdAt.getTime()
+      if (ageMs < oneDayMs) pendingAging.underOneDay += 1
+      else if (ageMs < 7 * oneDayMs) pendingAging.oneToSevenDays += 1
+      else if (ageMs < 30 * oneDayMs) pendingAging.sevenToThirtyDays += 1
+      else pendingAging.overThirtyDays += 1
+
+      if (row.expiresAt.getTime() < now.getTime()) overduePendingCount += 1
+    }
+  }
+
+  const bySource: Array<{ source: string; count: number }> = []
+  let otherSourcesCount = 0
+  for (const [source, count] of bySourceCounts) {
+    if (count >= MIN_COHORT_FOR_SOURCE_DISCLOSURE) bySource.push({ source, count })
+    else otherSourcesCount += count
+  }
+  bySource.sort((a, b) => b.count - a.count)
+
+  const [{ count: activeSuppressions }] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(profileSuppressions)
+    .where(isNull(profileSuppressions.revokedAt))
+
+  return {
+    totalRequests: requests.length,
+    byStatus,
+    bySource,
+    otherSourcesCount,
+    pendingAging,
+    overduePendingCount,
+    activeSuppressions,
+    generatedAt: now.toISOString(),
+  }
 }
 
 export function listWorkerOrganizationIds(db: PostgresJsDatabase | typeof workerDb = workerDb) {
