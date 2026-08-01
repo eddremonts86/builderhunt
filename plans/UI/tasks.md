@@ -224,7 +224,7 @@
 
 ## Wave 6 — Public navigation and cross-links
 
-- [ ] **Build responsive public product navigation**
+- [x] **Build responsive public product navigation**
   - Files: `src/shared/components/Header.tsx`, `src/shared/components/PublicNavDrawer.tsx`, `src/routes/_landing/route.tsx`, `tests/unit/shared/components/Header.test.tsx`, `tests/e2e/public-content.spec.ts`
   - Do: Expose Explore, Pricing, Blog, Changelog, Roadmap, Status, and Security through Product/Learn/Trust groupings; retain Home anchors; add a keyboard-accessible mobile drawer with current-route state.
   - Verify: every destination is reachable at desktop and 320 px without scrolling to the footer; focus return, Escape, overlay click, and reduced motion pass.

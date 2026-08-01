@@ -145,8 +145,9 @@ async function withPage(
   browser: Browser,
   storageState: StorageState | undefined,
   run: (page: Page, guard: StrictBrowserGuard) => Promise<void>,
+  contextOptions: Parameters<Browser['newContext']>[0] = {},
 ): Promise<void> {
-  const context = await browser.newContext(storageState ? { storageState } : {})
+  const context = await browser.newContext({ ...(storageState ? { storageState } : {}), ...contextOptions })
   const page = await context.newPage()
   const guard = expectStrictBrowser(page)
   try {
@@ -196,6 +197,106 @@ test.describe('landing page', () => {
       await expect(page.getByText('404')).toBeVisible()
       await expect(page.getByText('Page not found')).toBeVisible()
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Public navigation — Wave 6 "Build responsive public product navigation"
+// ---------------------------------------------------------------------------
+
+test.describe('public navigation', () => {
+  test('desktop Product/Learn/Trust dropdowns expose every non-home destination', async ({ browser }) => {
+    await withPage(browser, undefined, async (page) => {
+      await gotoHydrated(page, `${harness.baseURL}/`)
+
+      await page.getByRole('button', { name: 'Product' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Explore' })).toHaveAttribute('href', '/explore')
+      await expect(page.getByRole('menuitem', { name: 'Pricing' })).toHaveAttribute('href', '/pricing')
+      await page.keyboard.press('Escape')
+
+      await page.getByRole('button', { name: 'Learn' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Blog' })).toHaveAttribute('href', '/blog')
+      await expect(page.getByRole('menuitem', { name: 'Changelog' })).toHaveAttribute('href', '/changelog')
+      await expect(page.getByRole('menuitem', { name: 'Roadmap' })).toHaveAttribute('href', '/roadmap')
+      await page.keyboard.press('Escape')
+
+      await page.getByRole('button', { name: 'Trust' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Status' })).toHaveAttribute('href', '/status')
+      await expect(page.getByRole('menuitem', { name: 'Security' })).toHaveAttribute('href', '/security')
+    })
+  })
+
+  test('at 320px, the mobile drawer reaches every destination without the page footer', async ({ browser }) => {
+    await withPage(
+      browser,
+      undefined,
+      async (page) => {
+        await gotoHydrated(page, `${harness.baseURL}/pricing`)
+
+        // The header's own auth links are only ever in the drawer below `md` — the
+        // footer has its own always-present copies, so this scopes to the header.
+        const header = page.getByRole('banner')
+        await expect(header.getByRole('link', { name: 'Sign in' })).toHaveCount(0)
+        await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(0)
+
+        const trigger = page.getByRole('button', { name: 'Open menu' })
+        await trigger.click()
+
+        const dialog = page.getByRole('dialog', { name: 'Menu' })
+        await expect(dialog).toBeVisible()
+        for (const label of ['How it works', 'Use cases', 'Sources', 'FAQ', 'Explore', 'Pricing', 'Blog', 'Changelog', 'Roadmap', 'Status', 'Security', 'Sign in', 'Get started']) {
+          await expect(dialog.getByRole('link', { name: label })).toBeVisible()
+        }
+
+        // Escape closes it and returns focus to the trigger — a keyboard user is
+        // never dropped onto <body> with no visible focus indicator.
+        await page.keyboard.press('Escape')
+        await expect(dialog).not.toBeVisible()
+        await expect(trigger).toBeFocused()
+
+        // Overlay click closes it too.
+        await trigger.click()
+        await expect(dialog).toBeVisible()
+        await page.mouse.click(10, 300)
+        await expect(dialog).not.toBeVisible()
+      },
+      { viewport: { width: 320, height: 720 } },
+    )
+  })
+
+  test('the mobile drawer highlights the current route and navigates on link click', async ({ browser }) => {
+    await withPage(
+      browser,
+      undefined,
+      async (page) => {
+        await gotoHydrated(page, `${harness.baseURL}/pricing`)
+        await page.getByRole('button', { name: 'Open menu' }).click()
+        const dialog = page.getByRole('dialog', { name: 'Menu' })
+        await expect(dialog.getByRole('link', { name: 'Pricing' })).toHaveAttribute('aria-current', 'page')
+
+        await dialog.getByRole('link', { name: 'Changelog' }).click()
+        await expect(page).toHaveURL(`${harness.baseURL}/changelog`)
+        await expect(dialog).not.toBeVisible()
+      },
+      { viewport: { width: 320, height: 720 } },
+    )
+  })
+
+  test('respects prefers-reduced-motion and still opens/closes the drawer correctly', async ({ browser }) => {
+    await withPage(
+      browser,
+      undefined,
+      async (page) => {
+        await gotoHydrated(page, `${harness.baseURL}/pricing`)
+        const trigger = page.getByRole('button', { name: 'Open menu' })
+        await trigger.click()
+        const dialog = page.getByRole('dialog', { name: 'Menu' })
+        await expect(dialog).toBeVisible()
+        await page.keyboard.press('Escape')
+        await expect(dialog).not.toBeVisible()
+      },
+      { viewport: { width: 320, height: 720 }, reducedMotion: 'reduce' },
+    )
   })
 })
 
