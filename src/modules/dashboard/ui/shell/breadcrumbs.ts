@@ -29,7 +29,10 @@ const CONTEXTUAL_ROUTES: readonly ContextualRoute[] = [
   { prefix: '/builder/', parentLabel: 'Search', parentTo: '/search', fallbackLabel: 'Builder' },
   { prefix: '/lists/', parentLabel: 'Shortlists', parentTo: '/lists', fallbackLabel: 'Shortlist' },
   { prefix: '/sprints/', parentLabel: 'Sprints', parentTo: '/sprints', fallbackLabel: 'Sprint', exclude: ['/sprints/new'] },
-  { prefix: '/interviews/', parentLabel: 'Interviews', parentTo: '/interviews', fallbackLabel: 'Interview' },
+  // `/interviews/invitations` is a static list page (plans/UI Wave 3 "Build a central invitation
+  // management hub"), not a `$interviewId` detail route — excluded the same way `/sprints/new` is,
+  // so it falls through to nav-config's own "Invitations" label instead of "Interview".
+  { prefix: '/interviews/', parentLabel: 'Interviews', parentTo: '/interviews', fallbackLabel: 'Interview', exclude: ['/interviews/invitations'] },
 ]
 
 function findContextualRoute(pathname: string): ContextualRoute | null {

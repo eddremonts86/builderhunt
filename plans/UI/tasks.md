@@ -108,7 +108,7 @@
   - Do: Add View in Calendar, Prepare brief, and Start/Rejoin actions when the invitation/event state permits; preserve safe external meeting links as secondary actions.
   - Verify: draft/sent/opened/booked/cancelled states expose only valid actions and navigate to the correct event/interview.
 
-- [ ] **Build a central invitation management hub**
+- [x] **Build a central invitation management hub**
   - Files: `src/routes/_dashboard/interviews/invitations.tsx`, `src/modules/scheduling/components/InvitationList.tsx`, `src/modules/scheduling/components/InvitationStatus.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `src/routes/api/scheduling/invitations/index.ts`, `tests/e2e/scheduling-organizer.spec.ts`
   - Do: Add Invitations under Pipeline with filters for draft/sent/opened/booked/declined/revoked, pagination, draft resume/preview/send, revoke, and links to builder, Calendar, brief, and live interview when valid.
   - Verify: refresh preserves discoverability of a draft; every lifecycle state exposes only legal actions; tenant and role negative cases pass.

@@ -15,7 +15,7 @@
 import {
   Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
   Download, Gauge, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plus, RotateCcw,
-  Mic,
+  Mic, Send,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
 } from 'lucide-react'
 
@@ -96,6 +96,9 @@ export const NAV_AREAS: readonly NavArea[] = [
       // in this schema. Without an entry here the page existed but nothing linked to it, which is the state
       // the whole interview feature was in until now.
       { to: '/interviews', label: 'Interviews', icon: Mic, group: 'Schedule', exact: true },
+      // Before this, an invitation was only reachable from the one builder profile it was created
+      // on — plans/UI Wave 3 "Build a central invitation management hub".
+      { to: '/interviews/invitations', label: 'Invitations', icon: Send, group: 'Schedule' },
     ],
   },
   {

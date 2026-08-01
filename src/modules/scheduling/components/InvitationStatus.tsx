@@ -15,6 +15,12 @@
  * Interviews") built from `bookedEventId` alone — no extra lookup, because an interview *is* the
  * calendar event it was booked onto: `/interviews/$interviewId` and the calendar route both resolve
  * by that same id. The candidate's own meeting URL stays a secondary, safety-checked external link.
+ *
+ * A draft row gets Send and Resume (plans/UI Wave 3 "Build a central invitation management hub").
+ * Send needs only `{version, idempotencyKey}` — the candidate address was captured at creation and
+ * lives on the row already, so there is no second form to fill in; the email is shown plainly first
+ * so the organizer can catch a stale/typo'd address before committing to an unresendable action.
+ * Resume points at the builder's own profile, where the compose panel that created this draft lives.
  */
 import * as React from 'react'
 import { ExternalLink } from 'lucide-react'
@@ -34,6 +40,7 @@ export interface InvitationSummary {
   /** Same id as the calendar event and the `/interviews/$interviewId` route; null until booked. */
   bookedEventId?: string | null
   meetingUrl?: string | null
+  candidateEmail?: string | null
 }
 
 interface InvitationStatusProps {
@@ -58,23 +65,23 @@ export function InvitationStatus({ invitations, onChanged }: InvitationStatusPro
   const [busyId, setBusyId] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
 
-  async function revoke(invitation: InvitationSummary) {
+  async function transition(invitation: InvitationSummary, action: 'revoke' | 'send', failureMessage: string) {
     if (busyId) return
     setBusyId(invitation.invitationId)
     setError(null)
     try {
-      const res = await fetch(`/api/scheduling/invitations/${invitation.invitationId}/revoke`, {
+      const res = await fetch(`/api/scheduling/invitations/${invitation.invitationId}/${action}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           version: invitation.version,
-          idempotencyKey: `revoke-${invitation.invitationId}-${invitation.version}`,
+          idempotencyKey: `${action}-${invitation.invitationId}-${invitation.version}`,
         }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
-        setError(body?.message ?? 'Could not revoke this invitation.')
+        setError(body?.message ?? failureMessage)
         return
       }
       onChanged()
@@ -84,6 +91,9 @@ export function InvitationStatus({ invitations, onChanged }: InvitationStatusPro
       setBusyId(null)
     }
   }
+
+  const revoke = (invitation: InvitationSummary) => transition(invitation, 'revoke', 'Could not revoke this invitation.')
+  const send = (invitation: InvitationSummary) => transition(invitation, 'send', 'Could not send this invitation.')
 
   if (invitations.length === 0) {
     return <p className="text-sm text-bh-text-muted">No interview invitations yet.</p>
@@ -114,6 +124,24 @@ export function InvitationStatus({ invitations, onChanged }: InvitationStatusPro
                     {new Date(invitation.bookedAt).toLocaleString()}
                   </p>
                 ) : null}
+                {invitation.status === 'draft' ? (
+                  <div className="mt-1 space-y-1">
+                    {invitation.candidateEmail && (
+                      <p className="text-xs text-bh-text-muted" data-testid="invitation-status-candidate-email">
+                        To: {invitation.candidateEmail}
+                      </p>
+                    )}
+                    {invitation.organizationBuilderId && (
+                      <a
+                        href={`/builder/${invitation.organizationBuilderId}`}
+                        className="inline-block text-xs text-bh-accent underline"
+                        data-testid="invitation-status-resume-draft"
+                      >
+                        Resume draft
+                      </a>
+                    )}
+                  </div>
+                ) : null}
                 {invitation.status === 'booked' && invitation.bookedEventId ? (
                   <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="invitation-status-booked-links">
                     <a href={`/calendar?event=${invitation.bookedEventId}`} className="text-bh-accent underline" data-testid="invitation-status-view-in-calendar">
@@ -140,17 +168,31 @@ export function InvitationStatus({ invitations, onChanged }: InvitationStatusPro
                   </div>
                 ) : null}
               </div>
-              {TERMINAL.has(invitation.status) ? null : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => revoke(invitation)}
-                  disabled={busyId === invitation.invitationId}
-                >
-                  {busyId === invitation.invitationId ? 'Revoking…' : 'Revoke'}
-                </Button>
-              )}
+              <div className="flex shrink-0 items-center gap-2">
+                {invitation.status === 'draft' && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => send(invitation)}
+                    disabled={busyId === invitation.invitationId}
+                    data-testid="invitation-status-send"
+                  >
+                    {busyId === invitation.invitationId ? 'Sending…' : 'Send'}
+                  </Button>
+                )}
+                {TERMINAL.has(invitation.status) ? null : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => revoke(invitation)}
+                    disabled={busyId === invitation.invitationId}
+                  >
+                    {busyId === invitation.invitationId ? 'Revoking…' : 'Revoke'}
+                  </Button>
+                )}
+              </div>
             </li>
           )
         })}

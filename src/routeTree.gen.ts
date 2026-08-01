@@ -125,6 +125,7 @@ import { Route as DashboardSettingsSecurityRouteImport } from './routes/_dashboa
 import { Route as DashboardSettingsPrivacyRouteImport } from './routes/_dashboard/settings/privacy'
 import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboard/settings/billing'
 import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
+import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_dashboard/interviews/invitations'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
@@ -854,6 +855,12 @@ const DashboardListsListIdRoute = DashboardListsListIdRouteImport.update({
   path: '/lists/$listId',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardInterviewsInvitationsRoute =
+  DashboardInterviewsInvitationsRouteImport.update({
+    id: '/interviews/invitations',
+    path: '/interviews/invitations',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -1690,6 +1697,7 @@ export interface FileRoutesByFullPath {
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
+  '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
   '/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
@@ -1945,6 +1953,7 @@ export interface FileRoutesByTo {
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/users': typeof DashboardAdminUsersRoute
+  '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
   '/settings/privacy': typeof DashboardSettingsPrivacyRoute
   '/settings/security': typeof DashboardSettingsSecurityRoute
@@ -2203,6 +2212,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
+  '/_dashboard/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/_dashboard/lists/$listId': typeof DashboardListsListIdRoute
   '/_dashboard/settings/billing': typeof DashboardSettingsBillingRouteWithChildren
   '/_dashboard/settings/privacy': typeof DashboardSettingsPrivacyRoute
@@ -2461,6 +2471,7 @@ export interface FileRouteTypes {
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
+    | '/interviews/invitations'
     | '/lists/$listId'
     | '/settings/billing'
     | '/settings/privacy'
@@ -2716,6 +2727,7 @@ export interface FileRouteTypes {
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/users'
+    | '/interviews/invitations'
     | '/lists/$listId'
     | '/settings/privacy'
     | '/settings/security'
@@ -2973,6 +2985,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
     | '/_dashboard/admin/users'
+    | '/_dashboard/interviews/invitations'
     | '/_dashboard/lists/$listId'
     | '/_dashboard/settings/billing'
     | '/_dashboard/settings/privacy'
@@ -4177,6 +4190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardListsListIdRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/interviews/invitations': {
+      id: '/_dashboard/interviews/invitations'
+      path: '/interviews/invitations'
+      fullPath: '/interviews/invitations'
+      preLoaderRoute: typeof DashboardInterviewsInvitationsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/users': {
       id: '/_dashboard/admin/users'
       path: '/admin/users'
@@ -5190,6 +5210,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
+  DashboardInterviewsInvitationsRoute: typeof DashboardInterviewsInvitationsRoute
   DashboardListsListIdRoute: typeof DashboardListsListIdRoute
   DashboardSettingsBillingRoute: typeof DashboardSettingsBillingRouteWithChildren
   DashboardSettingsPrivacyRoute: typeof DashboardSettingsPrivacyRoute
@@ -5226,6 +5247,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
+  DashboardInterviewsInvitationsRoute: DashboardInterviewsInvitationsRoute,
   DashboardListsListIdRoute: DashboardListsListIdRoute,
   DashboardSettingsBillingRoute: DashboardSettingsBillingRouteWithChildren,
   DashboardSettingsPrivacyRoute: DashboardSettingsPrivacyRoute,
