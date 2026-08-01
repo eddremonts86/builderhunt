@@ -75,9 +75,9 @@ Verificado contra HEAD, **esa afirmación era parcialmente falsa** y se retira.
 
 | Artefacto | Estado en HEAD | Ruta |
 | --- | --- | --- |
-| Tabla `candidate_documents` | existe (WIP sin commitear) | `src/shared/lib/db/schema.ts` ~2352, `drizzle/0084` |
-| Tabla `document_extractions` | existe (WIP sin commitear) | `src/shared/lib/db/schema.ts` ~2401 |
-| RLS + grants de ambas | existe (WIP sin commitear) | `drizzle/0085_candidate_documents_rls_grants.sql` |
+| Tabla `candidate_documents` | existe (commiteado) | `src/shared/lib/db/schema.ts` ~2481, `drizzle/0084` |
+| Tabla `document_extractions` | existe (commiteado) | `src/shared/lib/db/schema.ts` ~2553 |
+| RLS + grants de ambas | existe (commiteado) | `drizzle/0085_candidate_documents_rls_grants.sql` |
 | Contrato de tipos de storage/scan/parse | existe, sin implementación | `src/lib/storage/types.ts` |
 | Variables de entorno de storage y ClamAV | existen | `src/shared/lib/env.ts` (`INTERVIEW_R2_*`, `INTERVIEW_CLAMAV_*`, `CANDIDATE_UPLOADS_ENABLED`) |
 | Adaptador S3/MinIO real | **no existe** | — |
@@ -362,7 +362,7 @@ check (document_consent_withdrawn_at is null or document_consent_granted_at is n
 ```
 
 **No hay tabla `career_processing_consents`.** El rastro append-only de evidencia se escribe en la
-tabla existente `user_consents` (`src/shared/lib/db/schema.ts:587`, clase account-subject) con
+tabla existente `user_consents` (`src/shared/lib/db/schema.ts:663`, clase account-subject) con
 `document in ('career_ai_processing','career_document_storage')` y `version` = la versión del aviso;
 esas columnas son exactamente lo que hace falta. `user_consents` sólo sabe aceptar, así que el
 **estado actual** (incluida la retirada) vive en las seis columnas de arriba, y la evidencia

@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: nothing (pure read-only consumer of `src/lib/score.ts` and `builder_source_snapshots`). Files new connector findings against [`audit-trust`](../../phase-1/52-audit-trust/spec.md) and must respect [`project-hygiene`](../../phase-1/05-project-hygiene/spec.md) (no synthetic evidence presented as measured fact).
 > **Blocks**: [`jd-to-candidates-matching`](../jd-to-candidates-matching/spec.md) (soft — that plan reuses this panel to explain per-JD match reasons); [`browser-extension-overlay`](../browser-extension-overlay/spec.md) (soft — it reads `src/lib/score.ts`, so land Phase 1 first)
-> **Reality check**: `src/lib/score.ts` returns one integer and now branches over **15** sources; `getScoreBreakdown` (`src/components/ui/score-ring.tsx:158`) is a drifted second copy feeding the ring tooltip; `SearchPage.tsx:1473` already renders a one-line "why this match"; `builder_source_snapshots` is migrated (`drizzle/0005_builder_normalization.sql`) but has no reader, no writer, and no `builderhunt_app` grant.
+> **Reality check**: `src/lib/score.ts` returns one integer and now branches over **15** sources; `getScoreBreakdown` (`src/components/ui/score-ring.tsx:158`) is a drifted second copy feeding the ring tooltip; `SearchPage.tsx:1408` already renders a one-line "why this match"; `builder_source_snapshots` is migrated (`drizzle/0005_builder_normalization.sql`) but has no reader, no writer, and no `builderhunt_app` grant.
 
 ## Phases (dependency order — shippable after each)
 

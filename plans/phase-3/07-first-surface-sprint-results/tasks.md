@@ -34,7 +34,7 @@
 - [ ] **Migrate the sprint results UI onto the shell**
   - Files: `src/routes/_dashboard/sprints/$sprintId/index.tsx`
   - Do: `validateSearch: tableSearchSchema`, a `ColumnDef[]` for the result row, `DataTable` with
-    `rowTestId`. Delete the local `filter` state (`index.tsx:56`) and any local sort. **Do not
+    `rowTestId`. Delete the local `filter` state (`index.tsx:58`) and any local sort. **Do not
     touch `sprint.cursor`** — that is sourcing progress feeding a progress bar, not pagination.
   - Verify: `pnpm dev`, open a sprint with more than 50 results; scroll to page 2, sort by score,
     group by source, select rows, navigate by keyboard.

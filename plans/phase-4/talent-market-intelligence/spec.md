@@ -3,7 +3,7 @@
 > **Status**: `pending`
 > **Depends on**: [`proactive-discovery`](../../phase-1/23-proactive-discovery/spec.md) (the global index breadth every aggregate is computed from — already shipped); [`public-landing-pages`](../../phase-1/45-public-landing-pages/spec.md) (public page shell, SEO, and OG image plumbing — already shipped); [`content-marketing`](../../phase-1/46-content-marketing/spec.md) (the blog/content surface these reports extend — already shipped); [`claimable-profiles`](../../phase-1/36-claimable-profiles/spec.md) (`published_builder_profiles`/`builder_claims`, the entire consent basis for §1 Type B — already shipped). Enhanced by [`smart-alerts`](../../phase-1/34-smart-alerts/spec.md) (digest email delivery; not required).
 > **Blocks**: nothing
-> **Reality check**: The index exists — `builder_embeddings` (global, no RLS, `src/shared/lib/db/schema.ts:739`) and `builder_identities` (`src/shared/lib/db/schema.ts:139`). The public surface exists — `src/routes/_landing/{blog,changelog,explore}`, `src/routes/sitemap[.]xml.ts`, `src/routes/robots[.]txt.ts`, `src/routes/api/og/explore.tsx`. Public-surface indexing is now *governed*: `src/shared/lib/seo/surfaces.ts` (`SEO_SURFACES`) + `public_surface_indexing` (`drizzle/0082`/`0083`), fail-closed to `noindex`. Cron is now *governed*: `OPERATIONAL_SCHEDULES` in `src/shared/lib/operational-schedules.ts` + `withJobRun` in `src/shared/lib/repositories/platform-operations.ts`. The admin-published-public-content precedent exists — `src/shared/lib/repositories/platform-content.ts` + `src/routes/api/admin/changelog/index.ts`. What does **not** exist: any time series, any aggregate table, any report route.
+> **Reality check**: The index exists — `builder_embeddings` (global, no RLS, `src/shared/lib/db/schema.ts:816`) and `builder_identities` (`src/shared/lib/db/schema.ts:139`). The public surface exists — `src/routes/_landing/{blog,changelog,explore}`, `src/routes/sitemap[.]xml.ts`, `src/routes/robots[.]txt.ts`, `src/routes/api/og/explore.tsx`. Public-surface indexing is now *governed*: `src/shared/lib/seo/surfaces.ts` (`SEO_SURFACES`) + `public_surface_indexing` (`drizzle/0082`/`0083`), fail-closed to `noindex`. Cron is now *governed*: `OPERATIONAL_SCHEDULES` in `src/shared/lib/operational-schedules.ts` + `withJobRun` in `src/shared/lib/repositories/platform-operations.ts`. The admin-published-public-content precedent exists — `src/shared/lib/repositories/platform-content.ts` + `src/routes/api/admin/changelog/index.ts`. What does **not** exist: any time series, any aggregate table, any report route.
 
 ## Problem
 
@@ -107,7 +107,7 @@ Audited what the schema supports, re-audited against HEAD on 2026-07-27:
 | `builder_identities.first_seen_at`             | **Will have two writers.** `trackOrganizationBuilder` (`src/shared/lib/repositories/organization-builders.ts:274`, the only `insert(builderIdentities)` in the tree at HEAD) stamps it when a tenant tracks someone; [`collaboration-graph`](../collaboration-graph/spec.md)'s crawler will stamp it for co-contributors nobody tracked. Either way: customer-choice biased or crawler biased, and small. Unusable as a population frame — see the touchpoint below. |
 | `builder_embeddings.created_at`                | The only broad time dimension. `created_at` = when one of the ingestion paths in §2.2 first indexed the profile. **Usable, with care.**                                          |
 | `builder_embeddings.updated_at`                | **Not a content-change signal — a coverage signal.** See §2.1. Confined to the coverage envelope.                                                                                |
-| `discovery_state.stats`                        | Cumulative `{runs, upserted, errors}` only (`src/shared/lib/db/schema.ts:776-779`), no per-period history. Usable only as a coverage witness once snapshotted monthly.            |
+| `discovery_state.stats`                        | Cumulative `{runs, upserted, errors}` only (`src/shared/lib/db/schema.ts:853-856`), no per-period history. Usable only as a coverage witness once snapshotted monthly.            |
 | `builder_embeddings.profile->topics/language`  | The topic signal. Deterministic keyword match, no LLM.                                                                                                                          |
 
 So: **no historical time series exists today, and the one time dimension that does is
@@ -453,7 +453,7 @@ A marketing digest to a list is not transactional. Resend exists (`src/shared/li
 `sendAlertDigestEmail` at line 249 is the shape to copy, including the `E2E_MODE` outbox
 short-circuit at line 41) and no new mailing-list system is built.
 
-- **Opt-in only, authenticated users only.** Reuses `user_consents` (`src/shared/lib/db/schema.ts:587`
+- **Opt-in only, authenticated users only.** Reuses `user_consents` (`src/shared/lib/db/schema.ts:663`
   — free-text `document`/`version`, no check constraint): `document: 'market_digest'`,
   `version: 'v1'`. `/api/consent`'s `ConsentBody` enum (`src/routes/api/consent/index.ts:14`) gains
   `market_digest`, but its local `CURRENT_VERSIONS` map (line 7) does **not** — a missing marketing

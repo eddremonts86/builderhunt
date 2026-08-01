@@ -302,7 +302,7 @@ the same shape as `semantic-search`'s Coolify pgvector step) and requires `EXPLA
 of an index scan before Phase 3 is considered done.
 
 **Sprint matches — the query shape is load-bearing.** `sprint_results` has exactly two indexes
-(`schema.ts:874-877`): `sprint_results_sprint_source_unique` on `(sprint_id, source, source_id)` and
+(`schema.ts:952`): `sprint_results_sprint_source_unique` on `(sprint_id, source, source_id)` and
 `sprint_results_sprint_created_idx` on `(sprint_id, created_at)`. **Neither can serve a predicate
 whose leading column is `organization_id` or `source`**, so the naive
 `WHERE organization_id = $1 AND source = $2 AND source_id = $3` is a sequential scan on the largest

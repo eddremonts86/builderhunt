@@ -120,7 +120,7 @@ exentas de snapshot.
     propietario (`where status in ('queued','running')`), el `job_import_items_worker_scan_idx` sobre
     `(status, available_at, lease_expires_at)` — deliberadamente **sin** `organization_id`, porque el
     barrido de leases del worker es cross-organización, igual que
-    `enrichment_jobs_worker_scan_idx` (`src/shared/lib/db/schema.ts:924`) — y los cinco checks de
+    `enrichment_jobs_worker_scan_idx` (`src/shared/lib/db/schema.ts:1001`) — y los cinco checks de
     integridad del item (`input_presence`, `lease`, `lease_status`, `success`, `error`).
   - Verify: `pnpm type-check`; `pnpm exec drizzle-kit check` no reporta drift.
 

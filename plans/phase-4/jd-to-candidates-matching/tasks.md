@@ -28,7 +28,7 @@ Ordered so the app is shippable after every checkbox.
     org+fingerprint indexes, an `expires_at` index, a `mode` check constraint, and the composite
     tenant FK `(organization_id, reservation_id) → billing_credit_reservations(organization_id, id)`.
     The FK target exists — `billing_credit_reservations_organization_id_id_unique`
-    (`schema.ts:1174`) — and `billingCreditAllocations` (`schema.ts:1199-1202`) is the working
+    (`schema.ts:1252`) — and `billingCreditAllocations` (`schema.ts:1277-1281`) is the working
     precedent for this exact shape. `reservationId` stays nullable: Postgres `MATCH SIMPLE`
     (the default) satisfies a composite FK whenever any column is NULL.
   - Verify: `pnpm type-check`.

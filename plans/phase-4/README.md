@@ -98,10 +98,10 @@ it fixes are all still gaps. The target image `pgvector/pgvector:0.8.5-pg18` was
 Docker Hub (amd64 + arm64) on 2026-07-27, and pgvector availability is now stated as a hard
 requirement with the incident rationale, not a footnote.
 
-**Its blocker is real and belongs to someone else**: `drizzle/0084`/`0085` are untracked
-working-tree WIP, so every count in the plan describes the working tree, not `git HEAD`. An
-operator running Phase 0 from a clean checkout provisions a *different* schema than the one
-rehearsed. Land or drop that WIP first.
+**Its blocker has since been resolved**: `drizzle/0084`/`0085` (the candidate-documents schema and
+its RLS/grants) were untracked working-tree WIP when this pass ran; they are now committed and
+tracked at HEAD (`git ls-files` confirms both), so a clean checkout provisions the same schema that
+Phase 0 rehearses. No WIP remains to land first.
 
 ## Dependency graph
 

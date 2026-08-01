@@ -21,9 +21,9 @@ backfills `pipeline_stage` / `pipeline_stage_changed_at` (mapping `status = 'sho
 `reviewed` without touching `status`).
 
 **No migration number is written down anywhere in this plan.** The head of `drizzle/` moves
-constantly (86 journal entries as of 2026-07-27, and two of the newest files are uncommitted
-working-tree WIP). Every migration task reads the real next index from `drizzle/meta/_journal.json`
-at the moment it runs; a hardcoded `00NN` in a task is a defect.
+constantly (115 journal entries as of 2026-07-31, all committed). Every migration task reads the
+real next index from `drizzle/meta/_journal.json` at the moment it runs; a hardcoded `00NN` in a
+task is a defect.
 
 The grants migration also adds the one grant Phase 6 needs and no existing migration provides: a
 column-scoped `builderhunt_worker` SELECT on `organization_entitlements` (`0008` scopes it to

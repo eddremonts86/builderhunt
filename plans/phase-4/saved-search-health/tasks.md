@@ -8,11 +8,11 @@
 Ordered so the app ships cleanly after every checkbox. Phase 0's FK repair must land before any
 code writes `alerts.query_id`.
 
-**Migration numbering — read before Phase 0.** Never hardcode a migration index or filename. At the
-time of writing `drizzle/meta/_journal.json` held 86 entries with head
-`0085_candidate_documents_rls_grants`, but two of those are uncommitted working-tree WIP, so the
-real next index will differ. Both migration tasks below say to let drizzle-kit allocate the index
-and to read the actual value back out of `drizzle/meta/_journal.json`.
+**Migration numbering — read before Phase 0.** Never hardcode a migration index or filename.
+`drizzle/meta/_journal.json` grows constantly (115 entries, head `0114_*` at last check, all
+committed), so the real next index will differ from anything written here. Both migration tasks
+below say to let drizzle-kit allocate the index and to read the actual value back out of
+`drizzle/meta/_journal.json`.
 
 ## Phase 0 — Attribution foundation
 

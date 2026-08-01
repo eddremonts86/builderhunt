@@ -87,7 +87,7 @@ must be under `tests/`.
     form `(table) => [ ... ]` that `builderIdentities`/`organizationBuilders` already use
     (`schema.ts:158,193`), not the older object form. The partial unique index is
     `uniqueIndex('extension_tokens_active_user_org_unique').on(t.userId, t.organizationId).where(sql\`${t.revokedAt} is null\`)`
-    — same shape as `builder_claims_active_identity_unique` (`schema.ts:222`). Include
+    — same shape as `builder_claims_active_identity_unique` (`schema.ts:283`). Include
     `extension_pairings_status_check`.
   - Verify: `pnpm type-check`; `pnpm db:audit-schema` reports no unclassified table.
 
@@ -384,7 +384,7 @@ must be under `tests/`.
     nested-loops through `sprint_results_sprint_source_unique`. The obvious form
     (`WHERE sprint_results.organization_id = $1 AND source = $2 AND source_id = $3`) is a **sequential
     scan**: `sprint_results` has only `(sprint_id, source, source_id)` and `(sprint_id, created_at)`
-    (`schema.ts:874-877`), and both lead with `sprint_id`. Run it under `withTenantContext` because
+    (`schema.ts:952`), and both lead with `sprint_id`. Run it under `withTenantContext` because
     `builderhunt_app`'s access is `SELECT` + the org-scoped `sprint_results_app_select` policy and
     nothing more (`drizzle/0024_sourcing_sprints_grants.sql:31,56`). `builder_identities` is
     `global-public` with a `builderhunt_app` grant (`drizzle/0011_builder_claim_policies.sql`), so
