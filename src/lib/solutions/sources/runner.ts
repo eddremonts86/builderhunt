@@ -43,6 +43,9 @@ export type RunAdapterResult =
        * metadata at all. Counted rather than silently dropped — a non-zero value means the adapter and
        * its register entry disagree about what this source publishes. */
       emptyAfterFieldFilter: number
+      /** Retrieval projections written for the components this run changed. Zero alongside a non-zero
+       * `created`/`versioned` means projection failed and the next projector pass has work to do. */
+      projected: number
     }
   | { status: 'skipped'; sourceKey: string; reason: 'source_not_registered' | 'source_disabled' | 'mode_mismatch' }
   | { status: 'retry'; sourceKey: string; reason: 'rate_limited' | 'upstream_unavailable' }
@@ -105,6 +108,8 @@ export async function runSolutionSourceAdapter(
   let versioned = 0
   let unchanged = 0
   let emptyAfterFieldFilter = 0
+  /** Components whose content changed, so only those need re-projecting. */
+  const touchedComponentIds = new Set<string>()
 
   for (const component of outcome.components) {
     const metadata = filterToAllowedFields(component.metadata, source.allowedFields)
@@ -133,6 +138,7 @@ export async function runSolutionSourceAdapter(
     if (ingested.status === 'created') created += 1
     else if (ingested.status === 'versioned') versioned += 1
     else unchanged += 1
+    if (ingested.status !== 'unchanged') touchedComponentIds.add(ingested.componentId)
 
     // Only attach claims for content that actually changed. Re-attaching identical claims on every
     // unchanged refresh would rewrite `primary_evidence_id` for no reason.
@@ -158,10 +164,36 @@ export async function runSolutionSourceAdapter(
     }
   }
 
+  // Project what this run actually changed, so a component is retrievable as soon as it is ingested.
+  //
+  // Scoped to the touched components rather than the whole catalog: a full rebuild is a separate,
+  // idempotent job (`pnpm solutions:project`), and making every ingestion run re-project everything would
+  // make ingestion cost grow with catalog size for no benefit.
+  //
+  // Failure here is logged and does not fail the run. The ingested versions and evidence are already
+  // committed and correct; a missing projection means a component is temporarily unretrievable, which the
+  // next projector pass fixes. Reporting the whole ingestion as failed would invite a re-run that
+  // re-fetches every source to fix an index.
+  let projected = 0
+  if (touchedComponentIds.size > 0) {
+    try {
+      const { projectComponents } = await import('~/lib/solutions/indexing/project-components')
+      const projection = await projectComponents({
+        componentIds: [...touchedComponentIds], readDb, writeDb,
+      })
+      projected = projection.written
+    } catch (error) {
+      log.warn('solutions_projection_after_ingest_failed', {
+        sourceKey: adapter.sourceKey,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+
   log.info('solutions_adapter_run', {
-    sourceKey: adapter.sourceKey, created, versioned, unchanged, emptyAfterFieldFilter,
+    sourceKey: adapter.sourceKey, created, versioned, unchanged, emptyAfterFieldFilter, projected,
   })
-  return { status: 'completed', sourceKey: adapter.sourceKey, created, versioned, unchanged, emptyAfterFieldFilter }
+  return { status: 'completed', sourceKey: adapter.sourceKey, created, versioned, unchanged, emptyAfterFieldFilter, projected }
 }
 
 /**

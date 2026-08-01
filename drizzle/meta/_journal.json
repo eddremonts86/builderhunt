@@ -911,6 +911,20 @@
       "when": 1785615847325,
       "tag": "0129_seed_solution_capabilities",
       "breakpoints": true
+    },
+    {
+      "idx": 130,
+      "version": "7",
+      "when": 1785619447325,
+      "tag": "0130_solution_component_projections",
+      "breakpoints": true
+    },
+    {
+      "idx": 131,
+      "version": "7",
+      "when": 1785623047325,
+      "tag": "0131_worker_builder_embeddings_grant",
+      "breakpoints": true
     }
   ]
 }

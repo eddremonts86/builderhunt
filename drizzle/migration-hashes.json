@@ -520,6 +520,14 @@
     "0129_seed_solution_capabilities": {
       "sql": "e9f02771ad9bce4faaf43ffdad78e81af4176b26a68bb87ecfe3e2b3fdfa3389",
       "snapshot": "7ae8c9b319ec94007bac6bf08dca1e19a98dab7f065567569ca886483ed9e239"
+    },
+    "0130_solution_component_projections": {
+      "sql": "34c98bd0b8994b81aed510cf23db518290d20a28e8d3b814813c041dc16875c1",
+      "snapshot": "daf29f31ec4df40f7bd549792000bcba80bb98e68b22d3e4ebe8462088496e2a"
+    },
+    "0131_worker_builder_embeddings_grant": {
+      "sql": "789ba197d7a08a00890cb9740ce753b6c8f103b60426884bcaf41ce7206b2db2",
+      "snapshot": "4dcdc3890dc82cbc6e46808a84060f851329abcc4926ffee76191a627ad03f2b"
     }
   }
 }

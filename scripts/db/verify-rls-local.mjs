@@ -1320,6 +1320,14 @@ try {
     // never be able to delete history.
     { table: 'builder_source_snapshots', role: 'builderhunt_platform', granted: ['SELECT', 'DELETE'] },
     { table: 'builder_embeddings', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    // The catalog projector is a real worker and enqueues stubs for components it just projected. No
+    // DELETE: removing an embedding is either retention or a subject's removal request, both platform
+    // actions.
+    { table: 'builder_embeddings', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE'], denied: ['DELETE'] },
+    // Projections are derived data the worker genuinely owns — rebuilding is DELETE + reinsert, which is
+    // the normal operation here and would be unthinkable against version history.
+    { table: 'solution_component_projections', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'solution_component_projections', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] },
     // Asserting that two real people are the same person is never a request-scoped action.
     { table: 'canonical_humans', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
     { table: 'human_source_links', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },

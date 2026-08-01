@@ -5,7 +5,7 @@ import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 // see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
 // zod, so this cannot cycle back into the schema.
 import type { ComponentKind, ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
-import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
+import type { EmbeddingPayload } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
 import type { WorkSampleAnalysis } from '~/shared/lib/work-sample'
@@ -1013,7 +1013,7 @@ export const builderEmbeddings = pgTable(
     sourceId: text('source_id').notNull(),
     contentHash: text('content_hash').notNull(),
     document: text('document').notNull(),
-    profile: jsonb('profile').$type<EmbeddedProfile>().notNull(),
+    profile: jsonb('profile').$type<EmbeddingPayload>().notNull(),
     // NULL = pending embed (picked up by the run-worker).
     embedding: vector('embedding', { dimensions: EMBEDDING_DIM }),
     embeddedAt: timestamp('embedded_at', { withTimezone: true }),
@@ -3625,6 +3625,52 @@ export const solutionEvidence = pgTable(
     check('solution_evidence_kind_check', sql`${table.kind} in ('official_metadata', 'benchmark', 'documentation', 'production_report', 'manual_review')`),
     check('solution_evidence_expiry_order_check', sql`${table.expiresAt} is null or ${table.expiresAt} > ${table.observedAt}`),
     index('solution_evidence_component_idx').on(table.componentId, table.observedAt),
+  ],
+)
+
+/**
+ * Retrieval projections: the lexical document and filter columns retrieval actually queries, derived
+ * from a component version.
+ *
+ * Separate from the version it describes because a version is history that must never be rewritten,
+ * while a projection is a cache that is rebuilt whenever the document builder changes. The vector lane
+ * is deliberately not here — it lives in `builderEmbeddings`, whose `entityKind` column exists so
+ * catalog components share one embedding dimension, one HNSW index and one re-embed script with
+ * builder profiles.
+ */
+export const solutionComponentProjections = pgTable(
+  'solution_component_projections',
+  {
+    componentId: text('component_id').notNull(),
+    version: integer('version').notNull(),
+    /** Copied from `solutionComponents` so a filtered retrieval needs no join. Safe: neither value
+     * changes for a given (component, version). */
+    kind: text('kind').notNull(),
+    sourceKey: text('source_key').notNull(),
+    /** Derived prose, not raw metadata — download counts and library names would only add lexical
+     * noise. Indexed by a generated `search_vector` column that cannot drift from it. */
+    searchDocument: text('search_document').notNull(),
+    /** Exact structured filtering. A capability requirement is array containment against this, never a
+     * substring match on the document. */
+    capabilityKeys: text('capability_keys').array().$type<string[]>().default([]).notNull(),
+    /** Strongest evidence among this version's claims, denormalized because scoring reads it for every
+     * candidate and computing it needs an aggregate. */
+    maxEvidenceLevel: text('max_evidence_level').notNull(),
+    /** Hash of the projection's inputs, so an unchanged rebuild writes nothing. */
+    contentHash: text('content_hash').notNull(),
+    /** Bumped when the document builder changes shape. The upsert refuses to go backwards on it, which
+     * is what stops a job that started before a rollout from overwriting newer work. */
+    projectionVersion: integer('projection_version').notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    projectedAt: timestamp('projected_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.componentId, table.version] }),
+    check('solution_component_projections_kind_check', sql`${table.kind} in ('human_profile', 'human_role', 'agent', 'model', 'model_endpoint', 'mcp_server', 'tool', 'service')`),
+    check('solution_component_projections_evidence_check', sql`${table.maxEvidenceLevel} in ('claimed', 'observed', 'verified', 'production_evidence')`),
+    check('solution_component_projections_version_positive_check', sql`${table.projectionVersion} > 0`),
+    index('solution_component_projections_kind_idx').on(table.kind, table.maxEvidenceLevel),
+    index('solution_component_projections_stale_idx').on(table.projectionVersion),
   ],
 )
 

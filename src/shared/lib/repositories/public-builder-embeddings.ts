@@ -8,7 +8,7 @@ import { publicDb } from '../db/client'
 import { builderEmbeddings } from '../db/schema'
 import { randomId } from '~/lib/utils'
 import type { ComponentKind } from '~/shared/lib/solutions/contracts'
-import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
+import { asEmbeddedProfile, type EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 
 /** Real people — the only kind that existed before plan 43 Phase 2, and still the default. */
 export const DEFAULT_ENTITY_KIND: ComponentKind = 'human_profile'
@@ -248,15 +248,28 @@ export async function searchBuilderEmbeddings(
   db: PostgresJsDatabase = publicDb,
 ): Promise<BuilderEmbeddingSearchResult> {
   const offset = page.offset ?? 0
+  // Over-fetch by one *before* the payload filter below, then again after: dropping catalog rows can
+  // shrink the page, so `hasMore` is decided from what survives rather than from what the index returned.
   const rows = await similarBuilderEmbeddingsQuery(db, queryVector, page.limit + 1, filters, offset)
-  const hasMore = rows.length > page.limit
-  return {
-    matches: rows.slice(0, page.limit).map((row) => ({
-      ...row,
-      entityKind: row.entityKind as ComponentKind,
-      profile: row.profile as EmbeddedProfile,
-    })),
-    hasMore,
-  }
+
+  /**
+   * Catalog components share this table with people — that is what `entity_kind` is for — so a row here
+   * is not necessarily a person. This function's contract is people, and its result feeds person result
+   * cards.
+   *
+   * Previously this read `row.profile as EmbeddedProfile`, which is a cast and not a check: a catalog
+   * component reaching it would have been handed to a card that reads `username` and `profileUrl`, fields
+   * a component does not have. Narrowing instead of casting is what makes that impossible.
+   *
+   * Rows are dropped rather than an error thrown. A caller wanting components asks for them explicitly
+   * through `filters.entityKinds`, and a mixed index answering a person query with the people it found is
+   * the correct behaviour, not a failure.
+   */
+  const profileRows = rows.flatMap((row) => {
+    const profile = asEmbeddedProfile(row.profile)
+    return profile ? [{ ...row, entityKind: row.entityKind as ComponentKind, profile }] : []
+  })
+  const hasMore = profileRows.length > page.limit
+  return { matches: profileRows.slice(0, page.limit), hasMore }
 }
 

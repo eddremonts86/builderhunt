@@ -215,11 +215,32 @@ export async function ingestComponentVersion(
 
   return db.transaction(async (tx) => {
     const [source] = await tx
-      .select({ enabled: solutionSources.enabled })
+      .select({ enabled: solutionSources.enabled, kind: solutionSources.kind })
       .from(solutionSources)
       .where(eq(solutionSources.key, input.sourceKey))
       .limit(1)
     if (!source?.enabled) return { status: 'source_disabled' } as const
+
+    /**
+     * Whether a newly ingested component is immediately visible to retrieval, decided by who asserted
+     * it exists.
+     *
+     * `lifecycle_state` defaults to `draft` and `findCandidateComponents` reads only `active`. Nothing
+     * promoted anything, so the eighteen components ingested from real sources were invisible to
+     * retrieval and always would have been — the catalog worked and answered nothing.
+     *
+     * The line is authorship. When Hugging Face's own API says a model exists, that is a publisher
+     * describing its own thing, and requiring a human to confirm each of thousands means the catalog
+     * stays empty forever. When we inferred a component from a crawled page, *we* asserted it, and that
+     * deserves review before it becomes advice.
+     *
+     * This weakens no claim gate. Being listed is not a claim about what a component can do: capability
+     * claims still enter at `claimed` and only a human raises them, and a similarity-derived
+     * compatibility edge still cannot activate itself. Those are the gates that decide advice.
+     */
+    const lifecycleState = source.kind === 'official_api' || source.kind === 'feed' || source.kind === 'licensed_dataset'
+      ? 'active'
+      : 'draft'
 
     const [existing] = await tx
       .select({ id: solutionComponents.id })
@@ -242,6 +263,7 @@ export async function ingestComponentVersion(
         sourceKey: input.sourceKey,
         externalId: input.externalId ?? null,
         homepageUrl: input.homepageUrl ?? null,
+        lifecycleState,
         createdAt: observedAt,
         updatedAt: observedAt,
       })

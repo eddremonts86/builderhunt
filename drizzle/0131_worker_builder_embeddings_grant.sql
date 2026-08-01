@@ -1,0 +1,22 @@
+-- Custom SQL migration file, put your code below! --
+-- Lets the ingestion worker enqueue embedding stubs.
+--
+-- `builder_embeddings` had grants for the app role only, because until now everything that wrote it ran
+-- on the request path: the write-through indexer upserts stubs as the app role, and the embed worker —
+-- despite its name — also connects as the app role (`findPendingBuilderEmbeddings` and
+-- `markBuilderEmbeddingsEmbedded` both use `publicDb`).
+--
+-- The catalog projector is a genuine worker, and enqueueing a stub for a component it just projected is
+-- ingestion. Without this it failed with
+-- `42501: permission denied for table builder_embeddings` on the first component.
+--
+-- **What this does not imply.** The worker can now write rows in this table, including — as far as the
+-- grant is concerned — rows with `entity_kind = 'human_profile'`. That is not a new capability class: the
+-- worker already holds INSERT and UPDATE on `builder_identities` and INSERT on
+-- `builder_source_snapshots`, which is the person data itself. A grant cannot express "this role may only
+-- write non-person entity kinds"; RLS or a trigger could, and neither is justified by a role that already
+-- writes the underlying identities.
+--
+-- No DELETE. Removing an embedding is either a retention action or a subject's removal request, both of
+-- which belong to the platform role.
+GRANT SELECT, INSERT, UPDATE ON "builder_embeddings" TO "builderhunt_worker";

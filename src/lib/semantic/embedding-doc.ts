@@ -24,6 +24,48 @@ export const embeddedProfileSchema = z.object({
 
 export type EmbeddedProfile = z.infer<typeof embeddedProfileSchema>
 
+/**
+ * The payload stored for a catalog component (plan 43 Phase 5).
+ *
+ * `builder_embeddings` holds vectors for both people and catalog components — that is what migration
+ * 0121's `entity_kind` column is for, so both share one embedding dimension, one HNSW index and one
+ * re-embed script. But the two need different payloads: a component has no username and no profile URL,
+ * and inventing them to satisfy a shared shape would put fake data in the column that renders result
+ * cards.
+ *
+ * Only what a result card needs. Never the component's full metadata — that lives in
+ * `solution_component_versions`, and copying it here would create a second store nothing keeps in step
+ * with the first.
+ */
+export interface EmbeddedCatalogComponent {
+  payloadKind: 'catalog_component'
+  displayName: string
+  componentKind: string
+  capabilityKeys: string[]
+}
+
+/**
+ * What `builder_embeddings.profile` can hold, discriminated by `payloadKind`.
+ *
+ * `entity_kind` already discriminates at the row level, but a type system cannot relate two columns — so
+ * the payload carries its own tag. Optional on the profile branch, and absent means human profile: rows
+ * written before this union existed have no tag, and a backfill to add one would rewrite the whole table
+ * to record something already implied by `entity_kind = 'human_profile'`.
+ */
+export type EmbeddingPayload =
+  | (EmbeddedProfile & { payloadKind?: 'human_profile' })
+  | EmbeddedCatalogComponent
+
+/** Narrows to a human profile, or null for a catalog component. Never casts — a cast here was previously
+ * how a component row would have been handed to a person result card. */
+export function asEmbeddedProfile(payload: EmbeddingPayload): EmbeddedProfile | null {
+  return payload.payloadKind === 'catalog_component' ? null : payload
+}
+
+export function asEmbeddedCatalogComponent(payload: EmbeddingPayload): EmbeddedCatalogComponent | null {
+  return payload.payloadKind === 'catalog_component' ? payload : null
+}
+
 /** Shape of anything `buildEmbeddingDoc`/`toEmbeddedProfile` can consume —
  * a structural subset of `RawBuilder` (src/lib/sources/types.ts) so this
  * module never needs to import it (kept dependency-free/pure). */
