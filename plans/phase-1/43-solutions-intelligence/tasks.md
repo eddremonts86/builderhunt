@@ -110,7 +110,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
 
 ## Phase 3 — Canonical humans
 
-- [ ] **Add canonical human and source-link schema**
+- [x] **Add canonical human and source-link schema**
   - Files: `src/shared/lib/db/schema.ts`, the next generated Drizzle migration,
     `docs/architecture/data-classification.md`
   - Do: Add canonical human profiles and evidence-bearing source links; extend current identities

@@ -44,6 +44,14 @@ const classifications: Classification[] = [
   tenant('organization_plan_changes', 'organization_id', ['security-and-multitenancy', 'pricing-and-billing'], { organizationColumn: true }),
   global('builder_identities', ['id', 'source', 'source_id', 'username', 'display_name', 'avatar_url', 'bio', 'profile_url'], ['security-and-multitenancy', 'shared-resources']),
   operational('builder_source_snapshots', 'builder_identity_id', ['security-and-multitenancy']),
+  // Canonical humans (plan 43 Phase 3). Global-public for the same reason as `builder_identities`:
+  // a person and the accounts they hold are public facts, and no organization owns them. The
+  // per-organization opinion about that person stays in `organization_builders.private_metadata`.
+  // `human_merge_events` is operational — an append-only audit of merges, so an unmerge has
+  // something to restore from.
+  global('canonical_humans', ['id', 'display_name', 'headline', 'country', 'language'], ['solutions-intelligence']),
+  global('human_source_links', ['canonical_human_id', 'builder_identity_id', 'link_method', 'review_state', 'valid_from', 'valid_until'], ['solutions-intelligence']),
+  operational('human_merge_events', 'target_canonical_human_id', ['solutions-intelligence']),
   tenant('organization_builders', 'organization_id', ['security-and-multitenancy', 'shared-resources'], { organizationColumn: true }),
   account('builder_claims', 'subject_user_id', ['security-and-multitenancy', 'claimable-profiles']),
   global('published_builder_profiles', ['builder_identity_id', 'display_name', 'bio', 'open_to_status', 'topics', 'published_at'], ['security-and-multitenancy', 'claimable-profiles']),

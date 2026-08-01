@@ -488,6 +488,10 @@
     "0121_builder_embeddings_entity_kind": {
       "sql": "06780e12a73542f7fe837389a3eed42a0878b95ba6c8087112956394aa274257",
       "snapshot": "52094eb133eaf26e64926fa812a826f85df15660bb7d5b66b4661605d044aa1e"
+    },
+    "0122_canonical_human_identity": {
+      "sql": "5096e56cbec134715bb3f015852b1fb5f2f200775ba03162fdaffedc4054a0d1",
+      "snapshot": "e085659f4bb0c90562e7d8a746c2a3aae31bf049c0fa085932dc5608f1bb4d23"
     }
   }
 }

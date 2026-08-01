@@ -14,7 +14,7 @@ import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
 import { deduplicateBuilders } from '~/lib/dedup'
-import { fuseByRank, scoreBuilders } from '~/lib/score'
+import { fuseByRank, scoreBuilders, type FusedBuilder } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/types'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
@@ -51,7 +51,9 @@ export interface SourceStatus {
 }
 
 export interface SearchOutcome {
-  builders: ScoredBuilder[]
+  /** `FusedBuilder`, not `ScoredBuilder`: the ordering these come back in is the fused one, and the
+   * `fusedScore` that produced it has to be visible to anything that wants to re-sort or explain it. */
+  builders: FusedBuilder[]
   sources: SourceStatus[]
 }
 
@@ -159,7 +161,7 @@ function cacheKey(opts: SearchOptions): string {
  * Backward-compatible facade: thirteen call sites want the ranked list and nothing else.
  * `searchBuildersWithStatus` is for the surfaces that must tell a user which sources answered.
  */
-export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder[]> {
+export async function searchBuilders(opts: SearchOptions): Promise<FusedBuilder[]> {
   const { builders } = await searchBuildersWithStatus(opts)
   return builders
 }

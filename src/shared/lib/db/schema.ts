@@ -165,6 +165,152 @@ export const builderIdentities = pgTable(
   ],
 )
 
+// ---------------------------------------------------------------------------
+// Canonical humans (plan 43 — solutions-intelligence Phase 3)
+//
+// `builder_identities` is a *source account*: one row per (source, source_id). One person can hold
+// several. `canonical_humans` is the stable person those accounts may belong to, and
+// `human_source_links` is the evidence that says so.
+//
+// The separation exists because the naive alternative — treating one username as one person — is
+// what plan 43 Phase 2 had to rip out of `dedup.ts`, where it merged unrelated people who happened
+// to share a handle and made the losers unfindable. Linking accounts is a claim about a real human,
+// so it carries evidence, a confidence, a review state, and a validity window that lets it be
+// withdrawn. Nothing here may be inferred from name similarity alone: see `linkMethod`.
+//
+// Global-public, like `builder_identities` — no organization column, read through `publicDb`,
+// mutated only by workers and reviewed admin actions. Tenant-private judgements about a person stay
+// where they already are, in `organization_builders.private_metadata`.
+// ---------------------------------------------------------------------------
+
+export const canonicalHumans = pgTable(
+  'canonical_humans',
+  {
+    id: text('id').primaryKey(),
+    /**
+     * Canonical projections, chosen from linked source accounts rather than authored here. Every
+     * one of them is nullable because a canonical human with no agreed display name is a normal
+     * state, not an error — two sources disagreeing is exactly the case `fieldProvenance` records
+     * instead of silently picking a winner.
+     */
+    displayName: text('display_name'),
+    headline: text('headline'),
+    country: text('country'),
+    language: text('language'),
+    /**
+     * Which source link each projected field came from, so a merge can be undone field by field:
+     * `{ displayName: { sourceLinkId, observedAt } }`. Without this, unmerging restores the rows but
+     * leaves the projection carrying values whose origin has been detached — the plan's
+     * "reversible field provenance".
+     */
+    fieldProvenance: jsonb('field_provenance').$type<Record<string, { sourceLinkId: string; observedAt: string }>>().default({}).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+)
+
+/** How a source account came to be attached to a canonical human. Ordered by strength. */
+export const HUMAN_LINK_METHODS = [
+  /** The person proved control of the account through the claim flow. Strongest; auto-approves. */
+  'verified_claim',
+  /** Account A publicly links to account B (a profile field pointing at the other). Auto-approves. */
+  'explicit_cross_link',
+  /** A deterministic signal (same verified email hash, same signed key) a human then reviewed. */
+  'reviewed_deterministic',
+  /**
+   * A similarity signal — matching names, overlapping topics, embedding proximity. NEVER auto-links:
+   * it may only ever create a `pending_review` row for a human to decide, which is the mechanism
+   * that stops "two people called alice" from becoming one person again.
+   */
+  'probabilistic_candidate',
+] as const
+
+export const HUMAN_LINK_REVIEW_STATES = ['auto_approved', 'pending_review', 'approved', 'rejected'] as const
+
+export const humanSourceLinks = pgTable(
+  'human_source_links',
+  {
+    id: text('id').primaryKey(),
+    canonicalHumanId: text('canonical_human_id').notNull().references(() => canonicalHumans.id, { onDelete: 'cascade' }),
+    builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    linkMethod: text('link_method').notNull(),
+    reviewState: text('review_state').notNull().default('pending_review'),
+    /** Basis points (0-10000), so confidence is an integer and cannot drift through float rounding. */
+    confidenceBps: integer('confidence_bps').notNull().default(0),
+    /** What actually justified the link. Never a raw scraped payload — an identifier and a kind. */
+    evidence: jsonb('evidence').$type<Record<string, unknown>>().default({}).notNull(),
+    reviewedByUserId: text('reviewed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    /**
+     * Validity window rather than a delete. Withdrawing a link sets `validUntil`, which keeps the
+     * history that a link once existed — required for the plan's reversible merges, and for
+     * answering "why was this person shown as that account last week".
+     */
+    validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // One link row per (human, account): a re-link reuses and revalidates the row rather than
+    // stacking duplicates that later disagree about review state.
+    unique('human_source_links_human_identity_unique').on(table.canonicalHumanId, table.builderIdentityId),
+    /**
+     * The core integrity rule: a source account may belong to at most ONE canonical human at a time.
+     * Partial, so withdrawn (`valid_until IS NOT NULL`) and rejected links do not block a later
+     * correct link — which is what makes an unmerge followed by a re-merge possible at all.
+     */
+    uniqueIndex('human_source_links_active_identity_unique')
+      .on(table.builderIdentityId)
+      .where(sql`valid_until is null and review_state in ('auto_approved', 'approved')`),
+    index('human_source_links_review_queue_idx').on(table.reviewState, table.createdAt),
+    index('human_source_links_human_idx').on(table.canonicalHumanId),
+    check('human_source_links_method_check', sql`${table.linkMethod} in ('verified_claim', 'explicit_cross_link', 'reviewed_deterministic', 'probabilistic_candidate')`),
+    check('human_source_links_review_state_check', sql`${table.reviewState} in ('auto_approved', 'pending_review', 'approved', 'rejected')`),
+    check('human_source_links_confidence_range_check', sql`${table.confidenceBps} between 0 and 10000`),
+    /**
+     * A probabilistic signal can never be auto-approved. This is the constraint that enforces the
+     * spec's "Semantic similarity can propose ... but cannot activate it" at the storage layer, so a
+     * future code path cannot bypass it by writing the row directly.
+     */
+    check(
+      'human_source_links_probabilistic_needs_review_check',
+      sql`${table.linkMethod} <> 'probabilistic_candidate' or ${table.reviewState} <> 'auto_approved'`,
+    ),
+    check('human_source_links_validity_order_check', sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`),
+  ],
+)
+
+/**
+ * Merge lineage. Every merge of one canonical human into another records enough to put it back:
+ * which links moved, and what the surviving projection looked like before.
+ *
+ * Append-only audit, never updated in place except to stamp `revertedAt` — a merge history that can
+ * be edited cannot be trusted to reverse anything.
+ */
+export const humanMergeEvents = pgTable(
+  'human_merge_events',
+  {
+    id: uuid('id').primaryKey().default(sql`uuidv7()`),
+    /** The human that survived and absorbed the other. */
+    targetCanonicalHumanId: text('target_canonical_human_id').notNull().references(() => canonicalHumans.id, { onDelete: 'cascade' }),
+    /** The human that was absorbed. Deliberately NOT a foreign key: the row it names may be deleted
+     * after the merge, and the lineage has to survive that to remain reversible. */
+    sourceCanonicalHumanId: text('source_canonical_human_id').notNull(),
+    performedByUserId: text('performed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    reason: text('reason').notNull(),
+    /** Pre-merge snapshot: the absorbed human's own fields and the ids of the links that moved. */
+    restoreSnapshot: jsonb('restore_snapshot').$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    revertedAt: timestamp('reverted_at', { withTimezone: true }),
+    revertedByUserId: text('reverted_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+  },
+  (table) => [
+    index('human_merge_events_target_idx').on(table.targetCanonicalHumanId, table.createdAt),
+    index('human_merge_events_source_idx').on(table.sourceCanonicalHumanId),
+  ],
+)
+
 export const builderSourceSnapshots = pgTable(
   'builder_source_snapshots',
   {
