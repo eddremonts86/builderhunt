@@ -218,6 +218,62 @@ most of the defects recorded in this repository's Phase 4 and 5 notes were intro
 | The Muse | US/UK/CA, rich company profiles | `apiKey` |
 | USAJOBS | US federal | API key (`Authorization-Key` header) |
 
+## Identity: how source accounts become one person
+
+`canonical_humans` is the entity a recruiter searches. Accounts reach it only through `decideLink`
+(`src/shared/lib/human-identity/link-policy.ts`), which auto-approves four methods and sends everything
+inferred to review. What was missing until 2026-08-01 was anything *producing* the deterministic methods —
+the mechanism existed and had made zero links.
+
+### The signal, in order of strength
+
+| Evidence | Method | Outcome |
+|---|---|---|
+| The person proved control through the claim flow | `verified_claim` | auto-links, 100% precision |
+| Two accounts each publicly name the other (`github.blog = dev.to/ben` **and** `devto.github_username = benhalpern`) | `explicit_cross_link`, bidirectional | auto-links, 9500 bps, **no network call** |
+| An account declares a domain and the domain links back to that exact profile | `explicit_cross_link`, bidirectional | auto-links, 9500 bps |
+| A Bluesky handle that is a domain, confirmed by `_atproto` DNS TXT | domain control proven | anchors the domain |
+| One account names another, unreciprocated | `probabilistic` | **review queue** |
+| Two accounts declare the same domain, unreciprocated | `probabilistic` | **review queue** |
+
+**Reciprocity is the whole test.** A declaration is a claim — anyone can type any URL into a profile. What
+makes it evidence is that the other side, which can only speak for itself, says the same thing.
+
+### Why unreciprocated shared domains must never link
+
+On the first real run, `rustdesk.com` was declared by **25 different GitHub accounts** — usernames like
+`joyjoyiwvm` and `talexa723w2`, i.e. a spam campaign. A "same declared domain means same person" heuristic
+would have merged 25 unrelated people into one canonical human. The site links back to none of them, so all
+25 are `contradicted` and nothing was linked. That case is a permanent test
+(`tests/unit/lib/identity/reciprocity.test.ts`).
+
+### Running it
+
+```bash
+pnpm identity:verify --domains=25 --dry-run
+```
+
+Safe to re-run: only `declared` rows are checked, so an answered domain is not re-fetched. Each domain's
+homepage is fetched once through `safeFetch`, honouring robots — and here `no_robots_file` is permission,
+because RFC 9309 §2.3.1.3 says a 4xx on `/robots.txt` allows every resource and most personal sites have
+none. `unavailable` still is not permission.
+
+Drop `--dry-run` to unify. A group spanning two *existing* canonical humans is reported as
+`needsMergeReview` and left alone: that is a merge, it affects tenant data pointing at either, and
+`mergeCanonicalHumans` captures a restore snapshot first — an operator invokes it.
+
+### Measured coverage, not projected
+
+- 75% of GitHub profiles declare a site or a social handle.
+- 46% of reachable sites link back → **~30% of accounts anchor on the first hop.**
+- `rel="me"`, the IndieAuth microformat this design expected to use, matched **0 of 20** real developer
+  sites. It is accepted as the stronger form where present and never required.
+- GitHub's `/search/users` sends no `name`, `bio`, `location` or `followers`. Hydrating `/users/{login}` is
+  what makes a person's record useful *and* what yields `blog` — before it, 1 of 43 GitHub people had a name.
+
+The rest goes to the review queue, and claims are what close the gap: a verified claim is the strongest
+method available and it is also the GDPR-clean path, because the person participates.
+
 ## Not integrated: social-analyzer
 
 [qeeqbox/social-analyzer](https://github.com/qeeqbox/social-analyzer) was evaluated as an enrichment

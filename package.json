@@ -68,7 +68,8 @@
     "bench:booking": "node scripts/bench/scheduling-booking.mjs",
     "bench:segments": "node scripts/bench/transcript-segments.mjs",
     "bench:interviews": "pnpm bench:calendar && pnpm bench:booking && pnpm bench:segments",
-    "solutions:project": "node --env-file=.env --import tsx scripts/solutions/project-components.ts"
+    "solutions:project": "node --env-file=.env --import tsx scripts/solutions/project-components.ts",
+    "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",

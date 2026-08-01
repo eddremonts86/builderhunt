@@ -1326,6 +1326,11 @@ try {
     { table: 'identity_declared_links', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'], denied: ['DELETE'] },
     { table: 'identity_declared_links', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE'], denied: ['DELETE'] },
     { table: 'identity_declared_links', role: 'builderhunt_platform', granted: ['SELECT', 'DELETE'] },
+    // Asserting that two accounts are one person is never a request-scoped action, so the app role reads and
+    // nothing more — the same rule migration 0122 set, restated here because the reciprocity verifier is a new
+    // writer and the temptation to widen it was real.
+    { table: 'canonical_humans', role: 'builderhunt_platform', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    { table: 'human_source_links', role: 'builderhunt_platform', granted: ['SELECT', 'INSERT', 'UPDATE'] },
     // The catalog projector is a real worker and enqueues stubs for components it just projected. No
     // DELETE: removing an embedding is either retention or a subject's removal request, both platform
     // actions.

@@ -536,6 +536,10 @@
     "0133_identity_kind_and_declared_links": {
       "sql": "ec2a3a1bffc4393bdc1b3d04d3d81c81788d14eaaf8dc9630a9bb45a5b20df40",
       "snapshot": "228b422de564cd6a60af918299c214063517485ef4f25806e7f42b656d18acaa"
+    },
+    "0134_platform_declared_link_kinds": {
+      "sql": "2729dcded6f0608d0841cedf29a27ca3f8116adaa12a7c914f91ed07f0146438",
+      "snapshot": "f5fad6631269bafafc8845870b8b2943d5fc010fad606bbfad80f3dd554bbb96"
     }
   }
 }

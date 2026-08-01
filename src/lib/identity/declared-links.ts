@@ -48,6 +48,71 @@ const NON_ANCHOR_HOSTS = new Set([
 ])
 
 /**
+ * Platform hosts a declared URL can be resolved *into an account reference* on.
+ *
+ * The counterpart to `NON_ANCHOR_HOSTS`, and the reason rejecting those hosts is not the end of the story.
+ * GitHub's `benhalpern` publishes `blog: https://dev.to/ben` while dev.to's `ben` publishes
+ * `github_username: benhalpern` — each account naming the other. That is reciprocity in its purest form, it
+ * needs no domain and no HTTP request, and the first version of this file discarded it because `dev.to` is
+ * not a website anchor.
+ *
+ * A platform URL is not a weak website claim. It is a precise statement about one account, so it becomes a
+ * declaration of that platform's own kind carrying the handle — which a SQL join can then match against a
+ * real identity.
+ *
+ * `linkedin`, `facebook` and the other hard-blocked platforms are deliberately absent: this product holds no
+ * identities from them, so such a declaration could never be resolved and would only be an unmatched row
+ * about a person on a service we do not read.
+ */
+const PLATFORM_PROFILE_HOSTS: Readonly<Record<string, DeclaredLinkKind>> = Object.freeze({
+  'github.com': 'github',
+  'gitlab.com': 'gitlab',
+  'codeberg.org': 'codeberg',
+  'dev.to': 'devto',
+  'lobste.rs': 'lobsters',
+  'hashnode.com': 'hashnode',
+  'stackoverflow.com': 'stackoverflow',
+  'twitter.com': 'twitter',
+  'x.com': 'twitter',
+  'bsky.app': 'bluesky_handle',
+})
+
+/**
+ * Reads a declared URL as a reference to one platform account.
+ *
+ * Returns null unless the URL is a *profile* — a single path segment on a known host. `github.com/alice/repo`
+ * is a repository, not a person, and `dev.to/ben/some-article` is an article. Accepting either would attach a
+ * project or a blog post to whoever happened to link it.
+ *
+ * `bsky.app/profile/<handle>` is the one host with a prefix segment, handled explicitly rather than by a rule
+ * that would loosen the single-segment requirement for every other host.
+ */
+export function resolvePlatformProfile(value: string): { linkKind: DeclaredLinkKind; handle: string } | null {
+  const trimmed = value.trim()
+  if (trimmed.length === 0 || trimmed.length > 300) return null
+  const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+
+  let url: URL
+  try {
+    url = new URL(candidate)
+  } catch {
+    return null
+  }
+  const host = url.hostname.toLowerCase().replace(/^www\./, '')
+  const linkKind = PLATFORM_PROFILE_HOSTS[host]
+  if (!linkKind) return null
+
+  const segments = url.pathname.split('/').filter(Boolean)
+  const raw = host === 'bsky.app'
+    ? (segments[0] === 'profile' && segments.length === 2 ? segments[1] : null)
+    : (segments.length === 1 ? segments[0] : null)
+  if (!raw) return null
+
+  const handle = normalizeHandle(raw)
+  return handle.length > 0 ? { linkKind, handle } : null
+}
+
+/**
  * Normalizes a declared website to a bare registrable-ish host.
  *
  * Host only — no path, no scheme, no query. A person's site is the anchor; which page they linked to is
@@ -132,6 +197,29 @@ export function isDomainBackedBlueskyHandle(handle: string): boolean {
   return normalizeWebsite(normalized) === normalized
 }
 
+/**
+ * Records a declared website, or — when the value is a platform profile — the account it names instead.
+ *
+ * Falling through rather than dropping is what keeps GitHub's `blog: https://dev.to/ben` usable. The website
+ * kind rejects it because a platform host is not a domain anchor; the platform resolver turns it into exactly
+ * what it is.
+ */
+function pushWebsiteOrProfile(links: DeclaredLink[], raw: unknown): void {
+  if (typeof raw !== 'string' || raw.trim().length === 0) return
+  const asWebsite = normalizeWebsite(raw)
+  if (asWebsite.length > 0) {
+    pushValue(links, 'website', raw.trim(), asWebsite)
+    return
+  }
+  const profile = resolvePlatformProfile(raw)
+  if (profile) pushValue(links, profile.linkKind, raw.trim(), profile.handle)
+}
+
+function pushValue(links: DeclaredLink[], linkKind: DeclaredLinkKind, rawValue: string, normalizedValue: string): void {
+  if (links.some((link) => link.linkKind === linkKind && link.normalizedValue === normalizedValue)) return
+  links.push({ linkKind, rawValue, normalizedValue })
+}
+
 function push(links: DeclaredLink[], linkKind: DeclaredLinkKind, raw: unknown, normalize: (value: string) => string): void {
   // Numbers are accepted because Stack Exchange's `account_id` is one, and stringifying at the call site
   // would mean every caller remembering to handle null and undefined first.
@@ -166,12 +254,12 @@ export function extractDeclaredLinks(source: string, payload: Record<string, unk
 
   switch (source) {
     case 'github':
-      push(links, 'website', payload.blog, normalizeWebsite)
+      pushWebsiteOrProfile(links, payload.blog)
       push(links, 'twitter', payload.twitterUsername ?? payload.twitter_username, normalizeHandle)
       break
 
     case 'devto':
-      push(links, 'website', payload.websiteUrl ?? payload.website_url, normalizeWebsite)
+      pushWebsiteOrProfile(links, payload.websiteUrl ?? payload.website_url)
       push(links, 'twitter', payload.twitter ?? payload.twitter_username, normalizeHandle)
       // The strongest thing dev.to publishes: a direct statement of which GitHub account is theirs.
       push(links, 'github', payload.github ?? payload.github_username, normalizeHandle)
@@ -183,7 +271,7 @@ export function extractDeclaredLinks(source: string, payload: Record<string, unk
       break
 
     case 'codeberg':
-      push(links, 'website', payload.website, normalizeWebsite)
+      pushWebsiteOrProfile(links, payload.website)
       break
 
     case 'bluesky': {
@@ -200,7 +288,7 @@ export function extractDeclaredLinks(source: string, payload: Record<string, unk
     }
 
     case 'stackoverflow':
-      push(links, 'website', payload.websiteUrl ?? payload.website_url, normalizeWebsite)
+      pushWebsiteOrProfile(links, payload.websiteUrl ?? payload.website_url)
       // Stack Exchange's own account id, shared across every site in its network. First-party and
       // authoritative: the platform itself asserts these accounts are one person, which makes this the only
       // signal here that needs no reciprocity check at all.

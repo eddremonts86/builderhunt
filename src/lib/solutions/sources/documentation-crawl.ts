@@ -67,8 +67,10 @@ export function createDocumentationCrawlAdapter(target: DocumentationCrawlTarget
         // Asked per path, not once per host: robots.txt can allow /docs and forbid /internal, and a
         // single host-level check would miss that.
         const decision = await isPathAllowedByRobots(origin, path, ENRICHMENT_DEFAULT_USER_AGENT)
-        if (decision !== 'allowed') {
-          // `unavailable` lands here too. Not being able to read robots.txt is not permission.
+        // `no_robots_file` is permission: RFC 9309 says a 4xx on /robots.txt means every resource may be
+        // accessed. `unavailable` still is not — that value now means only "we asked and got no answer",
+        // which for a crawl of someone else's documentation is a reason to stop.
+        if (decision !== 'allowed' && decision !== 'no_robots_file') {
           robotsBlocked += 1
           log.warn('solutions_crawl_robots_blocked', { sourceKey: target.sourceKey, path, decision })
           continue

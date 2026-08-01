@@ -32,6 +32,34 @@
 import { createHash } from 'node:crypto'
 import { SafeFetchError, safeFetch } from '~/lib/enrichment/network'
 import { isPathAllowedByRobots, type RobotsDecision } from '~/lib/enrichment/robots'
+
+/**
+ * The three values `candidate_web_imports.robots_result` accepts
+ * (`candidate_web_imports_robots_result_check`).
+ *
+ * Narrower than `RobotsDecision`, which gained `no_robots_file` when the robots reader learned to tell a 4xx
+ * apart from a failure. Kept narrow deliberately rather than widened, for two reasons:
+ *
+ * 1. **This call site is stricter than RFC 9309, on purpose.** The RFC says a missing robots.txt permits
+ *    everything. Plan 42 chose to block anyway for *candidate-supplied* links, because a link a person pasted
+ *    into an interview record is fetched on their behalf and the conservative reading is the defensible one.
+ *    Being stricter than required is always allowed; quietly becoming less strict because an unrelated module
+ *    gained precision is not.
+ * 2. Widening the type without the migration would store a value the CHECK constraint rejects, which is a
+ *    runtime 23514 rather than a compile error.
+ */
+type StoredRobotsDecision = 'allowed' | 'disallowed' | 'unavailable'
+
+/**
+ * Collapses the reader's finer answer back onto this worker's policy.
+ *
+ * `no_robots_file` becomes `unavailable` because for this worker's question — "did the site say yes?" — the
+ * answer is no either way. The distinction the reader now makes is real and useful; it is simply not a
+ * distinction *this* policy acts on.
+ */
+function toStoredDecision(decision: RobotsDecision): StoredRobotsDecision {
+  return decision === 'no_robots_file' ? 'unavailable' : decision
+}
 import { SOURCE_POLICIES } from '~/lib/enrichment/policies'
 import {
   LINK_AUTHORIZATION_NOTICE_VERSION,
@@ -85,9 +113,9 @@ function sourcePolicyVersionFor(connectorId: string | null): string {
 }
 
 type ImportOutcome =
-  | { kind: 'imported'; robots: RobotsDecision; record: Parameters<typeof recordWebImport>[1] }
-  | { kind: 'blocked'; robots: RobotsDecision; errorCode: string; sourcePolicyVersion: string; finalUrl: string }
-  | { kind: 'failed'; robots: RobotsDecision; errorCode: string; sourcePolicyVersion: string; finalUrl: string }
+  | { kind: 'imported'; robots: StoredRobotsDecision; record: Parameters<typeof recordWebImport>[1] }
+  | { kind: 'blocked'; robots: StoredRobotsDecision; errorCode: string; sourcePolicyVersion: string; finalUrl: string }
+  | { kind: 'failed'; robots: StoredRobotsDecision; errorCode: string; sourcePolicyVersion: string; finalUrl: string }
 
 async function importOne(params: {
   link: CandidateLinkRow
@@ -123,9 +151,9 @@ async function importOne(params: {
   const registryPolicy = policy.connectorId === null ? null : SOURCE_POLICIES[policy.connectorId]
   const robotsRequired = registryPolicy?.robotsRequired ?? true
 
-  let robots: RobotsDecision = 'allowed'
+  let robots: StoredRobotsDecision = 'allowed'
   if (robotsRequired) {
-    robots = await checkRobots(url.origin, url.pathname)
+    robots = toStoredDecision(await checkRobots(url.origin, url.pathname))
     if (robots !== 'allowed') {
       // Fail-closed on `unavailable`. A site we could not ask has not said yes, and guessing in our
       // own favour is exactly the behaviour RFC 9309 exists to prevent.

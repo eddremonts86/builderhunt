@@ -180,7 +180,13 @@ export const builderIdentities = pgTable(
 )
 
 export const DECLARED_LINK_KINDS = [
-  'website', 'github', 'gitlab', 'twitter', 'mastodon', 'bluesky_handle', 'bluesky_did', 'stackexchange_account',
+  'website',
+  /** Platform accounts. The value is the handle, so a declaration joins straight to a `builderIdentities` row
+   * by (source, username) — bidirectional pairs are then a SQL join rather than an HTTP request. */
+  'github', 'gitlab', 'codeberg', 'devto', 'lobsters', 'hashnode', 'stackoverflow',
+  'twitter', 'mastodon',
+  'bluesky_handle', 'bluesky_did',
+  'stackexchange_account',
 ] as const
 export type DeclaredLinkKind = (typeof DECLARED_LINK_KINDS)[number]
 
@@ -220,7 +226,7 @@ export const identityDeclaredLinks = pgTable(
     lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    check('identity_declared_links_kind_check', sql`${table.linkKind} in ('website', 'github', 'gitlab', 'twitter', 'mastodon', 'bluesky_handle', 'bluesky_did', 'stackexchange_account')`),
+    check('identity_declared_links_kind_check', sql`${table.linkKind} in ('website', 'github', 'gitlab', 'codeberg', 'devto', 'lobsters', 'hashnode', 'stackoverflow', 'twitter', 'mastodon', 'bluesky_handle', 'bluesky_did', 'stackexchange_account')`),
     check('identity_declared_links_state_check', sql`${table.verificationState} in ('declared', 'reciprocal', 'dns_verified', 'unreachable', 'contradicted')`),
     /** A verified state must say when: an unstamped `reciprocal` cannot be aged out, and a reciprocity that
      * was true two years ago is not evidence today. */
