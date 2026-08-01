@@ -552,6 +552,10 @@
     "0137_solution_briefs_runs_feedback": {
       "sql": "90e2f126aa6a92c0ad4bf7318c3a890e0ef7d9b7aa07227db03fefb42057ff30",
       "snapshot": "9cd90e3ba69e232faf47cd4b5b4c05e4176f0ee484ea3a921de970410ef0d484"
+    },
+    "0138_solution_gold_briefs": {
+      "sql": "833d5c8b3e6422294ea07b8b86fc6d966a36dba11c446ae5feed7f01b0171933",
+      "snapshot": "5975c850bc19123b39d9bda80267f09760693bc284b0d8b8caa5e8fc43551177"
     }
   }
 }

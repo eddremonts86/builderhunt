@@ -1,0 +1,1813 @@
+{
+  "version": 1,
+  "generatedBy": "plan 43 Phase 0 \u2014 synthetic gold set",
+  "authorshipNote": "Every record here is machine-authored. The generator and the grader share assumptions, so a score measured against these briefs detects regressions and proves nothing about quality. Human-authored records live in the database and are reported separately.",
+  "briefs": [
+    {
+      "id": "gold-001",
+      "authorship": "synthetic",
+      "briefText": "Translate 20 product pages into German. Budget max 500 EUR. Must be delivered by 2026-10-15. Data sensitivity is public.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 50000,
+            "currency": "EUR"
+          },
+          {
+            "type": "deadline_by",
+            "byDate": "2026-10-15"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "public"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-002",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 40 hours of recorded interviews.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-003",
+      "authorship": "synthetic",
+      "briefText": "Summarise 60 customer support threads into weekly digests.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-004",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 80 scanned invoices. Budget max 1250 EUR.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 125000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-005",
+      "authorship": "synthetic",
+      "briefText": "Classify 100 inbound support tickets by product area. Must be delivered by 2026-11-15.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-11-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-006",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 120 competitor websites every week. Data sensitivity is confidential.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "confidential"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-007",
+      "authorship": "synthetic",
+      "briefText": "Write 140 short product descriptions from a spec sheet. Budget max 2000 EUR.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 200000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-008",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 160 internal documents.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-009",
+      "authorship": "synthetic",
+      "briefText": "Describe 180 product photographs for accessibility alt text. Must be delivered by 2026-12-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-12-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-010",
+      "authorship": "synthetic",
+      "briefText": "Move 20 records from a legacy CRM into the new schema. Budget max 1000 EUR.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 100000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-011",
+      "authorship": "synthetic",
+      "briefText": "Translate 40 product pages into Japanese. Data sensitivity is internal.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "internal"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-012",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 60 hours of recorded interviews.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-013",
+      "authorship": "synthetic",
+      "briefText": "Summarise 80 customer support threads into weekly digests. Budget max 1750 EUR. Must be delivered by 2026-10-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 175000,
+            "currency": "EUR"
+          },
+          {
+            "type": "deadline_by",
+            "byDate": "2026-10-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-014",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 100 scanned invoices.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-015",
+      "authorship": "synthetic",
+      "briefText": "Classify 120 inbound support tickets by product area.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-016",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 140 competitor websites every week. Budget max 750 EUR. Data sensitivity is public.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 75000,
+            "currency": "EUR"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "public"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-017",
+      "authorship": "synthetic",
+      "briefText": "Write 160 short product descriptions from a spec sheet. Must be delivered by 2026-11-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-11-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-018",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 180 internal documents.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-019",
+      "authorship": "synthetic",
+      "briefText": "Describe 20 product photographs for accessibility alt text. Budget max 1500 EUR.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 150000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-020",
+      "authorship": "synthetic",
+      "briefText": "Move 40 records from a legacy CRM into the new schema.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-021",
+      "authorship": "synthetic",
+      "briefText": "Translate 60 product pages into Spanish. Must be delivered by 2026-12-15. Data sensitivity is confidential.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-12-15"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "confidential"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-022",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 80 hours of recorded interviews. Budget max 500 EUR.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 50000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-023",
+      "authorship": "synthetic",
+      "briefText": "Summarise 100 customer support threads into weekly digests.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-024",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 120 scanned invoices.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-025",
+      "authorship": "synthetic",
+      "briefText": "Classify 140 inbound support tickets by product area. Budget max 1250 EUR. Must be delivered by 2026-10-15.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 125000,
+            "currency": "EUR"
+          },
+          {
+            "type": "deadline_by",
+            "byDate": "2026-10-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-026",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 160 competitor websites every week. Data sensitivity is internal.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "internal"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-027",
+      "authorship": "synthetic",
+      "briefText": "Write 180 short product descriptions from a spec sheet.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-028",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 20 internal documents. Budget max 2000 EUR.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 200000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-029",
+      "authorship": "synthetic",
+      "briefText": "Describe 40 product photographs for accessibility alt text. Must be delivered by 2026-11-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-11-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-030",
+      "authorship": "synthetic",
+      "briefText": "Move 60 records from a legacy CRM into the new schema.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-031",
+      "authorship": "synthetic",
+      "briefText": "Translate 80 product pages into German. Budget max 1000 EUR. Data sensitivity is public.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 100000,
+            "currency": "EUR"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "public"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-032",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 100 hours of recorded interviews.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-033",
+      "authorship": "synthetic",
+      "briefText": "Summarise 120 customer support threads into weekly digests. Must be delivered by 2026-12-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-12-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-034",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 140 scanned invoices. Budget max 1750 EUR.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 175000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-035",
+      "authorship": "synthetic",
+      "briefText": "Classify 160 inbound support tickets by product area.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-036",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 180 competitor websites every week. Data sensitivity is confidential.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "confidential"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-037",
+      "authorship": "synthetic",
+      "briefText": "Write 20 short product descriptions from a spec sheet. Budget max 750 EUR. Must be delivered by 2026-10-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 75000,
+            "currency": "EUR"
+          },
+          {
+            "type": "deadline_by",
+            "byDate": "2026-10-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-038",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 40 internal documents.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-039",
+      "authorship": "synthetic",
+      "briefText": "Describe 60 product photographs for accessibility alt text.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-040",
+      "authorship": "synthetic",
+      "briefText": "Move 80 records from a legacy CRM into the new schema. Budget max 1500 EUR.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 150000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-041",
+      "authorship": "synthetic",
+      "briefText": "Translate 100 product pages into Japanese. Must be delivered by 2026-11-15. Data sensitivity is internal.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-11-15"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "internal"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-042",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 120 hours of recorded interviews.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-043",
+      "authorship": "synthetic",
+      "briefText": "Summarise 140 customer support threads into weekly digests. Budget max 500 EUR.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 50000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-044",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 160 scanned invoices.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-045",
+      "authorship": "synthetic",
+      "briefText": "Classify 180 inbound support tickets by product area. Must be delivered by 2026-12-15.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-12-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-046",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 20 competitor websites every week. Budget max 1250 EUR. Data sensitivity is public.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 125000,
+            "currency": "EUR"
+          },
+          {
+            "type": "max_data_sensitivity",
+            "level": "public"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-047",
+      "authorship": "synthetic",
+      "briefText": "Write 40 short product descriptions from a spec sheet.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-048",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 60 internal documents.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-049",
+      "authorship": "synthetic",
+      "briefText": "Describe 80 product photographs for accessibility alt text. Budget max 2000 EUR. Must be delivered by 2026-10-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 200000,
+            "currency": "EUR"
+          },
+          {
+            "type": "deadline_by",
+            "byDate": "2026-10-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-050",
+      "authorship": "synthetic",
+      "briefText": "Move 100 records from a legacy CRM into the new schema.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-051",
+      "authorship": "synthetic",
+      "briefText": "Translate 120 product pages into Spanish. Data sensitivity is confidential.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "translation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "confidential"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "translation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-052",
+      "authorship": "synthetic",
+      "briefText": "Transcribe 140 hours of recorded interviews. Budget max 1000 EUR.",
+      "expected": {
+        "domain": "translation_and_transcription",
+        "capabilityKeys": [
+          "transcription"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 100000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "transcription"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-053",
+      "authorship": "synthetic",
+      "briefText": "Summarise 160 customer support threads into weekly digests. Must be delivered by 2026-11-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "summarization"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-11-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "summarization"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-054",
+      "authorship": "synthetic",
+      "briefText": "Extract company names and dates from 180 scanned invoices.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "document_understanding",
+          "entity_extraction"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "entity_extraction"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-055",
+      "authorship": "synthetic",
+      "briefText": "Classify 20 inbound support tickets by product area. Budget max 1750 EUR.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "classification"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 175000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "classification"
+          }
+        ],
+        "unacceptableComponentKinds": [
+          "human_role:jobindex"
+        ],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-056",
+      "authorship": "synthetic",
+      "briefText": "Pull pricing tables from 40 competitor websites every week. Data sensitivity is internal.",
+      "expected": {
+        "domain": "research_and_data",
+        "capabilityKeys": [
+          "web_extraction",
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_data_sensitivity",
+            "level": "internal"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "web_extraction"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "large"
+      }
+    },
+    {
+      "id": "gold-057",
+      "authorship": "synthetic",
+      "briefText": "Write 60 short product descriptions from a spec sheet. Must be delivered by 2026-12-15.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "text_generation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "deadline_by",
+            "byDate": "2026-12-15"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "text_generation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "one_off"
+      }
+    },
+    {
+      "id": "gold-058",
+      "authorship": "synthetic",
+      "briefText": "Build a semantic search index over 80 internal documents. Budget max 750 EUR.",
+      "expected": {
+        "domain": "software_and_ai",
+        "capabilityKeys": [
+          "embedding",
+          "document_understanding"
+        ],
+        "offerableLanes": [
+          "ai"
+        ],
+        "hardConstraints": [
+          {
+            "type": "max_budget",
+            "maxCents": 75000,
+            "currency": "EUR"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "embedding"
+          },
+          {
+            "type": "required_capability",
+            "capabilityKey": "document_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "recommended",
+        "scaleMagnitude": "small"
+      }
+    },
+    {
+      "id": "gold-059",
+      "authorship": "synthetic",
+      "briefText": "Describe 100 product photographs for accessibility alt text.",
+      "expected": {
+        "domain": "content_and_design",
+        "capabilityKeys": [
+          "image_understanding"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "image_understanding"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "maximum_quality",
+        "scaleMagnitude": "medium"
+      }
+    },
+    {
+      "id": "gold-060",
+      "authorship": "synthetic",
+      "briefText": "Move 120 records from a legacy CRM into the new schema.",
+      "expected": {
+        "domain": "automation",
+        "capabilityKeys": [
+          "data_transformation"
+        ],
+        "offerableLanes": [
+          "human",
+          "ai",
+          "hybrid"
+        ],
+        "hardConstraints": [
+          {
+            "type": "required_capability",
+            "capabilityKey": "data_transformation"
+          }
+        ],
+        "unacceptableComponentKinds": [],
+        "rankingMode": "lower_cost_time",
+        "scaleMagnitude": "large"
+      }
+    }
+  ]
+}

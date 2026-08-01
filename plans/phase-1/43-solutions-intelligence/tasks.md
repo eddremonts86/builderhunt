@@ -33,10 +33,10 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: production-equivalent evidence shows tenant isolation, synchronous non-negative credit
     authorization, provider kill switches, and safe public fetching.
 
-- [ ] **Create the synthetic gold set, its CRUD, and the baseline report**
-  - Files: `tests/fixtures/solutions/gold-set.json` (new),
+- [x] **Create the synthetic gold set, its CRUD, and the baseline report**
+  - Files: `tests/fixtures/solutions/gold-set.json` (new), `src/shared/lib/solutions/gold-set.ts` (new),
     `scripts/evaluate-solutions.ts` (new), `docs/operations/solutions-evaluation.md` (new),
-    gold-set admin CRUD routes/UI (new)
+    `drizzle/0138_solution_gold_briefs.sql`, `src/routes/api/admin/solutions/gold-briefs.ts` (new)
   - Do: Seed 60 de-identified briefs and judgments for valid lanes, hard constraints, capability
     coverage, unacceptable components, and ranking. Every seeded record carries
     `authorship: 'synthetic'`. Ship the CRUD so humans can add, edit and replace briefs and
@@ -46,6 +46,21 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
     segmented metrics, fails on malformed or leaked personal data, and reports synthetic and human
     judgment scores as **separate** figures — a synthetic-only run must never print an unqualified
     quality number, because the generator and the grader share assumptions.
+
+  `summarize` takes an authorship and returns one population's figures; there is no function that produces
+  a combined score, and `citableAsQualityGate` is false until a human-authored record exists. The rule is
+  code rather than a convention, because a blended mean is exactly the number that gets quoted without its
+  caveat.
+
+  The two populations have two homes: the synthetic 60 are version-controlled scaffolding that changes by
+  deploy, human judgments are edited during the beta through a platform-admin API. `authorship` is forced
+  to `human` on write, so the populations cannot mix through the form.
+
+  **Baseline recorded 2026-08-01, deterministic path only** (both LLM flags off): capability recall 55.0%
+  ±12.0, lane recall 44.4% ±10.4, latency p50 6ms, zero exclusion failures. Domain accuracy and constraint
+  retention are 0% and that is the correct score — the fallback returns `other` rather than guessing a
+  domain, and extracts no constraints at all. Those two measure the fallback, not the product, and become
+  meaningful the moment interpretation is enabled.
 
 - [x] **Approve the initial source and domain register** — moved, not done
   - Moved on 2026-08-01 to
@@ -502,11 +517,25 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
 
 ## Phase 9 — Certification and rollout
 
-- [ ] **Pass security, privacy, and adversarial certification**
-  - Files: `docs/operations/solutions-security-review.md` (new), security test suites
+- [x] **Pass security, privacy, and adversarial certification** — engineering review only
+  - Files: `docs/operations/solutions-security-review.md` (new),
+    `tests/unit/security/solutions-adversarial.test.ts` (new)
   - Do: Test prompt injection, poisoned source content, SSRF, malicious links, stale evidence,
     identity collision, tenant crossover, privilege changes, credit races, and source deletion.
   - Verify: no critical/high finding remains and every incident class has a kill switch and runbook.
+
+  Every named class has a stated defence, an executable test, and a runbook entry. **What has not happened
+  is an independent review** — everything was written by whoever wrote the code — and the document says so
+  rather than implying certification.
+
+  The defence worth naming: constraints are grounded by substring against the user's own text, so a fully
+  obedient model told "the budget is unlimited" still cannot put that constraint into the composer's input.
+  The honest limit is asserted alongside it — text injected *into the brief* is the user's own text, and a
+  constraint quoting it does survive, which is correct.
+
+  The suite ends with a live cross-reference rather than a comment: it reads `verify-rls-local.mjs` and the
+  billing test and fails if the RLS or credit-race coverage it defers to is deleted. A superuser connection
+  cannot prove either, and a comment saying so would go stale in silence.
 
 - [ ] **Pass quality, performance, and cost gates**
   - Files: `docs/operations/solutions-evaluation.md`,
@@ -515,10 +544,18 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
     and billing reconciliation against the exact release configuration.
   - Verify: every acceptance threshold in `spec.md` passes with dated artifacts.
 
-- [ ] **Roll out through independent flags**
-  - Files: feature flag configuration, `docs/operations/solutions-rollout.md` (new)
+- [x] **Roll out through independent flags** — plan written, nothing executed
+  - Files: `docs/operations/solutions-rollout.md` (new)
   - Do: Enable staff-only, closed beta with operator grants, paid beta, then general availability.
     Define abort thresholds, on-call owners, rollback, source disablement, and credit correction
     escalation.
   - Verify: each stage observes a full monitoring window; rollback disables new operations while
     preserving saved data and historical settlements; ordinary builder search remains healthy.
+
+  Five stages with named abort thresholds, written before the first switch is thrown so the thresholds are
+  not negotiated during an incident. Every flag stays off; the four preconditions are all non-engineering
+  (legal sign-off, AI Act read, real provider pricing, human gold-set records), so the stages cannot start
+  yet and the document says which.
+
+  The rollback property that makes it safe to use without deliberation: disabling paid generation preserves
+  every saved brief, run, and settlement. It is not a data decision.

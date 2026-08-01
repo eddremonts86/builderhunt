@@ -3990,3 +3990,37 @@ export const solutionRunFeedback = pgTable(
     index('solution_run_feedback_org_idx').on(table.organizationId, table.createdAt),
   ],
 )
+
+/**
+ * Human-authored gold-set records (plan 43 Phase 0, "Create the synthetic gold set, its CRUD, and the baseline
+ * report").
+ *
+ * System-operational, not tenant-private: a gold-set brief is an evaluation artifact the platform owns, written
+ * by whoever is curating quality, and no organization's data is in it. Platform-admin only.
+ *
+ * The synthetic 60 stay in `tests/fixtures/solutions/gold-set.json` and are never written here. Two populations,
+ * two homes, on purpose: the synthetic set is version-controlled scaffolding that changes by deploy, while human
+ * judgments are edited during a beta by people who should not need one. `authorship` is stored anyway so a row
+ * can never be mistaken for the other kind, and the evaluator reports the two separately — a synthetic-only run
+ * must never print an unqualified quality number.
+ */
+export const solutionGoldBriefs = pgTable(
+  'solution_gold_briefs',
+  {
+    id: text('id').primaryKey(),
+    authorship: text('authorship').notNull().default('human'),
+    briefText: text('brief_text').notNull(),
+    /** A validated `GoldBrief['expected']`. Stored whole for the same reason a brief is. */
+    expected: jsonb('expected').$type<Record<string, unknown>>().notNull(),
+    /** Who curated it, so a disputed judgment has someone to ask. */
+    createdByUserId: text('created_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    notes: text('notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_gold_briefs_authorship_check', sql`${table.authorship} in ('synthetic', 'human')`),
+    check('solution_gold_briefs_text_length_check', sql`char_length(${table.briefText}) between 1 and 4000`),
+    index('solution_gold_briefs_authorship_idx').on(table.authorship, table.createdAt),
+  ],
+)

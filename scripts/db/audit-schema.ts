@@ -81,6 +81,10 @@ const classifications: Classification[] = [
   tenant('solution_runs', 'organization_id (immutable: SELECT/INSERT/DELETE only)', ['solutions-intelligence'], { organizationColumn: true }),
   tenant('solution_run_routes', 'organization_id + run_id (immutable: SELECT/INSERT/DELETE only)', ['solutions-intelligence'], { organizationColumn: true }),
   tenant('solution_run_feedback', 'organization_id + run_id + created_by_user_id', ['solutions-intelligence'], { organizationColumn: true }),
+  // The human half of the evaluation corpus (plan 43 Phase 0). System-operational: it is a platform artifact
+  // about the product's own quality, owned by whoever curates it, and granted to the platform role only —
+  // `builderhunt_app` has no grant, so a tenant request cannot reach the corpus even by mistake.
+  operational('solution_gold_briefs', 'platform curator', ['solutions-intelligence']),
   global('canonical_humans', ['id', 'display_name', 'headline', 'country', 'language'], ['solutions-intelligence']),
   global('human_source_links', ['canonical_human_id', 'builder_identity_id', 'link_method', 'review_state', 'valid_from', 'valid_until'], ['solutions-intelligence']),
   operational('human_merge_events', 'target_canonical_human_id', ['solutions-intelligence']),

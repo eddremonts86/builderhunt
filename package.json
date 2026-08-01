@@ -69,6 +69,7 @@
     "bench:segments": "node scripts/bench/transcript-segments.mjs",
     "bench:interviews": "pnpm bench:calendar && pnpm bench:booking && pnpm bench:segments",
     "solutions:project": "node --env-file=.env --import tsx scripts/solutions/project-components.ts",
+    "solutions:evaluate": "node --env-file=.env --import tsx scripts/evaluate-solutions.ts",
     "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts"
   },
   "dependencies": {

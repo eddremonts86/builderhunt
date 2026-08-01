@@ -223,6 +223,7 @@ import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/user
 import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminSolutionsSourcesRouteImport } from './routes/api/admin/solutions/sources'
+import { Route as ApiAdminSolutionsGoldBriefsRouteImport } from './routes/api/admin/solutions/gold-briefs'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
 import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
@@ -1418,6 +1419,12 @@ const ApiAdminSolutionsSourcesRoute =
     path: '/api/admin/solutions/sources',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminSolutionsGoldBriefsRoute =
+  ApiAdminSolutionsGoldBriefsRouteImport.update({
+    id: '/api/admin/solutions/gold-briefs',
+    path: '/api/admin/solutions/gold-briefs',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminRoadmapIdRoute = ApiAdminRoadmapIdRouteImport.update({
   id: '/api/admin/roadmap/$id',
   path: '/api/admin/roadmap/$id',
@@ -1976,6 +1983,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -2254,6 +2262,7 @@ export interface FileRoutesByTo {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -2537,6 +2546,7 @@ export interface FileRoutesById {
   '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
+  '/api/admin/solutions/gold-briefs': typeof ApiAdminSolutionsGoldBriefsRoute
   '/api/admin/solutions/sources': typeof ApiAdminSolutionsSourcesRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
@@ -2819,6 +2829,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -3097,6 +3108,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -3379,6 +3391,7 @@ export interface FileRouteTypes {
     | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
+    | '/api/admin/solutions/gold-briefs'
     | '/api/admin/solutions/sources'
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
@@ -3602,6 +3615,7 @@ export interface RootRouteChildren {
   ApiAdminOperationsJobKeyRoute: typeof ApiAdminOperationsJobKeyRouteWithChildren
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
+  ApiAdminSolutionsGoldBriefsRoute: typeof ApiAdminSolutionsGoldBriefsRoute
   ApiAdminSolutionsSourcesRoute: typeof ApiAdminSolutionsSourcesRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
   ApiAdminStatusSnapshotRoute: typeof ApiAdminStatusSnapshotRoute
@@ -5178,6 +5192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminSolutionsSourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/solutions/gold-briefs': {
+      id: '/api/admin/solutions/gold-briefs'
+      path: '/api/admin/solutions/gold-briefs'
+      fullPath: '/api/admin/solutions/gold-briefs'
+      preLoaderRoute: typeof ApiAdminSolutionsGoldBriefsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/roadmap/$id': {
       id: '/api/admin/roadmap/$id'
       path: '/api/admin/roadmap/$id'
@@ -6209,6 +6230,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminOperationsJobKeyRoute: ApiAdminOperationsJobKeyRouteWithChildren,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
+  ApiAdminSolutionsGoldBriefsRoute: ApiAdminSolutionsGoldBriefsRoute,
   ApiAdminSolutionsSourcesRoute: ApiAdminSolutionsSourcesRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,
   ApiAdminStatusSnapshotRoute: ApiAdminStatusSnapshotRoute,
