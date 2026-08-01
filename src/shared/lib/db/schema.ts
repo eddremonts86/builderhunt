@@ -471,7 +471,10 @@ export const builderNotes = pgTable('builder_notes', {
   id: text('id').primaryKey(),
   organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
-  builderId: text('builder_id').notNull().references(() => builders.id),
+  // References organization_builders, not the legacy `builders` table — nothing writes to
+  // `builders` anymore, and `resolveOrganizationBuilderId` (notes.ts) has always resolved and
+  // stored an organization_builders.id here. See migration 0120's comment for the empirical proof.
+  builderId: text('builder_id').notNull().references(() => organizationBuilders.id),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
@@ -479,7 +482,7 @@ export const builderNotes = pgTable('builder_notes', {
   organizationIdIdUnique: uniqueIndex('builder_notes_organization_id_id_unique').on(table.organizationId, table.id),
   organizationBuilderFk: foreignKey({
     columns: [table.organizationId, table.builderId],
-    foreignColumns: [builders.organizationId, builders.id],
+    foreignColumns: [organizationBuilders.organizationId, organizationBuilders.id],
     name: 'builder_notes_organization_builder_fk',
   }),
 }))

@@ -480,6 +480,10 @@
     "0119_public_claimant_owned_ai_enrichment": {
       "sql": "4e47ef94d432d15d6eeb19ca8bac598c29719cd9dcf47dba6ffae0b35c0c2c92",
       "snapshot": "2873b17317df78f7e73f687bd26c675407dedbef098cd91b36f6ccb1885eea53"
+    },
+    "0120_fix_builder_notes_organization_builder_fk": {
+      "sql": "ef977196c9bcac69abb468ed941ae5a0c3b0b50641962cb4631b06decf348312",
+      "snapshot": "49b0dc16ee129e3c5f3265406aeef4e582666dba1d705e3aef67df29c80e4cb8"
     }
   }
 }

@@ -199,14 +199,6 @@ test.describe('Export Center — note collection', () => {
     const { builderIdentityId: noted, organizationBuilderId: notedOrgBuilderId } = await seedTrackedBuilder(harness.ctx, { organizationId: organization.organizationId, creatorUserId: principal.userId! })
     const { builderIdentityId: unnoted } = await seedTrackedBuilder(harness.ctx, { organizationId: organization.organizationId, creatorUserId: principal.userId! })
     try {
-      // `builder_notes.builder_id` still FKs to the legacy `builders` table (nothing in this
-      // codebase writes to it anymore — see organization-builders.ts's listNotedOrganizationBuilders
-      // comment) — same shadow-row workaround `tests/e2e/api/cross-tenant.spec.ts` uses, with the
-      // shadow row's id matching the organization_builders id the notes route actually resolves to.
-      await harness.sql`
-        insert into builders (id, organization_id, user_id, source, source_id, username, profile_url, created_at, updated_at)
-        values (${notedOrgBuilderId}, ${organization.organizationId}, ${principal.userId!}, 'github', ${notedOrgBuilderId}, ${notedOrgBuilderId}, ${`https://e2e.test/github/${notedOrgBuilderId}`}, now(), now())
-      `
       const noteRes = await principal.api!.post(`/api/builders/${noted}/notes`, { data: { content: 'Strong systems background.' } })
       expect(noteRes.status()).toBe(200)
 
@@ -220,7 +212,6 @@ test.describe('Export Center — note collection', () => {
       expect(profileUrls.some((url) => url.includes(unnoted))).toBe(false)
     } finally {
       await harness.sql`delete from builder_notes where organization_id = ${organization.organizationId} and builder_id = ${notedOrgBuilderId}`.catch(() => undefined)
-      await harness.sql`delete from builders where id = ${notedOrgBuilderId}`.catch(() => undefined)
       await cleanupBuilderIdentity(harness.sql, noted)
       await cleanupBuilderIdentity(harness.sql, unnoted)
     }

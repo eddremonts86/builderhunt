@@ -94,11 +94,6 @@ async function seedTenant(sql: Sql, ctx: FixtureContext, label: string): Promise
             ${`${label} saved search`}, '{}', '{}', now())
   `
   await sql`
-    insert into builders (id, organization_id, user_id, source, source_id, username, profile_url, created_at, updated_at)
-    values (${builderId}, ${organization.organizationId}, ${principal.userId!}, 'github',
-            ${`xt-${label}`}, ${`xt-${label}`}, ${`https://e2e.test/github/xt-${label}`}, now(), now())
-  `
-  await sql`
     insert into alerts (id, organization_id, user_id, query_id, name, keywords, created_at)
     values (${alertId}, ${organization.organizationId}, ${principal.userId!}, ${queryId},
             ${`${label} alert`}, '{}', now())
@@ -108,11 +103,8 @@ async function seedTenant(sql: Sql, ctx: FixtureContext, label: string): Promise
     values (${sprintId}, ${organization.organizationId}, ${principal.userId!},
             ${`${label} sprint`}, '{}'::jsonb, '[]'::jsonb, now())
   `
-  // The notes route resolves a builder through `organization_builders`, not the
-  // legacy `builders` table, and answers `[]` for anything it cannot resolve.
-  // Seeding only the legacy row would make A's own request indistinguishable
-  // from an absent one — which the negative control caught, and which is why
-  // the canonical rows are seeded here too.
+  // The notes route resolves a builder through `organization_builders`/`builder_identities` —
+  // the canonical, current tables — not the legacy `builders` table (superseded, unwritten).
   const identityId = uniqueId(`i-${label}`)
   await sql`
     insert into builder_identities (id, source, source_id, username, profile_url, created_at, updated_at)

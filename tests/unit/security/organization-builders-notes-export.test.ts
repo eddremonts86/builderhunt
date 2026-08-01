@@ -2,15 +2,13 @@
  * plans/UI/tasks.md Wave 6 "Build a scoped Export Center and reconcile public claims".
  *
  * `listNotedOrganizationBuilders` — the "note collection" export scope — against a real database.
- * `builder_notes.builder_id` still foreign-keys to the legacy, never-populated `builders` table
- * (see the function's own doc comment and the flagged follow-up task); a shadow row with the same
- * id as the `organization_builders` row is inserted here purely to satisfy that FK, matching the
- * same workaround `tests/e2e/api/cross-tenant.spec.ts` already uses.
+ * `builder_notes.builder_id` FKs directly to `organization_builders(id)` (migration 0120 fixed the
+ * stale FK to the legacy, never-populated `builders` table).
  */
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
-import { authUsers, builderIdentities, builderNotes, builders, organizationBuilders, organizations } from '~/shared/lib/db/schema'
+import { authUsers, builderIdentities, builderNotes, organizationBuilders, organizations } from '~/shared/lib/db/schema'
 import { listNotedOrganizationBuilders } from '~/shared/lib/repositories/organization-builders'
 
 let db: PostgresJsDatabase
@@ -32,7 +30,6 @@ afterAll(async () => { await drop() })
 
 beforeEach(async () => {
   await db.delete(builderNotes)
-  await db.delete(builders)
   await db.delete(organizationBuilders)
   await db.delete(builderIdentities)
 })
@@ -50,11 +47,6 @@ async function seedTrackedBuilder() {
 }
 
 async function addNote(orgBuilderId: string) {
-  // Shadow row for the stale FK — see file header.
-  await db.insert(builders).values({
-    id: orgBuilderId, organizationId: ORG, userId: OWNER, source: 'github', sourceId: orgBuilderId,
-    username: orgBuilderId, profileUrl: `https://github.com/${orgBuilderId}`,
-  })
   await db.insert(builderNotes).values({ id: `note-${orgBuilderId}`, organizationId: ORG, userId: OWNER, builderId: orgBuilderId, content: 'A note.' })
 }
 
