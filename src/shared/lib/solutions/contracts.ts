@@ -147,6 +147,40 @@ export type ComponentKind = (typeof COMPONENT_KINDS)[number]
 export const CAPABILITY_EVIDENCE_LEVELS = ['claimed', 'observed', 'verified', 'production_evidence'] as const
 export type CapabilityEvidenceLevel = (typeof CAPABILITY_EVIDENCE_LEVELS)[number]
 
+/**
+ * The capability vocabulary a brief's requirements and a component's claims are both keyed by.
+ *
+ * It exists as a typed constant, and not only as rows in `solution_capabilities`, because every adapter
+ * maps a vendor's own task label into this vocabulary — and a typo in one of those maps was previously
+ * a runtime foreign-key violation on the first ingestion run rather than a compile error. Typing the
+ * maps as `Record<string, SolutionCapabilityKey>` moves that mistake to `tsc`.
+ *
+ * Kept small and deliberately coarse. A vocabulary with a hundred near-synonyms cannot be matched
+ * against a brief: two components claiming `translation` and `machine_translation` would look unrelated
+ * to the composer, so splitting a capability is a decision that has to be made once, here, rather than
+ * by whoever writes the next adapter.
+ *
+ * Migration 0129 seeds these rows, and a parity test asserts the two never drift.
+ */
+export const SOLUTION_CAPABILITIES = [
+  { key: 'translation', label: 'Translation', description: 'Converts text from one natural language to another.' },
+  { key: 'summarization', label: 'Summarization', description: 'Produces a shorter version of a longer text.' },
+  { key: 'transcription', label: 'Transcription', description: 'Converts speech audio to text.' },
+  { key: 'text_generation', label: 'Text generation', description: 'Produces free-form text from a prompt.' },
+  { key: 'embedding', label: 'Embedding', description: 'Maps text or other content to vectors for similarity search.' },
+  { key: 'classification', label: 'Classification', description: 'Assigns content to one of a set of labels.' },
+  { key: 'entity_extraction', label: 'Entity extraction', description: 'Identifies named entities and spans within text.' },
+  { key: 'image_understanding', label: 'Image understanding', description: 'Derives text or structure from an image.' },
+  { key: 'document_understanding', label: 'Document understanding', description: 'Extracts structure and answers from documents such as PDFs.' },
+  { key: 'web_extraction', label: 'Web extraction', description: 'Retrieves and structures content from web pages.' },
+  { key: 'data_transformation', label: 'Data transformation', description: 'Moves and reshapes data between formats or systems.' },
+] as const
+
+export type SolutionCapabilityKey = (typeof SOLUTION_CAPABILITIES)[number]['key']
+
+export const SOLUTION_CAPABILITY_KEYS: readonly SolutionCapabilityKey[] =
+  SOLUTION_CAPABILITIES.map((capability) => capability.key)
+
 export const componentCapabilityClaimSchema = z.object({
   capabilityKey: z.string().min(1).max(80),
   evidenceLevel: z.enum(CAPABILITY_EVIDENCE_LEVELS),

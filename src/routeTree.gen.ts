@@ -113,6 +113,7 @@ import { Route as ApiAlertsIdRouteImport } from './routes/api/alerts/$id'
 import { Route as ApiAiEmbedRouteImport } from './routes/api/ai/embed'
 import { Route as ApiAiConfigRouteImport } from './routes/api/ai/config'
 import { Route as ApiAiCompleteRouteImport } from './routes/api/ai/complete'
+import { Route as ApiAdminSearchSourcesRouteImport } from './routes/api/admin/search-sources'
 import { Route as LandingPrivacyRemoveRouteImport } from './routes/_landing/privacy/remove'
 import { Route as LandingLegalTermsRouteImport } from './routes/_landing/legal/terms'
 import { Route as LandingLegalPrivacyRouteImport } from './routes/_landing/legal/privacy'
@@ -129,6 +130,7 @@ import { Route as DashboardSettingsBillingRouteImport } from './routes/_dashboar
 import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/lists/$listId'
 import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_dashboard/interviews/invitations'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
+import { Route as DashboardAdminSourcesRouteImport } from './routes/_dashboard/admin/sources'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
 import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
@@ -807,6 +809,11 @@ const ApiAiCompleteRoute = ApiAiCompleteRouteImport.update({
   path: '/api/ai/complete',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminSearchSourcesRoute = ApiAdminSearchSourcesRouteImport.update({
+  id: '/api/admin/search-sources',
+  path: '/api/admin/search-sources',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LandingPrivacyRemoveRoute = LandingPrivacyRemoveRouteImport.update({
   id: '/privacy/remove',
   path: '/privacy/remove',
@@ -889,6 +896,11 @@ const DashboardInterviewsInvitationsRoute =
 const DashboardAdminUsersRoute = DashboardAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminSourcesRoute = DashboardAdminSourcesRouteImport.update({
+  id: '/admin/sources',
+  path: '/admin/sources',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
@@ -1797,6 +1809,7 @@ export interface FileRoutesByFullPath {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/sources': typeof DashboardAdminSourcesRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
@@ -1813,6 +1826,7 @@ export interface FileRoutesByFullPath {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -2068,6 +2082,7 @@ export interface FileRoutesByTo {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/sources': typeof DashboardAdminSourcesRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/lists/$listId': typeof DashboardListsListIdRoute
@@ -2083,6 +2098,7 @@ export interface FileRoutesByTo {
   '/legal/privacy': typeof LandingLegalPrivacyRoute
   '/legal/terms': typeof LandingLegalTermsRoute
   '/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -2342,6 +2358,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/_dashboard/admin/sources': typeof DashboardAdminSourcesRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
   '/_dashboard/lists/$listId': typeof DashboardListsListIdRoute
@@ -2358,6 +2375,7 @@ export interface FileRoutesById {
   '/_landing/legal/privacy': typeof LandingLegalPrivacyRoute
   '/_landing/legal/terms': typeof LandingLegalTermsRoute
   '/_landing/privacy/remove': typeof LandingPrivacyRemoveRoute
+  '/api/admin/search-sources': typeof ApiAdminSearchSourcesRoute
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
@@ -2616,6 +2634,7 @@ export interface FileRouteTypes {
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
+    | '/admin/sources'
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
@@ -2632,6 +2651,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -2887,6 +2907,7 @@ export interface FileRouteTypes {
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
+    | '/admin/sources'
     | '/admin/users'
     | '/interviews/invitations'
     | '/lists/$listId'
@@ -2902,6 +2923,7 @@ export interface FileRouteTypes {
     | '/legal/privacy'
     | '/legal/terms'
     | '/privacy/remove'
+    | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -3160,6 +3182,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/plan-requests'
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
+    | '/_dashboard/admin/sources'
     | '/_dashboard/admin/users'
     | '/_dashboard/interviews/invitations'
     | '/_dashboard/lists/$listId'
@@ -3176,6 +3199,7 @@ export interface FileRouteTypes {
     | '/_landing/legal/privacy'
     | '/_landing/legal/terms'
     | '/_landing/privacy/remove'
+    | '/api/admin/search-sources'
     | '/api/ai/complete'
     | '/api/ai/config'
     | '/api/ai/embed'
@@ -3406,6 +3430,7 @@ export interface RootRouteChildren {
   PortfolioClaimIdRoute: typeof PortfolioClaimIdRoute
   RSlugRoute: typeof RSlugRoute
   ScheduleInvitationIdRoute: typeof ScheduleInvitationIdRoute
+  ApiAdminSearchSourcesRoute: typeof ApiAdminSearchSourcesRoute
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
@@ -4305,6 +4330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAiCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/search-sources': {
+      id: '/api/admin/search-sources'
+      path: '/api/admin/search-sources'
+      fullPath: '/api/admin/search-sources'
+      preLoaderRoute: typeof ApiAdminSearchSourcesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_landing/privacy/remove': {
       id: '/_landing/privacy/remove'
       path: '/privacy/remove'
@@ -4415,6 +4447,13 @@ declare module '@tanstack/react-router' {
       path: '/admin/users'
       fullPath: '/admin/users'
       preLoaderRoute: typeof DashboardAdminUsersRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
+    '/_dashboard/admin/sources': {
+      id: '/_dashboard/admin/sources'
+      path: '/admin/sources'
+      fullPath: '/admin/sources'
+      preLoaderRoute: typeof DashboardAdminSourcesRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
     '/_dashboard/admin/roadmap': {
@@ -5515,6 +5554,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
+  DashboardAdminSourcesRoute: typeof DashboardAdminSourcesRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardInterviewsInvitationsRoute: typeof DashboardInterviewsInvitationsRoute
   DashboardListsListIdRoute: typeof DashboardListsListIdRoute
@@ -5554,6 +5594,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
+  DashboardAdminSourcesRoute: DashboardAdminSourcesRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardInterviewsInvitationsRoute: DashboardInterviewsInvitationsRoute,
   DashboardListsListIdRoute: DashboardListsListIdRoute,
@@ -5926,6 +5967,7 @@ const rootRouteChildren: RootRouteChildren = {
   PortfolioClaimIdRoute: PortfolioClaimIdRoute,
   RSlugRoute: RSlugRoute,
   ScheduleInvitationIdRoute: ScheduleInvitationIdRoute,
+  ApiAdminSearchSourcesRoute: ApiAdminSearchSourcesRoute,
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,

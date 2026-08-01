@@ -55,6 +55,10 @@ const classifications: Classification[] = [
   // operational — it is the ingestion register and kill switch, not content, and its `enabled` column
   // is an operator control rather than anything a reader consumes.
   operational('solution_sources', 'platform operator', ['solutions-intelligence']),
+  // The people-search register (migration 0126). Operational for the same reason: it is the ingestion
+  // kill switch, not content — nothing reads it to learn about a builder, and its `enabled` column is
+  // an operator control.
+  operational('search_sources', 'platform operator', ['solutions-intelligence', 'stealth-scraping']),
   global('solution_capabilities', ['key', 'label', 'description'], ['solutions-intelligence']),
   global('solution_components', ['id', 'kind', 'slug', 'display_name', 'lifecycle_state', 'homepage_url'], ['solutions-intelligence']),
   global('solution_component_versions', ['component_id', 'version', 'metadata', 'observed_at', 'valid_from', 'valid_until'], ['solutions-intelligence']),

@@ -38,7 +38,13 @@ export type ScoredBuilder = ReturnType<typeof scoreBuilders>[number]
  */
 export const CONNECTOR_TIMEOUT_MS = 8000
 
-export type SourceHealth = 'ok' | 'failed' | 'timeout'
+/**
+ * `disabled` is not a failure and not a success: the operator switched this source off in
+ * `search_sources`, so it was never contacted. It exists as its own value because folding it into
+ * `ok, 0 results` would tell a user the source had nothing to say, and folding it into `failed` would
+ * tell them something is broken. Neither is true.
+ */
+export type SourceHealth = 'ok' | 'failed' | 'timeout' | 'disabled'
 
 /** Per-source outcome, so a caller can tell "this source found nothing" from "this source broke". */
 export interface SourceStatus {
@@ -131,6 +137,19 @@ function isUsableBuilder(value: unknown): value is RawBuilder {
 }
 
 /**
+ * Drops rows belonging to sources the register no longer permits.
+ *
+ * A cache entry is written with whatever was enabled at the time. Switching a source off has to stop
+ * serving its rows immediately, not once the entry expires — otherwise the kill switch has a
+ * five-minute (or Redis-lifetime) tail during which the product still shows data from a source
+ * someone withdrew.
+ */
+function restrictToSources(rows: RawBuilder[], allowed: string[]): RawBuilder[] {
+  const permitted = new Set(allowed)
+  return rows.filter((row) => permitted.has(row.source))
+}
+
+/**
  * Per-source status for a cache hit, reconstructed from the cached rows.
  *
  * A cache hit never contacted any source, so claiming live health would be a lie. What is
@@ -167,18 +186,39 @@ export async function searchBuilders(opts: SearchOptions): Promise<FusedBuilder[
 }
 
 export async function searchBuildersWithStatus(opts: SearchOptions): Promise<SearchOutcome> {
-  const { keywords, sources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
+  const { keywords, sources: requestedSources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
   const start = Date.now()
   metrics.increment('searches')
 
+  // The operator register decides which of the requested sources may be contacted at all. Consulted
+  // before the cache, not after: a cache entry written while a source was enabled must not keep
+  // serving that source's rows after it was switched off.
+  //
+  // Dynamic import for the same reason as the connectors — this module is reachable from route files
+  // that the client bundle pulls in, and the repository imports `publicDb`, which constructs a real
+  // `postgres()` client at module-evaluation time.
+  const { partitionRequestedSources } = await import('~/shared/lib/repositories/search-sources')
+  const { allowed: sources, refused } = await partitionRequestedSources(requestedSources)
+  const disabledStatuses: SourceStatus[] = refused.map((source) => ({
+    source,
+    health: 'disabled' as const,
+    resultCount: 0,
+    durationMs: 0,
+    detail: 'Switched off in the source register',
+  }))
+  if (refused.length > 0) log.info('search_sources_refused', { refused })
+  if (sources.length === 0) {
+    return { builders: [], sources: disabledStatuses }
+  }
+
   // Check in-memory cache first
   const cached = cache.get(cacheKeyStr)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-    const visible = await filterSuppressed(cached.results)
+    const visible = restrictToSources(await filterSuppressed(cached.results), sources)
     metrics.increment('searchCacheHits')
     log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'memory' })
-    return { builders: fuseByRank(scoreBuilders(visible)), sources: statusFromCachedRows(visible, sources) }
+    return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources), ...disabledStatuses] }
   }
 
   // Check Redis cache (if available)
@@ -191,10 +231,10 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
       if (cachedRaw) {
         const parsed = JSON.parse(cachedRaw) as RawBuilder[]
         cache.set(cacheKeyStr, { results: parsed, timestamp: Date.now() })
-        const visible = await filterSuppressed(parsed)
+        const visible = restrictToSources(await filterSuppressed(parsed), sources)
         metrics.increment('searchCacheHits')
         log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'redis' })
-        return { builders: fuseByRank(scoreBuilders(visible)), sources: statusFromCachedRows(visible, sources) }
+        return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources), ...disabledStatuses] }
       }
     }
   } catch {
@@ -265,6 +305,6 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   })
   return {
     builders: fuseByRank(scoreBuilders(visible)),
-    sources: outcomes.map(({ builders: _builders, ...status }) => status),
+    sources: [...outcomes.map(({ builders: _builders, ...status }) => status), ...disabledStatuses],
   }
 }

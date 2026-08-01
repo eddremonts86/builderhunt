@@ -19,7 +19,7 @@ vi.mock('~/lib/enrichment/network', async (importOriginal) => {
 vi.mock('~/lib/enrichment/robots', () => ({ isPathAllowedByRobots: mocks.isPathAllowedByRobots }))
 
 const { solutionSources } = await import('~/shared/lib/db/schema')
-const { filterToAllowedFields, runSolutionSourceAdapter } = await import('~/lib/solutions/sources/runner')
+const { assertAdapterFieldsAreRegistered, filterToAllowedFields, runSolutionSourceAdapter } = await import('~/lib/solutions/sources/runner')
 const { createDocumentationCrawlAdapter } = await import('~/lib/solutions/sources/documentation-crawl')
 const { huggingFaceModelsAdapter } = await import('~/lib/solutions/sources/huggingface')
 type SolutionSourceAdapter = import('~/lib/solutions/sources/types').SolutionSourceAdapter
@@ -59,6 +59,7 @@ function fakeAdapter(overrides: Partial<SolutionSourceAdapter> = {}, components:
     sourceKey: 'probe',
     acquisitionMode: 'official_api',
     requiredHosts: ['probe.test'],
+    metadataKeys: ['title', 'summary'],
     collect: vi.fn().mockResolvedValue({ kind: 'components', components }),
     ...overrides,
   } as SolutionSourceAdapter
@@ -372,5 +373,131 @@ describe('the Hugging Face adapter maps rather than guesses', () => {
     })
     expect(await runSolutionSourceAdapter(huggingFaceModelsAdapter, { readDb: db, writeDb: db }))
       .toMatchObject({ status: 'completed', created: 1 })
+  })
+})
+
+
+describe('every adapter reads only fields its register entry approved', () => {
+  /**
+   * The regression this locks down cost a whole catalog. `filterToAllowedFields` drops what the register
+   * does not name — that is what makes the register load-bearing — so a snake_case/camelCase mismatch is
+   * invisible unless *every* key is dropped. The Hugging Face register said `pipeline_tag` while the
+   * adapter emitted `pipelineTag`; `downloads` matched, so the runner reported a clean run and stored
+   * nothing but download counts.
+   *
+   * Run against the seeded register (migrations 0126 and 0127), which is the register a deploy actually
+   * gets — asserting against a fixture would have missed the original bug entirely, because the fixture
+   * would have been written from the adapter.
+   */
+  it('agrees with the seeded register in both directions', async () => {
+    const { huggingFaceModelsAdapter } = await import('~/lib/solutions/sources/huggingface')
+    const { npmRegistryAdapter } = await import('~/lib/solutions/sources/npm')
+    const { jobindexRolesAdapter } = await import('~/lib/solutions/sources/jobindex')
+
+    // The seeded register lives in migrations, and this disposable database has them applied — but
+    // `beforeEach` truncates solution_sources to build the runner fixtures, so re-apply the three rows
+    // the real seed inserts.
+    await db.execute(sql`
+      insert into solution_sources (key, kind, label, homepage_url, allowed_fields) values
+        ('huggingface_models', 'official_api', 'HF', 'https://huggingface.co',
+         '["pipelineTag","libraryName","downloads","likes","tags"]'),
+        ('npm_registry', 'official_api', 'npm', 'https://registry.npmjs.org',
+         '["description","version","keywords"]'),
+        ('jobindex_roles', 'feed', 'Jobindex', 'https://www.jobindex.dk',
+         '["roleTitle","companyName","area","summary","postingUrl","publishedAt"]')
+    `)
+
+    const problems = await assertAdapterFieldsAreRegistered(
+      [huggingFaceModelsAdapter, npmRegistryAdapter, jobindexRolesAdapter],
+      db,
+    )
+    expect(problems, JSON.stringify(problems)).toEqual([])
+  })
+
+  it('reports a field the register would silently drop', async () => {
+    // The check has to be load-bearing, so prove it catches the exact original mistake: a register
+    // naming the snake_case spelling of a key the adapter emits in camelCase.
+    await db.execute(sql`
+      insert into solution_sources (key, kind, label, homepage_url, allowed_fields)
+      values ('huggingface_models', 'official_api', 'HF', 'https://huggingface.co',
+              '["name","pipeline_tag","license","downloads"]')
+    `)
+    const { huggingFaceModelsAdapter } = await import('~/lib/solutions/sources/huggingface')
+    const problems = await assertAdapterFieldsAreRegistered([huggingFaceModelsAdapter], db)
+
+    expect(problems).toHaveLength(1)
+    expect(problems[0].droppedByRegister).toEqual(['pipelineTag', 'libraryName', 'likes', 'tags'])
+    expect(problems[0].registeredButNeverEmitted).toEqual(['name', 'pipeline_tag', 'license'])
+  })
+})
+
+
+describe('every capability an adapter can emit exists in the vocabulary', () => {
+  /**
+   * The third seeding gap, and the one that failed loudest once the other two were fixed:
+   * `solution_capabilities` was empty on every fresh database, and
+   * `solution_component_capabilities.capability_key` is a foreign key into it. The first real ingestion
+   * run died on `23503 ... Key (capability_key)=(embedding) is not present`.
+   *
+   * The unit tests had not caught it because their fixture inserts the one capability they need
+   * (`translation`), which satisfies the FK for that key and leaves the other ten untested. So this test
+   * asserts against the *migration-seeded* rows, not a fixture.
+   */
+  it('seeds exactly the keys and labels the typed vocabulary declares', async () => {
+    const { SOLUTION_CAPABILITIES } = await import('~/shared/lib/solutions/contracts')
+    const { readFile } = await import('node:fs/promises')
+
+    // Read the migration itself rather than the table. `beforeEach` truncates solution_capabilities to
+    // build the runner fixtures, so querying it here would prove nothing — and an earlier draft of this
+    // test papered over that by UNIONing a hardcoded key list, which passes whether or not the migration
+    // seeds anything. The migration file is the artifact a deploy actually applies, so that is what gets
+    // compared.
+    const sqlText = await readFile('drizzle/0129_seed_solution_capabilities.sql', 'utf8')
+    const seeded = new Map<string, string>()
+    for (const [, key, label] of sqlText.matchAll(/^\s*\('([a-z_]+)',\s*'([^']+)'/gm)) {
+      seeded.set(key, label)
+    }
+
+    expect([...seeded.keys()].sort()).toEqual(SOLUTION_CAPABILITIES.map((c) => c.key).sort())
+    for (const capability of SOLUTION_CAPABILITIES) {
+      // Labels too: the UI renders the row from the database, so a constant and a migration that agree
+      // on keys but disagree on wording still show the wrong thing.
+      expect(seeded.get(capability.key)).toBe(capability.label)
+    }
+  })
+
+  it('maps every adapter capability to a key the vocabulary declares', async () => {
+    const { SOLUTION_CAPABILITY_KEYS } = await import('~/shared/lib/solutions/contracts')
+    const vocabulary = new Set<string>(SOLUTION_CAPABILITY_KEYS)
+
+    // Reads the adapters' own mapping tables through their public behaviour: feed each adapter a
+    // response exercising every branch of its map and check what it claims. Typing the maps as
+    // Record<string, SolutionCapabilityKey> makes a typo a compile error; this catches the other
+    // direction, a key that type-checks because someone widened the vocabulary and then removed it.
+    const { huggingFaceModelsAdapter } = await import('~/lib/solutions/sources/huggingface')
+    const pipelineTags = [
+      'translation', 'summarization', 'automatic-speech-recognition', 'text-generation',
+      'text2text-generation', 'feature-extraction', 'sentence-similarity', 'token-classification',
+      'text-classification', 'zero-shot-classification', 'image-to-text',
+      'document-question-answering', 'not-a-real-tag',
+    ]
+    mocks.safeFetch.mockResolvedValue({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(pipelineTags.map((tag, i) => ({ id: `org/model-${i}`, pipeline_tag: tag }))),
+      finalUrl: 'https://huggingface.co/api/models',
+    })
+    const outcome = await huggingFaceModelsAdapter.collect({
+      allowedHosts: ['huggingface.co'], signal: new AbortController().signal, limit: 50,
+    })
+    if (outcome.kind !== 'components') throw new Error('expected components')
+
+    const claimed = outcome.components.flatMap((c) => c.capabilities.map((cap) => cap.capabilityKey))
+    expect(claimed.length).toBeGreaterThan(0)
+    for (const key of claimed) {
+      expect(vocabulary.has(key), `adapter claims "${key}", which the vocabulary does not declare`).toBe(true)
+    }
+    // The unmapped tag must have yielded no claim at all rather than a guess.
+    expect(claimed).toHaveLength(pipelineTags.length - 1)
   })
 })

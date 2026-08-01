@@ -51,5 +51,18 @@ export interface SolutionSourceAdapter {
   readonly acquisitionMode: 'official_api' | 'feed' | 'public_scrape'
   /** Hosts the adapter needs. The runner intersects these with the register's own entry. */
   readonly requiredHosts: readonly string[]
+  /**
+   * Every metadata key this adapter can emit.
+   *
+   * Declared rather than inferred because the runner filters metadata to the register's
+   * `allowed_fields` and silently drops anything unnamed. A mismatch is therefore invisible at runtime
+   * unless *every* key is dropped: the Hugging Face register listed `pipeline_tag` while the adapter
+   * emitted `pipelineTag`, and because `downloads` happened to match, the run reported success while
+   * storing nothing but a download count.
+   *
+   * `assertAdapterFieldsAreRegistered` compares this list against the register, which is what turns
+   * that class of mistake into a failing test.
+   */
+  readonly metadataKeys: readonly string[]
   collect(context: AdapterContext): Promise<AdapterOutcome>
 }

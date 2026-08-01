@@ -1324,6 +1324,33 @@ try {
     { table: 'canonical_humans', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
     { table: 'human_source_links', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
     { table: 'human_source_links', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    // The source registers are read on every search and every ingestion run, and written only by a
+    // reviewed operator action. The denials are the load-bearing half: a role able to flip `enabled`
+    // could re-enable a source someone withdrew, which makes the kill switch decorative. That is the
+    // whole reason these two tables exist, so it is asserted rather than assumed.
+    { table: 'search_sources', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'search_sources', role: 'builderhunt_worker', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'search_sources', role: 'builderhunt_platform', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    { table: 'solution_sources', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'solution_sources', role: 'builderhunt_worker', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'solution_sources', role: 'builderhunt_platform', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    // A capability claim keyed by (component, version, capability) is immutable content: if a source
+    // changed what it says, the content hash changed and it is a new version. `evidence_level` is what a
+    // human raises to `verified`, so a worker holding UPDATE here could push a verified claim back down
+    // to `claimed`. The ingestion path uses ON CONFLICT DO NOTHING precisely so it does not need it.
+    { table: 'solution_component_capabilities', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT'], denied: ['UPDATE', 'DELETE'] },
+    { table: 'solution_component_capabilities', role: 'builderhunt_platform', granted: ['SELECT', 'INSERT', 'UPDATE', 'DELETE'] },
+    // Column-level, and the negative half is the point. Closing a validity window is ingestion's job —
+    // the no-overlap EXCLUDE constraint makes it mandatory before a new version can be inserted — but
+    // rewriting a historical version's metadata or content hash falsifies the audit trail the versions
+    // exist to keep. `has_table_privilege` reports UPDATE as absent here, which is exactly right: the
+    // grant is on one column, so the table-level assertion below must stay a denial.
+    {
+      table: 'solution_component_versions', role: 'builderhunt_worker',
+      granted: ['SELECT', 'INSERT'], denied: ['UPDATE', 'DELETE'],
+      grantedColumns: [['valid_until', 'UPDATE']],
+      deniedColumns: [['metadata', 'UPDATE'], ['content_hash', 'UPDATE'], ['version', 'UPDATE'], ['valid_from', 'UPDATE']],
+    },
   ]
   for (const expectation of globalIngestionExpectations) {
     for (const privilege of expectation.granted ?? []) {
@@ -1342,8 +1369,27 @@ try {
         throw new Error(`${expectation.role} unexpectedly holds ${privilege} on ${expectation.table}`)
       }
     }
+    for (const [column, privilege] of expectation.grantedColumns ?? []) {
+      const [row] = await platform`
+        select has_column_privilege(${expectation.role}, ${expectation.table}, ${column}, ${privilege}) as ok
+      `
+      if (!row.ok) {
+        throw new Error(`${expectation.role} is missing ${privilege} on ${expectation.table}.${column} — the write path that needs it will fail with 42501 at runtime`)
+      }
+    }
+    for (const [column, privilege] of expectation.deniedColumns ?? []) {
+      const [row] = await platform`
+        select has_column_privilege(${expectation.role}, ${expectation.table}, ${column}, ${privilege}) as ok
+      `
+      if (row.ok) {
+        throw new Error(`${expectation.role} unexpectedly holds ${privilege} on ${expectation.table}.${column}`)
+      }
+    }
     const key = `${expectation.table}:${expectation.role}`
-    globalIngestionGrantReport[key] = `granted ${(expectation.granted ?? []).join('/')}${expectation.denied ? `, denied ${expectation.denied.join('/')}` : ''}`
+    const columnNote = expectation.grantedColumns
+      ? `, granted ${expectation.grantedColumns.map(([c, p]) => `${p}(${c})`).join('/')}`
+      : ''
+    globalIngestionGrantReport[key] = `granted ${(expectation.granted ?? []).join('/')}${expectation.denied ? `, denied ${expectation.denied.join('/')}` : ''}${columnNote}`
   }
   const workerWebhookEvents = await worker`select id from billing_webhook_events`
   if (workerWebhookEvents.length !== 1 || workerWebhookEvents[0].id !== 'webhook-a') {

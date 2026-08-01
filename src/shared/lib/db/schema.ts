@@ -3385,6 +3385,75 @@ export const SOLUTION_SOURCE_KINDS = [
   'external_link_only',
 ] as const
 
+/**
+ * Operator register for the people-search connectors, so a source can be switched off from Admin →
+ * Sources instead of through a deploy.
+ *
+ * Separate from `solutionSources` on purpose. A solutions source contributes facts about tools and its
+ * risk is a wrong capability claim; a search source contributes data about *people* and its risk is
+ * processing personal data without a basis. The load-bearing columns differ, so one shared table would
+ * mean half of every row is NULL.
+ */
+export const searchSources = pgTable(
+  'search_sources',
+  {
+    /** Matches the `source` value each connector stamps on its results, e.g. `github`. */
+    key: text('key').primaryKey(),
+    kind: text('kind').notNull(),
+    label: text('label').notNull(),
+    homepageUrl: text('homepage_url').notNull(),
+    /** The kill switch, read on every search — flipping it takes effect on the next query. */
+    enabled: boolean('enabled').notNull().default(false),
+    /**
+     * Whether code exists to query this source. Not an operator toggle: "does an adapter exist" is a
+     * fact about the repository, so it changes in a migration alongside the connector that lands. It
+     * is a column so the constraint below can use it, and so the UI can tell "switched off" apart from
+     * "nothing to switch on" rather than rendering a dead control.
+     *
+     * `assertSearchConnectorRegistryMatchesDatabase` keeps it honest against the code registry.
+     */
+    connectorImplemented: boolean('connector_implemented').notNull().default(false),
+    /** Hosts this connector may contact, so the register is auditable without reading the connector. */
+    allowedHosts: jsonb('allowed_hosts').$type<string[]>().default([]).notNull(),
+    /** False only for `external_link_only`, and the CHECK below holds us to that. */
+    storesPersonalData: boolean('stores_personal_data').notNull().default(true),
+    geography: text('geography'),
+    rateLimitPerHour: integer('rate_limit_per_hour'),
+    retentionDays: integer('retention_days'),
+    termsReviewedAt: timestamp('terms_reviewed_at', { withTimezone: true }),
+    termsReviewedBy: text('terms_reviewed_by').references(() => authUsers.id, { onDelete: 'set null' }),
+    registerNotes: text('register_notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('search_sources_kind_check', sql`${table.kind} in ('official_api', 'feed', 'licensed_dataset', 'user_submission', 'public_scrape', 'external_link_only')`),
+    /** Same legal gate as `solution_sources_scrape_needs_review_check`. */
+    check(
+      'search_sources_scrape_needs_review_check',
+      sql`${table.kind} <> 'public_scrape' or ${table.enabled} = false or ${table.termsReviewedAt} is not null`,
+    ),
+    check(
+      'search_sources_link_only_stores_nothing_check',
+      sql`${table.kind} <> 'external_link_only' or ${table.storesPersonalData} = false`,
+    ),
+    /**
+     * An enabled source with no connector is a promise the product cannot keep: the UI offers it, the
+     * search reports it healthy, and it contributes nothing. Refuse the state rather than explain it.
+     */
+    check(
+      'search_sources_enabled_needs_connector_check',
+      sql`${table.enabled} = false or ${table.connectorImplemented} = true`,
+    ),
+    /** NULL retention on personal data reads as "keep forever", which is not a retention policy. */
+    check(
+      'search_sources_retention_check',
+      sql`${table.storesPersonalData} = false or (${table.retentionDays} is not null and ${table.retentionDays} > 0)`,
+    ),
+    index('search_sources_enabled_idx').on(table.enabled),
+  ],
+)
+
 export const solutionSources = pgTable(
   'solution_sources',
   {

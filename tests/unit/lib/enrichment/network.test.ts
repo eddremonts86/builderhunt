@@ -55,6 +55,23 @@ beforeAll(async () => {
       res.end()
       return
     }
+    if (url.pathname === '/latin1-feed') {
+      // A legacy feed: charset only in the XML prolog, never in the header. Exactly Jobindex's shape.
+      res.writeHead(200, { 'content-type': 'application/rss+xml' })
+      res.end(Buffer.from('<?xml version="1.0" encoding="ISO-8859-1"?><t>K\xf8benhavn \xe6\xf8\xe5</t>', 'binary'))
+      return
+    }
+    if (url.pathname === '/declared-utf8') {
+      // A header charset must beat the caller's fallback: the server knows, the caller is guessing.
+      res.writeHead(200, { 'content-type': 'application/rss+xml; charset=utf-8' })
+      res.end(Buffer.from('<t>K\u00f8benhavn</t>', 'utf8'))
+      return
+    }
+    if (url.pathname === '/bogus-charset') {
+      res.writeHead(200, { 'content-type': 'application/json; charset=not-a-real-charset' })
+      res.end(JSON.stringify({ hello: 'world' }))
+      return
+    }
     if (url.pathname === '/slow') {
       // Never responds within the client's timeout window.
       return
@@ -107,6 +124,41 @@ describe('safeFetch', () => {
 
   it('maps 403 to auth_required', async () => {
     await expect(fetchTestUrl('/forbidden')).rejects.toMatchObject({ code: 'auth_required' })
+  })
+
+  it('still rejects a feed content type when the caller did not opt in', async () => {
+    // The global allowlist stays as tight as it was. A caller that needs XML says so per call, so no
+    // existing connector silently starts accepting it.
+    await expect(fetchTestUrl('/latin1-feed')).rejects.toMatchObject({ code: 'unsupported_content_type' })
+  })
+
+  it('decodes a legacy feed with the caller\'s fallback charset', async () => {
+    const result = await safeFetch(`${baseUrl}/latin1-feed`, {
+      allowedHosts: hosts,
+      insecureAllowHttpAndPrivateNetworkForTests: true,
+      additionalContentTypes: ['application/rss+xml'],
+      fallbackCharset: 'iso-8859-1',
+    })
+    // Without the fallback these bytes decode to replacement characters, and those characters then
+    // become part of a component slug that outlives the mistake.
+    expect(result.body).toContain('København æøå')
+  })
+
+  it('lets a declared header charset win over the caller\'s fallback', async () => {
+    const result = await safeFetch(`${baseUrl}/declared-utf8`, {
+      allowedHosts: hosts,
+      insecureAllowHttpAndPrivateNetworkForTests: true,
+      additionalContentTypes: ['application/rss+xml'],
+      fallbackCharset: 'iso-8859-1',
+    })
+    expect(result.body).toContain('København')
+  })
+
+  it('falls back to UTF-8 rather than throwing on an unusable charset label', async () => {
+    // The label comes from a remote header, so a hostile or misspelled one must cost nothing more than
+    // the decoding it asked for.
+    const result = await fetchTestUrl('/bogus-charset')
+    expect(JSON.parse(result.body)).toEqual({ hello: 'world' })
   })
 
   it('follows a single same-host redirect', async () => {

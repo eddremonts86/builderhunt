@@ -1,0 +1,21 @@
+-- Custom SQL migration file, put your code below! --
+-- Lets the ingestion worker close a version's validity window, and nothing else.
+--
+-- `ingestComponentVersion` opens a new version by first setting the previous one's `valid_until`. It has
+-- to: `solution_component_versions_no_overlap` is an EXCLUDE constraint over
+-- `tstzrange(valid_from, coalesce(valid_until, 'infinity'))`, so an open window physically prevents the
+-- next one from being inserted. Migration 0125 gave the worker only INSERT and SELECT, which means every
+-- *second* observation of a changed component failed with
+-- `42501: permission denied for table solution_component_versions`.
+--
+-- It went unnoticed because the failing path is the refresh path. A first ingestion has no previous
+-- window to close, so it succeeds; a repeat observation of unchanged content short-circuits on the
+-- content hash before reaching the update. Only a component whose metadata actually changed since the
+-- last run hits it — which no test covered, because the disposable test databases connect as superuser
+-- and superusers ignore grants entirely.
+--
+-- A **column-level** grant rather than table UPDATE. Closing a window is ingestion's job; rewriting a
+-- historical version's `metadata` or `content_hash` is falsifying an audit trail, and the whole point of
+-- keeping old versions is that they are what the source said at the time. Postgres can express exactly
+-- that distinction, so it is expressed rather than approximated:
+GRANT UPDATE ("valid_until") ON "solution_component_versions" TO "builderhunt_worker";

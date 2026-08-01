@@ -504,6 +504,22 @@
     "0125_solutions_catalog": {
       "sql": "0e2b71eaba007ed1414094b12996a422117e4854cf92fa0a0e7738516419b171",
       "snapshot": "ca81095f32f9a5fa73ad38175cf32df14fde3258fdd25dbc0ada50380fc559b5"
+    },
+    "0126_search_source_register": {
+      "sql": "471ff4b7c79ee1a8c0305d137a2db39304e470a0a29b1ca4ef18e7af2fb9787b",
+      "snapshot": "90347023340f0b8eae17ccf17fcc8978ebe1bb09c5df017ec02fef002d6302e7"
+    },
+    "0127_seed_solution_source_register": {
+      "sql": "b7e3ebd057ed6366c06d3d6481606b48c401051ad9ef3de131de1068806d839f",
+      "snapshot": "7221f58d172fa3adf752371d1687de6f3beefa5bda5aa37d8e6cf40af4c46733"
+    },
+    "0128_solution_version_close_grant": {
+      "sql": "7b0ecb82dbe7545d99db3a55b93dacf0797c6c1ff127aa3aace86f009845b03b",
+      "snapshot": "2c575a1b8afd7468014d0d782c1c20abd69fb325d9b748f389a060ea96196243"
+    },
+    "0129_seed_solution_capabilities": {
+      "sql": "e9f02771ad9bce4faaf43ffdad78e81af4176b26a68bb87ecfe3e2b3fdfa3389",
+      "snapshot": "7ae8c9b319ec94007bac6bf08dca1e19a98dab7f065567569ca886483ed9e239"
     }
   }
 }

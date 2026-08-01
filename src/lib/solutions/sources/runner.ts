@@ -21,7 +21,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { workerDb } from '~/shared/lib/db/worker-db'
 import { publicDb } from '~/shared/lib/db/client'
 import { log } from '~/shared/lib/log'
-import type { AdapterComponent, SolutionSourceAdapter } from './types'
+import type { SolutionSourceAdapter } from './types'
 
 export interface RunAdapterOptions {
   limit?: number
@@ -210,4 +210,44 @@ export function filterToAllowedFields(
 }
 
 /** Every adapter the runner knows about. A source with no adapter simply never ingests. */
-export const SOLUTION_ADAPTERS: readonly string[] = ['huggingface_models', 'npm_registry']
+export const SOLUTION_ADAPTERS: readonly string[] = ['huggingface_models', 'npm_registry', 'jobindex_roles']
+
+/**
+ * Compares each adapter's declared `metadataKeys` against its register entry's `allowed_fields`.
+ *
+ * This exists because `filterToAllowedFields` fails silently by design: it drops what the register does
+ * not name, which is exactly what makes the register load-bearing, and also exactly why a naming
+ * mismatch is invisible. The Hugging Face register listed `pipeline_tag` while the adapter emitted
+ * `pipelineTag`; `downloads` matched, so `emptyAfterFieldFilter` stayed at zero and the run reported
+ * success while storing nothing but a download count.
+ *
+ * Both directions are reported, because they are different mistakes:
+ *
+ * - `droppedByRegister` — the adapter reads a field the register never approved. Either the review needs
+ *   to cover it or the adapter should stop reading it. Never harmless: the adapter's author believed
+ *   that data was reaching the catalog.
+ * - `registeredButNeverEmitted` — the register approves a field nothing produces. Harmless at runtime,
+ *   but it makes the register describe a source that does not exist, and the next person reads it as
+ *   documentation.
+ *
+ * A source with no register row is skipped rather than reported: `runSolutionSourceAdapter` already
+ * refuses to run one, and a missing row is that check's business, not this one's.
+ */
+export async function assertAdapterFieldsAreRegistered(
+  adapters: readonly SolutionSourceAdapter[],
+  db: PostgresJsDatabase = publicDb,
+): Promise<Array<{ sourceKey: string; droppedByRegister: string[]; registeredButNeverEmitted: string[] }>> {
+  const problems: Array<{ sourceKey: string; droppedByRegister: string[]; registeredButNeverEmitted: string[] }> = []
+  for (const adapter of adapters) {
+    const source = await findSolutionSource(adapter.sourceKey, db)
+    if (!source) continue
+    const allowed = new Set(source.allowedFields)
+    const emitted = new Set(adapter.metadataKeys)
+    const droppedByRegister = adapter.metadataKeys.filter((key) => !allowed.has(key))
+    const registeredButNeverEmitted = source.allowedFields.filter((key) => !emitted.has(key))
+    if (droppedByRegister.length > 0 || registeredButNeverEmitted.length > 0) {
+      problems.push({ sourceKey: adapter.sourceKey, droppedByRegister, registeredButNeverEmitted })
+    }
+  }
+  return problems
+}

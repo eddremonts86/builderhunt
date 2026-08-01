@@ -883,6 +883,34 @@
       "when": 1785601447325,
       "tag": "0125_solutions_catalog",
       "breakpoints": true
+    },
+    {
+      "idx": 126,
+      "version": "7",
+      "when": 1785605047325,
+      "tag": "0126_search_source_register",
+      "breakpoints": true
+    },
+    {
+      "idx": 127,
+      "version": "7",
+      "when": 1785608647325,
+      "tag": "0127_seed_solution_source_register",
+      "breakpoints": true
+    },
+    {
+      "idx": 128,
+      "version": "7",
+      "when": 1785612247325,
+      "tag": "0128_solution_version_close_grant",
+      "breakpoints": true
+    },
+    {
+      "idx": 129,
+      "version": "7",
+      "when": 1785615847325,
+      "tag": "0129_seed_solution_capabilities",
+      "breakpoints": true
     }
   ]
 }

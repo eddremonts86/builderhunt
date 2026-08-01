@@ -11,6 +11,7 @@
  */
 import { safeFetch, SafeFetchError } from '~/lib/enrichment/network'
 import { log } from '~/shared/lib/log'
+import type { SolutionCapabilityKey } from '~/shared/lib/solutions/contracts'
 import type { AdapterContext, AdapterOutcome, SolutionSourceAdapter } from './types'
 
 const HOST = 'huggingface.co'
@@ -29,7 +30,7 @@ interface HuggingFaceModel {
  * lookup, never an inference: an unmapped tag yields no capability claim rather than a guessed one,
  * because a wrong capability claim is what makes the composer recommend a model for work it cannot do.
  */
-const PIPELINE_TO_CAPABILITY: Record<string, string> = {
+const PIPELINE_TO_CAPABILITY: Record<string, SolutionCapabilityKey> = {
   translation: 'translation',
   summarization: 'summarization',
   'automatic-speech-recognition': 'transcription',
@@ -48,6 +49,7 @@ export const huggingFaceModelsAdapter: SolutionSourceAdapter = {
   sourceKey: 'huggingface_models',
   acquisitionMode: 'official_api',
   requiredHosts: [HOST],
+  metadataKeys: ['pipelineTag', 'libraryName', 'downloads', 'likes', 'tags'],
 
   async collect(context: AdapterContext): Promise<AdapterOutcome> {
     const url = `https://${HOST}/api/models?sort=downloads&direction=-1&limit=${context.limit}&full=false`

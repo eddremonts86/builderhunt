@@ -10,6 +10,7 @@
  */
 import { safeFetch, SafeFetchError } from '~/lib/enrichment/network'
 import { log } from '~/shared/lib/log'
+import type { SolutionCapabilityKey } from '~/shared/lib/solutions/contracts'
 import type { AdapterComponent, AdapterContext, AdapterOutcome, SolutionSourceAdapter } from './types'
 
 const HOST = 'registry.npmjs.org'
@@ -30,7 +31,7 @@ interface NpmSearchObject {
  * match. A fuzzy keyword match would be an inference dressed up as a claim, and the composer treats
  * claims as facts about what a component can do.
  */
-const KEYWORD_TO_CAPABILITY: Record<string, string> = {
+const KEYWORD_TO_CAPABILITY: Record<string, SolutionCapabilityKey> = {
   translation: 'translation',
   i18n: 'translation',
   transcription: 'transcription',
@@ -47,6 +48,7 @@ export const npmRegistryAdapter: SolutionSourceAdapter = {
   sourceKey: 'npm_registry',
   acquisitionMode: 'official_api',
   requiredHosts: [HOST, SEARCH_HOST],
+  metadataKeys: ['description', 'version', 'keywords'],
 
   async collect(context: AdapterContext): Promise<AdapterOutcome> {
     // Bounded by the runner's limit. npm caps `size` at 250; asking for more is silently truncated,

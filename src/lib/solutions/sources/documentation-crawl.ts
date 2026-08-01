@@ -54,6 +54,7 @@ export function createDocumentationCrawlAdapter(target: DocumentationCrawlTarget
     sourceKey: target.sourceKey,
     acquisitionMode: 'public_scrape',
     requiredHosts: [target.host],
+    metadataKeys: ['summary', 'crawledPath'],
 
     async collect(context: AdapterContext): Promise<AdapterOutcome> {
       const origin = `https://${target.host}`

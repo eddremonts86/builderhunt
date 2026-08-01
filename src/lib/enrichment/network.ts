@@ -42,6 +42,26 @@ export interface SafeFetchOptions {
   signal?: AbortSignal
   userAgent?: string
   /**
+   * Extra content types this one call accepts, on top of `ALLOWED_CONTENT_TYPES`.
+   *
+   * Opt-in per call rather than added to the global list, because widening the global list widens what
+   * *every* connector may receive to solve one caller's problem. The Jobindex feed adapter is the first
+   * caller: it needs `application/rss+xml`, and no other connector should start accepting XML because
+   * of that.
+   */
+  additionalContentTypes?: readonly string[]
+  /**
+   * Character set to decode the body with when the response does not declare one in its `Content-Type`
+   * header.
+   *
+   * The default is UTF-8, which is right for the JSON APIs and modern HTML every existing connector
+   * reads. It is wrong for a legacy feed that declares its encoding only in an XML prolog: decoding
+   * ISO-8859-1 bytes as UTF-8 turns Danish "København" into replacement characters, and those
+   * characters then become a permanent part of a slug or a display name. A declared header charset
+   * always wins over this — the caller is stating a fallback, not overriding the server.
+   */
+  fallbackCharset?: string
+  /**
    * Test-only escape hatch: skips the production SSRF guard (which
    * unconditionally blocks loopback/private addresses and non-HTTPS) so
    * network.test.ts can exercise redirect/timeout/size/content-type
@@ -128,23 +148,32 @@ export async function safeFetch(url: string, options: SafeFetchOptions): Promise
       throw new SafeFetchError('upstream_error', `Upstream returned ${response.status}`, response.status)
     }
 
-    const contentType = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
-    if (!ALLOWED_CONTENT_TYPES.includes(contentType)) {
+    const contentTypeHeader = response.headers.get('content-type') ?? ''
+    const contentType = contentTypeHeader.split(';')[0].trim().toLowerCase()
+    if (!ALLOWED_CONTENT_TYPES.includes(contentType) && !(options.additionalContentTypes ?? []).includes(contentType)) {
       throw new SafeFetchError('unsupported_content_type', `Unsupported content type: ${contentType}`)
     }
 
-    const body = await readBoundedBody(response)
+    const body = await readBoundedBody(response, charsetFrom(contentTypeHeader) ?? options.fallbackCharset)
     return { status: response.status, contentType, body, finalUrl: validated.toString() }
   }
   throw new SafeFetchError('too_many_redirects', 'Exceeded redirect limit')
 }
 
-async function readBoundedBody(response: Response): Promise<string> {
+/** The `charset` parameter of a Content-Type header, if it declared one. */
+function charsetFrom(header: string): string | undefined {
+  const value = /;\s*charset\s*=\s*"?([\w-]{1,40})"?/i.exec(header)?.[1]
+  return value ? value.toLowerCase() : undefined
+}
+
+async function readBoundedBody(response: Response, charset?: string): Promise<string> {
   const contentLength = Number(response.headers.get('content-length'))
   if (Number.isFinite(contentLength) && contentLength > MAX_RESPONSE_BYTES) {
     throw new SafeFetchError('too_large', 'Response exceeds the size limit')
   }
-  if (!response.body) return response.text()
+  // `response.text()` always decodes UTF-8 regardless of charset, so it is only correct on the path
+  // where no charset was requested.
+  if (!response.body) return charset ? decodeBody(Buffer.from(await response.arrayBuffer()), charset) : response.text()
 
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -159,7 +188,24 @@ async function readBoundedBody(response: Response): Promise<string> {
     }
     chunks.push(value)
   }
-  return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString('utf8')
+  return decodeBody(Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))), charset)
+}
+
+/**
+ * Decodes bytes with the requested charset, falling back to UTF-8.
+ *
+ * The label reaching `TextDecoder` can come from a remote header, so an unknown or hostile label must
+ * not throw and take down a request that otherwise succeeded — hence the try/catch rather than a trust
+ * in the input. `fatal` stays off: a few undecodable bytes should cost those characters, not the whole
+ * body.
+ */
+function decodeBody(buffer: Buffer, charset?: string): string {
+  if (!charset || charset === 'utf-8' || charset === 'utf8') return buffer.toString('utf8')
+  try {
+    return new TextDecoder(charset).decode(buffer)
+  } catch {
+    return buffer.toString('utf8')
+  }
 }
 
 /** Test-only: see `insecureAllowHttpAndPrivateNetworkForTests` on SafeFetchOptions. */

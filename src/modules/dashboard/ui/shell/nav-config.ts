@@ -14,7 +14,7 @@
 
 import {
   Activity, AlertTriangle, BadgeCheck, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
-  Download, Gauge, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plug, Plus, RotateCcw,
+  Download, Gauge, Globe, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plug, Plus, RotateCcw,
   Mic, Send,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
 } from 'lucide-react'
@@ -139,6 +139,7 @@ export const NAV_AREAS: readonly NavArea[] = [
       { to: '/admin/metrics', label: 'Metrics', icon: Activity, group: 'Operations' },
       { to: '/admin/operations', label: 'Operations', icon: Cog, group: 'Operations' },
       { to: '/admin/integrations', label: 'Integrations', icon: Plug, group: 'Operations' },
+      { to: '/admin/sources', label: 'Sources', icon: Globe, group: 'Operations' },
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
       { to: '/admin/plan-requests', label: 'Plan requests', icon: Inbox, group: 'Operations', badge: 'planRequests' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },

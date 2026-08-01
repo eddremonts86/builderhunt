@@ -335,6 +335,28 @@ export async function recordEvidence(
   return { evidenceId: existing.id, created: false }
 }
 
+/**
+ * Attaches a capability claim to one version of a component.
+ *
+ * `onConflictDoNothing`, not `DoUpdate`, and the reason is both a privilege and a policy:
+ *
+ * - **Privilege.** Postgres decides which grants a statement needs statically, from the statement, not
+ *   from whether a conflict actually occurs. `INSERT ... ON CONFLICT DO UPDATE` therefore requires
+ *   UPDATE on the table, and migration 0125 deliberately gives the worker only INSERT and SELECT here.
+ *   Every ingestion run failed with `42501: permission denied for table
+ *   solution_component_capabilities` on its first claim — including runs where no row conflicted.
+ *
+ * - **Policy, which is why the fix is here and not a new grant.** A claim keyed by
+ *   `(component, version, capability)` is immutable content: if anything a source says about a component
+ *   changed, its content hash changed, so it is a *new version* and a new key. Nothing legitimate
+ *   overwrites a claim in place. Meanwhile a claim's `evidence_level` is exactly what a human raises to
+ *   `verified` after checking, so a worker with UPDATE here could silently push a verified claim back
+ *   down to `claimed`. Promotion belongs to the platform role, which does hold UPDATE.
+ *
+ * The consequence is that `claimId` is only returned when a row was actually written. A conflict means
+ * the claim is already recorded with the evidence that established it, which is the correct outcome and
+ * not something a caller needs to react to.
+ */
 export async function attachCapabilityClaim(
   input: {
     componentId: string
@@ -344,21 +366,20 @@ export async function attachCapabilityClaim(
     primaryEvidenceId: string
   },
   db: PostgresJsDatabase = workerDb,
-): Promise<{ claimId: string }> {
+): Promise<{ claimId: string | null }> {
   const id = randomId()
   const [row] = await db
     .insert(solutionComponentCapabilities)
     .values({ id, ...input })
-    .onConflictDoUpdate({
+    .onConflictDoNothing({
       target: [
         solutionComponentCapabilities.componentId,
         solutionComponentCapabilities.componentVersion,
         solutionComponentCapabilities.capabilityKey,
       ],
-      set: { evidenceLevel: input.evidenceLevel, primaryEvidenceId: input.primaryEvidenceId },
     })
     .returning({ id: solutionComponentCapabilities.id })
-  return { claimId: row.id }
+  return { claimId: row?.id ?? null }
 }
 
 // ── Compatibility edges ────────────────────────────────────────────────────────────────────────
