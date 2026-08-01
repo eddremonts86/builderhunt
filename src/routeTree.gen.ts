@@ -160,6 +160,7 @@ import { Route as ApiAdminOperationsIndexRouteImport } from './routes/api/admin/
 import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
 import { Route as ApiAdminIncidentsIndexRouteImport } from './routes/api/admin/incidents/index'
 import { Route as ApiAdminChangelogIndexRouteImport } from './routes/api/admin/changelog/index'
+import { Route as ApiAdminBuilderClaimsIndexRouteImport } from './routes/api/admin/builder-claims/index'
 import { Route as ApiAdminAbuseIndexRouteImport } from './routes/api/admin/abuse/index'
 import { Route as DashboardSprintsSprintIdIndexRouteImport } from './routes/_dashboard/sprints/$sprintId/index'
 import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_dashboard/settings/billing/index'
@@ -1039,6 +1040,12 @@ const ApiAdminChangelogIndexRoute = ApiAdminChangelogIndexRouteImport.update({
   path: '/api/admin/changelog/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAdminBuilderClaimsIndexRoute =
+  ApiAdminBuilderClaimsIndexRouteImport.update({
+    id: '/api/admin/builder-claims/',
+    path: '/api/admin/builder-claims/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminAbuseIndexRoute = ApiAdminAbuseIndexRouteImport.update({
   id: '/api/admin/abuse/',
   path: '/api/admin/abuse/',
@@ -1876,6 +1883,7 @@ export interface FileRoutesByFullPath {
   '/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse/': typeof ApiAdminAbuseIndexRoute
+  '/api/admin/builder-claims/': typeof ApiAdminBuilderClaimsIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
@@ -2133,6 +2141,7 @@ export interface FileRoutesByTo {
   '/settings/billing': typeof DashboardSettingsBillingIndexRoute
   '/sprints/$sprintId': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse': typeof ApiAdminAbuseIndexRoute
+  '/api/admin/builder-claims': typeof ApiAdminBuilderClaimsIndexRoute
   '/api/admin/changelog': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics': typeof ApiAdminMetricsIndexRoute
@@ -2395,6 +2404,7 @@ export interface FileRoutesById {
   '/_dashboard/settings/billing/': typeof DashboardSettingsBillingIndexRoute
   '/_dashboard/sprints/$sprintId/': typeof DashboardSprintsSprintIdIndexRoute
   '/api/admin/abuse/': typeof ApiAdminAbuseIndexRoute
+  '/api/admin/builder-claims/': typeof ApiAdminBuilderClaimsIndexRoute
   '/api/admin/changelog/': typeof ApiAdminChangelogIndexRoute
   '/api/admin/incidents/': typeof ApiAdminIncidentsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
@@ -2656,6 +2666,7 @@ export interface FileRouteTypes {
     | '/settings/billing/'
     | '/sprints/$sprintId/'
     | '/api/admin/abuse/'
+    | '/api/admin/builder-claims/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
@@ -2913,6 +2924,7 @@ export interface FileRouteTypes {
     | '/settings/billing'
     | '/sprints/$sprintId'
     | '/api/admin/abuse'
+    | '/api/admin/builder-claims'
     | '/api/admin/changelog'
     | '/api/admin/incidents'
     | '/api/admin/metrics'
@@ -3174,6 +3186,7 @@ export interface FileRouteTypes {
     | '/_dashboard/settings/billing/'
     | '/_dashboard/sprints/$sprintId/'
     | '/api/admin/abuse/'
+    | '/api/admin/builder-claims/'
     | '/api/admin/changelog/'
     | '/api/admin/incidents/'
     | '/api/admin/metrics/'
@@ -3362,6 +3375,7 @@ export interface RootRouteChildren {
   ApiQueriesIdVisibilityRoute: typeof ApiQueriesIdVisibilityRoute
   ApiSchedulingInvitationsInvitationIdRoute: typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
   ApiAdminAbuseIndexRoute: typeof ApiAdminAbuseIndexRoute
+  ApiAdminBuilderClaimsIndexRoute: typeof ApiAdminBuilderClaimsIndexRoute
   ApiAdminChangelogIndexRoute: typeof ApiAdminChangelogIndexRoute
   ApiAdminIncidentsIndexRoute: typeof ApiAdminIncidentsIndexRoute
   ApiAdminMetricsIndexRoute: typeof ApiAdminMetricsIndexRoute
@@ -4460,6 +4474,13 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/changelog'
       fullPath: '/api/admin/changelog/'
       preLoaderRoute: typeof ApiAdminChangelogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/admin/builder-claims/': {
+      id: '/api/admin/builder-claims/'
+      path: '/api/admin/builder-claims'
+      fullPath: '/api/admin/builder-claims/'
+      preLoaderRoute: typeof ApiAdminBuilderClaimsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/abuse/': {
@@ -5744,6 +5765,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSchedulingInvitationsInvitationIdRoute:
     ApiSchedulingInvitationsInvitationIdRouteWithChildren,
   ApiAdminAbuseIndexRoute: ApiAdminAbuseIndexRoute,
+  ApiAdminBuilderClaimsIndexRoute: ApiAdminBuilderClaimsIndexRoute,
   ApiAdminChangelogIndexRoute: ApiAdminChangelogIndexRoute,
   ApiAdminIncidentsIndexRoute: ApiAdminIncidentsIndexRoute,
   ApiAdminMetricsIndexRoute: ApiAdminMetricsIndexRoute,

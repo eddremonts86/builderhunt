@@ -155,7 +155,7 @@
   - Do: POST eligible consent-aware profile views without blocking render; add verified-owner total and 30-day daily chart with minimum-cohort/empty states. Never expose viewer identity, organization, query, or referrer.
   - Verify: eligible views aggregate once per policy; signed-out/451/ineligible calls fail quietly; non-owner and unverified claimant cannot read aggregates.
 
-- [ ] **Build platform-admin claim management projection**
+- [x] **Build platform-admin claim management projection**
   - Files: `src/shared/lib/repositories/builder-claims.ts`, `src/routes/api/admin/builder-claims/index.ts`, `tests/unit/security/builder-claims-admin.test.ts`
   - Do: Add bounded cursor pagination and allowlisted filters/DTO fields for claim status, source proof, claimant, verification dates, and portfolio publication. Use the platform role and audit reads without exposing raw proof tokens.
   - Verify: platform admin can page/filter; organization admins and unauthenticated callers are denied; DTO snapshot excludes secrets and raw metadata.

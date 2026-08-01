@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto'
-import { and, eq, gt } from 'drizzle-orm'
+import { and, desc, eq, gt, lt, or, sql } from 'drizzle-orm'
 import type { TenantTransaction, publicDb } from '../db/client'
 import {
+  authUsers,
   builderClaims,
   builderIdentities,
   publishedBuilderProfiles,
@@ -204,6 +205,153 @@ export async function revokeBuilderClaim(
     eq(builderClaims.status, 'verified'),
   )).returning({ id: builderClaims.id, builderIdentityId: builderClaims.builderIdentityId })
   return revoked ?? null
+}
+
+export type BuilderClaimStatus = 'pending' | 'verified' | 'rejected' | 'revoked' | 'expired'
+
+export interface AdminBuilderClaimFilters {
+  status?: BuilderClaimStatus[]
+  source?: string
+  subjectUserId?: string
+  verifiedFrom?: Date
+  verifiedTo?: Date
+  portfolioPublished?: boolean
+}
+
+export interface AdminListBuilderClaimsOptions extends AdminBuilderClaimFilters {
+  /** Keyset cursor: return rows strictly older than (createdAt, id). */
+  before?: { createdAt: Date; id: string }
+  limit?: number
+}
+
+export interface AdminBuilderClaimDTO {
+  id: string
+  status: BuilderClaimStatus
+  evidenceSource: string
+  evidenceReference: string
+  subjectUserId: string
+  subjectName: string | null
+  subjectEmail: string | null
+  builderIdentityId: string
+  builderSource: string
+  builderUsername: string
+  builderDisplayName: string | null
+  expiresAt: string | null
+  verifiedAt: string | null
+  revokedAt: string | null
+  revokedByUserId: string | null
+  revocationReason: string | null
+  createdAt: string
+  /** `published_builder_profiles` row exists — the directory publication, distinct from the portfolio-builder flag below. */
+  directoryPublished: boolean
+  /** `builder_claims.metadata.portfolio.published` — the portfolio-builder feature's own, independent publish flag. */
+  portfolioPublished: boolean
+}
+
+export interface AdminListBuilderClaimsResult {
+  rows: AdminBuilderClaimDTO[]
+  nextCursor: { createdAt: string; id: string } | null
+}
+
+/**
+ * Platform-admin claim management projection (plans/UI/tasks.md Wave 4 "Build platform-admin claim
+ * management projection"). Bounded cursor pagination, allowlisted filters, and a DTO that excludes
+ * `verificationSecretHash` and raw `metadata` entirely — only the derived `portfolioPublished`
+ * boolean is read out of metadata, never the jsonb blob itself.
+ */
+export async function listBuilderClaimsForAdmin(
+  db: ClaimsDb,
+  options: AdminListBuilderClaimsOptions = {},
+): Promise<AdminListBuilderClaimsResult> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
+
+  const whereParts = []
+  if (options.status && options.status.length > 0) {
+    whereParts.push(or(...options.status.map((s) => eq(builderClaims.status, s)))!)
+  }
+  if (options.source) whereParts.push(eq(builderIdentities.source, options.source))
+  if (options.subjectUserId) whereParts.push(eq(builderClaims.subjectUserId, options.subjectUserId))
+  if (options.verifiedFrom) whereParts.push(gt(builderClaims.verifiedAt, options.verifiedFrom))
+  if (options.verifiedTo) whereParts.push(lt(builderClaims.verifiedAt, options.verifiedTo))
+  if (options.portfolioPublished !== undefined) {
+    // jsonb predicate, not a post-filter — filtering after LIMIT would make a page report fewer
+    // rows than exist and desynchronize `nextCursor` from what was actually filtered.
+    whereParts.push(
+      options.portfolioPublished
+        ? sql`(${builderClaims.metadata}#>>'{portfolio,published}')::boolean is true`
+        : sql`coalesce((${builderClaims.metadata}#>>'{portfolio,published}')::boolean, false) is false`,
+    )
+  }
+  // Drizzle has no tuple comparator: (created_at, id) < (cursor.createdAt, cursor.id) built by hand.
+  if (options.before) {
+    whereParts.push(
+      or(
+        lt(builderClaims.createdAt, options.before.createdAt),
+        and(eq(builderClaims.createdAt, options.before.createdAt), lt(builderClaims.id, options.before.id)),
+      )!,
+    )
+  }
+
+  const rows = await db
+    .select({
+      id: builderClaims.id,
+      status: builderClaims.status,
+      evidenceSource: builderClaims.evidenceSource,
+      evidenceReference: builderClaims.evidenceReference,
+      subjectUserId: builderClaims.subjectUserId,
+      subjectName: authUsers.name,
+      subjectEmail: authUsers.email,
+      builderIdentityId: builderClaims.builderIdentityId,
+      builderSource: builderIdentities.source,
+      builderUsername: builderIdentities.username,
+      builderDisplayName: builderIdentities.displayName,
+      expiresAt: builderClaims.expiresAt,
+      verifiedAt: builderClaims.verifiedAt,
+      revokedAt: builderClaims.revokedAt,
+      revokedByUserId: builderClaims.revokedByUserId,
+      revocationReason: builderClaims.revocationReason,
+      createdAt: builderClaims.createdAt,
+      metadata: builderClaims.metadata,
+      directoryPublished: publishedBuilderProfiles.builderIdentityId,
+    })
+    .from(builderClaims)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, builderClaims.builderIdentityId))
+    .innerJoin(authUsers, eq(authUsers.id, builderClaims.subjectUserId))
+    .leftJoin(publishedBuilderProfiles, eq(publishedBuilderProfiles.builderIdentityId, builderClaims.builderIdentityId))
+    .where(whereParts.length > 0 ? and(...whereParts) : undefined)
+    .orderBy(desc(builderClaims.createdAt), desc(builderClaims.id))
+    .limit(limit + 1)
+
+  const hasMore = rows.length > limit
+  const slice = hasMore ? rows.slice(0, limit) : rows
+
+  const dtos: AdminBuilderClaimDTO[] = slice.map((r) => ({
+    id: r.id,
+    status: r.status as BuilderClaimStatus,
+    evidenceSource: r.evidenceSource,
+    evidenceReference: r.evidenceReference,
+    subjectUserId: r.subjectUserId,
+    subjectName: r.subjectName,
+    subjectEmail: r.subjectEmail,
+    builderIdentityId: r.builderIdentityId,
+    builderSource: r.builderSource,
+    builderUsername: r.builderUsername,
+    builderDisplayName: r.builderDisplayName,
+    expiresAt: r.expiresAt ? r.expiresAt.toISOString() : null,
+    verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
+    revokedAt: r.revokedAt ? r.revokedAt.toISOString() : null,
+    revokedByUserId: r.revokedByUserId,
+    revocationReason: r.revocationReason,
+    createdAt: r.createdAt.toISOString(),
+    directoryPublished: r.directoryPublished !== null,
+    portfolioPublished: parsePortfolioSettings((r.metadata as Record<string, unknown>).portfolio).published,
+  }))
+
+  const last = slice[slice.length - 1]
+  return {
+    rows: dtos,
+    nextCursor: hasMore && last ? { createdAt: last.createdAt.toISOString(), id: last.id } : null,
+  }
 }
 
 export function listVerifiedBuilderProfiles(transaction: TenantTransaction, subjectUserId: string) {
