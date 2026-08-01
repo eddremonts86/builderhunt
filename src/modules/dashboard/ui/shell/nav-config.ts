@@ -13,7 +13,7 @@
  */
 
 import {
-  Activity, AlertTriangle, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
+  Activity, AlertTriangle, BadgeCheck, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
   Download, Gauge, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plus, RotateCcw,
   Mic, Send,
   Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
@@ -141,6 +141,7 @@ export const NAV_AREAS: readonly NavArea[] = [
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
       { to: '/admin/plan-requests', label: 'Plan requests', icon: Inbox, group: 'Operations', badge: 'planRequests' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },
+      { to: '/admin/claims', label: 'Claims', icon: BadgeCheck, group: 'Operations' },
       { to: '/admin/abuse', label: 'Abuse console', icon: Siren, group: 'Operations' },
       { to: '/admin/billing', label: 'Billing ops', icon: Gauge, group: 'Money' },
       { to: '/admin/refunds', label: 'Refunds', icon: RotateCcw, group: 'Money' },

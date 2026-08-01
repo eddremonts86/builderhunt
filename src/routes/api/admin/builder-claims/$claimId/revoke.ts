@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { revokeBuilderClaim } from '~/shared/lib/repositories/builder-claims'
-import { publicDb } from '~/shared/lib/db/client'
+import { platformDb } from '~/shared/lib/db/client'
 import { purgePortfolioCache } from '~/shared/lib/portfolio-cache'
 
 const Body = z.object({ reason: z.string().min(3).max(500) })
@@ -17,7 +17,10 @@ export const Route = createFileRoute('/api/admin/builder-claims/$claimId/revoke'
           const parsed = Body.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'A reason (3-500 chars) is required' }, { status: 400 })
 
-          const revoked = await revokeBuilderClaim(publicDb, {
+          // `platformDb` (builderhunt_platform), not `publicDb` — the caller is never the claim's
+          // own subject, so `builderhunt_app`'s owner-scoped RLS policy would silently match zero
+          // rows here (see drizzle/0116_grant_platform_builder_claims_revoke.sql).
+          const revoked = await revokeBuilderClaim(platformDb, {
             claimId: params.claimId,
             adminUserId: principal.userId,
             reason: parsed.data.reason,

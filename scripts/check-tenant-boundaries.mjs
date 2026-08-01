@@ -41,6 +41,13 @@ const authDbAllowlist = new Set([
   // organization_members). Found 2026-07-31 exercising a real Stripe test-mode checkout live —
   // every prior test ran as the migration superuser, which bypasses the missing grant entirely.
   'src/shared/lib/repositories/billing.ts',
+  // `listBuilderClaimsForAdmin` resolves a claimant's name/email for the platform-admin claims
+  // projection (plans/UI/tasks.md Wave 4). auth_users is auth-broker-owned; neither `publicDb` nor
+  // `TenantTransaction` has a grant on it post auth-broker (drizzle/0007_auth_broker.sql). Resolved
+  // through a second, id-scoped query, same shape as `organization-lifecycle.ts`'s
+  // `resolveActorDisplayNames` — found live (permission denied for table auth_users) exercising the
+  // route against the real e2e role, not the migration superuser.
+  'src/shared/lib/repositories/builder-claims.ts',
 ])
 // Global-public data/health surfaces are explicitly allowed to read the
 // unscoped runtime db directly (static or dynamic import) — they never

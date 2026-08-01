@@ -136,6 +136,7 @@ import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/a
 import { Route as DashboardAdminIncidentsRouteImport } from './routes/_dashboard/admin/incidents'
 import { Route as DashboardAdminDisputesRouteImport } from './routes/_dashboard/admin/disputes'
 import { Route as DashboardAdminContentRouteImport } from './routes/_dashboard/admin/content'
+import { Route as DashboardAdminClaimsRouteImport } from './routes/_dashboard/admin/claims'
 import { Route as DashboardAdminChangelogRouteImport } from './routes/_dashboard/admin/changelog'
 import { Route as DashboardAdminBillingRouteImport } from './routes/_dashboard/admin/billing'
 import { Route as DashboardAdminAbuseRouteImport } from './routes/_dashboard/admin/abuse'
@@ -914,6 +915,11 @@ const DashboardAdminDisputesRoute = DashboardAdminDisputesRouteImport.update({
 const DashboardAdminContentRoute = DashboardAdminContentRouteImport.update({
   id: '/admin/content',
   path: '/admin/content',
+  getParentRoute: () => DashboardRouteRoute,
+} as any)
+const DashboardAdminClaimsRoute = DashboardAdminClaimsRouteImport.update({
+  id: '/admin/claims',
+  path: '/admin/claims',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
 const DashboardAdminChangelogRoute = DashboardAdminChangelogRouteImport.update({
@@ -1708,6 +1714,7 @@ export interface FileRoutesByFullPath {
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/claims': typeof DashboardAdminClaimsRoute
   '/admin/content': typeof DashboardAdminContentRoute
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
@@ -1967,6 +1974,7 @@ export interface FileRoutesByTo {
   '/admin/abuse': typeof DashboardAdminAbuseRoute
   '/admin/billing': typeof DashboardAdminBillingRoute
   '/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/admin/claims': typeof DashboardAdminClaimsRoute
   '/admin/content': typeof DashboardAdminContentRoute
   '/admin/disputes': typeof DashboardAdminDisputesRoute
   '/admin/incidents': typeof DashboardAdminIncidentsRoute
@@ -2229,6 +2237,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/abuse': typeof DashboardAdminAbuseRoute
   '/_dashboard/admin/billing': typeof DashboardAdminBillingRoute
   '/_dashboard/admin/changelog': typeof DashboardAdminChangelogRoute
+  '/_dashboard/admin/claims': typeof DashboardAdminClaimsRoute
   '/_dashboard/admin/content': typeof DashboardAdminContentRoute
   '/_dashboard/admin/disputes': typeof DashboardAdminDisputesRoute
   '/_dashboard/admin/incidents': typeof DashboardAdminIncidentsRoute
@@ -2491,6 +2500,7 @@ export interface FileRouteTypes {
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/claims'
     | '/admin/content'
     | '/admin/disputes'
     | '/admin/incidents'
@@ -2750,6 +2760,7 @@ export interface FileRouteTypes {
     | '/admin/abuse'
     | '/admin/billing'
     | '/admin/changelog'
+    | '/admin/claims'
     | '/admin/content'
     | '/admin/disputes'
     | '/admin/incidents'
@@ -3011,6 +3022,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/abuse'
     | '/_dashboard/admin/billing'
     | '/_dashboard/admin/changelog'
+    | '/_dashboard/admin/claims'
     | '/_dashboard/admin/content'
     | '/_dashboard/admin/disputes'
     | '/_dashboard/admin/incidents'
@@ -4308,6 +4320,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminContentRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/claims': {
+      id: '/_dashboard/admin/claims'
+      path: '/admin/claims'
+      fullPath: '/admin/claims'
+      preLoaderRoute: typeof DashboardAdminClaimsRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/changelog': {
       id: '/_dashboard/admin/changelog'
       path: '/admin/changelog'
@@ -5263,6 +5282,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminAbuseRoute: typeof DashboardAdminAbuseRoute
   DashboardAdminBillingRoute: typeof DashboardAdminBillingRoute
   DashboardAdminChangelogRoute: typeof DashboardAdminChangelogRoute
+  DashboardAdminClaimsRoute: typeof DashboardAdminClaimsRoute
   DashboardAdminContentRoute: typeof DashboardAdminContentRoute
   DashboardAdminDisputesRoute: typeof DashboardAdminDisputesRoute
   DashboardAdminIncidentsRoute: typeof DashboardAdminIncidentsRoute
@@ -5300,6 +5320,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminAbuseRoute: DashboardAdminAbuseRoute,
   DashboardAdminBillingRoute: DashboardAdminBillingRoute,
   DashboardAdminChangelogRoute: DashboardAdminChangelogRoute,
+  DashboardAdminClaimsRoute: DashboardAdminClaimsRoute,
   DashboardAdminContentRoute: DashboardAdminContentRoute,
   DashboardAdminDisputesRoute: DashboardAdminDisputesRoute,
   DashboardAdminIncidentsRoute: DashboardAdminIncidentsRoute,

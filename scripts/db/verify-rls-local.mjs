@@ -99,6 +99,34 @@ try {
   }
   if (!crossSubjectClaimDenied) throw new Error('Cross-subject claim insert was not denied')
 
+  // `builder_claims_platform_revoke` (0116) — the admin revoke route writes through `platformDb`,
+  // not `publicDb`/`app`, precisely because `app`'s own update policy is owner-scoped and can never
+  // touch another subject's row. Confirm both halves: the platform role CAN flip a verified claim
+  // to revoked, and the app role (even with no context at all) still cannot.
+  const [platformRevoked] = await platform`
+    update builder_claims set status = 'revoked', revoked_at = now() where id = 'claim-b' and status = 'verified' returning id
+  `
+  if (platformRevoked?.id !== 'claim-b') throw new Error('Platform role could not revoke a verified claim')
+
+  // The app role's own UPDATE policy exists (`builder_claims_app_update`) — with no `app.user_id`
+  // context, its USING clause compares `subject_user_id` to NULL, which is never true, so RLS
+  // silently filters every row rather than throwing. A thrown error is not the signal here; a
+  // returned empty row set is.
+  const appRevokeAttempt = await app`update builder_claims set status = 'revoked' where id = 'claim-a' returning id`
+  if (appRevokeAttempt.length !== 0) throw new Error('App role (no context) revoked a builder claim directly')
+
+  // The platform policy's USING clause is `status = 'verified'` — a pending claim must stay
+  // untouchable by this same role, not just by app. No thrown error is expected here (RLS silently
+  // filters rows rather than erroring on an UPDATE that matches nothing) — the row simply must not
+  // have changed. Platform has no SELECT policy on this table at all, so read the result back as
+  // the claim's own subject (app role, same technique as `pendingOwnerSeesOwnClaim` above).
+  await platform`update builder_claims set status = 'revoked' where id = 'claim-pending'`
+  const [pendingStillPending] = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.user_id', 'user-pending-claimant', true)`
+    return transaction`select status from builder_claims where id = 'claim-pending'`
+  })
+  if (pendingStillPending?.status !== 'pending') throw new Error('Platform role revoked a non-verified (pending) claim')
+
   const billingMissing = await app`select id from billing_customers`
   if (billingMissing.length !== 0) throw new Error('Missing context exposed billing customers')
   const scopedBilling = (organizationId) => app.begin(async (transaction) => {

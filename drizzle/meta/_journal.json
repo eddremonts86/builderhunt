@@ -813,6 +813,13 @@
       "when": 1785571285363,
       "tag": "0115_fix_builder_profile_views_identity_fk",
       "breakpoints": true
+    },
+    {
+      "idx": 116,
+      "version": "7",
+      "when": 1785573064614,
+      "tag": "0116_grant_platform_builder_claims_revoke",
+      "breakpoints": true
     }
   ]
 }

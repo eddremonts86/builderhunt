@@ -460,6 +460,14 @@
     "0114_builder_lists_update_grant": {
       "sql": "b705e5c535a3d5e8f9e22d2584eb1e81f6feeb13b3741621719984a6125870e4",
       "snapshot": "a7c37cb6ed049a60f142dbe30e210ef3f4a1d393801f4a43bc61884eb419b3ce"
+    },
+    "0115_fix_builder_profile_views_identity_fk": {
+      "sql": "a8d4e9b8318575a1766354e488b20022f34e963188e3104631b171b3ca80ea5c",
+      "snapshot": "dc833dae779b3cc55cca8f5e076ef09d8de55bc2feb2e3c457cb71ba129896fb"
+    },
+    "0116_grant_platform_builder_claims_revoke": {
+      "sql": "701db0bc0a26f5378940ba5e0ba8664d9cfa2ee57e0ac6eed8bb5c2fbe13fcf5",
+      "snapshot": "27a29d853a120905ccec733815fff487508b02f0df1c3f12b20b69f9bbfe4ce4"
     }
   }
 }

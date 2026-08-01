@@ -12,10 +12,21 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 const { createDisposableTestDatabase } = await import('~/shared/lib/db/create-disposable-test-database')
 const schema = await import('~/shared/lib/db/schema')
-const { listBuilderClaimsForAdmin } = await import('~/shared/lib/repositories/builder-claims')
+const { listBuilderClaimsForAdmin: listBuilderClaimsForAdminRaw } = await import('~/shared/lib/repositories/builder-claims')
 
 let db: PostgresJsDatabase
 let drop: () => Promise<void>
+
+// `authDb` is a real module-level singleton pointed at the app's normal DATABASE_URL, not this
+// disposable database — inject the disposable `db` as the auth-broker override (same seam
+// `billing/checkout.ts` uses) so the claimant name/email lookup resolves against the rows this
+// file actually seeded, instead of failing to authenticate against the wrong database.
+function listBuilderClaimsForAdmin(
+  dbArg: Parameters<typeof listBuilderClaimsForAdminRaw>[0],
+  options?: Parameters<typeof listBuilderClaimsForAdminRaw>[1],
+) {
+  return listBuilderClaimsForAdminRaw(dbArg, options, db as never)
+}
 
 const OWNER = 'bca-owner'
 

@@ -160,7 +160,7 @@
   - Do: Add bounded cursor pagination and allowlisted filters/DTO fields for claim status, source proof, claimant, verification dates, and portfolio publication. Use the platform role and audit reads without exposing raw proof tokens.
   - Verify: platform admin can page/filter; organization admins and unauthenticated callers are denied; DTO snapshot excludes secrets and raw metadata.
 
-- [ ] **Build Admin Claims UI and revocation flow**
+- [x] **Build Admin Claims UI and revocation flow**
   - Files: `src/routes/_dashboard/admin/claims.tsx`, `src/modules/admin/claims/ClaimsPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `tests/e2e/admin-claims.spec.ts`
   - Do: Add list, filters, detail drawer, public preview links, portfolio state, and revoke confirmation with reason against the existing revoke endpoint; add Claims to Admin navigation.
   - Verify: revoke invalidates public profile/portfolio immediately, writes audit evidence, and is unavailable to non-platform admins.

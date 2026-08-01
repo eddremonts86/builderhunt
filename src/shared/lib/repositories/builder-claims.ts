@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
-import { and, desc, eq, gt, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, inArray, lt, or, sql } from 'drizzle-orm'
+import { authDb } from '../db/auth-db'
 import type { TenantTransaction, publicDb } from '../db/client'
 import {
   authUsers,
@@ -262,6 +263,8 @@ export interface AdminListBuilderClaimsResult {
 export async function listBuilderClaimsForAdmin(
   db: ClaimsDb,
   options: AdminListBuilderClaimsOptions = {},
+  /** Test-only override for the auth-broker read below — defaults to the real `authDb`. */
+  authDbOverride?: typeof authDb,
 ): Promise<AdminListBuilderClaimsResult> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
 
@@ -299,8 +302,6 @@ export async function listBuilderClaimsForAdmin(
       evidenceSource: builderClaims.evidenceSource,
       evidenceReference: builderClaims.evidenceReference,
       subjectUserId: builderClaims.subjectUserId,
-      subjectName: authUsers.name,
-      subjectEmail: authUsers.email,
       builderIdentityId: builderClaims.builderIdentityId,
       builderSource: builderIdentities.source,
       builderUsername: builderIdentities.username,
@@ -316,7 +317,6 @@ export async function listBuilderClaimsForAdmin(
     })
     .from(builderClaims)
     .innerJoin(builderIdentities, eq(builderIdentities.id, builderClaims.builderIdentityId))
-    .innerJoin(authUsers, eq(authUsers.id, builderClaims.subjectUserId))
     .leftJoin(publishedBuilderProfiles, eq(publishedBuilderProfiles.builderIdentityId, builderClaims.builderIdentityId))
     .where(whereParts.length > 0 ? and(...whereParts) : undefined)
     .orderBy(desc(builderClaims.createdAt), desc(builderClaims.id))
@@ -325,14 +325,25 @@ export async function listBuilderClaimsForAdmin(
   const hasMore = rows.length > limit
   const slice = hasMore ? rows.slice(0, limit) : rows
 
+  // `auth_users` is auth-broker-owned (drizzle/0007_auth_broker.sql) — `db` (whichever tenant/public
+  // connection the caller passed) has no grant on it, so the claimant's name/email is resolved
+  // through the dedicated `authDb` connection, same allowlisted exception as
+  // `organization-lifecycle.ts`'s `resolveActorDisplayNames`, scoped to only this page's ids.
+  const subjectIds = Array.from(new Set(slice.map((r) => r.subjectUserId)))
+  const subjects = subjectIds.length > 0
+    ? await (authDbOverride ?? authDb).select({ id: authUsers.id, name: authUsers.name, email: authUsers.email })
+      .from(authUsers).where(inArray(authUsers.id, subjectIds))
+    : []
+  const subjectById = new Map(subjects.map((s) => [s.id, s]))
+
   const dtos: AdminBuilderClaimDTO[] = slice.map((r) => ({
     id: r.id,
     status: r.status as BuilderClaimStatus,
     evidenceSource: r.evidenceSource,
     evidenceReference: r.evidenceReference,
     subjectUserId: r.subjectUserId,
-    subjectName: r.subjectName,
-    subjectEmail: r.subjectEmail,
+    subjectName: subjectById.get(r.subjectUserId)?.name ?? null,
+    subjectEmail: subjectById.get(r.subjectUserId)?.email ?? null,
     builderIdentityId: r.builderIdentityId,
     builderSource: r.builderSource,
     builderUsername: r.builderUsername,
