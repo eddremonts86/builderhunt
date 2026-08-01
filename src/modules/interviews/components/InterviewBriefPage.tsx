@@ -3,6 +3,7 @@ import { useParams } from '@tanstack/react-router'
 import { InterviewBriefEditor, type BriefView } from './InterviewBriefEditor'
 import { InterviewReportEditor, type ReportContent, type ReportView } from './InterviewReportEditor'
 import { CreditBalance, type CreditBalanceProps } from './CreditBalance'
+import { InterviewParticipantsPanel } from './InterviewParticipantsPanel'
 import type { EvidenceSegment } from './TranscriptEvidence'
 
 /**
@@ -162,6 +163,13 @@ export function InterviewBriefPage() {
             void loadReport()
           }}
         />
+      )}
+
+      {/* Owner-only (plans/UI Wave 3 "Add interview participant material-access controls") — gated
+          on the same `canEdit` the brief editor already uses, since that is the server's own answer
+          to "does this reader own this interview", not a role guessed on the client. */}
+      {brief?.canEdit === true && (
+        <InterviewParticipantsPanel interviewId={interviewId} />
       )}
     </div>
   )

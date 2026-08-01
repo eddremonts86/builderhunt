@@ -237,6 +237,7 @@ import { Route as DashboardSettingsBillingReturnRouteImport } from './routes/_da
 import { Route as DashboardInterviewsInterviewIdLiveRouteImport } from './routes/_dashboard/interviews/$interviewId/live'
 import { Route as ApiPublicSchedulingInvitationIdIndexRouteImport } from './routes/api/public/scheduling/$invitationId/index'
 import { Route as ApiListsListIdItemsIndexRouteImport } from './routes/api/lists/$listId/items/index'
+import { Route as ApiInterviewsInterviewIdParticipantsIndexRouteImport } from './routes/api/interviews/$interviewId/participants/index'
 import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
@@ -1481,6 +1482,12 @@ const ApiListsListIdItemsIndexRoute =
     path: '/items/',
     getParentRoute: () => ApiListsListIdRoute,
   } as any)
+const ApiInterviewsInterviewIdParticipantsIndexRoute =
+  ApiInterviewsInterviewIdParticipantsIndexRouteImport.update({
+    id: '/api/interviews/$interviewId/participants/',
+    path: '/api/interviews/$interviewId/participants/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiInterviewsInterviewIdBriefIndexRoute =
   ApiInterviewsInterviewIdBriefIndexRouteImport.update({
     id: '/api/interviews/$interviewId/brief/',
@@ -1906,6 +1913,7 @@ export interface FileRoutesByFullPath {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
@@ -2161,6 +2169,7 @@ export interface FileRoutesByTo {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/interviews/$interviewId/participants': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
@@ -2421,6 +2430,7 @@ export interface FileRoutesById {
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
+  '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   '/api/lists/$listId/items/': typeof ApiListsListIdItemsIndexRoute
   '/api/public/scheduling/$invitationId/': typeof ApiPublicSchedulingInvitationIdIndexRoute
   '/api/admin/billing/events/$eventId/replay': typeof ApiAdminBillingEventsEventIdReplayRoute
@@ -2680,6 +2690,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
+    | '/api/interviews/$interviewId/participants/'
     | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
@@ -2935,6 +2946,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence'
     | '/api/interviews/$interviewId/brief'
+    | '/api/interviews/$interviewId/participants'
     | '/api/lists/$listId/items'
     | '/api/public/scheduling/$invitationId'
     | '/api/admin/billing/events/$eventId/replay'
@@ -3194,6 +3206,7 @@ export interface FileRouteTypes {
     | '/api/scheduling/invitations/$invitationId/send'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
+    | '/api/interviews/$interviewId/participants/'
     | '/api/lists/$listId/items/'
     | '/api/public/scheduling/$invitationId/'
     | '/api/admin/billing/events/$eventId/replay'
@@ -3371,6 +3384,7 @@ export interface RootRouteChildren {
   ApiPublicSchedulingInvitationIdUploadsRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteWithChildren
   ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   ApiInterviewsInterviewIdBriefIndexRoute: typeof ApiInterviewsInterviewIdBriefIndexRoute
+  ApiInterviewsInterviewIdParticipantsIndexRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
   ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
@@ -4974,6 +4988,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiListsListIdItemsIndexRouteImport
       parentRoute: typeof ApiListsListIdRoute
     }
+    '/api/interviews/$interviewId/participants/': {
+      id: '/api/interviews/$interviewId/participants/'
+      path: '/api/interviews/$interviewId/participants'
+      fullPath: '/api/interviews/$interviewId/participants/'
+      preLoaderRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/interviews/$interviewId/brief/': {
       id: '/api/interviews/$interviewId/brief/'
       path: '/api/interviews/$interviewId/brief'
@@ -5751,6 +5772,8 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicSchedulingInvitationIdWithdrawRoute,
   ApiInterviewsInterviewIdBriefIndexRoute:
     ApiInterviewsInterviewIdBriefIndexRoute,
+  ApiInterviewsInterviewIdParticipantsIndexRoute:
+    ApiInterviewsInterviewIdParticipantsIndexRoute,
   ApiPublicSchedulingInvitationIdIndexRoute:
     ApiPublicSchedulingInvitationIdIndexRoute,
   ApiAdminBillingEventsEventIdReplayRoute:

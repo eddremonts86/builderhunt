@@ -118,7 +118,7 @@
   - Do: Replace cancel-then-book with select-new-slot then atomic reschedule. Keep the old booking on 409 or network failure, refresh alternatives, and reconcile the typed scheduling route registry with reschedule/cancel/decline.
   - Verify: success moves exactly once; conflict, stale token, rate limit, and offline retry preserve the previous booking and never create duplicates.
 
-- [ ] **Add interview participant material-access controls**
+- [x] **Add interview participant material-access controls**
   - Files: `src/modules/interviews/components/InterviewParticipantsPanel.tsx`, `src/modules/interviews/components/InterviewWorkspace.tsx`, `src/routes/api/interviews/$interviewId/participants/$participantId.ts`, `src/shared/lib/interview-api-routes.ts`, `tests/e2e/interview-material-access.spec.ts`
   - Do: Let the interview owner explicitly grant/revoke brief, report, and transcript access per participant, independently of calendar attendance. Show effective access, confirmation, pending/error states, and audit result.
   - Verify: each permission gates its material independently; non-owner, cross-tenant, removed participant, and revoked-access cases fail closed.
