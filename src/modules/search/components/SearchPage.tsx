@@ -231,11 +231,23 @@ export function SearchPage() {
     }
   }, [])
 
+  /* Mount: a `?sources=` deep link (e.g. from Admin Integrations) wins over whatever was
+     persisted locally — a link that says "show me github" must not silently show yesterday's
+     five-source default instead. Only when absent does localStorage restoration below apply. */
+  React.useEffect(() => {
+    if (!search.sources) return
+    const requested = search.sources.split(',').map((s) => s.trim())
+    const valid = requested.filter((s): s is Source => (ALL_SOURCES as string[]).includes(s))
+    if (valid.length > 0) setActiveSources(new Set(valid))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
+  }, [])
+
   /* Mount: restore sources/location/language from localStorage. A plain
      useState initializer would run during SSR (no localStorage there), so
      this loads post-mount instead — same pattern as recent searches above. */
   React.useEffect(() => {
     try {
+      if (search.sources) return // a URL deep link already decided this above
       const stored = localStorage.getItem(FILTERS_KEY)
       if (!stored) return
       const parsed = JSON.parse(stored)
@@ -248,6 +260,7 @@ export function SearchPage() {
     } catch {
       // ignore
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
   }, [])
 
   /* Persist sources/location/language on every change so they apply to

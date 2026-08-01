@@ -192,7 +192,7 @@
   - Do: Build typed rows from `SOURCE_NAMES` plus AI tasks: enabled/dark/dormant, credential-present boolean, quota, last success/failure, indexed/backlog counts, kill-switch state, provider availability, task version, and budget-error counts. Never expose credential values, provider payloads, prompts, or user input.
   - Verify: the type check fails when a source lacks a row; DTO redaction snapshot and platform-admin boundary pass.
 
-- [ ] **Build Admin Integrations UI**
+- [x] **Build Admin Integrations UI**
   - Files: `src/routes/_dashboard/admin/integrations.tsx`, `src/modules/admin/integrations/IntegrationsPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `tests/e2e/admin-integrations.spec.ts`
   - Do: Render source and AI health, filters, honest dormant reasons, last run/quota, and links to Operations, Metrics, source-filtered Search, and runbooks; add Integrations to Admin navigation. Do not add secret editors.
   - Verify: all source enum members render; disabled Product Hunt/Devpost/enrichment and unavailable AI states are explicit; no secret-like text appears in DOM.
