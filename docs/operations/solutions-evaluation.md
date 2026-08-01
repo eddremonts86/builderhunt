@@ -84,3 +84,24 @@ p50 is the whole pipeline minus providers: two SQL lanes and arithmetic.
 4. **Provider variance** — the same brief run repeatedly with a live model, to see how much the interpretation
    moves. The composer is deterministic, so any variance in the final routes comes from interpretation alone,
    which makes this a clean measurement.
+
+## Reranker: not adopted
+
+Plan 43 Phase 5 asks for a comparison of deterministic fusion against a reranker, and offers two acceptable
+outcomes. This is the second: **deterministic Reciprocal Rank Fusion remains canonical**, and the reason is
+arithmetic rather than a preference.
+
+Retrieval returns 0–3 candidates per lane against the current catalog, and the composer's greedy set cover
+consumes at most four components. A reranker reorders a list shorter than the number of slots it feeds, so
+there is no ordering left for it to improve — the available gain is zero, not merely unmeasured. Adding one
+would put a provider call per run into a cost model whose entire margin argument rests on retrieval touching
+no provider at all, and would make the composition non-reproducible: the trace records a `compositionHash` so
+a stored recommendation can be audited, and a model in the ranking path breaks that.
+
+Revisit when **both** hold:
+
+1. a lane routinely returns more candidates than the cover can use, so ordering starts to matter; and
+2. human-authored gold judgments exist to measure a reordering against.
+
+Both, because a reranker tuned against synthetic judgments would be tuned against the generator's assumptions —
+the same circularity the authorship split exists to prevent, moved one layer deeper where it is harder to see.

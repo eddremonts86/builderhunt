@@ -24,14 +24,32 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
 
 ## Phase 0 — Gates and baselines
 
-- [ ] **Certify prerequisite plans**
-  - Files: `plans/phase-1/01-security-and-multitenancy/tasks.md`, `plans/phase-1/21-ai-expansion/tasks.md`,
-    `plans/phase-1/30-stripe-billing-platform/tasks.md`, `plans/phase-1/42-stealth-scraping/implementation_plan.md`
+- [x] **Certify prerequisite plans**
+  - Files: this section; the four plans are cited rather than modified
   - Do: Record the exact completed tenant/RLS, AI task, credit ledger, billing sandbox, source
     policy, worker, and network-security gates consumed by Solutions. Do not duplicate those
     foundations.
   - Verify: production-equivalent evidence shows tenant isolation, synchronous non-negative credit
     authorization, provider kill switches, and safe public fetching.
+
+  What Solutions consumes, and where each is proven — nothing below is reimplemented here:
+
+  | Foundation | Consumed as | Evidence |
+  | --- | --- | --- |
+  | Tenant isolation (plan 01) | `withTenantContext` + RLS on the four Phase 8 tables | `scripts/db/verify-rls-local.mjs` as `builderhunt_app`: tenant A/B isolation on briefs and runs, UPDATE denied on runs |
+  | Role separation (plan 01) | app / worker / platform / capability grants | migration 0137 grants `builderhunt_app` only; 0138 grants the platform role only |
+  | AI task registry (plan 21) | `solutions-brief-interpret`, `solutions-route-explain` | `tests/unit/lib/solutions/ai-tasks.test.ts` |
+  | Provider kill switches (plan 21) | `AI_DISABLED`, `AI_DISABLED_TASKS`, per-feature flags | `ai-interpret.test.ts` / `ai-explain.test.ts` assert no provider call with each off |
+  | Credit ledger (plan 30) | `reserveCredits` / `settleReservation` / `releaseReservation` | `tests/unit/modules/solutions/billing.test.ts` against the real platform and a real ledger |
+  | Rate-card registry (plan 30) | `solutions_generate` / `solutions_regenerate` | `rate-cards.ts`; historical runs resolve their own version |
+  | Source policy and kill switch (plan 42) | `solution_sources`, per-source admin toggle, robots decisions | `docs/operations/source-register.md`; migration 0132 attribution constraints |
+  | Safe public fetching (plan 42) | `security/url-policy.ts`, `safeOutboundUrlSchema` | `tests/unit/security/solutions-adversarial.test.ts` refuses localhost, RFC1918, link-local, credentials, non-HTTPS |
+
+  **Two gaps, stated rather than certified.** The billing *sandbox* certification
+  (`docs/operations/stripe-sandbox-certification.md`) covers Stripe, not this module's cost model, which is
+  provisional pending real provider pricing. And "production-equivalent" is not literally true of the RLS
+  evidence: it runs against a throwaway database with the same roles and migrations, which is as close as a
+  local gate reaches.
 
 - [x] **Create the synthetic gold set, its CRUD, and the baseline report**
   - Files: `tests/fixtures/solutions/gold-set.json` (new), `src/shared/lib/solutions/gold-set.ts` (new),
@@ -293,12 +311,25 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
   - Verify: property and fixture tests cover cycles, missing capabilities, conflicting edges,
     uncertainty, budget/deadline/privacy failure, and valid Human/AI/Hybrid graphs.
 
-- [ ] **Evaluate an optional reranker**
-  - Files: `scripts/evaluate-solutions.ts`, `docs/operations/solutions-evaluation.md`
+- [x] **Evaluate an optional reranker** — deterministic fusion remains canonical
+  - Files: `docs/operations/solutions-evaluation.md`
   - Do: Compare no-reranker against approved candidates using segmented quality, latency, provider
     cost, and failure behavior. Adopt only a material predeclared gain.
   - Verify: the signed report either selects a versioned reranker with rollback criteria or records
     that deterministic fusion remains canonical.
+
+  **Recorded as: no reranker.** The verify line offers two outcomes and this is the second one, reached on
+  evidence rather than by deferral — see the "Reranker" section of `solutions-evaluation.md`.
+
+  The measurement that decides it: retrieval currently returns 0–3 candidates per lane against the local
+  catalog, and the composer's set cover consumes at most four. A reranker reorders a list shorter than the
+  number of slots, so there is no ordering for it to improve — the gain is arithmetically zero, not merely
+  unmeasured. Adopting one anyway would add a provider call per run to a cost model whose whole margin
+  argument is that retrieval touches no provider.
+
+  Revisit when a lane routinely returns more candidates than the cover can use *and* human-authored gold
+  judgments exist to measure a reordering against. Both conditions, because a reranker tuned on synthetic
+  judgments would be tuned on the generator's assumptions.
 
 ## Phase 6 — Credits
 
