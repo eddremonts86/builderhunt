@@ -1,0 +1,136 @@
+/**
+ * plans/UI/tasks.md Wave 5 "Render conversion metrics in Admin Metrics".
+ *
+ * Empty, insufficient-sample, healthy, and degraded (API-error) fixtures for the conversion funnel
+ * section — proves each renders honestly (never a fabricated rate) and that the degraded state
+ * links to Operations, while a real zero-rate anomaly links to Content.
+ */
+import { act } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { createRouter, createRootRoute, createMemoryHistory, RouterProvider } from '@tanstack/react-router'
+import { AdminMetricsPage } from '~/routes/_dashboard/admin/metrics'
+
+beforeAll(() => {
+  ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+})
+
+let container: HTMLDivElement | null = null
+let root: Root | null = null
+
+afterEach(() => {
+  if (root) act(() => root!.unmount())
+  container?.remove()
+  container = null
+  root = null
+  vi.unstubAllGlobals()
+})
+
+function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Response {
+  return { ok, status, json: async () => body } as Response
+}
+
+const METRICS_RESPONSE = {
+  inProcess: { searches: 0, searchCacheHits: 0, apiRequests: 0, apiErrors: 0, signups: 0, signins: 0, uptimeSeconds: 10 },
+  db: { totalUsers: 1, newUsersLast24h: 0, newUsersLast7d: 1, totalSavedQueries: null, totalBuilders: null, totalNotes: null },
+  discovery: null,
+  server: { nodeVersion: 'v1', platform: 'darwin', pid: 1, memoryUsage: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0 } },
+}
+
+function emptyConversionMetrics() {
+  const zero = { numerator: 0, denominator: 0, rate: null, ci95: null, insufficientSample: true }
+  return {
+    landing_to_signup: { ...zero, numeratorEvent: 'signup_complete', denominatorEvent: 'landing_view' },
+    hero_signup_ctr: { ...zero, numeratorEvent: 'hero_signup_click', denominatorEvent: 'landing_view' },
+    hero_explore_ctr: { ...zero, numeratorEvent: 'hero_explore_click', denominatorEvent: 'landing_view' },
+    explore_search_completion: { ...zero, numeratorEvent: 'explore_search_complete', denominatorEvent: 'hero_explore_click' },
+    explore_to_signup_ctr: { ...zero, numeratorEvent: 'explore_signup_click', denominatorEvent: 'explore_search_complete' },
+    signup_completion: { ...zero, numeratorEvent: 'signup_complete', denominatorEvent: 'signup_submit' },
+  }
+}
+
+function mockFetchRouter(conversionByVariant: { baseline: unknown; treatment: unknown } | 'error' = { baseline: emptyConversionResponse('baseline'), treatment: emptyConversionResponse('treatment') }): void {
+  vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/api/admin/metrics/conversion')) {
+      if (conversionByVariant === 'error') return jsonResponse({ error: 'Forbidden' }, false, 403)
+      const variant = url.includes('variant=treatment') ? 'treatment' : 'baseline'
+      return jsonResponse(conversionByVariant[variant])
+    }
+    return jsonResponse(METRICS_RESPONSE)
+  })
+}
+
+function emptyConversionResponse(variant: 'baseline' | 'treatment') {
+  return { start: '2027-01-01', end: '2027-01-15', variant, metrics: emptyConversionMetrics() }
+}
+
+async function render() {
+  const rootRoute = createRootRoute({ component: () => <AdminMetricsPage /> })
+  const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory() })
+  container = document.createElement('div')
+  document.body.appendChild(container)
+  root = createRoot(container)
+  await act(async () => {
+    root!.render(<RouterProvider router={router} />)
+    await router.load()
+  })
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
+}
+
+function testId(id: string): Element | null {
+  return container!.querySelector(`[data-testid="${id}"]`)
+}
+
+describe('AdminMetricsPage — conversion funnel', () => {
+  it('shows an honest empty state when no conversion events exist in the window', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter()
+    await render()
+
+    expect(testId('metrics-conversion-empty')?.textContent).toContain('No conversion events recorded')
+  })
+
+  it('shows a real rate with a "low n" flag for an insufficient sample, never a fabricated confidence interval', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const baseline = emptyConversionResponse('baseline')
+    baseline.metrics.landing_to_signup = { numerator: 2, denominator: 10, rate: 0.2, ci95: null, insufficientSample: true, numeratorEvent: 'signup_complete', denominatorEvent: 'landing_view' }
+    mockFetchRouter({ baseline, treatment: emptyConversionResponse('treatment') })
+    await render()
+
+    const row = testId('metrics-conversion-row-landing_to_signup')
+    expect(row?.textContent).toContain('20.0%')
+    expect(row?.textContent).toContain('low n')
+  })
+
+  it('renders a healthy funnel with confidence intervals and no anomaly banner', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const baseline = emptyConversionResponse('baseline')
+    baseline.metrics.landing_to_signup = { numerator: 40, denominator: 200, rate: 0.2, ci95: [0.15, 0.26], insufficientSample: false, numeratorEvent: 'signup_complete', denominatorEvent: 'landing_view' }
+    mockFetchRouter({ baseline, treatment: emptyConversionResponse('treatment') })
+    await render()
+
+    expect(testId('metrics-conversion-row-landing_to_signup')?.textContent).toContain('20.0%')
+    expect(testId('metrics-conversion-anomaly')).toBeNull()
+  })
+
+  it('flags a real zero-rate anomaly and links to Content', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    const baseline = emptyConversionResponse('baseline')
+    baseline.metrics.hero_signup_ctr = { numerator: 0, denominator: 200, rate: 0, ci95: [0, 0.02], insufficientSample: false, numeratorEvent: 'hero_signup_click', denominatorEvent: 'landing_view' }
+    mockFetchRouter({ baseline, treatment: emptyConversionResponse('treatment') })
+    await render()
+
+    expect(testId('metrics-conversion-anomaly')).not.toBeNull()
+    expect((testId('metrics-conversion-content-link') as HTMLAnchorElement).textContent).toContain('review Content')
+  })
+
+  it('shows a degraded state and links to Operations when the conversion API errors', async () => {
+    vi.stubGlobal('fetch', vi.fn())
+    mockFetchRouter('error')
+    await render()
+
+    expect(testId('metrics-conversion-error')).not.toBeNull()
+    expect((testId('metrics-conversion-operations-link') as HTMLAnchorElement).textContent).toContain('Check Operations')
+  })
+})

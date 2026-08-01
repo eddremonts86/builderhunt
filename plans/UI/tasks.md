@@ -212,7 +212,7 @@
   - Do: Show owning organization and canonical entitlement including Pro Max; label user-level controls as audited manual grants/exceptions and link to Billing Operations. Do not present them as Stripe subscription editing.
   - Verify: canonical paid, manual exception, expired exception, and no-organization fixtures are distinguishable; mutations remain step-up protected and audited.
 
-- [ ] **Render conversion metrics in Admin Metrics**
+- [x] **Render conversion metrics in Admin Metrics**
   - Files: `src/routes/_dashboard/admin/metrics.tsx`, `src/routes/api/admin/metrics/conversion.ts`, `tests/unit/routes/admin/metrics.test.tsx`
   - Do: Fetch and render the bounded funnel, retention window, variant breakdown, and insufficient-data state; link anomalous API-error or conversion states to the appropriate operations/content page.
   - Verify: empty, insufficient, healthy, and degraded fixtures render without fabricating rates.
