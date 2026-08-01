@@ -3,6 +3,7 @@ import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAd
 import { CRON_PRINCIPAL_USER_ID, tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
 import { runReconciliation, type ReconciliationCursor } from '~/shared/lib/billing/reconciliation'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 /**
  * Manually (or via external scheduler) runs one daily-financial-reconciliation pass
@@ -28,7 +29,14 @@ export const Route = createFileRoute('/api/admin/billing/reconcile')({
           // synthetic cron principal's userId isn't a row there, so a cron-triggered run is
           // recorded as unattended (null) rather than violating that constraint.
           const actorUserId = principal.userId === CRON_PRINCIPAL_USER_ID ? null : principal.userId
-          const summary = await runReconciliation({ provider: getBillingProvider(), actorUserId, resumeFrom })
+          const { payload: summary } = await withJobRun({ jobKey: 'billing.reconcile' }, async () => {
+            const result = await runReconciliation({ provider: getBillingProvider(), actorUserId, resumeFrom })
+            const processedCount = Object.values(result.countsChecked).reduce((sum, n) => sum + n, 0)
+            // "repairs_applied" means every mismatch found was auto-corrected — an operational
+            // success, not a failure. Only unresolved mismatches ("mismatches_found") count as failed.
+            const failedCount = result.result === 'mismatches_found' ? result.mismatches.length : 0
+            return { processedCount, failedCount, errorCode: failedCount > 0 ? 'mismatches_found' : null, payload: result }
+          })
 
           await auditPlatformAdminAction(principal, {
             action: 'admin.billing.reconcile',

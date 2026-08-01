@@ -212,6 +212,7 @@ import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/s
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
 import { Route as ApiAdminRoadmapIdRouteImport } from './routes/api/admin/roadmap/$id'
 import { Route as ApiAdminOperationsSyncSchedulesRouteImport } from './routes/api/admin/operations/sync-schedules'
+import { Route as ApiAdminOperationsJobKeyRouteImport } from './routes/api/admin/operations/$jobKey'
 import { Route as ApiAdminMetricsConversionRouteImport } from './routes/api/admin/metrics/conversion'
 import { Route as ApiAdminLegalRunWorkerRouteImport } from './routes/api/admin/legal/run-worker'
 import { Route as ApiAdminInterviewsRunRetentionRouteImport } from './routes/api/admin/interviews/run-retention'
@@ -264,6 +265,7 @@ import { Route as ApiInterviewsInterviewIdParticipantsParticipantIdRouteImport }
 import { Route as ApiInterviewsInterviewIdBriefVersionRouteImport } from './routes/api/interviews/$interviewId/brief/$version'
 import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './routes/api/builders/$builderId/evidence/$evidenceId'
 import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
+import { Route as ApiAdminOperationsJobKeyRunRouteImport } from './routes/api/admin/operations/$jobKey/run'
 import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
@@ -1341,6 +1343,12 @@ const ApiAdminOperationsSyncSchedulesRoute =
     path: '/api/admin/operations/sync-schedules',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminOperationsJobKeyRoute =
+  ApiAdminOperationsJobKeyRouteImport.update({
+    id: '/api/admin/operations/$jobKey',
+    path: '/api/admin/operations/$jobKey',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiAdminMetricsConversionRoute =
   ApiAdminMetricsConversionRouteImport.update({
     id: '/api/admin/metrics/conversion',
@@ -1645,6 +1653,12 @@ const ApiBuildersBuilderIdClaimVerifyRoute =
     path: '/verify',
     getParentRoute: () => ApiBuildersBuilderIdClaimRoute,
   } as any)
+const ApiAdminOperationsJobKeyRunRoute =
+  ApiAdminOperationsJobKeyRunRouteImport.update({
+    id: '/run',
+    path: '/run',
+    getParentRoute: () => ApiAdminOperationsJobKeyRoute,
+  } as any)
 const ApiAdminBuilderClaimsClaimIdRevokeRoute =
   ApiAdminBuilderClaimsClaimIdRevokeRouteImport.update({
     id: '/api/admin/builder-claims/$claimId/revoke',
@@ -1847,6 +1861,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -1920,6 +1935,7 @@ export interface FileRoutesByFullPath {
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
@@ -2107,6 +2123,7 @@ export interface FileRoutesByTo {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -2180,6 +2197,7 @@ export interface FileRoutesByTo {
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
@@ -2372,6 +2390,7 @@ export interface FileRoutesById {
   '/api/admin/interviews/run-retention': typeof ApiAdminInterviewsRunRetentionRoute
   '/api/admin/legal/run-worker': typeof ApiAdminLegalRunWorkerRoute
   '/api/admin/metrics/conversion': typeof ApiAdminMetricsConversionRoute
+  '/api/admin/operations/$jobKey': typeof ApiAdminOperationsJobKeyRouteWithChildren
   '/api/admin/operations/sync-schedules': typeof ApiAdminOperationsSyncSchedulesRoute
   '/api/admin/roadmap/$id': typeof ApiAdminRoadmapIdRoute
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
@@ -2445,6 +2464,7 @@ export interface FileRoutesById {
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
+  '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
   '/api/builders/$builderId/evidence/$evidenceId': typeof ApiBuildersBuilderIdEvidenceEvidenceIdRoute
   '/api/interviews/$interviewId/brief/$version': typeof ApiInterviewsInterviewIdBriefVersionRoute
@@ -2636,6 +2656,7 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -2709,6 +2730,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
@@ -2896,6 +2918,7 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -2969,6 +2992,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations'
     | '/api/scheduling/invitations'
     | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
@@ -3160,6 +3184,7 @@ export interface FileRouteTypes {
     | '/api/admin/interviews/run-retention'
     | '/api/admin/legal/run-worker'
     | '/api/admin/metrics/conversion'
+    | '/api/admin/operations/$jobKey'
     | '/api/admin/operations/sync-schedules'
     | '/api/admin/roadmap/$id'
     | '/api/admin/sprints/run-worker'
@@ -3233,6 +3258,7 @@ export interface FileRouteTypes {
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
     | '/api/admin/builder-claims/$claimId/revoke'
+    | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
     | '/api/builders/$builderId/evidence/$evidenceId'
     | '/api/interviews/$interviewId/brief/$version'
@@ -3367,6 +3393,7 @@ export interface RootRouteChildren {
   ApiAdminInterviewsRunRetentionRoute: typeof ApiAdminInterviewsRunRetentionRoute
   ApiAdminLegalRunWorkerRoute: typeof ApiAdminLegalRunWorkerRoute
   ApiAdminMetricsConversionRoute: typeof ApiAdminMetricsConversionRoute
+  ApiAdminOperationsJobKeyRoute: typeof ApiAdminOperationsJobKeyRouteWithChildren
   ApiAdminOperationsSyncSchedulesRoute: typeof ApiAdminOperationsSyncSchedulesRoute
   ApiAdminRoadmapIdRoute: typeof ApiAdminRoadmapIdRoute
   ApiAdminSprintsRunWorkerRoute: typeof ApiAdminSprintsRunWorkerRoute
@@ -4864,6 +4891,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminOperationsSyncSchedulesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/operations/$jobKey': {
+      id: '/api/admin/operations/$jobKey'
+      path: '/api/admin/operations/$jobKey'
+      fullPath: '/api/admin/operations/$jobKey'
+      preLoaderRoute: typeof ApiAdminOperationsJobKeyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/admin/metrics/conversion': {
       id: '/api/admin/metrics/conversion'
       path: '/api/admin/metrics/conversion'
@@ -5227,6 +5261,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/builders/$builderId/claim/verify'
       preLoaderRoute: typeof ApiBuildersBuilderIdClaimVerifyRouteImport
       parentRoute: typeof ApiBuildersBuilderIdClaimRoute
+    }
+    '/api/admin/operations/$jobKey/run': {
+      id: '/api/admin/operations/$jobKey/run'
+      path: '/run'
+      fullPath: '/api/admin/operations/$jobKey/run'
+      preLoaderRoute: typeof ApiAdminOperationsJobKeyRunRouteImport
+      parentRoute: typeof ApiAdminOperationsJobKeyRoute
     }
     '/api/admin/builder-claims/$claimId/revoke': {
       id: '/api/admin/builder-claims/$claimId/revoke'
@@ -5592,6 +5633,20 @@ const ApiSprintsSprintIdRouteChildren: ApiSprintsSprintIdRouteChildren = {
 const ApiSprintsSprintIdRouteWithChildren =
   ApiSprintsSprintIdRoute._addFileChildren(ApiSprintsSprintIdRouteChildren)
 
+interface ApiAdminOperationsJobKeyRouteChildren {
+  ApiAdminOperationsJobKeyRunRoute: typeof ApiAdminOperationsJobKeyRunRoute
+}
+
+const ApiAdminOperationsJobKeyRouteChildren: ApiAdminOperationsJobKeyRouteChildren =
+  {
+    ApiAdminOperationsJobKeyRunRoute: ApiAdminOperationsJobKeyRunRoute,
+  }
+
+const ApiAdminOperationsJobKeyRouteWithChildren =
+  ApiAdminOperationsJobKeyRoute._addFileChildren(
+    ApiAdminOperationsJobKeyRouteChildren,
+  )
+
 interface ApiMeBuilderBuilderIdRouteChildren {
   ApiMeBuilderBuilderIdEvidenceProvenanceRoute: typeof ApiMeBuilderBuilderIdEvidenceProvenanceRoute
   ApiMeBuilderBuilderIdRestrictProcessingRoute: typeof ApiMeBuilderBuilderIdRestrictProcessingRoute
@@ -5781,6 +5836,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminInterviewsRunRetentionRoute: ApiAdminInterviewsRunRetentionRoute,
   ApiAdminLegalRunWorkerRoute: ApiAdminLegalRunWorkerRoute,
   ApiAdminMetricsConversionRoute: ApiAdminMetricsConversionRoute,
+  ApiAdminOperationsJobKeyRoute: ApiAdminOperationsJobKeyRouteWithChildren,
   ApiAdminOperationsSyncSchedulesRoute: ApiAdminOperationsSyncSchedulesRoute,
   ApiAdminRoadmapIdRoute: ApiAdminRoadmapIdRoute,
   ApiAdminSprintsRunWorkerRoute: ApiAdminSprintsRunWorkerRoute,

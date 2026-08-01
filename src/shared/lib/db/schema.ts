@@ -3007,6 +3007,10 @@ export const operationalSchedules = pgTable(
     scope: text('scope').notNull(),
     enabled: boolean('enabled').notNull().default(true),
     nextRunAt: timestamp('next_run_at', { withTimezone: true }),
+    // Optimistic concurrency for the admin pause/resume mutation (plans/UI/tasks.md Wave 5 "Add
+    // allowlisted pause, resume, and manual-run APIs") — two admins toggling the same job from two
+    // open tabs must not silently clobber one another.
+    version: integer('version').notNull().default(1),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },

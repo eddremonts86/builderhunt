@@ -6,6 +6,7 @@ import { workerDb } from '~/shared/lib/db/worker-db'
 import { statusChecks } from '~/shared/lib/db/schema'
 import { runStatusChecks } from '~/shared/lib/status'
 import { randomId } from '~/lib/utils'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 const RETENTION_DAYS = 90
 
@@ -24,12 +25,22 @@ export const Route = createFileRoute('/api/admin/status/snapshot')({
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
 
-          const components = await runStatusChecks()
-          const ok = components.every((c) => c.ok)
-          await workerDb.insert(statusChecks).values({ id: randomId(), ok, components })
+          const { payload: { ok, pruned } } = await withJobRun({ jobKey: 'status.snapshot' }, async () => {
+            const components = await runStatusChecks()
+            const failing = components.filter((c) => !c.ok)
+            const ok = failing.length === 0
+            await workerDb.insert(statusChecks).values({ id: randomId(), ok, components })
 
-          const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000)
-          const pruned = await workerDb.delete(statusChecks).where(lt(statusChecks.checkedAt, cutoff)).returning({ id: statusChecks.id })
+            const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000)
+            const pruned = await workerDb.delete(statusChecks).where(lt(statusChecks.checkedAt, cutoff)).returning({ id: statusChecks.id })
+
+            return {
+              processedCount: components.length,
+              failedCount: failing.length,
+              errorCode: failing.length > 0 ? 'status_check_failed' : null,
+              payload: { ok, pruned },
+            }
+          })
 
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',

@@ -1,5 +1,6 @@
 import { emitSecurityAudit } from '../security/audit'
 import { consoleSecurityAuditSink } from '../security/audit-sink'
+import { RECENT_AUTH_MAX_AGE_SECONDS } from './organization-lifecycle'
 
 /**
  * Platform admin is a distinct, server-verified principal — never an
@@ -12,10 +13,18 @@ import { consoleSecurityAuditSink } from '../security/audit-sink'
 export interface PlatformAdminPrincipal {
   userId: string
   requestId: string
+  /**
+   * When the session itself was created — absent for a machine caller (`tryCronPrincipal`'s
+   * `{ userId: 'cron' }`), which has no browser session to be recent or stale; a secret-bearing
+   * cron request is already strongly authenticated on its own terms. Present for a real browser
+   * session, and required by `requireRecentPlatformAdminAuthentication`.
+   */
+  authenticatedAt?: Date
 }
 
 export interface PlatformAdminSessionScope {
   userId: string
+  authenticatedAt?: Date
 }
 
 export interface PlatformAdminDependencies {
@@ -56,7 +65,7 @@ export async function resolvePlatformAdminPrincipal(
   if (!dependencies.isAdminUserId(session.userId)) {
     throw new PlatformAdminAuthorizationError('Forbidden', 403)
   }
-  return { userId: session.userId, requestId: requestIdFrom(request) }
+  return { userId: session.userId, requestId: requestIdFrom(request), authenticatedAt: session.authenticatedAt }
 }
 
 export async function requirePlatformAdminPrincipal(request: Request): Promise<PlatformAdminPrincipal> {
@@ -66,10 +75,24 @@ export async function requirePlatformAdminPrincipal(request: Request): Promise<P
   return resolvePlatformAdminPrincipal(request, {
     getSession: async (currentRequest) => {
       const result = await auth.api.getSession({ headers: currentRequest.headers })
-      return result ? { userId: result.user.id } : null
+      return result ? { userId: result.user.id, authenticatedAt: new Date(result.session.createdAt) } : null
     },
     isAdminUserId: (userId) => adminIds.size > 0 && adminIds.has(userId),
   })
+}
+
+/**
+ * Guards a sensitive platform-admin mutation (pause/resume/manual-run, etc.) behind a recent
+ * browser session — same convention and window as billing's `requireRecentBillingAuthentication`.
+ * A no-op for a machine caller (no `authenticatedAt` at all, e.g. `tryCronPrincipal`): a
+ * secret-bearing scheduler has no session to be stale, and is already strongly authenticated.
+ */
+export function requireRecentPlatformAdminAuthentication(principal: PlatformAdminPrincipal, now: Date = new Date()): void {
+  if (!principal.authenticatedAt) return
+  const ageSeconds = (now.getTime() - principal.authenticatedAt.getTime()) / 1000
+  if (ageSeconds > RECENT_AUTH_MAX_AGE_SECONDS) {
+    throw new PlatformAdminAuthorizationError('Recent re-authentication required', 401)
+  }
 }
 
 /** Redacted audit trail for a platform-admin mutation. `organizationId` is null when the action has no single target organization (e.g. a global roadmap edit). */

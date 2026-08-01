@@ -3,6 +3,7 @@ import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAd
 import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { processPendingOrganizationDeletions } from '~/shared/lib/auth/organization-lifecycle'
 import { processPendingDeletions } from '~/shared/lib/legal'
+import { withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 /**
  * Manually (or via external scheduler) runs both grace-period purge workers —
@@ -20,10 +21,17 @@ export const Route = createFileRoute('/api/admin/legal/run-worker')({
       POST: async ({ request }) => {
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
-          const [accounts, organizations] = await Promise.all([
-            processPendingDeletions(),
-            processPendingOrganizationDeletions(),
-          ])
+          const { payload: { accounts, organizations } } = await withJobRun({ jobKey: 'legal.retention' }, async () => {
+            const [accountsResult, organizationsResult] = await Promise.all([
+              processPendingDeletions(),
+              processPendingOrganizationDeletions(),
+            ])
+            return {
+              processedCount: accountsResult.processed + organizationsResult.processed,
+              failedCount: accountsResult.errors + organizationsResult.errors,
+              payload: { accounts: accountsResult, organizations: organizationsResult },
+            }
+          })
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',
             targetType: 'worker',

@@ -108,6 +108,56 @@ export async function syncScheduleRegistry(
   return { created, updated, retired: retired.length }
 }
 
+export type SetScheduleEnabledResult =
+  | { outcome: 'updated'; jobKey: string; enabled: boolean; version: number }
+  | { outcome: 'not_found' }
+  | { outcome: 'version_conflict'; currentVersion: number }
+
+/**
+ * Pause/resume with optimistic concurrency: two admins toggling the same job from two open tabs
+ * must not silently clobber one another — the second write must see that the row moved and fail
+ * closed rather than overwrite the first admin's intent.
+ *
+ * `jobKey` must already be resolved through `findScheduleDefinition` by the caller — this function
+ * only distinguishes "no such row yet" (registry hasn't synced this key in) from a real conflict,
+ * it does not itself validate the key against the code registry.
+ */
+export async function setScheduleEnabled(
+  jobKey: string,
+  enabled: boolean,
+  expectedVersion: number,
+  db: Db = platformDb,
+): Promise<SetScheduleEnabledResult> {
+  const [current] = await db
+    .select({ enabled: operationalSchedules.enabled, version: operationalSchedules.version })
+    .from(operationalSchedules)
+    .where(eq(operationalSchedules.jobKey, jobKey))
+    .limit(1)
+  if (!current) return { outcome: 'not_found' }
+  if (current.version !== expectedVersion) return { outcome: 'version_conflict', currentVersion: current.version }
+
+  const [row] = await db
+    .update(operationalSchedules)
+    .set({ enabled, version: expectedVersion + 1, updatedAt: new Date() })
+    .where(and(eq(operationalSchedules.jobKey, jobKey), eq(operationalSchedules.version, expectedVersion)))
+    .returning({ jobKey: operationalSchedules.jobKey, enabled: operationalSchedules.enabled, version: operationalSchedules.version })
+  // The version could have moved between the SELECT and the UPDATE (a race between two concurrent
+  // requests) — re-check rather than trust the pre-read.
+  if (!row) return { outcome: 'version_conflict', currentVersion: current.version }
+  return { outcome: 'updated', jobKey: row.jobKey, enabled: row.enabled, version: row.version }
+}
+
+/** For manual-run idempotency: a job already `running` must not be triggered a second time in parallel. */
+export async function findRunningJobRun(jobKey: string, db: Db = workerDb): Promise<{ id: string; startedAt: Date | null } | null> {
+  const [row] = await db
+    .select({ id: jobRuns.id, startedAt: jobRuns.startedAt })
+    .from(jobRuns)
+    .where(and(eq(jobRuns.jobKey, jobKey), eq(jobRuns.state, 'running')))
+    .orderBy(desc(jobRuns.startedAt))
+    .limit(1)
+  return row ?? null
+}
+
 export async function listScheduleRegistry(db: Db = workerDb) {
   return db
     .select({
@@ -118,6 +168,7 @@ export async function listScheduleRegistry(db: Db = workerDb) {
       scope: operationalSchedules.scope,
       enabled: operationalSchedules.enabled,
       nextRunAt: operationalSchedules.nextRunAt,
+      version: operationalSchedules.version,
     })
     .from(operationalSchedules)
     .orderBy(asc(operationalSchedules.jobKey))

@@ -47,6 +47,10 @@ export const Route = createFileRoute('/api/admin/operations/')({
               cronExpression: definition.cronExpression,
               timezone: definition.timezone,
               enabled,
+              // Absent until the registry has synced this key in at least once (`syncScheduleRegistry`
+              // runs at boot) — the pause/resume mutation needs this for its optimistic-concurrency
+              // check, so the UI must not offer that control until a real version exists.
+              version: row?.version ?? null,
               nextRunAt: nextRunAt ? nextRunAt.toISOString() : null,
               overdue,
               stale,

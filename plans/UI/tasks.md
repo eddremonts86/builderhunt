@@ -177,7 +177,7 @@
   - Do: Return one bounded row per registered schedule with enabled/cadence/timezone/next run and latest run status/duration/counters/redacted error code. Never return payloads, source URLs, candidate data, headers, tokens, or stack traces.
   - Verify: DTO snapshot is redacted; stale/overdue/running/failed/success states calculate correctly; platform-admin boundary passes.
 
-- [ ] **Add allowlisted pause, resume, and manual-run APIs**
+- [x] **Add allowlisted pause, resume, and manual-run APIs**
   - Files: `src/shared/lib/operational-schedules.ts`, `src/shared/lib/repositories/platform-operations.ts`, `src/routes/api/admin/operations/$jobKey.ts`, `src/routes/api/admin/operations/$jobKey/run.ts`, `tests/unit/security/admin-operations.test.ts`
   - Do: Resolve `jobKey` only through `OPERATIONAL_SCHEDULES`; never accept a route or arbitrary argument from the browser. Add optimistic versioning, idempotency, step-up requirement, and audit records.
   - Verify: unknown/traversal job keys fail closed; duplicate manual run does not duplicate work; pause survives registry sync; every mutation is audited.

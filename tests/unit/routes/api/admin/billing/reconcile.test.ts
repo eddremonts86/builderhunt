@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
   runReconciliation: vi.fn(),
+  withJobRun: vi.fn(async (_input: unknown, operation: () => Promise<unknown>) => operation()),
 }))
 
 vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
@@ -14,6 +15,14 @@ vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
 vi.mock('~/shared/lib/billing/reconciliation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/billing/reconciliation')>()
   return { ...actual, runReconciliation: mocks.runReconciliation }
+})
+
+// The route wraps the reconciliation call in `withJobRun` to record `job_runs` history — bypass
+// its real DB-backed bookkeeping here and just run the operation, same as every other mocked
+// admin-worker route test.
+vi.mock('~/shared/lib/repositories/platform-operations', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/shared/lib/repositories/platform-operations')>()
+  return { ...actual, withJobRun: mocks.withJobRun }
 })
 
 const { Route } = await import('~/routes/api/admin/billing/reconcile')
