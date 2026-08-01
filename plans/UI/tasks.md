@@ -7,71 +7,71 @@
 
 ## Wave 0 — Verification foundation
 
-- [ ] **Restore a safe authenticated browser fixture**
+- [x] **Restore a safe authenticated browser fixture**
   - Files: `scripts/db/seed-admin.ts`, `scripts/dev/capture-app-screenshots.ts`, `tests/e2e/harness/fixtures/platform-admin.ts`, `docs/operations/development.md`
   - Do: Stop `seed-admin` from writing through the non-owner app connection. Use the existing privileged/auth fixture boundary without granting owner rights to `builderhunt_app`, and document one safe command for an authenticated local browser session. Never print connection strings or fixture passwords.
   - Verify: seed or mint a platform admin, sign in through `/auth/sign-in`, reach `/dashboard` and `/admin/metrics`, reload successfully, and prove the app runtime role still cannot insert `auth_users`.
 
 ## Wave 1 — Route integrity
 
-- [ ] **Register Shortlists and Team activity in dashboard navigation**
+- [x] **Register Shortlists and Team activity in dashboard navigation**
   - Files: `src/modules/dashboard/ui/shell/nav-config.ts`, `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts`
   - Do: Add `/lists` under Pipeline and `/team/activity` under Workspace; update both `items` and `routes`; verify desktop rail/panel and the flattened mobile drawer use the same registry.
   - Verify: run the nav-config unit test and use desktop plus 320 px browsers to navigate directly and through both menus.
 
-- [ ] **Replace obsolete shortlist paths and route-ID navigation**
+- [x] **Replace obsolete shortlist paths and route-ID navigation**
   - Files: `src/modules/builder-profile/components/AddToListMenu.tsx`, `src/modules/dashboard/components/ListsPage.tsx`, `src/modules/dashboard/components/ListDetailPage.tsx`, `src/modules/dashboard/components/TeamActivityPage.tsx`, `src/lib/calendar/projections.ts`, `src/modules/calendar/components/ProjectionDetails.tsx`, `src/shared/lib/email.ts`, `tests/e2e/dashboard-and-navigation.spec.ts`
   - Do: Replace obsolete shortlist paths, Team Activity `/_dashboard`, alert projection `/dashboard/alerts`, operational API anchors, and privacy-email `/dashboard/settings/privacy`. Route jobs to `/admin/operations?job=…`; remove `as never` route bypasses.
   - Verify: assert no obsolete literal remains under `src/`; exercise list/activity/projection navigation and both generated privacy email CTAs.
 
-- [ ] **Add an internal route-graph and reachability gate**
+- [x] **Add an internal route-graph and reachability gate**
   - Files: `scripts/check-ui-route-graph.mjs`, `tests/unit/modules/dashboard/ui/shell/nav-config.test.ts`, `.github/workflows/quality.yml`
   - Do: Compare stable client links, server-generated email/metadata/projection/redirect URLs, and navigation destinations with generated `fullPath` values. Reject browser-visible `/_dashboard` targets, obsolete aliases, missing owning areas, registered destinations absent from the tree, and robots policy that omits authenticated top-level routes.
   - Verify: make the check fail with one invalid fixture path, restore it, then run `node scripts/check-ui-route-graph.mjs` in CI and locally.
 
-- [ ] **Create an exhaustive source presentation registry**
+- [x] **Create an exhaustive source presentation registry**
   - Files: `src/lib/sources/types.ts`, `src/shared/lib/source-presentation.ts`, `src/modules/search/components/SearchPage.tsx`, `src/modules/search/components/PersonResultCard.tsx`, `src/modules/dashboard/components/RecommendationsSection.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, `tests/unit/shared/lib/source-presentation.test.ts`
   - Do: Define label, icon, badge, safe URL builder, tracking availability, and dormant reason for every `SOURCE_NAMES` member. Replace duplicated maps and prohibit `#` fallback links.
   - Verify: the type check fails for an omitted source; Bluesky, Product Hunt, and Devpost render deterministic valid/unavailable states; malicious handles cannot create unsafe URLs.
 
-- [ ] **Add entity-aware breadcrumbs and contextual parents**
+- [x] **Add entity-aware breadcrumbs and contextual parents**
   - Files: `src/modules/dashboard/ui/shell/breadcrumbs.ts`, `src/modules/dashboard/ui/shell/DashboardHeader.tsx`, `src/routes/_dashboard/builder/$builderId/index.tsx`, `src/routes/_dashboard/lists/$listId.tsx`, `src/routes/_dashboard/sprints/$sprintId/index.tsx`, `src/routes/_dashboard/interviews/$interviewId/index.tsx`, `tests/unit/modules/dashboard/ui/shell/breadcrumbs.test.ts`
   - Do: Define safe parents and optional loaded entity labels for builder, shortlist, sprint, interview, live-interview, and admin detail routes. Never derive a breadcrumb from untrusted search params or expose a private entity label before authorization.
   - Verify: direct-load and in-app navigation show a usable parent at desktop/mobile; missing/deleted/foreign resources use generic labels without leaking existence.
 
 ## Wave 2 — Builder workspace journey
 
-- [ ] **Create a shared builder result action contract**
+- [x] **Create a shared builder result action contract**
   - Files: `src/modules/search/components/BuilderResultActions.tsx`, `src/modules/search/components/PersonResultCard.tsx`, `src/modules/search/components/SearchPage.tsx`, `src/shared/lib/safe-next.ts`, `tests/unit/modules/search/components/BuilderResultActions.test.tsx`
   - Do: Standardize `Open workspace`, `Track & open`, and `Open source profile`. For an untracked result, call `/api/builders/track` and navigate with the returned organization-builder ID; show plan-limit and unsupported-source states without losing the result.
   - Verify: component tests cover tracked, untracked, loading, 402, unsupported, and unsafe external URL states; browser test opens the internal workspace from Search.
 
-- [ ] **Use workspace actions in recommendations, alerts, and sprints**
+- [x] **Use workspace actions in recommendations, alerts, and sprints**
   - Files: `src/modules/dashboard/components/RecommendationsSection.tsx`, `src/routes/_dashboard/alerts.tsx`, `src/routes/_dashboard/sprints/$sprintId/index.tsx`, `src/modules/search/components/PersonResultCard.tsx`, `tests/e2e/builder-workspace-navigation.spec.ts`
   - Do: Replace external-only or track-only dead ends with the shared result actions. Replace authenticated legacy `/builders/$builderId` navigation with `/builder/$builderId` only when the ID is the organization-builder ID.
   - Verify: real journeys Recommendation → Builder, Alert → Builder, and Sprint → Builder pass; source profile remains a secondary new-tab link.
 
-- [ ] **Connect shortlist members to the builder workspace**
+- [x] **Connect shortlist members to the builder workspace**
   - Files: `src/shared/lib/repositories/builder-lists.ts`, `src/routes/api/lists/$listId/items/index.ts`, `src/modules/dashboard/components/ListDetailPage.tsx`, `tests/e2e/builder-workspace-navigation.spec.ts`
   - Do: Include the safe organization-builder ID in the item DTO and make the row/name open `/builder/$builderId`; retain remove action and permission rules; add Search builders CTA to the empty state.
   - Verify: private and shared list members open the correct tenant-scoped builder; a cross-tenant ID remains 404.
 
-- [ ] **Preserve safe origin context on builder pages**
+- [x] **Preserve safe origin context on builder pages**
   - Files: `src/routes/_dashboard/builder/$builderId/index.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, `src/shared/lib/safe-next.ts`, `tests/unit/shared/lib/safe-next.test.ts`, `tests/e2e/builder-workspace-navigation.spec.ts`
   - Do: Accept only allowlisted same-origin `from` paths for Search, Alerts, Sprint detail, and List detail; render a contextual back action; fall back to Search.
   - Verify: four valid origins round-trip; encoded external, protocol-relative, `javascript:`, and `/_dashboard` values fall back safely.
 
-- [ ] **Connect Exports to the internal builder workspace**
+- [x] **Connect Exports to the internal builder workspace**
   - Files: `src/modules/dashboard/components/ExportsPage.tsx`, `src/modules/search/components/BuilderResultActions.tsx`, `src/routes/api/export/builders.ts`, `tests/e2e/builder-workspace-navigation.spec.ts`
   - Do: Make each export-history/tracked-builder row open `/builder/$builderId` using the organization-builder ID already present in the DTO; keep the safe source profile secondary and preserve download actions.
   - Verify: Export → Builder works for an authorized row; malformed external URLs are suppressed; foreign builder IDs remain inaccessible.
 
-- [ ] **Add shortlist metadata and visibility editing**
+- [x] **Add shortlist metadata and visibility editing**
   - Files: `src/shared/lib/repositories/builder-lists.ts`, `src/routes/api/lists/$listId.ts`, `src/modules/dashboard/components/ListDetailPage.tsx`, `tests/e2e/lists.spec.ts`
   - Do: Add versioned PATCH for name, description, and private/organization visibility; render an edit dialog with a visibility-consequence warning, creator permission states, and an activity event.
   - Verify: creator edits each field and resolves a stale 409; non-creator and cross-tenant mutations fail; visibility change immediately affects authorized readers.
 
-- [ ] **Make Team Activity human and navigable**
+- [x] **Make Team Activity human and navigable**
   - Files: `src/shared/lib/repositories/activity-events.ts`, `src/modules/dashboard/components/TeamActivityWidget.tsx`, `src/modules/dashboard/components/TeamActivityPage.tsx`, `tests/unit/security/activity-events.test.ts`, `tests/e2e/team-activity.spec.ts`
   - Do: Return allowlisted `actorDisplayName` and server-derived `targetHref` for list/search/alert event types. Link authorized existing targets; render deleted/inaccessible targets as plain text and never send raw arbitrary target keys to navigation.
   - Verify: human names and three target types navigate correctly; deleted and cross-tenant targets reveal no existence; pagination ordering remains stable.
