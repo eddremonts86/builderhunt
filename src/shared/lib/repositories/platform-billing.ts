@@ -130,6 +130,98 @@ export async function listPlatformUsersWithPlans() {
   }))
 }
 
+export type UserBillingProvenance = 'canonical' | 'manual_exception' | 'expired_exception' | 'no_organization'
+
+export interface PlatformUserBillingSummary {
+  organizationId: string
+  organizationName: string
+  /** Canonical `OrganizationTier` — includes `pro_max`, unlike the legacy `PlanTier` above. */
+  entitlementTier: string
+  entitlementStatus: string
+  currentPeriodEnd: string | null
+  trialEndsAt: string | null
+  provenance: UserBillingProvenance
+  /** Distinct from `provenance === 'canonical'`: a plain free-tier org is also "canonical" (free is
+   * the default, not an exception) but has no subscription to speak of — this is the fact a "Stripe"
+   * badge should actually gate on, not the broader provenance classification. */
+  hasActiveSubscription: boolean
+}
+
+/**
+ * The organization a user owns, its canonical entitlement, and whether that entitlement is backed
+ * by a real Stripe subscription (`canonical`) or was granted by an admin with no matching
+ * `billing_subscriptions` row (`manual_exception` / `expired_exception` once its own period has
+ * passed) — plans/UI/tasks.md Wave 5 "Align Admin Users with organization-owned billing". `null`
+ * means the user owns no organization at all (a real, distinguishable state — see
+ * `platform_admin_user_billing_summary`'s own migration comment for why `builderhunt_platform`
+ * reads this via a SECURITY DEFINER function rather than a direct table grant).
+ */
+export async function getPlatformUserBillingSummary(
+  userId: string,
+  now: Date = new Date(),
+  db: Pick<typeof platformDb, 'execute'> = platformDb,
+): Promise<PlatformUserBillingSummary | null> {
+  const rows = await db.execute<{
+    organization_id: string
+    organization_name: string
+    tier: string
+    status: string
+    current_period_end: string | null
+    trial_ends_at: string | null
+    has_active_subscription: boolean
+  }>(sql`select * from platform_admin_user_billing_summary(${userId})`)
+  const row = rows[0]
+  if (!row) return null
+
+  // A raw `.execute(sql...)` call bypasses drizzle's column-aware result mapping — postgres-js
+  // hands back timestamptz columns from a plain function call as strings, not `Date` instances (the
+  // typed `.select()` API is what normally does that conversion), so both fields are parsed here.
+  const currentPeriodEnd = row.current_period_end ? new Date(row.current_period_end) : null
+  const trialEndsAt = row.trial_ends_at ? new Date(row.trial_ends_at) : null
+  const periodPassed = (currentPeriodEnd !== null && currentPeriodEnd.getTime() < now.getTime())
+    || (trialEndsAt !== null && trialEndsAt.getTime() < now.getTime())
+  const provenance: UserBillingProvenance = row.has_active_subscription
+    ? 'canonical'
+    : row.tier === 'free'
+      ? 'canonical' // free is the default state, not an "exception" of anything
+      : periodPassed
+        ? 'expired_exception'
+        : 'manual_exception'
+
+  return {
+    organizationId: row.organization_id,
+    organizationName: row.organization_name,
+    entitlementTier: row.tier,
+    entitlementStatus: row.status,
+    currentPeriodEnd: currentPeriodEnd?.toISOString() ?? null,
+    trialEndsAt: trialEndsAt?.toISOString() ?? null,
+    provenance,
+    hasActiveSubscription: row.has_active_subscription,
+  }
+}
+
+export interface PlatformUserWithBilling {
+  userId: string
+  name: string
+  email: string
+  createdAt: string
+  plan: PlanTier
+  status: string
+  planEndsAt: string | null
+  billing: PlatformUserBillingSummary | null
+}
+
+/** `listPlatformUsersWithPlans` plus each user's owning-organization billing summary — one function
+ * call per user (bounded by the admin page's own page size, same shape as `listLatestJobRuns`'s
+ * per-key fan-out), since the underlying read is a SECURITY DEFINER function call, not a joinable
+ * table this connection has a grant on. */
+export async function listPlatformUsersWithBilling(): Promise<PlatformUserWithBilling[]> {
+  const users = await listPlatformUsersWithPlans()
+  const now = new Date()
+  const billing = await Promise.all(users.map((u) => getPlatformUserBillingSummary(u.userId, now)))
+  return users.map((u, i) => ({ ...u, billing: billing[i] ?? null }))
+}
+
 export function listPlatformPlanRequests() {
   return platformDb.select({
     id: planRequests.id,

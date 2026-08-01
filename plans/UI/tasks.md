@@ -207,7 +207,7 @@
   - Do: Add bounded status/type/date filters, redacted detail, retry history, and replay eligibility so operators can find a failed event before invoking the existing replay action. Never return provider payload, headers, payment data, or secrets.
   - Verify: failed/stale/replayed events are discoverable and correctly gated; raw fixture secrets are absent from API snapshots and DOM; pagination is stable.
 
-- [ ] **Align Admin Users with organization-owned billing**
+- [x] **Align Admin Users with organization-owned billing**
   - Files: `src/modules/admin/users/AdminUsersPage.tsx`, `src/routes/api/admin/users.ts`, `src/modules/admin/billing/BillingOperationsPage.tsx`, `tests/e2e/admin-users.spec.ts`
   - Do: Show owning organization and canonical entitlement including Pro Max; label user-level controls as audited manual grants/exceptions and link to Billing Operations. Do not present them as Stripe subscription editing.
   - Verify: canonical paid, manual exception, expired exception, and no-organization fixtures are distinguishable; mutations remain step-up protected and audited.

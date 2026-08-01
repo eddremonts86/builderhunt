@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import {
+  auditPlatformAdminAction,
+  platformAdminErrorResponse,
+  requirePlatformAdminPrincipal,
+  requireRecentPlatformAdminAuthentication,
+} from '~/shared/lib/auth/platform-admin'
 import { SeatLimitExceededError } from '~/shared/lib/auth/organization-lifecycle'
 import { setUserPlan } from '~/shared/lib/billing'
 
@@ -17,6 +22,7 @@ export const Route = createFileRoute('/api/admin/users/$userId')({
       PATCH: async ({ request, params }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
           const body = await request.json().catch(() => ({}))
           const parsed = UpdateBody.safeParse(body)
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })

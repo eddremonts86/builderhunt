@@ -472,6 +472,10 @@
     "0117_operational_schedules_version": {
       "sql": "3340c77a3c6154ee508a9c5f28b3926932886640b42b9632a4b50fc2c508a513",
       "snapshot": "46ea07d41c98c810a5c3cdd8819ba2eeb78d95353a42a751eb4cbcafe227b465"
+    },
+    "0118_platform_admin_user_billing_summary": {
+      "sql": "4f27c5fb4d931d47621f39825f5320801e7e4738d2a574cc49e1f5d69e77dd1d",
+      "snapshot": "cf7edddca9f4f7257962731e2b828a3ca149fc05c50d4d327b8015192990365d"
     }
   }
 }

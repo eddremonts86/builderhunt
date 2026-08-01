@@ -3,6 +3,7 @@ export {
   getPlatformUserPlan as getUserPlan,
   LegacyPlanMutationDisabledError,
   listPlatformPlanRequests as listPlanRequestsWithUsers,
+  listPlatformUsersWithBilling as listAllUsersWithBilling,
   listPlatformUsersWithPlans as listAllUsersWithPlans,
   requestPlatformPlanUpgrade as requestPlanUpgrade,
   resolvePlatformPlanRequest as resolvePlanRequest,
