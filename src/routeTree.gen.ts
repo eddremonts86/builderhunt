@@ -87,6 +87,7 @@ import { Route as ApiOnboardingCompleteRouteImport } from './routes/api/onboardi
 import { Route as ApiOgExploreRouteImport } from './routes/api/og/explore'
 import { Route as ApiOgBlogRouteImport } from './routes/api/og/blog'
 import { Route as ApiListsListIdRouteImport } from './routes/api/lists/$listId'
+import { Route as ApiInterviewsSharedRouteImport } from './routes/api/interviews/shared'
 import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprint/match'
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
@@ -660,6 +661,11 @@ const ApiOgBlogRoute = ApiOgBlogRouteImport.update({
 const ApiListsListIdRoute = ApiListsListIdRouteImport.update({
   id: '/api/lists/$listId',
   path: '/api/lists/$listId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInterviewsSharedRoute = ApiInterviewsSharedRouteImport.update({
+  id: '/api/interviews/shared',
+  path: '/api/interviews/shared',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiFingerprintMatchRoute = ApiFingerprintMatchRouteImport.update({
@@ -1743,6 +1749,7 @@ export interface FileRoutesByFullPath {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/interviews/shared': typeof ApiInterviewsSharedRoute
   '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -1999,6 +2006,7 @@ export interface FileRoutesByTo {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/interviews/shared': typeof ApiInterviewsSharedRoute
   '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -2260,6 +2268,7 @@ export interface FileRoutesById {
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
   '/api/fingerprint/match': typeof ApiFingerprintMatchRoute
+  '/api/interviews/shared': typeof ApiInterviewsSharedRoute
   '/api/lists/$listId': typeof ApiListsListIdRouteWithChildren
   '/api/og/blog': typeof ApiOgBlogRoute
   '/api/og/explore': typeof ApiOgExploreRoute
@@ -2520,6 +2529,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/interviews/shared'
     | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
@@ -2776,6 +2786,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/interviews/shared'
     | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
@@ -3036,6 +3047,7 @@ export interface FileRouteTypes {
     | '/api/export/builders'
     | '/api/feeds/$searchId'
     | '/api/fingerprint/match'
+    | '/api/interviews/shared'
     | '/api/lists/$listId'
     | '/api/og/blog'
     | '/api/og/explore'
@@ -3254,6 +3266,7 @@ export interface RootRouteChildren {
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
   ApiFingerprintMatchRoute: typeof ApiFingerprintMatchRoute
+  ApiInterviewsSharedRoute: typeof ApiInterviewsSharedRoute
   ApiListsListIdRoute: typeof ApiListsListIdRouteWithChildren
   ApiOgBlogRoute: typeof ApiOgBlogRoute
   ApiOgExploreRoute: typeof ApiOgExploreRoute
@@ -3936,6 +3949,13 @@ declare module '@tanstack/react-router' {
       path: '/api/lists/$listId'
       fullPath: '/api/lists/$listId'
       preLoaderRoute: typeof ApiListsListIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/interviews/shared': {
+      id: '/api/interviews/shared'
+      path: '/api/interviews/shared'
+      fullPath: '/api/interviews/shared'
+      preLoaderRoute: typeof ApiInterviewsSharedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/fingerprint/match': {
@@ -5622,6 +5642,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,
   ApiFingerprintMatchRoute: ApiFingerprintMatchRoute,
+  ApiInterviewsSharedRoute: ApiInterviewsSharedRoute,
   ApiListsListIdRoute: ApiListsListIdRouteWithChildren,
   ApiOgBlogRoute: ApiOgBlogRoute,
   ApiOgExploreRoute: ApiOgExploreRoute,

@@ -123,7 +123,7 @@
   - Do: Let the interview owner explicitly grant/revoke brief, report, and transcript access per participant, independently of calendar attendance. Show effective access, confirmation, pending/error states, and audit result.
   - Verify: each permission gates its material independently; non-owner, cross-tenant, removed participant, and revoked-access cases fail closed.
 
-- [ ] **Add a tenant-safe Shared with me interview list**
+- [x] **Add a tenant-safe Shared with me interview list**
   - Files: `src/shared/lib/repositories/interviews.ts`, `src/routes/api/interviews/shared.ts`, `src/modules/interviews/components/InterviewList.tsx`, `tests/e2e/interview-material-access.spec.ts`
   - Do: Add a bounded projection of interviews where the current user has at least one active material grant, with only fields needed for navigation and visible material badges. Add a `Shared with me` section without broadening the owner list endpoint.
   - Verify: recipient discovers only granted interviews; revoke removes the row; UUID guessing, another organization, and attendance-only participation reveal nothing.

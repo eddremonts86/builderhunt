@@ -1062,3 +1062,88 @@ export async function listInterviewsForOwner(
     transcriptSegments: Number(row.transcript_segments ?? 0),
   }))
 }
+
+/**
+ * Every booked interview where the caller — not the owner — holds an active material grant
+ * (plans/UI Wave 3 "Add a tenant-safe Shared with me interview list").
+ *
+ * Deliberately a second, narrower query rather than widening `listInterviewsForOwner`'s `where`:
+ * that function's own contract is "owner-scoped, so the shape of the page cannot change if a policy
+ * is ever widened" (see its route's doc comment). Joining through `event_participants` here, gated
+ * on `material_access_granted = true`, means a colleague merely on the calendar invite — but never
+ * granted material access — gets nothing, and a revoke makes the row disappear on the next load with
+ * no separate cleanup: the join simply stops matching.
+ *
+ * `e.owner_user_id != userId` excludes interviews the caller already owns — those already have a
+ * home in the owner's own list, and a self-granted row here would just be a confusing duplicate.
+ */
+export async function listInterviewsSharedWithMe(
+  transaction: BriefTransaction,
+  params: { organizationId: string; userId: string; limit?: number },
+): Promise<InterviewListRow[]> {
+  const rows = await transaction.execute(sql`
+    select
+      e.id                        as event_id,
+      i.id                        as invitation_id,
+      i.role_title,
+      s.display_name              as candidate_display_name,
+      e.starts_at,
+      e.ends_at,
+      e.timezone,
+      i.modality,
+      i.meeting_url,
+      i.location,
+      e.status                    as event_status,
+      sess.state                  as session_state,
+      (b.id is not null)          as has_brief,
+      r.status                    as report_status,
+      coalesce(seg.n, 0)::int     as transcript_segments
+    from event_participants p
+    join calendar_events e
+      on e.organization_id = p.organization_id and e.id = p.event_id
+    join scheduling_invitations i
+      on i.organization_id = e.organization_id and i.booked_event_id = e.id
+    left join candidate_submissions s
+      on s.organization_id = i.organization_id and s.invitation_id = i.id
+    left join interview_sessions sess
+      on sess.organization_id = e.organization_id and sess.event_id = e.id
+    left join interview_briefs b
+      on b.organization_id = e.organization_id and b.event_id = e.id and b.status = 'active'
+    left join (
+      select organization_id, event_id, status
+      from interview_reports r1
+      where version = (
+        select max(version) from interview_reports r2
+        where r2.organization_id = r1.organization_id and r2.event_id = r1.event_id
+      )
+    ) r on r.organization_id = e.organization_id and r.event_id = e.id
+    left join (
+      select organization_id, session_id, count(*)::int as n
+      from transcript_segments group by 1, 2
+    ) seg on seg.organization_id = sess.organization_id and seg.session_id = sess.id
+    where p.organization_id = ${params.organizationId}
+      and p.user_id = ${params.userId}
+      and p.material_access_granted = true
+      and e.owner_user_id != ${params.userId}
+    order by e.starts_at desc
+    limit ${params.limit ?? 100}
+  `)
+
+  return (rows as unknown as Record<string, unknown>[]).map((row) => ({
+    eventId: String(row.event_id),
+    invitationId: String(row.invitation_id),
+    roleTitle: String(row.role_title),
+    candidateDisplayName: optionalText(row.candidate_display_name),
+    startsAt: new Date(row.starts_at as string),
+    endsAt: new Date(row.ends_at as string),
+    timezone: String(row.timezone),
+    modality: String(row.modality),
+    meetingUrl: optionalText(row.meeting_url),
+    location: optionalText(row.location),
+    eventStatus: String(row.event_status),
+    sessionState: optionalText(row.session_state),
+    hasBrief: row.has_brief === true,
+    reportStatus: optionalText(row.report_status),
+    transcriptSegments: Number(row.transcript_segments ?? 0),
+  }))
+}
