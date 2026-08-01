@@ -15,7 +15,8 @@ const mockEnv = vi.hoisted(() => ({
 }))
 vi.mock('~/shared/lib/env', () => ({ env: mockEnv }))
 
-const { getSolutionsFeatureFlags, SOLUTIONS_RATE_CARD_KEYS, SOLUTIONS_ENTITLEMENT_TIERS } = await import('~/shared/lib/solutions/config')
+const { getSolutionsFeatureFlags, getSolutionsRateCardKey, listSolutionsRateCardKeys, SOLUTIONS_ENTITLEMENT_TIERS } = await import('~/shared/lib/solutions/config')
+const { RATE_CARDS } = await import('~/shared/lib/billing/rate-cards')
 
 describe('getSolutionsFeatureFlags', () => {
   it('defaults every flag to false', () => {
@@ -43,10 +44,40 @@ describe('getSolutionsFeatureFlags', () => {
   })
 })
 
-describe('SOLUTIONS_RATE_CARD_KEYS', () => {
-  it('declares the exact fixed units from spec.md', () => {
-    expect(SOLUTIONS_RATE_CARD_KEYS.generate).toEqual({ operationKey: 'solutions.generate.v1', version: 1, units: 10 })
-    expect(SOLUTIONS_RATE_CARD_KEYS.regenerate).toEqual({ operationKey: 'solutions.regenerate.v1', version: 1, units: 3 })
+describe('getSolutionsRateCardKey', () => {
+  it('resolves the exact fixed units from spec.md', () => {
+    // The operation *names* are the registry's snake_case identifiers rather than spec.md's
+    // `solutions.generate.v1`; the version moved into the card's own field. The numbers are spec.md's.
+    expect(getSolutionsRateCardKey('generate')).toEqual({ operationKey: 'solutions_generate', version: 1, units: 10 })
+    expect(getSolutionsRateCardKey('regenerate')).toEqual({ operationKey: 'solutions_regenerate', version: 1, units: 3 })
+    expect(listSolutionsRateCardKeys().generate.units).toBe(10)
+  })
+
+  it('refuses an operation it does not know', () => {
+    // Not a silent undefined: the caller is about to reserve credits with whatever comes back.
+    expect(() => getSolutionsRateCardKey('generate_v2')).toThrow(/Unknown solutions rate-card operation/)
+  })
+
+  it('follows a registry price change without a restart', () => {
+    // A snapshot taken at module load would have let two servers mid-deploy quote different prices for the
+    // same operation.
+    const original = { ...RATE_CARDS.solutions_generate }
+    RATE_CARDS.solutions_generate = { ...original, version: 2, maxUnits: 14 }
+    try {
+      expect(getSolutionsRateCardKey('generate')).toEqual({ operationKey: 'solutions_generate', version: 2, units: 14 })
+    } finally {
+      RATE_CARDS.solutions_generate = original
+    }
+  })
+
+  it('reports a deregistered operation as unregistered rather than mispricing it', () => {
+    const original = RATE_CARDS.solutions_regenerate
+    delete RATE_CARDS.solutions_regenerate
+    try {
+      expect(() => getSolutionsRateCardKey('regenerate')).toThrow(/is not registered/)
+    } finally {
+      RATE_CARDS.solutions_regenerate = original
+    }
   })
 })
 

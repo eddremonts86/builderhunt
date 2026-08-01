@@ -287,22 +287,67 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
 
 ## Phase 6 — Credits
 
-- [ ] **Register Solutions rate cards with billing**
-  - Files: billing platform rate-card registry, `src/shared/lib/solutions/config.ts`,
+- [x] **Register Solutions rate cards with billing**
+  - Files: `src/shared/lib/billing/rate-cards.ts`, `src/shared/lib/solutions/config.ts`,
+    `src/shared/lib/solutions/cost-model.ts` (new),
     `docs/operations/solutions-cost-certification.md` (new)
   - Do: Register fixed immutable operations, maximum duration, reservation expiry, provider-usage
     mapping, and refund/release rules. Do not add Stripe products or credit tables.
   - Verify: cost fixtures prove the selected rate covers certified provider scenarios and historical
     runs resolve their original rate-card version after a future change.
 
-- [ ] **Add entitlement and reservation orchestration**
-  - Files: `src/modules/solutions/server/*` (new), Solutions API routes
+  `solutions.generate.v1` and `solutions.regenerate.v1` were declared locally in `config.ts` and
+  registered nowhere, so every `reserveCredits` call with them would have thrown `unknown_feature`:
+  Solutions could not have billed anything. Registered as `solutions_generate` / `solutions_regenerate`
+  and `config.ts` now derives from the registry, resolved per call rather than snapshotted at import —
+  a snapshot would let two servers mid-deploy quote different prices for one operation.
+
+  **Two corrections along the way, both worth keeping.** The first draft priced them at 12 and 5 units
+  and metered provider usage against that ceiling. spec.md's premium contract fixes a *price*: "fixed
+  10-credit settlement after a usable result", "fixed 3-credit settlement when the rerun invokes
+  providers". Metering would have charged two users different amounts for the same product because one
+  brief needed a clarification round, and would have made the confirmation prompt quote a maximum where
+  the spec promises a price. The pre-existing `config.test.ts` already asserted 10 and 3 — the numbers
+  were right in the repo before the rate cards were.
+
+  Cost certification is **provisional, not signed**: the arithmetic uses declared token budgets and the
+  documented-placeholder `MINIMAX_COST_PER_*` constants. It shows the worst generate run (2 interpret + 3
+  explain, the maximum the code can emit) costs 0.837¢ against 45¢ charged, break-even at ~53× current
+  provider prices. The doc records what real signing still needs.
+
+- [x] **Add entitlement and reservation orchestration**
+  - Files: `src/modules/solutions/server/billing.ts` (new),
+    `src/modules/solutions/server/billing-state.ts` (new)
   - Do: Require tenant principal, paid entitlement, displayed maximum charge, explicit confirmation,
     and reservation before interpretation or other provider access; keep clarification inside the
     reservation; settle one usable result; release abandonment or unusable failure; reuse
     idempotency on retry; expose billing-owned balance/action DTOs.
   - Verify: tests cover Free, suspended, insufficient credits, owner/member actions, concurrent
     duplicate, timeout-before/after-provider, usable partial, unusable partial, and reconciliation.
+
+  Ordering: flag → entitlement → confirmation → reserve → work → settle or release. The work callback is
+  only ever invoked after the reservation exists, asserted by reading the reservation row *from inside*
+  the callback rather than by inspecting the code.
+
+  The caller reports two facts — `usable` and `providerInvoked` — and the boundary derives the charge.
+  `usable` is not "the provider threw": a degraded provider that answers with only `unavailable` routes
+  never raises, so a catch-based boundary would charge full price for nothing. There is deliberately no
+  `extend`: a fixed price has nothing to extend to.
+
+  Three terminal shapes, deliberately distinguishable for reconciliation: `settled` at the price,
+  `settled` at zero (a regenerate that invoked no provider — the user got a fresh answer that cost
+  nothing to serve), and `released`. A release only survives if the caller commits; a route that lets the
+  error escape rolls the reservation away entirely. Both halves are asserted, after a first draft of
+  those tests asserted `released` on a row the rollback had already removed.
+
+  `billing-state.ts` hands the surface a *decision* (`available` plus a distinct reason) rather than a
+  balance and a price to compare itself. Its tests assert the agreement from both sides: what the DTO
+  offers, the reservation accepts; what it refuses, the reservation refuses. An enabled button whose
+  charge the platform then refuses is worse than a disabled one — the user has already confirmed a price
+  by then. The API routes that serve this DTO belong to Phase 8's end-to-end flow.
+
+  Not yet wired to any provider call: Phase 7 registers interpretation and explanation, Phase 8 connects
+  the flow. Nothing charges credits today.
 
 ## Phase 7 — AI boundaries
 

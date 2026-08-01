@@ -39,6 +39,53 @@ export const RATE_CARDS: Record<string, RateCard> = {
     settlementGraceSeconds: 60, minimumTier: 'pro_max',
   },
 
+  // ── Solutions Intelligence (plan 43, Phase 6 "Register Solutions rate cards with billing") ────
+  //
+  // Registered here rather than kept as local constants in `solutions/config.ts`, because local constants
+  // are how the interview module shipped an operation name the platform had never heard of: every
+  // `reserveCredits` call with it would have thrown `unknown_feature`. `solutions.generate.v1` and
+  // `solutions.regenerate.v1` were in exactly that state — declared locally, unregistered, unbillable.
+  // `SOLUTIONS_RATE_CARD_KEYS` now derives from these entries so one price has one source.
+  //
+  // ## Where the numbers come from
+  //
+  // spec.md's "Premium contract" fixes them, and fixes them as *prices* rather than ceilings:
+  // "`solutions.generate.v1`: fixed 10-credit settlement after a usable result" and
+  // "`solutions.regenerate.v1`: fixed 3-credit settlement when the rerun invokes providers".
+  //
+  // So `maxUnits` here is the whole price, not a budget the run consumes against. A first draft of these
+  // entries read 12 and 5, sized to bound provider usage the way `interview_live_transcription` does, and
+  // that was wrong in a way worth naming: it would have billed each user a different amount for the same
+  // product depending on how many clarification rounds their brief needed, which is neither what spec.md
+  // promises nor something a confirmation prompt can state in advance.
+  //
+  // Provider cost therefore does not set the price — it only has to stay under it. A generate run is at most
+  // two interpretation calls (one clarification round, kept inside the reservation) and three explanation
+  // calls, one per offered route; retrieval and composition touch no provider at all. That worst case is
+  // computed from declared token budgets in `~/shared/lib/solutions/cost-model.ts` and certified against the
+  // 10-credit price in `docs/operations/solutions-cost-certification.md`, which also records the multiple by
+  // which provider prices could rise before the margin inverts.
+  //
+  // A regenerate carries no interpretation — it reuses the stored interpretation and retrieval and only
+  // re-explains — which is why it is priced lower, and why it settles nothing at all when the rerun turned
+  // out to need no provider.
+  //
+  // `maxDurationSeconds` is the reservation's lifetime, and both are generous on purpose: a run that
+  // exceeds it has its hold expired by the platform, and expiring a reservation for a run that was merely
+  // slow charges the user nothing while losing them the result. 300s is past the sum of every task's own
+  // timeout.
+  //
+  // `minimumTier: 'pro'` from spec.md's premium contract — free organizations cannot reach this at all,
+  // which `SOLUTIONS_ENTITLEMENT_TIERS` states and `checkEntitlement` enforces from this field.
+  solutions_generate: {
+    operation: 'solutions_generate', version: 1, maxUnits: 10, maxDurationSeconds: 300,
+    settlementGraceSeconds: 120, minimumTier: 'pro',
+  },
+  solutions_regenerate: {
+    operation: 'solutions_regenerate', version: 1, maxUnits: 3, maxDurationSeconds: 180,
+    settlementGraceSeconds: 120, minimumTier: 'pro',
+  },
+
   // ── Interview intelligence (plan: calendar-scheduling-interview-intelligence, Phase 7) ────────
   //
   // spec.md "Usage credits and pricing" fixes the numbers: brief 5, transcription 1 credit per
