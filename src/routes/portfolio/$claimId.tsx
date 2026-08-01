@@ -21,7 +21,8 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       { fetchPortfolioProjectCandidates },
       { getPublicPortfolioClaim, getPortfolioLinkContext },
       { findClaimantOwnedAiEnrichment },
-      { readAiPersonaForPortfolio },
+      { readAiPersonaForPortfolio, readTimelineForPortfolio },
+      { getBuilderTimeline },
       { env },
     ] = await Promise.all([
       import('~/shared/lib/db/client'),
@@ -31,6 +32,7 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       import('~/shared/lib/repositories/builder-claims'),
       import('~/shared/lib/repositories/organization-builders'),
       import('~/shared/lib/portfolio-integrations'),
+      import('~/lib/timeline'),
       import('~/shared/lib/env'),
     ])
     if (env.PORTFOLIOS_ENABLED === 'false') return null
@@ -57,6 +59,27 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       }
     }
 
+    // getBuilderTimeline never throws (it degrades to {events: [], supported: false} for
+    // unsupported sources or upstream failures), but the field-name mapping below is new code
+    // that could theoretically throw on unexpected shapes — caught defensively so a timeline
+    // hiccup never 500s the whole public portfolio.
+    let timeline: ReturnType<typeof readTimelineForPortfolio> = []
+    if (settings.showTimeline) {
+      try {
+        const result = await getBuilderTimeline({ source: claim.source as never, sourceId: claim.sourceId, username: claim.username })
+        const mapped = result.events.map((event) => ({
+          id: event.id,
+          occurredAt: event.timestamp,
+          kind: event.type,
+          title: event.title,
+          summary: event.description ?? '',
+        }))
+        timeline = readTimelineForPortfolio(mapped, { timelineEnabled: settings.showTimeline })
+      } catch {
+        timeline = []
+      }
+    }
+
     const portfolio = buildPublicPortfolio({
       claimId: claim.claimId,
       source: claim.source,
@@ -67,6 +90,7 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       settings,
       projectCandidates: candidates,
       aiPersona,
+      timeline,
     })
     if (!portfolio) return null
 

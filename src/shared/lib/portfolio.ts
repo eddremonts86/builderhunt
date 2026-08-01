@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { PortfolioAiPersonaSchema } from './portfolio-integrations'
+import { PortfolioAiPersonaSchema, PortfolioTimelineEventSchema } from './portfolio-integrations'
 
 export const PORTFOLIO_THEMES = ['default', 'minimal', 'terminal'] as const
 export type PortfolioTheme = (typeof PORTFOLIO_THEMES)[number]
@@ -72,6 +72,9 @@ export const PublicPortfolioSchema = z.object({
   /** Null unless the owner opted in (`showAiPersona`) AND a valid, fresh artifact of their OWN
    * exists — see `findClaimantOwnedAiEnrichment`'s doc comment for why "their own" is load-bearing. */
   aiPersona: PortfolioAiPersonaSchema.nullable(),
+  /** Empty unless the owner opted in (`showTimeline`) — see `readTimelineForPortfolio`'s doc
+   * comment for the allowlisted shape and bounded length. */
+  timeline: z.array(PortfolioTimelineEventSchema),
 })
 export type PublicPortfolio = z.infer<typeof PublicPortfolioSchema>
 
@@ -138,6 +141,9 @@ export interface PublicPortfolioSource {
   /** Already read via `readAiPersonaForPortfolio` (fail-closed) — this function does not parse the
    * raw enrichment itself, it only enforces the opt-in gate a second time as defense in depth. */
   aiPersona?: import('./portfolio-integrations').PortfolioAiPersona | null
+  /** Already read via `readTimelineForPortfolio` (fail-closed, allowlisted, bounded) — same
+   * defense-in-depth opt-in gate as `aiPersona`. */
+  timeline?: import('./portfolio-integrations').PortfolioTimelineEvent[]
 }
 
 /** Returns null (not an error) when the claim isn't published — the caller turns that into a 404 without leaking whether an unpublished draft exists. */
@@ -156,5 +162,6 @@ export function buildPublicPortfolio(input: PublicPortfolioSource): PublicPortfo
     projects: selectPortfolioProjects(input.projectCandidates, input.settings.selectedProjectIds),
     publishedAt: input.settings.publishedAt,
     aiPersona: input.settings.showAiPersona ? (input.aiPersona ?? null) : null,
+    timeline: input.settings.showTimeline ? (input.timeline ?? []) : [],
   }
 }

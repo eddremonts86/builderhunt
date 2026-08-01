@@ -1,6 +1,7 @@
 import { BadgeCheck, ExternalLink, Sparkles, Star, UserCircle, Wand2 } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import type { PublicPortfolio as PublicPortfolioData } from '~/shared/lib/portfolio'
+import { PortfolioTimelineSlot } from './PortfolioTimelineSlot'
 
 interface PublicPortfolioProps {
   portfolio: PublicPortfolioData | null
@@ -104,6 +105,8 @@ export function PublicPortfolio({ portfolio, builderId = null, isOwner = false }
           </p>
         </section>
       )}
+
+      <PortfolioTimelineSlot events={portfolio.timeline} isOwner={isOwner} />
 
       {portfolio.projects.length > 0 && (
         <section aria-labelledby="portfolio-projects-heading">

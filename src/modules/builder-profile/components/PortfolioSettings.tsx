@@ -213,6 +213,21 @@ export function PortfolioSettings({ claimId }: PortfolioSettingsProps) {
         />
       </div>
 
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-bh-border">
+        <div>
+          <label className="text-sm font-medium text-bh-text" htmlFor="portfolio-show-timeline">Show recent activity</label>
+          <p className="text-xs text-bh-text-dim mt-0.5">
+            Shows a bounded list of your recent public activity (repos, releases, posts). Off by default.
+          </p>
+        </div>
+        <Switch
+          id="portfolio-show-timeline"
+          checked={settings.showTimeline}
+          onCheckedChange={(checked) => setDraft({ ...draft, settings: { ...settings, showTimeline: checked } })}
+          data-testid="portfolio-show-timeline-toggle"
+        />
+      </div>
+
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-bh-border">
         <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={() => patch(settings)}>
           Save draft

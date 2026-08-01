@@ -424,6 +424,7 @@ export async function updateVerifiedBuilderProfile(
 interface PortfolioClaimRow {
   claimId: string
   source: string
+  sourceId: string
   username: string
   displayName: string | null
   avatarUrl: string | null
@@ -439,6 +440,7 @@ async function findOwnedVerifiedClaimForPortfolio(
     claimId: builderClaims.id,
     metadata: builderClaims.metadata,
     source: builderIdentities.source,
+    sourceId: builderIdentities.sourceId,
     username: builderIdentities.username,
     displayName: builderIdentities.displayName,
     avatarUrl: builderIdentities.avatarUrl,
@@ -539,6 +541,7 @@ export async function getPublicPortfolioClaim(transaction: ClaimsDb, claimId: st
     claimId: builderClaims.id,
     metadata: builderClaims.metadata,
     source: builderIdentities.source,
+    sourceId: builderIdentities.sourceId,
     username: builderIdentities.username,
     displayName: builderIdentities.displayName,
     avatarUrl: builderIdentities.avatarUrl,

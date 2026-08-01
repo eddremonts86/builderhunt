@@ -251,7 +251,7 @@
   - Do: Parse the existing versioned persona artifact, require explicit owner opt-in, expose only summary/focus/strengths/provenance, and never invoke AI from a public request.
   - Verify: absent, invalid, stale-policy-disabled, opted-out, and opted-in valid artifacts behave fail-closed.
 
-- [ ] **Add opt-in public timeline to portfolios**
+- [x] **Add opt-in public timeline to portfolios**
   - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PortfolioSettings.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
   - Do: Render only owner-selected public events; preserve lazy degradation; hide summary controls when neither local nor authenticated proxy AI is usable.
   - Verify: dependency absent, unavailable AI, valid timeline, invalid timeline, and revoked publication states pass.

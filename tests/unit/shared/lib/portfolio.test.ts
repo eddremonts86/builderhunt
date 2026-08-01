@@ -120,7 +120,7 @@ describe('buildPublicPortfolio', () => {
     const settings = publishPortfolio(UNPUBLISHED_PORTFOLIO, '2026-07-26T00:00:00.000Z')
     const result = buildPublicPortfolio({ ...base, settings })
     expect(result && Object.keys(result).sort()).toEqual(
-      ['aiPersona', 'avatarUrl', 'claimId', 'displayName', 'headline', 'introduction', 'profileUrl', 'projects', 'publishedAt', 'source', 'theme', 'username'].sort(),
+      ['aiPersona', 'avatarUrl', 'claimId', 'displayName', 'headline', 'introduction', 'profileUrl', 'projects', 'publishedAt', 'source', 'theme', 'timeline', 'username'].sort(),
     )
   })
 
@@ -151,6 +151,30 @@ describe('buildPublicPortfolio', () => {
       const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showAiPersona: true }, '2026-07-26T00:00:00.000Z')
       const result = buildPublicPortfolio({ ...base, settings, aiPersona: persona })
       expect(result?.aiPersona).toEqual(persona)
+    })
+  })
+
+  describe('timeline gating (defense in depth — the caller should already gate this on showTimeline before calling)', () => {
+    const events = [
+      { id: 'evt_1', occurredAt: '2026-07-01T00:00:00.000Z', kind: 'repo', title: 'Pushed to builderhunt', summary: '' },
+    ]
+
+    it('is empty when showTimeline is false, even if events were passed in', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showTimeline: false }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, timeline: events })
+      expect(result?.timeline).toEqual([])
+    })
+
+    it('is empty when showTimeline is true but no events were found', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showTimeline: true }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, timeline: [] })
+      expect(result?.timeline).toEqual([])
+    })
+
+    it('carries the events when showTimeline is true and events were passed in', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showTimeline: true }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, timeline: events })
+      expect(result?.timeline).toEqual(events)
     })
   })
 })
