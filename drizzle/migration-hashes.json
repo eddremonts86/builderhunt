@@ -492,6 +492,10 @@
     "0122_canonical_human_identity": {
       "sql": "5096e56cbec134715bb3f015852b1fb5f2f200775ba03162fdaffedc4054a0d1",
       "snapshot": "e085659f4bb0c90562e7d8a746c2a3aae31bf049c0fa085932dc5608f1bb4d23"
+    },
+    "0123_builder_source_snapshots_grants": {
+      "sql": "eccc8f901a37ab447b04649ec63e476b3c39e03a249ef447d1b3100f8e7d2687",
+      "snapshot": "4f1e7ec5f08fe0a0a1fda192b8ac545c984b0266c2d617c77541330085054a25"
     }
   }
 }

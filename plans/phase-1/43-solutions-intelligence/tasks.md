@@ -119,7 +119,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: migration/integrity/RLS tests cover duplicate links, conflicting facts, tenant access,
     public DTO boundaries, and forward rollback.
 
-- [ ] **Persist approved source observations**
+- [x] **Persist approved source observations**
   - Files: `src/shared/lib/repositories/public-builders.ts`,
     `src/shared/lib/repositories/enrichment.ts`, `src/lib/enrichment/worker.ts`
   - Do: Upsert public source accounts and content-hashed snapshots during approved ingestion, update

@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
 import { randomId } from '~/lib/utils'
-import { upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
+import { recordIngestedSourceObservations, upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -84,6 +84,7 @@ export const Route = createFileRoute('/api/builders/track')({
           // Write-through indexing for semantic-search — fire-and-forget,
           // never awaited on the response (see src/lib/semantic/index-writer.ts).
           upsertEmbeddingStubs([parsed.data]).catch((err) => log.error('embedding_writethrough_error', { error: err instanceof Error ? err.message : String(err) }))
+          recordIngestedSourceObservations([parsed.data]).catch((err) => log.error('source_observation_writethrough_error', { error: err instanceof Error ? err.message : String(err) }))
           return Response.json({ id: result.tracked.id, tracked: true })
         } catch (error) {
           if (error instanceof TenantAuthorizationError) {

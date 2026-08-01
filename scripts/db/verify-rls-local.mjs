@@ -1296,6 +1296,55 @@ try {
     appWebhookEventsDenied = error?.code === '42501'
   }
   if (!appWebhookEventsDenied) throw new Error('App role accessed billing_webhook_events (system-operational, no app grant)')
+
+  // ── Global-public ingestion tables ────────────────────────────────────────────────────────────
+  //
+  // These have no organization_id and no RLS, so their entire access story is the GRANT — and this
+  // gate had no coverage for any of them until 2026-08-01, which is exactly how
+  // `builder_source_snapshots` shipped with grants for the `postgres` owner alone. It was created
+  // with a schema, a unique index and a cascade FK, and every write as the app role failed with
+  // 42501. Nothing noticed for as long as nothing wrote to it; the moment plan 43 Phase 3 wired the
+  // write-through, every single insert was denied.
+  //
+  // Asserted as privileges rather than by attempting writes: these tables are global, so a write
+  // here would leak fixture rows into every other assertion in this script.
+  const globalIngestionGrantReport = {}
+  const globalIngestionExpectations = [
+    // The request-path write-through upserts identities and appends snapshots as the app role.
+    // SELECT accompanies INSERT on snapshots because the insert uses RETURNING to tell a new
+    // observation from an unchanged one, and RETURNING requires SELECT.
+    { table: 'builder_identities', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    { table: 'builder_source_snapshots', role: 'builderhunt_app', granted: ['SELECT', 'INSERT'], denied: ['UPDATE', 'DELETE'] },
+    { table: 'builder_source_snapshots', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT'], denied: ['UPDATE', 'DELETE'] },
+    // Purging a subject's observations on a removal request is a platform action; ingestion must
+    // never be able to delete history.
+    { table: 'builder_source_snapshots', role: 'builderhunt_platform', granted: ['SELECT', 'DELETE'] },
+    { table: 'builder_embeddings', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    // Asserting that two real people are the same person is never a request-scoped action.
+    { table: 'canonical_humans', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'human_source_links', role: 'builderhunt_app', granted: ['SELECT'], denied: ['INSERT', 'UPDATE', 'DELETE'] },
+    { table: 'human_source_links', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+  ]
+  for (const expectation of globalIngestionExpectations) {
+    for (const privilege of expectation.granted ?? []) {
+      const [row] = await platform`
+        select has_table_privilege(${expectation.role}, ${expectation.table}, ${privilege}) as ok
+      `
+      if (!row.ok) {
+        throw new Error(`${expectation.role} is missing ${privilege} on ${expectation.table} — the write path that needs it will fail with 42501 at runtime`)
+      }
+    }
+    for (const privilege of expectation.denied ?? []) {
+      const [row] = await platform`
+        select has_table_privilege(${expectation.role}, ${expectation.table}, ${privilege}) as ok
+      `
+      if (row.ok) {
+        throw new Error(`${expectation.role} unexpectedly holds ${privilege} on ${expectation.table}`)
+      }
+    }
+    const key = `${expectation.table}:${expectation.role}`
+    globalIngestionGrantReport[key] = `granted ${(expectation.granted ?? []).join('/')}${expectation.denied ? `, denied ${expectation.denied.join('/')}` : ''}`
+  }
   const workerWebhookEvents = await worker`select id from billing_webhook_events`
   if (workerWebhookEvents.length !== 1 || workerWebhookEvents[0].id !== 'webhook-a') {
     throw new Error(`Worker role could not read billing_webhook_events (${JSON.stringify(workerWebhookEvents)})`)
@@ -1520,6 +1569,7 @@ try {
     workerCandidateWrite: 'denied',
     appBuilderListUpdate: renamedListA.name,
     appBuilderListCrossTenantUpdate: 'no-op (0 rows under RLS)',
+    globalIngestionGrants: globalIngestionGrantReport,
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end(), capability?.end()].filter(Boolean))
