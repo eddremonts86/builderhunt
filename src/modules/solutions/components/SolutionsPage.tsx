@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Lightbulb, Lock, Sparkles } from 'lucide-react'
 import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '~/components/ui'
+import { PaidStateActions } from '~/shared/components/PaidStateActions'
 import { BRIEF_DOMAINS, RANKING_MODES, type BriefDomain, type RankingMode, type SolutionRun } from '~/shared/lib/solutions/contracts'
 import { DEMO_SOLUTION_RUN } from '~/shared/lib/solutions/demo-fixtures'
 
@@ -42,22 +43,27 @@ type Step = 'brief' | 'interpretation' | 'confirm' | 'result'
 
 export interface SolutionsPageProps {
   /** Injected for tests — defaults to a real fetch against `/api/billing/summary`. */
-  fetchEntitlement?: () => Promise<{ paidActionsAllowed: boolean }>
+  fetchEntitlement?: () => Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }>
 }
 
+type Entitlement = 'loading' | 'locked' | 'stale_session' | 'unlocked'
+
 export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
-  const [entitlement, setEntitlement] = React.useState<'loading' | 'locked' | 'unlocked'>('loading')
+  const [entitlement, setEntitlement] = React.useState<Entitlement>('loading')
   const [draft, setDraft] = React.useState<DraftBrief>(initialDraft)
   const [step, setStep] = React.useState<Step>('brief')
   const [clarifyingAnswer, setClarifyingAnswer] = React.useState('')
 
   React.useEffect(() => {
     const load = fetchEntitlement
-      ?? (() => fetch('/api/billing/summary', { credentials: 'include' })
-        .then((r) => (r.ok ? r.json() : { capabilities: { paidActionsAllowed: false } }))
-        .then((data: { capabilities?: { paidActionsAllowed?: boolean } }) => ({ paidActionsAllowed: Boolean(data.capabilities?.paidActionsAllowed) })))
+      ?? ((): Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }> => fetch('/api/billing/summary', { credentials: 'include' })
+        .then((r) => {
+          if (r.status === 401) return { paidActionsAllowed: false, staleSession: true }
+          if (!r.ok) return { paidActionsAllowed: false }
+          return r.json().then((data: { capabilities?: { paidActionsAllowed?: boolean } }) => ({ paidActionsAllowed: Boolean(data.capabilities?.paidActionsAllowed) }))
+        }))
     load()
-      .then((result) => setEntitlement(result.paidActionsAllowed ? 'unlocked' : 'locked'))
+      .then((result) => setEntitlement(result.staleSession ? 'stale_session' : result.paidActionsAllowed ? 'unlocked' : 'locked'))
       .catch(() => setEntitlement('locked'))
   }, [fetchEntitlement])
 
@@ -91,6 +97,21 @@ export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
     return <div className="container py-12" data-testid="solutions-loading" aria-live="polite">Loading…</div>
   }
 
+  if (entitlement === 'stale_session') {
+    return (
+      <div className="container py-12 max-w-3xl" data-testid="solutions-stale-session">
+        <div className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl text-center">
+          <Lock className="w-8 h-8 text-bh-accent mx-auto mb-4" aria-hidden="true" />
+          <h1 className="text-2xl font-bold mb-2">Sign in again to continue</h1>
+          <p className="text-bh-text-muted mb-6 max-w-lg mx-auto">
+            Your session needs refreshing before we can check your plan.
+          </p>
+          <PaidStateActions reason="stale_session" />
+        </div>
+      </div>
+    )
+  }
+
   if (entitlement === 'locked') {
     return (
       <div className="container py-12 max-w-3xl" data-testid="solutions-locked">
@@ -101,7 +122,7 @@ export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
             Describe a piece of digital work and get up to three evidence-backed ways to solve it —
             a human specialist, an AI system, or a hybrid workflow — compared side by side.
           </p>
-          <a href="/pricing" className="btn-primary inline-flex" data-testid="solutions-upgrade-cta">Upgrade to unlock</a>
+          <PaidStateActions reason="not_entitled" />
           <div className="mt-8 text-left">
             <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-3">Example output</p>
             <DemoResultLanes run={DEMO_SOLUTION_RUN} />

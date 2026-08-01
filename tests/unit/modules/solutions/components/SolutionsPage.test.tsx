@@ -1,7 +1,8 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { createMemoryHistory, createRootRoute, createRouter, RouterProvider } from '@tanstack/react-router'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { SolutionsPage } from '~/modules/solutions/components/SolutionsPage'
+import { SolutionsPage, type SolutionsPageProps } from '~/modules/solutions/components/SolutionsPage'
 
 beforeAll(() => {
   ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -17,16 +18,25 @@ afterEach(() => {
   root = null
 })
 
-async function mount(paidActionsAllowed: boolean) {
+// The locked/stale-session states render router `Link`s (PaidStateActions), so every mount needs a
+// router in context — same shape as CreditBalance.test.tsx.
+async function mountWith(fetchEntitlement: SolutionsPageProps['fetchEntitlement']) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
+  const rootRoute = createRootRoute({ component: () => <SolutionsPage fetchEntitlement={fetchEntitlement} /> })
+  const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory({ initialEntries: ['/solutions'] }) })
   await act(async () => {
-    root!.render(<SolutionsPage fetchEntitlement={() => Promise.resolve({ paidActionsAllowed })} />)
+    root!.render(<RouterProvider router={router as never} />)
+    await router.load()
   })
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
+}
+
+async function mount(paidActionsAllowed: boolean) {
+  await mountWith(() => Promise.resolve({ paidActionsAllowed }))
 }
 
 function $(selector: string) {
@@ -41,10 +51,11 @@ function setValue(el: HTMLElement, value: string) {
 }
 
 describe('SolutionsPage — Free (locked)', () => {
-  it('shows the locked explanation, an upgrade CTA, and a labeled example result — no brief form', async () => {
+  it('shows the locked explanation, Billing/Pricing actions, and a labeled example result — no brief form', async () => {
     await mount(false)
     expect($('[data-testid="solutions-locked"]')).not.toBeNull()
-    expect($('[data-testid="solutions-upgrade-cta"]')).not.toBeNull()
+    expect($('[data-testid="paid-state-billing"]')).not.toBeNull()
+    expect($('[data-testid="paid-state-pricing"]')).not.toBeNull()
     expect($('[data-testid="brief-form"]')).toBeNull()
     expect($('[data-testid="demo-result-lanes"]')).not.toBeNull()
   })
@@ -186,15 +197,24 @@ describe('SolutionsPage — Paid (unlocked)', () => {
 
 describe('SolutionsPage — entitlement fetch failure', () => {
   it('fails closed to the locked state on a fetch error', async () => {
-    container = document.createElement('div')
-    document.body.appendChild(container)
-    root = createRoot(container)
-    await act(async () => {
-      root!.render(<SolutionsPage fetchEntitlement={() => Promise.reject(new Error('network error'))} />)
-    })
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
+    await mountWith(() => Promise.reject(new Error('network error')))
     expect($('[data-testid="solutions-locked"]')).not.toBeNull()
+  })
+})
+
+describe('SolutionsPage — stale session', () => {
+  it('offers only "sign in again" — no Billing/Pricing links until the session is proven', async () => {
+    await mountWith(() => Promise.resolve({ paidActionsAllowed: false, staleSession: true }))
+    expect($('[data-testid="solutions-stale-session"]')).not.toBeNull()
+    expect($('[data-testid="solutions-locked"]')).toBeNull()
+    expect($('[data-testid="paid-state-sign-in"]')).not.toBeNull()
+    expect($('[data-testid="paid-state-billing"]')).toBeNull()
+    expect($('[data-testid="paid-state-pricing"]')).toBeNull()
+  })
+
+  it('the sign-in link preserves a return path back to /solutions', async () => {
+    await mountWith(() => Promise.resolve({ paidActionsAllowed: false, staleSession: true }))
+    const signIn = $('[data-testid="paid-state-sign-in"]') as HTMLAnchorElement
+    expect(signIn.getAttribute('href')).toBe('/auth/sign-in?redirect=%2Fsolutions')
   })
 })

@@ -4,7 +4,7 @@ import {
   TrendingUp, Save, Lightbulb, ChevronDown, Sparkles, RotateCcw, MapPin,
   Users, BookMarked, Star, GitFork, Loader2, Lock, Wand2,
 } from 'lucide-react'
-import { useLocation, useSearch } from '@tanstack/react-router'
+import { Link, useLocation, useSearch } from '@tanstack/react-router'
 import { Input, Button, Dialog, ScoreRing, getScoreBreakdown } from '~/components/ui'
 import { Tooltip } from '~/shared/components/Tooltip'
 import { ai } from '~/shared/lib/ai/client'
@@ -171,6 +171,11 @@ export function SearchPage() {
    * raw (possibly long, natural-language) query text. */
   const [matchedKeywords, setMatchedKeywords] = React.useState<string[]>([])
   const [plan, setPlan] = React.useState<'free' | 'pro' | 'team' | 'pro_max' | null>(null)
+  // Distinguishes "we checked and you're on Free" from "we couldn't check because your
+  // session isn't valid right now" — both fail closed to the same locked toggle, but the
+  // action offered differs (Billing/Pricing vs. sign in again).
+  const [planStaleSession, setPlanStaleSession] = React.useState(false)
+  const routerLocation = useLocation()
   const aiCaps = useAICapabilities()
   // Semantic search is a paid feature (Pro, Pro Max, Team). Pro Max carries the
   // same semantic entitlement as Team; the server enforces the real gate, so
@@ -179,7 +184,13 @@ export function SearchPage() {
 
   React.useEffect(() => {
     fetch('/api/plans/me', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (r.status === 401) {
+          setPlanStaleSession(true)
+          return null
+        }
+        return r.ok ? r.json() : null
+      })
       .then((data: { plan?: { plan?: 'free' | 'pro' | 'team' | 'pro_max' } } | null) => {
         if (data?.plan?.plan) setPlan(data.plan.plan)
       })
@@ -673,7 +684,15 @@ export function SearchPage() {
               be pro/pro_max/team (fail-closed while /api/plans/me is loading, for
               anonymous visitors, and for free-plan users). */}
           {!aiCaps.disabled && aiCaps.serverAI && (
-            <Tooltip label={semanticSearchAllowed ? 'Semantic search — find builders by meaning, not just keywords' : 'Semantic search — upgrade to Pro to unlock'}>
+            <Tooltip
+              label={
+                semanticSearchAllowed
+                  ? 'Semantic search — find builders by meaning, not just keywords'
+                  : planStaleSession
+                    ? 'Semantic search — sign in again to check your plan'
+                    : 'Semantic search — a Pro feature. Opens Billing settings.'
+              }
+            >
               {semanticSearchAllowed ? (
                 <button
                   type="button"
@@ -689,16 +708,27 @@ export function SearchPage() {
                 >
                   <Wand2 className="w-4 h-4" aria-hidden="true" />
                 </button>
+              ) : planStaleSession ? (
+                <Link
+                  to="/auth/sign-in"
+                  search={{ redirect: routerLocation.pathname }}
+                  className="relative shrink-0 w-11 h-11 rounded-full border border-bh-border bg-transparent text-bh-text-dim flex items-center justify-center hover:border-bh-border-strong hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
+                  aria-label="Semantic search — sign in again to check your plan"
+                  data-testid="semantic-toggle-locked"
+                >
+                  <Wand2 className="w-4 h-4" aria-hidden="true" />
+                  <Lock className="w-2.5 h-2.5 absolute -bottom-0.5 -right-0.5 bg-bh-bg-alt rounded-full p-0.5" aria-hidden="true" />
+                </Link>
               ) : (
-                <a
-                  href="/pricing"
+                <Link
+                  to="/settings/billing"
                   className="relative shrink-0 w-11 h-11 rounded-full border border-bh-border bg-transparent text-bh-text-dim flex items-center justify-center hover:border-bh-border-strong hover:text-bh-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2"
                   aria-label="Semantic search — Pro feature, upgrade to unlock"
                   data-testid="semantic-toggle-locked"
                 >
                   <Wand2 className="w-4 h-4" aria-hidden="true" />
                   <Lock className="w-2.5 h-2.5 absolute -bottom-0.5 -right-0.5 bg-bh-bg-alt rounded-full p-0.5" aria-hidden="true" />
-                </a>
+                </Link>
               )}
             </Tooltip>
           )}

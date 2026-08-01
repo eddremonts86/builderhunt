@@ -9,6 +9,7 @@
 import * as React from 'react'
 import { ChevronDown, ChevronUp, FileCode2, Loader2, Lock, RefreshCw, Trash2, Copy, Check, AlertTriangle } from 'lucide-react'
 import { Button, Input } from '~/components/ui'
+import { PaidStateActions } from '~/shared/components/PaidStateActions'
 import { useAICapabilities } from '~/shared/lib/ai/useAICapabilities'
 
 interface LevelSignal {
@@ -44,6 +45,7 @@ type AnalyzeState =
   | { kind: 'loading' }
   | { kind: 'result'; analysis: WorkSampleAnalysis }
   | { kind: 'plan' }
+  | { kind: 'stale_session' }
   | { kind: 'unsupported_url' }
   | { kind: 'not_found' }
   | { kind: 'rate_limited' }
@@ -203,6 +205,10 @@ export function WorkSamplePanel({ builderId }: { builderId: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: url.trim(), builderId, force }),
       })
+      if (res.status === 401) {
+        setState({ kind: 'stale_session' })
+        return
+      }
       const data = await res.json().catch(() => ({}))
       if (res.status === 429 && data.error === 'plan') {
         setState({ kind: 'plan' })
@@ -282,7 +288,7 @@ export function WorkSamplePanel({ builderId }: { builderId: string }) {
           )}
 
           {state.kind === 'plan' && (
-            <div className="rounded-lg border border-bh-accent/30 bg-bh-accent-soft p-4 space-y-2" data-testid="work-sample-upgrade">
+            <div className="rounded-lg border border-bh-accent/30 bg-bh-accent-soft p-4 space-y-3" data-testid="work-sample-upgrade">
               <p className="flex items-center gap-2 text-sm font-semibold text-bh-text">
                 <Lock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
                 Work-sample analysis is a Team-plan feature
@@ -290,6 +296,18 @@ export function WorkSamplePanel({ builderId }: { builderId: string }) {
               <p className="text-xs text-bh-text-muted">
                 Upgrade to Team to get AI-reviewed work samples with level signals and interview questions.
               </p>
+              <PaidStateActions reason="not_entitled" className="justify-start" />
+            </div>
+          )}
+
+          {state.kind === 'stale_session' && (
+            <div className="rounded-lg border border-bh-border/60 bg-bh-surface p-4 space-y-3" data-testid="work-sample-stale-session">
+              <p className="flex items-center gap-2 text-sm font-semibold text-bh-text">
+                <Lock className="w-4 h-4 text-bh-accent" aria-hidden="true" />
+                Sign in again to continue
+              </p>
+              <p className="text-xs text-bh-text-muted">Your session needs refreshing before we can analyze this sample.</p>
+              <PaidStateActions reason="stale_session" className="justify-start" />
             </div>
           )}
 

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Zap } from 'lucide-react'
 import { LinkComponent } from '~/components/ui'
+import { PaidStateActions } from '~/shared/components/PaidStateActions'
 // `billing-shared`, never `billing`: the latter reaches `feature-authorization` and therefore the
 // `postgres` driver, which calls `Buffer.allocUnsafe` at module scope and kills the whole client bundle
 // before any app code runs. Same rule as `alerts-shared` in the dashboard.
@@ -139,11 +140,16 @@ export function CreditBalance({ summary, stale = false, liveSession = null }: Cr
 
       {remainingUnits === null ? (
         // A plain member. They can see whether paid features work, and nothing about the money.
-        <p className="text-muted-foreground text-xs">
-          {summary.capabilities.paidActionsAllowed
-            ? 'AI interview features are available on this organization’s plan.'
-            : 'AI interview features are not available on this organization’s plan. Ask an owner to review the billing settings.'}
-        </p>
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs">
+            {summary.capabilities.paidActionsAllowed
+              ? 'AI interview features are available on this organization’s plan.'
+              : 'AI interview features are not available on this organization’s plan.'}
+          </p>
+          {!summary.capabilities.paidActionsAllowed && (
+            <PaidStateActions reason="not_entitled" className="justify-start" />
+          )}
+        </div>
       ) : (
         <>
           <p>
@@ -160,12 +166,15 @@ export function CreditBalance({ summary, stale = false, liveSession = null }: Cr
       )}
 
       {isFullSummary(summary) && !summary.capabilities.paidActionsAllowed && (
-        <p role="alert" className="text-destructive flex items-start gap-1 text-xs">
-          <AlertTriangle aria-hidden className="mt-0.5 size-3 shrink-0" />
-          {summary.grace.paymentBlockedAt !== null
-            ? 'Paid AI features are paused while a payment problem is resolved.'
-            : 'Paid AI features are not available on the current plan.'}
-        </p>
+        <div className="space-y-2">
+          <p role="alert" className="text-destructive flex items-start gap-1 text-xs">
+            <AlertTriangle aria-hidden className="mt-0.5 size-3 shrink-0" />
+            {summary.grace.paymentBlockedAt !== null
+              ? 'Paid AI features are paused while a payment problem is resolved.'
+              : 'Paid AI features are not available on the current plan.'}
+          </p>
+          <PaidStateActions reason={summary.grace.paymentBlockedAt !== null ? 'past_due' : 'not_entitled'} className="justify-start" />
+        </div>
       )}
 
       {/* Visible copy of the warnings. The live region above is for announcement only. */}

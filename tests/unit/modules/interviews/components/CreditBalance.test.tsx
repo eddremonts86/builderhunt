@@ -77,10 +77,11 @@ describe('a member sees availability, not money', () => {
     expect(links()).toEqual([])
   })
 
-  it('says paid features are unavailable without naming a reason it was not told', async () => {
+  it('says paid features are unavailable without naming a reason it was not told, and offers Billing/Pricing links', async () => {
     await render({ summary: { capabilities: { paidActionsAllowed: false } } })
     expect(text()).toMatch(/not available on this organization/i)
-    expect(text()).toMatch(/ask an owner/i)
+    expect(links().join(' ')).toMatch(/billing settings/i)
+    expect(links().join(' ')).toMatch(/pricing details/i)
   })
 })
 
@@ -109,7 +110,7 @@ describe('an owner sees the platform’s own numbers', () => {
     expect(links()).toEqual([])
   })
 
-  it('explains a payment block as a pause, not a plan problem', async () => {
+  it('explains a payment block as a pause, not a plan problem, and offers only Billing settings (not Pricing)', async () => {
     await render({
       summary: ownerSummary({
         grace: { gracePeriodEndsAt: null, paymentBlockedAt: '2027-06-01T00:00:00.000Z' },
@@ -117,6 +118,20 @@ describe('an owner sees the platform’s own numbers', () => {
       }),
     })
     expect(text()).toMatch(/paused while a payment problem is resolved/i)
+    expect(links().join(' ')).toMatch(/billing settings/i)
+    expect(links().join(' ')).not.toMatch(/pricing details/i)
+  })
+
+  it('offers Billing settings and Pricing details when the plan itself does not include this feature', async () => {
+    await render({
+      summary: ownerSummary({
+        grace: { gracePeriodEndsAt: null, paymentBlockedAt: null },
+        capabilities: { paidActionsAllowed: false, canOpenPortal: true, canConfigureAutoRecharge: true },
+      }),
+    })
+    expect(text()).toMatch(/not available on the current plan/i)
+    expect(links().join(' ')).toMatch(/billing settings/i)
+    expect(links().join(' ')).toMatch(/pricing details/i)
   })
 
   it('keeps a stale balance on screen with a caveat', async () => {

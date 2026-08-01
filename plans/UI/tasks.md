@@ -234,7 +234,7 @@
   - Do: Add public preview links from content management, public builder ↔ published portfolio links, and portfolio-owner return to Account. Show links only when the allowlisted public target exists.
   - Verify: unpublished/revoked/missing targets render no link; published targets round-trip correctly.
 
-- [ ] **Connect paid-state actions consistently**
+- [x] **Connect paid-state actions consistently**
   - Files: `src/modules/solutions/components/SolutionsPage.tsx`, `src/modules/interviews/components/CreditBalance.tsx`, `src/modules/builder-profile/components/WorkSamplePanel.tsx`, `src/modules/search/components/SearchPage.tsx`, `tests/unit/modules/billing/paid-state-links.test.tsx`
   - Do: In authenticated surfaces, offer Billing settings as the primary action and Pricing details as secondary; preserve intended return path after checkout/sign-in.
   - Verify: Free, Pro, Pro Max, Team, past-due, and stale-session states expose only valid actions.
