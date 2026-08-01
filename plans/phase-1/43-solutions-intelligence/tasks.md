@@ -1,8 +1,26 @@
 # Tasks: Solutions Intelligence
 
-> **Status**: `pending`
-> **Implementation authorized**: no; checklist for a future implementation task
+> **Status**: `in progress`
+> **Implementation authorized**: yes — maintainer decision, 2026-08-01. Supersedes the earlier
+> "no; checklist for a future implementation task" header.
 > **Depends on**: [`spec.md`](./spec.md) and [`plan.md`](./plan.md)
+
+Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one changes what
+"done" means below — read them before closing any task:
+
+1. **Source register sign-off moved out.** The human legal/privacy approval of each scrapable
+   source now lives in
+   [`plans/phase-5/01-production-readiness-audit/tasks.md`](../../phase-5/01-production-readiness-audit/tasks.md)
+   as a pre-production gate. Engineering proceeds without it, but every scraping source ships
+   **disabled by default** behind a per-source admin toggle, so enabling one stays an explicit
+   maintainer act.
+2. **The gold set is synthetic.** The 60 briefs and judgments are machine-authored, which makes
+   any score measured against them circular — the generator and the grader share assumptions.
+   They are scaffolding for regression detection, never evidence of real quality. A CRUD surface
+   ships alongside them so humans can add, edit and replace briefs and judgments during MVP/beta;
+   only human-authored judgments may be cited as a quality gate.
+3. **Real providers are in use.** Local LLM first, then MiniMax, then Mistral. Provider spend is
+   accepted by the maintainer.
 
 ## Phase 0 — Gates and baselines
 
@@ -15,22 +33,26 @@
   - Verify: production-equivalent evidence shows tenant isolation, synchronous non-negative credit
     authorization, provider kill switches, and safe public fetching.
 
-- [ ] **Create the gold set and baseline report**
+- [ ] **Create the synthetic gold set, its CRUD, and the baseline report**
   - Files: `tests/fixtures/solutions/gold-set.json` (new),
-    `scripts/evaluate-solutions.ts` (new), `docs/operations/solutions-evaluation.md` (new)
-  - Do: Add 60 de-identified briefs and human judgments for valid lanes, hard constraints,
-    capability coverage, unacceptable components, and ranking. Measure current lexical/vector
-    retrieval, latency, and provider cost separately by domain and lane.
+    `scripts/evaluate-solutions.ts` (new), `docs/operations/solutions-evaluation.md` (new),
+    gold-set admin CRUD routes/UI (new)
+  - Do: Seed 60 de-identified briefs and judgments for valid lanes, hard constraints, capability
+    coverage, unacceptable components, and ranking. Every seeded record carries
+    `authorship: 'synthetic'`. Ship the CRUD so humans can add, edit and replace briefs and
+    judgments during MVP/beta, stamped `authorship: 'human'`. Measure lexical/vector retrieval,
+    latency, and provider cost separately by domain and lane.
   - Verify: the evaluator is deterministic for fixed fixtures, reports confidence intervals and
-    segmented metrics, and fails on malformed or leaked personal data.
+    segmented metrics, fails on malformed or leaked personal data, and reports synthetic and human
+    judgment scores as **separate** figures — a synthetic-only run must never print an unqualified
+    quality number, because the generator and the grader share assumptions.
 
-- [ ] **Approve the initial source and domain register**
-  - Files: `docs/operations/solutions-source-register.md` (new),
-    `docs/operations/solutions-domain-policy.md` (new)
-  - Do: Record access method, terms/robots/privacy review, allowed fields, geography, owner,
-    refresh/retention/deletion, rate limits, and kill switch for every source. Explicitly deny
-    physical and high-risk regulated domains.
-  - Verify: security/privacy/product reviewers sign every enabled source and domain.
+- [x] **Approve the initial source and domain register** — moved, not done
+  - Moved on 2026-08-01 to
+    [`plans/phase-5/01-production-readiness-audit/tasks.md`](../../phase-5/01-production-readiness-audit/tasks.md)
+    Phase 2–3, next to plan 42's own source-register approval. It needs a human legal/privacy
+    judgement per source, so it gates production rather than engineering. Phase 4 still builds the
+    register file, the per-source kill switch, and the admin toggle; every source ships disabled.
 
 ## Phase 1 — Contracts and shell
 

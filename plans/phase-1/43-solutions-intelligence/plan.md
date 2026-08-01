@@ -1,12 +1,16 @@
 # Plan: Solutions Intelligence
 
-> **Status**: `pending`
+> **Status**: `in progress`
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`ai-expansion`](../21-ai-expansion/spec.md),
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md), and
 > [`stealth-scraping`](../42-stealth-scraping/spec.md)
 > **Blocks**: nothing
-> **Implementation authorized**: no; this document is planning output only
+> **Implementation authorized**: yes — maintainer decision, 2026-08-01. Supersedes the earlier
+> "no; this document is planning output only" header. See
+> [`tasks.md`](./tasks.md) for the three Phase 0 gates that decision resolved (source-register
+> sign-off moved to `plans/phase-5`, synthetic gold set with a human CRUD path, real providers in
+> use).
 
 ## Delivery strategy
 

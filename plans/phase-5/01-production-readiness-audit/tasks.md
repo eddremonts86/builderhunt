@@ -56,6 +56,20 @@ parallel deliberately: queued, they add three weeks for no reason.
     requests, and zero overdue retention rows.
   - Moved from `plans/phase-1/42-stealth-scraping` on 2026-07-29 — it waits on production, not on work.
 
+- [ ] **Approve the Solutions source and domain register**
+  - Files: `docs/operations/solutions-source-register.md`, `docs/operations/solutions-domain-policy.md`
+  - Do: For every source the Solutions catalog can ingest, record access method, terms/robots/privacy
+    review, allowed fields, geography, owner, refresh/retention/deletion, rate limits, and kill
+    switch. Explicitly deny physical and high-risk regulated domains.
+  - Verify: security/privacy/product reviewers sign every source before it is enabled in production.
+  - Operator: needs a human legal/privacy judgement per source. The code ships every scraping source
+    **disabled by default** with a per-source toggle in Admin → Solutions sources, so enabling one is
+    an explicit maintainer act and this register is the record of why it was allowed. An agent can
+    build the switch; it cannot decide that scraping a given site is lawful.
+  - Moved from `plans/phase-1/43-solutions-intelligence` Phase 0 on 2026-08-01 at the maintainer's
+    direction — it waits on a human decision, not on work, and blocking the whole module's
+    engineering on it was stopping real progress.
+
 
 ## Phase 4 — the decisions the waiting was for
 
