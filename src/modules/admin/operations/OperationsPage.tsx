@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { AlertTriangle, CheckCircle2, Clock, RefreshCw, XCircle } from 'lucide-react'
+import { AlertTriangle, BookOpen, CheckCircle2, Clock, Pause, Play, RefreshCw, XCircle } from 'lucide-react'
+import { Button } from '~/components/ui'
 
 interface JobRunSummary {
   state: string
@@ -19,6 +20,8 @@ interface JobRow {
   cronExpression: string
   timezone: string
   enabled: boolean
+  /** Null until the registry has synced this key in at least once — pause/resume is disabled until then. */
+  version: number | null
   nextRunAt: string | null
   overdue: boolean
   stale: boolean
@@ -29,6 +32,8 @@ interface OperationsResponse {
   jobs: JobRow[]
   generatedAt: string
 }
+
+const RUNBOOK_PATH = 'docs/operations/deploy-runbook.md'
 
 function formatDuration(ms: number | null): string {
   if (ms === null) return '—'
@@ -81,6 +86,62 @@ function StatusPill({ job }: { job: JobRow }) {
   )
 }
 
+interface RowActionsProps {
+  job: JobRow
+  pausing: boolean
+  running: boolean
+  confirmingRun: boolean
+  rowMessage: string | null
+  onTogglePause: () => void
+  onStartRunConfirm: () => void
+  onCancelRunConfirm: () => void
+  onConfirmRun: () => void
+}
+
+function RowActions({ job, pausing, running, confirmingRun, rowMessage, onTogglePause, onStartRunConfirm, onCancelRunConfirm, onConfirmRun }: RowActionsProps) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={job.version === null || pausing}
+          onClick={onTogglePause}
+          data-testid={`operations-toggle-${job.jobKey}`}
+        >
+          {job.enabled ? <Pause className="size-3.5" aria-hidden /> : <Play className="size-3.5" aria-hidden />}
+          {pausing ? 'Working…' : job.enabled ? 'Pause' : 'Resume'}
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={running}
+          onClick={onStartRunConfirm}
+          data-testid={`operations-run-${job.jobKey}`}
+        >
+          {running ? 'Running…' : 'Run now'}
+        </Button>
+      </div>
+      {confirmingRun && (
+        <div className="rounded border border-bh-border bg-bh-surface p-2 text-xs" data-testid={`operations-run-confirm-${job.jobKey}`}>
+          <p className="text-bh-text-muted mb-1.5">Run &ldquo;{job.label}&rdquo; now, outside its normal {job.cronExpression} cadence?</p>
+          <div className="flex gap-1.5">
+            <Button type="button" variant="primary" size="sm" onClick={onConfirmRun} disabled={running} data-testid={`operations-run-confirm-yes-${job.jobKey}`}>
+              {running ? 'Running…' : 'Run now'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={onCancelRunConfirm} disabled={running}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+      {rowMessage && <p className="text-xs text-bh-text-muted" role="status" data-testid={`operations-message-${job.jobKey}`}>{rowMessage}</p>}
+    </div>
+  )
+}
+
 export interface OperationsPageProps {
   /** Pre-selects the job this page was linked to from, e.g. a calendar projection anchor. */
   highlightJobKey?: string | null
@@ -91,6 +152,10 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [scopeFilter, setScopeFilter] = React.useState<'all' | 'platform' | 'organization'>('all')
+  const [pausingKey, setPausingKey] = React.useState<string | null>(null)
+  const [runningKey, setRunningKey] = React.useState<string | null>(null)
+  const [confirmRunKey, setConfirmRunKey] = React.useState<string | null>(null)
+  const [rowMessages, setRowMessages] = React.useState<Record<string, string>>({})
   const highlightedRowRef = React.useRef<HTMLTableRowElement | null>(null)
 
   React.useEffect(() => {
@@ -121,6 +186,61 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
     return () => clearInterval(id)
   }, [load])
 
+  const setRowMessage = React.useCallback((jobKey: string, message: string) => {
+    setRowMessages((prev) => ({ ...prev, [jobKey]: message }))
+  }, [])
+
+  const togglePause = React.useCallback(async (job: JobRow) => {
+    if (job.version === null) return
+    setPausingKey(job.jobKey)
+    try {
+      const res = await fetch(`/api/admin/operations/${job.jobKey}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ enabled: !job.enabled, expectedVersion: job.version }),
+      })
+      if (res.status === 409) {
+        setRowMessage(job.jobKey, 'Someone else changed this job — refreshed with the latest state, try again.')
+        await load()
+        return
+      }
+      if (!res.ok) {
+        setRowMessage(job.jobKey, `Failed: ${res.status}`)
+        return
+      }
+      setRowMessage(job.jobKey, job.enabled ? 'Paused.' : 'Resumed.')
+      await load()
+    } catch (e) {
+      setRowMessage(job.jobKey, e instanceof Error ? e.message : String(e))
+    } finally {
+      setPausingKey(null)
+    }
+  }, [load, setRowMessage])
+
+  const runNow = React.useCallback(async (job: JobRow) => {
+    setRunningKey(job.jobKey)
+    setConfirmRunKey(null)
+    try {
+      const res = await fetch(`/api/admin/operations/${job.jobKey}/run`, { method: 'POST', credentials: 'include' })
+      if (res.status === 409) {
+        setRowMessage(job.jobKey, 'Already running — this run was not started again.')
+        return
+      }
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        setRowMessage(job.jobKey, body.error ? `Failed: ${body.error}` : `Failed: ${res.status}`)
+        return
+      }
+      setRowMessage(job.jobKey, 'Run started.')
+      await load()
+    } catch (e) {
+      setRowMessage(job.jobKey, e instanceof Error ? e.message : String(e))
+    } finally {
+      setRunningKey(null)
+    }
+  }, [load, setRowMessage])
+
   const jobs = data?.jobs.filter((job) => scopeFilter === 'all' || job.scope === scopeFilter) ?? []
   const attentionCount = data?.jobs.filter((job) => job.enabled && (job.overdue || job.stale || job.lastRun?.state === 'failed')).length ?? 0
 
@@ -138,16 +258,10 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={load}
-          className="inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-sm hover:bg-bh-surface"
-          aria-label="Refresh"
-          data-testid="operations-refresh"
-        >
+        <Button type="button" variant="ghost" size="sm" onClick={load} data-testid="operations-refresh">
           <RefreshCw className="size-4" aria-hidden />
           Refresh
-        </button>
+        </Button>
       </header>
 
       <div className="mb-4 flex items-center gap-2" role="group" aria-label="Filter by scope">
@@ -172,50 +286,116 @@ export function OperationsPage({ highlightJobKey = null }: OperationsPageProps =
       ) : error ? (
         <p className="text-bh-danger" role="alert">{error}</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm" data-testid="operations-table">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wider text-bh-text-dim border-b border-bh-border">
-                <th className="py-2 pr-4">Job</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Scope</th>
-                <th className="py-2 pr-4">Next run</th>
-                <th className="py-2 pr-4">Last run</th>
-                <th className="py-2 pr-4">Duration</th>
-                <th className="py-2 pr-4">Counters</th>
-                <th className="py-2 pr-4">Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr
-                  key={job.jobKey}
-                  ref={job.jobKey === highlightJobKey ? highlightedRowRef : undefined}
-                  className={`border-b border-bh-border/50 ${job.jobKey === highlightJobKey ? 'bg-bh-accent-soft' : ''}`}
-                  data-testid={`operations-row-${job.jobKey}`}
-                >
-                  <td className="py-2.5 pr-4">
+        <>
+          {/* Desktop/tablet: table. Mobile: stacked cards below — same data, actions, testids. */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm" data-testid="operations-table">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wider text-bh-text-dim border-b border-bh-border">
+                  <th className="py-2 pr-4">Job</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Scope</th>
+                  <th className="py-2 pr-4">Next run</th>
+                  <th className="py-2 pr-4">Last run</th>
+                  <th className="py-2 pr-4">Duration</th>
+                  <th className="py-2 pr-4">Counters</th>
+                  <th className="py-2 pr-4">Error</th>
+                  <th className="py-2 pr-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job) => (
+                  <tr
+                    key={job.jobKey}
+                    ref={job.jobKey === highlightJobKey ? highlightedRowRef : undefined}
+                    className={`border-b border-bh-border/50 ${job.jobKey === highlightJobKey ? 'bg-bh-accent-soft' : ''}`}
+                    data-testid={`operations-row-${job.jobKey}`}
+                  >
+                    <td className="py-2.5 pr-4">
+                      <div className="font-medium text-bh-text">{job.label}</div>
+                      <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
+                    </td>
+                    <td className="py-2.5 pr-4"><StatusPill job={job} /></td>
+                    <td className="py-2.5 pr-4 capitalize text-bh-text-muted">{job.scope}</td>
+                    <td className="py-2.5 pr-4 text-bh-text-muted">{job.enabled ? formatWhen(job.nextRunAt) : '—'}</td>
+                    <td className="py-2.5 pr-4 text-bh-text-muted">{formatWhen(job.lastRun?.scheduledFor ?? null)}</td>
+                    <td className="py-2.5 pr-4 text-bh-text-muted">{formatDuration(job.lastRun?.durationMs ?? null)}</td>
+                    <td className="py-2.5 pr-4 text-bh-text-muted">
+                      {job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}
+                    </td>
+                    <td className="py-2.5 pr-4 text-bh-text-dim font-mono text-xs">{job.lastRun?.errorCode ?? '—'}</td>
+                    <td className="py-2.5 pr-4">
+                      <RowActions
+                        job={job}
+                        pausing={pausingKey === job.jobKey}
+                        running={runningKey === job.jobKey}
+                        confirmingRun={confirmRunKey === job.jobKey}
+                        rowMessage={rowMessages[job.jobKey] ?? null}
+                        onTogglePause={() => togglePause(job)}
+                        onStartRunConfirm={() => setConfirmRunKey(job.jobKey)}
+                        onCancelRunConfirm={() => setConfirmRunKey(null)}
+                        onConfirmRun={() => runNow(job)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <ul className="md:hidden flex flex-col gap-3">
+            {jobs.map((job) => (
+              <li
+                key={job.jobKey}
+                className={`card p-3 ${job.jobKey === highlightJobKey ? 'bg-bh-accent-soft' : ''}`}
+                data-testid={`operations-card-${job.jobKey}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
                     <div className="font-medium text-bh-text">{job.label}</div>
                     <div className="text-xs text-bh-text-dim font-mono">{job.cronExpression} · {job.timezone}</div>
-                  </td>
-                  <td className="py-2.5 pr-4"><StatusPill job={job} /></td>
-                  <td className="py-2.5 pr-4 capitalize text-bh-text-muted">{job.scope}</td>
-                  <td className="py-2.5 pr-4 text-bh-text-muted">{job.enabled ? formatWhen(job.nextRunAt) : '—'}</td>
-                  <td className="py-2.5 pr-4 text-bh-text-muted">{formatWhen(job.lastRun?.scheduledFor ?? null)}</td>
-                  <td className="py-2.5 pr-4 text-bh-text-muted">{formatDuration(job.lastRun?.durationMs ?? null)}</td>
-                  <td className="py-2.5 pr-4 text-bh-text-muted">
-                    {job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}
-                  </td>
-                  <td className="py-2.5 pr-4 text-bh-text-dim font-mono text-xs">{job.lastRun?.errorCode ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <StatusPill job={job} />
+                </div>
+                <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-bh-text-muted mb-3">
+                  <dt className="text-bh-text-dim">Scope</dt><dd className="capitalize">{job.scope}</dd>
+                  <dt className="text-bh-text-dim">Next run</dt><dd>{job.enabled ? formatWhen(job.nextRunAt) : '—'}</dd>
+                  <dt className="text-bh-text-dim">Last run</dt><dd>{formatWhen(job.lastRun?.scheduledFor ?? null)}</dd>
+                  <dt className="text-bh-text-dim">Duration</dt><dd>{formatDuration(job.lastRun?.durationMs ?? null)}</dd>
+                  <dt className="text-bh-text-dim">Counters</dt><dd>{job.lastRun ? `${job.lastRun.processedCount} ok / ${job.lastRun.failedCount} failed` : '—'}</dd>
+                  <dt className="text-bh-text-dim">Error</dt><dd className="font-mono">{job.lastRun?.errorCode ?? '—'}</dd>
+                </dl>
+                <RowActions
+                  job={job}
+                  pausing={pausingKey === job.jobKey}
+                  running={runningKey === job.jobKey}
+                  confirmingRun={confirmRunKey === job.jobKey}
+                  rowMessage={rowMessages[job.jobKey] ?? null}
+                  onTogglePause={() => togglePause(job)}
+                  onStartRunConfirm={() => setConfirmRunKey(job.jobKey)}
+                  onCancelRunConfirm={() => setConfirmRunKey(null)}
+                  onConfirmRun={() => runNow(job)}
+                />
+              </li>
+            ))}
+          </ul>
+
           {jobs.length === 0 && (
             <p className="text-bh-text-muted py-6 text-center">No jobs match this filter.</p>
           )}
-        </div>
+        </>
       )}
+
+      <section className="card p-4 mt-6" data-testid="operations-runbook">
+        <h2 className="font-semibold text-sm flex items-center gap-2 mb-1">
+          <BookOpen className="w-4 h-4" aria-hidden="true" />
+          Runbook
+        </h2>
+        <p className="text-xs text-bh-text-muted">
+          For deploy sequencing, incident response, and worker-recovery steps, see{' '}
+          <code className="text-xs">{RUNBOOK_PATH}</code> in the repository.
+        </p>
+      </section>
     </div>
   )
 }

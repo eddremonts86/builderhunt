@@ -182,7 +182,7 @@
   - Do: Resolve `jobKey` only through `OPERATIONAL_SCHEDULES`; never accept a route or arbitrary argument from the browser. Add optimistic versioning, idempotency, step-up requirement, and audit records.
   - Verify: unknown/traversal job keys fail closed; duplicate manual run does not duplicate work; pause survives registry sync; every mutation is audited.
 
-- [ ] **Build Admin Operations UI**
+- [x] **Build Admin Operations UI**
   - Files: `src/routes/_dashboard/admin/operations.tsx`, `src/modules/admin/operations/OperationsPage.tsx`, `src/modules/dashboard/ui/shell/nav-config.ts`, `tests/e2e/admin-operations.spec.ts`
   - Do: Add status summary, filters, job rows, next/last run, duration/counters, redacted error, pause/resume, manual-run confirmation, refresh, and runbook link; add Operations to Admin navigation.
   - Verify: keyboard and mobile table/card layouts work; platform admin can run/pause/resume; non-admin never sees the destination or data.
