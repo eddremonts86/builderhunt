@@ -19,7 +19,7 @@
  */
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { Bell, BellOff, Check, Clock, Inbox, Pause, Play, Plus, Radar, Trash2, X } from 'lucide-react'
+import { Bell, BellOff, Check, Clock, Inbox, Pause, Play, Plus, Radar, Send, Trash2, X } from 'lucide-react'
 import { getAppAuthSession } from '~/shared/lib/auth/auth-session'
 import { formatDistanceToNow } from '~/shared/lib/format'
 // From `alerts-shared`, never `alerts`: the latter imports `node:crypto` and
@@ -174,6 +174,9 @@ function AlertsInboxPage() {
   // already tracked in an earlier session, so those still show "Track & open" — a pre-existing
   // gap, not a regression from this component now being able to open the workspace at all).
   const [trackedRowIds, setTrackedRowIds] = React.useState<Map<string, string>>(new Map())
+  const [confirmingTestId, setConfirmingTestId] = React.useState<string | null>(null)
+  const [sendingTestId, setSendingTestId] = React.useState<string | null>(null)
+  const [testResults, setTestResults] = React.useState<Map<string, { kind: 'delivered' | 'degraded' | 'rate_limited'; message: string }>>(new Map())
 
   const load = React.useCallback(async () => {
     try {
@@ -292,6 +295,31 @@ function AlertsInboxPage() {
       body: JSON.stringify({ frequency: nextFrequency }),
     })
     await load()
+  }
+
+  const sendTestAlert = async (id: string) => {
+    setSendingTestId(id)
+    try {
+      const res = await fetch(`/api/alerts/${id}/test-send`, { method: 'POST', credentials: 'include' })
+      const body = await res.json().catch(() => ({}))
+      setConfirmingTestId(null)
+      if (res.status === 429) {
+        setTestResults((prev) => new Map(prev).set(id, { kind: 'rate_limited', message: 'Too many test sends — try again later.' }))
+        return
+      }
+      if (!res.ok || body.degraded) {
+        setTestResults((prev) => new Map(prev).set(id, { kind: 'degraded', message: body.message ?? body.error ?? 'Test delivery failed.' }))
+        return
+      }
+      setTestResults((prev) => new Map(prev).set(id, {
+        kind: 'delivered',
+        message: body.channel === 'email' ? 'Test email sent.' : 'Dashboard delivery confirmed.',
+      }))
+    } catch {
+      setTestResults((prev) => new Map(prev).set(id, { kind: 'degraded', message: 'Network error sending test.' }))
+    } finally {
+      setSendingTestId(null)
+    }
   }
 
   const onMatchTracked = React.useCallback((match: AlertMatchPayload, organizationBuilderId: string) => {
@@ -470,13 +498,14 @@ function AlertsInboxPage() {
               <div className="space-y-2" data-testid="alerts-config-list">
                 {userAlerts.map((a) => {
                   const matchCount = triggers.filter((t) => t.alertId === a.id).length
+                  const testResult = testResults.get(a.id)
                   return (
                     // Wraps on narrow viewports: the frequency Select (128px)
                     // plus two icon buttons leave ~50px for the name at 375px,
                     // which truncated every radar to "P…". Below `sm` the
                     // controls drop to their own full-width row instead.
+                    <React.Fragment key={a.id}>
                     <div
-                      key={a.id}
                       className="card p-3 flex flex-wrap items-center gap-3"
                       data-testid={`alert-config-${a.id}`}
                     >
@@ -532,6 +561,19 @@ function AlertsInboxPage() {
                         </Select>
                         <Button
                           type="button"
+                          onClick={() => { setConfirmingTestId(a.id); setTestResults((prev) => { const next = new Map(prev); next.delete(a.id); return next }) }}
+                          disabled={!a.enabled || sendingTestId === a.id}
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0"
+                          aria-label="Send test"
+                          title={a.enabled ? 'Send test' : 'Resume this radar to test it'}
+                          data-testid={`alert-test-send-${a.id}`}
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button
+                          type="button"
                           onClick={() => toggleAlertEnabled(a.id, a.enabled)}
                           disabled={togglingId === a.id}
                           variant="ghost"
@@ -557,6 +599,49 @@ function AlertsInboxPage() {
                         </Button>
                       </div>
                     </div>
+                    {confirmingTestId === a.id && (
+                      <div className="card p-3 -mt-1 space-y-2 border-bh-accent/30" data-testid={`alert-test-confirm-${a.id}`}>
+                        <p className="text-sm text-bh-text">
+                          Send a test to confirm delivery — {a.deliveryChannel === 'email' ? 'email + dashboard' : 'dashboard only'},{' '}
+                          {(a.frequency ?? 'daily')} cadence. No real match is required and none is recorded.
+                        </p>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={() => sendTestAlert(a.id)}
+                            disabled={sendingTestId === a.id}
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`alert-test-confirm-button-${a.id}`}
+                          >
+                            {sendingTestId === a.id ? 'Sending…' : 'Send test'}
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={() => setConfirmingTestId(null)}
+                            disabled={sendingTestId === a.id}
+                            variant="ghost"
+                            size="sm"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {testResult && (
+                      <p
+                        className={`text-xs px-1 -mt-1 ${
+                          testResult.kind === 'delivered' ? 'text-bh-success'
+                            : testResult.kind === 'rate_limited' ? 'text-bh-warning' : 'text-bh-danger'
+                        }`}
+                        role={testResult.kind === 'delivered' ? 'status' : 'alert'}
+                        data-testid={`alert-test-result-${a.id}`}
+                        data-result={testResult.kind}
+                      >
+                        {testResult.message}
+                      </p>
+                    )}
+                    </React.Fragment>
                   )
                 })}
               </div>

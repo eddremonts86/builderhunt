@@ -206,6 +206,7 @@ import { Route as ApiBillingCheckoutStatusRouteImport } from './routes/api/billi
 import { Route as ApiBillingCheckoutCreditsRouteImport } from './routes/api/billing/checkout/credits'
 import { Route as ApiAlertsTriggersUnreadCountRouteImport } from './routes/api/alerts/triggers/unread-count'
 import { Route as ApiAlertsTriggersIdRouteImport } from './routes/api/alerts/triggers/$id'
+import { Route as ApiAlertsIdTestSendRouteImport } from './routes/api/alerts/$id/test-send'
 import { Route as ApiAdminUsersUserIdRouteImport } from './routes/api/admin/users/$userId'
 import { Route as ApiAdminStatusSnapshotRouteImport } from './routes/api/admin/status/snapshot'
 import { Route as ApiAdminSprintsRunWorkerRouteImport } from './routes/api/admin/sprints/run-worker'
@@ -1308,6 +1309,11 @@ const ApiAlertsTriggersIdRoute = ApiAlertsTriggersIdRouteImport.update({
   path: '/api/alerts/triggers/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAlertsIdTestSendRoute = ApiAlertsIdTestSendRouteImport.update({
+  id: '/test-send',
+  path: '/test-send',
+  getParentRoute: () => ApiAlertsIdRoute,
+} as any)
 const ApiAdminUsersUserIdRoute = ApiAdminUsersUserIdRouteImport.update({
   id: '/api/admin/users/$userId',
   path: '/api/admin/users/$userId',
@@ -1742,7 +1748,7 @@ export interface FileRoutesByFullPath {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
-  '/api/alerts/$id': typeof ApiAlertsIdRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRouteWithChildren
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -1846,6 +1852,7 @@ export interface FileRoutesByFullPath {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/$id/test-send': typeof ApiAlertsIdTestSendRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -2001,7 +2008,7 @@ export interface FileRoutesByTo {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
-  '/api/alerts/$id': typeof ApiAlertsIdRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRouteWithChildren
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -2105,6 +2112,7 @@ export interface FileRoutesByTo {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/$id/test-send': typeof ApiAlertsIdTestSendRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -2265,7 +2273,7 @@ export interface FileRoutesById {
   '/api/ai/complete': typeof ApiAiCompleteRoute
   '/api/ai/config': typeof ApiAiConfigRoute
   '/api/ai/embed': typeof ApiAiEmbedRoute
-  '/api/alerts/$id': typeof ApiAlertsIdRoute
+  '/api/alerts/$id': typeof ApiAlertsIdRouteWithChildren
   '/api/alerts/test-trigger': typeof ApiAlertsTestTriggerRoute
   '/api/analytics/conversion': typeof ApiAnalyticsConversionRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
@@ -2369,6 +2377,7 @@ export interface FileRoutesById {
   '/api/admin/sprints/run-worker': typeof ApiAdminSprintsRunWorkerRoute
   '/api/admin/status/snapshot': typeof ApiAdminStatusSnapshotRoute
   '/api/admin/users/$userId': typeof ApiAdminUsersUserIdRoute
+  '/api/alerts/$id/test-send': typeof ApiAlertsIdTestSendRoute
   '/api/alerts/triggers/$id': typeof ApiAlertsTriggersIdRoute
   '/api/alerts/triggers/unread-count': typeof ApiAlertsTriggersUnreadCountRoute
   '/api/billing/checkout/credits': typeof ApiBillingCheckoutCreditsRoute
@@ -2632,6 +2641,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
+    | '/api/alerts/$id/test-send'
     | '/api/alerts/triggers/$id'
     | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
@@ -2891,6 +2901,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
+    | '/api/alerts/$id/test-send'
     | '/api/alerts/triggers/$id'
     | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
@@ -3154,6 +3165,7 @@ export interface FileRouteTypes {
     | '/api/admin/sprints/run-worker'
     | '/api/admin/status/snapshot'
     | '/api/admin/users/$userId'
+    | '/api/alerts/$id/test-send'
     | '/api/alerts/triggers/$id'
     | '/api/alerts/triggers/unread-count'
     | '/api/billing/checkout/credits'
@@ -3270,7 +3282,7 @@ export interface RootRouteChildren {
   ApiAiCompleteRoute: typeof ApiAiCompleteRoute
   ApiAiConfigRoute: typeof ApiAiConfigRoute
   ApiAiEmbedRoute: typeof ApiAiEmbedRoute
-  ApiAlertsIdRoute: typeof ApiAlertsIdRoute
+  ApiAlertsIdRoute: typeof ApiAlertsIdRouteWithChildren
   ApiAlertsTestTriggerRoute: typeof ApiAlertsTestTriggerRoute
   ApiAnalyticsConversionRoute: typeof ApiAnalyticsConversionRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
@@ -4810,6 +4822,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAlertsTriggersIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/alerts/$id/test-send': {
+      id: '/api/alerts/$id/test-send'
+      path: '/test-send'
+      fullPath: '/api/alerts/$id/test-send'
+      preLoaderRoute: typeof ApiAlertsIdTestSendRouteImport
+      parentRoute: typeof ApiAlertsIdRoute
+    }
     '/api/admin/users/$userId': {
       id: '/api/admin/users/$userId'
       path: '/api/admin/users/$userId'
@@ -5448,6 +5467,18 @@ const OnboardingRouteRouteWithChildren = OnboardingRouteRoute._addFileChildren(
   OnboardingRouteRouteChildren,
 )
 
+interface ApiAlertsIdRouteChildren {
+  ApiAlertsIdTestSendRoute: typeof ApiAlertsIdTestSendRoute
+}
+
+const ApiAlertsIdRouteChildren: ApiAlertsIdRouteChildren = {
+  ApiAlertsIdTestSendRoute: ApiAlertsIdTestSendRoute,
+}
+
+const ApiAlertsIdRouteWithChildren = ApiAlertsIdRoute._addFileChildren(
+  ApiAlertsIdRouteChildren,
+)
+
 interface ApiBillingContactRouteChildren {
   ApiBillingContactVerifyRoute: typeof ApiBillingContactVerifyRoute
 }
@@ -5663,7 +5694,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAiCompleteRoute: ApiAiCompleteRoute,
   ApiAiConfigRoute: ApiAiConfigRoute,
   ApiAiEmbedRoute: ApiAiEmbedRoute,
-  ApiAlertsIdRoute: ApiAlertsIdRoute,
+  ApiAlertsIdRoute: ApiAlertsIdRouteWithChildren,
   ApiAlertsTestTriggerRoute: ApiAlertsTestTriggerRoute,
   ApiAnalyticsConversionRoute: ApiAnalyticsConversionRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,

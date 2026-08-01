@@ -165,7 +165,7 @@
   - Do: Add list, filters, detail drawer, public preview links, portfolio state, and revoke confirmation with reason against the existing revoke endpoint; add Claims to Admin navigation.
   - Verify: revoke invalidates public profile/portfolio immediately, writes audit evidence, and is unavailable to non-platform admins.
 
-- [ ] **Expose alert test delivery**
+- [x] **Expose alert test delivery**
   - Files: `src/routes/_dashboard/alerts.tsx`, `src/routes/api/alerts/test-trigger.ts`, `tests/e2e/alerts.spec.ts`
   - Do: Add per-alert Send test action with confirmation of channel/frequency, pending state, delivered/degraded result, and rate-limit feedback.
   - Verify: in-app and email-fixture paths work; disabled/deleted/foreign alerts cannot be tested.
