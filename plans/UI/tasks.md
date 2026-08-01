@@ -172,7 +172,7 @@
 
 ## Wave 5 — Operator UI
 
-- [ ] **Add a redacted operations projection API**
+- [x] **Add a redacted operations projection API**
   - Files: `src/shared/lib/repositories/platform-operations.ts`, `src/shared/lib/operational-schedules.ts`, `src/routes/api/admin/operations/index.ts`, `tests/unit/security/admin-operations.test.ts`
   - Do: Return one bounded row per registered schedule with enabled/cadence/timezone/next run and latest run status/duration/counters/redacted error code. Never return payloads, source URLs, candidate data, headers, tokens, or stack traces.
   - Verify: DTO snapshot is redacted; stale/overdue/running/failed/success states calculate correctly; platform-admin boundary passes.
