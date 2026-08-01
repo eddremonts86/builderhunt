@@ -575,6 +575,20 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
     and billing reconciliation against the exact release configuration.
   - Verify: every acceptance threshold in `spec.md` passes with dated artifacts.
 
+  **Deliberately left open — it cannot be closed by engineering.** The evaluator, the corpus, and the cost
+  model all exist and have produced a dated baseline
+  (`docs/operations/solutions-evaluation.md`, 2026-08-01). Four inputs are missing, and none of them is code:
+
+  1. Real provider pricing. The `MINIMAX_COST_PER_*` constants are documented placeholders, so the cost
+     certification is provisional by its own first line.
+  2. Human-authored gold judgments. Until `solution_gold_briefs` holds some, `citableAsQualityGate` is false
+     and no run may be quoted as a quality figure.
+  3. Warm/cold load tests and source-outage drills against the release configuration.
+  4. Provider variance — the same brief run repeatedly against a live model.
+
+  Checking this box on the strength of a synthetic baseline is precisely the failure the authorship split
+  exists to prevent.
+
 - [x] **Roll out through independent flags** — plan written, nothing executed
   - Files: `docs/operations/solutions-rollout.md` (new)
   - Do: Enable staff-only, closed beta with operator grants, paid beta, then general availability.
