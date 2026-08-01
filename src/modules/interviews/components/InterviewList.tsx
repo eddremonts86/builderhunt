@@ -115,6 +115,17 @@ export function InterviewList(props: InterviewListProps) {
                 {interview.hasBrief ? 'Brief' : 'Prepare a brief'}
               </Link>
 
+              {/* An interview IS its calendar event (same id) — plans/UI Wave 3 "Connect booked
+                  scheduling to Calendar and Interviews". */}
+              <Link
+                to="/calendar"
+                search={{ event: interview.eventId }}
+                className="text-xs underline underline-offset-2"
+              >
+                <CalendarDays className="mr-1 inline size-3" aria-hidden />
+                View in Calendar
+              </Link>
+
               {(live || soon) && (
                 <Link
                   to="/interviews/$interviewId/live"

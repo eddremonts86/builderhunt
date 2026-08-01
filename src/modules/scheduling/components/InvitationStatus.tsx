@@ -10,9 +10,16 @@
  * 2. **The version goes with the action.** Every mutation carries the version this list was rendered
  *    from, so a revoke racing another tab's send loses with a conflict instead of resurrecting or
  *    clobbering. On conflict the fix is a reload, and the message says that.
+ *
+ * A booked row gets three more links (plans/UI Wave 3 "Connect booked scheduling to Calendar and
+ * Interviews") built from `bookedEventId` alone — no extra lookup, because an interview *is* the
+ * calendar event it was booked onto: `/interviews/$interviewId` and the calendar route both resolve
+ * by that same id. The candidate's own meeting URL stays a secondary, safety-checked external link.
  */
 import * as React from 'react'
+import { ExternalLink } from 'lucide-react'
 import { Button } from '~/components/ui'
+import { isSafeHttpUrl } from '~/shared/lib/url-safety'
 
 export interface InvitationSummary {
   /** The DTO's own key name (`toInvitationDto` in the route), not `id`. */
@@ -24,6 +31,9 @@ export interface InvitationSummary {
   organizationBuilderId?: string | null
   expiresAt?: string | null
   bookedAt?: string | null
+  /** Same id as the calendar event and the `/interviews/$interviewId` route; null until booked. */
+  bookedEventId?: string | null
+  meetingUrl?: string | null
 }
 
 interface InvitationStatusProps {
@@ -103,6 +113,31 @@ export function InvitationStatus({ invitations, onChanged }: InvitationStatusPro
                   <p className="mt-0.5 text-xs text-bh-text-muted">
                     {new Date(invitation.bookedAt).toLocaleString()}
                   </p>
+                ) : null}
+                {invitation.status === 'booked' && invitation.bookedEventId ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" data-testid="invitation-status-booked-links">
+                    <a href={`/calendar?event=${invitation.bookedEventId}`} className="text-bh-accent underline" data-testid="invitation-status-view-in-calendar">
+                      View in Calendar
+                    </a>
+                    <a href={`/interviews/${invitation.bookedEventId}`} className="text-bh-accent underline" data-testid="invitation-status-prepare-brief">
+                      Prepare brief
+                    </a>
+                    <a href={`/interviews/${invitation.bookedEventId}/live`} className="text-bh-accent underline" data-testid="invitation-status-join-interview">
+                      Start / Rejoin
+                    </a>
+                    {isSafeHttpUrl(invitation.meetingUrl ?? null) && (
+                      <a
+                        href={invitation.meetingUrl!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-bh-text-muted underline"
+                        data-testid="invitation-status-meeting-link"
+                      >
+                        <ExternalLink className="size-3 shrink-0" aria-hidden />
+                        Meeting link
+                      </a>
+                    )}
+                  </div>
                 ) : null}
               </div>
               {TERMINAL.has(invitation.status) ? null : (

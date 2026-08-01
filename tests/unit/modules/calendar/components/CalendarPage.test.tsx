@@ -318,6 +318,75 @@ describe('CalendarPage — multi-view shell (plans/UI Wave 3)', () => {
   })
 })
 
+describe('CalendarPage — deep-link an event (plans/UI Wave 3 "Connect booked scheduling to Calendar and Interviews")', () => {
+  it('fetches the event directly, jumps the active date to where it lives, opens its detail panel, and reports it consumed exactly once', async () => {
+    const fetchFeed = vi.fn(async () => ({ items: [], staleSources: [] }))
+    const loadEventById = vi.fn(async (id: string) => ({
+      event: eventItem({ id, title: 'Booked interview', startsAt: '2027-09-03T14:00:00.000Z', endsAt: '2027-09-03T15:00:00.000Z', type: 'interview' }),
+      detail: { rrule: null, recurrenceUntil: null, participants: [] },
+    }))
+    const onEventConsumed = vi.fn()
+    const onDateChange = vi.fn()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        <CalendarPage
+          today={TODAY}
+          fetchFeed={fetchFeed}
+          eventId="deep-linked-event"
+          loadEventById={loadEventById}
+          onEventConsumed={onEventConsumed}
+          onDateChange={onDateChange}
+        />,
+      )
+    })
+    await flush()
+
+    expect(loadEventById).toHaveBeenCalledWith('deep-linked-event')
+    expect(onDateChange).toHaveBeenCalledWith(new Date('2027-09-03T00:00:00.000Z'))
+    expect(testId('event-details-title').textContent).toBe('Booked interview')
+    expect(onEventConsumed).toHaveBeenCalledTimes(1)
+
+    // Re-rendering with the same eventId (the route hasn't cleared it from the URL yet, say) must
+    // not fetch or report consumption a second time.
+    await act(async () => {
+      root!.render(
+        <CalendarPage
+          today={TODAY}
+          fetchFeed={fetchFeed}
+          eventId="deep-linked-event"
+          loadEventById={loadEventById}
+          onEventConsumed={onEventConsumed}
+          onDateChange={onDateChange}
+        />,
+      )
+    })
+    await flush()
+    expect(loadEventById).toHaveBeenCalledTimes(1)
+    expect(onEventConsumed).toHaveBeenCalledTimes(1)
+  })
+
+  it('does nothing when the deep-linked event no longer exists or is not visible to the caller', async () => {
+    const fetchFeed = vi.fn(async () => ({ items: [], staleSources: [] }))
+    const loadEventById = vi.fn(async () => null)
+    const onEventConsumed = vi.fn()
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root!.render(
+        <CalendarPage today={TODAY} fetchFeed={fetchFeed} eventId="gone" loadEventById={loadEventById} onEventConsumed={onEventConsumed} />,
+      )
+    })
+    await flush()
+
+    expect(onEventConsumed).toHaveBeenCalledTimes(1)
+    expect(maybeTestId('event-details')).toBeNull()
+  })
+})
+
 describe('CalendarPage — stale sources', () => {
   it('warns in plain language and names the source', async () => {
     await renderPage([], ['calendar.reminder-delivery'])

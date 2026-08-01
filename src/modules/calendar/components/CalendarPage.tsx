@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CalendarDays, Clock, Download, Plus, Search, X } from 'lucide-react'
 import { Button, Input } from '~/components/ui'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
@@ -57,6 +57,10 @@ export interface CalendarPageProps {
   updateEvent?: (id: string, body: unknown) => Promise<{ ok: boolean; error?: string }>
   deleteEvent?: (id: string, version: number, options?: { recurrenceScope?: RecurrenceScope; recurrenceId?: string }) => Promise<{ ok: boolean; error?: string }>
   loadEventDetail?: (id: string) => Promise<EventDetailView | null>
+  /** Deep-link support (plans/UI Wave 3 "Connect booked scheduling to Calendar and Interviews") —
+   * resolves `eventId` to the base event plus its detail in one request, since the feed alone
+   * cannot answer for an event outside the currently-loaded range. */
+  loadEventById?: (id: string) => Promise<{ event: CalendarEventDto; detail: EventDetailView } | null>
   loadNotifications?: (cursor: string | null) => Promise<NotificationsPage>
   markNotificationsRead?: (deliveryIds: string[]) => Promise<MarkReadResult>
   /** Fixed "today" so the grid is deterministic under test. */
@@ -68,6 +72,10 @@ export interface CalendarPageProps {
   onViewChange?: (view: CalendarViewKey) => void
   onDateChange?: (date: Date) => void
   onQueryChange?: (query: string) => void
+  /** A calendar event id to open on mount (an interview id is the same value) — see `eventId`. */
+  eventId?: string
+  /** Called once `eventId` has been opened, so the route can clear it from the URL. */
+  onEventConsumed?: () => void
 }
 
 async function defaultFetchFeed(range: { from: string; to: string }, layers: CalendarLayerKey[]): Promise<CalendarFeedDto> {
@@ -121,10 +129,7 @@ async function defaultUpdateEvent(id: string, body: unknown) {
   return { ok: false as const, error: String(payload.error ?? 'invalid_input') }
 }
 
-async function defaultLoadEventDetail(id: string): Promise<EventDetailView | null> {
-  const response = await fetch(`/api/calendar/events/${id}`)
-  if (!response.ok) return null
-  const body = await response.json()
+function toEventDetailView(body: { event?: Record<string, unknown>; participants?: unknown }): EventDetailView {
   const participants: Array<Record<string, unknown>> = Array.isArray(body.participants) ? body.participants : []
   return {
     rrule: (body.event?.rrule as string | null) ?? null,
@@ -137,6 +142,39 @@ async function defaultLoadEventDetail(id: string): Promise<EventDetailView | nul
       response: (participant.response as EventDetailView['participants'][number]['response']) ?? 'needs_action',
       materialAccessGranted: Boolean(participant.materialAccessGranted),
     })),
+  }
+}
+
+async function defaultLoadEventDetail(id: string): Promise<EventDetailView | null> {
+  const response = await fetch(`/api/calendar/events/${id}`)
+  if (!response.ok) return null
+  return toEventDetailView(await response.json())
+}
+
+async function defaultLoadEventById(id: string): Promise<{ event: CalendarEventDto; detail: EventDetailView } | null> {
+  const response = await fetch(`/api/calendar/events/${id}`)
+  if (!response.ok) return null
+  const body = await response.json()
+  const row = body.event as Record<string, unknown> | undefined
+  if (!row) return null
+  return {
+    event: {
+      kind: 'event',
+      editable: true,
+      id: String(row.id),
+      title: String(row.title),
+      startsAt: String(row.startsAt),
+      endsAt: String(row.endsAt),
+      type: String(row.type),
+      status: String(row.status),
+      allDay: Boolean(row.allDay),
+      busy: Boolean(row.busy),
+      version: Number(row.version),
+      location: (row.location as string | null) ?? null,
+      meetingUrl: (row.meetingUrl as string | null) ?? null,
+      description: (row.description as string | null) ?? null,
+    },
+    detail: toEventDetailView(body),
   }
 }
 
@@ -283,6 +321,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const updateEventFn = props.updateEvent ?? defaultUpdateEvent
   const deleteEventFn = props.deleteEvent ?? defaultDeleteEvent
   const loadEventDetailFn = props.loadEventDetail ?? defaultLoadEventDetail
+  const loadEventByIdFn = props.loadEventById ?? defaultLoadEventById
   const loadNotificationsFn = props.loadNotifications ?? defaultLoadNotifications
   const markNotificationsReadFn = props.markNotificationsRead ?? defaultMarkRead
   const today = useMemo(() => props.today ?? new Date(), [props.today])
@@ -499,6 +538,37 @@ export function CalendarPage(props: CalendarPageProps = {}) {
       .catch(() => setEventDetail(null))
       .finally(() => setDetailLoading(false))
   }
+
+  // Deep-link from an invitation or interview row: unlike `handleNotificationNavigate`, the target
+  // event is very likely outside whatever range is currently loaded (a booked interview weeks out,
+  // opened from the invitation list), so this fetches the one event directly instead of searching
+  // `items`, and moves the active date to where it actually lives.
+  const consumedEventIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!props.eventId || consumedEventIdRef.current === props.eventId) return
+    consumedEventIdRef.current = props.eventId
+    const eventId = props.eventId
+    setFormOpen(false)
+    setSelectedProjection(null)
+    setEditing(false)
+    setActionError(null)
+    setDetailLoading(true)
+    void loadEventByIdFn(eventId)
+      .then((result) => {
+        if (!result) return
+        const eventDay = result.event.startsAt.slice(0, 10)
+        setActiveDate(new Date(`${eventDay}T00:00:00.000Z`))
+        setSelectedEvent(result.event)
+        setEventDetail(result.detail)
+      })
+      .finally(() => {
+        setDetailLoading(false)
+        props.onEventConsumed?.()
+      })
+    // Only `eventId` should retrigger this — `loadEventByIdFn`/`setActiveDate`/`props.onEventConsumed`
+    // are read fresh from the closure each time the effect actually runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.eventId])
 
   function closeEventPanel() {
     setSelectedEvent(null)

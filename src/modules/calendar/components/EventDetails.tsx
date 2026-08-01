@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CalendarClock, ExternalLink, MapPin, Repeat, Users, X } from 'lucide-react'
+import { CalendarClock, ExternalLink, FileText, MapPin, Repeat, Users, Video, X } from 'lucide-react'
 import { Button } from '~/components/ui'
 import { isSafeHttpUrl } from '~/shared/lib/url-safety'
 import type { CalendarEventDto } from './CalendarView'
@@ -17,6 +17,10 @@ import type { RecurrenceScope } from './EventEditor'
  *   URL-safety allowlist was tightened are still clickable otherwise;
  * - deleting a recurring event forces a `this|following|series` scope choice rather than defaulting
  *   to a destructive whole-series delete.
+ *
+ * An `interview`-type event IS the interview (plans/UI Wave 3 "Connect booked scheduling to
+ * Calendar and Interviews") — `interview_sessions.event_id` and every `/interviews/$interviewId`
+ * route resolve by this same calendar event id, so no extra lookup is needed to cross-link.
  */
 
 export interface EventParticipantView {
@@ -135,6 +139,27 @@ export function EventDetails({
           <div className="flex items-center gap-2 text-bh-text-muted" data-testid="event-details-recurrence">
             <Repeat className="size-4 shrink-0" aria-hidden />
             <span>Repeats{detail?.recurrenceUntil ? ` until ${new Date(detail.recurrenceUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })}` : ''}</span>
+          </div>
+        )}
+
+        {event.type === 'interview' && (
+          <div className="flex flex-wrap items-center gap-3" data-testid="event-details-interview-links">
+            <a
+              href={`/interviews/${event.id}`}
+              className="inline-flex items-center gap-1.5 text-bh-accent underline"
+              data-testid="event-details-prepare-brief"
+            >
+              <FileText className="size-3.5" aria-hidden />
+              Prepare brief
+            </a>
+            <a
+              href={`/interviews/${event.id}/live`}
+              className="inline-flex items-center gap-1.5 text-bh-accent underline"
+              data-testid="event-details-join-interview"
+            >
+              <Video className="size-3.5" aria-hidden />
+              Join interview
+            </a>
           </div>
         )}
 

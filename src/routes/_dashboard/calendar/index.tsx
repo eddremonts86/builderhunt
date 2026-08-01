@@ -9,6 +9,10 @@ const CalendarSearchSchema = z.object({
   view: z.enum(['month', 'week', 'day', 'list']).optional().default('month'),
   date: z.string().regex(isoDatePattern).optional(),
   q: z.string().max(200).optional().default(''),
+  // Deep-link from an invitation/interview row (plans/UI Wave 3 "Connect booked scheduling to
+  // Calendar and Interviews") — an interview id and a calendar event id are the same value, so
+  // this never needs a separate lookup to resolve.
+  event: z.string().uuid().optional(),
 })
 
 export const Route = createFileRoute('/_dashboard/calendar/')({
@@ -34,9 +38,11 @@ function CalendarRoute() {
       view={search.view as CalendarViewKey}
       date={search.date ? new Date(`${search.date}T00:00:00.000Z`) : undefined}
       query={search.q}
+      eventId={search.event}
       onViewChange={(view) => navigate({ search: (prev) => ({ ...prev, view }), replace: true })}
       onDateChange={(date) => navigate({ search: (prev) => ({ ...prev, date: toIsoDate(date) }), replace: true })}
       onQueryChange={(q) => navigate({ search: (prev) => ({ ...prev, q }), replace: true })}
+      onEventConsumed={() => navigate({ search: (prev) => ({ ...prev, event: undefined }), replace: true })}
     />
   )
 }

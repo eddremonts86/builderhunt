@@ -145,6 +145,19 @@ describe('EventDetails — read view', () => {
   })
 })
 
+describe('EventDetails — interview cross-links (plans/UI Wave 3 "Connect booked scheduling")', () => {
+  it('links Prepare brief and Join interview to the event\'s own id for an interview-type event', () => {
+    render({ event: eventDto({ type: 'interview', id: 'evt-interview-1' }) })
+    expect(testId('event-details-prepare-brief').getAttribute('href')).toBe('/interviews/evt-interview-1')
+    expect(testId('event-details-join-interview').getAttribute('href')).toBe('/interviews/evt-interview-1/live')
+  })
+
+  it('never renders interview links for a personal event', () => {
+    render({ event: eventDto({ type: 'personal' }) })
+    expect(maybeTestId('event-details-interview-links')).toBeNull()
+  })
+})
+
 describe('EventDetails — actions', () => {
   it('wires edit, cancel, delete and close to their callbacks', () => {
     const onEdit = vi.fn()

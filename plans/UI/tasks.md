@@ -103,7 +103,7 @@
   - Do: Let the user select a bounded date range, explain that the snapshot contains private calendar data, request the authenticated export, and download only on success.
   - Verify: valid export downloads `text/calendar` with `private, no-store`; invalid/unbounded ranges and signed-out requests fail without a download.
 
-- [ ] **Connect booked scheduling to Calendar and Interviews**
+- [x] **Connect booked scheduling to Calendar and Interviews**
   - Files: `src/modules/scheduling/components/InvitationStatus.tsx`, `src/modules/calendar/components/EventDetails.tsx`, `src/modules/interviews/components/InterviewList.tsx`, `tests/e2e/scheduling-organizer.spec.ts`
   - Do: Add View in Calendar, Prepare brief, and Start/Rejoin actions when the invitation/event state permits; preserve safe external meeting links as secondary actions.
   - Verify: draft/sent/opened/booked/cancelled states expose only valid actions and navigate to the correct event/interview.
