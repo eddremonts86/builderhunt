@@ -3,7 +3,7 @@ import { z } from 'zod'
 
 export interface PublicSearchBuilder {
   id: string
-  kind: 'person' | 'repo'
+  kind: 'person' | 'repo' | 'organization'
   username: string
   displayName: string | null
   source: string

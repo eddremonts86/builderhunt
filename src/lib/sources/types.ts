@@ -1,4 +1,11 @@
-export type BuilderKind = 'person' | 'repo'
+/**
+ * What a search result actually is.
+ *
+ * `organization` was added after 30 of 60 GitHub results turned out to be repositories and one of the
+ * "people" was a company account. A recruiter searching for people must not be shown either, and merging
+ * either into a canonical human is not a subtle error.
+ */
+export type BuilderKind = 'person' | 'repo' | 'organization'
 
 export type SourceName =
   | 'github'

@@ -44,6 +44,10 @@ const classifications: Classification[] = [
   tenant('organization_plan_changes', 'organization_id', ['security-and-multitenancy', 'pricing-and-billing'], { organizationColumn: true }),
   global('builder_identities', ['id', 'source', 'source_id', 'username', 'display_name', 'avatar_url', 'bio', 'profile_url'], ['security-and-multitenancy', 'shared-resources']),
   operational('builder_source_snapshots', 'builder_identity_id', ['security-and-multitenancy']),
+  // Cross-links an account declares about itself. Global-public for the same reason as
+  // `builder_identities`: a profile saying "my site is example.com" is a public statement by that account,
+  // and no organization owns it. It is the raw material identity resolution runs on.
+  global('identity_declared_links', ['builder_identity_id', 'link_kind', 'normalized_value', 'verification_state'], ['solutions-intelligence', 'security-and-multitenancy']),
   // Canonical humans (plan 43 Phase 3). Global-public for the same reason as `builder_identities`:
   // a person and the accounts they hold are public facts, and no organization owns them. The
   // per-organization opinion about that person stays in `organization_builders.private_metadata`.

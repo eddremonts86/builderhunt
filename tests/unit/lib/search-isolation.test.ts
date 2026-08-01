@@ -33,6 +33,20 @@ vi.mock('~/lib/sources/lobsters', () => ({ searchLobsters: mocks.lobsters }))
 vi.mock('~/shared/lib/profile-suppression', () => ({ filterSuppressed: (rows: RawBuilder[]) => Promise.resolve(rows) }))
 // Redis would make the cache path non-deterministic across cases.
 vi.mock('~/shared/lib/redis', () => ({ getRedis: () => Promise.resolve(null) }))
+/**
+ * The operator source register is a database read, exactly like suppression above, and this suite is about
+ * aggregation. Mocked to permit whatever the case asked for.
+ *
+ * Worth knowing why it has to be mocked at all: `partitionRequestedSources` **fails closed** — if the
+ * register cannot be read, nothing is contacted. That is deliberate (a database blip must not bring every
+ * disabled source back online), and it means an unmocked read here returns an empty allowed set and every
+ * case in this file sees zero results. Which is what happened when the register landed: these twelve tests
+ * broke and stayed broken, because the verification runs after that change were scoped to other directories.
+ */
+vi.mock('~/shared/lib/repositories/search-sources', () => ({
+  partitionRequestedSources: (requested: readonly string[]) =>
+    Promise.resolve({ allowed: [...requested], refused: [] }),
+}))
 
 const { CONNECTOR_TIMEOUT_MS, searchBuildersWithStatus } = await import('~/lib/search')
 

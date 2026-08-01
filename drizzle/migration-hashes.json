@@ -532,6 +532,10 @@
     "0132_job_feed_sources": {
       "sql": "4e3a82f73e74fdbda8e6a60e4489a59226da58c9cc2fc4c95460589ac7348e46",
       "snapshot": "f0a4d721deadd2b7a40d55ab4ddb153f9fb29038503f5ecc16005ccea04c55db"
+    },
+    "0133_identity_kind_and_declared_links": {
+      "sql": "ec2a3a1bffc4393bdc1b3d04d3d81c81788d14eaaf8dc9630a9bb45a5b20df40",
+      "snapshot": "228b422de564cd6a60af918299c214063517485ef4f25806e7f42b656d18acaa"
     }
   }
 }

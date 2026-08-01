@@ -8,7 +8,7 @@ interface Builder {
   id: string
   username: string
   displayName?: string | null
-  kind?: 'person' | 'repo'
+  kind?: 'person' | 'repo' | 'organization'
   source: string
   sourceId: string
   profileUrl: string

@@ -73,6 +73,13 @@ export interface EmbeddableSource {
   source: string
   sourceId: string
   username: string
+  /** `RawBuilder.kind`. Carried so the write-through can file a repository as a repository instead of as a
+   * person — 52 of the 175 identities in this repository's database were misfiled before it existed. */
+  kind?: 'person' | 'repo' | 'organization'
+  /** The connector's `RawBuilder.metadata`. Not part of the embedding document; carried so the observation
+   * write can extract self-declared cross-links, which are the only deterministic way two accounts become
+   * one person. */
+  metadata?: Record<string, unknown> | null
   displayName?: string | null
   avatarUrl?: string | null
   bio?: string | null

@@ -983,7 +983,7 @@ function slugify(s: string): string {
 }
 
 interface ExportableBuilder {
-  kind?: 'person' | 'repo'
+  kind?: 'person' | 'repo' | 'organization'
   source: string
   username: string
   displayName?: string

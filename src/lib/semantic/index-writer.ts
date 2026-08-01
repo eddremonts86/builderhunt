@@ -76,6 +76,7 @@ export async function recordIngestedSourceObservations(profiles: EmbeddableSourc
         source: profile.source,
         sourceId: profile.sourceId,
         username: profile.username,
+        kind: profile.kind ?? 'person',
         profileUrl: profile.profileUrl,
         displayName: profile.displayName ?? null,
         avatarUrl: profile.avatarUrl ?? null,
@@ -86,6 +87,9 @@ export async function recordIngestedSourceObservations(profiles: EmbeddableSourc
         // The same minimized public projection the embedding document is built from — never a raw
         // upstream response body.
         payload: toEmbeddedProfile(profile) as unknown as Record<string, unknown>,
+        // The connector's metadata, which is where a profile's self-declared links live. Not snapshotted;
+        // read once to record what this account says about its other accounts.
+        declaredLinkFields: profile.metadata ?? null,
       })
       if (outcome.status === 'recorded') recorded += 1
       else if (outcome.status === 'unchanged') unchanged += 1

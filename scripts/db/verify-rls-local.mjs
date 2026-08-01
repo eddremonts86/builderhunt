@@ -1320,6 +1320,12 @@ try {
     // never be able to delete history.
     { table: 'builder_source_snapshots', role: 'builderhunt_platform', granted: ['SELECT', 'DELETE'] },
     { table: 'builder_embeddings', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'] },
+    // Declarations arrive with a search observation, so the request path writes them — the same reasoning
+    // that gives the app role INSERT on builder_identities. Verification is a worker's job and needs UPDATE.
+    // Neither may DELETE: removing a declaration is a retention action or a subject's removal request.
+    { table: 'identity_declared_links', role: 'builderhunt_app', granted: ['SELECT', 'INSERT', 'UPDATE'], denied: ['DELETE'] },
+    { table: 'identity_declared_links', role: 'builderhunt_worker', granted: ['SELECT', 'INSERT', 'UPDATE'], denied: ['DELETE'] },
+    { table: 'identity_declared_links', role: 'builderhunt_platform', granted: ['SELECT', 'DELETE'] },
     // The catalog projector is a real worker and enqueues stubs for components it just projected. No
     // DELETE: removing an embedding is either retention or a subject's removal request, both platform
     // actions.

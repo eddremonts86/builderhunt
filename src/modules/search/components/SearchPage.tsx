@@ -17,7 +17,7 @@ import { SOURCE_PRESENTATION } from '~/shared/lib/source-presentation'
 /* -------------------------------------------------------------------------- */
 /*  Types                                                                      */
 /* -------------------------------------------------------------------------- */
-type BuilderKind = 'person' | 'repo'
+type BuilderKind = 'person' | 'repo' | 'organization'
 
 interface Builder {
   id: string

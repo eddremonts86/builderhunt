@@ -147,6 +147,18 @@ export const builderIdentities = pgTable(
     source: text('source').notNull(),
     sourceId: text('source_id').notNull(),
     username: text('username').notNull(),
+    /**
+     * What this identity actually is.
+     *
+     * `RawBuilder` has carried this since the first connector and every write path dropped it, because
+     * there was no column. The GitHub connector searches users *and* repositories, so 41 GitHub rows and 11
+     * GitLab rows here have an `owner/repo` "username" and were indistinguishable from real people — a
+     * recruiter searching for people got repositories back about a third of the time.
+     *
+     * Load-bearing for identity resolution too: merging a repository into a canonical human is not a subtle
+     * error, so anything that unifies identities filters on `person` first.
+     */
+    kind: text('kind').notNull().default('person').$type<'person' | 'repo' | 'organization'>(),
     displayName: text('display_name'),
     avatarUrl: text('avatar_url'),
     bio: text('bio'),
@@ -162,6 +174,65 @@ export const builderIdentities = pgTable(
   (table) => [
     uniqueIndex('builder_identities_source_source_id_unique').on(table.source, table.sourceId),
     index('builder_identities_source_username_idx').on(table.source, table.username),
+    check('builder_identities_kind_check', sql`${table.kind} in ('person', 'repo', 'organization')`),
+    index('builder_identities_kind_idx').on(table.kind),
+  ],
+)
+
+export const DECLARED_LINK_KINDS = [
+  'website', 'github', 'gitlab', 'twitter', 'mastodon', 'bluesky_handle', 'bluesky_did', 'stackexchange_account',
+] as const
+export type DeclaredLinkKind = (typeof DECLARED_LINK_KINDS)[number]
+
+export const DECLARED_LINK_STATES = ['declared', 'reciprocal', 'dns_verified', 'unreachable', 'contradicted'] as const
+export type DeclaredLinkState = (typeof DECLARED_LINK_STATES)[number]
+
+/**
+ * Cross-source links an account declares about itself, and what verification found.
+ *
+ * The signals every connector used to throw away. Verified live against each API: GitHub publishes `blog`
+ * and `twitter_username`; dev.to publishes `website_url`, `twitter_username` and `github_username`;
+ * lobste.rs publishes `github_username` and `mastodon_username`; Stack Exchange publishes a first-party
+ * identity graph across its whole network; a Bluesky handle that is a domain is proven by a DNS record.
+ *
+ * A declaration proves nothing by itself — anyone can put any URL in a profile. What makes it deterministic
+ * is **reciprocity**: if the target also links back to this exact account, its owner has asserted the
+ * account is theirs, and the two statements together prove one controller. `verificationState` is that
+ * distinction, and `decideLink` remains the only thing that turns it into a link.
+ */
+export const identityDeclaredLinks = pgTable(
+  'identity_declared_links',
+  {
+    id: text('id').primaryKey(),
+    builderIdentityId: text('builder_identity_id').notNull()
+      .references(() => builderIdentities.id, { onDelete: 'cascade' }),
+    linkKind: text('link_kind').notNull().$type<DeclaredLinkKind>(),
+    /** Exactly what the source published, so a reviewer sees the declaration and not our reading of it. */
+    rawValue: text('raw_value').notNull(),
+    /** The comparable form — bare lowercase host, or bare lowercase handle. Two accounts declaring
+     * `https://Example.com/` and `example.com` are declaring the same thing, and a resolver that could not
+     * see that would find no reciprocity at all. */
+    normalizedValue: text('normalized_value').notNull(),
+    verificationState: text('verification_state').notNull().default('declared').$type<DeclaredLinkState>(),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    verificationDetail: text('verification_detail'),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('identity_declared_links_kind_check', sql`${table.linkKind} in ('website', 'github', 'gitlab', 'twitter', 'mastodon', 'bluesky_handle', 'bluesky_did', 'stackexchange_account')`),
+    check('identity_declared_links_state_check', sql`${table.verificationState} in ('declared', 'reciprocal', 'dns_verified', 'unreachable', 'contradicted')`),
+    /** A verified state must say when: an unstamped `reciprocal` cannot be aged out, and a reciprocity that
+     * was true two years ago is not evidence today. */
+    check(
+      'identity_declared_links_verified_stamp_check',
+      sql`${table.verificationState} not in ('reciprocal', 'dns_verified') or ${table.verifiedAt} is not null`,
+    ),
+    uniqueIndex('identity_declared_links_unique').on(table.builderIdentityId, table.linkKind, table.normalizedValue),
+    /** The resolver's core query — "which other identities declared this same value?" is where reciprocity
+     * is found. */
+    index('identity_declared_links_normalized_idx').on(table.linkKind, table.normalizedValue),
+    index('identity_declared_links_state_idx').on(table.verificationState, table.lastSeenAt),
   ],
 )
 
