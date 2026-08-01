@@ -6,6 +6,7 @@ import { Input } from '~/components/ui'
 import { Button } from '~/components/ui/button'
 import { LinkButton } from '~/components/ui/link'
 import { PortfolioSettings } from '~/modules/builder-profile/components/PortfolioSettings'
+import { EvidenceProvenancePanel } from '~/modules/builder-profile/components/EvidenceProvenancePanel'
 
 interface ClaimedBuilder {
   id: string
@@ -326,6 +327,10 @@ function MePage() {
 
                 <div className="mt-4 pt-4 border-t border-bh-border">
                   <PortfolioSettings claimId={b.claimId} />
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-bh-border">
+                  <EvidenceProvenancePanel builderId={b.id} />
                 </div>
               </div>
             )

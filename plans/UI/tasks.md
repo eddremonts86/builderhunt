@@ -130,12 +130,12 @@
 
 ## Wave 4 — Claimant and trust UI
 
-- [ ] **Add verified-subject provenance UI**
+- [x] **Add verified-subject provenance UI**
   - Files: `src/modules/builder-profile/components/EvidenceProvenancePanel.tsx`, `src/routes/_dashboard/me/index.tsx`, `src/routes/api/me/builder/$builderId/evidence-provenance.ts`, `tests/unit/modules/builder-profile/components/EvidenceProvenancePanel.test.tsx`
   - Do: Show only source, field categories, observation date, and retention state for a verified claimant; include loading, empty, error, and restricted states; link to Privacy and profile removal guidance.
   - Verify: claimant sees the allowlisted projection; another user, another builder, and random ID reveal no tenant/recruiter/reviewer/note/score data.
 
-- [ ] **Add restrict-processing confirmation and state**
+- [x] **Add restrict-processing confirmation and state**
   - Files: `src/modules/builder-profile/components/EvidenceProvenancePanel.tsx`, `src/routes/_dashboard/me/index.tsx`, `src/routes/api/me/builder/$builderId/restrict-processing.ts`, `tests/e2e/profile-enrichment-privacy.spec.ts`
   - Do: Explain future-job cancellation and bounded evidence purge, require explicit confirmation, submit idempotently, and replace controls with a durable restricted state.
   - Verify: verified claimant restricts once and repeats safely; running work stops; non-claimant cannot observe or mutate the state.

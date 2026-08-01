@@ -59,10 +59,18 @@ export async function withdrawBuilderProcessingRestriction(builderIdentityId: st
 
 export interface EnrichmentProvenanceEntry {
   source: string
+  /** Payload field names present on this evidence row — never the values themselves. */
+  fieldCategories: string[]
   observedAt: string
   expiresAt: string
   retentionState: 'active' | 'expired'
 }
+
+// The only keys `EnrichmentEvidencePayload` (src/lib/enrichment/types.ts) ever has — used to turn
+// a stored payload into field-category *names* without trusting arbitrary jsonb keys.
+const PAYLOAD_FIELD_CATEGORIES = [
+  'profileUrl', 'username', 'displayName', 'headline', 'organization', 'role', 'location', 'bio', 'topics', 'recentActivitySummary',
+] as const
 
 /**
  * Cross-organization aggregation for the verified-claimant provenance read
@@ -74,11 +82,11 @@ export interface EnrichmentProvenanceEntry {
  */
 export async function listEnrichmentProvenanceForIdentity(builderIdentityId: string): Promise<EnrichmentProvenanceEntry[]> {
   const rows = await workerDb.execute(sql`
-    select connector, observed_at, expires_at
+    select connector, payload, observed_at, expires_at
     from enrichment_evidence
     where builder_identity_id = ${builderIdentityId} and resolution in ('accepted', 'review')
     order by observed_at desc
-  `) as unknown as Array<{ connector: string; observed_at: string; expires_at: string }>
+  `) as unknown as Array<{ connector: string; payload: Record<string, unknown>; observed_at: string; expires_at: string }>
 
   // `drizzle`'s raw `.execute()` returns timestamp columns as strings, not
   // `Date` (unlike the typed query builder, and unlike the underlying
@@ -87,8 +95,13 @@ export async function listEnrichmentProvenanceForIdentity(builderIdentityId: str
   // fix (found while extending scripts/db/verify-api-isolation-local.mjs).
   return rows.map((row) => {
     const expiresAt = new Date(row.expires_at)
+    const payload = row.payload ?? {}
     return {
       source: row.connector,
+      fieldCategories: PAYLOAD_FIELD_CATEGORIES.filter((key) => {
+        const value = payload[key]
+        return Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
+      }),
       observedAt: new Date(row.observed_at).toISOString(),
       expiresAt: expiresAt.toISOString(),
       retentionState: expiresAt.getTime() > Date.now() ? 'active' : 'expired',
