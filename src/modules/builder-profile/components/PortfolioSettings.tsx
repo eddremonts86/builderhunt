@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Check, Copy, Eye, ExternalLink } from 'lucide-react'
-import { Button, Textarea } from '~/components/ui'
+import { Button, Switch, Textarea } from '~/components/ui'
 import {
   HEADLINE_MAX,
   INTRODUCTION_MAX,
@@ -197,6 +197,21 @@ export function PortfolioSettings({ claimId }: PortfolioSettingsProps) {
           </ul>
         </div>
       )}
+
+      <div className="flex items-center justify-between gap-3 pt-2 border-t border-bh-border">
+        <div>
+          <label className="text-sm font-medium text-bh-text" htmlFor="portfolio-show-ai-persona">Show AI-summarized profile</label>
+          <p className="text-xs text-bh-text-dim mt-0.5">
+            Shows a short AI-generated summary (focus, strengths) from your own tracked-builder enrichment. Off by default.
+          </p>
+        </div>
+        <Switch
+          id="portfolio-show-ai-persona"
+          checked={settings.showAiPersona}
+          onCheckedChange={(checked) => setDraft({ ...draft, settings: { ...settings, showAiPersona: checked } })}
+          data-testid="portfolio-show-ai-persona-toggle"
+        />
+      </div>
 
       <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-bh-border">
         <Button type="button" variant="secondary" size="sm" disabled={saving} onClick={() => patch(settings)}>

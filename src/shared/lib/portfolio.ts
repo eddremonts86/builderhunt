@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { PortfolioAiPersonaSchema } from './portfolio-integrations'
 
 export const PORTFOLIO_THEMES = ['default', 'minimal', 'terminal'] as const
 export type PortfolioTheme = (typeof PORTFOLIO_THEMES)[number]
@@ -68,6 +69,9 @@ export const PublicPortfolioSchema = z.object({
     language: z.string().nullable(),
   })),
   publishedAt: z.string().datetime(),
+  /** Null unless the owner opted in (`showAiPersona`) AND a valid, fresh artifact of their OWN
+   * exists — see `findClaimantOwnedAiEnrichment`'s doc comment for why "their own" is load-bearing. */
+  aiPersona: PortfolioAiPersonaSchema.nullable(),
 })
 export type PublicPortfolio = z.infer<typeof PublicPortfolioSchema>
 
@@ -131,6 +135,9 @@ export interface PublicPortfolioSource {
   profileUrl: string
   settings: PortfolioSettings
   projectCandidates: PortfolioProject[]
+  /** Already read via `readAiPersonaForPortfolio` (fail-closed) — this function does not parse the
+   * raw enrichment itself, it only enforces the opt-in gate a second time as defense in depth. */
+  aiPersona?: import('./portfolio-integrations').PortfolioAiPersona | null
 }
 
 /** Returns null (not an error) when the claim isn't published — the caller turns that into a 404 without leaking whether an unpublished draft exists. */
@@ -148,5 +155,6 @@ export function buildPublicPortfolio(input: PublicPortfolioSource): PublicPortfo
     introduction: input.settings.introduction,
     projects: selectPortfolioProjects(input.projectCandidates, input.settings.selectedProjectIds),
     publishedAt: input.settings.publishedAt,
+    aiPersona: input.settings.showAiPersona ? (input.aiPersona ?? null) : null,
   }
 }

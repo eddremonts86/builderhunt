@@ -19,7 +19,9 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       { buildPublicPortfolio, parsePortfolioSettings },
       { getCachedPortfolio, setCachedPortfolio },
       { fetchPortfolioProjectCandidates },
-      { getPublicPortfolioClaim },
+      { getPublicPortfolioClaim, getPortfolioLinkContext },
+      { findClaimantOwnedAiEnrichment },
+      { readAiPersonaForPortfolio },
       { env },
     ] = await Promise.all([
       import('~/shared/lib/db/client'),
@@ -27,6 +29,8 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       import('~/shared/lib/portfolio-cache'),
       import('~/lib/github/content'),
       import('~/shared/lib/repositories/builder-claims'),
+      import('~/shared/lib/repositories/organization-builders'),
+      import('~/shared/lib/portfolio-integrations'),
       import('~/shared/lib/env'),
     ])
     if (env.PORTFOLIOS_ENABLED === 'false') return null
@@ -42,6 +46,17 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       ? await fetchPortfolioProjectCandidates(claim.username).catch(() => [])
       : []
 
+    // Never invoke AI from a public request — this only ever reads an artifact a background
+    // enrichment job already produced and the claimant already opted into showing.
+    let aiPersona = null
+    if (settings.showAiPersona) {
+      const context = await getPortfolioLinkContext(publicDb, claimId)
+      if (context) {
+        const rawEnrichment = await findClaimantOwnedAiEnrichment(publicDb, context.builderIdentityId, context.subjectUserId)
+        aiPersona = readAiPersonaForPortfolio(rawEnrichment, { aiPersonaEnabled: settings.showAiPersona })
+      }
+    }
+
     const portfolio = buildPublicPortfolio({
       claimId: claim.claimId,
       source: claim.source,
@@ -51,6 +66,7 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
       profileUrl: claim.profileUrl,
       settings,
       projectCandidates: candidates,
+      aiPersona,
     })
     if (!portfolio) return null
 

@@ -834,6 +834,13 @@
       "when": 1785581971334,
       "tag": "0118_platform_admin_user_billing_summary",
       "breakpoints": true
+    },
+    {
+      "idx": 119,
+      "version": "7",
+      "when": 1785589867237,
+      "tag": "0119_public_claimant_owned_ai_enrichment",
+      "breakpoints": true
     }
   ]
 }

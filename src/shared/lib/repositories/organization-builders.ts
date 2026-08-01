@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm'
-import type { TenantTransaction } from '../db/client'
+import type { PublicDb, TenantTransaction } from '../db/client'
 import {
   builderIdentities,
   builderNotes,
@@ -244,6 +244,39 @@ export async function setOrganizationBuilderEnrichment(
     .set({ privateMetadata, updatedAt: new Date() })
     .where(and(eq(organizationBuilders.organizationId, organizationId), eq(organizationBuilders.id, existing.id)))
   return enrichment
+}
+
+/**
+ * The one enrichment artifact a public portfolio is allowed to surface (plans/UI/tasks.md Wave 7
+ * "Add opt-in AI persona to public portfolios").
+ *
+ * `organization_builders.privateMetadata.aiEnrichment` is org-scoped — any number of organizations
+ * can independently track and enrich the same `builder_identities` row, each with its own private
+ * AI-generated judgment of that person. A public portfolio has no "canonical" or "owning"
+ * organization to pick from, and showing a stranger org's private research about someone (even with
+ * the claimant's own `showAiPersona` opt-in) would surface a third party's assessment, not the
+ * claimant's own. So this deliberately narrows to the ONE case that's actually the claimant's own
+ * artifact: an `organization_builders` row for this identity that the claimant (`subjectUserId`)
+ * themselves created — e.g. tracking themselves in their own personal workspace. Any other org's
+ * enrichment of this identity is invisible here, by design.
+ *
+ * Calls the `public_claimant_owned_ai_enrichment` SECURITY DEFINER function (migration 0119) rather
+ * than a plain `.select()` — `organization_builders`'s SELECT RLS policy requires
+ * `organization_id = app.organization_id`, which is never set for the anonymous, cross-org read the
+ * public portfolio page does (confirmed empirically: a real matching row was invisible to a plain
+ * `builderhunt_app` connection with no tenant context — same structural gap 0111 fixed for
+ * `builder_claims`). The function runs as its owner regardless of the caller's own privileges, so
+ * this is safe to call from either a tenant transaction or `publicDb`.
+ */
+export async function findClaimantOwnedAiEnrichment(
+  transaction: TenantTransaction | PublicDb,
+  builderIdentityId: string,
+  subjectUserId: string,
+): Promise<unknown> {
+  const [row] = await transaction.execute<{ public_claimant_owned_ai_enrichment: unknown }>(
+    sql`select public_claimant_owned_ai_enrichment(${builderIdentityId}, ${subjectUserId})`,
+  )
+  return row?.public_claimant_owned_ai_enrichment ?? null
 }
 
 /**

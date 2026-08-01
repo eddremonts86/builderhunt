@@ -120,7 +120,37 @@ describe('buildPublicPortfolio', () => {
     const settings = publishPortfolio(UNPUBLISHED_PORTFOLIO, '2026-07-26T00:00:00.000Z')
     const result = buildPublicPortfolio({ ...base, settings })
     expect(result && Object.keys(result).sort()).toEqual(
-      ['avatarUrl', 'claimId', 'displayName', 'headline', 'introduction', 'profileUrl', 'projects', 'publishedAt', 'source', 'theme', 'username'].sort(),
+      ['aiPersona', 'avatarUrl', 'claimId', 'displayName', 'headline', 'introduction', 'profileUrl', 'projects', 'publishedAt', 'source', 'theme', 'username'].sort(),
     )
+  })
+
+  describe('aiPersona gating (defense in depth — the caller should already gate this on showAiPersona before calling)', () => {
+    const persona = {
+      summary: 'Ships reliable backend systems with a focus on observability.',
+      estimatedSeniority: 'senior' as const,
+      primaryFocus: 'distributed systems',
+      strengths: ['systems design', 'debugging'],
+      codingStyle: 'pragmatic',
+      enrichedAt: '2026-07-01T00:00:00.000Z',
+      model: 'minimax',
+    }
+
+    it('is null when showAiPersona is false, even if an aiPersona was passed in', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showAiPersona: false }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, aiPersona: persona })
+      expect(result?.aiPersona).toBeNull()
+    })
+
+    it('is null when showAiPersona is true but no artifact was found', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showAiPersona: true }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, aiPersona: null })
+      expect(result?.aiPersona).toBeNull()
+    })
+
+    it('carries the persona when showAiPersona is true and a valid artifact was passed in', () => {
+      const settings = publishPortfolio({ ...UNPUBLISHED_PORTFOLIO, showAiPersona: true }, '2026-07-26T00:00:00.000Z')
+      const result = buildPublicPortfolio({ ...base, settings, aiPersona: persona })
+      expect(result?.aiPersona).toEqual(persona)
+    })
   })
 })

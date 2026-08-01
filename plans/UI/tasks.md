@@ -246,7 +246,7 @@
 
 ## Wave 7 — Optional adapters and honest incomplete features
 
-- [ ] **Add opt-in AI persona to public portfolios**
+- [x] **Add opt-in AI persona to public portfolios**
   - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PortfolioSettings.tsx`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `tests/unit/shared/lib/portfolio-integrations.test.ts`
   - Do: Parse the existing versioned persona artifact, require explicit owner opt-in, expose only summary/focus/strengths/provenance, and never invoke AI from a public request.
   - Verify: absent, invalid, stale-policy-disabled, opted-out, and opted-in valid artifacts behave fail-closed.

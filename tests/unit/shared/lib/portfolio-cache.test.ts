@@ -14,6 +14,7 @@ const SAMPLE: PublicPortfolio = {
   introduction: '',
   projects: [],
   publishedAt: '2026-07-26T00:00:00.000Z',
+  aiPersona: null,
 }
 
 describe('portfolio cache (in-memory fallback — no REDIS_URL in test env)', () => {

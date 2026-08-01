@@ -476,6 +476,10 @@
     "0118_platform_admin_user_billing_summary": {
       "sql": "4f27c5fb4d931d47621f39825f5320801e7e4738d2a574cc49e1f5d69e77dd1d",
       "snapshot": "cf7edddca9f4f7257962731e2b828a3ca149fc05c50d4d327b8015192990365d"
+    },
+    "0119_public_claimant_owned_ai_enrichment": {
+      "sql": "4e47ef94d432d15d6eeb19ca8bac598c29719cd9dcf47dba6ffae0b35c0c2c92",
+      "snapshot": "2873b17317df78f7e73f687bd26c675407dedbef098cd91b36f6ccb1885eea53"
     }
   }
 }
