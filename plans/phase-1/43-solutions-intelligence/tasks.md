@@ -135,7 +135,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: collision/adversarial fixtures prove username similarity cannot merge people and
     unmerge restores every source account and organization reference.
 
-- [ ] **Dual-read/write organization tracking**
+- [x] **Dual-read/write organization tracking**
   - Files: `src/shared/lib/repositories/organization-builders.ts`,
     `src/shared/lib/public-builder-dto.ts`, builder profile/search routes
   - Do: Introduce canonical-human references additively, backfill safely, dual-write, compare old/new

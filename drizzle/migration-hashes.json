@@ -496,6 +496,10 @@
     "0123_builder_source_snapshots_grants": {
       "sql": "eccc8f901a37ab447b04649ec63e476b3c39e03a249ef447d1b3100f8e7d2687",
       "snapshot": "4f1e7ec5f08fe0a0a1fda192b8ac545c984b0266c2d617c77541330085054a25"
+    },
+    "0124_organization_builders_canonical_human": {
+      "sql": "447d4ac7ac18eceac1e7d1c7bf68208f9901ff946347cdf8fd083e3e2079a4c1",
+      "snapshot": "597d3ef4a91db807db86ff8b96541810dc1c68f01c5b34744689e2dcea634a6b"
     }
   }
 }

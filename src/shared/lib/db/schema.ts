@@ -393,6 +393,18 @@ export const organizationBuilders = pgTable(
     id: text('id').primaryKey(),
     organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
     builderIdentityId: text('builder_identity_id').notNull().references(() => builderIdentities.id, { onDelete: 'restrict' }),
+    /**
+     * The canonical human this tracked account currently resolves to (plan 43 Phase 3,
+     * "Dual-read/write organization tracking"). Additive and nullable throughout the migration:
+     * `builder_identity_id` above stays the authoritative key, and every read still works when this
+     * is null — which is the state for every row until the backfill runs, and the state a row falls
+     * back to if its canonical human is later deleted.
+     *
+     * `ON DELETE SET NULL`, deliberately not cascade: deleting or unmerging a canonical human must
+     * never take an organization's tracking, notes or status with it. The tenant keeps its record and
+     * loses only the pointer, which is what makes a cutover reversible.
+     */
+    canonicalHumanId: text('canonical_human_id').references(() => canonicalHumans.id, { onDelete: 'set null' }),
     creatorUserId: text('creator_user_id').notNull().references(() => authUsers.id, { onDelete: 'restrict' }),
     visibility: text('visibility').notNull().default('private'),
     status: text('status').notNull().default('tracked'),
@@ -403,6 +415,9 @@ export const organizationBuilders = pgTable(
   (table) => [
     uniqueIndex('organization_builders_org_identity_unique').on(table.organizationId, table.builderIdentityId),
     uniqueIndex('organization_builders_organization_id_id_unique').on(table.organizationId, table.id),
+    // Reads that go by canonical human ("every account this person holds that we track") need this,
+    // and the parity check scans it per organization.
+    index('organization_builders_canonical_human_idx').on(table.organizationId, table.canonicalHumanId),
     check('organization_builders_visibility_check', sql`${table.visibility} in ('private', 'organization')`),
     check('organization_builders_status_check', sql`${table.status} in ('tracked', 'shortlisted', 'archived')`),
   ],
@@ -621,9 +636,20 @@ export const builderNotes = pgTable('builder_notes', {
   id: text('id').primaryKey(),
   organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => authUsers.id),
-  // References organization_builders, not the legacy `builders` table — nothing writes to
-  // `builders` anymore, and `resolveOrganizationBuilderId` (notes.ts) has always resolved and
-  // stored an organization_builders.id here. See migration 0120's comment for the empirical proof.
+  /**
+   * References `organization_builders`, not the legacy `builders` table, because that is the id
+   * space this column actually holds: `resolveOrganizationBuilderId` (notes.ts) resolves an
+   * `organization_builders.id` and stores it here.
+   *
+   * CORRECTION to migration 0120's comment, which claimed nothing writes to `builders` anymore.
+   * That is wrong — `trackOrganizationBuilder` still inserts a `builders` row using the *same* id as
+   * the `organization_builders` row it creates (organization-builders.ts, the single remaining write
+   * site; 5 such rows exist in local dev). So the old FK did resolve, but only by coincidence of that
+   * shared id, never by design. Any path that creates an `organization_builders` row without going
+   * through `trackOrganizationBuilder` — test fixtures did, and Phase 3's ingestion does — produced a
+   * row whose notes could not be written at all. Repointing the FK at the table whose id this column
+   * holds is correct either way; the coincidence was just load-bearing without being documented.
+   */
   builderId: text('builder_id').notNull().references(() => organizationBuilders.id),
   content: text('content').notNull(),
   createdAt: timestamp('created_at').defaultNow(),

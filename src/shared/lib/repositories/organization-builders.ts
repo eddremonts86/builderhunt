@@ -1,10 +1,11 @@
 import { createHash } from 'node:crypto'
-import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicDb, TenantTransaction } from '../db/client'
 import {
   builderIdentities,
   builderNotes,
   builders,
+  humanSourceLinks,
   organizationBuilders,
   savedQueries,
 } from '../db/schema'
@@ -44,6 +45,9 @@ const privateBuilderFields = {
   privateMetadata: organizationBuilders.privateMetadata,
   lastSeen: builderIdentities.lastSeenAt,
   createdAt: organizationBuilders.createdAt,
+  /** Null until the backfill runs, or when the account belongs to no canonical human yet. Additive
+   * during the plan 43 Phase 3 cutover — `identityId` above stays authoritative. */
+  canonicalHumanId: organizationBuilders.canonicalHumanId,
 }
 
 export function trackedKey(source: string, sourceId: string) {
@@ -78,8 +82,11 @@ export function listOrganizationBuilders(transaction: TenantTransaction, organiz
  * Tracked builders this org has attached at least one private note to (plans/UI/tasks.md Wave 6
  * "Build a scoped Export Center" — the "note collection" export scope). `builder_notes.builderId`
  * stores an `organization_builders.id` — the same id space `resolveOrganizationBuilderId` resolves
- * to and `listOrganizationBuilders` selects as `id` above — never the legacy `builders` table's own
- * id, which nothing in this codebase writes to anymore.
+ * to and `listOrganizationBuilders` selects as `id` above.
+ *
+ * `trackOrganizationBuilder` below does still write a legacy `builders` row, reusing that same id, so
+ * the two id spaces overlap for anything tracked through it. That overlap is a coincidence of one
+ * write path, not an invariant — see the correction on `builderNotes.builderId` in schema.ts.
  */
 export async function listNotedOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
   const noted = await transaction.selectDistinct({ builderId: builderNotes.builderId })
@@ -392,18 +399,186 @@ export async function trackOrganizationBuilder(
     metadata: { ...(input.metadata ?? {}), score: input.score ?? null },
   }).onConflictDoNothing()
 
+  // Dual-write leg (plan 43 Phase 3): record which canonical human this account currently resolves
+  // to, alongside the authoritative `builderIdentityId`. Read through the same transaction so it
+  // sees any link written earlier in this request.
+  //
+  // Only ACTIVE links count — a queued probabilistic proposal must not attach a tenant's tracking to
+  // a person nobody has confirmed. Null is a normal value here, not a failure: an account with no
+  // canonical human yet simply has none, and every read still works.
+  const canonicalHumanId = await resolveActiveCanonicalHumanId(transaction, identityId)
+
   await transaction.insert(organizationBuilders).values({
     id: trackingId,
     organizationId: input.organizationId,
     builderIdentityId: identityId,
+    canonicalHumanId,
     creatorUserId: input.creatorUserId,
     privateMetadata,
   }).onConflictDoUpdate({
     target: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
-    set: { privateMetadata, updatedAt: new Date() },
+    // `privateMetadata` and `canonicalHumanId` only. Status and visibility are the tenant's own
+    // decisions and re-tracking must never reset them.
+    set: { privateMetadata, canonicalHumanId, updatedAt: new Date() },
   })
 
-  return { id: trackingId, identityId, tracked: true as const, existed: Boolean(existing) }
+  return { id: trackingId, identityId, canonicalHumanId, tracked: true as const, existed: Boolean(existing) }
+}
+
+/**
+ * The canonical human an account is currently attached to, or null.
+ *
+ * Duplicated as a narrow query rather than calling `human-profiles.ts`'s reader because this runs
+ * inside a tenant transaction: that module takes a `PostgresJsDatabase` and would open its own
+ * connection, which would not see uncommitted work from this one.
+ */
+async function resolveActiveCanonicalHumanId(
+  transaction: TenantTransaction,
+  builderIdentityId: string,
+): Promise<string | null> {
+  const [link] = await transaction
+    .select({ canonicalHumanId: humanSourceLinks.canonicalHumanId })
+    .from(humanSourceLinks)
+    .where(and(
+      eq(humanSourceLinks.builderIdentityId, builderIdentityId),
+      isNull(humanSourceLinks.validUntil),
+      inArray(humanSourceLinks.reviewState, ['auto_approved', 'approved']),
+    ))
+    .limit(1)
+  return link?.canonicalHumanId ?? null
+}
+
+export interface CanonicalHumanParityRow {
+  organizationBuilderId: string
+  builderIdentityId: string
+  /** What the dual-write leg stored. */
+  storedCanonicalHumanId: string | null
+  /** What the link table says right now. */
+  liveCanonicalHumanId: string | null
+}
+
+export interface CanonicalHumanParityReport {
+  total: number
+  /** Rows where the stored pointer matches the live link — including both-null. */
+  matching: number
+  /** Stored is null but a link now exists: the row predates the link, so the backfill has work. */
+  missingBackfill: number
+  /** Stored and live disagree, or stored points somewhere the link no longer does. A cutover must
+   * not happen while this is non-zero — reading by canonical human would return a different set than
+   * reading by identity. */
+  divergent: CanonicalHumanParityRow[]
+}
+
+/**
+ * Compares the old read (by `builder_identity_id`) against the new one (by `canonical_human_id`) for
+ * one organization — the "compare old/new reads, then cut over only after parity" step.
+ *
+ * Deliberately a read-only report rather than a self-healing pass. A cutover decision needs evidence
+ * that the two agree, and a function that quietly repaired disagreements as it found them would
+ * destroy exactly the signal the decision depends on. `backfillCanonicalHumanIds` does the writing.
+ */
+export async function compareCanonicalHumanParity(
+  transaction: TenantTransaction,
+  organizationId: string,
+  limit = 500,
+): Promise<CanonicalHumanParityReport> {
+  const rows = await transaction
+    .select({
+      organizationBuilderId: organizationBuilders.id,
+      builderIdentityId: organizationBuilders.builderIdentityId,
+      storedCanonicalHumanId: organizationBuilders.canonicalHumanId,
+      liveCanonicalHumanId: humanSourceLinks.canonicalHumanId,
+    })
+    .from(organizationBuilders)
+    .leftJoin(
+      humanSourceLinks,
+      and(
+        eq(humanSourceLinks.builderIdentityId, organizationBuilders.builderIdentityId),
+        isNull(humanSourceLinks.validUntil),
+        inArray(humanSourceLinks.reviewState, ['auto_approved', 'approved']),
+      ),
+    )
+    .where(eq(organizationBuilders.organizationId, organizationId))
+    .limit(limit)
+
+  const report: CanonicalHumanParityReport = { total: rows.length, matching: 0, missingBackfill: 0, divergent: [] }
+  for (const row of rows) {
+    if (row.storedCanonicalHumanId === row.liveCanonicalHumanId) report.matching += 1
+    else if (row.storedCanonicalHumanId === null) report.missingBackfill += 1
+    else report.divergent.push(row)
+  }
+  return report
+}
+
+/**
+ * Fills `canonical_human_id` for rows the dual-write missed — everything tracked before the column
+ * existed, plus anything whose link arrived after it was tracked.
+ *
+ * Only ever writes that one column, never `private_metadata`, `status` or `visibility`: the backfill
+ * must be invisible to the tenant's own decisions about a builder. Batched and resumable by the WHERE
+ * clause alone (rows already carrying the right value are skipped), so an interruption is continued
+ * by running it again.
+ */
+export async function backfillCanonicalHumanIds(
+  transaction: TenantTransaction,
+  organizationId: string,
+  batchSize = 500,
+): Promise<{ updated: number }> {
+  const pending = await transaction
+    .select({
+      organizationBuilderId: organizationBuilders.id,
+      canonicalHumanId: humanSourceLinks.canonicalHumanId,
+    })
+    .from(organizationBuilders)
+    .innerJoin(
+      humanSourceLinks,
+      and(
+        eq(humanSourceLinks.builderIdentityId, organizationBuilders.builderIdentityId),
+        isNull(humanSourceLinks.validUntil),
+        inArray(humanSourceLinks.reviewState, ['auto_approved', 'approved']),
+      ),
+    )
+    .where(and(
+      eq(organizationBuilders.organizationId, organizationId),
+      isNull(organizationBuilders.canonicalHumanId),
+    ))
+    .limit(batchSize)
+
+  let updated = 0
+  for (const row of pending) {
+    await transaction
+      .update(organizationBuilders)
+      .set({ canonicalHumanId: row.canonicalHumanId, updatedAt: new Date() })
+      .where(and(
+        eq(organizationBuilders.id, row.organizationBuilderId),
+        eq(organizationBuilders.organizationId, organizationId),
+      ))
+    updated += 1
+  }
+  return { updated }
+}
+
+/**
+ * Every account this organization tracks that belongs to the given canonical human — the new read
+ * shape, which is only meaningful once parity holds.
+ *
+ * Reads the stored column rather than joining the link table, on purpose: after cutover this is the
+ * path in use, so `compareCanonicalHumanParity` has to be comparing the thing that will actually be
+ * read, not a join that happens to agree with it today.
+ */
+export function listOrganizationBuildersByCanonicalHuman(
+  transaction: TenantTransaction,
+  organizationId: string,
+  canonicalHumanId: string,
+) {
+  return transaction.select(privateBuilderFields)
+    .from(organizationBuilders)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+    .where(and(
+      eq(organizationBuilders.organizationId, organizationId),
+      eq(organizationBuilders.canonicalHumanId, canonicalHumanId),
+    ))
+    .orderBy(desc(builderIdentities.lastSeenAt))
 }
 
 export async function updateOrganizationBuilder(
