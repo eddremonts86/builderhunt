@@ -212,20 +212,48 @@ owner. The mechanism accepts that decision without making it. Same for x, facebo
 
 ## Phase 5 — Retrieval and composition
 
-- [ ] **Build versioned search projections**
-  - Files: `src/lib/solutions/indexing/*` (new), `src/lib/semantic/index-writer.ts`,
-    `src/shared/lib/repositories/public-builder-embeddings.ts`
+- [x] **Build versioned search projections**
+  - Files: `src/lib/solutions/indexing/{projection-doc,project-components}.ts`,
+    `drizzle/0130_solution_component_projections.sql`, `drizzle/0131_worker_builder_embeddings_grant.sql`,
+    `src/lib/semantic/embedding-doc.ts`, `src/shared/lib/repositories/public-builder-embeddings.ts`,
+    `scripts/solutions/project-components.ts`
   - Do: Produce provenance-preserving lexical/vector projections for canonical humans, roles, and
     catalog components; enqueue writes by content hash and embedding version.
   - Verify: changed evidence invalidates the right projection, stale jobs cannot overwrite current
     versions, and rebuild/resume is idempotent.
 
-- [ ] **Implement hybrid retrieval**
-  - Files: `src/lib/solutions/retrieval/*` (new)
+- [x] **Implement hybrid retrieval**
+  - Files: `src/lib/solutions/retrieval/{filters,fuse,lanes,retrieve}.ts`
   - Do: Apply hard structured filters, bounded FTS and pgvector search, normalized reciprocal-rank
     fusion, evidence/freshness scoring, diversity, and trace output. Keep reranking disabled.
   - Verify: gold-set retrieval reaches the agreed recall threshold by lane, filters are exact, one
     backend can degrade safely, and warm p95 stays within budget.
+  - **Partially verified, 2026-08-01.** Filters-are-exact and degrade-safely are asserted against a real
+    migrated database (`tests/unit/lib/solutions/retrieval.test.ts`). Recall-by-lane and warm p95 are
+    **not** — both need the gold set, which is Phase 9's task; a recall number from a four-row fixture
+    would mean nothing, and stating one would be worse than stating none.
+
+### Phase 5 progress note, 2026-08-01
+
+**Known limitation: the human lane retrieves roles, not people.** `RETRIEVAL_LANES.human` covers the
+`human_profile` and `human_role` component kinds, and only `human_role` components exist — Jobindex
+postings. Real people are in `canonical_humans`, deliberately *not* in `solution_components`: plan 43
+Phase 3 built them as a separate identity system, and `organization_builders.canonical_human_id` uses
+`ON DELETE SET NULL` precisely because a global identity decision must not destroy tenant data.
+
+So the composer cannot yet build a human route from actual candidates. Closing this means a human lane
+that reads `canonical_humans` joined to `builder_embeddings` (`entity_kind = 'human_profile'`, which
+already holds real vectors from builder search) and returns them in the same shape — not turning people
+into catalog components, which would conflate the two identity systems on purpose built to stay apart.
+`routeComponentAssignmentSchema.componentId` will need to distinguish the two id spaces.
+
+Three more defects surfaced here, all of the same shape as Phase 4's — see the commit messages for detail:
+
+| Defect | Fix |
+|---|---|
+| Nothing was retrievable: every ingested component sat at `lifecycle_state = 'draft'` and `findCandidateComponents` reads only `active` | `0130`, plus a lifecycle rule in `ingestComponentVersion` keyed on who asserted the component exists |
+| The worker had no grants on `builder_embeddings` — 42501 on the first component | `0131` |
+| `websearch_to_tsquery` ANDs unquoted terms, so a real brief's description could never match any document; retrieval returned zero candidates for every brief while the trace showed a healthy lane | `toAnyTermQuery` joins with `or` and strips the operators (`-` reads as NOT, so "English-to-Danish" excluded what the brief asked for) |
 
 - [ ] **Implement the deterministic solution composer**
   - Files: `src/lib/solutions/composer/*` (new)
