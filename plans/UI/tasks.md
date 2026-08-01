@@ -187,7 +187,7 @@
   - Do: Add status summary, filters, job rows, next/last run, duration/counters, redacted error, pause/resume, manual-run confirmation, refresh, and runbook link; add Operations to Admin navigation.
   - Verify: keyboard and mobile table/card layouts work; platform admin can run/pause/resume; non-admin never sees the destination or data.
 
-- [ ] **Add a redacted integration and AI health API**
+- [x] **Add a redacted integration and AI health API**
   - Files: `src/lib/sources/types.ts`, `src/shared/lib/ai/tasks.ts`, `src/routes/api/admin/integrations/index.ts`, `tests/unit/security/admin-integrations.test.ts`
   - Do: Build typed rows from `SOURCE_NAMES` plus AI tasks: enabled/dark/dormant, credential-present boolean, quota, last success/failure, indexed/backlog counts, kill-switch state, provider availability, task version, and budget-error counts. Never expose credential values, provider payloads, prompts, or user input.
   - Verify: the type check fails when a source lacks a row; DTO redaction snapshot and platform-admin boundary pass.

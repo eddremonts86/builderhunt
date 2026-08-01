@@ -88,6 +88,8 @@ export interface AITaskDefinition<I = unknown, O = unknown> {
    * with this one.
    */
   sensitive?: boolean
+  /** Prompt/schema revision, for tasks that track one (see e.g. `INTERVIEW_BRIEF_PROMPT_VERSION`). Absent means unversioned — not yet given its own revision counter. */
+  version?: string
 }
 
 const pingTask: AITaskDefinition<Record<string, never>, { pong: true }> = {
@@ -795,6 +797,7 @@ export function buildInterviewBriefOutputSchema(sources: readonly SourceManifest
 
 const interviewBriefTask: AITaskDefinition<InterviewBriefTaskInput, InterviewBriefContent> = {
   id: 'interview-brief-generate',
+  version: INTERVIEW_BRIEF_PROMPT_VERSION,
   // Never local. A browser-side model is not the EU provider anyone was told about, and the local
   // ladder has no reservation, no audit row and no residency guarantee.
   tier: 'server-only',
@@ -957,6 +960,7 @@ export function buildInterviewFollowupOutputSchema(
 
 const interviewFollowupTask: AITaskDefinition<InterviewFollowupTaskInput, InterviewFollowupSuggestOutput> = {
   id: 'interview-followup-suggest',
+  version: INTERVIEW_FOLLOWUP_PROMPT_VERSION,
   tier: 'server-only',
   sensitive: true,
   inputSchema: interviewFollowupInputSchema,
@@ -1115,6 +1119,7 @@ export function buildInterviewReportOutputSchema(
 
 const interviewReportTask: AITaskDefinition<InterviewReportTaskInput, InterviewReportContent> = {
   id: 'interview-report-generate',
+  version: INTERVIEW_REPORT_PROMPT_VERSION,
   tier: 'server-only',
   sensitive: true,
   inputSchema: interviewReportInputSchema,

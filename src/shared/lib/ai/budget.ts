@@ -9,6 +9,7 @@ import { getRedis } from '~/shared/lib/redis'
 import type { EntitlementPolicy } from '~/shared/lib/repositories/entitlements'
 import { resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
+import { metrics } from '~/shared/lib/metrics'
 import type { AITaskDefinition } from './tasks'
 
 export interface BudgetDecision {
@@ -75,7 +76,7 @@ export async function checkAndConsumeBudget(
     if (redis) {
       const used = await redis.incr(key)
       if (used === 1) await redis.expire(key, BUDGET_KEY_EXPIRE_SECONDS)
-      return { ...decideBudget({ used, limit }), used, limit }
+      return recordBudgetResult({ ...decideBudget({ used, limit }), used, limit })
     }
   } catch {
     // Fall through to in-memory
@@ -84,5 +85,11 @@ export async function checkAndConsumeBudget(
   const existing = memoryCounters.get(key)
   const used = existing && existing.dateKey === dateKey ? existing.count + 1 : 1
   memoryCounters.set(key, { count: used, dateKey })
-  return { ...decideBudget({ used, limit }), used, limit }
+  return recordBudgetResult({ ...decideBudget({ used, limit }), used, limit })
+}
+
+/** Single choke point for every caller (`~/lib/sources` search, work-samples, fingerprint, synergy, interviews, `/api/ai/complete`) so the admin-visible counter can't miss one. */
+function recordBudgetResult(result: BudgetResult): BudgetResult {
+  if (result.reason === 'budget') metrics.increment('aiBudgetDenials')
+  return result
 }

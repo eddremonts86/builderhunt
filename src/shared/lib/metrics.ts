@@ -10,6 +10,8 @@ interface Counters {
   signins: number
   /** Checkout attempts rejected for `country_not_allowed` (`billing/checkout.ts`, `billing/packs.ts`) — the only trace of a country-gate rejection, since it happens before any `billing_checkout_attempts` row is ever written. */
   checkoutCountryGateRejections: number
+  /** `checkAndConsumeBudget` (`ai/budget.ts`) denials with `reason: 'budget'` — a tier that ran out of its daily allowance, not one with a zero allowance (`reason: 'plan'`, not counted here). */
+  aiBudgetDenials: number
 
   // ── Interviews (plan: calendar-scheduling-interview-intelligence, Phase 11) ──────────────────────
   //
@@ -61,6 +63,7 @@ const counters: Counters = {
   signups: 0,
   signins: 0,
   checkoutCountryGateRejections: 0,
+  aiBudgetDenials: 0,
   interviewBookingConflicts: 0,
   interviewDocumentBacklog: 0,
   interviewDocumentFailures: 0,
