@@ -61,6 +61,10 @@ const classifications: Classification[] = [
   operational('search_sources', 'platform operator', ['solutions-intelligence', 'stealth-scraping']),
   global('solution_capabilities', ['key', 'label', 'description'], ['solutions-intelligence']),
   global('solution_components', ['id', 'kind', 'slug', 'display_name', 'lifecycle_state', 'homepage_url'], ['solutions-intelligence']),
+  // Derived retrieval index, not content: rebuilt from versions by `pnpm solutions:project` and safe to
+  // delete wholesale. Operational rather than global because nothing reads it to learn about a component —
+  // it exists so a query can *find* one.
+  operational('solution_component_projections', 'platform operator', ['solutions-intelligence']),
   global('solution_component_versions', ['component_id', 'version', 'metadata', 'observed_at', 'valid_from', 'valid_until'], ['solutions-intelligence']),
   global('solution_component_capabilities', ['component_id', 'component_version', 'capability_key', 'evidence_level'], ['solutions-intelligence']),
   global('solution_evidence', ['id', 'source_key', 'component_id', 'kind', 'source_url', 'observed_at', 'expires_at'], ['solutions-intelligence']),

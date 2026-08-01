@@ -210,7 +210,7 @@ describe('evidence and claims', () => {
     expect(claim.claimId).toBeTruthy()
   })
 
-  it('surfaces only active components with a matching capability to retrieval', async () => {
+  it('surfaces an official-API component to retrieval as soon as it is ingested', async () => {
     const ingested = await ingestComponentVersion(component(), db)
     if (ingested.status !== 'created') throw new Error('expected created')
     const evidence = await seedEvidence()
@@ -219,14 +219,41 @@ describe('evidence and claims', () => {
       capabilityKey: 'translation', evidenceLevel: 'verified', primaryEvidenceId: evidence.evidenceId,
     }, db)
 
-    // Still `draft` — a component nobody promoted must never appear in advice.
-    expect(await findCandidateComponents({ kinds: ['model'], capabilityKeys: ['translation'] }, db)).toEqual([])
-
-    await db.execute(sql`update solution_components set lifecycle_state = 'active'`)
+    /**
+     * `active`, without anyone promoting it — a deliberate change, and this test previously asserted the
+     * opposite. Everything used to be ingested as `draft`, nothing promoted anything, and the result was
+     * that a catalog full of real components answered every brief with nothing. The rule now turns on who
+     * asserted the component exists: when Hugging Face's own API says a model exists, that is a publisher
+     * describing its own thing, and requiring a human to confirm each of thousands means the catalog stays
+     * empty forever.
+     *
+     * No claim gate weakens. Being listed is not a claim about what a component can do, and the tests below
+     * still hold the gates that decide advice: a claim enters at `claimed`, and a similarity-derived edge
+     * cannot activate itself.
+     */
     const candidates = await findCandidateComponents({ kinds: ['model'], capabilityKeys: ['translation'] }, db)
     expect(candidates).toHaveLength(1)
     expect(candidates[0]).toMatchObject({ slug: 'm1', version: 1 })
     expect(candidates[0].capabilities).toEqual([{ capabilityKey: 'translation', evidenceLevel: 'verified' }])
+  })
+
+  it('keeps a scraped component out of retrieval until a human promotes it', async () => {
+    // The other half of the same rule. A crawl is *us* asserting a component exists, which is exactly the
+    // case that deserves review before it becomes advice.
+    await db.update(solutionSources).set({ enabled: true, termsReviewedAt: new Date() })
+      .where(eq(solutionSources.key, 'scrape'))
+    const ingested = await ingestComponentVersion(component({ sourceKey: 'scrape', slug: 'crawled' }), db)
+    if (ingested.status !== 'created') throw new Error('expected created')
+    const evidence = await seedEvidence()
+    await attachCapabilityClaim({
+      componentId: ingested.componentId, componentVersion: ingested.version,
+      capabilityKey: 'translation', evidenceLevel: 'claimed', primaryEvidenceId: evidence.evidenceId,
+    }, db)
+
+    expect(await findCandidateComponents({ kinds: ['model'], capabilityKeys: ['translation'] }, db)).toEqual([])
+
+    await db.execute(sql`update solution_components set lifecycle_state = 'active' where slug = 'crawled'`)
+    expect(await findCandidateComponents({ kinds: ['model'], capabilityKeys: ['translation'] }, db)).toHaveLength(1)
   })
 
   it('does not match a capability the component never claimed', async () => {
@@ -237,8 +264,6 @@ describe('evidence and claims', () => {
       componentId: ingested.componentId, componentVersion: ingested.version,
       capabilityKey: 'translation', evidenceLevel: 'claimed', primaryEvidenceId: evidence.evidenceId,
     }, db)
-    await db.execute(sql`update solution_components set lifecycle_state = 'active'`)
-
     expect(await findCandidateComponents({ kinds: ['model'], capabilityKeys: ['qa'] }, db)).toEqual([])
   })
 })

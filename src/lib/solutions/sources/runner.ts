@@ -242,7 +242,10 @@ export function filterToAllowedFields(
 }
 
 /** Every adapter the runner knows about. A source with no adapter simply never ingests. */
-export const SOLUTION_ADAPTERS: readonly string[] = ['huggingface_models', 'npm_registry', 'jobindex_roles']
+export const SOLUTION_ADAPTERS: readonly string[] = [
+  'huggingface_models', 'npm_registry', 'jobindex_roles',
+  'arbeitnow_jobs', 'remoteok_jobs', 'jobicy_jobs', 'himalayas_jobs',
+]
 
 /**
  * Compares each adapter's declared `metadataKeys` against its register entry's `allowed_fields`.

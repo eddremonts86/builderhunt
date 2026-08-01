@@ -53,6 +53,12 @@ export interface SolutionSourceRow {
   termsReviewedAt: Date | null
   termsReviewedBy: string | null
   registerNotes: string | null
+  /** Set when this source's terms make access conditional on crediting it. Whatever renders a result from
+   * this source must show `attributionText` linked to `attributionUrl`. */
+  attributionRequired: boolean
+  attributionText: string | null
+  attributionUrl: string | null
+  maxRequestsPerDay: number | null
   updatedAt: Date
 }
 
@@ -164,6 +170,10 @@ function toSourceRow(row: typeof solutionSources.$inferSelect): SolutionSourceRo
     termsReviewedAt: row.termsReviewedAt,
     termsReviewedBy: row.termsReviewedBy,
     registerNotes: row.registerNotes,
+    attributionRequired: row.attributionRequired,
+    attributionText: row.attributionText,
+    attributionUrl: row.attributionUrl,
+    maxRequestsPerDay: row.maxRequestsPerDay,
     updatedAt: row.updatedAt,
   }
 }

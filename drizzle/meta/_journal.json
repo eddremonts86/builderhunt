@@ -925,6 +925,13 @@
       "when": 1785623047325,
       "tag": "0131_worker_builder_embeddings_grant",
       "breakpoints": true
+    },
+    {
+      "idx": 132,
+      "version": "7",
+      "when": 1785626647325,
+      "tag": "0132_job_feed_sources",
+      "breakpoints": true
     }
   ]
 }

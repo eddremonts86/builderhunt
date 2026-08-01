@@ -55,13 +55,21 @@ export const Route = createFileRoute('/api/admin/solutions/sources')({
             details: { count: sources.length, enabled: sources.filter((s) => s.enabled).length },
           })
 
+          // Which register entries an adapter actually implements. A solutions source with no adapter is a
+          // harmless state — it simply never ingests — but offering a live toggle for one is not: the
+          // operator flips it, nothing happens, and the page has taught them to distrust it. Read from the
+          // adapter list rather than a column, because "does code exist" is a fact about the repository.
+          const { SOLUTION_ADAPTERS } = await import('~/lib/solutions/sources/runner')
+          const implemented = new Set<string>(SOLUTION_ADAPTERS)
+
           return Response.json({
-            sources,
+            sources: sources.map((source) => ({ ...source, connectorImplemented: implemented.has(source.key) })),
             // Surfaced so the UI can explain *why* a toggle is unavailable rather than just
             // disabling it: a scrape with no recorded review cannot be enabled at all.
             blockedOnReview: sources
               .filter((s) => s.kind === 'public_scrape' && !s.enabled && s.termsReviewedAt === null)
               .map((s) => s.key),
+            blockedOnConnector: sources.filter((s) => !implemented.has(s.key)).map((s) => s.key),
           })
         } catch (error) {
           const response = platformAdminErrorResponse(error)

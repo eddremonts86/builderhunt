@@ -52,6 +52,11 @@ interface SolutionSource {
   retentionDays: number | null
   termsReviewedAt: string | null
   registerNotes: string | null
+  /** Whether an adapter implements this source. Derived from the adapter list by the API, not stored. */
+  connectorImplemented: boolean
+  attributionRequired: boolean
+  attributionText: string | null
+  attributionUrl: string | null
 }
 
 /** What the two registers have in common, which is everything this page renders. */
@@ -71,6 +76,14 @@ interface Row {
    * answering "what can this source reach or contribute", so they share a column. */
   scopeLabel: string
   scope: string[]
+  /**
+   * Set when this source's terms make continued access conditional on crediting it.
+   *
+   * Surfaced here because two of the job feeds say outright that they will suspend API access if a
+   * link-back is missing — so an operator switching one on has to see the obligation they are taking on at
+   * the moment they take it on, not in a document.
+   */
+  attribution: { text: string; url: string } | null
 }
 
 const KIND_LABELS: Record<SourceKind, string> = {
@@ -265,6 +278,13 @@ function SourceRow({
           ) : null}
         </div>
 
+        {row.attribution ? (
+          <p className="max-w-3xl text-xs text-bh-warning" data-testid={`source-attribution-${row.key}`}>
+            Attribution required: results from this source must show &ldquo;{row.attribution.text}&rdquo;
+            linked to {row.attribution.url}. Omitting it can cost API access.
+          </p>
+        ) : null}
+
         {row.registerNotes ? (
           <p className="max-w-3xl text-xs leading-relaxed text-bh-text-dim">{row.registerNotes}</p>
         ) : null}
@@ -391,6 +411,8 @@ function searchToRow(source: SearchSource): Row {
     connectorImplemented: source.connectorImplemented,
     scopeLabel: 'Hosts',
     scope: source.allowedHosts,
+    // The people-search register carries no attribution column: none of its connectors imposes one.
+    attribution: null,
   }
 }
 
@@ -405,11 +427,14 @@ function solutionToRow(source: SolutionSource): Row {
     registerNotes: source.registerNotes,
     geography: source.geography,
     retentionDays: source.retentionDays,
-    // Solutions sources carry no `connector_implemented` column: an entry with no adapter simply never
-    // ingests, which is a harmless state rather than one worth a constraint. Reported as true so the
-    // toggle renders — enabling a source before its adapter lands is a legitimate order of operations.
-    connectorImplemented: true,
+    // Derived by the API from `SOLUTION_ADAPTERS` rather than stored, because "does code exist" is a fact
+    // about the repository. A source with no adapter never ingests, which is harmless — but a live toggle
+    // for one is not, so the UI shows "No connector" instead and the register notes say why.
+    connectorImplemented: source.connectorImplemented,
     scopeLabel: 'Fields',
     scope: source.allowedFields,
+    attribution: source.attributionRequired && source.attributionText && source.attributionUrl
+      ? { text: source.attributionText, url: source.attributionUrl }
+      : null,
   }
 }

@@ -35,6 +35,7 @@
  */
 import { safeFetch, SafeFetchError } from '~/lib/enrichment/network'
 import { log } from '~/shared/lib/log'
+import { decodeHtmlEntities, htmlToPlainText } from './html-text'
 import type { AdapterComponent, AdapterContext, AdapterOutcome, SolutionSourceAdapter } from './types'
 
 const HOST = 'www.jobindex.dk'
@@ -154,40 +155,13 @@ function tag(block: string, name: string): string | null {
   const pattern = new RegExp(`<${name}>([\\s\\S]*?)</${name}>`, 'i')
   const found = pattern.exec(block)?.[1]
   if (found === undefined) return null
-  const value = decodeEntities(stripCdata(found)).trim()
+  const value = decodeHtmlEntities(stripCdata(found)).trim()
   return value.length > 0 ? value : null
 }
 
 function stripCdata(value: string): string {
   const cdata = /^\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*$/.exec(value)
   return cdata ? cdata[1] : value
-}
-
-/**
- * Decodes the numeric and named entities this feed actually emits. Jobindex escapes its descriptions
- * twice (the HTML body arrives as `&#x3C;div ...`), so numeric forms dominate and have to be handled.
- * `&amp;` is decoded last, otherwise `&amp;#x3C;` would become `<` instead of the literal `&#x3C;`.
- */
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => safeCodePoint(Number.parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec: string) => safeCodePoint(Number.parseInt(dec, 10)))
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-}
-
-/** An out-of-range code point would throw and take the whole feed down over one bad escape. */
-function safeCodePoint(code: number): string {
-  if (!Number.isFinite(code) || code < 1 || code > 0x10ffff) return ''
-  try {
-    return String.fromCodePoint(code)
-  } catch {
-    return ''
-  }
 }
 
 /**
@@ -241,11 +215,9 @@ function extractArea(description: string | null): string | null {
   return area ? area.trim() : null
 }
 
-/** The first paragraph of the ad, stripped of markup and hard-capped. Never the whole body. */
+/** The first paragraph of the ad, as prose and hard-capped. Never the whole body. */
 function extractSummary(description: string | null): string | null {
   if (!description) return null
   const paragraph = /<p[^>]*>([\s\S]{1,2000}?)<\/p>/i.exec(description)?.[1]
-  if (!paragraph) return null
-  const text = paragraph.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-  return text.length > 0 ? text.slice(0, 500) : null
+  return paragraph ? htmlToPlainText(paragraph, 500) : null
 }

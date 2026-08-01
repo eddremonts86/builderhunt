@@ -3480,10 +3480,27 @@ export const solutionSources = pgTable(
     termsReviewedAt: timestamp('terms_reviewed_at', { withTimezone: true }),
     termsReviewedBy: text('terms_reviewed_by').references(() => authUsers.id, { onDelete: 'set null' }),
     registerNotes: text('register_notes'),
+    /**
+     * Whether this source's terms make continued access conditional on us crediting it.
+     *
+     * Structured rather than left to `registerNotes`, because two of the job feeds say outright that they
+     * will suspend API access if a link-back is missing. A prose note cannot be read by the code that
+     * renders a result, so the obligation has to travel with the data.
+     */
+    attributionRequired: boolean('attribution_required').notNull().default(false),
+    attributionText: text('attribution_text'),
+    attributionUrl: text('attribution_url'),
+    /** Some limits are per day and cannot be expressed per hour — four requests a day rounds to zero. */
+    maxRequestsPerDay: integer('max_requests_per_day'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
+    /** A source cannot claim to require attribution without saying what to show and where to link. */
+    check(
+      'solution_sources_attribution_complete_check',
+      sql`${table.attributionRequired} = false or (${table.attributionText} is not null and ${table.attributionUrl} is not null)`,
+    ),
     check('solution_sources_kind_check', sql`${table.kind} in ('official_api', 'feed', 'licensed_dataset', 'user_submission', 'public_scrape', 'external_link_only')`),
     /**
      * A scraping source cannot be enabled until its review is recorded. This is the legal gate
