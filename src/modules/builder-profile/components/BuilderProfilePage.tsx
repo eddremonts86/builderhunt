@@ -115,6 +115,13 @@ export function BuilderProfilePage() {
       setBuilder(b)
       setMeId(userId)
 
+      // Fire-and-forget: never awaited, never blocks render, and swallows any error (401 for a
+      // signed-out visitor, 451 for one who hasn't accepted the privacy consent, or a network
+      // failure) — a dropped view record must never affect what the visitor sees on this page.
+      if (userId && builderId) {
+        fetch(`/api/builders/${builderId}/views`, { method: 'POST', credentials: 'include', keepalive: true }).catch(() => {})
+      }
+
       if (!userId) {
         setNotes([])
         setTrackedBuildersCount(0)

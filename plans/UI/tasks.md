@@ -150,7 +150,7 @@
   - Do: Render the complete server-returned check set, including memory, with measured status and explanation. Remove hard-coded Search/API OK rows unless backend checks are implemented. Guarantee degraded overall state names a visible degraded/unknown component.
   - Verify: db, Redis, memory, partial-response, timeout, and all-healthy fixtures agree between overall and rows; no fake healthy component is rendered.
 
-- [ ] **Record profile views and show owner aggregates**
+- [x] **Record profile views and show owner aggregates**
   - Files: `src/routes/builders/$builderId.tsx`, `src/modules/builder-profile/components/BuilderProfilePage.tsx`, `src/modules/builder-profile/components/ProfileViewAnalytics.tsx`, `src/routes/_dashboard/me/index.tsx`, `src/routes/api/builders/$builderId/views.ts`, `tests/e2e/profile-view-analytics.spec.ts`
   - Do: POST eligible consent-aware profile views without blocking render; add verified-owner total and 30-day daily chart with minimum-cohort/empty states. Never expose viewer identity, organization, query, or referrer.
   - Verify: eligible views aggregate once per policy; signed-out/451/ineligible calls fail quietly; non-owner and unverified claimant cannot read aggregates.

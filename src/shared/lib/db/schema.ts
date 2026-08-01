@@ -502,7 +502,13 @@ export const builderProfileViews = pgTable(
   {
     // uuidv7 — append-heavy, see postgres-18-upgrade Phase 5 task 1.
     id: uuid('id').primaryKey().default(sql`uuidv7()`),
-    builderId: text('builder_id').notNull().references(() => builders.id, { onDelete: 'cascade' }),
+    // References `builderIdentities`, not the legacy per-organization `builders` table — every
+    // caller (the views route, `isVerifiedBuilderClaimant`, the public `/builders/$builderId`
+    // page) already addresses a builder by its identity id, the same id space `builder_claims`
+    // and `published_builder_profiles` use. The FK pointed at `builders` from this table's
+    // original migration (predates the builder_identities normalization) and was never updated,
+    // which meant every write 500'd with a foreign-key violation for any real profile view.
+    builderId: text('builder_id').notNull().references(() => builderIdentities.id, { onDelete: 'cascade' }),
     viewerId: text('viewer_id').references(() => authUsers.id, { onDelete: 'set null' }),
     viewedAt: timestamp('viewed_at', { withTimezone: true }).defaultNow().notNull(),
   },
