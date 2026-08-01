@@ -1309,6 +1309,15 @@ try {
   // Asserted as privileges rather than by attempting writes: these tables are global, so a write
   // here would leak fixture rows into every other assertion in this script.
   const globalIngestionGrantReport = {}
+  const vectorOperatorReport = {}
+  /**
+   * Must match `AI_EMBEDDING_DIM` and the `builder_embeddings.embedding` column.
+   *
+   * Cast to `int` at the call site. Without the cast postgres.js binds it as an untyped parameter,
+   * `array_fill(real, unknown[])` does not resolve, and the query fails with 42883 — an assertion that fails
+   * for the wrong reason, which is worse than no assertion because it looks like it is testing something.
+   */
+  const EMBEDDING_DIMENSION = 768
   const globalIngestionExpectations = [
     // The request-path write-through upserts identities and appends snapshots as the app role.
     // SELECT accompanies INSERT on snapshots because the insert uses RETURNING to tell a new
@@ -1410,6 +1419,32 @@ try {
       : ''
     globalIngestionGrantReport[key] = `granted ${(expectation.granted ?? []).join('/')}${expectation.denied ? `, denied ${expectation.denied.join('/')}` : ''}${columnNote}`
   }
+  /**
+   * pgvector's operators must be executable by every runtime role.
+   *
+   * `0002_database_roles.sql` runs `REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM PUBLIC`, aimed at
+   * application functions — and pgvector installs its operator implementations into `public`. On a clean
+   * chain the ordering saves it (0002 runs before 0013 creates the extension, so there is nothing to revoke
+   * yet), but in any database where that revoke landed after the extension existed, semantic search dies
+   * silently: reading the column needs no function, so nothing looks broken, while every query touching a
+   * vector *operator* fails with 42501 into a fire-and-forget `.catch()`.
+   *
+   * Asserted through a real query rather than `has_function_privilege`, because the failing thing is an
+   * operator expression and there is no single function name to name. `0136` is the grant.
+   */
+  try {
+    await app`select id from builder_embeddings order by embedding <=> array_fill(0.0::real, array[${EMBEDDING_DIMENSION}::int])::vector limit 1`
+  } catch (error) {
+    throw new Error(`app role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'}): a vector operator is unusable for this role, so semantic search cannot work`)
+  }
+  try {
+    await worker`select id from builder_embeddings order by embedding <=> array_fill(0.0::real, array[${EMBEDDING_DIMENSION}::int])::vector limit 1`
+  } catch (error) {
+    throw new Error(`worker role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'})`)
+  }
+  vectorOperatorReport.appRole = 'can evaluate <=>'
+  vectorOperatorReport.workerRole = 'can evaluate <=>'
+
   const workerWebhookEvents = await worker`select id from billing_webhook_events`
   if (workerWebhookEvents.length !== 1 || workerWebhookEvents[0].id !== 'webhook-a') {
     throw new Error(`Worker role could not read billing_webhook_events (${JSON.stringify(workerWebhookEvents)})`)
@@ -1634,7 +1669,7 @@ try {
     workerCandidateWrite: 'denied',
     appBuilderListUpdate: renamedListA.name,
     appBuilderListCrossTenantUpdate: 'no-op (0 rows under RLS)',
-    globalIngestionGrants: globalIngestionGrantReport,
+    globalIngestionGrants: globalIngestionGrantReport, vectorOperators: vectorOperatorReport,
   }))
 } finally {
   await Promise.all([app.end(), auth.end(), worker.end(), platform.end(), capability?.end()].filter(Boolean))

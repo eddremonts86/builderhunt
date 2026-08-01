@@ -235,7 +235,20 @@ owner. The mechanism accepts that decision without making it. Same for x, facebo
 
 ### Phase 5 progress note, 2026-08-01
 
-**Known limitation: the human lane retrieves roles, not people.** `RETRIEVAL_LANES.human` covers the
+**Closed 2026-08-01: the human lane retrieves people.** `humanLane` reads `builder_embeddings.search_vector`
+— a tsvector generated from the same document the vector lane embeds — joined to `builder_identities` filtered
+to `kind = 'person'`, and grouped by canonical human through *active* links only. People are still not catalog
+components, which was the right call; they are their own lane over their own corpus.
+
+The composer draws its human route from that lane and assigns **no capabilities** to a person. Nothing in this
+product asks someone what they can do, so claiming a capability on their behalf would be inventing the one
+thing there is no evidence for. A person covers work by delegation, stated in `humanReviewPoints`, which is
+what the contract's own refinement accepts as grounds for recommending an incompletely-covered route. An
+earlier version treated a person as covering everything, and a real run showed the consequence immediately:
+the person always won the set cover, so the hybrid route came back identical to the human route and the AI
+lane never contributed.
+
+*Superseded, kept for the reasoning:* **the human lane retrieved roles, not people.** `RETRIEVAL_LANES.human` covers the
 `human_profile` and `human_role` component kinds, and only `human_role` components exist — Jobindex
 postings. Real people are in `canonical_humans`, deliberately *not* in `solution_components`: plan 43
 Phase 3 built them as a separate identity system, and `organization_builders.canonical_human_id` uses
@@ -255,8 +268,10 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
 | The worker had no grants on `builder_embeddings` — 42501 on the first component | `0131` |
 | `websearch_to_tsquery` ANDs unquoted terms, so a real brief's description could never match any document; retrieval returned zero candidates for every brief while the trace showed a healthy lane | `toAnyTermQuery` joins with `or` and strips the operators (`-` reads as NOT, so "English-to-Danish" excluded what the brief asked for) |
 
-- [ ] **Implement the deterministic solution composer**
-  - Files: `src/lib/solutions/composer/*` (new)
+- [x] **Implement the deterministic solution composer**
+  - Files: `src/lib/solutions/composer/{coverage,constraints,estimate,compose}.ts`,
+    `src/lib/solutions/retrieval/lanes.ts` (`humanLane`),
+    `drizzle/0135_builder_embeddings_search_vector.sql`, `drizzle/0136_pgvector_execute_grants.sql`
   - Do: Cover required capabilities with approved versioned edges, reject incompatibilities and
     constraint violations, calculate estimate intervals, place human reviews, diversify lanes, and
     emit a complete trace.

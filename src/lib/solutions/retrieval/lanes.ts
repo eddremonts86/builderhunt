@@ -219,3 +219,133 @@ export async function loadCandidates(
       observedAt: row.observedAt,
     }))
 }
+
+// ── The human lane ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * A person retrieval can return.
+ *
+ * `canonicalHumanId` is null when the account has not been unified with anything yet, which is the common
+ * case: unification needs deterministic evidence and roughly 30% of accounts anchor on the first hop. A
+ * single unlinked account is still a real person a recruiter can act on, so it is returned — with the id
+ * absent rather than invented, so the composer can say which of its candidates is one confirmed person and
+ * which is one account that might be part of a larger picture.
+ */
+export interface HumanCandidate {
+  /** Set when the account belongs to a canonical human by an active link. */
+  canonicalHumanId: string | null
+  /** Always present: the account this candidate was found through. */
+  builderIdentityId: string
+  source: string
+  username: string
+  displayName: string | null
+  profileUrl: string
+  bio: string | null
+  topics: string[]
+  followersCount: number
+  /** How many source accounts this canonical human is known by. One means "not yet unified". */
+  accountCount: number
+  lastSeenAt: Date
+}
+
+/**
+ * Retrieves people, lexically.
+ *
+ * Reads `builder_embeddings.search_vector` — the same document the vector lane embeds — rather than a second
+ * projection built for the purpose. A second document would be a second thing to keep in step with the
+ * first, and the first is already maintained by the write-through indexer.
+ *
+ * Two filters are non-negotiable and both are in SQL:
+ *
+ * - `kind = 'person'`. A third of `builder_identities` are repositories, and a recruiter searching for people
+ *   must never be shown one.
+ * - The canonical-human join uses only **active** links (`valid_until is null` and an approved review state).
+ *   A withdrawn or merely proposed link contributing a person to a recommendation is exactly what the review
+ *   queue exists to prevent.
+ *
+ * Deduplicated by canonical human where one exists, so a person known by three accounts is one candidate
+ * rather than three — returning them three times would let one person occupy a whole lane.
+ */
+export async function humanLane(
+  queryText: string,
+  limit = 20,
+  db: PostgresJsDatabase = publicDb,
+): Promise<HumanCandidate[]> {
+  const anyTerm = toAnyTermQuery(queryText)
+  if (anyTerm.length === 0) return []
+
+  const rows = await db.execute<{
+    canonical_human_id: string | null
+    builder_identity_id: string
+    source: string
+    username: string
+    display_name: string | null
+    profile_url: string
+    bio: string | null
+    followers_count: number
+    last_seen_at: Date
+    account_count: number
+    rank: number
+  }>(sql`
+    with matched as (
+      select
+        i.id            as builder_identity_id,
+        i.source, i.username, i.display_name, i.profile_url, i.bio,
+        i.followers_count, i.last_seen_at,
+        hsl.canonical_human_id,
+        ts_rank(e.search_vector, websearch_to_tsquery('english', ${anyTerm})) as rank
+      from builder_embeddings e
+      join builder_identities i
+        on i.source = e.source and i.source_id = e.source_id and i.kind = 'person'
+      left join human_source_links hsl
+        on hsl.builder_identity_id = i.id
+       and hsl.valid_until is null
+       and hsl.review_state in ('auto_approved', 'approved')
+      where e.entity_kind = 'human_profile'
+        and e.search_vector @@ websearch_to_tsquery('english', ${anyTerm})
+    ),
+    ranked as (
+      select *,
+        -- Counted from the person's *links*, not from the rows that matched this query. Counting matches
+        -- would report "1 account" for someone known by three when only one of them happened to contain the
+        -- search terms — a different number from the one this field claims to be.
+        (
+          select count(*) from human_source_links hs
+          where hs.canonical_human_id = matched.canonical_human_id
+            and hs.valid_until is null
+            and hs.review_state in ('auto_approved', 'approved')
+        ) as account_count,
+        -- One row per canonical human, keeping its best-matching account. A person known by three accounts is
+        -- one candidate; returning three would let one person fill a lane.
+        row_number() over (
+          partition by coalesce(canonical_human_id, builder_identity_id)
+          order by rank desc, followers_count desc, builder_identity_id
+        ) as row_in_person
+      from matched
+    )
+    select canonical_human_id, builder_identity_id, source, username, display_name, profile_url, bio,
+           followers_count, last_seen_at,
+           case when canonical_human_id is null then 1 else account_count end as account_count,
+           rank
+    from ranked
+    where row_in_person = 1
+    order by rank desc, followers_count desc
+    limit ${limit}
+  `)
+
+  return rows.map((row) => ({
+    canonicalHumanId: row.canonical_human_id,
+    builderIdentityId: row.builder_identity_id,
+    source: row.source,
+    username: row.username,
+    displayName: row.display_name,
+    profileUrl: row.profile_url,
+    bio: row.bio,
+    // Topics live on the embedded payload, not on the identity row, and reading them would mean a second
+    // query for a field the composer does not rank on. Left empty rather than half-populated.
+    topics: [],
+    followersCount: row.followers_count,
+    accountCount: Number(row.account_count),
+    lastSeenAt: row.last_seen_at,
+  }))
+}

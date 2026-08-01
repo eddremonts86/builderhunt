@@ -540,6 +540,14 @@
     "0134_platform_declared_link_kinds": {
       "sql": "2729dcded6f0608d0841cedf29a27ca3f8116adaa12a7c914f91ed07f0146438",
       "snapshot": "f5fad6631269bafafc8845870b8b2943d5fc010fad606bbfad80f3dd554bbb96"
+    },
+    "0135_builder_embeddings_search_vector": {
+      "sql": "b2a647867a68499850957ee2f8c198a64844db9326f0700530394d26da36d93f",
+      "snapshot": "afb8a6702974f972dd642789d1ea7dae72b52adaa5923bed0380c9e97094e84d"
+    },
+    "0136_pgvector_execute_grants": {
+      "sql": "6ed2c681df1db3d0e0bdfb19ade5ad915ad1aa712f5b490da8ec27c09b77b8ed",
+      "snapshot": "096fe521a083b01daaa084a52ba17153948d0387b17b8ad19131ce71c1525bfb"
     }
   }
 }

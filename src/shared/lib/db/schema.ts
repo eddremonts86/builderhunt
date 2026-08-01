@@ -14,6 +14,18 @@ import type { WorkSampleAnalysis } from '~/shared/lib/work-sample'
 // Authentication Tables (Better Auth)
 // ---------------------------------------------------------------------------
 
+/**
+ * `tsvector`, which drizzle has no built-in for.
+ *
+ * Declared so the column is visible to the query builder and to anyone reading the schema — a full-text
+ * lane written against a column the schema does not mention is a lane nobody can find. Never written from
+ * TypeScript: the column is `GENERATED ALWAYS AS ... STORED`, so Postgres owns its value and an attempt to
+ * set it would be rejected.
+ */
+const tsvector = customType<{ data: string; driverData: string; notNull: true }>({
+  dataType: () => 'tsvector',
+})
+
 export const authUsers = pgTable('auth_users', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
@@ -1091,6 +1103,11 @@ export const builderEmbeddings = pgTable(
     contentHash: text('content_hash').notNull(),
     document: text('document').notNull(),
     profile: jsonb('profile').$type<EmbeddingPayload>().notNull(),
+    /**
+     * Generated from `document`, so the lexical lane and the vector lane rank the same text — which is the
+     * premise rank fusion depends on. Read-only: Postgres owns the value.
+     */
+    searchVector: tsvector('search_vector').notNull().generatedAlwaysAs(sql`to_tsvector('english', document)`),
     // NULL = pending embed (picked up by the run-worker).
     embedding: vector('embedding', { dimensions: EMBEDDING_DIM }),
     embeddedAt: timestamp('embedded_at', { withTimezone: true }),
@@ -3722,17 +3739,6 @@ export const solutionEvidence = pgTable(
   ],
 )
 
-/**
- * `tsvector`, which drizzle has no built-in for.
- *
- * Declared so the column is visible to the query builder and to anyone reading the schema — a full-text
- * lane written against a column the schema does not mention is a lane nobody can find. Never written from
- * TypeScript: the column is `GENERATED ALWAYS AS ... STORED`, so Postgres owns its value and an attempt to
- * set it would be rejected.
- */
-const tsvector = customType<{ data: string; driverData: string; notNull: true }>({
-  dataType: () => 'tsvector',
-})
 
 /**
  * Retrieval projections: the lexical document and filter columns retrieval actually queries, derived

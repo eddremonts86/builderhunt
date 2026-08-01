@@ -946,6 +946,20 @@
       "when": 1785633847325,
       "tag": "0134_platform_declared_link_kinds",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1785637447325,
+      "tag": "0135_builder_embeddings_search_vector",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1785641047325,
+      "tag": "0136_pgvector_execute_grants",
+      "breakpoints": true
     }
   ]
 }
