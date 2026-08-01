@@ -85,9 +85,17 @@ pnpm deploy:db:dry
 
 ### 1. Postgres database resource
 
-- Image **must** be `pgvector/pgvector:pg16` (semantic search needs the `vector` extension;
-  same Postgres major as plain `postgres:16`, so the data volume is compatible — see
-  `database-migrations.md` → pgvector).
+- Image **must** be a `pgvector/pgvector:*` image — semantic search needs the `vector` extension,
+  and on a plain `postgres:*` image `drizzle/0013`'s `CREATE EXTENSION vector` rolls back the entire
+  migration chain. See `database-migrations.md` → pgvector.
+- **Production currently runs `pgvector/pgvector:pg16`** (verified 2026-08-01 against the Coolify
+  `builderhunt-db` resource). Local dev and CI have already moved to `pgvector/pgvector:0.8.5-pg18`.
+- ⚠️ **A 16 → 18 change is NOT a swap of this image.** Postgres major versions have incompatible
+  on-disk formats, so the existing data volume is unreadable by 18 and there is no `pg_upgrade` path
+  across the Docker volume boundary. Changing this line alone would start an empty database. The
+  move requires the dump/restore cutover in "PostgreSQL 16 → 18 cutover" below, against a **second**
+  resource. The earlier wording here said the volume was compatible "since the Postgres major is
+  unchanged" — true of a 16→16 image swap, dangerously false for 16→18.
 - **Persistent volume is mandatory.** This is what makes the DB durable across deploys — it
   is the answer to "we don't want to start from zero every deploy." Confirm the resource has
   a named volume mounted at the Postgres data dir and that redeploying the app does **not**

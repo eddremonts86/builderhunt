@@ -35,6 +35,25 @@ see `postgres-18-upgrade` for why). **The image MUST stay a `pgvector/pgvector:*
 a plain `postgres:18*` image does not ship the `vector` extension and `drizzle/0013`'s
 `CREATE EXTENSION vector` rolls back the entire migration chain.
 
+### The daily backup is not an upgrade vehicle
+
+`scripts/db/backup.ts` dumps with `--no-owner --no-acl` and takes no
+`pg_dumpall --globals-only`. That is the right shape for **disaster recovery of the same cluster**,
+where the roles already exist — and the wrong shape for moving to a new one:
+
+- Roles are **cluster-global**, not per-database. A new cluster has none of `builderhunt_app`,
+  `builderhunt_auth`, `builderhunt_worker`, `builderhunt_platform` or `builderhunt_capability`.
+- `--no-owner --no-acl` strips every `GRANT` and every owner. Restoring it into a fresh cluster
+  produces a database where the schema exists, RLS policies reference roles that do not exist, and
+  the app role has no privileges on anything — the failure looks like "permission denied for table
+  X" on the first request, not like a failed restore.
+
+So never use the daily artifact to seed a PG18 cluster. Restores go roles-first through
+`pnpm db:restore`, which applies `scripts/db/roles.sql` before the data and then asserts RLS
+integrity — see [`database-restore.md`](./database-restore.md). The 16 → 18 cutover uses its own
+pipeline; see "PostgreSQL 16 → 18 cutover" in
+[`deploy-runbook.md`](./deploy-runbook.md).
+
 **Local dev — fresh checkout or a previously-Postgres-16 checkout (2026-07-29)**: the
 PG16 data volume is not readable on PG18 (different on-disk format, no `pg_upgrade` path
 across the Docker volume boundary). One-shot reset, before `pnpm db:up`:

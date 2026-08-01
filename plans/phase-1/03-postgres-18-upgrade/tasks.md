@@ -1,6 +1,39 @@
 # PostgreSQL 18 Upgrade (tasks)
 
-> **Status**: `pending`
+> **Status**: `in progress — Phase 5 ran ahead of its gate; Phases 2-4 are now on the critical path`
+
+## ⚠️ Ordering violation, found 2026-08-01
+
+Phase 5 is titled "**only after Phase 4 is observed**" and this file's header says Phase 5 and 6
+"must not be executed before Phase 4 is complete and observed". Phase 5's first task — switching four
+append-heavy UUID PKs to `uuidv7()` — is marked complete. **Phase 4, the production cutover, has not
+been started.**
+
+That gate existed to prevent exactly what happened. Verified facts:
+
+| Fact | Evidence |
+| --- | --- |
+| Production runs `pgvector/pgvector:pg16` | Coolify resource `builderhunt-db` (`rhxnxwo8bnvbndyuvx56m00k`), `running:healthy` |
+| Production runs `master`, which ends at migration `0101` | `origin/master:drizzle/meta/_journal.json` — 102 entries, last `0101_material_access_guard` |
+| The three `uuidv7()` migrations exist only on the unmerged branch | `0102_uuidv7_pk`, `0107_organization_activity`, `0122_canonical_human_identity` are absent from `master` |
+| `uuidv7()` is a PG18 built-in and does not exist on PG16 | `.github/workflows/quality.yml` pg16 job: `function uuidv7() does not exist` |
+
+Consequences, stated plainly:
+
+- **Production is not broken.** It has never seen `uuidv7()`, because the migrations that call it
+  have never been merged.
+- **The red pg16 CI job is correct, not stale.** It is reporting that the branch's migrations cannot
+  apply to production as it exists. Silencing it would move the collision to deploy time, where
+  migrations apply fatally.
+- **`phase-1-execution` cannot be merged and deployed until the cutover lands.** A fresh
+  `pnpm deploy:db` against today's production database fails at `0102`.
+
+So Phases 2, 3 and 4 are no longer optional groundwork for a future upgrade — they are the blocker on
+an entire branch. Do not "fix" this by rewriting the `uuidv7()` migrations: `0102` and `0107` are
+already applied in local and CI databases, editing them changes their drizzle content hashes, and the
+time-ordering those append-heavy tables chose is the whole point of Phase 5's benchmark task.
+
+Maintainer decision, 2026-08-01: **do this plan's cutover first, then merge.**
 > **Depends on**: nothing — but see [`spec.md`](./spec.md) §1: tasks in Phase 5 and 6 must not be executed before Phase 4 is complete and observed.
 > **Blocks**: nothing today; Phase 4 is the gate for any other plan's use of PG18-only SQL.
 > **Reality check** (re-verified 2026-07-27): `docker-compose.yml:8`, `.github/workflows/quality.yml:16` and `docs/operations/deploy-runbook.md:87` all pin `pgvector/pgvector:pg16`. `pnpm deploy:db` ([`scripts/deploy/orchestrate.mjs`](../../../scripts/deploy/orchestrate.mjs), 8 steps) is the only sanctioned provisioning path and has no version check (`grep -rn server_version src/ scripts/ drizzle/` → 0). Restore rehearsal exists (`pnpm db:restore-test`) and a roles-first restore path exists (`pnpm db:restore`, `scripts/db/roles.sql`, `docs/operations/database-restore.md`); the daily local backup ([`scripts/db/backup.ts:56`](../../../scripts/db/backup.ts)) still dumps with `--no-owner --no-acl` and is not usable as an upgrade vehicle.
@@ -233,7 +266,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
 
 ## Phase 2 — Production runbook + standing PG18 resource (no cutover)
 
-- [ ] **Correct the stale claims in the migration doc and the runbook env table**
+- [x] **Correct the stale claims in the migration doc and the runbook env table**
   - Files: `docs/operations/database-migrations.md` (lines 30–41), `docs/operations/deploy-runbook.md`
     (lines 87–89 and 121–125)
   - Do: three edits.
