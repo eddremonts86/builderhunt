@@ -1,6 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { z } from 'zod'
-import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import {
+  auditPlatformAdminAction,
+  platformAdminErrorResponse,
+  requirePlatformAdminPrincipal,
+  requireRecentPlatformAdminAuthentication,
+} from '~/shared/lib/auth/platform-admin'
 import { issueRiskException, listRiskExceptions, revokeRiskException, RiskExceptionError } from '~/shared/lib/billing/risk'
 
 const IssueExceptionBody = z.object({
@@ -40,6 +45,7 @@ export const Route = createFileRoute('/api/admin/billing/risk-exceptions')({
       POST: async ({ request }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
           const parsed = IssueExceptionBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) {
             return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })
@@ -68,6 +74,7 @@ export const Route = createFileRoute('/api/admin/billing/risk-exceptions')({
       DELETE: async ({ request }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
           const parsed = RevokeExceptionBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) {
             return Response.json({ error: 'Invalid body', issues: parsed.error.flatten() }, { status: 400 })

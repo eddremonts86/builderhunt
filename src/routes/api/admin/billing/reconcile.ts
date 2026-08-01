@@ -1,9 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import {
+  auditPlatformAdminAction,
+  platformAdminErrorResponse,
+  requirePlatformAdminPrincipal,
+  requireRecentPlatformAdminAuthentication,
+} from '~/shared/lib/auth/platform-admin'
 import { CRON_PRINCIPAL_USER_ID, tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
 import { runReconciliation, type ReconciliationCursor } from '~/shared/lib/billing/reconciliation'
-import { withJobRun } from '~/shared/lib/repositories/platform-operations'
+import { findRunningJobRun, withJobRun } from '~/shared/lib/repositories/platform-operations'
 
 /**
  * Manually (or via external scheduler) runs one daily-financial-reconciliation pass
@@ -20,6 +25,16 @@ export const Route = createFileRoute('/api/admin/billing/reconcile')({
       POST: async ({ request }) => {
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
+
+          // The manual-run dispatcher (`operations/$jobKey/run.ts`) already guards this same
+          // `billing.reconcile` job key against a concurrent duplicate — this bespoke route is a
+          // second entry point to the identical job, so it needs the identical guard.
+          const running = await findRunningJobRun('billing.reconcile')
+          if (running) {
+            return Response.json({ error: 'already_running', startedAt: running.startedAt?.toISOString() ?? null }, { status: 409 })
+          }
+
           const body = await request.json().catch(() => ({}))
           const resumeFrom: ReconciliationCursor | null = body && typeof body === 'object' && body.resumeFrom
             ? { objectType: body.resumeFrom.objectType }

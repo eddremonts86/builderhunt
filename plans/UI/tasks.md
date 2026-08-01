@@ -197,7 +197,7 @@
   - Do: Render source and AI health, filters, honest dormant reasons, last run/quota, and links to Operations, Metrics, source-filtered Search, and runbooks; add Integrations to Admin navigation. Do not add secret editors.
   - Verify: all source enum members render; disabled Product Hunt/Devpost/enrichment and unavailable AI states are explicit; no secret-like text appears in DOM.
 
-- [ ] **Add guarded billing operations actions**
+- [x] **Add guarded billing operations actions**
   - Files: `src/modules/admin/billing/BillingOperationsPage.tsx`, `src/routes/api/admin/billing/reconcile.ts`, `src/routes/api/admin/billing/events/$eventId/replay.ts`, `src/routes/api/admin/billing/risk-exceptions.ts`, `src/routes/api/admin/billing/accounting-export.ts`, `src/routes/api/admin/billing/run-worker.ts`, `tests/e2e/billing-operations.spec.ts`
   - Do: Add reconciliation, dead-letter lookup/replay, risk-exception management, worker run, bounded accounting export, and Refunds/Disputes links. Require confirmation, step-up where applicable, idempotency, and audit feedback.
   - Verify: fake-provider E2E covers success, repeat, stale, forbidden, and failed-event paths; raw Stripe payloads and secrets never render.

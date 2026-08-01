@@ -1,5 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import {
+  auditPlatformAdminAction,
+  platformAdminErrorResponse,
+  requirePlatformAdminPrincipal,
+  requireRecentPlatformAdminAuthentication,
+} from '~/shared/lib/auth/platform-admin'
 import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
 import { createStripeEventRetriever, runBillingWorker } from '~/shared/lib/billing/worker'
@@ -18,6 +23,7 @@ export const Route = createFileRoute('/api/admin/billing/run-worker')({
       POST: async ({ request }) => {
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
           const summary = await runBillingWorker({ retriever: createStripeEventRetriever(), provider: getBillingProvider() })
           await auditPlatformAdminAction(principal, {
             action: 'admin.worker.run',

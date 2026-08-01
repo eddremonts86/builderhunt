@@ -2,14 +2,21 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
+  requireRecentPlatformAdminAuthentication: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
   runReconciliation: vi.fn(),
   withJobRun: vi.fn(async (_input: unknown, operation: () => Promise<unknown>) => operation()),
+  findRunningJobRun: vi.fn(),
 }))
 
 vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/auth/platform-admin')>()
-  return { ...actual, requirePlatformAdminPrincipal: mocks.requirePlatformAdminPrincipal, auditPlatformAdminAction: mocks.auditPlatformAdminAction }
+  return {
+    ...actual,
+    requirePlatformAdminPrincipal: mocks.requirePlatformAdminPrincipal,
+    requireRecentPlatformAdminAuthentication: mocks.requireRecentPlatformAdminAuthentication,
+    auditPlatformAdminAction: mocks.auditPlatformAdminAction,
+  }
 })
 
 vi.mock('~/shared/lib/billing/reconciliation', async (importOriginal) => {
@@ -22,7 +29,7 @@ vi.mock('~/shared/lib/billing/reconciliation', async (importOriginal) => {
 // admin-worker route test.
 vi.mock('~/shared/lib/repositories/platform-operations', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/lib/repositories/platform-operations')>()
-  return { ...actual, withJobRun: mocks.withJobRun }
+  return { ...actual, withJobRun: mocks.withJobRun, findRunningJobRun: mocks.findRunningJobRun }
 })
 
 const { Route } = await import('~/routes/api/admin/billing/reconcile')
@@ -53,7 +60,9 @@ const SAMPLE_SUMMARY = {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
+  mocks.withJobRun.mockImplementation(async (_input: unknown, operation: () => Promise<unknown>) => operation())
+  mocks.findRunningJobRun.mockResolvedValue(null)
 })
 
 describe('POST /api/admin/billing/reconcile', () => {
@@ -120,5 +129,29 @@ describe('POST /api/admin/billing/reconcile', () => {
     } finally {
       process.env.CRON_SECRET = previous
     }
+  })
+
+  it('requires recent authentication for a real admin session before running', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.requireRecentPlatformAdminAuthentication.mockImplementation(() => {
+      throw new PlatformAdminAuthorizationError('Recent re-authentication required', 401)
+    })
+
+    const response = await callPost({})
+
+    expect(response.status).toBe(401)
+    expect(mocks.runReconciliation).not.toHaveBeenCalled()
+  })
+
+  it('does not duplicate work when a reconciliation pass is already running', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.findRunningJobRun.mockResolvedValue({ id: 'run-x', startedAt: new Date('2027-01-01T00:00:00.000Z') })
+
+    const response = await callPost({})
+    const body = await response.json()
+
+    expect(response.status).toBe(409)
+    expect(body).toEqual({ error: 'already_running', startedAt: '2027-01-01T00:00:00.000Z' })
+    expect(mocks.runReconciliation).not.toHaveBeenCalled()
   })
 })

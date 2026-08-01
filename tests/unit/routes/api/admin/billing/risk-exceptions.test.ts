@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
+  requireRecentPlatformAdminAuthentication: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
   issueRiskException: vi.fn(),
   listRiskExceptions: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
   return {
     ...actual,
     requirePlatformAdminPrincipal: mocks.requirePlatformAdminPrincipal,
+    requireRecentPlatformAdminAuthentication: mocks.requireRecentPlatformAdminAuthentication,
     auditPlatformAdminAction: mocks.auditPlatformAdminAction,
   }
 })
@@ -49,7 +51,7 @@ async function callHandler(method: 'GET' | 'POST' | 'DELETE', request: Request):
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
 })
 
 describe('GET /api/admin/billing/risk-exceptions', () => {
@@ -113,6 +115,17 @@ describe('POST /api/admin/billing/risk-exceptions', () => {
     expect(response.status).toBe(400)
     expect((await response.json()).code).toBe('invalid_duration')
   })
+
+  it('requires recent authentication before issuing an exception', async () => {
+    mocks.requireRecentPlatformAdminAuthentication.mockImplementation(() => {
+      throw new PlatformAdminAuthorizationError('Recent re-authentication required', 401)
+    })
+
+    const response = await callHandler('POST', jsonRequest('POST', { organizationId: 'org-1', reason: 'reviewed', durationMs: 60_000 }))
+
+    expect(response.status).toBe(401)
+    expect(mocks.issueRiskException).not.toHaveBeenCalled()
+  })
 })
 
 describe('DELETE /api/admin/billing/risk-exceptions', () => {
@@ -135,5 +148,16 @@ describe('DELETE /api/admin/billing/risk-exceptions', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.auditPlatformAdminAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('requires recent authentication before revoking an exception', async () => {
+    mocks.requireRecentPlatformAdminAuthentication.mockImplementation(() => {
+      throw new PlatformAdminAuthorizationError('Recent re-authentication required', 401)
+    })
+
+    const response = await callHandler('DELETE', jsonRequest('DELETE', { organizationId: 'org-1', exceptionId: 'exc-1' }))
+
+    expect(response.status).toBe(401)
+    expect(mocks.revokeRiskException).not.toHaveBeenCalled()
   })
 })

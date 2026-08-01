@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { Activity, AlertTriangle, BookOpen, CreditCard, Gauge, RotateCcw, ShieldAlert, Timer } from 'lucide-react'
-import { Button } from '~/components/ui'
+import { Link } from '@tanstack/react-router'
+import { Activity, AlertTriangle, BookOpen, CreditCard, Download, ExternalLink, Gauge, RotateCcw, ShieldAlert, Timer } from 'lucide-react'
+import { Button, Input, Textarea } from '~/components/ui'
 
 interface WebhookBacklogMetrics {
   pending: number
@@ -66,13 +67,246 @@ function StatCard({
   )
 }
 
+/** Runs `action`, shows a result message, and clears any prior confirm state. Every guarded action shares this shape: confirm → run → feedback. */
+function useGuardedAction() {
+  const [pending, setPending] = React.useState(false)
+  const [message, setMessage] = React.useState<{ ok: boolean; text: string } | null>(null)
+
+  const run = React.useCallback(async (action: () => Promise<{ ok: boolean; text: string }>) => {
+    setPending(true)
+    setMessage(null)
+    try {
+      setMessage(await action())
+    } finally {
+      setPending(false)
+    }
+  }, [])
+
+  return { pending, message, run }
+}
+
+async function describeResponse(res: Response, successText: string): Promise<{ ok: boolean; text: string }> {
+  if (res.status === 401) return { ok: false, text: 'Recent re-authentication required — sign in again and retry.' }
+  if (res.status === 409) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, text: body.error === 'already_running' ? 'Already running — this was not started again.' : 'Conflict — refresh and retry.' }
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    return { ok: false, text: body.error ? String(body.error) : `Failed: ${res.status}` }
+  }
+  return { ok: true, text: successText }
+}
+
+function ReconciliationSection({ lastRun }: { lastRun: { windowEnd: string; result: string } | null }) {
+  const [confirming, setConfirming] = React.useState(false)
+  const { pending, message, run } = useGuardedAction()
+
+  const trigger = () => run(async () => {
+    const res = await fetch('/api/admin/billing/reconcile', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: '{}' })
+    setConfirming(false)
+    return describeResponse(res, 'Reconciliation pass completed.')
+  })
+
+  return (
+    <section className="card p-4" data-testid="billing-operations-reconciliation">
+      <h2 className="font-semibold text-sm mb-2">Reconciliation</h2>
+      <p className="text-sm text-bh-text-muted mb-3">
+        {lastRun
+          ? `Last run ${new Date(lastRun.windowEnd).toLocaleString()} — ${lastRun.result}`
+          : 'No reconciliation run recorded yet.'}
+      </p>
+      {!confirming ? (
+        <Button type="button" variant="secondary" size="sm" onClick={() => setConfirming(true)} disabled={pending} data-testid="billing-reconcile-trigger">
+          Run reconciliation
+        </Button>
+      ) : (
+        <div className="rounded border border-bh-border bg-bh-surface p-2 text-xs">
+          <p className="text-bh-text-muted mb-1.5">Compare every organization's live Stripe state against ours and auto-repair drift?</p>
+          <div className="flex gap-1.5">
+            <Button type="button" variant="primary" size="sm" onClick={trigger} disabled={pending} data-testid="billing-reconcile-confirm">
+              {pending ? 'Running…' : 'Run now'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={pending}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {message && <p className={`text-xs mt-2 ${message.ok ? 'text-bh-success' : 'text-bh-danger'}`} role="status" data-testid="billing-reconcile-message">{message.text}</p>}
+    </section>
+  )
+}
+
+function WorkerRunSection() {
+  const [confirming, setConfirming] = React.useState(false)
+  const { pending, message, run } = useGuardedAction()
+
+  const trigger = () => run(async () => {
+    const res = await fetch('/api/admin/billing/run-worker', { method: 'POST', credentials: 'include' })
+    setConfirming(false)
+    return describeResponse(res, 'Worker run completed.')
+  })
+
+  return (
+    <section className="card p-4" data-testid="billing-operations-worker">
+      <h2 className="font-semibold text-sm mb-2">Webhook worker</h2>
+      <p className="text-sm text-bh-text-muted mb-3">Claims and processes pending/retryable webhook events, and sweeps expired credit grants.</p>
+      {!confirming ? (
+        <Button type="button" variant="secondary" size="sm" onClick={() => setConfirming(true)} disabled={pending} data-testid="billing-worker-trigger">
+          Run worker
+        </Button>
+      ) : (
+        <div className="rounded border border-bh-border bg-bh-surface p-2 text-xs">
+          <p className="text-bh-text-muted mb-1.5">Process the current webhook backlog now?</p>
+          <div className="flex gap-1.5">
+            <Button type="button" variant="primary" size="sm" onClick={trigger} disabled={pending} data-testid="billing-worker-confirm">
+              {pending ? 'Running…' : 'Run now'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={pending}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {message && <p className={`text-xs mt-2 ${message.ok ? 'text-bh-success' : 'text-bh-danger'}`} role="status" data-testid="billing-worker-message">{message.text}</p>}
+    </section>
+  )
+}
+
+function DeadLetterReplaySection() {
+  const [eventId, setEventId] = React.useState('')
+  const [confirming, setConfirming] = React.useState(false)
+  const { pending, message, run } = useGuardedAction()
+
+  const trigger = () => run(async () => {
+    const id = eventId.trim()
+    const res = await fetch(`/api/admin/billing/events/${encodeURIComponent(id)}/replay`, { method: 'POST', credentials: 'include' })
+    setConfirming(false)
+    if (res.status === 404) return { ok: false, text: 'No webhook event found with that id.' }
+    return describeResponse(res, 'Event replayed. Safe to repeat — an already-processed event is a no-op.')
+  })
+
+  return (
+    <section className="card p-4" data-testid="billing-operations-dead-letter">
+      <h2 className="font-semibold text-sm mb-2">Dead-letter replay</h2>
+      <p className="text-sm text-bh-text-muted mb-3">Re-process one webhook event by its row id. Safe to repeat — an already-applied event is a no-op, not a double effect.</p>
+      <div className="flex items-center gap-2 mb-2">
+        <Input
+          value={eventId}
+          onChange={(e) => setEventId(e.target.value)}
+          placeholder="billing_webhook_events row id"
+          className="max-w-xs"
+          data-testid="billing-replay-event-id"
+        />
+        <Button type="button" variant="secondary" size="sm" onClick={() => setConfirming(true)} disabled={pending || eventId.trim().length === 0} data-testid="billing-replay-trigger">
+          Replay
+        </Button>
+      </div>
+      {confirming && (
+        <div className="rounded border border-bh-border bg-bh-surface p-2 text-xs mb-2">
+          <p className="text-bh-text-muted mb-1.5">Replay event <code>{eventId.trim()}</code>?</p>
+          <div className="flex gap-1.5">
+            <Button type="button" variant="primary" size="sm" onClick={trigger} disabled={pending} data-testid="billing-replay-confirm">
+              {pending ? 'Replaying…' : 'Replay now'}
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={pending}>Cancel</Button>
+          </div>
+        </div>
+      )}
+      {message && <p className={`text-xs ${message.ok ? 'text-bh-success' : 'text-bh-danger'}`} role="status" data-testid="billing-replay-message">{message.text}</p>}
+    </section>
+  )
+}
+
+function RiskExceptionsSection({ active }: { active: number }) {
+  const [organizationId, setOrganizationId] = React.useState('')
+  const [reason, setReason] = React.useState('')
+  const [durationHours, setDurationHours] = React.useState('24')
+  const [revokeExceptionId, setRevokeExceptionId] = React.useState('')
+  const issue = useGuardedAction()
+  const revoke = useGuardedAction()
+
+  const runIssue = () => issue.run(async () => {
+    const hours = Number(durationHours)
+    if (!organizationId.trim() || reason.trim().length === 0 || !Number.isFinite(hours) || hours <= 0) {
+      return { ok: false, text: 'Organization id, a reason, and a positive duration are required.' }
+    }
+    const res = await fetch('/api/admin/billing/risk-exceptions', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ organizationId: organizationId.trim(), reason: reason.trim(), durationMs: hours * 60 * 60 * 1000 }),
+    })
+    return describeResponse(res, 'Exception issued.')
+  })
+
+  const runRevoke = () => revoke.run(async () => {
+    if (!organizationId.trim() || !revokeExceptionId.trim()) {
+      return { ok: false, text: 'Organization id and exception id are required.' }
+    }
+    const res = await fetch('/api/admin/billing/risk-exceptions', {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ organizationId: organizationId.trim(), exceptionId: revokeExceptionId.trim() }),
+    })
+    if (res.status === 404) return { ok: false, text: 'No active exception found with that id.' }
+    return describeResponse(res, 'Exception revoked.')
+  })
+
+  return (
+    <section className="card p-4" data-testid="billing-operations-risk-exceptions-manage">
+      <h2 className="font-semibold text-sm mb-2">Risk exceptions</h2>
+      <p className="text-sm text-bh-text-muted mb-3">{active} active across all organizations. Issue a time-boxed exception, or revoke one early.</p>
+      <div className="grid gap-2 max-w-md mb-2">
+        <Input value={organizationId} onChange={(e) => setOrganizationId(e.target.value)} placeholder="Organization id" data-testid="billing-risk-org-id" />
+        <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason (required, shown in the audit log)" rows={2} data-testid="billing-risk-reason" />
+        <div className="flex items-center gap-2">
+          <Input type="number" min={1} value={durationHours} onChange={(e) => setDurationHours(e.target.value)} className="w-24" data-testid="billing-risk-duration-hours" />
+          <span className="text-xs text-bh-text-dim">hours (max 30 days)</span>
+        </div>
+        <Button type="button" variant="secondary" size="sm" onClick={runIssue} disabled={issue.pending} data-testid="billing-risk-issue">
+          {issue.pending ? 'Issuing…' : 'Issue exception'}
+        </Button>
+        {issue.message && <p className={`text-xs ${issue.message.ok ? 'text-bh-success' : 'text-bh-danger'}`} role="status" data-testid="billing-risk-issue-message">{issue.message.text}</p>}
+      </div>
+      <div className="grid gap-2 max-w-md">
+        <Input value={revokeExceptionId} onChange={(e) => setRevokeExceptionId(e.target.value)} placeholder="Exception id to revoke" data-testid="billing-risk-exception-id" />
+        <Button type="button" variant="danger-outline" size="sm" onClick={runRevoke} disabled={revoke.pending} data-testid="billing-risk-revoke">
+          {revoke.pending ? 'Revoking…' : 'Revoke exception'}
+        </Button>
+        {revoke.message && <p className={`text-xs ${revoke.message.ok ? 'text-bh-success' : 'text-bh-danger'}`} role="status" data-testid="billing-risk-revoke-message">{revoke.message.text}</p>}
+      </div>
+    </section>
+  )
+}
+
+function AccountingExportSection() {
+  const [month, setMonth] = React.useState('')
+  const query = month ? `?month=${encodeURIComponent(month)}` : ''
+
+  return (
+    <section className="card p-4" data-testid="billing-operations-cost-margin">
+      <h2 className="font-semibold text-sm mb-2">Accounting export</h2>
+      <p className="text-sm text-bh-text-muted mb-3">One calendar month, aggregated only — no per-organization detail, no raw Stripe payloads.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="max-w-[10rem]" data-testid="billing-export-month" aria-label="Month (defaults to last full month)" />
+        <a href={`/api/admin/billing/accounting-export${query}${query ? '&' : '?'}format=csv`} className="inline-flex items-center gap-1 text-bh-accent hover:underline text-sm" data-testid="billing-export-csv">
+          <Download className="size-3.5" aria-hidden />CSV
+        </a>
+        <a href={`/api/admin/billing/accounting-export${query}`} className="inline-flex items-center gap-1 text-bh-accent hover:underline text-sm" data-testid="billing-export-json">
+          <Download className="size-3.5" aria-hidden />JSON
+        </a>
+      </div>
+    </section>
+  )
+}
+
 /**
- * Platform-admin-only read-only summary of live billing operational health
- * (plans/phase-1/30-stripe-billing-platform/tasks.md §9 "Build platform billing operations dashboard").
- * Every number here is an aggregate count from `getBillingOperationsMetrics` — no raw webhook
- * payloads, no per-organization detail, no secrets ever render on this page. Reconciliation and
- * cost/margin sections intentionally show "not yet available" rather than a fabricated number:
- * neither has been built yet (plans/phase-1/30-stripe-billing-platform/tasks.md §10, unstarted).
+ * Platform-admin-only billing operations console (plans/phase-1/30-stripe-billing-platform/tasks.md
+ * §9-10; plans/UI/tasks.md Wave 5 "Add guarded billing operations actions"). The top summary is a
+ * read-only aggregate — no raw webhook payloads, no per-organization detail, no secrets ever render
+ * here. Every mutating action below (reconciliation, worker run, dead-letter replay, risk-exception
+ * issue/revoke) requires an explicit confirm click, is server-side step-up-gated
+ * (`requireRecentPlatformAdminAuthentication`) and audited, and reports its own real result — never a
+ * fabricated success.
  */
 export function BillingOperationsPage() {
   const [metrics, setMetrics] = React.useState<BillingOperationsMetrics | null>(null)
@@ -114,9 +348,17 @@ export function BillingOperationsPage() {
             Live aggregate health across every organization. Read-only — no raw payloads or per-organization detail.
           </p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={load} disabled={loading} className="shrink-0" data-testid="billing-operations-refresh">
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </Button>
+        <div className="flex items-center gap-3 shrink-0">
+          <Link to="/admin/refunds" className="inline-flex items-center gap-1 text-sm text-bh-accent hover:underline" data-testid="billing-operations-refunds-link">
+            Refunds <ExternalLink className="size-3.5" aria-hidden />
+          </Link>
+          <Link to="/admin/disputes" className="inline-flex items-center gap-1 text-sm text-bh-accent hover:underline" data-testid="billing-operations-disputes-link">
+            Disputes <ExternalLink className="size-3.5" aria-hidden />
+          </Link>
+          <Button type="button" variant="secondary" size="sm" onClick={load} disabled={loading} data-testid="billing-operations-refresh">
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </header>
 
       {error && (
@@ -199,20 +441,11 @@ export function BillingOperationsPage() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <section className="card p-4" data-testid="billing-operations-reconciliation">
-              <h2 className="font-semibold text-sm mb-2">Reconciliation</h2>
-              {metrics.reconciliation.lastRun ? (
-                <p className="text-sm text-bh-text-muted">
-                  Last run {new Date(metrics.reconciliation.lastRun.windowEnd).toLocaleString()} — {metrics.reconciliation.lastRun.result}
-                </p>
-              ) : (
-                <p className="text-sm text-bh-text-muted">Not yet available — reconciliation has not been built yet.</p>
-              )}
-            </section>
-            <section className="card p-4" data-testid="billing-operations-cost-margin">
-              <h2 className="font-semibold text-sm mb-2">Cost &amp; margin</h2>
-              <p className="text-sm text-bh-text-muted">Not yet available — cost/margin export has not been built yet.</p>
-            </section>
+            <ReconciliationSection lastRun={metrics.reconciliation.lastRun} />
+            <WorkerRunSection />
+            <DeadLetterReplaySection />
+            <RiskExceptionsSection active={metrics.riskExceptions.active} />
+            <AccountingExportSection />
           </div>
 
           <section className="card p-4" data-testid="billing-operations-runbooks">

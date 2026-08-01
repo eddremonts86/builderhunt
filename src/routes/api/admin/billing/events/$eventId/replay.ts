@@ -1,5 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
+import {
+  auditPlatformAdminAction,
+  platformAdminErrorResponse,
+  requirePlatformAdminPrincipal,
+  requireRecentPlatformAdminAuthentication,
+} from '~/shared/lib/auth/platform-admin'
 import { createStripeEventRetriever, replayBillingWebhookEvent, ReplayError } from '~/shared/lib/billing/worker'
 
 /**
@@ -16,6 +21,7 @@ export const Route = createFileRoute('/api/admin/billing/events/$eventId/replay'
       POST: async ({ request, params }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)
+          requireRecentPlatformAdminAuthentication(principal)
           const result = await replayBillingWebhookEvent(params.eventId, { retriever: createStripeEventRetriever() })
           await auditPlatformAdminAction(principal, {
             action: 'admin.billing.events.replay',

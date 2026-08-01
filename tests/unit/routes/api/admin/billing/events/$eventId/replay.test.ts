@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
   requirePlatformAdminPrincipal: vi.fn(),
+  requireRecentPlatformAdminAuthentication: vi.fn(),
   auditPlatformAdminAction: vi.fn(),
   replayBillingWebhookEvent: vi.fn(),
   createStripeEventRetriever: vi.fn(),
@@ -12,6 +13,7 @@ vi.mock('~/shared/lib/auth/platform-admin', async (importOriginal) => {
   return {
     ...actual,
     requirePlatformAdminPrincipal: mocks.requirePlatformAdminPrincipal,
+    requireRecentPlatformAdminAuthentication: mocks.requireRecentPlatformAdminAuthentication,
     auditPlatformAdminAction: mocks.auditPlatformAdminAction,
   }
 })
@@ -31,7 +33,7 @@ async function callRoute(eventId = 'row-1'): Promise<Response> {
 }
 
 beforeEach(() => {
-  vi.clearAllMocks()
+  vi.resetAllMocks()
   mocks.createStripeEventRetriever.mockReturnValue({ retrieveEvent: vi.fn() })
 })
 
@@ -76,5 +78,31 @@ describe('POST /api/admin/billing/events/$eventId/replay', () => {
     const response = await callRoute('row-1')
 
     expect(response.status).toBe(500)
+  })
+
+  it('requires recent authentication before replaying', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.requireRecentPlatformAdminAuthentication.mockImplementation(() => {
+      throw new PlatformAdminAuthorizationError('Recent re-authentication required', 401)
+    })
+
+    const response = await callRoute('row-1')
+
+    expect(response.status).toBe(401)
+    expect(mocks.replayBillingWebhookEvent).not.toHaveBeenCalled()
+  })
+
+  it('replaying the same event twice is idempotent — the second call still succeeds as a no-op', async () => {
+    mocks.requirePlatformAdminPrincipal.mockResolvedValue({ userId: 'admin-1', requestId: 'req-1' })
+    mocks.replayBillingWebhookEvent
+      .mockResolvedValueOnce({ eventRowId: 'row-1', stripeEventId: 'evt_1', result: 'processed', detail: 'ok' })
+      .mockResolvedValueOnce({ eventRowId: 'row-1', stripeEventId: 'evt_1', result: 'processed', detail: 'already processed — no-op' })
+
+    const first = await callRoute('row-1')
+    const second = await callRoute('row-1')
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(mocks.replayBillingWebhookEvent).toHaveBeenCalledTimes(2)
   })
 })

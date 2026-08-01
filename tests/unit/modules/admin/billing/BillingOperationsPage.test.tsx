@@ -78,7 +78,7 @@ describe('BillingOperationsPage', () => {
     expect(testId('billing-operations-disputes')?.textContent).toContain('1')
     expect(testId('billing-operations-risk-exceptions')?.textContent).toContain('3')
     expect(testId('billing-operations-reconciliation')?.textContent).toContain('clean')
-    expect(testId('billing-operations-cost-margin')?.textContent).toContain('Not yet available')
+    expect(testId('billing-operations-cost-margin')?.textContent).toContain('Accounting export')
     expect(testId('billing-operations-runbooks')).not.toBeNull()
   })
 
@@ -107,13 +107,12 @@ describe('BillingOperationsPage', () => {
     expect(testId('billing-operations-configuration')?.textContent).not.toContain('v3')
   })
 
-  it('shows reconciliation and cost/margin as explicitly unavailable when nothing has run yet', async () => {
+  it('shows reconciliation as explicitly unrun (not a fabricated result) when nothing has run yet', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ ...FULL_METRICS, reconciliation: { lastRun: null } }))
 
     await render()
 
-    expect(testId('billing-operations-reconciliation')?.textContent).toContain('Not yet available')
-    expect(testId('billing-operations-cost-margin')?.textContent).toContain('Not yet available')
+    expect(testId('billing-operations-reconciliation')?.textContent).toContain('No reconciliation run recorded yet')
   })
 
   it('never renders anything resembling a raw webhook payload, a secret, or a stripe id', async () => {
@@ -136,5 +135,85 @@ describe('BillingOperationsPage', () => {
     await act(async () => (testId('billing-operations-refresh') as HTMLButtonElement).click())
 
     expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('reconciliation requires an explicit confirm click before POSTing', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    await render()
+
+    await act(async () => (testId('billing-reconcile-trigger') as HTMLButtonElement).click())
+    expect(testId('billing-reconcile-confirm')).not.toBeNull()
+    expect(fetch).toHaveBeenCalledTimes(1) // only the initial metrics load — no reconcile call yet
+
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: 'run-1', result: 'clean' }))
+    await act(async () => {
+      (testId('billing-reconcile-confirm') as HTMLButtonElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const [url, init] = vi.mocked(fetch).mock.calls[1]
+    expect(String(url)).toBe('/api/admin/billing/reconcile')
+    expect(init).toMatchObject({ method: 'POST' })
+    expect(testId('billing-reconcile-message')?.textContent).toContain('completed')
+  })
+
+  it('surfaces the step-up (recent-auth) rejection distinctly, without a fake success', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    await render()
+
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: 'Recent re-authentication required' }, false, 401))
+    await act(async () => (testId('billing-worker-trigger') as HTMLButtonElement).click())
+    await act(async () => {
+      (testId('billing-worker-confirm') as HTMLButtonElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(testId('billing-worker-message')?.textContent).toMatch(/re-authentication required/i)
+  })
+
+  it('dead-letter replay is disabled until an event id is entered, then requires confirm', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    await render()
+
+    expect((testId('billing-replay-trigger') as HTMLButtonElement).disabled).toBe(true)
+
+    const input = testId('billing-replay-event-id') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, 'evt-row-1')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect((testId('billing-replay-trigger') as HTMLButtonElement).disabled).toBe(false)
+
+    await act(async () => (testId('billing-replay-trigger') as HTMLButtonElement).click())
+    expect(testId('billing-replay-confirm')).not.toBeNull()
+
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ eventRowId: 'evt-row-1', result: 'processed' }))
+    await act(async () => {
+      (testId('billing-replay-confirm') as HTMLButtonElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const [url] = vi.mocked(fetch).mock.calls[1]
+    expect(String(url)).toBe('/api/admin/billing/events/evt-row-1/replay')
+    expect(testId('billing-replay-message')?.textContent).toMatch(/replayed/i)
+  })
+
+  it('issuing a risk exception validates locally before ever calling the API', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    await render()
+
+    await act(async () => (testId('billing-risk-issue') as HTMLButtonElement).click())
+
+    expect(testId('billing-risk-issue-message')?.textContent).toMatch(/required/i)
+    expect(fetch).toHaveBeenCalledTimes(1) // only the metrics load — no POST for an incomplete form
+  })
+
+  it('links to the CSV and JSON accounting export endpoints', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    await render()
+
+    expect((testId('billing-export-csv') as HTMLAnchorElement).getAttribute('href')).toBe('/api/admin/billing/accounting-export?format=csv')
+    expect((testId('billing-export-json') as HTMLAnchorElement).getAttribute('href')).toBe('/api/admin/billing/accounting-export')
   })
 })
