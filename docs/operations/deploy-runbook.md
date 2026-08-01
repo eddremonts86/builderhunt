@@ -260,3 +260,231 @@ seccomp profile blocks the `io_uring_setup` syscall and a container
 that tries to set it dies immediately. The default `io_method=worker`
 is correct for Docker; the `io_uring` value is a Linux-host only
 optimisation.
+
+## PostgreSQL 16 → 18 cutover
+
+> **Status: not executed.** Production runs `pgvector/pgvector:pg16` (verified 2026-08-01 against the
+> Coolify `builderhunt-db` resource). Until this section has been executed and observed, the
+> "One-time Coolify setup" image line above stays `pg16` — do not pre-emptively change it.
+>
+> **Why this is on the critical path.** Migrations `0102_uuidv7_pk`, `0107_organization_activity`
+> and `0122_canonical_human_identity` call `uuidv7()`, a PG18 built-in. They exist only on the
+> unmerged `phase-1-execution` branch, so production has never seen them and is not broken. But that
+> branch cannot ship until this cutover lands, and it fails in two different places depending on how
+> the migrations are applied:
+>
+> - **`pnpm deploy:db` stops cleanly at orchestrator step 2**, before touching any migration:
+>   `PostgreSQL 16.x detected …, but this build requires >= 18.x` (`assertPostgresMajor`,
+>   `scripts/deploy/orchestrate.mjs`). That floor is fatal by design and its message points back at
+>   this section, so a production deploy cannot half-apply anything.
+> - **CI and any bare `drizzle-kit migrate` fail later and messier**, at `0102` itself:
+>   `function uuidv7() does not exist`. That is what the red pg16 `quality` job is reporting, and it
+>   is correct — not a stale config.
+>
+> See the ordering-violation note at the top of
+> `plans/phase-1/03-postgres-18-upgrade/tasks.md` for how these migrations landed before the cutover
+> that licenses them.
+
+### 0. Non-negotiables
+
+- **The target image must be `pgvector/pgvector:0.8.5-pg18`** — a `pgvector/pgvector:*` image, pinned,
+  not the floating `pg18` tag. On a plain `postgres:18*` image, `drizzle/0013`'s
+  `CREATE EXTENSION vector` fails inside `drizzle-kit migrate` and **rolls back the entire migration
+  chain**. This has already taken production down once. Orchestrator step 3 only *warns*, so the
+  mistake surfaces one step later, after everything has been undone.
+- **A 16 → 18 move is not an image swap.** The major versions have incompatible on-disk formats and
+  there is no `pg_upgrade` path across the Docker volume boundary. This procedure creates a
+  **second** resource and moves the data. Editing the image on the existing resource would start an
+  empty database.
+- **Run every `pg_dump`/`pg_restore` from inside a PG18 container.** Client binaries must match the
+  newer server; that is the supported direction. A pg16 client against the pg18 server aborts:
+  ```
+  pg_dump: error: aborting because of server version mismatch
+  pg_dump: detail: server version: 18.4 (Debian 18.4-1.pgdg12+1); pg_dump version: 16.14 (Homebrew)
+  ```
+- **The daily backup is not the vehicle.** `scripts/db/backup.ts` dumps `--no-owner --no-acl` with no
+  `pg_dumpall --globals-only`; roles are cluster-global and every `GRANT` is stripped. See
+  [`database-migrations.md`](./database-migrations.md) → "The daily backup is not an upgrade vehicle".
+
+### 1. Create and provision the standing PG18 resource
+
+1. In Coolify, create a **new** Postgres resource on `pgvector/pgvector:0.8.5-pg18` with its own
+   **named persistent volume**. Do not touch `builderhunt-db`.
+2. Redeploy the app once and confirm the new resource is *not* recreated — that proves the volume is
+   durable across deploys.
+3. Point all six `DATABASE_*_URL` values at it (see §2 below) and run `pnpm deploy:db`.
+
+Verify, on the migration connection:
+
+```sh
+psql "$PG18_URL" -tAc "show server_version"                                   # 18.x
+psql "$PG18_URL" -tAc "select extversion from pg_extension where extname='vector'"   # 0.8.5
+psql "$PG18_URL" -tAc "select rolsuper from pg_roles where rolname = current_user"   # t
+psql "$PG18_URL" -tAc "select count(*) from drizzle.__drizzle_migrations"      # equals: ls drizzle/*.sql | wc -l
+```
+
+All **8** orchestrator steps must pass with **no warning at step 3**. `rolsuper = t` is a hard
+precondition, not a nicety: 64 tables carry `FORCE ROW LEVEL SECURITY` and all seven `builderhunt_*`
+roles are `NOSUPERUSER … NOBYPASSRLS`, so no application role can perform the restore in §3.
+
+### 2. The six variables to repoint
+
+These are the `DATABASE_*` variables actually set on the Coolify app (enumerated 2026-08-01, not
+copied from a template). All six move together — a half-repointed app reads one database and writes
+another.
+
+| Variable | Role |
+| --- | --- |
+| `DATABASE_URL` | `builderhunt_app` |
+| `DATABASE_MIGRATION_URL` | privileged migration identity (superuser) |
+| `DATABASE_AUTH_URL` | `builderhunt_auth` |
+| `DATABASE_WORKER_URL` | `builderhunt_worker` |
+| `DATABASE_PLATFORM_URL` | `builderhunt_platform` |
+| `DATABASE_CAPABILITY_URL` | `builderhunt_capability` |
+
+Also repoint, or the new database has no backups at all:
+
+- Coolify's **03:00 scheduled backup** — retarget it at the new resource.
+- The **03:30 `scripts/ops/builderhunt-backup-sync.sh`** roles capture (`pg_dumpall --roles-only
+  --no-role-passwords`).
+
+### 3. The pipeline
+
+Reproduced end to end on 2026-08-01 against two freshly-provisioned PG18 databases: restore exit 0,
+row-count parity identical, zero forced-tables-without-policy. Every flag has a reason.
+
+```sh
+# (a) Drop the HNSW index on the TARGET. Rebuilding it after the load is far cheaper than
+#     maintaining it row by row during the COPY.
+psql "$TGT" -c 'DROP INDEX IF EXISTS builder_embeddings_hnsw_idx'
+
+# (b) Migrations seed application rows, so a freshly-provisioned target is NOT empty. Truncate
+#     exactly what the migrations put there, or step (d) collides. Derived, not hardcoded — the set
+#     grows with every seeding migration.
+SEEDED=$(psql "$TGT" -tAc "select string_agg(format('%I', relname), ', ') from pg_stat_user_tables where n_live_tup > 0 and schemaname = 'public'")
+echo "truncating migration-seeded tables: $SEEDED"     # 2026-08-01: auth_users, public_surface_indexing
+psql "$TGT" -c "TRUNCATE $SEEDED CASCADE"
+
+# (c) --data-only because the target already has the schema from migrations.
+#     --schema=public to EXCLUDE drizzle.__drizzle_migrations — see claim 2 below.
+pg_dump -Fc --data-only --schema=public "$SRC" -f /tmp/data.dump
+
+# (d) --disable-triggers because privacy_consents has circular foreign keys and pg_dump says so
+#     itself (see claim 4). --single-transaction so a partial load cannot survive.
+pg_restore --data-only --disable-triggers --single-transaction -d "$TGT" /tmp/data.dump
+
+# (e) Recreate the index. The name and operator class must match
+#     drizzle/0013_polite_night_thrasher.sql exactly, or the EXPLAIN plan-shape regression test in
+#     tests/unit/shared/lib/repositories/public-builder-embeddings.test.ts stops matching.
+psql "$TGT" -c "SET maintenance_work_mem='1GB'; CREATE INDEX builder_embeddings_hnsw_idx ON builder_embeddings USING hnsw (embedding vector_cosine_ops)"
+
+# (f) ANALYZE — the planner has no statistics on freshly-loaded tables.
+psql "$TGT" -c 'ANALYZE'
+```
+
+### 4. Verify before repointing anything
+
+```sh
+# Row-count parity, per table.
+diff <(node scripts/db/pg18/row-counts.mjs "$SRC") <(node scripts/db/pg18/row-counts.mjs "$TGT")
+
+# RLS integrity: every forced table must have at least one policy. MUST return zero rows.
+psql "$TGT" -tAc "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relrowsecurity and not exists (select 1 from pg_policies p where p.schemaname='public' and p.tablename=c.relname)"
+
+# Policy count parity between source and target.
+psql "$SRC" -tAc "select count(*) from pg_policies where schemaname='public'"
+psql "$TGT" -tAc "select count(*) from pg_policies where schemaname='public'"
+
+# Locale parity. MUST be identical — a different collation changes text ORDER BY and the equality
+# semantics behind every unique index on a text column.
+diff <(node scripts/db/pg18/locale-check.mjs "$SRC") <(node scripts/db/pg18/locale-check.mjs "$TGT")
+```
+
+The RLS query is the one that would have caught the 2026-07-26 defect, where 192 policies were
+silently not created and 54 tables were left forced-with-no-policy while row counts and table counts
+both looked perfect. `--data-only` is not supposed to hit it, which is exactly why it is asserted.
+
+### 5. Recorded failure modes
+
+Reproduced against live PG18 clusters on 2026-08-01. These are the literal outputs; if you see one of
+them, this is what it means.
+
+**Claim 1 — restoring as an application role silently lands zero rows.** `pg_restore` as
+`builderhunt_app` instead of the superuser:
+
+```
+pg_restore: error: could not execute query: ERROR:  query would be affected by row-level security policy for table "saved_queries"
+Command was: COPY public.saved_queries (id, user_id, name, keywords, sources, language, country, created_at, organization_id, visibility, updated_at) FROM stdin;
+```
+
+`select count(*) from saved_queries` on the target afterwards: **0**. This is why §1's `rolsuper = t`
+check is a hard stop.
+
+**Claim 2 — omitting `--schema=public` collides on the migration journal:**
+
+```
+pg_restore: error: COPY failed for table "__drizzle_migrations": ERROR:  duplicate key value violates unique constraint "__drizzle_migrations_pkey"
+DETAIL:  Key (id)=(1) already exists.
+CONTEXT:  COPY __drizzle_migrations, line 1
+```
+
+**Claim 3 — locale parity holds between these two images.** `pgvector/pgvector:pg16` and
+`pgvector/pgvector:0.8.5-pg18` produced identical output, `datcollversion` included:
+
+```
+datcollate	en_US.utf8
+datctype	en_US.utf8
+datlocprovider	c
+datlocale_or_daticulocale	
+datcollversion	2.36
+server_encoding	UTF8
+```
+
+Because `datcollversion` matches, there is **no** `REFRESH COLLATION VERSION` decision to make. Re-run
+the diff anyway at cutover time — the images float unless pinned, and this is cheap.
+
+**Claim 4 — skipping `--disable-triggers` fails on circular foreign keys.** `pg_dump` warns about it
+during the dump itself:
+
+```
+pg_dump: warning: there are circular foreign-key constraints on this table:
+pg_dump: detail: privacy_consents
+pg_dump: hint: You might not be able to restore the dump without using --disable-triggers or temporarily dropping the constraints.
+```
+
+**Claim 5 — a freshly-provisioned target is not empty.** Skipping step (b):
+
+```
+pg_restore: error: COPY failed for table "auth_users": ERROR:  duplicate key value violates unique constraint "auth_users_pkey"
+```
+
+`auth_users` holds the `system-deleted-user` sentinel from `drizzle/0026_deleted_user_sentinel.sql`,
+and `public_surface_indexing` holds three seeded rows. `--schema=public` excludes the drizzle journal
+but not application rows that migrations themselves INSERT.
+
+### 6. Point of no return
+
+Repointing the six variables and redeploying is the irreversible step. Before it:
+
+- Freeze writes by **stopping the app resource**. All background work is HTTP-triggered and
+  idempotent, and every `run-worker` endpoint is reached over HTTP with `x-cron-secret`, so stopping
+  the app is a complete freeze. Pause the scheduled jobs listed in [`../runbook.md`](../runbook.md) §3.
+- Stripe webhooks will retry — `billing_webhook_events` carries `status` + `next_attempt_at` retry
+  state — and nothing is billed today, since the Stripe plan is still `pending`.
+- Decide explicitly what happens if the window overlaps the 03:00 backup or the 03:30 roles sync.
+- Acknowledge in writing that §4 passed, naming the row-count and policy-count figures.
+
+### 7. Rollback
+
+Before the repoint: **drop the PG18 resource and re-run `pnpm deploy:db` on it.** The pg16 resource
+was never touched, so this costs nothing but time.
+
+After the repoint: point the six variables back at the still-running pg16 resource and redeploy.
+Writes that landed on PG18 in between are lost, which is why the freeze in §6 exists.
+
+If a rollback ever needs a *restore* rather than a repoint, it goes through **`pnpm db:restore`**
+(roles-first — it applies `scripts/db/roles.sql` before the data and then asserts RLS integrity),
+never a bare `pg_restore`. See [`database-restore.md`](./database-restore.md).
+
+**Retire the pg16 resource on a schedule, not immediately.** Keep it running and un-repointed for at
+least one full backup cycle after the cutover is observed.

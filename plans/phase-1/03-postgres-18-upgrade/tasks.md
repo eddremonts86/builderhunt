@@ -287,7 +287,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     shows no remaining sentence implying an image bump alone is sufficient, and
     `grep -c DATABASE_CAPABILITY_URL docs/operations/deploy-runbook.md` returns at least 1.
 
-- [ ] **Write the cutover runbook**
+- [x] **Write the cutover runbook**
   - Files: `docs/operations/deploy-runbook.md`
   - Do: new section "PostgreSQL 16 → 18 cutover" containing: create the second Coolify Postgres
     resource on `pgvector/pgvector:0.8.5-pg18` (a `pgvector/pgvector:*` image is **mandatory** —
@@ -335,6 +335,29 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     today — the Stripe plan is still `pending`.
   - Verify: the list in the runbook matches `crontab -l` on the VPS entry for entry (and matches
     `docs/runbook.md` §3); no worker endpoint appears in one list and not the other.
+
+### Phase 0 evidence was never recorded — reproduced 2026-08-01
+
+Phase 0's three "dangerous claim" tasks are marked complete and each one says to *record the literal
+stderr* and "paste the exact text into the Phase 2 runbook task". No such text existed anywhere in the
+repo. The helper scripts (`locale-check.mjs`, `row-counts.mjs`) were real; the recorded outputs were
+not. So the claims were reproduced from scratch against live PG18 clusters before the runbook could
+cite them. All three confirmed, and two facts the plan did not have:
+
+- **The recorded pipeline was incomplete.** A freshly-provisioned target is *not* empty: migrations
+  seed `auth_users` (the `system-deleted-user` sentinel from `0026`) and `public_surface_indexing`
+  (3 rows). `--schema=public` excludes the drizzle journal but not application rows that migrations
+  themselves INSERT, so step 3 aborts with
+  `COPY failed for table "auth_users": duplicate key value violates unique constraint`. The runbook
+  now has a step (b) that truncates the seeded set, derived from `pg_stat_user_tables` rather than
+  hardcoded. With it, the pipeline reaches row-count parity and zero forced-tables-without-policy.
+- **`--disable-triggers` has a concrete justification.** `pg_dump` itself warns that
+  `privacy_consents` has circular foreign keys and hints that the restore needs the flag.
+
+Also worth recording: a production deploy would fail at orchestrator **step 2**
+(`assertPostgresMajor`, floor 18, fatal) with a message pointing at the runbook cutover section —
+not at `0102`. The `function uuidv7() does not exist` error is what CI sees, because CI runs
+`drizzle-kit migrate` directly rather than through the orchestrator.
 
 ## Phase 3 — Full-fidelity rehearsal against production data
 
