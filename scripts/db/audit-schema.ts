@@ -49,6 +49,18 @@ const classifications: Classification[] = [
   // per-organization opinion about that person stays in `organization_builders.private_metadata`.
   // `human_merge_events` is operational — an append-only audit of merges, so an unmerge has
   // something to restore from.
+  // Solutions catalog (plan 43 Phase 4). Global-public for the same reason as `builder_identities`:
+  // "this model can translate" is a public fact about a public thing, and no organization owns it. The
+  // per-organization judgement about whether to use it is not stored here at all. `solution_sources` is
+  // operational — it is the ingestion register and kill switch, not content, and its `enabled` column
+  // is an operator control rather than anything a reader consumes.
+  operational('solution_sources', 'platform operator', ['solutions-intelligence']),
+  global('solution_capabilities', ['key', 'label', 'description'], ['solutions-intelligence']),
+  global('solution_components', ['id', 'kind', 'slug', 'display_name', 'lifecycle_state', 'homepage_url'], ['solutions-intelligence']),
+  global('solution_component_versions', ['component_id', 'version', 'metadata', 'observed_at', 'valid_from', 'valid_until'], ['solutions-intelligence']),
+  global('solution_component_capabilities', ['component_id', 'component_version', 'capability_key', 'evidence_level'], ['solutions-intelligence']),
+  global('solution_evidence', ['id', 'source_key', 'component_id', 'kind', 'source_url', 'observed_at', 'expires_at'], ['solutions-intelligence']),
+  global('solution_compatibility_edges', ['id', 'version', 'edge_type', 'from_component_id', 'to_component_id', 'status', 'valid_from', 'valid_until'], ['solutions-intelligence']),
   global('canonical_humans', ['id', 'display_name', 'headline', 'country', 'language'], ['solutions-intelligence']),
   global('human_source_links', ['canonical_human_id', 'builder_identity_id', 'link_method', 'review_state', 'valid_from', 'valid_until'], ['solutions-intelligence']),
   operational('human_merge_events', 'target_canonical_human_id', ['solutions-intelligence']),

@@ -500,6 +500,10 @@
     "0124_organization_builders_canonical_human": {
       "sql": "447d4ac7ac18eceac1e7d1c7bf68208f9901ff946347cdf8fd083e3e2079a4c1",
       "snapshot": "597d3ef4a91db807db86ff8b96541810dc1c68f01c5b34744689e2dcea634a6b"
+    },
+    "0125_solutions_catalog": {
+      "sql": "0e2b71eaba007ed1414094b12996a422117e4854cf92fa0a0e7738516419b171",
+      "snapshot": "ca81095f32f9a5fa73ad38175cf32df14fde3258fdd25dbc0ada50380fc559b5"
     }
   }
 }

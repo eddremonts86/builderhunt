@@ -876,6 +876,13 @@
       "when": 1785597320822,
       "tag": "0124_organization_builders_canonical_human",
       "breakpoints": true
+    },
+    {
+      "idx": 125,
+      "version": "7",
+      "when": 1785601447325,
+      "tag": "0125_solutions_catalog",
+      "breakpoints": true
     }
   ]
 }

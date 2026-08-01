@@ -1,10 +1,10 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, primaryKey, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 // The embedding projection and the Solutions catalog share one entity vocabulary on purpose —
 // see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
 // zod, so this cannot cycle back into the schema.
-import type { ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
+import type { ComponentKind, ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
@@ -3347,5 +3347,272 @@ export const statusSubscribers = pgTable(
     index('status_subscribers_confirmed_idx')
       .on(table.confirmedAt)
       .where(sql`${table.unsubscribedAt} IS NULL`),
+  ],
+)
+
+// ---------------------------------------------------------------------------
+// Solutions catalog (plan 43 — solutions-intelligence Phase 4)
+//
+// What a Solutions route is composed *from*: real people, generic specialist roles, agents, models,
+// endpoints, MCP servers, tools and services — plus the evidence behind every claim and the typed
+// edges that say what can work with what.
+//
+// Two rules shape all of it, both from spec.md:
+//
+//   1. "Versioned component metadata and evidence are immutable observations; canonical projections
+//      may change." So a component has a stable identity row and an append-only series of version
+//      rows. Correcting a fact means a new version, never an UPDATE of the old one — otherwise a run
+//      recorded last month cannot be reproduced from the versions it cited.
+//   2. "Semantic similarity can propose an edge for review but cannot activate it." Enforced as a
+//      CHECK, not a convention, for the same reason `human_source_links` does it: a future code path
+//      must not be able to route around the reviewer.
+//
+// Global-public throughout — no `organization_id` anywhere. A catalog fact is not a tenant's
+// property. An organization's private opinion about a component belongs in its own tables.
+// App role reads; worker and reviewed platform actions write (see the migration's grants).
+// ---------------------------------------------------------------------------
+
+/** How a source's data reaches us. Drives what the ingestion layer is allowed to do. */
+export const SOLUTION_SOURCE_KINDS = [
+  'official_api',
+  'feed',
+  'licensed_dataset',
+  'user_submission',
+  /** Compliant public crawl. Requires a recorded terms/robots review before it may be enabled. */
+  'public_scrape',
+  /** Discovery only: we link out and store no fetched content. The fallback for sources whose terms
+   * prohibit ingestion — spec.md: "Route prohibited sources to external-link-only records." */
+  'external_link_only',
+] as const
+
+export const solutionSources = pgTable(
+  'solution_sources',
+  {
+    /** Stable operator-facing key, e.g. `huggingface_models`. Referenced by every fact we ingest. */
+    key: text('key').primaryKey(),
+    kind: text('kind').notNull(),
+    label: text('label').notNull(),
+    homepageUrl: text('homepage_url').notNull(),
+    /**
+     * THE KILL SWITCH. Ships `false` for every source, including official APIs: enabling one is an
+     * explicit maintainer act through Admin → Solutions sources, never a deploy side effect.
+     */
+    enabled: boolean('enabled').notNull().default(false),
+    /** Which fields this source is allowed to contribute. Empty means nothing may be stored. */
+    allowedFields: jsonb('allowed_fields').$type<string[]>().default([]).notNull(),
+    geography: text('geography'),
+    ownerContact: text('owner_contact'),
+    rateLimitPerHour: integer('rate_limit_per_hour'),
+    refreshIntervalHours: integer('refresh_interval_hours'),
+    retentionDays: integer('retention_days'),
+    /** When a human reviewed this source's terms, robots policy and privacy posture, and who. The
+     * legal gate lives in `plans/phase-5/01-production-readiness-audit`; these two columns are where
+     * its outcome is recorded, and the CHECK below makes them load-bearing rather than decorative. */
+    termsReviewedAt: timestamp('terms_reviewed_at', { withTimezone: true }),
+    termsReviewedBy: text('terms_reviewed_by').references(() => authUsers.id, { onDelete: 'set null' }),
+    registerNotes: text('register_notes'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_sources_kind_check', sql`${table.kind} in ('official_api', 'feed', 'licensed_dataset', 'user_submission', 'public_scrape', 'external_link_only')`),
+    /**
+     * A scraping source cannot be enabled until its review is recorded. This is the legal gate
+     * expressed as a database constraint: the admin toggle physically cannot turn on a crawl whose
+     * terms nobody signed off. Other source kinds are exempt because an official API's terms are
+     * accepted by holding a key.
+     */
+    check(
+      'solution_sources_scrape_needs_review_check',
+      sql`${table.kind} <> 'public_scrape' or ${table.enabled} = false or ${table.termsReviewedAt} is not null`,
+    ),
+    /** External-link-only means exactly that: no fields may be stored from it. */
+    check(
+      'solution_sources_link_only_stores_nothing_check',
+      sql`${table.kind} <> 'external_link_only' or jsonb_array_length(${table.allowedFields}) = 0`,
+    ),
+    index('solution_sources_enabled_idx').on(table.enabled),
+  ],
+)
+
+/** The capability vocabulary a brief's requirements and a component's claims are both keyed by. */
+export const solutionCapabilities = pgTable('solution_capabilities', {
+  key: text('key').primaryKey(),
+  label: text('label').notNull(),
+  description: text('description'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
+export const SOLUTION_LIFECYCLE_STATES = ['draft', 'active', 'deprecated', 'withdrawn'] as const
+
+/** A component's stable identity. Mutable projection; the facts live in its versions. */
+export const solutionComponents = pgTable(
+  'solution_components',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind').notNull().$type<ComponentKind>(),
+    slug: text('slug').notNull(),
+    displayName: text('display_name').notNull(),
+    lifecycleState: text('lifecycle_state').notNull().default('draft'),
+    sourceKey: text('source_key').notNull().references(() => solutionSources.key, { onDelete: 'restrict' }),
+    /** This component's id at its source, when it has one. Null for generic human roles, which we
+     * author rather than ingest. */
+    externalId: text('external_id'),
+    homepageUrl: text('homepage_url'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('solution_components_kind_slug_unique').on(table.kind, table.slug),
+    // One component per (source, external record) so a refresh updates rather than duplicates.
+    uniqueIndex('solution_components_source_external_unique')
+      .on(table.sourceKey, table.externalId)
+      .where(sql`external_id is not null`),
+    check('solution_components_kind_check', sql`${table.kind} in ('human_profile', 'human_role', 'agent', 'model', 'model_endpoint', 'mcp_server', 'tool', 'service')`),
+    check('solution_components_lifecycle_check', sql`${table.lifecycleState} in ('draft', 'active', 'deprecated', 'withdrawn')`),
+    index('solution_components_kind_lifecycle_idx').on(table.kind, table.lifecycleState),
+  ],
+)
+
+/**
+ * Immutable versioned metadata. A correction is a new version with a new validity window, never an
+ * UPDATE — a `solution_run` cites `(component_id, version)` pairs, and rewriting one retroactively
+ * changes what a past recommendation claimed.
+ */
+export const solutionComponentVersions = pgTable(
+  'solution_component_versions',
+  {
+    componentId: text('component_id').notNull().references(() => solutionComponents.id, { onDelete: 'cascade' }),
+    version: integer('version').notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull(),
+    contentHash: text('content_hash').notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.componentId, table.version], name: 'solution_component_versions_pkey' }),
+    // An unchanged refresh must not mint a version. Same discipline as builder_source_snapshots.
+    uniqueIndex('solution_component_versions_content_unique').on(table.componentId, table.contentHash),
+    check('solution_component_versions_validity_order_check', sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`),
+    index('solution_component_versions_current_idx').on(table.componentId, table.validFrom),
+  ],
+)
+
+/**
+ * What a component claims it can do, and how well that claim is evidenced.
+ *
+ * `primaryEvidenceId` is `ON DELETE RESTRICT`: a claim may never outlive the observation behind it.
+ * That is the "dangling evidence" the plan's verify line asks the schema to reject — a claim whose
+ * evidence has been purged is indistinguishable from an unsupported assertion.
+ */
+export const solutionComponentCapabilities = pgTable(
+  'solution_component_capabilities',
+  {
+    id: text('id').primaryKey(),
+    componentId: text('component_id').notNull(),
+    componentVersion: integer('component_version').notNull(),
+    capabilityKey: text('capability_key').notNull().references(() => solutionCapabilities.key, { onDelete: 'restrict' }),
+    evidenceLevel: text('evidence_level').notNull(),
+    primaryEvidenceId: text('primary_evidence_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.componentId, table.componentVersion],
+      foreignColumns: [solutionComponentVersions.componentId, solutionComponentVersions.version],
+      name: 'solution_component_capabilities_version_fk',
+    }).onDelete('cascade'),
+    uniqueIndex('solution_component_capabilities_unique').on(table.componentId, table.componentVersion, table.capabilityKey),
+    check('solution_component_capabilities_level_check', sql`${table.evidenceLevel} in ('claimed', 'observed', 'verified', 'production_evidence')`),
+    index('solution_component_capabilities_capability_idx').on(table.capabilityKey, table.evidenceLevel),
+  ],
+)
+
+/**
+ * An immutable observation that supports a capability claim or a compatibility edge.
+ *
+ * Never a raw upstream response body — a minimized, allowlisted payload plus the URL a reviewer can
+ * go and check. `expiresAt` exists because evidence goes stale: a benchmark from two years ago is not
+ * the same claim as one from last week, and the composer weighs freshness.
+ */
+export const solutionEvidence = pgTable(
+  'solution_evidence',
+  {
+    id: text('id').primaryKey(),
+    sourceKey: text('source_key').notNull().references(() => solutionSources.key, { onDelete: 'restrict' }),
+    componentId: text('component_id').references(() => solutionComponents.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    sourceUrl: text('source_url'),
+    contentHash: text('content_hash').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('solution_evidence_source_hash_unique').on(table.sourceKey, table.contentHash),
+    check('solution_evidence_kind_check', sql`${table.kind} in ('official_metadata', 'benchmark', 'documentation', 'production_report', 'manual_review')`),
+    check('solution_evidence_expiry_order_check', sql`${table.expiresAt} is null or ${table.expiresAt} > ${table.observedAt}`),
+    index('solution_evidence_component_idx').on(table.componentId, table.observedAt),
+  ],
+)
+
+export const SOLUTION_EDGE_DISCOVERY_METHODS = ['manual_review', 'official_metadata', 'semantic_similarity_reviewed'] as const
+export const SOLUTION_EDGE_STATUSES = ['proposed', 'active', 'rejected', 'expired'] as const
+
+/**
+ * Typed directed compatibility. The composer may only traverse `active` edges, so what can become
+ * active is the whole safety story.
+ */
+export const solutionCompatibilityEdges = pgTable(
+  'solution_compatibility_edges',
+  {
+    id: text('id').primaryKey(),
+    version: integer('version').notNull().default(1),
+    edgeType: text('edge_type').notNull(),
+    fromComponentId: text('from_component_id').notNull().references(() => solutionComponents.id, { onDelete: 'cascade' }),
+    toComponentId: text('to_component_id').notNull().references(() => solutionComponents.id, { onDelete: 'cascade' }),
+    constraints: jsonb('constraints').$type<Record<string, unknown>>().default({}).notNull(),
+    confidenceBps: integer('confidence_bps').notNull().default(0),
+    discoveryMethod: text('discovery_method').notNull(),
+    status: text('status').notNull().default('proposed'),
+    /** RESTRICT, like a capability claim: an edge may never outlive its evidence. */
+    primaryEvidenceId: text('primary_evidence_id').notNull().references(() => solutionEvidence.id, { onDelete: 'restrict' }),
+    reviewedByUserId: text('reviewed_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+    validFrom: timestamp('valid_from', { withTimezone: true }).defaultNow().notNull(),
+    validUntil: timestamp('valid_until', { withTimezone: true }),
+    lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_edges_type_check', sql`${table.edgeType} in ('can_perform', 'requires', 'accepts_output_from', 'integrates_with', 'hosted_by', 'reviewed_by', 'incompatible_with', 'substitutes_for')`),
+    check('solution_edges_discovery_check', sql`${table.discoveryMethod} in ('manual_review', 'official_metadata', 'semantic_similarity_reviewed')`),
+    check('solution_edges_status_check', sql`${table.status} in ('proposed', 'active', 'rejected', 'expired')`),
+    check('solution_edges_confidence_range_check', sql`${table.confidenceBps} between 0 and 10000`),
+    // No relationship type is meaningful pointing at itself.
+    check('solution_edges_no_self_loop_check', sql`${table.fromComponentId} <> ${table.toComponentId}`),
+    check('solution_edges_validity_order_check', sql`${table.validUntil} is null or ${table.validUntil} > ${table.validFrom}`),
+    /**
+     * spec.md: "Semantic similarity can propose an edge for review but cannot activate it." A
+     * similarity-derived edge reaching `active` requires a named reviewer — the same shape as
+     * `human_source_links_probabilistic_needs_review_check`, and for the same reason: the composer
+     * builds real recommendations out of active edges, so an unreviewed guess becoming active means
+     * advising someone to combine two things nobody checked work together.
+     */
+    check(
+      'solution_edges_similarity_needs_review_check',
+      sql`${table.discoveryMethod} <> 'semantic_similarity_reviewed' or ${table.status} <> 'active' or ${table.reviewedByUserId} is not null`,
+    ),
+    /** One live edge per (from, to, type). Partial, so withdrawn and rejected history never blocks a
+     * later correct edge. */
+    uniqueIndex('solution_edges_active_unique')
+      .on(table.fromComponentId, table.toComponentId, table.edgeType)
+      .where(sql`status = 'active' and valid_until is null`),
+    index('solution_edges_traversal_idx').on(table.fromComponentId, table.edgeType, table.status),
+    index('solution_edges_review_queue_idx').on(table.status, table.createdAt),
   ],
 )
