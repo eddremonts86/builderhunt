@@ -69,6 +69,7 @@ import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/str
 import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
+import { Route as ApiSolutionsConfigRouteImport } from './routes/api/solutions/config'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
@@ -576,6 +577,11 @@ const ApiSprintsPreviewRoute = ApiSprintsPreviewRouteImport.update({
 const ApiSprintsSprintIdRoute = ApiSprintsSprintIdRouteImport.update({
   id: '/api/sprints/$sprintId',
   path: '/api/sprints/$sprintId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsConfigRoute = ApiSolutionsConfigRouteImport.update({
+  id: '/api/solutions/config',
+  path: '/api/solutions/config',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
@@ -1837,6 +1843,7 @@ export interface FileRoutesByFullPath {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/config': typeof ApiSolutionsConfigRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -2104,6 +2111,7 @@ export interface FileRoutesByTo {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/config': typeof ApiSolutionsConfigRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -2376,6 +2384,7 @@ export interface FileRoutesById {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/config': typeof ApiSolutionsConfigRoute
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -2647,6 +2656,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/config'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -2914,6 +2924,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/config'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -3185,6 +3196,7 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/config'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -3412,6 +3424,7 @@ export interface RootRouteChildren {
   ApiPrivacyProfileRemovalRoute: typeof ApiPrivacyProfileRemovalRouteWithChildren
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
+  ApiSolutionsConfigRoute: typeof ApiSolutionsConfigRoute
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
   ApiStatusSubscribeRoute: typeof ApiStatusSubscribeRoute
@@ -3955,6 +3968,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sprints/$sprintId'
       fullPath: '/api/sprints/$sprintId'
       preLoaderRoute: typeof ApiSprintsSprintIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/config': {
+      id: '/api/solutions/config'
+      path: '/api/solutions/config'
+      fullPath: '/api/solutions/config'
+      preLoaderRoute: typeof ApiSolutionsConfigRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/search/semantic': {
@@ -5910,6 +5930,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPrivacyProfileRemovalRoute: ApiPrivacyProfileRemovalRouteWithChildren,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
+  ApiSolutionsConfigRoute: ApiSolutionsConfigRoute,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
   ApiStatusSubscribeRoute: ApiStatusSubscribeRoute,

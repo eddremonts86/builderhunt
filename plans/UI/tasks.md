@@ -256,7 +256,7 @@
   - Do: Render only owner-selected public events; preserve lazy degradation; hide summary controls when neither local nor authenticated proxy AI is usable.
   - Verify: dependency absent, unavailable AI, valid timeline, invalid timeline, and revoked publication states pass.
 
-- [ ] **Make Solutions preview state honest and dependency-aware**
+- [x] **Make Solutions preview state honest and dependency-aware**
   - Files: `src/modules/solutions/components/SolutionsPage.tsx`, `src/shared/lib/solutions/config.ts`, `src/routes/_dashboard/solutions/index.tsx`, `tests/unit/modules/solutions/components/SolutionsPage.test.tsx`
   - Do: Label fixture lanes as demo/preview, expose server-owned prerequisite readiness, remove production-success wording, and keep the same route ready for real plan 43 endpoints.
   - Verify: incomplete prerequisites can never render an unlabeled generated-result success state.

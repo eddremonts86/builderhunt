@@ -21,6 +21,7 @@ const publicAllowlist = new Map([
   ['src/routes/api/incidents/index.ts', 'reads only via listPublicIncidents, an explicit public DTO repository'],
   ['src/routes/api/status/index.ts', 'operational health check; touches no tenant or account data'],
   ['src/routes/api/ai/config.ts', 'documented public-safe AI feature-flag config, no secrets'],
+  ['src/routes/api/solutions/config.ts', 'documented public-safe Solutions feature-flag readiness config, no secrets — same pattern as ai/config.ts'],
   ['src/routes/api/feeds/$searchId.ts', 'documented public RSS feed, gated by a capability token rather than a session'],
   ['src/routes/api/webhooks/stripe.ts', 'Stripe cannot hold a user session — Stripe-Signature verification (receiveStripeWebhook) is the entire authentication mechanism, enforced before any DB write'],
   ['src/routes/api/e2e/outbox.ts', 'E2E-only email-outbox debug seam; hard-gated on E2E_MODE=true and returns a bare 404 for every method in any other mode'],

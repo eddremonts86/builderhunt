@@ -20,11 +20,14 @@ afterEach(() => {
 
 // The locked/stale-session states render router `Link`s (PaidStateActions), so every mount needs a
 // router in context — same shape as CreditBalance.test.tsx.
-async function mountWith(fetchEntitlement: SolutionsPageProps['fetchEntitlement']) {
+async function mountWith(
+  fetchEntitlement: SolutionsPageProps['fetchEntitlement'],
+  fetchReadiness: SolutionsPageProps['fetchReadiness'] = () => Promise.resolve({ ready: false }),
+) {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
-  const rootRoute = createRootRoute({ component: () => <SolutionsPage fetchEntitlement={fetchEntitlement} /> })
+  const rootRoute = createRootRoute({ component: () => <SolutionsPage fetchEntitlement={fetchEntitlement} fetchReadiness={fetchReadiness} /> })
   const router = createRouter({ routeTree: rootRoute, history: createMemoryHistory({ initialEntries: ['/solutions'] }) })
   await act(async () => {
     root!.render(<RouterProvider router={router as never} />)
@@ -35,8 +38,8 @@ async function mountWith(fetchEntitlement: SolutionsPageProps['fetchEntitlement'
   })
 }
 
-async function mount(paidActionsAllowed: boolean) {
-  await mountWith(() => Promise.resolve({ paidActionsAllowed }))
+async function mount(paidActionsAllowed: boolean, ready = false) {
+  await mountWith(() => Promise.resolve({ paidActionsAllowed }), () => Promise.resolve({ ready }))
 }
 
 function $(selector: string) {
@@ -112,8 +115,26 @@ describe('SolutionsPage — Paid (unlocked)', () => {
     expect($('[data-testid="clarifying-question"]')).toBeNull()
   })
 
-  it('confirming the interpretation shows the exact maximum credit charge before any generation', async () => {
-    await mount(true)
+  it('confirming the interpretation shows honest preview copy — no credit-charge claim while Solutions is not ready', async () => {
+    await mount(true, false)
+    await act(async () => {
+      setValue($('[data-testid="brief-description-input"]'), 'Translate a manual')
+      setValue($('[data-testid="brief-capabilities-input"]'), 'translation')
+    })
+    await act(async () => {
+      $('[data-testid="brief-form"]').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    })
+    await act(async () => {
+      ;($('[data-testid="interpretation-confirm-button"]') as HTMLButtonElement).click()
+    })
+    expect($('[data-testid="credit-confirmation"]')).not.toBeNull()
+    expect(container!.textContent).not.toContain('10 credits')
+    expect(container!.textContent).toMatch(/isn.t live for your organization yet/)
+    expect($('[data-testid="result-lanes"]')).toBeNull()
+  })
+
+  it('confirming the interpretation shows the exact maximum credit charge once Solutions is server-ready', async () => {
+    await mount(true, true)
     await act(async () => {
       setValue($('[data-testid="brief-description-input"]'), 'Translate a manual')
       setValue($('[data-testid="brief-capabilities-input"]'), 'translation')
@@ -170,6 +191,10 @@ describe('SolutionsPage — Paid (unlocked)', () => {
     expect($('[data-testid="route-hybrid-unavailable-reason"]')).not.toBeNull()
     // Demo results must be clearly labeled — never presented as a real generated result.
     expect($('[data-testid="demo-result-banner"]').textContent).toMatch(/example/i)
+    // Every fixture lane carries its own "Preview" label — not just a single banner above them.
+    expect($('[data-testid="route-human-preview-label"]')).not.toBeNull()
+    expect($('[data-testid="route-ai-preview-label"]')).not.toBeNull()
+    expect($('[data-testid="route-hybrid-preview-label"]')).not.toBeNull()
   })
 
   it('starting a new brief from the result screen returns to the empty form', async () => {
@@ -199,6 +224,23 @@ describe('SolutionsPage — entitlement fetch failure', () => {
   it('fails closed to the locked state on a fetch error', async () => {
     await mountWith(() => Promise.reject(new Error('network error')))
     expect($('[data-testid="solutions-locked"]')).not.toBeNull()
+  })
+})
+
+describe('SolutionsPage — server-owned readiness (plans/UI/tasks.md Wave 7 "Make Solutions preview state honest")', () => {
+  it('shows the preview banner while Solutions is not ready', async () => {
+    await mount(true, false)
+    expect($('[data-testid="solutions-preview-banner"]')).not.toBeNull()
+  })
+
+  it('hides the preview banner once the server reports Solutions is ready', async () => {
+    await mount(true, true)
+    expect($('[data-testid="solutions-preview-banner"]')).toBeNull()
+  })
+
+  it('fails closed to the preview banner when the readiness fetch itself fails', async () => {
+    await mountWith(() => Promise.resolve({ paidActionsAllowed: true }), () => Promise.reject(new Error('network error')))
+    expect($('[data-testid="solutions-preview-banner"]')).not.toBeNull()
   })
 })
 

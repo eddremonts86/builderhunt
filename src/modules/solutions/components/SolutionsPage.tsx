@@ -44,12 +44,17 @@ type Step = 'brief' | 'interpretation' | 'confirm' | 'result'
 export interface SolutionsPageProps {
   /** Injected for tests — defaults to a real fetch against `/api/billing/summary`. */
   fetchEntitlement?: () => Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }>
+  /** Injected for tests — defaults to a real fetch against `/api/solutions/config`. Server-owned:
+   * the client never guesses whether real (billed, saved) generation is live — `false` until the
+   * server says otherwise, so an unreachable config endpoint fails closed to the preview copy. */
+  fetchReadiness?: () => Promise<{ ready: boolean }>
 }
 
 type Entitlement = 'loading' | 'locked' | 'stale_session' | 'unlocked'
 
-export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
+export function SolutionsPage({ fetchEntitlement, fetchReadiness }: SolutionsPageProps = {}) {
   const [entitlement, setEntitlement] = React.useState<Entitlement>('loading')
+  const [solutionsReady, setSolutionsReady] = React.useState(false)
   const [draft, setDraft] = React.useState<DraftBrief>(initialDraft)
   const [step, setStep] = React.useState<Step>('brief')
   const [clarifyingAnswer, setClarifyingAnswer] = React.useState('')
@@ -66,6 +71,16 @@ export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
       .then((result) => setEntitlement(result.staleSession ? 'stale_session' : result.paidActionsAllowed ? 'unlocked' : 'locked'))
       .catch(() => setEntitlement('locked'))
   }, [fetchEntitlement])
+
+  React.useEffect(() => {
+    const load = fetchReadiness
+      ?? ((): Promise<{ ready: boolean }> => fetch('/api/solutions/config')
+        .then((r) => (r.ok ? r.json() : { ready: false }))
+        .catch(() => ({ ready: false })))
+    load()
+      .then((result) => setSolutionsReady(result.ready))
+      .catch(() => setSolutionsReady(false))
+  }, [fetchReadiness])
 
   // Deterministic materiality rule for the shell demo: an unknown budget is the one clarifying
   // question that would materially change viable routes (spec.md: "at most one clarifying
@@ -141,6 +156,16 @@ export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
         </h1>
         <p className="text-bh-text-muted mt-1">Describe the outcome you need. Nothing is saved until you explicitly save a result.</p>
       </header>
+
+      {!solutionsReady && (
+        <div
+          className="card p-4 mb-6 border border-bh-border/60 bg-bh-bg-alt rounded-xl text-sm text-bh-text-muted"
+          data-testid="solutions-preview-banner"
+        >
+          Solutions is in preview for your organization — briefs and results below are examples, not
+          live generation. Nothing here is charged or saved.
+        </div>
+      )}
 
       {step === 'brief' && (
         <form onSubmit={handlePreviewInterpretation} className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl" data-testid="brief-form">
@@ -244,14 +269,23 @@ export function SolutionsPage({ fetchEntitlement }: SolutionsPageProps = {}) {
         <div className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl" data-testid="credit-confirmation">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-bh-accent" aria-hidden="true" />
-            Confirm generation
+            {solutionsReady ? 'Confirm generation' : 'Preview a demo result'}
           </h2>
-          <p className="text-sm text-bh-text-muted">
-            This will use a maximum of <strong>10 credits</strong> (solutions.generate.v1). You&apos;ll
-            only be charged once a usable result is produced — an unusable or failed run is never charged.
-          </p>
+          {solutionsReady ? (
+            <p className="text-sm text-bh-text-muted">
+              This will use a maximum of <strong>10 credits</strong> (solutions.generate.v1). You&apos;ll
+              only be charged once a usable result is produced — an unusable or failed run is never charged.
+            </p>
+          ) : (
+            <p className="text-sm text-bh-text-muted">
+              Solutions generation isn&apos;t live for your organization yet — this shows an example
+              result only. No credits are charged and nothing is saved.
+            </p>
+          )}
           <div className="flex gap-3">
-            <Button type="button" onClick={handleConfirmCharge} data-testid="charge-confirm-button">Confirm and generate</Button>
+            <Button type="button" onClick={handleConfirmCharge} data-testid="charge-confirm-button">
+              {solutionsReady ? 'Confirm and generate' : 'See demo result'}
+            </Button>
             <Button type="button" variant="secondary" onClick={handleReset} data-testid="charge-cancel-button">Cancel</Button>
           </div>
         </div>
@@ -280,8 +314,11 @@ function DemoResultLanes({ run }: { run: SolutionRun }) {
           data-testid={`route-${route.routeType}`}
           data-status={route.status}
         >
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             <span className="text-xs uppercase tracking-wider text-bh-text-dim">{ROUTE_TYPE_LABELS[route.routeType]}</span>
+            <span className="badge" data-testid={`route-${route.routeType}-preview-label`}>Preview</span>
+          </div>
+          <div>
             <span
               className={
                 route.status === 'recommended' ? 'text-xs font-semibold text-bh-success'
