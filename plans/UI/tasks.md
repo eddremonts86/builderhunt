@@ -98,7 +98,7 @@
   - Do: Add a keyboard-accessible drawer, unread badge, keyset pagination, mark-one/mark-all-visible read, event navigation, and redacted candidate-safe summaries.
   - Verify: shared-timestamp pagination does not skip/duplicate; foreign IDs remain unmarked; mobile focus trap and Escape behavior pass.
 
-- [ ] **Expose bounded ICS export**
+- [x] **Expose bounded ICS export**
   - Files: `src/modules/calendar/components/CalendarExportDialog.tsx`, `src/modules/calendar/components/CalendarPage.tsx`, `src/routes/api/calendar/export[.]ics.ts`, `tests/e2e/calendar.spec.ts`
   - Do: Let the user select a bounded date range, explain that the snapshot contains private calendar data, request the authenticated export, and download only on success.
   - Verify: valid export downloads `text/calendar` with `private, no-store`; invalid/unbounded ranges and signed-out requests fail without a download.

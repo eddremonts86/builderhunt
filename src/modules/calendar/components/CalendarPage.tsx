@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, CalendarDays, Clock, Plus, Search, X } from 'lucide-react'
+import { Bell, CalendarDays, Clock, Download, Plus, Search, X } from 'lucide-react'
 import { Button, Input } from '~/components/ui'
 import { CalendarLayers, type CalendarLayerKey } from './CalendarLayers'
 import { ProjectionDetails, type ProjectionItem } from './ProjectionDetails'
@@ -20,6 +20,7 @@ import {
   type MarkReadResult,
   type NotificationsPage,
 } from './CalendarNotifications'
+import { CalendarExportDialog } from './CalendarExportDialog'
 
 /**
  * Calendar page (plan: calendar-scheduling-interview-intelligence, Phase 3 "Build calendar feature
@@ -319,6 +320,7 @@ export function CalendarPage(props: CalendarPageProps = {}) {
   const [formOpen, setFormOpen] = useState(false)
   const [availabilityOpen, setAvailabilityOpen] = useState(false)
   const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [notificationUnread, setNotificationUnread] = useState(0)
 
   const [selectedEvent, setSelectedEvent] = useState<CalendarEventDto | null>(null)
@@ -609,6 +611,10 @@ export function CalendarPage(props: CalendarPageProps = {}) {
             <Clock className="mr-2 size-4" aria-hidden />
             {availabilityOpen ? 'Hide availability' : 'Availability'}
           </Button>
+          <Button variant="secondary" onClick={() => setExportOpen(true)} data-testid="calendar-export-toggle">
+            <Download className="mr-2 size-4" aria-hidden />
+            Export
+          </Button>
           <Button onClick={() => setFormOpen((open) => !open)} data-testid="calendar-new-event">
             {formOpen ? <X className="mr-2 size-4" aria-hidden /> : <Plus className="mr-2 size-4" aria-hidden />}
             {formOpen ? 'Close' : 'New event'}
@@ -633,6 +639,13 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           onClose={() => setAvailabilityOpen(false)}
         />
       )}
+
+      <CalendarExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        defaultFrom={rangeFrom}
+        defaultTo={rangeTo}
+      />
 
       {formOpen && (
         <EventEditor
