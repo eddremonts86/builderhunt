@@ -8,6 +8,8 @@ interface Counters {
    * source timing out no longer fails the search, so this counter is the only signal that it did —
    * a rising value means a third-party API is degrading while results still look fine. */
   searchConnectorTimeouts: number
+  solutionsRetrievalLexicalFailures: number
+  solutionsRetrievalVectorFailures: number
   /** A search connector threw or returned an unusable shape. Same rationale: isolation means the
    * user sees partial results rather than an error, so the outage is invisible without this. */
   searchConnectorFailures: number
@@ -66,6 +68,8 @@ const counters: Counters = {
   searches: 0,
   searchCacheHits: 0,
   searchConnectorTimeouts: 0,
+  solutionsRetrievalLexicalFailures: 0,
+  solutionsRetrievalVectorFailures: 0,
   searchConnectorFailures: 0,
   apiRequests: 0,
   apiErrors: 0,

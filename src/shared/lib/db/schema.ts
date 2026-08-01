@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, primaryKey, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
+import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, primaryKey, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date, customType } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
 // The embedding projection and the Solutions catalog share one entity vocabulary on purpose —
 // see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
@@ -3629,6 +3629,18 @@ export const solutionEvidence = pgTable(
 )
 
 /**
+ * `tsvector`, which drizzle has no built-in for.
+ *
+ * Declared so the column is visible to the query builder and to anyone reading the schema — a full-text
+ * lane written against a column the schema does not mention is a lane nobody can find. Never written from
+ * TypeScript: the column is `GENERATED ALWAYS AS ... STORED`, so Postgres owns its value and an attempt to
+ * set it would be rejected.
+ */
+const tsvector = customType<{ data: string; driverData: string; notNull: true }>({
+  dataType: () => 'tsvector',
+})
+
+/**
  * Retrieval projections: the lexical document and filter columns retrieval actually queries, derived
  * from a component version.
  *
@@ -3650,6 +3662,11 @@ export const solutionComponentProjections = pgTable(
     /** Derived prose, not raw metadata — download counts and library names would only add lexical
      * noise. Indexed by a generated `search_vector` column that cannot drift from it. */
     searchDocument: text('search_document').notNull(),
+    /**
+     * Generated from `search_document` by Postgres, so it cannot drift from it. Read-only here: the
+     * lexical lane matches against this column, and nothing in TypeScript may assign it.
+     */
+    searchVector: tsvector('search_vector').notNull().generatedAlwaysAs(sql`to_tsvector('english', search_document)`),
     /** Exact structured filtering. A capability requirement is array containment against this, never a
      * substring match on the document. */
     capabilityKeys: text('capability_keys').array().$type<string[]>().default([]).notNull(),

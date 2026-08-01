@@ -15,14 +15,20 @@ import { createHash } from 'node:crypto'
 import { SOLUTION_CAPABILITIES, type CapabilityEvidenceLevel, type ComponentKind } from '~/shared/lib/solutions/contracts'
 
 /**
- * Bumped whenever this file changes what it emits.
+ * Which generation of this document builder produced a projection.
  *
- * The projector refuses to replace a projection carrying a higher version than the one it is writing, so
- * a job that started before a rollout cannot overwrite newer work with an older document shape. Raising
- * this number is what marks every existing projection as stale and eligible for rebuild.
+ * Not the primary invalidation mechanism — the content hash is, and it catches every change to the text
+ * this file emits without anyone having to remember a version bump. This number exists for the changes a
+ * hash *cannot* see:
+ *
+ * - the tsvector configuration changes, so identical text must be indexed differently;
+ * - a rebuild of the whole catalog has to be forced for some other reason.
+ *
+ * It also orders concurrent projectors: the upsert refuses to replace a projection carrying a higher
+ * version, so a job that started before a rollout cannot revert newer work to the older shape.
  *
  * History:
- *   1 — display name, capability labels, kind, source, and the prose metadata fields.
+ *   1 — display name, capability labels, kind, and the prose metadata fields, indexed with 'english'.
  */
 export const PROJECTION_VERSION = 1
 
