@@ -73,7 +73,13 @@ const zodEnv = z.object({
   AI_EMBEDDING_URL: z.string().optional(),
   AI_EMBEDDING_MODEL: z.string().optional(),
   AI_EMBEDDING_API_KEY: z.string().optional(),
-  AI_EMBEDDING_DIM: z.coerce.number().int().positive().default(1536),
+  // 768 = nomic-embed-text, the model docker-compose provisions and every .env example sets. It
+  // is also the literal the one and only pgvector migration created the column with
+  // (drizzle/0013_*.sql: `vector(768)`), so it is the only value a migrated database can hold.
+  // This default was 1536 until 2026-08-01 (plan 43 Phase 2) — a value nothing in the repo used,
+  // which meant an unset AI_EMBEDDING_DIM silently disagreed with the actual column.
+  // `assertEmbeddingDimensionMatchesDatabase` now catches that disagreement at first use.
+  AI_EMBEDDING_DIM: z.coerce.number().int().positive().default(768),
   AI_EMBEDDING_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
   // Kill switch for the claimable-profiles source-bound verification flow
   // (bio-challenge fetches against GitHub/GitLab/Codeberg/DEV.to).

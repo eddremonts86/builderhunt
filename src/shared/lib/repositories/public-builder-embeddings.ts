@@ -2,14 +2,20 @@
 // Every function here uses `publicDb` directly — never `withTenantContext` —
 // since this table has no organizationId (public profile data, shared across
 // all users). See schema.ts's "Semantic Search" section comment.
-import { and, asc, cosineDistance, eq, isNotNull, sql } from 'drizzle-orm'
+import { and, asc, cosineDistance, eq, inArray, isNotNull, sql } from 'drizzle-orm'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { publicDb } from '../db/client'
 import { builderEmbeddings } from '../db/schema'
 import { randomId } from '~/lib/utils'
+import type { ComponentKind } from '~/shared/lib/solutions/contracts'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 
+/** Real people — the only kind that existed before plan 43 Phase 2, and still the default. */
+export const DEFAULT_ENTITY_KIND: ComponentKind = 'human_profile'
+
 export interface UpsertBuilderEmbeddingStubInput {
+  /** Omitted means `human_profile`, which is what every pre-Phase-2 caller means. */
+  entityKind?: ComponentKind
   source: string
   sourceId: string
   document: string
@@ -37,11 +43,13 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
   // (if any), then run the upsert, then compare the hash that was
   // actually written. The read is bounded by the unique index on
   // (source, source_id) so it is O(1).
+  const entityKind = input.entityKind ?? DEFAULT_ENTITY_KIND
   const [existing] = await publicDb
     .select({ contentHash: builderEmbeddings.contentHash })
     .from(builderEmbeddings)
     .where(
       and(
+        eq(builderEmbeddings.entityKind, entityKind),
         eq(builderEmbeddings.source, input.source),
         eq(builderEmbeddings.sourceId, input.sourceId),
       ),
@@ -51,6 +59,7 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
     .insert(builderEmbeddings)
     .values({
       id: randomId(),
+      entityKind,
       source: input.source,
       sourceId: input.sourceId,
       document: input.document,
@@ -58,7 +67,7 @@ export async function upsertBuilderEmbeddingStub(input: UpsertBuilderEmbeddingSt
       profile: input.profile,
     })
     .onConflictDoUpdate({
-      target: [builderEmbeddings.source, builderEmbeddings.sourceId],
+      target: [builderEmbeddings.entityKind, builderEmbeddings.source, builderEmbeddings.sourceId],
       set: {
         document: sql`excluded.document`,
         profile: sql`excluded.profile`,
@@ -104,10 +113,53 @@ export async function markBuilderEmbeddingsEmbedded(rows: { id: string; embeddin
 }
 
 export interface BuilderEmbeddingMatch {
+  entityKind: ComponentKind
   source: string
   sourceId: string
   profile: EmbeddedProfile
   similarity: number
+}
+
+/**
+ * Hard filters applied in SQL, before the vector sort — not after it in JS (plan 43 Phase 2,
+ * "Honor semantic filters and pagination": "filtered pages contain no excluded source/type").
+ *
+ * Post-filtering a fixed candidate window is what made the old behaviour wrong in two ways at
+ * once: a source filter was never applied to local matches at all, and even once applied it would
+ * silently shrink the page, because the window was chosen before the filter ran. Pushing both into
+ * the WHERE clause means the index returns `limit` rows that already satisfy the filter.
+ */
+export interface BuilderEmbeddingSearchFilters {
+  /** Restrict to these entity kinds. Empty/omitted means every kind. */
+  entityKinds?: readonly ComponentKind[]
+  /** Restrict to these `source` values. Empty/omitted means every source. */
+  sources?: readonly string[]
+}
+
+export interface BuilderEmbeddingSearchPage {
+  limit: number
+  /** Rows to skip. Offset paging over an approximate index is stable only while the corpus is
+   * unchanged, which is the same caveat every HNSW pager carries — see `findSimilarBuilderEmbeddings`. */
+  offset?: number
+}
+
+export interface BuilderEmbeddingSearchResult {
+  matches: BuilderEmbeddingMatch[]
+  /** Measured, never guessed: the query asks for `limit + 1` rows and this is whether that extra
+   * row came back. `matches` is truncated to `limit` before returning, so a caller that trusts
+   * this flag can page without ever being told "there is more" about a page that does not exist. */
+  hasMore: boolean
+}
+
+function buildFilterConditions(filters: BuilderEmbeddingSearchFilters | undefined) {
+  const conditions = [isNotNull(builderEmbeddings.embedding)]
+  if (filters?.entityKinds?.length) {
+    conditions.push(inArray(builderEmbeddings.entityKind, [...filters.entityKinds]))
+  }
+  if (filters?.sources?.length) {
+    conditions.push(inArray(builderEmbeddings.source, [...filters.sources]))
+  }
+  return conditions
 }
 
 /**
@@ -126,19 +178,27 @@ export interface BuilderEmbeddingMatch {
  * ascending distance is descending similarity, so callers see the same
  * most-relevant-first order either way.
  */
-export function similarBuilderEmbeddingsQuery(db: PostgresJsDatabase, queryVector: number[], limit: number) {
+export function similarBuilderEmbeddingsQuery(
+  db: PostgresJsDatabase,
+  queryVector: number[],
+  limit: number,
+  filters?: BuilderEmbeddingSearchFilters,
+  offset = 0,
+) {
   const distance = cosineDistance(builderEmbeddings.embedding, queryVector)
-  return db
+  const query = db
     .select({
+      entityKind: builderEmbeddings.entityKind,
       source: builderEmbeddings.source,
       sourceId: builderEmbeddings.sourceId,
       profile: builderEmbeddings.profile,
       similarity: sql<number>`1 - (${distance})`,
     })
     .from(builderEmbeddings)
-    .where(isNotNull(builderEmbeddings.embedding))
+    .where(and(...buildFilterConditions(filters)))
     .orderBy(asc(distance))
     .limit(limit)
+  return offset > 0 ? query.offset(offset) : query
 }
 
 /**
@@ -165,7 +225,38 @@ export function similarBuilderEmbeddingsQuery(db: PostgresJsDatabase, queryVecto
  * 2k/5k/20k rows → HNSW index scan).
  */
 export async function findSimilarBuilderEmbeddings(queryVector: number[], limit: number): Promise<BuilderEmbeddingMatch[]> {
-  const rows = await similarBuilderEmbeddingsQuery(publicDb, queryVector, limit)
-  return rows.map((row) => ({ ...row, profile: row.profile as EmbeddedProfile }))
+  const { matches } = await searchBuilderEmbeddings(queryVector, { limit })
+  return matches
+}
+
+/**
+ * The filtered, paged form of `findSimilarBuilderEmbeddings`. Hard filters run in SQL and the
+ * continuation flag is measured by over-fetching one row rather than inferred from
+ * `rows.length >= limit` — the inference is wrong exactly when the last page is full, which is the
+ * case a user notices because the UI offers a next page that turns out to be empty.
+ *
+ * The `offset` caveat is inherent to paging an approximate index: HNSW explores a candidate set and
+ * returns the best it found, so a corpus that changes between page 1 and page 2 can shift a row
+ * across the boundary. That is acceptable for a relevance-ordered feed and is why deep paging here
+ * is bounded by the caller rather than offered without limit.
+ */
+export async function searchBuilderEmbeddings(
+  queryVector: number[],
+  page: BuilderEmbeddingSearchPage,
+  filters?: BuilderEmbeddingSearchFilters,
+  /** Override for disposable-database tests, same seam as `similarBuilderEmbeddingsQuery`. */
+  db: PostgresJsDatabase = publicDb,
+): Promise<BuilderEmbeddingSearchResult> {
+  const offset = page.offset ?? 0
+  const rows = await similarBuilderEmbeddingsQuery(db, queryVector, page.limit + 1, filters, offset)
+  const hasMore = rows.length > page.limit
+  return {
+    matches: rows.slice(0, page.limit).map((row) => ({
+      ...row,
+      entityKind: row.entityKind as ComponentKind,
+      profile: row.profile as EmbeddedProfile,
+    })),
+    hasMore,
+  }
 }
 

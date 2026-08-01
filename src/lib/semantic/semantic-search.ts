@@ -10,15 +10,25 @@ import { searchBuilders, type ScoredBuilder } from '~/lib/search'
 import type { PlanTier } from '~/shared/lib/billing-shared'
 import { checkAndConsumeBudget } from '~/shared/lib/ai/budget'
 import { embedTexts } from '~/shared/lib/ai/embeddings'
+import { assertEmbeddingDimensionMatchesDatabase } from '~/shared/lib/ai/embedding-dim-check'
 import { getCached, setCached } from '~/shared/lib/ai/cache'
 import { minimaxChat } from '~/shared/lib/ai/minimax'
 import { getTask, type QueryTranslation } from '~/shared/lib/ai/tasks'
 import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
+import { publicDb } from '~/shared/lib/db/client'
 import { log } from '~/shared/lib/log'
 import { getRedis } from '~/shared/lib/redis'
 import type { EntitlementPolicy } from '~/shared/lib/repositories/entitlements'
-import { findSimilarBuilderEmbeddings } from '~/shared/lib/repositories/public-builder-embeddings'
+import { searchBuilderEmbeddings } from '~/shared/lib/repositories/public-builder-embeddings'
+import type { ComponentKind } from '~/shared/lib/solutions/contracts'
 import { upsertEmbeddingStubs } from './index-writer'
+
+/**
+ * `/api/search/semantic` is the people-search endpoint. Now that the same projection also holds
+ * Solutions catalog components, leaving this unfiltered would silently start returning models and
+ * MCP servers as "builders" — so the default is explicit rather than "no filter".
+ */
+const DEFAULT_SEMANTIC_ENTITY_KINDS: readonly ComponentKind[] = ['human_profile']
 
 // Same daily-allowance shape as `ai/tasks.ts`'s registry, but embedding
 // isn't a chat task (no system prompt/output schema) so it doesn't fit
@@ -54,8 +64,19 @@ export interface SemanticBuilderResult {
 export interface SemanticSearchOptions {
   query: string
   translated?: QueryTranslation
+  /**
+   * Restrict to these sources. Applied to BOTH legs — the local vector index (in SQL) and the
+   * federated fallback. Until plan 43 Phase 2 this was accepted by the route and then dropped, so
+   * a search filtered to `['github']` still returned `hn` rows out of the local index.
+   */
+  sources?: readonly string[]
+  /** Restrict which entity kinds the local index may return. Defaults to people only, which keeps
+   * this endpoint's contract unchanged now that the projection also holds catalog components. */
+  entityKinds?: readonly ComponentKind[]
   language?: string
   country?: string
+  /** 1-based, matching `searchBuilders`. */
+  page?: number
   perPage?: number
   principal: Pick<TenantPrincipal, 'organizationId' | 'userId'>
   entitlement: Pick<EntitlementPolicy, 'tier'>
@@ -65,6 +86,14 @@ export interface SemanticSearchOutcome {
   results: (SemanticBuilderResult | ScoredBuilder)[]
   mode: 'semantic' | 'hybrid'
   translated?: QueryTranslation
+  page: number
+  /**
+   * Whether a further page exists. On the `semantic` path this is measured by the repository's
+   * over-fetch. On the `hybrid` path it reflects the federated leg, which cannot know its own total
+   * — so it reports "the page came back full", the strongest honest claim available from a
+   * federation of paged third-party APIs.
+   */
+  hasMore: boolean
 }
 
 /** Redis-cached query embedding — 1 embed call per unique query per 24h. Throws (caught by the route, which degrades to keyword search) when the daily embed budget is exhausted. */
@@ -147,10 +176,29 @@ function matchesFilter(value: string | undefined, filter: string | undefined): b
 
 export async function semanticSearch(opts: SemanticSearchOptions): Promise<SemanticSearchOutcome> {
   const perPage = opts.perPage ?? 30
-  const queryVector = await embedQueryCached(opts.query, opts.principal, opts.entitlement)
-  const candidates = await findSimilarBuilderEmbeddings(queryVector, 50)
+  const page = opts.page ?? 1
 
-  const kept = candidates
+  // Cheap once per process, and it turns "vector search silently matches nothing" into a loud
+  // error. Awaited before the first vector round trip on purpose.
+  await assertEmbeddingDimensionMatchesDatabase(publicDb)
+
+  const queryVector = await embedQueryCached(opts.query, opts.principal, opts.entitlement)
+
+  // The source filter has to be known before the local query runs, so it comes from what the caller
+  // already has — an explicit `sources`, or a translation the client did. A translation computed
+  // later (in the degradation branch below) can only constrain the federated leg.
+  const localSources = opts.sources ?? opts.translated?.sources
+  // Over-fetch: `SEMANTIC_SIMILARITY_THRESHOLD` is a relevance cut on a value derived from the
+  // vector, so it cannot be pushed into SQL alongside the hard filters. Asking for a wider window
+  // means the threshold has room to reject without starving the page.
+  const window = Math.max(perPage, SEMANTIC_MIN_LOCAL_MATCHES) * 2
+  const { matches, hasMore: moreRowsExist } = await searchBuilderEmbeddings(
+    queryVector,
+    { limit: window, offset: (page - 1) * perPage },
+    { sources: localSources, entityKinds: opts.entityKinds ?? DEFAULT_SEMANTIC_ENTITY_KINDS },
+  )
+
+  const kept = matches
     .filter((m) => m.similarity >= SEMANTIC_SIMILARITY_THRESHOLD)
     .filter((m) => matchesFilter(m.profile.language, opts.language))
     .filter((m) => matchesFilter(m.profile.country, opts.country))
@@ -165,7 +213,13 @@ export async function semanticSearch(opts: SemanticSearchOptions): Promise<Seman
   }))
 
   if (localResults.length >= SEMANTIC_MIN_LOCAL_MATCHES) {
-    return { results: localResults.slice(0, perPage), mode: 'semantic' }
+    return {
+      results: localResults.slice(0, perPage),
+      mode: 'semantic',
+      page,
+      // Either the window itself held more than one page, or the repository saw a row beyond it.
+      hasMore: localResults.length > perPage || moreRowsExist,
+    }
   }
 
   // Degradation: not enough local matches — translate + run the existing
@@ -173,11 +227,16 @@ export async function semanticSearch(opts: SemanticSearchOptions): Promise<Seman
   const translated = opts.translated ?? (await translateQueryServerSide(opts.query, opts.principal, opts.entitlement) ?? undefined)
   const keywords = translated?.keywords ?? opts.query.split(/\s+/).filter(Boolean)
 
+  // An explicit caller filter outranks the model's guess: the model may widen `sources` to
+  // something the caller deliberately excluded, and honoring that would make the federated leg
+  // return exactly the sources the local leg just filtered out.
+  const federatedSources = opts.sources ? [...opts.sources] : translated?.sources
   const federated = await searchBuilders({
     keywords,
-    sources: translated?.sources,
+    sources: federatedSources,
     language: translated?.language ?? opts.language,
     country: translated?.country ?? opts.country,
+    page,
     perPage,
   })
 
@@ -190,5 +249,11 @@ export async function semanticSearch(opts: SemanticSearchOptions): Promise<Seman
     log.error('embedding_writethrough_error', { error: error instanceof Error ? error.message : String(error) }),
   )
 
-  return { results: merged.slice(0, perPage), mode: 'hybrid', translated }
+  return {
+    results: merged.slice(0, perPage),
+    mode: 'hybrid',
+    translated,
+    page,
+    hasMore: merged.length > perPage || federated.length >= perPage,
+  }
 }

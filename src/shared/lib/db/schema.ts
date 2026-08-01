@@ -1,6 +1,10 @@
 import { sql } from 'drizzle-orm'
 import { pgTable, text, timestamp, boolean, integer, jsonb, numeric, unique, uniqueIndex, uuid, index, check, foreignKey, vector, time, date } from 'drizzle-orm/pg-core'
 import { EMBEDDING_DIM } from '~/shared/lib/ai/embedding-dim'
+// The embedding projection and the Solutions catalog share one entity vocabulary on purpose —
+// see `builderEmbeddings.entityKind`. Type-only import, and `contracts.ts` imports nothing but
+// zod, so this cannot cycle back into the schema.
+import type { ComponentKind as SemanticEntityKind } from '~/shared/lib/solutions/contracts'
 import type { EmbeddedProfile } from '~/lib/semantic/embedding-doc'
 import type { EnrichmentEvidencePayload } from '~/lib/enrichment/types'
 import type { ExtractedCriteria, QueryVariant, SprintCursor, SprintProfileSnapshot } from '~/shared/lib/sprints-shared'
@@ -826,6 +830,13 @@ export const builderEmbeddings = pgTable(
   'builder_embeddings',
   {
     id: text('id').primaryKey(),
+    // Which kind of thing this vector describes (plan 43 Phase 2, "support explicit human and
+    // catalog entity kinds"). Deliberately the SAME vocabulary as the Solutions catalog's
+    // `COMPONENT_KINDS` rather than a parallel one: Phase 5 indexes humans, generic roles and
+    // catalog components into this one projection, and a second vocabulary would mean a
+    // translation table on the hot retrieval path. Every row that predates migration 0121 is a
+    // real person, hence the default.
+    entityKind: text('entity_kind').notNull().default('human_profile').$type<SemanticEntityKind>(),
     source: text('source').notNull(),
     sourceId: text('source_id').notNull(),
     contentHash: text('content_hash').notNull(),
@@ -838,12 +849,23 @@ export const builderEmbeddings = pgTable(
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    unique('builder_embeddings_source_unique').on(table.source, table.sourceId),
+    // (entity_kind, source, source_id), not (source, source_id): a catalog component and a person
+    // can legitimately share a source and an id — e.g. a GitHub org that is both an indexed
+    // account and a `service` in the catalog — and collapsing them would let one overwrite the
+    // other's document on upsert.
+    unique('builder_embeddings_entity_unique').on(table.entityKind, table.source, table.sourceId),
+    check(
+      'builder_embeddings_entity_kind_check',
+      sql`${table.entityKind} in ('human_profile', 'human_role', 'agent', 'model', 'model_endpoint', 'mcp_server', 'tool', 'service')`,
+    ),
     // Worker scan target: `WHERE embedding IS NULL` benefits from indexing
     // embeddedAt (NULL rows sort first); the HNSW vector index itself is
     // hand-written SQL appended to the generated migration (drizzle-kit
     // does not emit `USING hnsw`) — see drizzle/000X_*.sql.
     index('builder_embeddings_pending_idx').on(table.embeddedAt),
+    // Retrieval filters by kind before the vector sort (Phase 5 asks for AI-only or human-only
+    // lanes), so the planner needs this to avoid scanning the whole projection.
+    index('builder_embeddings_entity_kind_idx').on(table.entityKind),
   ],
 )
 

@@ -130,7 +130,7 @@ Never commit real values — `.env.example` documents the shape with empty/place
 
 Coolify app env needs (once a real key is available): `MINIMAX_API_KEY` (secret),
 `MINIMAX_BASE_URL` (default `https://api.minimax.io`), `MINIMAX_MODEL=MiniMax-M3`,
-`AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, `AI_EMBEDDING_API_KEY`, `AI_EMBEDDING_DIM=1536`,
+`AI_EMBEDDING_URL`, `AI_EMBEDDING_MODEL`, `AI_EMBEDDING_API_KEY`, `AI_EMBEDDING_DIM=768`,
 `AI_EMBEDDING_TIMEOUT_MS=30000`. Leave `AI_DISABLED`/`AI_DISABLED_TASKS` unset for normal
 operation. **Kill-switch drill**: set `AI_DISABLED=true` in Coolify → restart → every
 `/api/ai/*` route and every AI-backed feature (persona cards, outreach drafts, team-synergy,

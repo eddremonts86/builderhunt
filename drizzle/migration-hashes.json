@@ -484,6 +484,10 @@
     "0120_fix_builder_notes_organization_builder_fk": {
       "sql": "ef977196c9bcac69abb468ed941ae5a0c3b0b50641962cb4631b06decf348312",
       "snapshot": "49b0dc16ee129e3c5f3265406aeef4e582666dba1d705e3aef67df29c80e4cb8"
+    },
+    "0121_builder_embeddings_entity_kind": {
+      "sql": "06780e12a73542f7fe837389a3eed42a0878b95ba6c8087112956394aa274257",
+      "snapshot": "52094eb133eaf26e64926fa812a826f85df15660bb7d5b66b4661605d044aa1e"
     }
   }
 }

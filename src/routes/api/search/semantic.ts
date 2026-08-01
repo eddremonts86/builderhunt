@@ -63,16 +63,22 @@ export const Route = createFileRoute('/api/search/semantic')({
           const translatedInput = translated?.success ? translated.data : undefined
 
           const perPage = parsed.data.perPage ?? 30
+          const page = parsed.data.page ?? 1
           let builders: Array<{ source: string; sourceId: string }>
           let mode: 'semantic' | 'hybrid' | 'keyword-fallback'
           let translatedOut = translatedInput
+          let hasMore: boolean
 
           try {
+            // `sources` and `page` were accepted by this schema and then dropped on the floor until
+            // plan 43 Phase 2 — the endpoint advertised a filter and a pager it did not honor.
             const outcome = await semanticSearch({
               query: parsed.data.query,
               translated: translatedInput,
+              sources: parsed.data.sources,
               language: parsed.data.language,
               country: parsed.data.country,
+              page,
               perPage,
               principal,
               entitlement,
@@ -80,14 +86,20 @@ export const Route = createFileRoute('/api/search/semantic')({
             builders = outcome.results
             mode = outcome.mode
             translatedOut = outcome.translated ?? translatedInput
+            hasMore = outcome.hasMore
           } catch (error) {
             log.error('semantic_search_route_error', { error: error instanceof Error ? error.message : String(error) })
             const fallback = await searchBuilders({
               keywords: parsed.data.query.split(/\s+/).filter(Boolean),
+              sources: parsed.data.sources,
+              language: parsed.data.language,
+              country: parsed.data.country,
+              page,
               perPage,
             })
             builders = fallback
             mode = 'keyword-fallback'
+            hasMore = fallback.length >= perPage
           }
 
           let trackedIds = new Map<string, string>()
@@ -111,6 +123,9 @@ export const Route = createFileRoute('/api/search/semantic')({
             builders: annotated,
             mode,
             translated: translatedOut,
+            page,
+            perPage,
+            hasMore,
           })
         } catch (error) {
           if (error instanceof TenantAuthorizationError) {

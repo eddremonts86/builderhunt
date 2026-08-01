@@ -3,7 +3,7 @@ import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
 import { builderEmbeddings } from '~/shared/lib/db/schema'
-import { similarBuilderEmbeddingsQuery } from '~/shared/lib/repositories/public-builder-embeddings'
+import { searchBuilderEmbeddings, similarBuilderEmbeddingsQuery } from '~/shared/lib/repositories/public-builder-embeddings'
 
 /**
  * Regression test for the ORDER BY shape of the semantic-search query.
@@ -28,10 +28,11 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
   let db: PostgresJsDatabase
   let drop: () => Promise<void>
   /**
-   * Read from the migrated column rather than `EMBEDDING_DIM`: vitest runs
-   * under happy-dom, so `window` exists and `env.ts` takes its browser-stub
-   * branch, which reports the 1536 default instead of the configured value.
-   * The column is the only dimension the inserts below have to agree with.
+   * Read from the migrated column rather than `EMBEDDING_DIM`: vitest runs under happy-dom, so
+   * `window` exists and `env.ts` takes its browser-stub branch, which reports the schema default
+   * rather than whatever `.env` configured. Since plan 43 Phase 2 that default is 768, which does
+   * agree with the column — but reading the column keeps this test correct regardless of which
+   * value the stub reports, which is the property that matters for the inserts below.
    */
   let dimensions: number
 
@@ -121,5 +122,119 @@ describe('findSimilarBuilderEmbeddings — HNSW index usage', () => {
 
     const similarities = rows.map((row) => row.similarity)
     expect([...similarities].sort((a, b) => b - a)).toEqual(similarities)
+  })
+
+  /**
+   * plans/phase-1/43-solutions-intelligence Phase 2, "Honor semantic filters and pagination".
+   *
+   * The two defects these pin: the `sources` filter was accepted by `/api/search/semantic` and
+   * never applied to local vector matches at all, and `hasMore` was inferred from
+   * `rows.length >= limit` — which lies precisely when the final page is exactly full, the case a
+   * user notices because the UI offers a next page that turns out to be empty.
+   */
+  describe('filters and pagination', () => {
+    beforeAll(async () => {
+      // A second source and a non-person entity kind, so "exact filter" has something to exclude.
+      await db.insert(builderEmbeddings).values([
+        {
+          id: 'embedding-hn-0',
+          source: 'hn',
+          sourceId: 'hn-user-0',
+          contentHash: 'hash-hn-0',
+          document: 'document hn 0',
+          profile: { username: 'hn-user-0', profileUrl: 'https://news.ycombinator.com/user?id=hn-user-0', topics: [] },
+          embedding: vectorFor(0.5),
+          embeddedAt: new Date(),
+        },
+        {
+          id: 'embedding-model-0',
+          entityKind: 'model',
+          source: 'huggingface',
+          sourceId: 'model-0',
+          contentHash: 'hash-model-0',
+          document: 'document model 0',
+          profile: { username: 'model-0', profileUrl: 'https://huggingface.co/model-0', topics: [] },
+          embedding: vectorFor(0.25),
+          embeddedAt: new Date(),
+        },
+      ])
+    })
+
+    it('defaults every pre-Phase-2 row to human_profile', async () => {
+      const { matches } = await searchBuilderEmbeddings(vectorFor(3), { limit: 1 }, undefined, db)
+      expect(matches[0].entityKind).toBe('human_profile')
+    })
+
+    it('excludes every non-matching source when sources is set', async () => {
+      const { matches } = await searchBuilderEmbeddings(vectorFor(0.5), { limit: 20 }, { sources: ['github'] }, db)
+
+      expect(matches.length).toBeGreaterThan(0)
+      expect(matches.every((m) => m.source === 'github')).toBe(true)
+      // The `hn` row is the nearest neighbour of this probe, so an unfiltered query would rank it
+      // first — its absence proves the filter ran in SQL rather than being ignored.
+      expect(matches.some((m) => m.source === 'hn')).toBe(false)
+    })
+
+    it('excludes every non-matching entity kind when entityKinds is set', async () => {
+      const { matches } = await searchBuilderEmbeddings(vectorFor(0.25), { limit: 20 }, { entityKinds: ['human_profile'] }, db)
+
+      expect(matches.length).toBeGreaterThan(0)
+      expect(matches.every((m) => m.entityKind === 'human_profile')).toBe(true)
+      expect(matches.some((m) => m.entityKind === 'model')).toBe(false)
+    })
+
+    it('can select the catalog side of the same projection', async () => {
+      const { matches } = await searchBuilderEmbeddings(vectorFor(0.25), { limit: 20 }, { entityKinds: ['model'] }, db)
+
+      expect(matches).toHaveLength(1)
+      expect(matches[0].sourceId).toBe('model-0')
+    })
+
+    it('combines source and kind filters conjunctively', async () => {
+      const { matches } = await searchBuilderEmbeddings(
+        vectorFor(0),
+        { limit: 20 },
+        { sources: ['huggingface'], entityKinds: ['human_profile'] },
+        db,
+      )
+      // huggingface holds only the `model` row, so an AND of these two yields nothing. An OR — or a
+      // filter applied to only one of the two columns — would return rows here.
+      expect(matches).toEqual([])
+    })
+
+    it('reports hasMore false on an exactly-full final page', async () => {
+      const total = 10 // 8 github + 1 hn + 1 model
+      const { matches, hasMore } = await searchBuilderEmbeddings(vectorFor(0), { limit: total }, undefined, db)
+
+      expect(matches).toHaveLength(total)
+      // The bug being pinned: `rows.length >= limit` would say true here and offer an empty page 2.
+      expect(hasMore).toBe(false)
+    })
+
+    it('reports hasMore true while rows remain, and pages without repeating a row', async () => {
+      const first = await searchBuilderEmbeddings(vectorFor(0), { limit: 4, offset: 0 }, undefined, db)
+      expect(first.matches).toHaveLength(4)
+      expect(first.hasMore).toBe(true)
+
+      const second = await searchBuilderEmbeddings(vectorFor(0), { limit: 4, offset: 4 }, undefined, db)
+      expect(second.matches).toHaveLength(4)
+
+      const firstIds = first.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`)
+      const secondIds = second.matches.map((m) => `${m.entityKind}:${m.source}:${m.sourceId}`)
+      expect(firstIds.filter((id) => secondIds.includes(id))).toEqual([])
+    })
+
+    it('honors the filter while paging, so a filtered page 2 cannot leak an excluded source', async () => {
+      const { matches, hasMore } = await searchBuilderEmbeddings(
+        vectorFor(0),
+        { limit: 4, offset: 4 },
+        { sources: ['github'] },
+        db,
+      )
+      expect(matches.every((m) => m.source === 'github')).toBe(true)
+      // 8 github rows, 4 consumed by page 1, 4 on this page, nothing beyond.
+      expect(matches).toHaveLength(4)
+      expect(hasMore).toBe(false)
+    })
   })
 })
