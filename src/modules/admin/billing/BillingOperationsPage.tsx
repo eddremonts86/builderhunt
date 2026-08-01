@@ -170,43 +170,126 @@ function WorkerRunSection() {
   )
 }
 
+interface BillingWebhookEventRow {
+  id: string
+  stripeEventId: string
+  eventType: string
+  objectType: string
+  status: string
+  attempts: number
+  receivedAt: string
+  processedAt: string | null
+  nextAttemptAt: string | null
+  hasError: boolean
+}
+
+const DISCOVERY_STATUS_FILTERS = ['failed', 'pending', 'processing'] as const
+
 function DeadLetterReplaySection() {
+  const [statusFilter, setStatusFilter] = React.useState<(typeof DISCOVERY_STATUS_FILTERS)[number]>('failed')
+  const [rows, setRows] = React.useState<BillingWebhookEventRow[] | null>(null)
+  const [listError, setListError] = React.useState<string | null>(null)
   const [eventId, setEventId] = React.useState('')
-  const [confirming, setConfirming] = React.useState(false)
+  const [confirmingId, setConfirmingId] = React.useState<string | null>(null)
+  const [manualConfirming, setManualConfirming] = React.useState(false)
   const { pending, message, run } = useGuardedAction()
 
-  const trigger = () => run(async () => {
-    const id = eventId.trim()
+  const loadRows = React.useCallback(async (status: string) => {
+    setRows(null)
+    setListError(null)
+    try {
+      const res = await fetch(`/api/admin/billing/events?status=${encodeURIComponent(status)}&limit=10`, { credentials: 'include' })
+      if (!res.ok) {
+        setListError(`Failed to load: ${res.status}`)
+        return
+      }
+      setRows((await res.json()).rows)
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : String(e))
+    }
+  }, [])
+
+  React.useEffect(() => { loadRows(statusFilter) }, [statusFilter, loadRows])
+
+  const replay = (id: string) => run(async () => {
     const res = await fetch(`/api/admin/billing/events/${encodeURIComponent(id)}/replay`, { method: 'POST', credentials: 'include' })
-    setConfirming(false)
+    setConfirmingId(null)
+    setManualConfirming(false)
+    setEventId('')
     if (res.status === 404) return { ok: false, text: 'No webhook event found with that id.' }
-    return describeResponse(res, 'Event replayed. Safe to repeat — an already-processed event is a no-op.')
+    const result = await describeResponse(res, 'Event replayed. Safe to repeat — an already-processed event is a no-op.')
+    if (result.ok) loadRows(statusFilter)
+    return result
   })
 
   return (
     <section className="card p-4" data-testid="billing-operations-dead-letter">
       <h2 className="font-semibold text-sm mb-2">Dead-letter replay</h2>
-      <p className="text-sm text-bh-text-muted mb-3">Re-process one webhook event by its row id. Safe to repeat — an already-applied event is a no-op, not a double effect.</p>
+      <p className="text-sm text-bh-text-muted mb-3">Find a failed webhook event, or re-process one directly by its row id. Safe to repeat — an already-applied event is a no-op, not a double effect.</p>
+
+      <div className="flex items-center gap-2 mb-2" role="group" aria-label="Filter events by status">
+        {DISCOVERY_STATUS_FILTERS.map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setStatusFilter(s)}
+            aria-pressed={statusFilter === s}
+            data-testid={`billing-events-filter-${s}`}
+            className={`rounded px-2 py-0.5 text-xs font-medium capitalize ${statusFilter === s ? 'bg-bh-accent text-white' : 'bg-bh-surface text-bh-text-muted hover:text-bh-text'}`}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
+
+      {listError && <p className="text-xs text-bh-danger mb-2" role="alert">{listError}</p>}
+      {rows === null && !listError && <p className="text-xs text-bh-text-muted mb-2">Loading…</p>}
+      {rows !== null && (
+        <ul className="mb-3" data-testid="billing-events-list">
+          {rows.length === 0 && <li className="text-xs text-bh-text-dim">No {statusFilter} events.</li>}
+          {rows.map((row) => (
+            <li key={row.id} className="flex items-center justify-between gap-2 py-1 border-b border-bh-border/50 text-xs" data-testid={`billing-event-row-${row.id}`}>
+              <div className="min-w-0">
+                <span className="font-mono text-bh-text-dim">{row.id}</span>{' '}
+                <span className="text-bh-text-muted">{row.eventType} · {row.attempts} attempt{row.attempts === 1 ? '' : 's'} · {new Date(row.receivedAt).toLocaleString()}</span>
+              </div>
+              {confirmingId === row.id ? (
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button type="button" variant="primary" size="sm" onClick={() => replay(row.id)} disabled={pending} data-testid={`billing-event-replay-confirm-${row.id}`}>
+                    {pending ? 'Replaying…' : 'Confirm'}
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmingId(null)} disabled={pending}>Cancel</Button>
+                </div>
+              ) : (
+                <Button type="button" variant="secondary" size="sm" onClick={() => setConfirmingId(row.id)} disabled={pending} className="shrink-0" data-testid={`billing-event-replay-${row.id}`}>
+                  Replay
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <div className="flex items-center gap-2 mb-2">
         <Input
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
-          placeholder="billing_webhook_events row id"
+          placeholder="Or enter a row id directly"
           className="max-w-xs"
           data-testid="billing-replay-event-id"
         />
-        <Button type="button" variant="secondary" size="sm" onClick={() => setConfirming(true)} disabled={pending || eventId.trim().length === 0} data-testid="billing-replay-trigger">
+        <Button type="button" variant="secondary" size="sm" onClick={() => setManualConfirming(true)} disabled={pending || eventId.trim().length === 0} data-testid="billing-replay-trigger">
           Replay
         </Button>
       </div>
-      {confirming && (
+      {manualConfirming && (
         <div className="rounded border border-bh-border bg-bh-surface p-2 text-xs mb-2">
           <p className="text-bh-text-muted mb-1.5">Replay event <code>{eventId.trim()}</code>?</p>
           <div className="flex gap-1.5">
-            <Button type="button" variant="primary" size="sm" onClick={trigger} disabled={pending} data-testid="billing-replay-confirm">
+            <Button type="button" variant="primary" size="sm" onClick={() => replay(eventId.trim())} disabled={pending} data-testid="billing-replay-confirm">
               {pending ? 'Replaying…' : 'Replay now'}
             </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirming(false)} disabled={pending}>Cancel</Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setManualConfirming(false)} disabled={pending}>Cancel</Button>
           </div>
         </div>
       )}

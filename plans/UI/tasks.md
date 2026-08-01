@@ -202,7 +202,7 @@
   - Do: Add reconciliation, dead-letter lookup/replay, risk-exception management, worker run, bounded accounting export, and Refunds/Disputes links. Require confirmation, step-up where applicable, idempotency, and audit feedback.
   - Verify: fake-provider E2E covers success, repeat, stale, forbidden, and failed-event paths; raw Stripe payloads and secrets never render.
 
-- [ ] **Add billing webhook and dead-letter discovery**
+- [x] **Add billing webhook and dead-letter discovery**
   - Files: `src/shared/lib/repositories/billing-events.ts`, `src/routes/api/admin/billing/events/index.ts`, `src/routes/api/admin/billing/events/$eventId.ts`, `src/modules/admin/billing/BillingOperationsPage.tsx`, `tests/e2e/billing-operations.spec.ts`
   - Do: Add bounded status/type/date filters, redacted detail, retry history, and replay eligibility so operators can find a failed event before invoking the existing replay action. Never return provider payload, headers, payment data, or secrets.
   - Verify: failed/stale/replayed events are discoverable and correctly gated; raw fixture secrets are absent from API snapshots and DOM; pagination is stable.

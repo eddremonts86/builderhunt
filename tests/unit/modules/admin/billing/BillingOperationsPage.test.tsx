@@ -23,6 +23,17 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Respon
   return { ok, status, json: async () => body } as Response
 }
 
+/** The page also fetches the dead-letter discovery list on mount (`/api/admin/billing/events?...`)
+ * — this routes each call by URL so a test can focus on the metrics response without every other
+ * call rejecting/erroring. Defaults the events list to empty. */
+function mockFetchRouter(metrics: unknown, eventsRows: unknown[] = []): void {
+  vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/api/admin/billing/events?')) return jsonResponse({ rows: eventsRows, nextCursor: null })
+    return jsonResponse(metrics)
+  })
+}
+
 const FULL_METRICS = {
   liveMode: false,
   configuration: { version: 3, effectiveAt: '2026-01-01T00:00:00.000Z', statementDescriptor: 'BUILDERHUNT', supportEmail: 'support@test.com' },
@@ -65,7 +76,7 @@ beforeEach(() => {
 
 describe('BillingOperationsPage', () => {
   it('renders every metric section once loaded', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
 
     await render()
 
@@ -99,7 +110,7 @@ describe('BillingOperationsPage', () => {
   })
 
   it('shows a "no configuration recorded" state distinctly, never a fabricated version number', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ ...FULL_METRICS, configuration: null }))
+    mockFetchRouter({ ...FULL_METRICS, configuration: null })
 
     await render()
 
@@ -108,7 +119,7 @@ describe('BillingOperationsPage', () => {
   })
 
   it('shows reconciliation as explicitly unrun (not a fabricated result) when nothing has run yet', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ ...FULL_METRICS, reconciliation: { lastRun: null } }))
+    mockFetchRouter({ ...FULL_METRICS, reconciliation: { lastRun: null } })
 
     await render()
 
@@ -116,7 +127,7 @@ describe('BillingOperationsPage', () => {
   })
 
   it('never renders anything resembling a raw webhook payload, a secret, or a stripe id', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
 
     await render()
 
@@ -127,23 +138,24 @@ describe('BillingOperationsPage', () => {
     expect(html).not.toContain('stripeEventId')
   })
 
-  it('the refresh button re-fetches metrics', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+  it('the refresh button re-fetches metrics (but not the events discovery list)', async () => {
+    mockFetchRouter(FULL_METRICS)
     await render()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2) // initial metrics load + dead-letter discovery list
 
     await act(async () => (testId('billing-operations-refresh') as HTMLButtonElement).click())
 
-    expect(fetch).toHaveBeenCalledTimes(2)
+    expect(fetch).toHaveBeenCalledTimes(3)
   })
 
   it('reconciliation requires an explicit confirm click before POSTing', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
     await render()
+    expect(fetch).toHaveBeenCalledTimes(2) // metrics + dead-letter discovery list, no reconcile yet
 
     await act(async () => (testId('billing-reconcile-trigger') as HTMLButtonElement).click())
     expect(testId('billing-reconcile-confirm')).not.toBeNull()
-    expect(fetch).toHaveBeenCalledTimes(1) // only the initial metrics load — no reconcile call yet
+    expect(fetch).toHaveBeenCalledTimes(2)
 
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ id: 'run-1', result: 'clean' }))
     await act(async () => {
@@ -151,14 +163,14 @@ describe('BillingOperationsPage', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    const [url, init] = vi.mocked(fetch).mock.calls[1]
+    const [url, init] = vi.mocked(fetch).mock.calls[2]
     expect(String(url)).toBe('/api/admin/billing/reconcile')
     expect(init).toMatchObject({ method: 'POST' })
     expect(testId('billing-reconcile-message')?.textContent).toContain('completed')
   })
 
   it('surfaces the step-up (recent-auth) rejection distinctly, without a fake success', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
     await render()
 
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: 'Recent re-authentication required' }, false, 401))
@@ -172,7 +184,7 @@ describe('BillingOperationsPage', () => {
   })
 
   it('dead-letter replay is disabled until an event id is entered, then requires confirm', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
     await render()
 
     expect((testId('billing-replay-trigger') as HTMLButtonElement).disabled).toBe(true)
@@ -194,23 +206,65 @@ describe('BillingOperationsPage', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
     })
 
-    const [url] = vi.mocked(fetch).mock.calls[1]
+    // The reconcile route's own replay endpoint is called after: [0] metrics, [1] discovery list, [2] replay.
+    const [url] = vi.mocked(fetch).mock.calls[2]
     expect(String(url)).toBe('/api/admin/billing/events/evt-row-1/replay')
     expect(testId('billing-replay-message')?.textContent).toMatch(/replayed/i)
   })
 
+  it('discovers failed events and lets an operator replay one directly from the list', async () => {
+    mockFetchRouter(FULL_METRICS, [
+      { id: 'wh-1', stripeEventId: 'evt_1', eventType: 'invoice.paid', objectType: 'invoice', status: 'failed', attempts: 3, receivedAt: '2027-01-01T00:00:00.000Z', processedAt: null, nextAttemptAt: null, hasError: true },
+    ])
+    await render()
+
+    expect(testId('billing-event-row-wh-1')?.textContent).toContain('invoice.paid')
+    expect(testId('billing-event-row-wh-1')?.textContent).toContain('3 attempts')
+
+    await act(async () => (testId('billing-event-replay-wh-1') as HTMLButtonElement).click())
+    expect(testId('billing-event-replay-confirm-wh-1')).not.toBeNull()
+
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ eventRowId: 'wh-1', result: 'processed' }))
+    await act(async () => {
+      (testId('billing-event-replay-confirm-wh-1') as HTMLButtonElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const [url] = vi.mocked(fetch).mock.calls[2]
+    expect(String(url)).toBe('/api/admin/billing/events/wh-1/replay')
+  })
+
+  it('switching the status filter re-fetches the discovery list for that status', async () => {
+    mockFetchRouter(FULL_METRICS)
+    await render()
+    expect(fetch).toHaveBeenCalledTimes(2) // metrics + the default "failed" discovery fetch
+
+    await act(async () => (testId('billing-events-filter-pending') as HTMLButtonElement).click())
+
+    expect(fetch).toHaveBeenCalledTimes(3)
+    const [url] = vi.mocked(fetch).mock.calls[2]
+    expect(String(url)).toContain('status=pending')
+  })
+
+  it('shows an honest empty state when no events match the filter', async () => {
+    mockFetchRouter(FULL_METRICS, [])
+    await render()
+
+    expect(testId('billing-events-list')?.textContent).toContain('No failed events')
+  })
+
   it('issuing a risk exception validates locally before ever calling the API', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
     await render()
 
     await act(async () => (testId('billing-risk-issue') as HTMLButtonElement).click())
 
     expect(testId('billing-risk-issue-message')?.textContent).toMatch(/required/i)
-    expect(fetch).toHaveBeenCalledTimes(1) // only the metrics load — no POST for an incomplete form
+    expect(fetch).toHaveBeenCalledTimes(2) // metrics + dead-letter discovery list — no POST for an incomplete form
   })
 
   it('links to the CSV and JSON accounting export endpoints', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse(FULL_METRICS))
+    mockFetchRouter(FULL_METRICS)
     await render()
 
     expect((testId('billing-export-csv') as HTMLAnchorElement).getAttribute('href')).toBe('/api/admin/billing/accounting-export?format=csv')

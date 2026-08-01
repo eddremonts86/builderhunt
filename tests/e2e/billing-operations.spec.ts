@@ -150,22 +150,74 @@ test.describe('billing operations — guarded actions', () => {
 
   test('failed-event: replaying a dead-lettered event succeeds, and replaying it again is a safe no-op', async () => {
     const eventId = await seedDeadLetteredEvent()
+    try {
+      const first = await harness.admin.api!.post(`/api/admin/billing/events/${eventId}/replay`)
+      expect(first.status()).toBe(200)
+      const firstBody = await first.json()
+      expect(firstBody.eventRowId).toBe(eventId)
 
-    const first = await harness.admin.api!.post(`/api/admin/billing/events/${eventId}/replay`)
-    expect(first.status()).toBe(200)
-    const firstBody = await first.json()
-    expect(firstBody.eventRowId).toBe(eventId)
-
-    // Repeat: the same dead-lettered event, replayed again, must not throw or double-apply —
-    // this is the "repeat" contract for replay specifically (distinct from reconciliation's
-    // already-running 409, since replay has no run-in-flight concept to guard).
-    const second = await harness.admin.api!.post(`/api/admin/billing/events/${eventId}/replay`)
-    expect(second.status()).toBe(200)
+      // Repeat: the same dead-lettered event, replayed again, must not throw or double-apply —
+      // this is the "repeat" contract for replay specifically (distinct from reconciliation's
+      // already-running 409, since replay has no run-in-flight concept to guard).
+      const second = await harness.admin.api!.post(`/api/admin/billing/events/${eventId}/replay`)
+      expect(second.status()).toBe(200)
+    } finally {
+      await harness.sql`delete from billing_webhook_events where id = ${eventId}`
+    }
   })
 
   test('replaying an unknown event id 404s distinctly from a forbidden or stale rejection', async () => {
     const response = await harness.admin.api!.post('/api/admin/billing/events/does-not-exist/replay')
     expect(response.status()).toBe(404)
+  })
+
+  test('discovery: a dead-lettered event is findable by status filter, with a redacted detail and correct replay eligibility', async () => {
+    const eventId = await seedDeadLetteredEvent()
+    try {
+      const list = await harness.admin.api!.get('/api/admin/billing/events?status=failed')
+      expect(list.status()).toBe(200)
+      const listBody = await list.json() as { rows: Array<{ id: string }> }
+      expect(listBody.rows.some((r) => r.id === eventId)).toBe(true)
+
+      const wrongStatus = await harness.admin.api!.get('/api/admin/billing/events?status=processed')
+      expect((await wrongStatus.json() as { rows: Array<{ id: string }> }).rows.some((r) => r.id === eventId)).toBe(false)
+
+      const detail = await harness.admin.api!.get(`/api/admin/billing/events/${eventId}`)
+      expect(detail.status()).toBe(200)
+      const detailBody = await detail.json()
+      expect(detailBody.replayEligible).toBe(true)
+      expect(detailBody.lastErrorPreview).toContain('simulated_processing_failure')
+      expect(JSON.stringify(detailBody)).not.toContain('payloadEncrypted')
+      expect(JSON.stringify(detailBody)).not.toContain('iv:tag:ciphertext') // never the raw encrypted column value
+    } finally {
+      await harness.sql`delete from billing_webhook_events where id = ${eventId}`
+    }
+  })
+
+  test('discovery list is unavailable to a non-platform-admin', async () => {
+    expect((await harness.owner.api!.get('/api/admin/billing/events')).status()).toBe(403)
+  })
+
+  test('an operator can discover and replay a dead-lettered event directly from the real page', async ({ browser }) => {
+    const eventId = await seedDeadLetteredEvent()
+    const context = await browser.newContext({ storageState: harness.admin.storageState! })
+    const page = await context.newPage()
+    const guard = expectStrictBrowser(page)
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/admin/billing`)
+      await dismissOverlays(page)
+
+      await expect(page.getByTestId(`billing-event-row-${eventId}`)).toBeVisible()
+      await page.getByTestId(`billing-event-replay-${eventId}`).click()
+      await page.getByTestId(`billing-event-replay-confirm-${eventId}`).click()
+      await expect(page.getByTestId('billing-replay-message')).toContainText(/replayed/i)
+
+      guard.assertClean()
+    } finally {
+      guard.dispose()
+      await context.close()
+      await harness.sql`delete from billing_webhook_events where id = ${eventId}`
+    }
   })
 
   test('a platform admin can issue and then revoke a risk exception', async () => {
@@ -181,7 +233,10 @@ test.describe('billing operations — guarded actions', () => {
     expect(revoke.status()).toBe(200)
   })
 
-  test('the real Billing Operations page never renders a raw payload, secret, or Stripe id', async ({ browser }) => {
+  test('the real Billing Operations page never renders a raw payload, secret, or Stripe event id', async ({ browser }) => {
+    // The row's own synthetic id IS shown by design (an operator needs it to identify what
+    // they're replaying) — what must never render is the Stripe event id, the encrypted payload,
+    // or the raw underlying error message this event was seeded with.
     const eventId = await seedDeadLetteredEvent()
     const context = await browser.newContext({ storageState: harness.admin.storageState! })
     const page = await context.newPage()
@@ -190,17 +245,19 @@ test.describe('billing operations — guarded actions', () => {
       await gotoHydrated(page, `${harness.baseURL}/admin/billing`)
       await dismissOverlays(page)
       await expect(page.getByTestId('admin-billing-operations')).toBeVisible()
+      await expect(page.getByTestId(`billing-event-row-${eventId}`)).toBeVisible()
 
       const bodyText = await page.locator('body').innerText()
       expect(bodyText).not.toMatch(/sk_(live|test)_/)
       expect(bodyText).not.toMatch(/whsec_/)
       expect(bodyText).not.toContain('payloadEncrypted')
-      expect(bodyText).not.toContain(eventId)
+      expect(bodyText).not.toContain(`evt_${eventId}`)
 
       guard.assertClean()
     } finally {
       guard.dispose()
       await context.close()
+      await harness.sql`delete from billing_webhook_events where id = ${eventId}`
     }
   })
 })

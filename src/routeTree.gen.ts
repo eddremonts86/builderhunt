@@ -247,6 +247,7 @@ import { Route as ApiListsListIdItemsIndexRouteImport } from './routes/api/lists
 import { Route as ApiInterviewsInterviewIdParticipantsIndexRouteImport } from './routes/api/interviews/$interviewId/participants/index'
 import { Route as ApiInterviewsInterviewIdBriefIndexRouteImport } from './routes/api/interviews/$interviewId/brief/index'
 import { Route as ApiBuildersBuilderIdEvidenceIndexRouteImport } from './routes/api/builders/$builderId/evidence/index'
+import { Route as ApiAdminBillingEventsIndexRouteImport } from './routes/api/admin/billing/events/index'
 import { Route as ApiSchedulingInvitationsInvitationIdSendRouteImport } from './routes/api/scheduling/invitations/$invitationId/send'
 import { Route as ApiSchedulingInvitationsInvitationIdRevokeRouteImport } from './routes/api/scheduling/invitations/$invitationId/revoke'
 import { Route as ApiPublicSchedulingInvitationIdWithdrawRouteImport } from './routes/api/public/scheduling/$invitationId/withdraw'
@@ -269,6 +270,7 @@ import { Route as ApiBuildersBuilderIdEvidenceEvidenceIdRouteImport } from './ro
 import { Route as ApiBuildersBuilderIdClaimVerifyRouteImport } from './routes/api/builders/$builderId/claim/verify'
 import { Route as ApiAdminOperationsJobKeyRunRouteImport } from './routes/api/admin/operations/$jobKey/run'
 import { Route as ApiAdminBuilderClaimsClaimIdRevokeRouteImport } from './routes/api/admin/builder-claims/$claimId/revoke'
+import { Route as ApiAdminBillingEventsEventIdRouteImport } from './routes/api/admin/billing/events/$eventId'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/unpublish'
 import { Route as ApiMeBuilderClaimsClaimIdPortfolioPublishRouteImport } from './routes/api/me/builder-claims/$claimId/portfolio/publish'
 import { Route as ApiAdminBillingEventsEventIdReplayRouteImport } from './routes/api/admin/billing/events/$eventId/replay'
@@ -1547,6 +1549,12 @@ const ApiBuildersBuilderIdEvidenceIndexRoute =
     path: '/evidence/',
     getParentRoute: () => ApiBuildersBuilderIdRoute,
   } as any)
+const ApiAdminBillingEventsIndexRoute =
+  ApiAdminBillingEventsIndexRouteImport.update({
+    id: '/api/admin/billing/events/',
+    path: '/api/admin/billing/events/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSchedulingInvitationsInvitationIdSendRoute =
   ApiSchedulingInvitationsInvitationIdSendRouteImport.update({
     id: '/send',
@@ -1679,6 +1687,12 @@ const ApiAdminBuilderClaimsClaimIdRevokeRoute =
     path: '/api/admin/builder-claims/$claimId/revoke',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiAdminBillingEventsEventIdRoute =
+  ApiAdminBillingEventsEventIdRouteImport.update({
+    id: '/api/admin/billing/events/$eventId',
+    path: '/api/admin/billing/events/$eventId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute =
   ApiMeBuilderClaimsClaimIdPortfolioUnpublishRouteImport.update({
     id: '/unpublish',
@@ -1693,9 +1707,9 @@ const ApiMeBuilderClaimsClaimIdPortfolioPublishRoute =
   } as any)
 const ApiAdminBillingEventsEventIdReplayRoute =
   ApiAdminBillingEventsEventIdReplayRouteImport.update({
-    id: '/api/admin/billing/events/$eventId/replay',
-    path: '/api/admin/billing/events/$eventId/replay',
-    getParentRoute: () => rootRouteImport,
+    id: '/replay',
+    path: '/replay',
+    getParentRoute: () => ApiAdminBillingEventsEventIdRoute,
   } as any)
 const ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRoute =
   ApiSchedulingInvitationsInvitationIdDocumentsDocumentIdDownloadRouteImport.update(
@@ -1950,6 +1964,7 @@ export interface FileRoutesByFullPath {
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
@@ -1972,6 +1987,7 @@ export interface FileRoutesByFullPath {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
@@ -2214,6 +2230,7 @@ export interface FileRoutesByTo {
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
@@ -2236,6 +2253,7 @@ export interface FileRoutesByTo {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/admin/billing/events': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
@@ -2483,6 +2501,7 @@ export interface FileRoutesById {
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
   '/api/scheduling/invitations/': typeof ApiSchedulingInvitationsIndexRoute
+  '/api/admin/billing/events/$eventId': typeof ApiAdminBillingEventsEventIdRouteWithChildren
   '/api/admin/builder-claims/$claimId/revoke': typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   '/api/admin/operations/$jobKey/run': typeof ApiAdminOperationsJobKeyRunRoute
   '/api/builders/$builderId/claim/verify': typeof ApiBuildersBuilderIdClaimVerifyRoute
@@ -2505,6 +2524,7 @@ export interface FileRoutesById {
   '/api/public/scheduling/$invitationId/withdraw': typeof ApiPublicSchedulingInvitationIdWithdrawRoute
   '/api/scheduling/invitations/$invitationId/revoke': typeof ApiSchedulingInvitationsInvitationIdRevokeRoute
   '/api/scheduling/invitations/$invitationId/send': typeof ApiSchedulingInvitationsInvitationIdSendRoute
+  '/api/admin/billing/events/': typeof ApiAdminBillingEventsIndexRoute
   '/api/builders/$builderId/evidence/': typeof ApiBuildersBuilderIdEvidenceIndexRoute
   '/api/interviews/$interviewId/brief/': typeof ApiInterviewsInterviewIdBriefIndexRoute
   '/api/interviews/$interviewId/participants/': typeof ApiInterviewsInterviewIdParticipantsIndexRoute
@@ -2751,6 +2771,7 @@ export interface FileRouteTypes {
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
+    | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
@@ -2773,6 +2794,7 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
     | '/api/interviews/$interviewId/participants/'
@@ -3015,6 +3037,7 @@ export interface FileRouteTypes {
     | '/api/me/stepup'
     | '/api/organizations/invitations'
     | '/api/scheduling/invitations'
+    | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
@@ -3037,6 +3060,7 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/admin/billing/events'
     | '/api/builders/$builderId/evidence'
     | '/api/interviews/$interviewId/brief'
     | '/api/interviews/$interviewId/participants'
@@ -3283,6 +3307,7 @@ export interface FileRouteTypes {
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
     | '/api/scheduling/invitations/'
+    | '/api/admin/billing/events/$eventId'
     | '/api/admin/builder-claims/$claimId/revoke'
     | '/api/admin/operations/$jobKey/run'
     | '/api/builders/$builderId/claim/verify'
@@ -3305,6 +3330,7 @@ export interface FileRouteTypes {
     | '/api/public/scheduling/$invitationId/withdraw'
     | '/api/scheduling/invitations/$invitationId/revoke'
     | '/api/scheduling/invitations/$invitationId/send'
+    | '/api/admin/billing/events/'
     | '/api/builders/$builderId/evidence/'
     | '/api/interviews/$interviewId/brief/'
     | '/api/interviews/$interviewId/participants/'
@@ -3475,6 +3501,7 @@ export interface RootRouteChildren {
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
   ApiSchedulingInvitationsIndexRoute: typeof ApiSchedulingInvitationsIndexRoute
+  ApiAdminBillingEventsEventIdRoute: typeof ApiAdminBillingEventsEventIdRouteWithChildren
   ApiAdminBuilderClaimsClaimIdRevokeRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRoute
   ApiInterviewsInterviewIdBriefVersionRoute: typeof ApiInterviewsInterviewIdBriefVersionRoute
   ApiInterviewsInterviewIdParticipantsParticipantIdRoute: typeof ApiInterviewsInterviewIdParticipantsParticipantIdRoute
@@ -3488,10 +3515,10 @@ export interface RootRouteChildren {
   ApiPublicSchedulingInvitationIdSubmissionRoute: typeof ApiPublicSchedulingInvitationIdSubmissionRoute
   ApiPublicSchedulingInvitationIdUploadsRoute: typeof ApiPublicSchedulingInvitationIdUploadsRouteWithChildren
   ApiPublicSchedulingInvitationIdWithdrawRoute: typeof ApiPublicSchedulingInvitationIdWithdrawRoute
+  ApiAdminBillingEventsIndexRoute: typeof ApiAdminBillingEventsIndexRoute
   ApiInterviewsInterviewIdBriefIndexRoute: typeof ApiInterviewsInterviewIdBriefIndexRoute
   ApiInterviewsInterviewIdParticipantsIndexRoute: typeof ApiInterviewsInterviewIdParticipantsIndexRoute
   ApiPublicSchedulingInvitationIdIndexRoute: typeof ApiPublicSchedulingInvitationIdIndexRoute
-  ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute: typeof ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute
 }
 
@@ -5163,6 +5190,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiBuildersBuilderIdEvidenceIndexRouteImport
       parentRoute: typeof ApiBuildersBuilderIdRoute
     }
+    '/api/admin/billing/events/': {
+      id: '/api/admin/billing/events/'
+      path: '/api/admin/billing/events'
+      fullPath: '/api/admin/billing/events/'
+      preLoaderRoute: typeof ApiAdminBillingEventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/scheduling/invitations/$invitationId/send': {
       id: '/api/scheduling/invitations/$invitationId/send'
       path: '/send'
@@ -5317,6 +5351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminBuilderClaimsClaimIdRevokeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/admin/billing/events/$eventId': {
+      id: '/api/admin/billing/events/$eventId'
+      path: '/api/admin/billing/events/$eventId'
+      fullPath: '/api/admin/billing/events/$eventId'
+      preLoaderRoute: typeof ApiAdminBillingEventsEventIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/me/builder-claims/$claimId/portfolio/unpublish': {
       id: '/api/me/builder-claims/$claimId/portfolio/unpublish'
       path: '/unpublish'
@@ -5333,10 +5374,10 @@ declare module '@tanstack/react-router' {
     }
     '/api/admin/billing/events/$eventId/replay': {
       id: '/api/admin/billing/events/$eventId/replay'
-      path: '/api/admin/billing/events/$eventId/replay'
+      path: '/replay'
       fullPath: '/api/admin/billing/events/$eventId/replay'
       preLoaderRoute: typeof ApiAdminBillingEventsEventIdReplayRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ApiAdminBillingEventsEventIdRoute
     }
     '/api/scheduling/invitations/$invitationId/documents/$documentId/download': {
       id: '/api/scheduling/invitations/$invitationId/documents/$documentId/download'
@@ -5743,6 +5784,21 @@ const ApiSchedulingInvitationsInvitationIdRouteWithChildren =
     ApiSchedulingInvitationsInvitationIdRouteChildren,
   )
 
+interface ApiAdminBillingEventsEventIdRouteChildren {
+  ApiAdminBillingEventsEventIdReplayRoute: typeof ApiAdminBillingEventsEventIdReplayRoute
+}
+
+const ApiAdminBillingEventsEventIdRouteChildren: ApiAdminBillingEventsEventIdRouteChildren =
+  {
+    ApiAdminBillingEventsEventIdReplayRoute:
+      ApiAdminBillingEventsEventIdReplayRoute,
+  }
+
+const ApiAdminBillingEventsEventIdRouteWithChildren =
+  ApiAdminBillingEventsEventIdRoute._addFileChildren(
+    ApiAdminBillingEventsEventIdRouteChildren,
+  )
+
 interface ApiMeBuilderClaimsClaimIdPortfolioRouteChildren {
   ApiMeBuilderClaimsClaimIdPortfolioPublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioPublishRoute
   ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute: typeof ApiMeBuilderClaimsClaimIdPortfolioUnpublishRoute
@@ -5939,6 +5995,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,
   ApiSchedulingInvitationsIndexRoute: ApiSchedulingInvitationsIndexRoute,
+  ApiAdminBillingEventsEventIdRoute:
+    ApiAdminBillingEventsEventIdRouteWithChildren,
   ApiAdminBuilderClaimsClaimIdRevokeRoute:
     ApiAdminBuilderClaimsClaimIdRevokeRoute,
   ApiInterviewsInterviewIdBriefVersionRoute:
@@ -5965,14 +6023,13 @@ const rootRouteChildren: RootRouteChildren = {
     ApiPublicSchedulingInvitationIdUploadsRouteWithChildren,
   ApiPublicSchedulingInvitationIdWithdrawRoute:
     ApiPublicSchedulingInvitationIdWithdrawRoute,
+  ApiAdminBillingEventsIndexRoute: ApiAdminBillingEventsIndexRoute,
   ApiInterviewsInterviewIdBriefIndexRoute:
     ApiInterviewsInterviewIdBriefIndexRoute,
   ApiInterviewsInterviewIdParticipantsIndexRoute:
     ApiInterviewsInterviewIdParticipantsIndexRoute,
   ApiPublicSchedulingInvitationIdIndexRoute:
     ApiPublicSchedulingInvitationIdIndexRoute,
-  ApiAdminBillingEventsEventIdReplayRoute:
-    ApiAdminBillingEventsEventIdReplayRoute,
   ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute:
     ApiPublicSchedulingInvitationIdLinksLinkIdImportRoute,
 }
