@@ -69,7 +69,11 @@ import { Route as ApiWebhooksStripeRouteImport } from './routes/api/webhooks/str
 import { Route as ApiStatusSubscribeRouteImport } from './routes/api/status/subscribe'
 import { Route as ApiSprintsPreviewRouteImport } from './routes/api/sprints/preview'
 import { Route as ApiSprintsSprintIdRouteImport } from './routes/api/sprints/$sprintId'
+import { Route as ApiSolutionsRunsRouteImport } from './routes/api/solutions/runs'
+import { Route as ApiSolutionsGenerateRouteImport } from './routes/api/solutions/generate'
 import { Route as ApiSolutionsConfigRouteImport } from './routes/api/solutions/config'
+import { Route as ApiSolutionsBriefsRouteImport } from './routes/api/solutions/briefs'
+import { Route as ApiSolutionsBillingStateRouteImport } from './routes/api/solutions/billing-state'
 import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/semantic'
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
@@ -174,6 +178,8 @@ import { Route as DashboardSettingsBillingIndexRouteImport } from './routes/_das
 import { Route as DashboardInterviewsInterviewIdIndexRouteImport } from './routes/_dashboard/interviews/$interviewId/index'
 import { Route as DashboardBuilderBuilderIdIndexRouteImport } from './routes/_dashboard/builder/$builderId/index'
 import { Route as ApiSprintsSprintIdResultsRouteImport } from './routes/api/sprints/$sprintId/results'
+import { Route as ApiSolutionsRunsRunIdRouteImport } from './routes/api/solutions/runs.$runId'
+import { Route as ApiSolutionsBriefsBriefIdRouteImport } from './routes/api/solutions/briefs.$briefId'
 import { Route as ApiSchedulingInvitationsInvitationIdRouteImport } from './routes/api/scheduling/invitations/$invitationId'
 import { Route as ApiQueriesIdVisibilityRouteImport } from './routes/api/queries/$id/visibility'
 import { Route as ApiQueriesIdShareRouteImport } from './routes/api/queries/$id/share'
@@ -583,11 +589,32 @@ const ApiSprintsSprintIdRoute = ApiSprintsSprintIdRouteImport.update({
   path: '/api/sprints/$sprintId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSolutionsRunsRoute = ApiSolutionsRunsRouteImport.update({
+  id: '/api/solutions/runs',
+  path: '/api/solutions/runs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsGenerateRoute = ApiSolutionsGenerateRouteImport.update({
+  id: '/api/solutions/generate',
+  path: '/api/solutions/generate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSolutionsConfigRoute = ApiSolutionsConfigRouteImport.update({
   id: '/api/solutions/config',
   path: '/api/solutions/config',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSolutionsBriefsRoute = ApiSolutionsBriefsRouteImport.update({
+  id: '/api/solutions/briefs',
+  path: '/api/solutions/briefs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSolutionsBillingStateRoute =
+  ApiSolutionsBillingStateRouteImport.update({
+    id: '/api/solutions/billing-state',
+    path: '/api/solutions/billing-state',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSearchSemanticRoute = ApiSearchSemanticRouteImport.update({
   id: '/api/search/semantic',
   path: '/api/search/semantic',
@@ -1131,6 +1158,17 @@ const ApiSprintsSprintIdResultsRoute =
     id: '/results',
     path: '/results',
     getParentRoute: () => ApiSprintsSprintIdRoute,
+  } as any)
+const ApiSolutionsRunsRunIdRoute = ApiSolutionsRunsRunIdRouteImport.update({
+  id: '/$runId',
+  path: '/$runId',
+  getParentRoute: () => ApiSolutionsRunsRoute,
+} as any)
+const ApiSolutionsBriefsBriefIdRoute =
+  ApiSolutionsBriefsBriefIdRouteImport.update({
+    id: '/$briefId',
+    path: '/$briefId',
+    getParentRoute: () => ApiSolutionsBriefsRoute,
   } as any)
 const ApiSchedulingInvitationsInvitationIdRoute =
   ApiSchedulingInvitationsInvitationIdRouteImport.update({
@@ -1870,7 +1908,11 @@ export interface FileRoutesByFullPath {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
+  '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
+  '/api/solutions/generate': typeof ApiSolutionsGenerateRoute
+  '/api/solutions/runs': typeof ApiSolutionsRunsRouteWithChildren
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -1977,6 +2019,8 @@ export interface FileRoutesByFullPath {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
+  '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/interviews/$interviewId/': typeof DashboardInterviewsInterviewIdIndexRoute
@@ -2142,7 +2186,11 @@ export interface FileRoutesByTo {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
+  '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
+  '/api/solutions/generate': typeof ApiSolutionsGenerateRoute
+  '/api/solutions/runs': typeof ApiSolutionsRunsRouteWithChildren
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -2249,6 +2297,8 @@ export interface FileRoutesByTo {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
+  '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/builder/$builderId': typeof DashboardBuilderBuilderIdIndexRoute
   '/interviews/$interviewId': typeof DashboardInterviewsInterviewIdIndexRoute
@@ -2419,7 +2469,11 @@ export interface FileRoutesById {
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
   '/api/search/semantic': typeof ApiSearchSemanticRoute
+  '/api/solutions/billing-state': typeof ApiSolutionsBillingStateRoute
+  '/api/solutions/briefs': typeof ApiSolutionsBriefsRouteWithChildren
   '/api/solutions/config': typeof ApiSolutionsConfigRoute
+  '/api/solutions/generate': typeof ApiSolutionsGenerateRoute
+  '/api/solutions/runs': typeof ApiSolutionsRunsRouteWithChildren
   '/api/sprints/$sprintId': typeof ApiSprintsSprintIdRouteWithChildren
   '/api/sprints/preview': typeof ApiSprintsPreviewRoute
   '/api/status/subscribe': typeof ApiStatusSubscribeRoute
@@ -2526,6 +2580,8 @@ export interface FileRoutesById {
   '/api/queries/$id/share': typeof ApiQueriesIdShareRoute
   '/api/queries/$id/visibility': typeof ApiQueriesIdVisibilityRoute
   '/api/scheduling/invitations/$invitationId': typeof ApiSchedulingInvitationsInvitationIdRouteWithChildren
+  '/api/solutions/briefs/$briefId': typeof ApiSolutionsBriefsBriefIdRoute
+  '/api/solutions/runs/$runId': typeof ApiSolutionsRunsRunIdRoute
   '/api/sprints/$sprintId/results': typeof ApiSprintsSprintIdResultsRoute
   '/_dashboard/builder/$builderId/': typeof DashboardBuilderBuilderIdIndexRoute
   '/_dashboard/interviews/$interviewId/': typeof DashboardInterviewsInterviewIdIndexRoute
@@ -2695,7 +2751,11 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/billing-state'
+    | '/api/solutions/briefs'
     | '/api/solutions/config'
+    | '/api/solutions/generate'
+    | '/api/solutions/runs'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -2802,6 +2862,8 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/solutions/briefs/$briefId'
+    | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId/'
     | '/interviews/$interviewId/'
@@ -2967,7 +3029,11 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/billing-state'
+    | '/api/solutions/briefs'
     | '/api/solutions/config'
+    | '/api/solutions/generate'
+    | '/api/solutions/runs'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -3074,6 +3140,8 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/solutions/briefs/$briefId'
+    | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
     | '/builder/$builderId'
     | '/interviews/$interviewId'
@@ -3243,7 +3311,11 @@ export interface FileRouteTypes {
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
     | '/api/search/semantic'
+    | '/api/solutions/billing-state'
+    | '/api/solutions/briefs'
     | '/api/solutions/config'
+    | '/api/solutions/generate'
+    | '/api/solutions/runs'
     | '/api/sprints/$sprintId'
     | '/api/sprints/preview'
     | '/api/status/subscribe'
@@ -3350,6 +3422,8 @@ export interface FileRouteTypes {
     | '/api/queries/$id/share'
     | '/api/queries/$id/visibility'
     | '/api/scheduling/invitations/$invitationId'
+    | '/api/solutions/briefs/$briefId'
+    | '/api/solutions/runs/$runId'
     | '/api/sprints/$sprintId/results'
     | '/_dashboard/builder/$builderId/'
     | '/_dashboard/interviews/$interviewId/'
@@ -3474,7 +3548,11 @@ export interface RootRouteChildren {
   ApiPrivacyProfileRemovalRoute: typeof ApiPrivacyProfileRemovalRouteWithChildren
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
   ApiSearchSemanticRoute: typeof ApiSearchSemanticRoute
+  ApiSolutionsBillingStateRoute: typeof ApiSolutionsBillingStateRoute
+  ApiSolutionsBriefsRoute: typeof ApiSolutionsBriefsRouteWithChildren
   ApiSolutionsConfigRoute: typeof ApiSolutionsConfigRoute
+  ApiSolutionsGenerateRoute: typeof ApiSolutionsGenerateRoute
+  ApiSolutionsRunsRoute: typeof ApiSolutionsRunsRouteWithChildren
   ApiSprintsSprintIdRoute: typeof ApiSprintsSprintIdRouteWithChildren
   ApiSprintsPreviewRoute: typeof ApiSprintsPreviewRoute
   ApiStatusSubscribeRoute: typeof ApiStatusSubscribeRoute
@@ -4022,11 +4100,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSprintsSprintIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/solutions/runs': {
+      id: '/api/solutions/runs'
+      path: '/api/solutions/runs'
+      fullPath: '/api/solutions/runs'
+      preLoaderRoute: typeof ApiSolutionsRunsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/generate': {
+      id: '/api/solutions/generate'
+      path: '/api/solutions/generate'
+      fullPath: '/api/solutions/generate'
+      preLoaderRoute: typeof ApiSolutionsGenerateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/solutions/config': {
       id: '/api/solutions/config'
       path: '/api/solutions/config'
       fullPath: '/api/solutions/config'
       preLoaderRoute: typeof ApiSolutionsConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/briefs': {
+      id: '/api/solutions/briefs'
+      path: '/api/solutions/briefs'
+      fullPath: '/api/solutions/briefs'
+      preLoaderRoute: typeof ApiSolutionsBriefsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/solutions/billing-state': {
+      id: '/api/solutions/billing-state'
+      path: '/api/solutions/billing-state'
+      fullPath: '/api/solutions/billing-state'
+      preLoaderRoute: typeof ApiSolutionsBillingStateRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/search/semantic': {
@@ -4756,6 +4862,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/sprints/$sprintId/results'
       preLoaderRoute: typeof ApiSprintsSprintIdResultsRouteImport
       parentRoute: typeof ApiSprintsSprintIdRoute
+    }
+    '/api/solutions/runs/$runId': {
+      id: '/api/solutions/runs/$runId'
+      path: '/$runId'
+      fullPath: '/api/solutions/runs/$runId'
+      preLoaderRoute: typeof ApiSolutionsRunsRunIdRouteImport
+      parentRoute: typeof ApiSolutionsRunsRoute
+    }
+    '/api/solutions/briefs/$briefId': {
+      id: '/api/solutions/briefs/$briefId'
+      path: '/$briefId'
+      fullPath: '/api/solutions/briefs/$briefId'
+      preLoaderRoute: typeof ApiSolutionsBriefsBriefIdRouteImport
+      parentRoute: typeof ApiSolutionsBriefsRoute
     }
     '/api/scheduling/invitations/$invitationId': {
       id: '/api/scheduling/invitations/$invitationId'
@@ -5828,6 +5948,28 @@ const ApiPrivacyProfileRemovalRouteWithChildren =
     ApiPrivacyProfileRemovalRouteChildren,
   )
 
+interface ApiSolutionsBriefsRouteChildren {
+  ApiSolutionsBriefsBriefIdRoute: typeof ApiSolutionsBriefsBriefIdRoute
+}
+
+const ApiSolutionsBriefsRouteChildren: ApiSolutionsBriefsRouteChildren = {
+  ApiSolutionsBriefsBriefIdRoute: ApiSolutionsBriefsBriefIdRoute,
+}
+
+const ApiSolutionsBriefsRouteWithChildren =
+  ApiSolutionsBriefsRoute._addFileChildren(ApiSolutionsBriefsRouteChildren)
+
+interface ApiSolutionsRunsRouteChildren {
+  ApiSolutionsRunsRunIdRoute: typeof ApiSolutionsRunsRunIdRoute
+}
+
+const ApiSolutionsRunsRouteChildren: ApiSolutionsRunsRouteChildren = {
+  ApiSolutionsRunsRunIdRoute: ApiSolutionsRunsRunIdRoute,
+}
+
+const ApiSolutionsRunsRouteWithChildren =
+  ApiSolutionsRunsRoute._addFileChildren(ApiSolutionsRunsRouteChildren)
+
 interface ApiSprintsSprintIdRouteChildren {
   ApiSprintsSprintIdResultsRoute: typeof ApiSprintsSprintIdResultsRoute
 }
@@ -6013,7 +6155,11 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPrivacyProfileRemovalRoute: ApiPrivacyProfileRemovalRouteWithChildren,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
   ApiSearchSemanticRoute: ApiSearchSemanticRoute,
+  ApiSolutionsBillingStateRoute: ApiSolutionsBillingStateRoute,
+  ApiSolutionsBriefsRoute: ApiSolutionsBriefsRouteWithChildren,
   ApiSolutionsConfigRoute: ApiSolutionsConfigRoute,
+  ApiSolutionsGenerateRoute: ApiSolutionsGenerateRoute,
+  ApiSolutionsRunsRoute: ApiSolutionsRunsRouteWithChildren,
   ApiSprintsSprintIdRoute: ApiSprintsSprintIdRouteWithChildren,
   ApiSprintsPreviewRoute: ApiSprintsPreviewRoute,
   ApiStatusSubscribeRoute: ApiStatusSubscribeRoute,

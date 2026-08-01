@@ -548,6 +548,10 @@
     "0136_pgvector_execute_grants": {
       "sql": "6ed2c681df1db3d0e0bdfb19ade5ad915ad1aa712f5b490da8ec27c09b77b8ed",
       "snapshot": "096fe521a083b01daaa084a52ba17153948d0387b17b8ad19131ce71c1525bfb"
+    },
+    "0137_solution_briefs_runs_feedback": {
+      "sql": "90e2f126aa6a92c0ad4bf7318c3a890e0ef7d9b7aa07227db03fefb42057ff30",
+      "snapshot": "9cd90e3ba69e232faf47cd4b5b4c05e4176f0ee484ea3a921de970410ef0d484"
     }
   }
 }

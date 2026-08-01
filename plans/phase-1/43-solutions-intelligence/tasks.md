@@ -422,27 +422,83 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
 
 ## Phase 8 — Product completion
 
-- [ ] **Connect the end-to-end generation flow**
-  - Files: Solutions routes, server orchestration, `src/modules/solutions/*`
+- [x] **Connect the end-to-end generation flow**
+  - Files: `src/modules/solutions/server/generate.ts` (new), `src/routes/api/solutions/*` (generate,
+    billing-state, runs, runs.$runId, briefs, briefs.$briefId), `src/modules/solutions/components/*`
   - Do: Implement interpret, correct, clarify, confirm charge, generate, stream progress/status,
     cancel, compare, reorder, and stable retry without persisting chat.
   - Verify: browser tests prove no provider access before confirmation, exact visible charge,
     partial-source status, cancellation release, and accessible focus/announcement behavior.
 
-- [ ] **Persist explicit briefs, runs, and feedback**
-  - Files: `src/shared/lib/db/schema.ts`, the next generated Drizzle migration,
-    `src/shared/lib/repositories/solutions.ts` (new)
+  **The order changed, and that was the point.** The preview shell showed an interpretation *before* the
+  charge was confirmed. Interpretation is provider access, and spec.md requires the reservation to exist
+  first — so that step was either lying about what it did or spending money nobody authorized. The flow
+  is now describe → confirm the exact charge → generate → result, and the confirmation echoes the
+  server's own figure so a stale price is refused rather than billed.
+
+  **Clarification is released, not held.** spec.md says to keep it "inside that reservation"; holding one
+  across two HTTP requests means server state, timeouts and abandonment handling. This releases the hold
+  and returns the question instead, so the user is charged nothing for the question and exactly once for
+  the run that answers it — the same promise, and the unanswered interpretation call is a cost we absorb.
+  The one-question ceiling bounds the obvious abuse.
+
+  Cancellation is the client disconnecting: `request.signal` fires, the orchestration throws between
+  stages, and the throw releases through the same path as any failure. No cancel endpoint to authorize
+  and no run id to leak. Progress is SSE, because a five-call run behind a plain POST is a spinner that
+  cannot tell slow from dead.
+
+- [x] **Persist explicit briefs, runs, and feedback**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0137_solution_briefs_runs_feedback.sql`,
+    `src/shared/lib/repositories/solutions.ts` (new), `scripts/db/audit-schema.ts`,
+    `scripts/db/verify-rls-local.mjs`, `scripts/db/prepare-rls-fixture.mjs`
   - Do: Add tenant-private saved briefs, immutable run/routes/components, and bounded feedback.
     Store trace/evidence/version/credit references but no transient chat or secret source payload.
   - Verify: tenant A/B RLS, explicit-save-only, retention/export/deletion, immutable run, and public
     DTO tests pass.
 
-- [ ] **Render complete evidence-backed routes**
-  - Files: `src/modules/solutions/components/*` (new)
+  The first tenant-private tables in this module, and the line is the one the rest of it draws: the
+  catalog is a public fact about a public thing; what an organization asked for and what it was told is
+  theirs. **Immutable means it cannot be changed, not that it cannot be erased** — `solution_runs` and
+  `solution_run_routes` get SELECT/INSERT/DELETE and *no UPDATE grant*, verified as the real
+  `builderhunt_app` role in `verify-rls-local.mjs` because the unit suite runs as superuser and would
+  have shown the update succeeding.
+
+  No transient chat is stored: the clarification question and answer are absent by design. `brief_id` is
+  nullable so a run can be kept without keeping its brief, and every run carries its own
+  `brief_snapshot`, so editing a saved brief cannot rewrite what a stored recommendation was based on.
+
+  The public DTO omits three things deliberately — the organization id, the author, and everything
+  billing owns. A charge duplicated here would be a second number that can disagree with the billing
+  surface.
+
+  One pre-existing invariant needed scoping rather than weakening: `solutions-catalog-schema.test.ts`
+  asserted that *no* `solution_*` table has an `organization_id`. Four now legitimately do, so they are
+  named, and a companion assertion requires all four to have RLS enabled and forced.
+
+- [x] **Render complete evidence-backed routes**
+  - Files: `src/modules/solutions/components/RouteCard.tsx` (new), `RunResult.tsx` (new),
+    `SolutionsPage.tsx` (rewritten)
   - Do: Show fit, steps, roles, coverage, limitations, estimates, risks, review points, provenance,
     freshness, uncertainty, safe outbound links, unavailable lane reasons, and generic human roles.
   - Verify: visual/accessibility tests cover all route/evidence/freshness states and never imply
     BuilderHunt verified a merely claimed capability.
+
+  Evidence level is rendered in words on every component, and the `claimed` case names the vendor as the
+  source of the claim — almost everything in the catalog enters at `claimed` and nothing promotes it, so
+  a tick or a badge would turn a vendor's marketing into our assessment. Explanation provenance is shown
+  too: a reader is owed the difference between prose a model wrote and prose the composer wrote, and it
+  is not recoverable from the text.
+
+  Reorder is a view, never an edit — the stored run keeps its own lane order, and an unavailable lane
+  sorts last rather than being hidden or sorted first on an absent cost.
+
+  **The attribution release blocker is closed.** `remoteok_jobs` and `jobicy_jobs` grant access on the
+  condition their notice is displayed. `listAttributionsForEvidence` derives it from the same source rows
+  the run drew on and the payload carries it, so a surface cannot render the data and forget the
+  obligation. A failure to load attributions logs at *error* level rather than being swallowed.
+
+  This also closes plans/UI task 78 and removes the Wave 7 preview banner: the banner said "this is an
+  example, nothing is charged", which is no longer true.
 
 ## Phase 9 — Certification and rollout
 

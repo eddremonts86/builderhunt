@@ -1435,12 +1435,15 @@ try {
   try {
     await app`select id from builder_embeddings order by embedding <=> array_fill(0.0::real, array[${EMBEDDING_DIMENSION}::int])::vector limit 1`
   } catch (error) {
-    throw new Error(`app role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'}): a vector operator is unusable for this role, so semantic search cannot work`)
+    throw new Error(
+      `app role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'}): a vector operator is unusable for this role, so semantic search cannot work`,
+      { cause: error },
+    )
   }
   try {
     await worker`select id from builder_embeddings order by embedding <=> array_fill(0.0::real, array[${EMBEDDING_DIMENSION}::int])::vector limit 1`
   } catch (error) {
-    throw new Error(`worker role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'})`)
+    throw new Error(`worker role cannot evaluate a pgvector distance operator (${error?.code ?? 'unknown'})`, { cause: error })
   }
   vectorOperatorReport.appRole = 'can evaluate <=>'
   vectorOperatorReport.workerRole = 'can evaluate <=>'
@@ -1609,6 +1612,53 @@ try {
   })
   if (listBUnchanged[0]?.name !== 'List B') throw new Error("Cross-tenant UPDATE reached another organization's builder_lists row")
 
+  // Saved Solutions briefs, runs, and routes (plan 43 Phase 8, migration 0137). Checked here rather than only
+  // in a unit test for the reason this file exists: the unit suite connects as the migration superuser, which
+  // bypasses RLS and holds every privilege, so it cannot see either of the two properties below.
+  const solutionBriefsA = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select id from solution_briefs order by id`
+  })
+  assertIds(solutionBriefsA, ['solution-brief-a'], 'solution_briefs tenant isolation')
+
+  const solutionRunsB = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-b', true)`
+    return transaction`select id from solution_runs order by id`
+  })
+  assertIds(solutionRunsB, ['solution-run-b'], 'solution_runs tenant isolation')
+
+  const solutionRoutesA = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`select run_id from solution_run_routes order by run_id`
+  })
+  if (solutionRoutesA.length !== 1 || solutionRoutesA[0].run_id !== 'solution-run-a') {
+    throw new Error('solution_run_routes tenant isolation failed')
+  }
+
+  /**
+   * A stored run is immutable, and the mechanism is the *absence* of an UPDATE grant rather than a trigger or a
+   * check. That distinction only shows up as the real role: under the superuser every unit test would see the
+   * update succeed and conclude the opposite.
+   */
+  let solutionRunUpdateDenied = false
+  try {
+    await app.begin(async (transaction) => {
+      await transaction`select set_config('app.organization_id', 'org-a', true)`
+      await transaction`update solution_runs set composition_hash = 'rewritten' where id = 'solution-run-a'`
+    })
+  } catch (error) {
+    solutionRunUpdateDenied = error.code === '42501'
+  }
+  if (!solutionRunUpdateDenied) throw new Error('App role could UPDATE solution_runs — a stored recommendation must not be editable')
+
+  // A saved brief, by contrast, is a working document its owner edits. Both grants are deliberate, so both are
+  // asserted: a copy-pasted grant block that made runs updatable would otherwise pass unnoticed.
+  const [renamedBriefA] = await app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', 'org-a', true)`
+    return transaction`update solution_briefs set title = 'Brief A (renamed)' where id = 'solution-brief-a' returning id, title`
+  })
+  if (renamedBriefA?.title !== 'Brief A (renamed)') throw new Error('App role could not UPDATE its own solution_briefs row')
+
   console.log(JSON.stringify({
     missingContext: 'denied',
     tenantA: tenantA.map((row) => row.id),
@@ -1667,6 +1717,10 @@ try {
     availabilityPolicyAdminRead: 'denied',
     availabilityPolicyForeignWrite: 'denied',
     workerCandidateWrite: 'denied',
+    solutionBriefsTenantA: solutionBriefsA.map((row) => row.id),
+    solutionRunsTenantB: solutionRunsB.map((row) => row.id),
+    solutionRunUpdate: 'denied',
+    solutionBriefUpdate: renamedBriefA.title,
     appBuilderListUpdate: renamedListA.name,
     appBuilderListCrossTenantUpdate: 'no-op (0 rows under RLS)',
     globalIngestionGrants: globalIngestionGrantReport, vectorOperators: vectorOperatorReport,

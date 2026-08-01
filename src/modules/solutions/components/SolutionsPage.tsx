@@ -1,111 +1,189 @@
+/**
+ * The Solutions surface, bound to the real endpoints (plan 43 Phase 8; plans/UI task 78).
+ *
+ * ## The order the user experiences, and why it is this order
+ *
+ *   describe → **confirm the exact charge** → generate → result → (save, choose a route)
+ *
+ * There is no interpretation step before the confirmation, and that is the change from the preview shell.
+ * spec.md requires the reservation to exist *before* any provider access, and interpretation is provider
+ * access — so a page that showed "here's what we understood" before the user agreed to pay was either lying
+ * about what it did or spending money nobody authorized. What the user confirms is a number the server told us
+ * (`GET /api/solutions/billing-state`), echoed back verbatim so a stale price is refused rather than billed.
+ *
+ * ## Clarification costs nothing
+ *
+ * When the run needs one question answered, the server releases the hold and returns the question. Answering it
+ * and pressing generate again is the only charge. The copy says so, because a user asked to answer a question
+ * mid-flow will otherwise assume they are being charged twice.
+ *
+ * ## Cancel is a disconnect
+ *
+ * `AbortController.abort()` drops the stream; the server sees `request.signal` fire and releases the
+ * reservation. No cancel endpoint, no run id to authorize, nothing to leak.
+ */
 import * as React from 'react'
 import { Lightbulb, Lock, Sparkles } from 'lucide-react'
-import { Button, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '~/components/ui'
+import { Button, Label, Textarea } from '~/components/ui'
 import { PaidStateActions } from '~/shared/components/PaidStateActions'
-import { BRIEF_DOMAINS, RANKING_MODES, type BriefDomain, type RankingMode, type SolutionRun } from '~/shared/lib/solutions/contracts'
+import type { SolutionRoute } from '~/shared/lib/solutions/contracts'
 import { DEMO_SOLUTION_RUN } from '~/shared/lib/solutions/demo-fixtures'
+import { RunResult } from './RunResult'
 
-const DOMAIN_LABELS: Record<BriefDomain, string> = {
-  software_and_ai: 'Software & AI',
-  translation_and_transcription: 'Translation & transcription',
-  research_and_data: 'Research & data',
-  content_and_design: 'Content & design',
-  automation: 'Automation',
-  other: 'Other',
+interface ChargeDto {
+  operation: string
+  units: number
+  rateCardVersion: number
 }
 
-const RANKING_LABELS: Record<RankingMode, string> = {
-  recommended: 'Recommended',
-  maximum_quality: 'Maximum quality',
-  lower_cost_time: 'Lower cost / time',
+interface ActionDto {
+  charge: ChargeDto
+  available: boolean
+  unavailableReason: string | null
 }
 
-const ROUTE_TYPE_LABELS: Record<SolutionRun['routes'][number]['routeType'], string> = {
-  human: 'Human',
-  ai: 'AI',
-  hybrid: 'Hybrid',
+export interface BillingStateDto {
+  balanceUnits: number
+  generate: ActionDto
+  regenerate: ActionDto
 }
 
-interface DraftBrief {
-  description: string
-  domain: BriefDomain
-  capabilities: string
-  budgetKnown: boolean
-  budgetMaxDollars: string
-  rankingMode: RankingMode
+interface GeneratedRunDto {
+  status: 'complete'
+  runId: string
+  brief: unknown
+  routes: SolutionRoute[]
+  routeExplanations: Array<{ provenance: 'model' | 'deterministic'; fallbackReason?: string }>
+  interpretation: { unknownFields: string[]; provenance: string; promptVersion: string | null }
+  evidenceLevels: Record<string, string>
+  attributions: Array<{ sourceKey: string; text: string; url: string }>
+  warnings: string[]
+  trace: { composerVersion: string; retrievalQueryHash: string; compositionHash: string; durationMs: number }
+  settledUnits: number
 }
 
-function initialDraft(): DraftBrief {
-  return { description: '', domain: 'software_and_ai', capabilities: '', budgetKnown: false, budgetMaxDollars: '', rankingMode: 'recommended' }
-}
-
-type Step = 'brief' | 'interpretation' | 'confirm' | 'result'
+type StreamEvent =
+  | { event: 'progress'; data: { stage: string; fraction: number; detail?: string } }
+  | { event: 'result'; data: GeneratedRunDto | { status: 'needs_clarification'; question: string; materiality: string } | { status: 'unreadable'; reason: string } }
+  | { event: 'error'; data: { code: string; message: string } }
 
 export interface SolutionsPageProps {
   /** Injected for tests — defaults to a real fetch against `/api/billing/summary`. */
   fetchEntitlement?: () => Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }>
-  /** Injected for tests — defaults to a real fetch against `/api/solutions/config`. Server-owned:
-   * the client never guesses whether real (billed, saved) generation is live — `false` until the
-   * server says otherwise, so an unreachable config endpoint fails closed to the preview copy. */
-  fetchReadiness?: () => Promise<{ ready: boolean }>
+  /** Injected for tests — defaults to `/api/solutions/billing-state`. */
+  fetchBillingState?: () => Promise<BillingStateDto | null>
+  /** Injected for tests — defaults to the SSE call against `/api/solutions/generate`. */
+  runGeneration?: (input: {
+    briefText: string
+    confirmation: { acceptedUnits: number; acceptedRateCardVersion: number }
+    idempotencyKey: string
+    clarification?: { question: string; answer: string }
+    signal: AbortSignal
+    onEvent: (event: StreamEvent) => void
+  }) => Promise<void>
+  saveRun?: (run: GeneratedRunDto) => Promise<{ id: string }>
 }
 
 type Entitlement = 'loading' | 'locked' | 'stale_session' | 'unlocked'
+type Step = 'brief' | 'confirm' | 'running' | 'clarify' | 'result'
 
-export function SolutionsPage({ fetchEntitlement, fetchReadiness }: SolutionsPageProps = {}) {
+export function SolutionsPage({
+  fetchEntitlement,
+  fetchBillingState,
+  runGeneration,
+  saveRun,
+}: SolutionsPageProps = {}) {
   const [entitlement, setEntitlement] = React.useState<Entitlement>('loading')
-  const [solutionsReady, setSolutionsReady] = React.useState(false)
-  const [draft, setDraft] = React.useState<DraftBrief>(initialDraft)
+  const [billing, setBilling] = React.useState<BillingStateDto | null>(null)
+  const [briefText, setBriefText] = React.useState('')
   const [step, setStep] = React.useState<Step>('brief')
-  const [clarifyingAnswer, setClarifyingAnswer] = React.useState('')
+  const [progress, setProgress] = React.useState<{ stage: string; fraction: number } | null>(null)
+  const [run, setRun] = React.useState<GeneratedRunDto | null>(null)
+  const [clarification, setClarification] = React.useState<{ question: string; materiality: string } | null>(null)
+  const [answer, setAnswer] = React.useState('')
+  const [error, setError] = React.useState<{ code: string; message: string } | null>(null)
+  const [savedRunId, setSavedRunId] = React.useState<string | null>(null)
+  const [chosenRoute, setChosenRoute] = React.useState<string | null>(null)
+  const abortRef = React.useRef<AbortController | null>(null)
+  // Stable across retries of the same intent, so a retried generation replays instead of charging twice.
+  const idempotencyRef = React.useRef<string>(newIdempotencyKey())
 
   React.useEffect(() => {
-    const load = fetchEntitlement
-      ?? ((): Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }> => fetch('/api/billing/summary', { credentials: 'include' })
-        .then((r) => {
-          if (r.status === 401) return { paidActionsAllowed: false, staleSession: true }
-          if (!r.ok) return { paidActionsAllowed: false }
-          return r.json().then((data: { capabilities?: { paidActionsAllowed?: boolean } }) => ({ paidActionsAllowed: Boolean(data.capabilities?.paidActionsAllowed) }))
-        }))
+    const load = fetchEntitlement ?? defaultFetchEntitlement
     load()
       .then((result) => setEntitlement(result.staleSession ? 'stale_session' : result.paidActionsAllowed ? 'unlocked' : 'locked'))
       .catch(() => setEntitlement('locked'))
   }, [fetchEntitlement])
 
   React.useEffect(() => {
-    const load = fetchReadiness
-      ?? ((): Promise<{ ready: boolean }> => fetch('/api/solutions/config')
-        .then((r) => (r.ok ? r.json() : { ready: false }))
-        .catch(() => ({ ready: false })))
-    load()
-      .then((result) => setSolutionsReady(result.ready))
-      .catch(() => setSolutionsReady(false))
-  }, [fetchReadiness])
+    if (entitlement !== 'unlocked') return
+    const load = fetchBillingState ?? defaultFetchBillingState
+    load().then(setBilling).catch(() => setBilling(null))
+  }, [entitlement, fetchBillingState])
 
-  // Deterministic materiality rule for the shell demo: an unknown budget is the one clarifying
-  // question that would materially change viable routes (spec.md: "at most one clarifying
-  // question when ambiguity would materially change the viable routes"). Phase 7's real
-  // interpreter replaces this with an LLM-driven decision under the same one-question ceiling.
-  const needsClarification = !draft.budgetKnown
-
-  function handlePreviewInterpretation(e: React.FormEvent) {
-    e.preventDefault()
-    if (!draft.description.trim() || !draft.capabilities.trim()) return
-    setStep('interpretation')
-  }
-
-  function handleConfirmInterpretation() {
-    setStep('confirm')
-  }
-
-  function handleConfirmCharge() {
-    setStep('result')
-  }
-
-  function handleReset() {
-    setDraft(initialDraft())
-    setClarifyingAnswer('')
+  function reset() {
+    abortRef.current?.abort()
+    idempotencyRef.current = newIdempotencyKey()
+    setBriefText('')
+    setRun(null)
+    setClarification(null)
+    setAnswer('')
+    setError(null)
+    setProgress(null)
+    setSavedRunId(null)
+    setChosenRoute(null)
     setStep('brief')
+  }
+
+  async function generate(withAnswer?: { question: string; answer: string }) {
+    const charge = billing?.generate.charge
+    if (!charge) return
+    setError(null)
+    setProgress({ stage: 'starting', fraction: 0 })
+    setStep('running')
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    const call = runGeneration ?? defaultRunGeneration
+
+    try {
+      await call({
+        briefText,
+        confirmation: { acceptedUnits: charge.units, acceptedRateCardVersion: charge.rateCardVersion },
+        idempotencyKey: idempotencyRef.current,
+        ...(withAnswer ? { clarification: withAnswer } : {}),
+        signal: controller.signal,
+        onEvent: (event) => {
+          if (event.event === 'progress') {
+            setProgress(event.data)
+            return
+          }
+          if (event.event === 'error') {
+            setError(event.data)
+            setStep('brief')
+            return
+          }
+          const result = event.data
+          if (result.status === 'needs_clarification') {
+            setClarification({ question: result.question, materiality: result.materiality })
+            setStep('clarify')
+            return
+          }
+          if (result.status === 'unreadable') {
+            setError({ code: 'unreadable', message: result.reason })
+            setStep('brief')
+            return
+          }
+          setRun(result)
+          setStep('result')
+        },
+      })
+    } catch (cause) {
+      if ((cause as Error).name !== 'AbortError') {
+        setError({ code: 'generation_failed', message: 'Generation failed. You have not been charged.' })
+      }
+      setStep('brief')
+    }
   }
 
   if (entitlement === 'loading') {
@@ -114,233 +192,345 @@ export function SolutionsPage({ fetchEntitlement, fetchReadiness }: SolutionsPag
 
   if (entitlement === 'stale_session') {
     return (
-      <div className="container py-12 max-w-3xl" data-testid="solutions-stale-session">
-        <div className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl text-center">
-          <Lock className="w-8 h-8 text-bh-accent mx-auto mb-4" aria-hidden="true" />
-          <h1 className="text-2xl font-bold mb-2">Sign in again to continue</h1>
-          <p className="text-bh-text-muted mb-6 max-w-lg mx-auto">
-            Your session needs refreshing before we can check your plan.
-          </p>
-          <PaidStateActions reason="stale_session" />
-        </div>
-      </div>
+      <LockedShell testId="solutions-stale-session" title="Sign in again to continue">
+        <p className="text-bh-text-muted mb-6 max-w-lg mx-auto">Your session needs refreshing before we can check your plan.</p>
+        <PaidStateActions reason="stale_session" />
+      </LockedShell>
     )
   }
 
   if (entitlement === 'locked') {
     return (
-      <div className="container py-12 max-w-3xl" data-testid="solutions-locked">
-        <div className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl text-center">
-          <Lock className="w-8 h-8 text-bh-accent mx-auto mb-4" aria-hidden="true" />
-          <h1 className="text-2xl font-bold mb-2">Solutions is a Pro, Pro Max, and Team feature</h1>
-          <p className="text-bh-text-muted mb-6 max-w-lg mx-auto">
-            Describe a piece of digital work and get up to three evidence-backed ways to solve it —
-            a human specialist, an AI system, or a hybrid workflow — compared side by side.
-          </p>
-          <PaidStateActions reason="not_entitled" />
-          <div className="mt-8 text-left">
-            <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-3">Example output</p>
-            <DemoResultLanes run={DEMO_SOLUTION_RUN} />
-          </div>
+      <LockedShell testId="solutions-locked" title="Solutions is a Pro, Pro Max, and Team feature">
+        <p className="text-bh-text-muted mb-6 max-w-lg mx-auto">
+          Describe a piece of digital work and get up to three evidence-backed ways to solve it — a human
+          specialist, an AI system, or a hybrid workflow — compared side by side.
+        </p>
+        <PaidStateActions reason="not_entitled" />
+        <div className="mt-8 text-left">
+          <p className="text-xs uppercase tracking-wider text-bh-text-dim mb-3">Example output</p>
+          <RunResult routes={DEMO_SOLUTION_RUN.routes} warnings={DEMO_SOLUTION_RUN.warnings} />
         </div>
-      </div>
+      </LockedShell>
     )
   }
 
+  const generateAction = billing?.generate
+  const blocked = generateAction && !generateAction.available ? generateAction.unavailableReason : null
+
   return (
-    <div className="container py-12 max-w-3xl" data-testid="solutions-page">
+    <div className="container py-12 max-w-5xl" data-testid="solutions-page">
       <header className="mb-8">
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
           <Lightbulb className="w-6 h-6 text-bh-accent" aria-hidden="true" />
           Solutions
         </h1>
-        <p className="text-bh-text-muted mt-1">Describe the outcome you need. Nothing is saved until you explicitly save a result.</p>
+        <p className="text-bh-text-muted mt-1">
+          Describe the outcome you need. Nothing is saved until you explicitly save a result.
+        </p>
       </header>
 
-      {!solutionsReady && (
-        <div
-          className="card p-4 mb-6 border border-bh-border/60 bg-bh-bg-alt rounded-xl text-sm text-bh-text-muted"
-          data-testid="solutions-preview-banner"
-        >
-          Solutions is in preview for your organization — briefs and results below are examples, not
-          live generation. Nothing here is charged or saved.
+      {/* One region announces every state change, so a screen reader hears the run start, progress, and finish
+          without the focus moving out from under the user. */}
+      <div className="sr-only" role="status" aria-live="polite" data-testid="solutions-announcer">
+        {step === 'running' && progress ? `Working: ${progress.stage}` : ''}
+        {step === 'result' ? 'Results ready' : ''}
+        {step === 'clarify' ? 'One question before we can continue' : ''}
+        {error ? error.message : ''}
+      </div>
+
+      {blocked && (
+        <div className="card p-4 mb-6 border border-bh-border/60 bg-bh-bg-alt rounded-xl text-sm" data-testid="solutions-blocked">
+          <BlockedMessage reason={blocked} balanceUnits={billing?.balanceUnits ?? 0} />
+        </div>
+      )}
+
+      {error && (
+        <div className="card p-4 mb-6 border border-bh-danger/40 bg-bh-danger-soft rounded-xl text-sm" data-testid="solutions-error">
+          {error.message}
         </div>
       )}
 
       {step === 'brief' && (
-        <form onSubmit={handlePreviewInterpretation} className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl" data-testid="brief-form">
+        <form
+          className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl"
+          data-testid="brief-form"
+          onSubmit={(event) => { event.preventDefault(); setStep('confirm') }}
+        >
           <div>
             <Label htmlFor="brief-description">What do you need done?</Label>
             <Textarea
               id="brief-description"
               required
-              rows={4}
-              placeholder="e.g. Translate a 20-page technical manual from English to Spanish"
-              value={draft.description}
-              onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+              rows={5}
+              placeholder="e.g. Translate a 20-page technical manual from English to Spanish by 30 September. Budget max 2000 EUR."
+              value={briefText}
+              onChange={(event) => setBriefText(event.target.value)}
               data-testid="brief-description-input"
             />
+            <p className="text-xs text-bh-text-dim mt-1">
+              Write it as you would to a colleague. Budgets, deadlines and constraints are read from your own words —
+              and only kept when your words actually say them.
+            </p>
           </div>
-          <div>
-            <Label htmlFor="brief-domain">Domain</Label>
-            <Select value={draft.domain} onValueChange={(value) => setDraft((d) => ({ ...d, domain: value as BriefDomain }))}>
-              <SelectTrigger id="brief-domain" data-testid="brief-domain-select"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {BRIEF_DOMAINS.map((domain) => (
-                  <SelectItem key={domain} value={domain}>{DOMAIN_LABELS[domain]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="brief-capabilities">Capabilities needed (comma-separated)</Label>
-            <Input
-              id="brief-capabilities"
-              required
-              placeholder="translation, quality_assurance"
-              value={draft.capabilities}
-              onChange={(e) => setDraft((d) => ({ ...d, capabilities: e.target.value }))}
-              data-testid="brief-capabilities-input"
-            />
-          </div>
-          <div>
-            <Label htmlFor="brief-ranking">Ranking preference</Label>
-            <Select value={draft.rankingMode} onValueChange={(value) => setDraft((d) => ({ ...d, rankingMode: value as RankingMode }))}>
-              <SelectTrigger id="brief-ranking" data-testid="brief-ranking-select"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {RANKING_MODES.map((mode) => (
-                  <SelectItem key={mode} value={mode}>{RANKING_LABELS[mode]}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" disabled={!draft.description.trim() || !draft.capabilities.trim()} data-testid="brief-preview-button">
-            Preview interpretation
+          <Button type="submit" disabled={briefText.trim().length === 0 || Boolean(blocked)} data-testid="brief-continue-button">
+            Continue
           </Button>
         </form>
       )}
 
-      {step === 'interpretation' && (
-        <div className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl" data-testid="interpretation-preview">
-          <h2 className="text-lg font-semibold">Here&apos;s what we understood</h2>
-          <dl className="text-sm space-y-2">
-            <div><dt className="inline font-semibold">Deliverable: </dt><dd className="inline text-bh-text-muted">{draft.description}</dd></div>
-            <div><dt className="inline font-semibold">Domain: </dt><dd className="inline text-bh-text-muted">{DOMAIN_LABELS[draft.domain]}</dd></div>
-            <div><dt className="inline font-semibold">Capabilities: </dt><dd className="inline text-bh-text-muted">{draft.capabilities}</dd></div>
-            <div><dt className="inline font-semibold">Ranking: </dt><dd className="inline text-bh-text-muted">{RANKING_LABELS[draft.rankingMode]}</dd></div>
-          </dl>
-
-          {needsClarification && (
-            <div data-testid="clarifying-question">
-              <Label htmlFor="clarify-budget">One quick question: do you have a maximum budget in mind?</Label>
-              <div className="flex gap-2 items-center mt-1">
-                <Input
-                  id="clarify-budget"
-                  type="number"
-                  placeholder="Leave blank if unknown"
-                  value={clarifyingAnswer}
-                  onChange={(e) => setClarifyingAnswer(e.target.value)}
-                  data-testid="clarify-budget-input"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setDraft((d) => ({ ...d, budgetKnown: true, budgetMaxDollars: clarifyingAnswer }))}
-                  data-testid="clarify-submit-button"
-                >
-                  Set budget
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="flex gap-3">
-            <Button type="button" onClick={handleConfirmInterpretation} data-testid="interpretation-confirm-button">
-              This looks right
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => setStep('brief')} data-testid="interpretation-back-button">
-              Correct it
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {step === 'confirm' && (
+      {step === 'confirm' && generateAction && (
         <div className="card p-6 space-y-5 border border-bh-border/60 rounded-2xl" data-testid="credit-confirmation">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-bh-accent" aria-hidden="true" />
-            {solutionsReady ? 'Confirm generation' : 'Preview a demo result'}
+            Confirm the charge
           </h2>
-          {solutionsReady ? (
-            <p className="text-sm text-bh-text-muted">
-              This will use a maximum of <strong>10 credits</strong> (solutions.generate.v1). You&apos;ll
-              only be charged once a usable result is produced — an unusable or failed run is never charged.
-            </p>
-          ) : (
-            <p className="text-sm text-bh-text-muted">
-              Solutions generation isn&apos;t live for your organization yet — this shows an example
-              result only. No credits are charged and nothing is saved.
-            </p>
-          )}
+          <p className="text-sm text-bh-text-muted">
+            This costs <strong data-testid="confirm-charge-units">{generateAction.charge.units} credits</strong>.
+            You are charged once, only when a usable result is produced — a failed or unusable run costs nothing,
+            and if we need to ask you a question first, that question is free.
+          </p>
+          <p className="text-xs text-bh-text-dim" data-testid="confirm-balance">
+            Your balance: {billing?.balanceUnits ?? 0} credits.
+          </p>
           <div className="flex gap-3">
-            <Button type="button" onClick={handleConfirmCharge} data-testid="charge-confirm-button">
-              {solutionsReady ? 'Confirm and generate' : 'See demo result'}
+            <Button type="button" onClick={() => void generate()} data-testid="charge-confirm-button">
+              Confirm and generate
             </Button>
-            <Button type="button" variant="secondary" onClick={handleReset} data-testid="charge-cancel-button">Cancel</Button>
+            <Button type="button" variant="secondary" onClick={() => setStep('brief')} data-testid="charge-cancel-button">
+              Back
+            </Button>
           </div>
         </div>
       )}
 
-      {step === 'result' && (
-        <div className="space-y-4" data-testid="result-lanes">
-          <div className="card p-4 border border-bh-accent/30 bg-bh-accent-soft rounded-xl text-sm" data-testid="demo-result-banner">
-            {DEMO_SOLUTION_RUN.warnings[0]}
+      {step === 'running' && (
+        <div className="card p-6 space-y-4 border border-bh-border/60 rounded-2xl" data-testid="generation-progress">
+          <p className="text-sm font-medium">{stageLabel(progress?.stage)}</p>
+          <div className="h-1.5 bg-bh-bg-alt rounded-full overflow-hidden">
+            <div
+              className="h-full bg-bh-accent transition-all"
+              style={{ width: `${Math.round((progress?.fraction ?? 0) * 100)}%` }}
+              role="progressbar"
+              aria-valuenow={Math.round((progress?.fraction ?? 0) * 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Generation progress"
+            />
           </div>
-          <DemoResultLanes run={DEMO_SOLUTION_RUN} />
-          <Button type="button" variant="secondary" onClick={handleReset} data-testid="result-reset-button">Start a new brief</Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => { abortRef.current?.abort(); setStep('brief') }}
+            data-testid="generation-cancel-button"
+          >
+            Cancel — you will not be charged
+          </Button>
+        </div>
+      )}
+
+      {step === 'clarify' && clarification && (
+        <div className="card p-6 space-y-4 border border-bh-border/60 rounded-2xl" data-testid="clarifying-question">
+          <h2 className="text-lg font-semibold">One question first</h2>
+          <p className="text-sm">{clarification.question}</p>
+          <p className="text-xs text-bh-text-dim">{clarification.materiality}. Answering costs nothing.</p>
+          <Label htmlFor="clarify-answer">Your answer</Label>
+          <Textarea
+            id="clarify-answer"
+            rows={2}
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            data-testid="clarify-answer-input"
+          />
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              disabled={answer.trim().length === 0}
+              onClick={() => void generate({ question: clarification.question, answer })}
+              data-testid="clarify-submit-button"
+            >
+              Answer and generate
+            </Button>
+            <Button type="button" variant="secondary" onClick={reset} data-testid="clarify-cancel-button">Start over</Button>
+          </div>
+        </div>
+      )}
+
+      {step === 'result' && run && (
+        <div className="space-y-4">
+          <RunResult
+            routes={run.routes}
+            routeProvenance={run.routes.map((route, index) => ({
+              routeType: route.routeType,
+              provenance: run.routeExplanations[index]?.provenance ?? 'deterministic',
+              fallbackReason: run.routeExplanations[index]?.fallbackReason ?? null,
+            }))}
+            evidenceLevels={run.evidenceLevels}
+            warnings={run.warnings}
+            unknownFields={run.interpretation.unknownFields}
+            attributions={run.attributions}
+            chosenRouteType={chosenRoute}
+            onChoose={setChosenRoute}
+          />
+          <div className="flex gap-3 items-center">
+            <Button
+              type="button"
+              disabled={Boolean(savedRunId)}
+              onClick={() => {
+                const save = saveRun ?? defaultSaveRun
+                void save(run).then((saved) => setSavedRunId(saved.id)).catch(() => setError({
+                  code: 'save_failed', message: 'Could not save this result. It is still on screen.',
+                }))
+              }}
+              data-testid="save-run-button"
+            >
+              {savedRunId ? 'Saved' : 'Save this result'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={reset} data-testid="result-reset-button">Start a new brief</Button>
+            <span className="text-xs text-bh-text-dim" data-testid="result-charge">
+              Charged {run.settledUnits} credits.
+            </span>
+          </div>
         </div>
       )}
     </div>
   )
 }
 
-function DemoResultLanes({ run }: { run: SolutionRun }) {
+function LockedShell({ testId, title, children }: { testId: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="grid gap-4 sm:grid-cols-3" data-testid="demo-result-lanes">
-      {run.routes.map((route) => (
-        <div
-          key={route.routeType}
-          className="card p-4 border border-bh-border/60 rounded-xl flex flex-col gap-2"
-          data-testid={`route-${route.routeType}`}
-          data-status={route.status}
-        >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs uppercase tracking-wider text-bh-text-dim">{ROUTE_TYPE_LABELS[route.routeType]}</span>
-            <span className="badge" data-testid={`route-${route.routeType}-preview-label`}>Preview</span>
-          </div>
-          <div>
-            <span
-              className={
-                route.status === 'recommended' ? 'text-xs font-semibold text-bh-success'
-                  : route.status === 'available' ? 'text-xs font-semibold text-bh-text-muted'
-                    : 'text-xs font-semibold text-bh-text-dim'
-              }
-            >
-              {route.status === 'recommended' ? 'Recommended' : route.status === 'available' ? 'Available' : 'Unavailable'}
-            </span>
-          </div>
-          {route.status === 'unavailable' || !route.estimate ? (
-            <p className="text-sm text-bh-text-muted" data-testid={`route-${route.routeType}-unavailable-reason`}>{route.unavailableReason}</p>
-          ) : (
-            <>
-              <p className="text-sm font-medium">{route.summary}</p>
-              <p className="text-xs text-bh-text-muted">
-                ${(route.estimate.costMinCents / 100).toFixed(0)}–${(route.estimate.costMaxCents / 100).toFixed(0)} · {route.estimate.timeMinHours}–{route.estimate.timeMaxHours}h
-              </p>
-            </>
-          )}
-        </div>
-      ))}
+    <div className="container py-12 max-w-3xl" data-testid={testId}>
+      <div className="card p-8 border border-bh-border/60 bg-bh-surface rounded-2xl text-center">
+        <Lock className="w-8 h-8 text-bh-accent mx-auto mb-4" aria-hidden="true" />
+        <h1 className="text-2xl font-bold mb-2">{title}</h1>
+        {children}
+      </div>
     </div>
   )
+}
+
+/**
+ * Each refusal leads somewhere different.
+ *
+ * A disabled feature has no remedy the user can buy, `tier_too_low` means upgrade, and `insufficient_credits`
+ * means a credit pack. Collapsing them into "unavailable" sends everyone to the pricing page, including the
+ * people an upgrade cannot help.
+ */
+function BlockedMessage({ reason, balanceUnits }: { reason: string; balanceUnits: number }) {
+  if (reason === 'feature_disabled') {
+    return <span>Solutions generation is switched off for now. Nothing you can do here — we will turn it on.</span>
+  }
+  if (reason === 'insufficient_credits') {
+    return <span>Not enough credits: you have {balanceUnits}. Top up to generate a solution.</span>
+  }
+  if (reason === 'tier_too_low' || reason === 'no_subscription') {
+    return <span>Solutions needs an active Pro, Pro Max, or Team plan.</span>
+  }
+  return <span>Solutions is unavailable right now.</span>
+}
+
+function stageLabel(stage?: string): string {
+  switch (stage) {
+    case 'interpreting': return 'Reading your brief…'
+    case 'retrieving': return 'Searching people and tools…'
+    case 'composing': return 'Building the three routes…'
+    case 'explaining': return 'Writing the explanations…'
+    case 'done': return 'Finishing up…'
+    default: return 'Starting…'
+  }
+}
+
+function newIdempotencyKey(): string {
+  return `sol-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+const defaultFetchEntitlement = (): Promise<{ paidActionsAllowed: boolean; staleSession?: boolean }> =>
+  fetch('/api/billing/summary', { credentials: 'include' }).then((response) => {
+    if (response.status === 401) return { paidActionsAllowed: false, staleSession: true }
+    if (!response.ok) return { paidActionsAllowed: false }
+    return response.json().then((data: { capabilities?: { paidActionsAllowed?: boolean } }) => ({
+      paidActionsAllowed: Boolean(data.capabilities?.paidActionsAllowed),
+    }))
+  })
+
+const defaultFetchBillingState = (): Promise<BillingStateDto | null> =>
+  fetch('/api/solutions/billing-state', { credentials: 'include' })
+    .then((response) => (response.ok ? response.json() : null))
+
+const defaultSaveRun = (run: GeneratedRunDto): Promise<{ id: string }> =>
+  fetch('/api/solutions/runs', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      brief: run.brief,
+      rankingMode: (run.brief as { rankingMode?: string }).rankingMode ?? 'recommended',
+      retrievalQueryHash: run.trace.retrievalQueryHash,
+      compositionHash: run.trace.compositionHash,
+      composerVersion: run.trace.composerVersion,
+      interpretPromptVersion: run.interpretation.promptVersion,
+      warnings: run.warnings,
+      routes: run.routes.map((route, index) => ({
+        route,
+        explanationProvenance: run.routeExplanations[index]?.provenance ?? 'deterministic',
+        explanationFallbackReason: run.routeExplanations[index]?.fallbackReason ?? null,
+      })),
+    }),
+  }).then((response) => {
+    if (!response.ok) throw new Error('save failed')
+    return response.json()
+  })
+
+/**
+ * Reads the SSE stream by hand rather than with `EventSource`.
+ *
+ * `EventSource` cannot POST, and the request carries a brief, a confirmation, and an idempotency key — none of
+ * which belong in a URL. Parsing is a two-line split because the server writes exactly one `event:`/`data:` pair
+ * per message and nothing else.
+ */
+const defaultRunGeneration: NonNullable<SolutionsPageProps['runGeneration']> = async (input) => {
+  const response = await fetch('/api/solutions/generate', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'content-type': 'application/json' },
+    signal: input.signal,
+    body: JSON.stringify({
+      briefText: input.briefText,
+      confirmation: input.confirmation,
+      idempotencyKey: input.idempotencyKey,
+      ...(input.clarification ? { clarification: input.clarification } : {}),
+    }),
+  })
+
+  if (!response.ok || !response.body) {
+    const payload = await response.json().catch(() => ({ error: 'Generation failed' }))
+    input.onEvent({ event: 'error', data: { code: 'request_failed', message: String(payload.error ?? 'Generation failed') } })
+    return
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const messages = buffer.split('\n\n')
+    // The tail may be a partial message; keep it for the next chunk.
+    buffer = messages.pop() ?? ''
+    for (const message of messages) {
+      const eventLine = message.split('\n').find((line) => line.startsWith('event: '))
+      const dataLine = message.split('\n').find((line) => line.startsWith('data: '))
+      if (!eventLine || !dataLine) continue
+      try {
+        input.onEvent({
+          event: eventLine.slice(7).trim(),
+          data: JSON.parse(dataLine.slice(6)),
+        } as StreamEvent)
+      } catch {
+        // A malformed frame is dropped rather than aborting the stream: the terminal event may still arrive,
+        // and killing the run over one unparsable progress tick would lose a result the user paid for.
+      }
+    }
+  }
 }

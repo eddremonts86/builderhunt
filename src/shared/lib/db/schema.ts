@@ -3848,3 +3848,145 @@ export const solutionCompatibilityEdges = pgTable(
     index('solution_edges_review_queue_idx').on(table.status, table.createdAt),
   ],
 )
+
+// --- Saved briefs, runs, and feedback (plan 43 Phase 8, "Persist explicit briefs, runs, and feedback") ---
+//
+// Tenant-private, unlike everything above. The catalog is a public fact about public things; what an
+// organization asked for, and what it was told, is theirs. So these four carry `organization_id`, RLS, and
+// per-role grants, and nothing here is ever exposed on a public surface.
+//
+// Two rules shape the columns:
+//
+// - **Explicit save only.** spec.md: "Nothing is saved until you explicitly save a result." A generation does
+//   not write a row; a user pressing save does. That is why `solution_runs.brief_id` is nullable — a run of an
+//   unsaved brief is savable on its own, and forcing a brief row first would save something nobody asked to
+//   keep.
+// - **No transient chat.** The clarification question and the user's answer are deliberately absent. They are
+//   a conversation, not a record, and the brief they produced is what matters. `brief_snapshot` holds the
+//   structured brief the run was actually composed from, which is also what makes the run immutable: editing
+//   the saved brief afterwards cannot retroactively change what a stored recommendation was based on.
+
+export const solutionBriefs = pgTable(
+  'solution_briefs',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    /** Who saved it. `set null` so a departing member does not take the team's briefs with them. */
+    createdByUserId: text('created_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    title: text('title').notNull(),
+    /** A validated `SolutionBrief`. Stored whole because the composer consumes it whole, and splitting it into
+     * columns would let a row exist that `solutionBriefSchema` would reject. */
+    brief: jsonb('brief').$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_briefs_title_length_check', sql`char_length(${table.title}) between 1 and 200`),
+    index('solution_briefs_org_idx').on(table.organizationId, table.createdAt),
+  ],
+)
+
+export const solutionRuns = pgTable(
+  'solution_runs',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    /** Null when the run was saved without saving its brief. Cascades: erasing a brief erases what it produced. */
+    briefId: text('brief_id').references(() => solutionBriefs.id, { onDelete: 'cascade' }),
+    createdByUserId: text('created_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    /** The exact brief this run was composed from. Immutability lives here. */
+    briefSnapshot: jsonb('brief_snapshot').$type<Record<string, unknown>>().notNull(),
+    rankingMode: text('ranking_mode').notNull(),
+    /** Reproducibility trace. Same brief and same catalog must produce the same hashes. */
+    retrievalQueryHash: text('retrieval_query_hash').notNull(),
+    compositionHash: text('composition_hash').notNull(),
+    composerVersion: text('composer_version').notNull(),
+    /** Null when a run answered deterministically — which is a fact worth recording, not a missing value. */
+    interpretPromptVersion: text('interpret_prompt_version'),
+    explainPromptVersion: text('explain_prompt_version'),
+    /** What the routes cited, denormalized so an audit does not have to reassemble it from the route rows. */
+    componentVersionIds: text('component_version_ids').array().$type<string[]>().default([]).notNull(),
+    evidenceIds: text('evidence_ids').array().$type<string[]>().default([]).notNull(),
+    /** Per-source freshness at generation time. A stale answer must be able to say which source was stale. */
+    sourceStatuses: jsonb('source_statuses').$type<unknown[]>().default([]).notNull(),
+    warnings: jsonb('warnings').$type<string[]>().default([]).notNull(),
+    /** The reservation this run was charged against, so a disputed charge resolves to a stored result. */
+    creditReservationId: text('credit_reservation_id'),
+    creditSettledUnits: integer('credit_settled_units'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_runs_ranking_mode_check', sql`${table.rankingMode} in ('recommended', 'maximum_quality', 'lower_cost_time')`),
+    check('solution_runs_settled_units_check', sql`${table.creditSettledUnits} is null or ${table.creditSettledUnits} >= 0`),
+    /** A settlement without the reservation it belongs to cannot be reconciled against billing. */
+    check(
+      'solution_runs_settlement_needs_reservation_check',
+      sql`${table.creditSettledUnits} is null or ${table.creditReservationId} is not null`,
+    ),
+    index('solution_runs_org_idx').on(table.organizationId, table.createdAt),
+    index('solution_runs_brief_idx').on(table.briefId),
+  ],
+)
+
+export const solutionRunRoutes = pgTable(
+  'solution_run_routes',
+  {
+    runId: text('run_id').notNull().references(() => solutionRuns.id, { onDelete: 'cascade' }),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    routeType: text('route_type').notNull(),
+    /** A validated `SolutionRoute`, whole, for the same reason as `brief`. */
+    route: jsonb('route').$type<Record<string, unknown>>().notNull(),
+    status: text('status').notNull(),
+    /**
+     * Whether the prose was written by a model or by the deterministic composer.
+     *
+     * Stored rather than inferred, because a reader is owed the difference and it is not recoverable from the
+     * text. A `deterministic` route is not a degraded one — the composer's sentences are the most defensible
+     * description of a route that exists — but a run whose every route fell back says something about the day
+     * it ran, and only this column can say it later.
+     */
+    explanationProvenance: text('explanation_provenance').notNull(),
+    explanationFallbackReason: text('explanation_fallback_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.runId, table.routeType] }),
+    check('solution_run_routes_type_check', sql`${table.routeType} in ('human', 'ai', 'hybrid')`),
+    check('solution_run_routes_status_check', sql`${table.status} in ('recommended', 'available', 'unavailable')`),
+    check('solution_run_routes_provenance_check', sql`${table.explanationProvenance} in ('model', 'deterministic')`),
+    /** A model-written explanation has no fallback reason, and a deterministic one always does. */
+    check(
+      'solution_run_routes_fallback_reason_check',
+      sql`(${table.explanationProvenance} = 'model' and ${table.explanationFallbackReason} is null)
+        or (${table.explanationProvenance} = 'deterministic' and ${table.explanationFallbackReason} is not null)`,
+    ),
+    index('solution_run_routes_org_idx').on(table.organizationId),
+  ],
+)
+
+export const solutionRunFeedback = pgTable(
+  'solution_run_feedback',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id').notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+    runId: text('run_id').notNull().references(() => solutionRuns.id, { onDelete: 'cascade' }),
+    routeType: text('route_type').notNull(),
+    createdByUserId: text('created_by_user_id').references(() => authUsers.id, { onDelete: 'set null' }),
+    /** Whether this is the route they went with. The only signal Phase 9's evaluation can trust, because it is
+     * the only one attached to a decision rather than an opinion. */
+    chosen: boolean('chosen').notNull(),
+    reason: text('reason'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check('solution_run_feedback_route_type_check', sql`${table.routeType} in ('human', 'ai', 'hybrid')`),
+    /** Bounded, matching `solutionFeedbackSchema`. Free text in an evaluation corpus grows without limit
+     * otherwise, and a 500-character ceiling is the contract's own. */
+    check('solution_run_feedback_reason_length_check', sql`${table.reason} is null or char_length(${table.reason}) <= 500`),
+    /** One opinion per person per route. Without it, a single user could weight the evaluation corpus by
+     * clicking repeatedly. */
+    uniqueIndex('solution_run_feedback_one_per_user_route').on(table.runId, table.routeType, table.createdByUserId),
+    index('solution_run_feedback_org_idx').on(table.organizationId, table.createdAt),
+  ],
+)

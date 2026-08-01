@@ -73,6 +73,14 @@ const classifications: Classification[] = [
   global('solution_component_capabilities', ['component_id', 'component_version', 'capability_key', 'evidence_level'], ['solutions-intelligence']),
   global('solution_evidence', ['id', 'source_key', 'component_id', 'kind', 'source_url', 'observed_at', 'expires_at'], ['solutions-intelligence']),
   global('solution_compatibility_edges', ['id', 'version', 'edge_type', 'from_component_id', 'to_component_id', 'status', 'valid_from', 'valid_until'], ['solutions-intelligence']),
+  // Saved briefs, runs, and feedback (plan 43 Phase 8). The first tenant-private tables in this module, and the
+  // line is the one the rest of the module draws: the catalog is a public fact about a public thing, while what
+  // an organization asked for and what it was told belongs to that organization. `solution_runs` and
+  // `solution_run_routes` carry no UPDATE grant — a stored recommendation is a record, not a document.
+  tenant('solution_briefs', 'organization_id + created_by_user_id', ['solutions-intelligence'], { organizationColumn: true }),
+  tenant('solution_runs', 'organization_id (immutable: SELECT/INSERT/DELETE only)', ['solutions-intelligence'], { organizationColumn: true }),
+  tenant('solution_run_routes', 'organization_id + run_id (immutable: SELECT/INSERT/DELETE only)', ['solutions-intelligence'], { organizationColumn: true }),
+  tenant('solution_run_feedback', 'organization_id + run_id + created_by_user_id', ['solutions-intelligence'], { organizationColumn: true }),
   global('canonical_humans', ['id', 'display_name', 'headline', 'country', 'language'], ['solutions-intelligence']),
   global('human_source_links', ['canonical_human_id', 'builder_identity_id', 'link_method', 'review_state', 'valid_from', 'valid_until'], ['solutions-intelligence']),
   operational('human_merge_events', 'target_canonical_human_id', ['solutions-intelligence']),

@@ -592,3 +592,124 @@ export async function findCandidateComponents(
   }
   return [...byComponent.values()]
 }
+
+/**
+ * The catalog's own claims for a set of `componentId@version` evidence ids (plan 43 Phase 8).
+ *
+ * These are what a route explanation is allowed to cite, and nothing else — `explainRoute` is handed the
+ * snippets for its own components so there is no adjacent claim it could reach for.
+ *
+ * The id shape is the composer's: `${componentId}@${version}`. It is not a `solution_evidence.id`, and the
+ * difference matters. A route cites the *component version* it recommends, which is stable and resolvable; a
+ * single evidence row is one observation behind one claim, and citing it would make an explanation's citations
+ * narrower than the recommendation they support.
+ */
+export interface ComponentClaimSnippet {
+  evidenceId: string
+  displayName: string
+  claim: string
+  evidenceLevel: CapabilityEvidenceLevel
+}
+
+export async function listComponentClaimSnippets(
+  evidenceIds: readonly string[],
+  db: PostgresJsDatabase = publicDb,
+): Promise<ComponentClaimSnippet[]> {
+  const parsed = evidenceIds
+    .map((id) => {
+      const at = id.lastIndexOf('@')
+      if (at <= 0) return null
+      const version = Number(id.slice(at + 1))
+      return Number.isInteger(version) ? { componentId: id.slice(0, at), version } : null
+    })
+    .filter((entry): entry is { componentId: string; version: number } => entry !== null)
+  if (parsed.length === 0) return []
+
+  const rows = await db
+    .select({
+      componentId: solutionComponentCapabilities.componentId,
+      version: solutionComponentCapabilities.componentVersion,
+      capabilityKey: solutionComponentCapabilities.capabilityKey,
+      evidenceLevel: solutionComponentCapabilities.evidenceLevel,
+      displayName: solutionComponents.displayName,
+    })
+    .from(solutionComponentCapabilities)
+    .innerJoin(solutionComponents, eq(solutionComponents.id, solutionComponentCapabilities.componentId))
+    .where(inArray(solutionComponentCapabilities.componentId, parsed.map((entry) => entry.componentId)))
+    .orderBy(asc(solutionComponentCapabilities.componentId), asc(solutionComponentCapabilities.capabilityKey))
+
+  const wanted = new Set(parsed.map((entry) => `${entry.componentId}@${entry.version}`))
+  const byEvidenceId = new Map<string, ComponentClaimSnippet>()
+  for (const row of rows) {
+    const evidenceId = `${row.componentId}@${row.version}`
+    if (!wanted.has(evidenceId)) continue
+    const existing = byEvidenceId.get(evidenceId)
+    const claim = `${row.capabilityKey.replace(/_/g, ' ')} (${row.evidenceLevel})`
+    if (existing) {
+      existing.claim = `${existing.claim}; ${claim}`
+      // The weakest level any of the folded claims carries. A component with one verified and one merely claimed
+      // capability must not be presented as verified — the explanation quotes this level directly.
+      if (evidenceRankFor(row.evidenceLevel) < evidenceRankFor(existing.evidenceLevel)) {
+        existing.evidenceLevel = row.evidenceLevel as CapabilityEvidenceLevel
+      }
+    } else {
+      byEvidenceId.set(evidenceId, {
+        evidenceId,
+        displayName: row.displayName,
+        claim,
+        evidenceLevel: row.evidenceLevel as CapabilityEvidenceLevel,
+      })
+    }
+  }
+  return [...byEvidenceId.values()]
+}
+
+const EVIDENCE_ORDER: readonly string[] = ['claimed', 'observed', 'verified', 'production_evidence']
+function evidenceRankFor(level: string): number {
+  const index = EVIDENCE_ORDER.indexOf(level)
+  return index < 0 ? 0 : index
+}
+
+/**
+ * The attribution obligations a set of cited components carries (plan 43 Phase 8).
+ *
+ * **A release blocker, not a nicety.** `remoteok_jobs` and `jobicy_jobs` grant access on the condition that
+ * their attribution is displayed, recorded verbatim in `solution_sources.attribution_text` when those sources
+ * were registered (migration 0132). A surface that shows their data without the notice loses the access — so
+ * this is derived from the same rows the composer drew on, rather than hard-coded into a component where it
+ * could drift out of step with which sources a run actually used.
+ *
+ * Returns one entry per source, not per component: three postings from one feed are one obligation.
+ */
+export interface SourceAttribution {
+  sourceKey: string
+  text: string
+  url: string
+}
+
+export async function listAttributionsForEvidence(
+  evidenceIds: readonly string[],
+  db: PostgresJsDatabase = publicDb,
+): Promise<SourceAttribution[]> {
+  const componentIds = [...new Set(evidenceIds
+    .map((id) => (id.lastIndexOf('@') > 0 ? id.slice(0, id.lastIndexOf('@')) : null))
+    .filter((id): id is string => id !== null))]
+  if (componentIds.length === 0) return []
+
+  const rows = await db
+    .select({
+      sourceKey: solutionSources.key,
+      attributionRequired: solutionSources.attributionRequired,
+      attributionText: solutionSources.attributionText,
+      attributionUrl: solutionSources.attributionUrl,
+    })
+    .from(solutionComponents)
+    .innerJoin(solutionSources, eq(solutionSources.key, solutionComponents.sourceKey))
+    .where(inArray(solutionComponents.id, componentIds))
+    .groupBy(solutionSources.key, solutionSources.attributionRequired, solutionSources.attributionText, solutionSources.attributionUrl)
+
+  return rows
+    .filter((row) => row.attributionRequired && row.attributionText && row.attributionUrl)
+    .map((row) => ({ sourceKey: row.sourceKey, text: row.attributionText!, url: row.attributionUrl! }))
+    .sort((a, b) => (a.sourceKey < b.sourceKey ? -1 : 1))
+}

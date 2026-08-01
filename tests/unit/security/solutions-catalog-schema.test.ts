@@ -242,14 +242,39 @@ describe('the source register is the kill switch', () => {
 
 describe('no tenant data, and no request-scoped writes', () => {
   it('has no organization_id column on any catalog table', async () => {
+    /**
+     * The `solution_*` prefix stopped meaning "catalog" in plan 43 Phase 8: `solution_briefs`,
+     * `solution_runs`, `solution_run_routes` and `solution_run_feedback` are tenant-private by design — what an
+     * organization asked for, and what it was told, is theirs. So the four are named here rather than the
+     * invariant being weakened to a prefix match that would pass for anything.
+     *
+     * The invariant itself is unchanged and still the important one: a *catalog* fact is not a tenant's
+     * property. If `solution_components` or `solution_evidence` grew an organization column, the separation
+     * between "what exists" and "what we privately think of it" would quietly collapse.
+     */
+    const TENANT_OWNED = ['solution_briefs', 'solution_runs', 'solution_run_routes', 'solution_run_feedback']
     const rows = await db.execute<{ offender: string }>(sql`
       select table_name || '.' || column_name as offender
       from information_schema.columns
       where table_schema = 'public' and table_name like 'solution\\_%' and column_name = 'organization_id'
+        and table_name <> all(${sql.raw(`array['${TENANT_OWNED.join("','")}']`)})
     `)
-    // A catalog fact is not a tenant's property. If one of these grew an organization column, the
-    // separation between "what exists" and "what we privately think of it" would quietly collapse.
     expect([...rows].map((r) => r.offender)).toEqual([])
+  })
+
+  it('keeps every tenant-owned Solutions table behind RLS', async () => {
+    // The other half of the same rule: the four tables that *do* carry an organization column must all have RLS
+    // enabled and forced. A tenant table without RLS is worse than a catalog table with an organization column.
+    const rows = await db.execute<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(sql`
+      select relname, relrowsecurity, relforcerowsecurity from pg_class
+      where relname in ('solution_briefs', 'solution_runs', 'solution_run_routes', 'solution_run_feedback')
+        and relkind = 'r'
+    `)
+    expect([...rows]).toHaveLength(4)
+    for (const row of rows) {
+      expect(row.relrowsecurity, `${row.relname} has RLS disabled`).toBe(true)
+      expect(row.relforcerowsecurity, `${row.relname} does not force RLS`).toBe(true)
+    }
   })
 
   it.each([

@@ -105,6 +105,33 @@ try {
       ('list-b', 'org-b', 'user-b', 'List B', null, 'private', 1, now(), now())
     on conflict (id) do nothing
   `
+  // Saved Solutions briefs and runs (plan 43 Phase 8). Seeded per tenant so the isolation checks in
+  // verify-rls-local.mjs have a row on each side — the point of the run rows is the *absence* of an UPDATE
+  // grant, which is only checkable against a row that exists.
+  await owner`
+    insert into solution_briefs (id, organization_id, created_by_user_id, title, brief, created_at, updated_at)
+    values
+      ('solution-brief-a', 'org-a', 'user-a', 'Brief A', '{"capabilities":["translation"]}'::jsonb, now(), now()),
+      ('solution-brief-b', 'org-b', 'user-b', 'Brief B', '{"capabilities":["translation"]}'::jsonb, now(), now())
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into solution_runs (
+      id, organization_id, brief_id, created_by_user_id, brief_snapshot, ranking_mode,
+      retrieval_query_hash, composition_hash, composer_version, created_at
+    ) values
+      ('solution-run-a', 'org-a', 'solution-brief-a', 'user-a', '{"capabilities":["translation"]}'::jsonb, 'recommended', 'hash-a', 'comp-a', 'composer-1', now()),
+      ('solution-run-b', 'org-b', 'solution-brief-b', 'user-b', '{"capabilities":["translation"]}'::jsonb, 'recommended', 'hash-b', 'comp-b', 'composer-1', now())
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into solution_run_routes (
+      run_id, organization_id, route_type, route, status, explanation_provenance, created_at
+    ) values
+      ('solution-run-a', 'org-a', 'ai', '{"routeType":"ai"}'::jsonb, 'available', 'model', now()),
+      ('solution-run-b', 'org-b', 'ai', '{"routeType":"ai"}'::jsonb, 'available', 'model', now())
+    on conflict (run_id, route_type) do nothing
+  `
   await owner`
     insert into builder_claims (
       id, builder_identity_id, subject_user_id, evidence_source, evidence_reference, status, created_at
