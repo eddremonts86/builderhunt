@@ -227,6 +227,7 @@ export async function listItemsForList(
       displayName: builderIdentities.displayName,
       avatarUrl: builderIdentities.avatarUrl,
       source: builderIdentities.source,
+      sourceId: builderIdentities.sourceId,
       profileUrl: builderIdentities.profileUrl,
     })
     .from(builderListItems)

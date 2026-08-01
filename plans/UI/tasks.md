@@ -239,7 +239,7 @@
   - Do: In authenticated surfaces, offer Billing settings as the primary action and Pricing details as secondary; preserve intended return path after checkout/sign-in.
   - Verify: Free, Pro, Pro Max, Team, past-due, and stale-session states expose only valid actions.
 
-- [ ] **Build a scoped Export Center and reconcile public claims**
+- [x] **Build a scoped Export Center and reconcile public claims**
   - Files: `src/modules/dashboard/components/ExportsPage.tsx`, `src/routes/api/export/builders.ts`, `src/routes/__root.tsx`, `src/routes/_landing/index.tsx`, `tests/e2e/exports.spec.ts`, `tests/e2e/public-content.spec.ts`
   - Do: Support explicit authorized scope (all tracked, one shortlist, saved-search results, or note collection) and CSV/JSON with bounded generation, progress/error, and permission copy. Until a scope/format is implemented, remove it from Home, FAQ, structured metadata, and product copy.
   - Verify: every advertised scope-format pair downloads valid bounded data; foreign/private scopes fail; a copy-contract test fails when public claims exceed the capability registry.

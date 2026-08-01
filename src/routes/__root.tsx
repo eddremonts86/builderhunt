@@ -133,7 +133,8 @@ export const Route = createRootRoute({
             // Deliberately no review-rating field here — BuilderHunt has no
             // review corpus to report, and an unsourced number is exactly
             // the kind of runtime-unbacked structured-data claim this app
-            // must not publish. See src/modules/landing/components/trust-claims.test.ts.
+            // must not publish. See tests/unit/modules/landing/components/trust-claims.test.ts,
+            // which also checks featureList's export claim against the real capability registry.
           },
           {
             '@context': 'https://schema.org',

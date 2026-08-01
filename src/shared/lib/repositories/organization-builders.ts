@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, count, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, count, desc, eq, gte, inArray, sql } from 'drizzle-orm'
 import type { TenantTransaction } from '../db/client'
 import {
   builderIdentities,
@@ -71,6 +71,26 @@ export function listOrganizationBuilders(transaction: TenantTransaction, organiz
     .from(organizationBuilders)
     .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
     .where(eq(organizationBuilders.organizationId, organizationId))
+    .orderBy(desc(builderIdentities.lastSeenAt))
+}
+
+/**
+ * Tracked builders this org has attached at least one private note to (plans/UI/tasks.md Wave 6
+ * "Build a scoped Export Center" — the "note collection" export scope). `builder_notes.builderId`
+ * stores an `organization_builders.id` — the same id space `resolveOrganizationBuilderId` resolves
+ * to and `listOrganizationBuilders` selects as `id` above — never the legacy `builders` table's own
+ * id, which nothing in this codebase writes to anymore.
+ */
+export async function listNotedOrganizationBuilders(transaction: TenantTransaction, organizationId: string) {
+  const noted = await transaction.selectDistinct({ builderId: builderNotes.builderId })
+    .from(builderNotes)
+    .where(eq(builderNotes.organizationId, organizationId))
+  if (noted.length === 0) return []
+  const ids = noted.map((row) => row.builderId)
+  return transaction.select(privateBuilderFields)
+    .from(organizationBuilders)
+    .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
+    .where(and(eq(organizationBuilders.organizationId, organizationId), inArray(organizationBuilders.id, ids)))
     .orderBy(desc(builderIdentities.lastSeenAt))
 }
 

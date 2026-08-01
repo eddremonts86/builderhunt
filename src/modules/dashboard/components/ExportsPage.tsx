@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { Download, Bookmark, Trash2, ExternalLink, Search } from 'lucide-react'
-import { Button, LinkButton, LinkComponent, ScoreRing } from '~/components/ui'
+import { Button, LinkButton, LinkComponent, ScoreRing, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '~/components/ui'
 import { StyleMatchPanel } from '~/modules/dashboard/components/StyleMatchPanel'
+import { EXPORT_FORMATS, EXPORT_SCOPE_DEFINITIONS, EXPORT_SCOPES, type ExportFormat, type ExportScope } from '~/shared/lib/exports/capability-registry'
 
 interface TrackedBuilder {
   id: string
@@ -15,12 +16,23 @@ interface TrackedBuilder {
   lastSeen: string | null
 }
 
+interface NamedResource {
+  id: string
+  name: string
+}
+
 export function ExportsPage() {
   const [builders, setBuilders] = React.useState<TrackedBuilder[] | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [removingId, setRemovingId] = React.useState<string | null>(null)
   const [downloading, setDownloading] = React.useState(false)
   const [downloadMsg, setDownloadMsg] = React.useState<string | null>(null)
+  const [scope, setScope] = React.useState<ExportScope>('all')
+  const [format, setFormat] = React.useState<ExportFormat>('csv')
+  const [listId, setListId] = React.useState<string | null>(null)
+  const [savedQueryId, setSavedQueryId] = React.useState<string | null>(null)
+  const [lists, setLists] = React.useState<NamedResource[] | null>(null)
+  const [savedQueries, setSavedQueries] = React.useState<NamedResource[] | null>(null)
 
   React.useEffect(() => {
     fetch('/api/me/builders', { credentials: 'include' })
@@ -31,6 +43,28 @@ export function ExportsPage() {
       .then((data: TrackedBuilder[]) => setBuilders(data))
       .catch(() => setError('Failed to load your tracked builders.'))
   }, [])
+
+  // Loaded once, lazily — most visitors export "all tracked" and never open these pickers.
+  React.useEffect(() => {
+    if (scope === 'list' && lists === null) {
+      fetch('/api/lists', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data: NamedResource[]) => {
+          setLists(data)
+          if (data.length > 0 && !listId) setListId(data[0].id)
+        })
+        .catch(() => setLists([]))
+    }
+    if (scope === 'saved-search' && savedQueries === null) {
+      fetch('/api/queries', { credentials: 'include' })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data: NamedResource[]) => {
+          setSavedQueries(data)
+          if (data.length > 0 && !savedQueryId) setSavedQueryId(data[0].id)
+        })
+        .catch(() => setSavedQueries([]))
+    }
+  }, [scope, lists, savedQueries, listId, savedQueryId])
 
   const handleRemove = async (id: string) => {
     setRemovingId(id)
@@ -46,19 +80,38 @@ export function ExportsPage() {
   }
 
   const handleDownload = async () => {
+    if (scope === 'list' && !listId) {
+      setDownloadMsg('Choose a shortlist to export.')
+      return
+    }
+    if (scope === 'saved-search' && !savedQueryId) {
+      setDownloadMsg('Choose a saved search to export.')
+      return
+    }
     setDownloading(true)
     setDownloadMsg(null)
     try {
-      const res = await fetch('/api/export/builders', { credentials: 'include' })
+      const params = new URLSearchParams({ scope, format })
+      if (scope === 'list' && listId) params.set('listId', listId)
+      if (scope === 'saved-search' && savedQueryId) params.set('savedQueryId', savedQueryId)
+      const res = await fetch(`/api/export/builders?${params}`, { credentials: 'include' })
       if (!res.ok) {
-        setDownloadMsg('Please sign in to download your builders.')
+        if (res.status === 404) {
+          setDownloadMsg("That shortlist or saved search isn't visible to you — it may have been deleted or belongs to someone else.")
+        } else if (res.status === 401) {
+          setDownloadMsg('Please sign in to download your builders.')
+        } else if (res.status === 429) {
+          setDownloadMsg('Daily export limit reached for this seat. Try again tomorrow.')
+        } else {
+          setDownloadMsg('Download failed. Please try again.')
+        }
         return
       }
       const blob = await res.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = 'builders.csv'
+      a.download = `builders-${scope}.${format}`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -88,7 +141,7 @@ export function ExportsPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-bh-text mb-1">Exports</h1>
           <p className="text-bh-text-muted text-sm md:text-base">
-            Builders you've tracked from search, in one place — download the list as a CSV whenever you want.
+            Export all tracked builders, one shortlist, one saved search's results, or your noted builders — as CSV or JSON.
           </p>
         </div>
       </div>
@@ -108,53 +161,124 @@ export function ExportsPage() {
         </div>
       )}
 
-      {!loading && count === 0 && !error && (
-        <div className="card text-center py-14">
-          <div className="w-12 h-12 rounded-xl bg-bh-accent-soft flex items-center justify-center mx-auto mb-4">
-            <Bookmark className="w-6 h-6 text-bh-accent" />
-          </div>
-          <p className="font-semibold text-bh-text mb-1">No tracked builders yet</p>
-          <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-5">
-            Search for builders and click "Track" on the ones you want to keep — they'll show up here, ready to export.
-          </p>
-          <LinkButton to="/search" variant="primary" size="sm" className="inline-flex items-center gap-2">
-            <Search className="w-4 h-4" /> Track your first builder
-          </LinkButton>
-        </div>
-      )}
-
-      {!loading && count > 0 && (
+      {!loading && !error && (
         <>
-          {/* Toolbar: count + source mix + primary export action, all in one place */}
-          <div className="card mb-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-            <div className="flex-1 min-w-0">
-              <p className="text-2xl font-bold text-bh-text leading-none mb-1.5">
-                {count} <span className="text-base font-medium text-bh-text-muted">builder{count === 1 ? '' : 's'} tracked</span>
+          {/* Export Center (plans/UI/tasks.md Wave 6 "Build a scoped Export Center") — every
+              scope/format combination this card offers is real; see
+              ~/shared/lib/exports/capability-registry.ts. Available regardless of tracked-builder
+              count: a saved-search or notes export doesn't depend on "all tracked" being non-empty. */}
+          <div className="card mb-5 space-y-4" data-testid="export-center">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+              <div className="flex-1 min-w-0">
+                <label className="text-xs font-medium text-bh-text-dim block mb-1" htmlFor="export-scope">Scope</label>
+                <Select value={scope} onValueChange={(v) => setScope(v as ExportScope)}>
+                  <SelectTrigger id="export-scope" data-testid="export-scope-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_SCOPES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        {s === 'all' ? 'All tracked builders' : EXPORT_SCOPE_DEFINITIONS[s].label.replace(/^./, (c) => c.toUpperCase())}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {scope === 'list' && (
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-medium text-bh-text-dim block mb-1" htmlFor="export-list">Shortlist</label>
+                  {lists === null ? (
+                    <p className="text-sm text-bh-text-muted py-2">Loading shortlists…</p>
+                  ) : lists.length === 0 ? (
+                    <p className="text-sm text-bh-text-muted py-2">No shortlists yet.</p>
+                  ) : (
+                    <Select value={listId ?? undefined} onValueChange={setListId}>
+                      <SelectTrigger id="export-list" data-testid="export-list-select"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {lists.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              {scope === 'saved-search' && (
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-medium text-bh-text-dim block mb-1" htmlFor="export-saved-search">Saved search</label>
+                  {savedQueries === null ? (
+                    <p className="text-sm text-bh-text-muted py-2">Loading saved searches…</p>
+                  ) : savedQueries.length === 0 ? (
+                    <p className="text-sm text-bh-text-muted py-2">No saved searches yet.</p>
+                  ) : (
+                    <Select value={savedQueryId ?? undefined} onValueChange={setSavedQueryId}>
+                      <SelectTrigger id="export-saved-search" data-testid="export-saved-search-select"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {savedQueries.map((q) => <SelectItem key={q.id} value={q.id}>{q.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
+
+              <div className="w-full sm:w-32">
+                <label className="text-xs font-medium text-bh-text-dim block mb-1" htmlFor="export-format">Format</label>
+                <Select value={format} onValueChange={(v) => setFormat(v as ExportFormat)}>
+                  <SelectTrigger id="export-format" data-testid="export-format-select"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {EXPORT_FORMATS.map((f) => <SelectItem key={f} value={f}>{f.toUpperCase()}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                variant="primary"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 shrink-0"
+                data-testid="export-download-button"
+              >
+                {downloading ? <span className="spinner" /> : <Download className="w-4 h-4" />}
+                {downloading ? 'Preparing...' : 'Download'}
+              </Button>
+            </div>
+
+            {downloadMsg && <p className="text-sm text-bh-danger" data-testid="export-message">{downloadMsg}</p>}
+
+            <p className="text-xs text-bh-text-dim">
+              Exports only include what you can already see — a shortlist or saved search someone else marked private
+              won't appear here, and every download is capped at a bounded number of rows.
+            </p>
+          </div>
+
+          {count === 0 && (
+            <div className="card text-center py-14">
+              <div className="w-12 h-12 rounded-xl bg-bh-accent-soft flex items-center justify-center mx-auto mb-4">
+                <Bookmark className="w-6 h-6 text-bh-accent" />
+              </div>
+              <p className="font-semibold text-bh-text mb-1">No tracked builders yet</p>
+              <p className="text-sm text-bh-text-muted max-w-sm mx-auto mb-5">
+                Search for builders and click "Track" on the ones you want to keep — they'll show up here, ready to export.
               </p>
-              <div className="flex flex-wrap gap-1.5">
+              <LinkButton to="/search" variant="primary" size="sm" className="inline-flex items-center gap-2">
+                <Search className="w-4 h-4" /> Track your first builder
+              </LinkButton>
+            </div>
+          )}
+
+          {count > 0 && (
+            <>
+              <div className="card mb-5 flex items-center gap-1.5 flex-wrap">
+                <p className="text-sm font-medium text-bh-text-muted mr-2">
+                  {count} builder{count === 1 ? '' : 's'} tracked:
+                </p>
                 {sourceCounts.map(([source, n]) => (
                   <span key={source} className={`badge badge-${source}`}>
                     {source} · {n}
                   </span>
                 ))}
               </div>
-            </div>
-            <div className="sm:text-right shrink-0">
-              {downloadMsg && <p className="text-sm mb-2 text-bh-danger">{downloadMsg}</p>}
-              <Button
-                variant="primary"
-                onClick={handleDownload}
-                disabled={downloading}
-                className="w-full sm:w-auto flex items-center justify-center gap-2"
-              >
-                {downloading ? <span className="spinner" /> : <Download className="w-4 h-4" />}
-                {downloading ? 'Preparing...' : 'Download CSV'}
-              </Button>
-            </div>
-          </div>
 
-          <ul className="space-y-2" role="list">
-            {builders!.map((b) => (
+              <ul className="space-y-2" role="list">
+                {builders!.map((b) => (
               <li
                 key={b.id}
                 className="card card-hover p-3 flex items-center gap-3"
@@ -207,7 +331,9 @@ export function ExportsPage() {
                 </Button>
               </li>
             ))}
-          </ul>
+              </ul>
+            </>
+          )}
         </>
       )}
 
