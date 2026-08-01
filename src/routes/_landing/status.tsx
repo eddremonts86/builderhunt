@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock } from 'lucide-react'
+import { z } from 'zod'
+import { CheckCircle2, AlertTriangle, XCircle, Activity, Clock, Mail } from 'lucide-react'
 import { useSession } from '~/shared/lib/auth/client'
 import { DashboardLayout } from '~/modules/dashboard/ui/shell/DashboardLayout'
 import { TenantQueryProvider } from '~/shared/components/TenantQueryProvider'
@@ -16,19 +17,33 @@ interface Incident {
   resolvedAt: string | null
 }
 
+interface CheckResult {
+  name: string
+  ok: boolean
+  message?: string
+}
+
 interface StatusResponse {
   status: 'ok' | 'degraded'
   version: string
   uptime: number
   checks: {
-    db: { name: string; ok: boolean; message?: string }
-    redis: { name: string; ok: boolean; message?: string }
+    db: CheckResult
+    redis: CheckResult
+    memory: CheckResult
   }
   uptime30d: number | null
   timestamp: string
 }
 
+const StatusSearchSchema = z.object({
+  // Set only by the redirect from `GET /api/status/subscribe?remove=<token>` — never written by
+  // this page itself, so it can't be used to fake a result for a link the visitor never clicked.
+  unsubscribed: z.enum(['ok', 'invalid']).optional(),
+})
+
 export const Route = createFileRoute('/_landing/status')({
+  validateSearch: StatusSearchSchema,
   component: StatusPage,
 })
 
@@ -74,6 +89,7 @@ function StatusPage() {
   }, [load])
 
   const { data: session } = useSession()
+  const search = Route.useSearch()
   const allOk = status?.status === 'ok'
   const openIncidents = incidents.filter((i) => i.status !== 'resolved')
 
@@ -86,6 +102,22 @@ function StatusPage() {
         </h1>
         <p className="text-bh-text-muted text-base">Live status of BuilderHunt services and API latency.</p>
       </header>
+
+      {search.unsubscribed && (
+        <div
+          className={`card p-4 mb-6 border text-sm ${
+            search.unsubscribed === 'ok'
+              ? 'border-bh-success/30 bg-bh-success/5 text-bh-success'
+              : 'border-bh-danger/30 bg-bh-danger/5 text-bh-danger'
+          }`}
+          data-testid="unsubscribe-result"
+          role="status"
+        >
+          {search.unsubscribed === 'ok'
+            ? 'You have been unsubscribed from status updates.'
+            : 'That unsubscribe link is invalid or has already been used.'}
+        </div>
+      )}
 
       <div
         className={`card p-6 mb-8 border rounded-2xl shadow-sm ${
@@ -121,8 +153,7 @@ function StatusPage() {
             <>
               <ComponentRow name="Database (Postgres)" check={status.checks.db} />
               <ComponentRow name="Cache (Redis)" check={status.checks.redis} />
-              <ComponentRow name="Search" check={{ name: 'search', ok: true }} />
-              <ComponentRow name="API" check={{ name: 'api', ok: true }} />
+              <ComponentRow name="Memory" check={status.checks.memory} />
             </>
           ) : (
             <p className="text-sm text-bh-text-muted">Checking…</p>
@@ -162,11 +193,18 @@ function StatusPage() {
         )}
       </section>
 
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-bh-text-dim mb-3">
+          Get notified
+        </h2>
+        <SubscribeForm />
+      </section>
+
       <footer className="text-center text-xs text-bh-text-dim">
         <p>
-          Status data refreshes every 30s. Subscribe via{' '}
+          Status data refreshes every 30s. See the{' '}
           <Link to="/changelog" className="text-bh-accent hover:underline">changelog</Link>
-          {' '}or see the <Link to="/roadmap" className="text-bh-accent hover:underline">roadmap</Link>.
+          {' '}or the <Link to="/roadmap" className="text-bh-accent hover:underline">roadmap</Link>.
         </p>
       </footer>
     </div>
@@ -187,7 +225,89 @@ function StatusPage() {
   ) : content
 }
 
-function ComponentRow({ name, check }: { name: string; check: { name: string; ok: boolean; message?: string } }) {
+type SubscribeState =
+  | { kind: 'idle' }
+  | { kind: 'loading' }
+  | { kind: 'success' }
+  | { kind: 'rate_limited' }
+  | { kind: 'error'; message: string }
+
+export function SubscribeForm() {
+  const [email, setEmail] = React.useState('')
+  const [state, setState] = React.useState<SubscribeState>({ kind: 'idle' })
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setState({ kind: 'loading' })
+    try {
+      const res = await fetch('/api/status/subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      if (res.status === 429) {
+        setState({ kind: 'rate_limited' })
+        return
+      }
+      if (!res.ok) {
+        setState({ kind: 'error', message: 'Enter a valid email address.' })
+        return
+      }
+      // Deliberately ignore `alreadySubscribed` in the response — a new and an existing address
+      // must produce the exact same UI, or this page becomes an oracle for which emails are
+      // already subscribed.
+      setState({ kind: 'success' })
+    } catch {
+      setState({ kind: 'error', message: 'Network error. Please try again.' })
+    }
+  }
+
+  if (state.kind === 'success') {
+    return (
+      <p className="text-sm text-bh-success" role="status" data-testid="subscribe-success">
+        Check your email to confirm — we'll let you know about incidents and resolutions.
+      </p>
+    )
+  }
+
+  return (
+    <form onSubmit={submit} className="flex flex-col sm:flex-row gap-2 max-w-md" data-testid="subscribe-form">
+      <div className="flex-1">
+        <label htmlFor="status-subscribe-email" className="sr-only">Email address</label>
+        <input
+          id="status-subscribe-email"
+          type="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          disabled={state.kind === 'loading'}
+          className="w-full px-3 py-2 rounded-lg border border-bh-border bg-bh-surface text-sm text-bh-text"
+        />
+      </div>
+      <button
+        type="submit"
+        disabled={state.kind === 'loading' || !email}
+        className="px-4 py-2 rounded-lg bg-bh-accent text-white text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-1.5"
+      >
+        <Mail className="w-3.5 h-3.5" aria-hidden="true" />
+        {state.kind === 'loading' ? 'Subscribing…' : 'Subscribe'}
+      </button>
+      {state.kind === 'rate_limited' && (
+        <p className="text-xs text-bh-danger sm:basis-full" role="alert" data-testid="subscribe-rate-limited">
+          Too many attempts. Please try again later.
+        </p>
+      )}
+      {state.kind === 'error' && (
+        <p className="text-xs text-bh-danger sm:basis-full" role="alert" data-testid="subscribe-error">
+          {state.message}
+        </p>
+      )}
+    </form>
+  )
+}
+
+export function ComponentRow({ name, check }: { name: string; check: { name: string; ok: boolean; message?: string } }) {
   return (
     <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-bh-surface/40 border border-bh-border" data-testid={`status-row-${check.name}`}>
       <StatusIcon ok={check.ok} />

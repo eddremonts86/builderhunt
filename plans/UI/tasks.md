@@ -140,12 +140,12 @@
   - Do: Explain future-job cancellation and bounded evidence purge, require explicit confirmation, submit idempotently, and replace controls with a durable restricted state.
   - Verify: verified claimant restricts once and repeats safely; running work stops; non-claimant cannot observe or mutate the state.
 
-- [ ] **Render a real status subscription form**
+- [x] **Render a real status subscription form**
   - Files: `src/routes/_landing/status.tsx`, `src/routes/api/status/subscribe.ts`, `tests/unit/routes/status.test.tsx`, `tests/e2e/public-content.spec.ts`
   - Do: Replace “Subscribe via changelog” with email input, validation, uniform success copy, loading, rate-limit, generic error, and unsubscribe-result states; preserve public shell behavior for signed-in and signed-out users.
   - Verify: new and existing email return indistinguishable UI; mail fixture receives incident and resolution messages; unsubscribe stops later mail.
 
-- [ ] **Make Status render only real health checks**
+- [x] **Make Status render only real health checks**
   - Files: `src/routes/api/status/index.ts`, `src/routes/_landing/status.tsx`, `src/shared/lib/status.ts`, `tests/unit/routes/status.test.tsx`, `tests/e2e/public-content.spec.ts`
   - Do: Render the complete server-returned check set, including memory, with measured status and explanation. Remove hard-coded Search/API OK rows unless backend checks are implemented. Guarantee degraded overall state names a visible degraded/unknown component.
   - Verify: db, Redis, memory, partial-response, timeout, and all-healthy fixtures agree between overall and rows; no fake healthy component is rendered.

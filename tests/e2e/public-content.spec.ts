@@ -25,6 +25,7 @@ import {
   type FixtureContext,
   type Principal,
 } from './harness/fixtures/principals'
+import { createPlatformAdminPrincipal, registerPlatformAdminEnv, reservePlatformAdminSeed } from './harness/fixtures/platform-admin'
 import type { OrganizationFixture } from './harness/fixtures/organizations'
 import { seedConsent } from './harness/fixtures/privacy'
 import { uniqueId } from './harness/ids'
@@ -45,6 +46,7 @@ interface Harness {
   clock: FixedClock
   owner: Principal
   organization: OrganizationFixture
+  admin: Principal
 }
 
 let harness: Harness
@@ -58,6 +60,12 @@ test.beforeAll(async () => {
   const workerIndex = Number(process.env.TEST_PARALLEL_INDEX ?? '0')
   const database = await acquireWorkerDatabase(workerIndex)
   const cache = await acquireWorkerRedis(workerIndex)
+
+  // Reserved and allow-listed BEFORE the server spawns — the worker server
+  // inherits process.env, and there is no product flow to allow-list an id
+  // after the fact (see fixtures/platform-admin.ts).
+  const adminSeed = reservePlatformAdminSeed(`w${workerIndex}content`)
+  registerPlatformAdminEnv(adminSeed)
 
   let sql: Sql | undefined
   try {
@@ -77,6 +85,7 @@ test.beforeAll(async () => {
       version: 'v1.0',
       acceptedAt: clock.now(),
     })
+    const admin = await createPlatformAdminPrincipal(ctx, adminSeed)
 
     harness = {
       workerIndex,
@@ -88,6 +97,7 @@ test.beforeAll(async () => {
       clock,
       owner,
       organization,
+      admin,
     }
 
     // Warm the dev server's SSR compile pipeline before the first test —
@@ -115,6 +125,7 @@ test.afterAll(async () => {
   const h = harness
   if (!h) return
   await disposePrincipal(h.owner).catch(() => undefined)
+  await disposePrincipal(h.admin).catch(() => undefined)
   await h.sql.end({ timeout: 5 }).catch(() => undefined)
   await stopWorkerServer(h.workerIndex)
   const admin = postgres(e2eEnv().DATABASE_MIGRATION_URL, { max: 1, prepare: false })
@@ -517,6 +528,33 @@ async function seedIncident(
   return id
 }
 
+interface OutboxEmail {
+  to: string
+  subject: string
+  html: string
+  scenario?: string
+  sentAt: string
+}
+
+async function readServerOutbox(): Promise<OutboxEmail[]> {
+  const res = await fetch(`${harness.baseURL}/api/e2e/outbox`)
+  expect(res.ok).toBe(true)
+  const body = (await res.json()) as { emails: OutboxEmail[] }
+  return body.emails
+}
+
+async function clearServerOutbox(): Promise<void> {
+  const res = await fetch(`${harness.baseURL}/api/e2e/outbox`, { method: 'DELETE' })
+  expect(res.ok).toBe(true)
+}
+
+/** Extract the unsubscribe link the subscribe-confirmation email carries. */
+function unsubscribeLinkFrom(email: OutboxEmail): string {
+  const match = email.html.match(/href="([^"]+)"/)
+  expect(match, 'confirmation email carries an unsubscribe link').toBeTruthy()
+  return match![1]
+}
+
 test.describe('status page', () => {
   test('the status API reports db and redis health', async () => {
     const api = await newApiContext(harness.baseURL)
@@ -578,6 +616,12 @@ test.describe('status page', () => {
       await expect(page.getByTestId('status-overall')).toBeVisible()
       await expect(page.getByTestId('status-row-db')).toContainText('OK')
       await expect(page.getByTestId('status-row-redis')).toContainText('OK')
+      // Memory is a real, measured check now (plans/UI Wave 4 "Make Status render only real health
+      // checks") — it may read OK or DOWN depending on this process's own RSS, but it must render
+      // as a genuine row, never the old hard-coded-`ok: true` Search/API rows this replaced.
+      await expect(page.getByTestId('status-row-memory')).toBeVisible()
+      await expect(page.getByTestId('status-row-search')).toHaveCount(0)
+      await expect(page.getByTestId('status-row-api')).toHaveCount(0)
 
       // Open incident in "Active incidents", resolved one in "Past 30 days".
       await expect(page.getByTestId(`incident-${openId}`)).toBeVisible()
@@ -591,6 +635,103 @@ test.describe('status page', () => {
       await expect(statusPage.getByRole('link', { name: 'changelog' })).toHaveAttribute('href', '/changelog')
       await expect(statusPage.getByRole('link', { name: 'roadmap' })).toHaveAttribute('href', '/roadmap')
     })
+  })
+
+  test('subscribing shows a uniform success message for a new and a repeat address, and delivers a confirmation email', async ({ browser }) => {
+    await clearServerOutbox()
+    const email = `e2e-sub-${uniqueId('status-sub')}@e2e.test`
+
+    await withPage(browser, undefined, async (page, guard) => {
+      guard.allowExpectedFailure(/status of 503/)
+      await gotoHydrated(page, `${harness.baseURL}/status`)
+      const form = page.getByTestId('subscribe-form')
+      await form.locator('#status-subscribe-email').fill(email)
+      await form.getByRole('button', { name: 'Subscribe' }).click()
+      await expect(page.getByTestId('subscribe-success')).toBeVisible()
+    })
+
+    const [confirmation] = await readServerOutbox()
+    expect(confirmation?.to).toBe(email)
+    expect(confirmation?.scenario).toBe('status_subscribe_confirmation')
+    await clearServerOutbox()
+
+    // Repeat subscribe with the SAME address: an enumeration probe must see the identical success
+    // UI, not a different message revealing the address was already on the list.
+    await withPage(browser, undefined, async (page, guard) => {
+      guard.allowExpectedFailure(/status of 503/)
+      await gotoHydrated(page, `${harness.baseURL}/status`)
+      const form = page.getByTestId('subscribe-form')
+      await form.locator('#status-subscribe-email').fill(email)
+      await form.getByRole('button', { name: 'Subscribe' }).click()
+      await expect(page.getByTestId('subscribe-success')).toBeVisible()
+    })
+    // No second confirmation email — the repeat subscribe never re-sends the (single-use) token.
+    expect(await readServerOutbox()).toHaveLength(0)
+  })
+
+  test('the emailed unsubscribe link stops further mail, and clicking it again reports invalid', async ({ browser }) => {
+    await clearServerOutbox()
+    const email = `e2e-unsub-${uniqueId('status-sub')}@e2e.test`
+    const subscribeRes = await fetch(`${harness.baseURL}/api/status/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    expect(subscribeRes.ok).toBe(true)
+
+    const [confirmation] = await readServerOutbox()
+    const unsubscribeUrl = unsubscribeLinkFrom(confirmation)
+
+    await withPage(browser, undefined, async (page) => {
+      await page.goto(unsubscribeUrl)
+      await page.waitForURL(/\/status\?unsubscribed=ok/)
+      await expect(page.getByTestId('unsubscribe-result')).toContainText('unsubscribed')
+    })
+
+    const [subscriberRow] = await harness.sql<{ unsubscribed_at: Date | null }[]>`
+      select unsubscribed_at from status_subscribers where email_lower = ${email.toLowerCase()}
+    `
+    expect(subscriberRow?.unsubscribed_at).not.toBeNull()
+
+    // The same link again: the row is already unsubscribed, so this must report invalid rather
+    // than a second "ok" — the token is single-use, not idempotently re-clickable forever.
+    await withPage(browser, undefined, async (page) => {
+      await page.goto(unsubscribeUrl)
+      await page.waitForURL(/\/status\?unsubscribed=invalid/)
+      await expect(page.getByTestId('unsubscribe-result')).toContainText('invalid')
+    })
+  })
+
+  test('a platform admin creating and resolving an incident emails every confirmed subscriber', async () => {
+    await clearServerOutbox()
+    const email = `e2e-incident-${uniqueId('status-sub')}@e2e.test`
+    const subscribeRes = await fetch(`${harness.baseURL}/api/status/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    expect(subscribeRes.ok).toBe(true)
+    await clearServerOutbox() // the confirmation email isn't what this test is about
+
+    const created = await harness.admin.api!.post('/api/admin/incidents', {
+      data: { title: 'E2E notified incident', severity: 'major', affectedComponents: ['api'] },
+    })
+    expect(created.status()).toBeLessThan(300)
+    const { id: incidentId } = await created.json() as { id: string }
+
+    const afterCreate = await readServerOutbox()
+    const opened = afterCreate.find((e) => e.to === email && e.scenario === 'status_incident')
+    expect(opened, 'subscriber is emailed when the incident opens').toBeTruthy()
+    await clearServerOutbox()
+
+    const resolved = await harness.admin.api!.patch(`/api/admin/incidents/${incidentId}`, {
+      data: { status: 'resolved' },
+    })
+    expect(resolved.status()).toBeLessThan(300)
+
+    const afterResolve = await readServerOutbox()
+    const resolution = afterResolve.find((e) => e.to === email && e.scenario === 'status_incident')
+    expect(resolution, 'subscriber is emailed when the incident resolves').toBeTruthy()
   })
 })
 
