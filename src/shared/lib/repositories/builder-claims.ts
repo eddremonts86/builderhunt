@@ -549,3 +549,24 @@ export async function getPublicPortfolioClaim(transaction: ClaimsDb, claimId: st
     .limit(1)
   return row ?? null
 }
+
+/**
+ * The two facts the public portfolio page's cross-links need but the (cacheable) portfolio payload
+ * itself must never carry: which builder identity to link back to, and whose session counts as
+ * "the owner" — an owner-only fact is exactly what a shared cache entry can't hold without leaking
+ * it to every other viewer. Deliberately no join to `builder_identities`/`published_builder_profiles`
+ * — cheap enough to run on every request (cache hit or not), same independent
+ * `status = 'verified'` recheck as `getPublicPortfolioClaim`.
+ */
+export async function getPortfolioLinkContext(
+  transaction: ClaimsDb,
+  claimId: string,
+): Promise<{ builderIdentityId: string; subjectUserId: string } | null> {
+  const [row] = await transaction.select({
+    builderIdentityId: builderClaims.builderIdentityId,
+    subjectUserId: builderClaims.subjectUserId,
+  }).from(builderClaims)
+    .where(and(eq(builderClaims.id, claimId), eq(builderClaims.status, 'verified')))
+    .limit(1)
+  return row ?? null
+}

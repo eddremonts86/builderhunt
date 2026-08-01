@@ -52,6 +52,9 @@ interface Builder {
   claimedAt?: string | null
   openToStatus?: string[]
   claimedTopics?: string[]
+  /** Set only when the claimant has actually published a portfolio — absent for unclaimed,
+   * verified-but-unpublished, and portfolio-never-configured builders alike. */
+  portfolioClaimId?: string | null
 }
 
 interface Note {
@@ -335,15 +338,28 @@ export function BuilderProfilePage() {
               )
             })()}
 
-            <a
-              href={builder.profileUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
-            >
-              <Code className="w-4 h-4" />
-              {builder.username} <ExternalLink className="w-3 h-3" />
-            </a>
+            <div className="flex items-center gap-4 flex-wrap">
+              <a
+                href={builder.profileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
+              >
+                <Code className="w-4 h-4" />
+                {builder.username} <ExternalLink className="w-3 h-3" />
+              </a>
+              {builder.portfolioClaimId && (
+                <Link
+                  to="/portfolio/$claimId"
+                  params={{ claimId: builder.portfolioClaimId }}
+                  className="flex items-center gap-2 text-sm text-bh-accent hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2 rounded px-0.5"
+                  data-testid="builder-portfolio-link"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  View portfolio
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>

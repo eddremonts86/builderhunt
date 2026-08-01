@@ -229,7 +229,7 @@
   - Do: Expose Explore, Pricing, Blog, Changelog, Roadmap, Status, and Security through Product/Learn/Trust groupings; retain Home anchors; add a keyboard-accessible mobile drawer with current-route state.
   - Verify: every destination is reachable at desktop and 320 px without scrolling to the footer; focus return, Escape, overlay click, and reduced motion pass.
 
-- [ ] **Add public/admin preview and profile/portfolio cross-links**
+- [x] **Add public/admin preview and profile/portfolio cross-links**
   - Files: `src/modules/admin/content/ContentStudioPage.tsx`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/routes/builders/$builderId.tsx`, `src/routes/_dashboard/me/index.tsx`, `tests/e2e/public-content.spec.ts`, `tests/e2e/portfolio-builder.spec.ts`
   - Do: Add public preview links from content management, public builder ↔ published portfolio links, and portfolio-owner return to Account. Show links only when the allowlisted public target exists.
   - Verify: unpublished/revoked/missing targets render no link; published targets round-trip correctly.

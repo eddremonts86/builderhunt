@@ -11,7 +11,17 @@ import {
 import { findPublishedBuilderProfile, findVerifiedBuilderClaim } from '~/shared/lib/repositories/public-builders'
 import { meterSeatActionAndEmit } from '~/shared/lib/abuse/anomalies'
 import { isSuppressed } from '~/shared/lib/profile-suppression'
+import { parsePortfolioSettings } from '~/shared/lib/portfolio'
 import { env } from '~/shared/lib/env'
+
+/** Null unless the claim's own portfolio has actually been published — a verified-but-unpublished
+ * or portfolio-never-configured claim must render no link, per plans/UI/tasks.md Wave 6's "show
+ * links only when the allowlisted public target exists". */
+function portfolioClaimIdFor(claim: { id: string; metadata: Record<string, unknown> } | null): string | null {
+  if (!claim) return null
+  const settings = parsePortfolioSettings((claim.metadata as Record<string, unknown>).portfolio)
+  return settings.published ? claim.id : null
+}
 
 const PatchBody = z.object({
   topics: z.array(z.string().min(1).max(40)).max(20).optional(),
@@ -88,6 +98,7 @@ export const Route = createFileRoute('/api/builders/$builderId')({
                 isVerified: Boolean(claim),
                 claimedByUserId: claim?.subjectUserId ?? null,
                 claimedAt: claim?.verifiedAt ?? null,
+                portfolioClaimId: portfolioClaimIdFor(claim),
               })
             }
           }
@@ -107,6 +118,7 @@ export const Route = createFileRoute('/api/builders/$builderId')({
             isVerified: Boolean(claim),
             claimedByUserId: claim?.subjectUserId ?? null,
             claimedAt: claim?.verifiedAt ?? null,
+            portfolioClaimId: portfolioClaimIdFor(claim),
           })
         } catch (error) {
           console.error('Builder fetch error:', error)

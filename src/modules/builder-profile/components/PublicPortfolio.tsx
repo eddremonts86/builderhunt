@@ -1,12 +1,18 @@
-import { BadgeCheck, ExternalLink, Star } from 'lucide-react'
+import { BadgeCheck, ExternalLink, Sparkles, Star, UserCircle } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import type { PublicPortfolio as PublicPortfolioData } from '~/shared/lib/portfolio'
 
 interface PublicPortfolioProps {
   portfolio: PublicPortfolioData | null
+  /** Only set when the builder identity behind this claim also has a published aggregate profile
+   * — an unpublished/suppressed/missing target renders no link, not a dead one. */
+  builderId?: string | null
+  /** True only when the viewer's own session is this claim's subject — never derived client-side. */
+  isOwner?: boolean
 }
 
 /** No contact form, no AI-impersonation widget — this is a static, verified, owner-curated page. Anything the owner didn't opt into simply isn't rendered (no "coming soon" placeholders). */
-export function PublicPortfolio({ portfolio }: PublicPortfolioProps) {
+export function PublicPortfolio({ portfolio, builderId = null, isOwner = false }: PublicPortfolioProps) {
   if (!portfolio) {
     return (
       <div className="p-8 max-w-2xl mx-auto text-center py-24" data-testid="portfolio-not-found">
@@ -40,14 +46,35 @@ export function PublicPortfolio({ portfolio }: PublicPortfolioProps) {
         {portfolio.introduction && (
           <p className="text-bh-text-muted mt-3 leading-relaxed whitespace-pre-line">{portfolio.introduction}</p>
         )}
-        <a
-          href={portfolio.profileUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="btn-secondary btn-sm inline-flex items-center gap-1.5 mt-5"
-        >
-          View on {portfolio.source} <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-        </a>
+        <div className="flex items-center justify-center gap-2 mt-5 flex-wrap">
+          <a
+            href={portfolio.profileUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary btn-sm inline-flex items-center gap-1.5"
+          >
+            View on {portfolio.source} <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          </a>
+          {builderId && (
+            <Link
+              to="/builders/$builderId"
+              params={{ builderId }}
+              className="btn-secondary btn-sm inline-flex items-center gap-1.5"
+              data-testid="portfolio-builder-profile-link"
+            >
+              <UserCircle className="w-3.5 h-3.5" aria-hidden="true" />
+              Full builder profile
+            </Link>
+          )}
+        </div>
+        {isOwner && (
+          <p className="text-xs text-bh-text-dim mt-3">
+            <Link to="/me" className="inline-flex items-center gap-1 text-bh-accent hover:underline" data-testid="portfolio-manage-link">
+              <Sparkles className="w-3 h-3" aria-hidden="true" />
+              Manage this portfolio in your Account
+            </Link>
+          </p>
+        )}
       </header>
 
       {portfolio.projects.length > 0 && (

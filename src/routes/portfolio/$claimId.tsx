@@ -58,14 +58,49 @@ const getPublicPortfolioForRoute = createServerFn({ method: 'GET' })
     return portfolio
   })
 
+/**
+ * The two cross-link facts (plans/UI/tasks.md Wave 6 "Add public/admin preview and profile/portfolio
+ * cross-links") — kept out of the cached portfolio payload above deliberately: `isOwner` is
+ * per-viewer, and caching it would leak one visitor's session state into another's response.
+ */
+const getPortfolioLinksForRoute = createServerFn({ method: 'GET' })
+  .validator(z.string())
+  .handler(async ({ data: claimId }): Promise<{ builderId: string | null; isOwner: boolean }> => {
+    const [
+      { publicDb },
+      { getPortfolioLinkContext },
+      { findPublishedBuilderProfile },
+      { getAppAuthSession },
+    ] = await Promise.all([
+      import('~/shared/lib/db/client'),
+      import('~/shared/lib/repositories/builder-claims'),
+      import('~/shared/lib/repositories/public-builders'),
+      import('~/shared/lib/auth/auth-session'),
+    ])
+    const context = await getPortfolioLinkContext(publicDb, claimId)
+    if (!context) return { builderId: null, isOwner: false }
+
+    const [profile, session] = await Promise.all([
+      findPublishedBuilderProfile(context.builderIdentityId),
+      getAppAuthSession(),
+    ])
+    return {
+      builderId: profile ? context.builderIdentityId : null,
+      isOwner: session.userId === context.subjectUserId,
+    }
+  })
+
 export const Route = createFileRoute('/portfolio/$claimId')({
   loader: async ({ params }) => {
     try {
-      const portfolio = await getPublicPortfolioForRoute({ data: params.claimId })
-      return { portfolio }
+      const [portfolio, links] = await Promise.all([
+        getPublicPortfolioForRoute({ data: params.claimId }),
+        getPortfolioLinksForRoute({ data: params.claimId }),
+      ])
+      return { portfolio, ...(portfolio ? links : { builderId: null, isOwner: false }) }
     } catch (err) {
       console.error('Portfolio loader error:', err)
-      return { portfolio: null }
+      return { portfolio: null, builderId: null, isOwner: false }
     }
   },
   head: ({ loaderData, params }) => {
@@ -104,10 +139,10 @@ export const Route = createFileRoute('/portfolio/$claimId')({
 })
 
 function PortfolioRouteComponent() {
-  const { portfolio } = Route.useLoaderData()
+  const { portfolio, builderId, isOwner } = Route.useLoaderData()
   return (
     <ThemeProvider>
-      <PublicPortfolio portfolio={portfolio} />
+      <PublicPortfolio portfolio={portfolio} builderId={builderId} isOwner={isOwner} />
     </ThemeProvider>
   )
 }
