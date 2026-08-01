@@ -50,14 +50,24 @@ From `src/shared/lib/solutions/cost-model.ts`. Phase 7 must register these same 
 `maxOutputTokens`; they live in one module so a prompt change cannot quietly double the cost of an operation
 whose price is already fixed and already confirmed by users.
 
-| Call | Max input tokens | Max output tokens | Cost at placeholder pricing |
-| --- | --- | --- | --- |
-| Interpret brief | 3,000 | 900 | 0.198¢ |
-| Explain route | 2,500 | 600 | 0.147¢ |
+| Call | Max input tokens | Max output tokens | Cost per attempt | Worst case per call |
+| --- | --- | --- | --- | --- |
+| Interpret brief | 3,000 | 900 | 0.198¢ | 0.396¢ |
+| Explain route | 2,500 | 600 | 0.147¢ | 0.294¢ |
 
 Placeholder pricing is `MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS = 0.03` and
 `MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS = 0.12`. `env.ts` documents both as rough order-of-magnitude
 stand-ins, not confirmed MiniMax figures.
+
+**One call is up to two billed requests.** `minimaxChat` retries once with a JSON-correction turn when the
+first answer does not parse or validate, re-sending the whole prompt and allowing the whole output budget
+again. The first version of this model counted logical calls and understated every figure below by exactly
+half. The factor lives in `PROVIDER_ATTEMPTS_PER_CALL`, because it belongs to the client's retry policy rather
+than to the budgets — a change there changes the cost of every operation.
+
+Registered in `ai/tasks.ts` as `solutions-brief-interpret` (`maxOutputTokens: 900`) and
+`solutions-route-explain` (`maxOutputTokens: 600`); a test asserts the registry and this table agree, so a
+prompt change cannot quietly raise the cost of an operation whose price is already fixed.
 
 ## The per-scenario arithmetic
 
@@ -66,17 +76,20 @@ organization spending its cheapest credits is the one the margin has to survive;
 pack would certify a price nobody pays. Included plan credits are all dearer per credit (annual Team is the
 closest, at 7.6¢), which the fixture asserts rather than assumes.
 
+Every figure assumes the worst case twice over: every call uses its entire token budget, and every call needs
+its correction retry.
+
 | Scenario | Calls | Provider cost | Charged | Cost / revenue | Break-even multiple |
 | --- | --- | --- | --- | --- | --- |
 | Generate, both LLM flags off | 0 | 0¢ | 45¢ | 0 | unbounded |
-| Generate, typical | 1 interpret + 2 explain | 0.492¢ | 45¢ | 0.011 | 91× |
-| **Generate, worst case** | 2 interpret + 3 explain | **0.837¢** | **45¢** | **0.019** | **53×** |
-| **Regenerate, worst case** | 3 explain | **0.441¢** | **13.5¢** | **0.033** | **30×** |
+| Generate, typical | 1 interpret + 2 explain | 0.984¢ | 45¢ | 0.022 | 46× |
+| **Generate, worst case** | 2 interpret + 3 explain | **1.674¢** | **45¢** | **0.037** | **27×** |
+| **Regenerate, worst case** | 3 explain | **0.882¢** | **13.5¢** | **0.065** | **15×** |
 | Regenerate, no provider | 0 | 0¢ | 0¢ | — | — |
 
 The break-even multiple is the number worth reading. The absolute cents are only as good as the placeholder
 constants; the multiple says how wrong those constants can be before the conclusion changes. Provider prices
-would have to rise about **30×** before the worst regenerate stops paying for itself, and about **53×** for
+would have to rise about **15×** before the worst regenerate stops paying for itself, and about **27×** for
 generate.
 
 Recomputed by `tests/unit/shared/lib/solutions/cost-model.test.ts` on every run, including a case that drives
@@ -132,8 +145,9 @@ after a price change").
 2. **A measured benchmark, not a budget ceiling.** These figures assume every call uses its entire token budget.
    Real distributions are what spec.md means by "a provider-cost benchmark validates the rate card" — run the
    60-brief suite from Phase 9 with usage capture and record p50/p95 alongside the worst case.
-3. **Phase 7's registered budgets.** `solutions_interpret_brief` and `solutions_explain_route` do not exist in
-   `ai/tasks.ts` yet. Once they do, a test must assert their `maxOutputTokens` equals
-   `SOLUTIONS_CALL_BUDGETS`, or this arithmetic describes budgets nothing enforces.
-4. **A billing reconciliation run** against the exact release configuration, per Phase 9's "Pass quality,
+3. **A billing reconciliation run** against the exact release configuration, per Phase 9's "Pass quality,
    performance, and cost gates".
+
+Closed since the first draft: the registered budgets. `solutions-brief-interpret` and `solutions-route-explain`
+now exist in `ai/tasks.ts`, and `tests/unit/lib/solutions/ai-tasks.test.ts` asserts their `maxOutputTokens`
+equals `SOLUTIONS_CALL_BUDGETS` — without that, this arithmetic described budgets nothing enforced.

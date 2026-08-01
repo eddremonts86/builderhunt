@@ -134,7 +134,11 @@ describe('one account belongs to one person at a time', () => {
 
   it('allows a re-link once the previous one is withdrawn', async () => {
     await db.insert(humanSourceLinks).values(link({ id: 'link-1', canonicalHumanId: 'human-1' }))
-    await db.update(humanSourceLinks).set({ validUntil: new Date() })
+    // Withdrawn relative to the row's own `valid_from`, not to this process's clock. `valid_from` defaults to
+    // Postgres's `now()`, and the two clocks are not the same clock: a run of the full suite produced a
+    // `valid_until` 5ms *before* `valid_from` and tripped `human_source_links_validity_order_check`. The
+    // interval also says what the test means — a withdrawal happens after the link began.
+    await db.update(humanSourceLinks).set({ validUntil: sql`valid_from + interval '1 second'` })
 
     // This is what makes an unmerge reversible: the constraint is partial, so history does not
     // permanently poison the account.

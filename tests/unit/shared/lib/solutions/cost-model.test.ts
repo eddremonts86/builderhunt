@@ -13,6 +13,7 @@ import { describe, expect, it } from 'vitest'
 import { RATE_CARDS } from '~/shared/lib/billing/rate-cards'
 import { PACK_CATALOG, SUBSCRIPTION_CATALOG } from '~/shared/lib/billing/catalog'
 import {
+  PROVIDER_ATTEMPTS_PER_CALL,
   SOLUTIONS_CALL_BUDGETS,
   SOLUTIONS_SCENARIOS,
   certifyScenario,
@@ -56,6 +57,20 @@ describe('worstCaseCallCostCents', () => {
     expect(worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.explainRoute, PRICING)).toBeCloseTo(0.147, 6)
   })
 
+  it('counts the correction retry as a billed attempt', () => {
+    /**
+     * `minimaxChat` retries once with a JSON-correction turn, re-sending the whole prompt. The first version of
+     * this model counted logical calls and understated the worst case by exactly half.
+     */
+    const perAttempt = worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.interpretBrief, PRICING)
+    const oneCall = scenarioCostCents(
+      { key: 'one', description: 'one interpretation', interpretCalls: 1, explainCalls: 0 },
+      PRICING,
+    )
+    expect(oneCall).toBeCloseTo(PROVIDER_ATTEMPTS_PER_CALL * perAttempt, 6)
+    expect(PROVIDER_ATTEMPTS_PER_CALL).toBe(2)
+  })
+
   it('charges output more than input, as the pricing does', () => {
     // Not a tautology: it is why the explanation budget is the one to watch. An explanation is short input and
     // long prose, so a future prompt change that grows the completion ceiling moves the cost more than one that
@@ -92,10 +107,11 @@ describe('the fixed prices cover the worst case', () => {
     const charged = RATE_CARDS.solutions_generate.maxUnits * cheapestCreditCents
     const certification = certifyScenario(scenario('generate_worst_case'), PRICING, charged)
 
-    // 2 × 0.198 + 3 × 0.147 = 0.837¢ of provider cost against 10 × 4.5¢ = 45¢ charged.
-    expect(certification.providerCostCents).toBeCloseTo(0.837, 6)
+    // 2 × (2 × 0.198 + 3 × 0.147) = 1.674¢ of provider cost against 10 × 4.5¢ = 45¢ charged — the leading 2
+    // being the correction retry.
+    expect(certification.providerCostCents).toBeCloseTo(1.674, 6)
     expect(certification.costToRevenueRatio).toBeLessThan(1)
-    // The number that matters: provider prices would have to rise ~53× before this run stops paying for itself.
+    // The number that matters: provider prices would have to rise ~27× before this run stops paying for itself.
     // Asserted as a floor rather than an equality so a pack repricing does not fail the test spuriously — but
     // a floor of 10 is high enough that losing it means something real changed.
     expect(certification.breakEvenPriceMultiple).toBeGreaterThan(10)

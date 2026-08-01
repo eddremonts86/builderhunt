@@ -41,7 +41,20 @@ export interface ProviderPricing {
   costPerThousandOutputTokensCents: number
 }
 
-/** Cost in cents of one call that used its entire budget. */
+/**
+ * Provider requests per logical call.
+ *
+ * `minimaxChat` retries once with a JSON-correction turn when the first answer does not parse or validate, and
+ * that retry re-sends the whole prompt and can use the whole output budget again. So one *call* in the scenarios
+ * below is up to two billed requests.
+ *
+ * Missed in the first version of this model, which counted logical calls and understated the worst case by
+ * exactly half. Worth stating rather than folding into the budgets: the factor belongs to the client's retry
+ * policy, and a change there changes the cost of every operation.
+ */
+export const PROVIDER_ATTEMPTS_PER_CALL = 2
+
+/** Cost in cents of one attempt that used its entire budget. */
 export function worstCaseCallCostCents(budget: CallBudget, pricing: ProviderPricing): number {
   return (budget.maxInputTokens / 1000) * pricing.costPerThousandInputTokensCents
     + (budget.maxOutputTokens / 1000) * pricing.costPerThousandOutputTokensCents
@@ -94,9 +107,11 @@ export const SOLUTIONS_SCENARIOS: readonly SolutionsScenario[] = [
   },
 ]
 
+/** Worst case: every call uses its whole budget and every call needs its correction retry. */
 export function scenarioCostCents(scenario: SolutionsScenario, pricing: ProviderPricing): number {
-  return scenario.interpretCalls * worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.interpretBrief, pricing)
-    + scenario.explainCalls * worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.explainRoute, pricing)
+  const perInterpret = worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.interpretBrief, pricing)
+  const perExplain = worstCaseCallCostCents(SOLUTIONS_CALL_BUDGETS.explainRoute, pricing)
+  return PROVIDER_ATTEMPTS_PER_CALL * (scenario.interpretCalls * perInterpret + scenario.explainCalls * perExplain)
 }
 
 export interface ScenarioCertification {

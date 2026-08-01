@@ -129,7 +129,12 @@ describe('parity reporting before cutover', () => {
     await backfillCanonicalHumanIds(tx(), ORG)
 
     // The account is re-linked to a different person, e.g. after a mistaken merge was corrected.
-    await db.update(humanSourceLinks).set({ validUntil: new Date() }).where(eq(humanSourceLinks.builderIdentityId, 'gh-d'))
+    // Relative to the row's own `valid_from` rather than this process's clock — Postgres's `now()` and the Node
+    // clock are not the same clock, and a skew in the wrong direction trips
+    // `human_source_links_validity_order_check`.
+    await db.update(humanSourceLinks)
+      .set({ validUntil: sql`valid_from + interval '1 second'` })
+      .where(eq(humanSourceLinks.builderIdentityId, 'gh-d'))
     await linkToHuman('gh-d', 'human-d2')
 
     const report = await compareCanonicalHumanParity(tx(), ORG)

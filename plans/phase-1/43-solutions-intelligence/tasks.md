@@ -351,19 +351,74 @@ Three more defects surfaced here, all of the same shape as Phase 4's — see the
 
 ## Phase 7 — AI boundaries
 
-- [ ] **Register brief interpretation**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/lib/solutions/ai/interpret.ts` (new)
+- [x] **Register brief interpretation**
+  - Files: `src/shared/lib/ai/tasks.ts` (`solutions-brief-interpret`),
+    `src/shared/lib/solutions/ai-contracts.ts` (new), `src/lib/solutions/ai/interpret.ts` (new)
   - Do: Add a strict bounded task with prompt/version metadata, one-question materiality policy,
     schema validation, injection isolation, and deterministic unknown handling.
   - Verify: ambiguous, multilingual, malicious, regulated, oversized, disabled-provider, timeout,
     and invalid-output fixtures preserve constraints and charge nothing before confirmation.
 
-- [ ] **Register grounded route explanation**
-  - Files: `src/shared/lib/ai/tasks.ts`, `src/lib/solutions/ai/explain.ts` (new)
+  **Every constraint carries a quote, and one that is not literally in the brief is discarded.** A
+  `max_budget` nobody stated can make every route unavailable, and a widened one ("they said €5,000, so
+  probably €8,000") produces a recommendation the real budget cannot buy. The check is a substring test
+  against the user's own text, so it is not a judgement the model can talk its way past. The prompt-
+  injection fixture makes the limit of that explicit: an instruction *inside the brief* can legitimately
+  set a constraint, because the user typed it — what it cannot do is escape the constraint system.
+
+  Unknown handling is deterministic in the literal sense: the model reports which fields it could not
+  determine, and the `{status:'unknown'}` markers are constructed in code from that list. A field it
+  simply omitted stays absent. A value it gave *and* listed unknown resolves to unknown.
+
+  Restricted-sensitivity briefs never reach a provider at all. There is no version of "we only sent a
+  summary" that is true, because the summary would be of the restricted text.
+
+  "Charges nothing before confirmation" is asserted structurally: the module imports no billing, and a
+  test checks the import lines. The first version of that test grepped the whole file and failed on the
+  header comment, which *names* `withSolutionsCredits` to explain the ordering.
+
+  **One real defect found by the fixtures.** Capability matching in the deterministic fallback used only
+  each capability's key and label — the nouns — so "we need to **translate** 200 pages" matched nothing
+  and the fallback returned no brief at all. `CAPABILITY_TERMS` now lists the inflections briefs actually
+  use, and a test asserts every capability has terms. Relatedly, a fallback that matches nothing returns
+  `brief: null` rather than substituting a placeholder key: a capability the catalog does not know would
+  produce a permanent coverage gap caused by this function rather than by the catalog.
+
+- [x] **Register grounded route explanation**
+  - Files: `src/shared/lib/ai/tasks.ts` (`solutions-route-explain`), `src/lib/solutions/ai/explain.ts` (new)
   - Do: Supply only the composed graph and evidence snippets; require resolvable citations and
     prohibit new component, price, compatibility, or performance claims.
   - Verify: unsupported citations, source instructions, stale facts, prompt injection, and malformed
     outputs fail closed to deterministic route facts with correct credit handling.
+
+  Four checks run *after* generation, because a reader cannot tell which sentence of an explanation was
+  grounded and which was merely fluent: citations resolve to the route's own evidence ids, no currency
+  amount or percentage or `Nx` multiple appears that is not in the composer's estimate text, no bracketed
+  component id outside the route, and no sentence asserting two components work together — the
+  compatibility graph decides that and was deliberately withheld from the call.
+
+  Bare numbers are deliberately *not* checked. "Two components cover this" is ordinary writing, and a check
+  that fired on it would send every explanation to the fallback — indistinguishable from having no check,
+  since the model output would stop being used and the failure would become invisible.
+
+  Failure returns the composer's own summary and fit explanation with a reason, and never retries:
+  re-rolling until the check passes selects for explanations that pass the check, which is not the same as
+  grounded. An `unavailable` route is never sent at all — rewriting a refusal risks softening it into
+  something that reads like an option.
+
+  **A cost correction came out of this.** `minimaxChat` retries once with a JSON-correction turn, so one
+  logical call is up to two billed requests; the cost model counted logical calls and understated every
+  scenario by exactly half. `PROVIDER_ATTEMPTS_PER_CALL` now carries the factor, the certification's
+  worst-case generate figure is 1.674¢ (break-even ~27× rather than ~53×), and a test asserts the
+  registered `maxOutputTokens` equals `SOLUTIONS_CALL_BUDGETS` — without that, the arithmetic described
+  budgets nothing enforced.
+
+  **Flagged, not resolved: EU AI Act classification.** Plan 43 has no classification task, and the
+  interview module has one (`docs/compliance/interview-ai-act-classification.md`) because Annex III point 4
+  covers recruitment and selection. Solutions' human lane recommends *named people* for work, and Annex III
+  point 4 also reaches task allocation — so this is closer to that boundary than a tool-recommendation
+  feature sounds, and the composer's own human-review requirements are the mitigation but not the
+  determination. Needs a human legal read before the flags go on, alongside the source-register sign-off.
 
 ## Phase 8 — Product completion
 
