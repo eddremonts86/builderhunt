@@ -145,31 +145,70 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
 
 ## Phase 4 — Catalog and ingestion
 
-- [ ] **Add catalog, graph, evidence, and source-policy schema**
-  - Files: `src/shared/lib/db/schema.ts`, the next generated Drizzle migration,
-    `src/shared/lib/repositories/solution-catalog.ts` (new)
+- [x] **Add catalog, graph, evidence, and source-policy schema**
+  - Files: `src/shared/lib/db/schema.ts`, `drizzle/0125_solutions_catalog.sql`,
+    `drizzle/0126_search_source_register.sql`, `drizzle/0127_seed_solution_source_register.sql`,
+    `drizzle/0128_solution_version_close_grant.sql`, `drizzle/0129_seed_solution_capabilities.sql`,
+    `src/shared/lib/repositories/solution-catalog.ts`, `src/shared/lib/repositories/search-sources.ts`
   - Do: Add versioned components, capabilities, claim mappings, compatibility edges, evidence,
     source registry, and lifecycle state with narrow public reads and worker-only mutations.
   - Verify: constraints reject active unsupported edges, dangling evidence, overlapping invalid
     versions, tenant fields in public records, and workerless writes.
 
-- [ ] **Create official metadata adapters**
-  - Files: `src/lib/solutions/sources/*` (new),
-    `docs/operations/solutions-source-register.md`
+- [x] **Create official metadata adapters**
+  - Files: `src/lib/solutions/sources/{types,runner,huggingface,npm,jobindex}.ts`,
+    `docs/operations/source-register.md`
   - Do: Ingest reviewed model, endpoint, MCP, agent, tool, service, and generic-role metadata through
     official APIs/feeds or licensed snapshots; map raw claims without promoting them to verified.
   - Verify: contract fixtures, pagination, rate limit, deletion, schema drift, source outage, and
     idempotent refresh tests pass.
 
-- [ ] **Extend compliant public crawl/scrape ingestion**
-  - Files: `src/lib/enrichment/registry.ts`, `src/lib/enrichment/policies.ts`,
-    `src/lib/enrichment/network.ts`, `src/lib/solutions/sources/*`,
-    `docs/operations/solutions-source-register.md`
+- [x] **Extend compliant public crawl/scrape ingestion**
+  - Files: `src/lib/enrichment/policies.ts`, `src/lib/enrichment/network.ts`,
+    `src/lib/solutions/sources/documentation-crawl.ts`, `src/modules/admin/sources/SourcesPage.tsx`,
+    `src/routes/api/admin/search-sources.ts`, `docs/operations/source-register.md`
   - Do: Register only reviewed public sources and reuse honest-user-agent robots checks, SSRF
     blocking, limits, content hashes, provenance, and kill switches. Route prohibited sources to
     external-link-only records.
   - Verify: tests deny private networks, redirects to private networks, auth/CAPTCHA pages,
     disallowed robots/terms policy, oversized/active content, and disabled sources.
+
+### Phase 4 outcome, recorded 2026-08-01
+
+The register doc is `docs/operations/source-register.md` — one document rather than the planned
+`solutions-source-register.md`, because there are two registers (`search_sources` for people-search
+connectors, `solution_sources` for the catalog) and an operator switching sources off does not care which
+table a source lives in. Both are driven from one page, **Admin → Sources**.
+
+Registering Jobindex meant running an adapter end-to-end for the first time, which exposed four defects
+that had made the whole catalog non-functional on any database except the developer's own. Recorded here
+because the shared cause is worth remembering, not the individual bugs:
+
+| # | Defect | Fix | Why nothing caught it |
+|---|---|---|---|
+| 1 | `solution_sources` had no rows in any migration — empty on CI and production, so the runner answered `source_not_registered` for every adapter | `0127` | An unregistered source is a legitimate state, so it looked like "nothing configured yet" |
+| 2 | `allowed_fields` said `pipeline_tag`, the adapter emits `pipelineTag`; the catalog would have stored only download counts | `0127` + `metadataKeys` on the adapter contract + `assertAdapterFieldsAreRegistered` | `filterToAllowedFields` drops silently by design, and one key *did* match, so `emptyAfterFieldFilter` stayed at 0 and the run reported clean |
+| 3 | `ON CONFLICT DO UPDATE` on capability claims needs table UPDATE, which the worker deliberately lacks — 42501 on every run's first claim | repository now uses `DO NOTHING` (a claim per version is immutable content; `evidence_level` is a human's to raise) | Disposable test databases connect as **superuser**, which ignores grants entirely |
+| 4 | Closing a version's validity window needs UPDATE — every *second* observation of a changed component failed | `0128`, granted at **column level** (`valid_until` only, so history stays unforgeable) | Only the refresh path hits it; a first ingestion has no window to close and unchanged content short-circuits earlier |
+| 5 | `solution_capabilities` was never seeded, so the first claim hit a foreign-key violation | `0129` + typed `SOLUTION_CAPABILITIES` in `contracts.ts` that types every adapter's mapping table | Fixtures insert the one capability they need, leaving the other ten keys untested |
+
+The structural lesson, which is why every check added here runs against either the real roles or the
+migration file itself: **a test that connects as superuser cannot see a grant defect, and a test whose
+fixture is written from the adapter cannot see a register mismatch.** Both were true of the entire Phase 4
+suite, which was green throughout.
+
+Also fixed in passing: `search_sources` did not exist, so which connectors ran was decided entirely by the
+request. There was no operator-side switch at all — `SourceHealth` gained `disabled` so a switched-off
+source says so instead of reporting zero results, and warm cache entries are filtered too, or the kill
+switch would have a five-minute tail.
+
+**LinkedIn** is registered, permanently unavailable, and visible as such. No adapter was written: its
+crawling terms prohibit automated collection, so enabling it requires a recorded terms review with a named
+owner. The mechanism accepts that decision without making it. Same for x, facebook, instagram.
+
+**social-analyzer** was evaluated and rejected — AGPL-3.0 network clause, and it produces exactly the
+`probabilistic` signal `decideLink` is built to send to review rather than act on. Reasoning in
+`docs/operations/source-register.md`.
 
 ## Phase 5 — Retrieval and composition
 
