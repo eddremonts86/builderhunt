@@ -441,10 +441,16 @@ test('an availability policy round-trips and bumps its version', async () => {
 })
 
 test('the calendar page renders the created event for its owner', async ({ browser }) => {
+  // The calendar opens on the real current month with no test clock (same reasoning as the UI
+  // create/edit/delete test below), so — unlike the API-only tests above, which pass `from`/`to`
+  // explicitly and don't care what day it is — this event has to land on *today* or it falls
+  // outside the default view and the assertion below would fail once "today" moves past July 2026.
+  const now = new Date()
+  const todayAt = (hour: number) => new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), hour)).toISOString()
   await createEvent({
     title: 'E2E visible on page',
-    startsAt: '2026-07-24T10:00:00.000Z',
-    endsAt: '2026-07-24T11:00:00.000Z',
+    startsAt: todayAt(10),
+    endsAt: todayAt(11),
   })
 
   const context = await browser.newContext({ storageState: harness.owner.storageState! })
