@@ -165,6 +165,79 @@ export function scoreBuilders(builders: RawBuilder[]): ScoredBuilder[] {
   })
 }
 
+/**
+ * Reciprocal-rank-fusion constant. 60 is the value from the original RRF paper and the one
+ * pgvector/hybrid-search implementations conventionally use; it damps the difference between the
+ * top few ranks so a source's #1 does not completely dominate another source's #2.
+ */
+const RRF_K = 60
+
+export interface FusedBuilder extends ScoredBuilder {
+  /**
+   * Cross-source comparable relevance, used for ordering. `score` stays exactly as it was — an
+   * absolute per-source 0-100 figure the UI can display — because the two answer different
+   * questions and conflating them is what made ranking wrong in the first place.
+   */
+  fusedScore: number
+}
+
+/**
+ * Normalizes before fusing (plan 43 Phase 2: "normalize scores before fusion").
+ *
+ * `scoreBuilders` produces an absolute 0-100 score from a per-source `if (source === ...)` ladder
+ * fed by raw magnitudes that are not comparable across platforms: GitHub stargazers, Reddit active
+ * users, HN submission counts, HuggingFace downloads. Sorting those numbers against each other
+ * directly — which is what a single global `sort((a, b) => b.score - a.score)` did — ranks sources
+ * against each other by whichever platform happens to publish the largest integers, not by
+ * relevance. GitHub wins that comparison structurally, so a highly relevant DEV.to author lost to a
+ * mediocre GitHub repo essentially every time.
+ *
+ * Rank fusion sidesteps the incommensurability instead of trying to calibrate it: within each
+ * source the absolute scores ARE comparable, so each source is ranked independently and only the
+ * resulting positions — 1st, 2nd, 3rd — are combined. A position means the same thing everywhere.
+ *
+ * Ordering is total and deterministic: fused score, then absolute score, then `source:sourceId`.
+ * Without that last key, two builders with equal scores could swap places between identical
+ * requests, which makes pagination drop and repeat rows.
+ */
+export function fuseByRank(builders: ScoredBuilder[]): FusedBuilder[] {
+  const bySource = new Map<string, ScoredBuilder[]>()
+  for (const builder of builders) {
+    const bucket = bySource.get(builder.source)
+    if (bucket) bucket.push(builder)
+    else bySource.set(builder.source, [builder])
+  }
+
+  const fusedScores = new Map<string, number>()
+  for (const bucket of bySource.values()) {
+    // Rank within the source. Ties share the earlier rank's contribution, which keeps the fused
+    // value a function of the scores alone rather than of connector arrival order.
+    const ranked = [...bucket].sort((a, b) => b.score - a.score || identity(a).localeCompare(identity(b)))
+    ranked.forEach((builder, index) => {
+      fusedScores.set(identity(builder), 1 / (RRF_K + index + 1))
+    })
+  }
+
+  return [...builders]
+    .map((builder) => ({ ...builder, fusedScore: fusedScores.get(identity(builder)) ?? 0 }))
+    .sort((a, b) =>
+      b.fusedScore - a.fusedScore
+      || b.score - a.score
+      || identity(a).localeCompare(identity(b)),
+    )
+}
+
+function identity(builder: RawBuilder): string {
+  return `${builder.source}:${builder.sourceId}`
+}
+
+/**
+ * Orders by absolute score. Retained for callers that only ever see one source (where absolute and
+ * fused ordering agree by construction) — `fuseByRank` is what the multi-source search path uses.
+ *
+ * No longer sorts in place: `Array.prototype.sort` mutates, so this used to reorder the caller's
+ * array as a side effect, including the arrays held in the search result cache.
+ */
 export function sortByScore(builders: ScoredBuilder[]): ScoredBuilder[] {
-  return builders.sort((a, b) => b.score - a.score)
+  return [...builders].sort((a, b) => b.score - a.score || identity(a).localeCompare(identity(b)))
 }

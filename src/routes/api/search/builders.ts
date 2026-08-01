@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { searchBuilders } from '~/lib/search'
+import { searchBuildersWithStatus } from '~/lib/search'
 import { upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
 import { rateLimit, getRateLimitId, getAuthedRateLimitId } from '~/shared/lib/rate-limit'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
@@ -48,7 +48,7 @@ export const Route = createFileRoute('/api/search/builders')({
           const keywordsArray = typeof keywords === 'string'
             ? keywords.split(/[,\s]+/).filter(Boolean)
             : Array.isArray(keywords) ? keywords : []
-          const results = await searchBuilders({
+          const { builders: results, sources: sourceStatuses } = await searchBuildersWithStatus({
             keywords: keywordsArray,
             sources: Array.isArray(sources) ? sources : undefined,
             language,
@@ -96,6 +96,11 @@ export const Route = createFileRoute('/api/search/builders')({
             page,
             perPage,
             hasMore: results.length >= perPage,
+            // Per-source health (plan 43 Phase 2). Connector isolation means a broken source now
+            // yields partial results instead of a 500 — which would be a silent downgrade if the
+            // response did not say so. The UI can tell "nobody matched" from "GitHub was down".
+            sources: sourceStatuses,
+            degraded: sourceStatuses.some((status) => status.health !== 'ok'),
           })
         } catch (err) {
           console.error('Search error:', err)

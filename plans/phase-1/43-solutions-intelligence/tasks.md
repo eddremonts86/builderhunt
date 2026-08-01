@@ -56,7 +56,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
 
 ## Phase 1 — Contracts and shell
 
-- [ ] **Define solution domain schemas**
+- [x] **Define solution domain schemas**
   - Files: `src/shared/lib/solutions/contracts.ts` (new),
     `tests/unit/shared/lib/solutions/contracts.test.ts` (new)
   - Do: Define strict discriminated schemas for structured briefs, unknown values, ranking modes,
@@ -65,7 +65,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: fixtures cover every valid lane and reject missing evidence, uncovered mandatory
     capability, unsupported regulated domain, invalid graph, and unsafe outbound URL.
 
-- [ ] **Define flags and immutable rate-card keys**
+- [x] **Define flags and immutable rate-card keys**
   - Files: `src/shared/lib/solutions/config.ts` (new),
     `tests/unit/shared/lib/solutions/config.test.ts` (new), `src/shared/lib/env.ts`
   - Do: Add independent catalog-ingestion, public-scrape, live-enrichment, interpretation,
@@ -74,7 +74,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: production defaults are off, client configuration exposes no secrets, and tests reject
     unknown keys or mutable historical prices.
 
-- [ ] **Build the non-provider product shell**
+- [x] **Build the non-provider product shell**
   - Files: `src/routes/_dashboard/solutions/index.tsx` (new),
     `src/modules/solutions/*` (new), dashboard navigation files
   - Do: Add the premium locked state, ephemeral brief editor, structured interpretation preview,
@@ -85,7 +85,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
 
 ## Phase 2 — Shared search repair
 
-- [ ] **Unify embedding dimension and entity contracts**
+- [x] **Unify embedding dimension and entity contracts**
   - Files: `src/shared/lib/ai/embedding-dim.ts`, `src/lib/semantic/*`,
     `src/shared/lib/db/schema.ts`, the next generated Drizzle migration, `docker-compose.yml`
   - Do: Select one runtime dimension, validate it at startup and write time, support explicit human
@@ -93,7 +93,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: local migration, dimension-mismatch, mixed-version, backfill-resume, and rollback tests
     pass without corrupting current builder embeddings.
 
-- [ ] **Honor semantic filters and pagination**
+- [x] **Honor semantic filters and pagination**
   - Files: `src/routes/api/search/semantic.ts`, `src/lib/semantic/semantic-search.ts`,
     `src/shared/lib/repositories/public-builder-embeddings.ts`
   - Do: Propagate entity type, source filters, page/cursor, and limit through every primary and
@@ -101,7 +101,7 @@ Three Phase 0 gates were resolved by the same 2026-08-01 decision, and each one 
   - Verify: API integration tests prove filtered pages contain no excluded source/type and fallback
     preserves the same contract.
 
-- [ ] **Isolate connectors and correct identity candidates**
+- [x] **Isolate connectors and correct identity candidates**
   - Files: `src/lib/search.ts`, `src/routes/api/search/builders.ts`, connector tests
   - Do: Replace all-or-nothing aggregation with per-source results/status, normalize scores before
     fusion, and replace global username deduplication with source-aware candidate keys.

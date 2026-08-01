@@ -14,7 +14,7 @@ import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
 import { deduplicateBuilders } from '~/lib/dedup'
-import { scoreBuilders, sortByScore } from '~/lib/score'
+import { fuseByRank, scoreBuilders } from '~/lib/score'
 import type { RawBuilder } from '~/lib/sources/types'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
@@ -31,6 +31,123 @@ export interface SearchOptions {
 
 export type ScoredBuilder = ReturnType<typeof scoreBuilders>[number]
 
+/**
+ * How long one connector may take before the search stops waiting for it (plan 43 Phase 2,
+ * "Isolate connectors and correct identity candidates"). There was no bound at all: a hanging
+ * third-party API hung the whole request until the platform's socket timeout.
+ */
+export const CONNECTOR_TIMEOUT_MS = 8000
+
+export type SourceHealth = 'ok' | 'failed' | 'timeout'
+
+/** Per-source outcome, so a caller can tell "this source found nothing" from "this source broke". */
+export interface SourceStatus {
+  source: string
+  health: SourceHealth
+  resultCount: number
+  durationMs: number
+  /** Present only when `health !== 'ok'`. Never the raw error — connectors can echo upstream bodies. */
+  detail?: string
+}
+
+export interface SearchOutcome {
+  builders: ScoredBuilder[]
+  sources: SourceStatus[]
+}
+
+/**
+ * Runs one connector in isolation: its failure, timeout, or malformed output can never affect
+ * another connector or the request as a whole.
+ *
+ * This replaces `await Promise.all(tasks)`, under which one rejecting connector rejected the whole
+ * search and the route answered 500 with zero results for all fifteen sources. That was not
+ * hypothetical: most connectors catch internally and return `[]`, but `github.ts` has no `catch`
+ * anywhere, and GitHub is the highest-traffic source — so a GitHub blip took the entire product's
+ * search down while fourteen healthy sources had answers ready.
+ *
+ * The timeout races rather than cancels. None of the fifteen connectors accepts an `AbortSignal`,
+ * so the underlying `fetch` keeps running and its result is discarded; threading signals through
+ * every connector is the real cancellation fix and is deliberately left as its own change. Racing
+ * still converts "the request hangs indefinitely" into "this source is reported unavailable",
+ * which is the user-visible failure that mattered.
+ */
+async function runConnector(connector: { source: string; run: () => Promise<RawBuilder[]> }): Promise<SourceStatus & { builders: RawBuilder[] }> {
+  const started = Date.now()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const TIMED_OUT = Symbol('timeout')
+
+  try {
+    const raced = await Promise.race([
+      // A rejection after the race is already lost would otherwise surface as an unhandled
+      // rejection and crash the process under Node's default policy, so it is caught here even
+      // though the value is discarded.
+      connector.run().catch((error: unknown) => { throw error }),
+      new Promise<typeof TIMED_OUT>((resolve) => {
+        timer = setTimeout(() => resolve(TIMED_OUT), CONNECTOR_TIMEOUT_MS)
+      }),
+    ])
+
+    if (raced === TIMED_OUT) {
+      log.warn('search_connector_timeout', { source: connector.source, timeoutMs: CONNECTOR_TIMEOUT_MS })
+      metrics.increment('searchConnectorTimeouts')
+      return { source: connector.source, health: 'timeout', resultCount: 0, durationMs: Date.now() - started, detail: `No response within ${CONNECTOR_TIMEOUT_MS}ms`, builders: [] }
+    }
+
+    // Shape guard: nothing validated connector output before it reached filtering, dedup and
+    // scoring, so a source that changed its response format injected malformed objects into
+    // results rather than reporting itself broken.
+    const builders = Array.isArray(raced) ? raced.filter(isUsableBuilder) : []
+    const health: SourceHealth = Array.isArray(raced) ? 'ok' : 'failed'
+    if (health === 'failed') {
+      log.warn('search_connector_malformed', { source: connector.source })
+    }
+    return {
+      source: connector.source,
+      health,
+      resultCount: builders.length,
+      durationMs: Date.now() - started,
+      detail: health === 'ok' ? undefined : 'Connector returned an unexpected shape',
+      builders,
+    }
+  } catch (error) {
+    log.warn('search_connector_failed', { source: connector.source, error: error instanceof Error ? error.message : String(error) })
+    metrics.increment('searchConnectorFailures')
+    return { source: connector.source, health: 'failed', resultCount: 0, durationMs: Date.now() - started, detail: 'Source unavailable', builders: [] }
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/** The minimum a record needs for dedup (`source:sourceId`), scoring (`source`) and display. */
+function isUsableBuilder(value: unknown): value is RawBuilder {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<RawBuilder>
+  return typeof candidate.source === 'string' && candidate.source.length > 0
+    && typeof candidate.sourceId === 'string' && candidate.sourceId.length > 0
+    && typeof candidate.username === 'string' && candidate.username.length > 0
+    && Array.isArray(candidate.topics)
+}
+
+/**
+ * Per-source status for a cache hit, reconstructed from the cached rows.
+ *
+ * A cache hit never contacted any source, so claiming live health would be a lie. What is
+ * knowable is which sources are represented in the cached set — and a requested source with no
+ * cached rows is reported `ok` with zero results rather than `failed`, because that is exactly what
+ * the entry records: the source was asked at write time and contributed nothing. `durationMs` is 0
+ * for the same reason; no request was made now.
+ */
+function statusFromCachedRows(rows: RawBuilder[], requested: string[]): SourceStatus[] {
+  const counts = new Map<string, number>()
+  for (const row of rows) counts.set(row.source, (counts.get(row.source) ?? 0) + 1)
+  return requested.map((source) => ({
+    source,
+    health: 'ok' as const,
+    resultCount: counts.get(source) ?? 0,
+    durationMs: 0,
+  }))
+}
+
 const cache = new Map<string, { results: RawBuilder[]; timestamp: number }>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
@@ -38,7 +155,16 @@ function cacheKey(opts: SearchOptions): string {
   return `${opts.keywords.sort().join(',')}-${(opts.sources ?? []).sort().join(',')}-${opts.country ?? ''}-${opts.language ?? ''}-${opts.page ?? 1}-${opts.perPage ?? 30}`
 }
 
+/**
+ * Backward-compatible facade: thirteen call sites want the ranked list and nothing else.
+ * `searchBuildersWithStatus` is for the surfaces that must tell a user which sources answered.
+ */
 export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder[]> {
+  const { builders } = await searchBuildersWithStatus(opts)
+  return builders
+}
+
+export async function searchBuildersWithStatus(opts: SearchOptions): Promise<SearchOutcome> {
   const { keywords, sources = ['github', 'hn', 'devto', 'reddit', 'lobsters'], language, country, page = 1, perPage = 30 } = opts
   const cacheKeyStr = cacheKey(opts)
   const start = Date.now()
@@ -50,7 +176,7 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
     const visible = await filterSuppressed(cached.results)
     metrics.increment('searchCacheHits')
     log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'memory' })
-    return sortByScore(scoreBuilders(visible))
+    return { builders: fuseByRank(scoreBuilders(visible)), sources: statusFromCachedRows(visible, sources) }
   }
 
   // Check Redis cache (if available)
@@ -66,33 +192,38 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
         const visible = await filterSuppressed(parsed)
         metrics.increment('searchCacheHits')
         log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'redis' })
-        return sortByScore(scoreBuilders(visible))
+        return { builders: fuseByRank(scoreBuilders(visible)), sources: statusFromCachedRows(visible, sources) }
       }
     }
   } catch {
     // Redis unavailable — fall through to live search
   }
 
-  const tasks: Promise<RawBuilder[]>[] = []
+  const paged = { page, perPage }
+  // Tagged, so a settled outcome can be attributed back to its source. The old shape was an
+  // untagged `Promise<RawBuilder[]>[]`, which is why nothing downstream could report which
+  // connector had answered.
+  const connectors: Array<{ source: string; run: () => Promise<RawBuilder[]> }> = []
+  const want = (source: string) => sources.includes(source)
 
-  if (sources.includes('github')) tasks.push(searchGitHub(keywords, { country, language, page, perPage }))
-  if (sources.includes('hn')) tasks.push(searchHN(keywords, { page, perPage }))
-  if (sources.includes('devto')) tasks.push(searchDevTo(keywords, { page, perPage }))
-  if (sources.includes('reddit')) tasks.push(searchReddit(keywords, { page, perPage }))
-  if (sources.includes('lobsters')) tasks.push(searchLobsters(keywords, { page, perPage }))
-  if (sources.includes('stackoverflow')) tasks.push(searchStackOverflow(keywords, { page, perPage }))
-  if (sources.includes('npm')) tasks.push(searchNpm(keywords, { page, perPage }))
-  if (sources.includes('huggingface')) tasks.push(searchHuggingFace(keywords, { page, perPage }))
-  if (sources.includes('gitlab')) tasks.push(searchGitLab(keywords, { page, perPage }))
-  if (sources.includes('codeberg')) tasks.push(searchCodeberg(keywords, { page, perPage }))
-  if (sources.includes('hashnode')) tasks.push(searchHashnode(keywords, { page, perPage }))
-  if (sources.includes('sourcehut')) tasks.push(searchSourceHut(keywords, { page, perPage }))
-  if (sources.includes('devpost')) tasks.push(searchDevpost(keywords, { page, perPage }))
-  if (sources.includes('producthunt')) tasks.push(searchProductHunt(keywords, { page, perPage }))
-  if (sources.includes('bluesky')) tasks.push(searchBluesky(keywords, { page, perPage }))
+  if (want('github')) connectors.push({ source: 'github', run: () => searchGitHub(keywords, { country, language, ...paged }) })
+  if (want('hn')) connectors.push({ source: 'hn', run: () => searchHN(keywords, paged) })
+  if (want('devto')) connectors.push({ source: 'devto', run: () => searchDevTo(keywords, paged) })
+  if (want('reddit')) connectors.push({ source: 'reddit', run: () => searchReddit(keywords, paged) })
+  if (want('lobsters')) connectors.push({ source: 'lobsters', run: () => searchLobsters(keywords, paged) })
+  if (want('stackoverflow')) connectors.push({ source: 'stackoverflow', run: () => searchStackOverflow(keywords, paged) })
+  if (want('npm')) connectors.push({ source: 'npm', run: () => searchNpm(keywords, paged) })
+  if (want('huggingface')) connectors.push({ source: 'huggingface', run: () => searchHuggingFace(keywords, paged) })
+  if (want('gitlab')) connectors.push({ source: 'gitlab', run: () => searchGitLab(keywords, paged) })
+  if (want('codeberg')) connectors.push({ source: 'codeberg', run: () => searchCodeberg(keywords, paged) })
+  if (want('hashnode')) connectors.push({ source: 'hashnode', run: () => searchHashnode(keywords, paged) })
+  if (want('sourcehut')) connectors.push({ source: 'sourcehut', run: () => searchSourceHut(keywords, paged) })
+  if (want('devpost')) connectors.push({ source: 'devpost', run: () => searchDevpost(keywords, paged) })
+  if (want('producthunt')) connectors.push({ source: 'producthunt', run: () => searchProductHunt(keywords, paged) })
+  if (want('bluesky')) connectors.push({ source: 'bluesky', run: () => searchBluesky(keywords, paged) })
 
-  const results = await Promise.all(tasks)
-  const all = results.flat()
+  const outcomes = await Promise.all(connectors.map((connector) => runConnector(connector)))
+  const all = outcomes.flatMap((outcome) => outcome.builders)
 
   // Post-filter: HN/DevTo/Reddit don't have location/language fields,
   // so the filter only applies to results that have those fields populated.
@@ -120,6 +251,18 @@ export async function searchBuilders(opts: SearchOptions): Promise<ScoredBuilder
   }
 
   const visible = await filterSuppressed(deduped)
-  log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'miss' })
-  return sortByScore(scoreBuilders(visible))
+  log.info('search_executed', {
+    keywords,
+    sources,
+    resultsCount: visible.length,
+    durationMs: Date.now() - start,
+    cache: 'miss',
+    // Which sources actually answered, not merely which were requested — the old log recorded the
+    // request and so could never show a silent connector outage.
+    degradedSources: outcomes.filter((o) => o.health !== 'ok').map((o) => o.source),
+  })
+  return {
+    builders: fuseByRank(scoreBuilders(visible)),
+    sources: outcomes.map(({ builders: _builders, ...status }) => status),
+  }
 }
