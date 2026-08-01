@@ -113,7 +113,7 @@
   - Do: Add Invitations under Pipeline with filters for draft/sent/opened/booked/declined/revoked, pagination, draft resume/preview/send, revoke, and links to builder, Calendar, brief, and live interview when valid.
   - Verify: refresh preserves discoverability of a draft; every lifecycle state exposes only legal actions; tenant and role negative cases pass.
 
-- [ ] **Implement atomic candidate rescheduling**
+- [x] **Implement atomic candidate rescheduling**
   - Files: `src/modules/scheduling/components/CandidatePortal.tsx`, `src/routes/api/public/scheduling/$invitationId/reschedule.ts`, `src/shared/lib/scheduling-api-routes.ts`, `tests/e2e/scheduling-candidate.spec.ts`
   - Do: Replace cancel-then-book with select-new-slot then atomic reschedule. Keep the old booking on 409 or network failure, refresh alternatives, and reconcile the typed scheduling route registry with reschedule/cancel/decline.
   - Verify: success moves exactly once; conflict, stale token, rate limit, and offline retry preserve the previous booking and never create duplicates.

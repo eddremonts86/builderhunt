@@ -301,6 +301,25 @@ export const bookSlotResponseSchema = z.object({
   managementCapability: z.string().min(1),
 }).strict()
 
+/** Same request shape as booking (`bookSlotRequestSchema`) — a reschedule is the same decision made
+ *  again, just atomically swapping which slot the existing booking occupies. */
+export const rescheduleResponseSchema = z.object({
+  eventId: z.string().uuid(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  timezone: z.string().min(1),
+}).strict()
+
+/** No request body: cancel/decline act on the invitation the capability already names. */
+export const cancelBookingResponseSchema = z.object({
+  status: z.literal('cancelled'),
+  eventId: z.string().uuid(),
+}).strict()
+
+export const declineInvitationResponseSchema = z.object({
+  status: z.literal('declined'),
+}).strict()
+
 export const withdrawConsentRequestSchema = z.object({
   purpose: z.enum(CONSENT_PURPOSES),
   noticeVersion: z.string().min(1),
@@ -513,6 +532,11 @@ export const INTERVIEW_API_ROUTES: readonly InterviewApiRoute[] = [
   { method: 'GET', path: '/api/public/scheduling/:id/slots', authority: 'capability', requestSchema: publicSlotsRequestSchema, responseSchema: publicSlotsResponseSchema },
   { method: 'PUT', path: '/api/public/scheduling/:id/submission', authority: 'capability', requestSchema: putCandidateSubmissionRequestSchema, responseSchema: candidateSubmissionResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/book', authority: 'capability', requestSchema: bookSlotRequestSchema, responseSchema: bookSlotResponseSchema },
+  // Reconciled into the registry alongside `book` (plans/UI Wave 3 "Implement atomic candidate
+  // rescheduling") — all three route handlers already existed, just never had a registry row.
+  { method: 'POST', path: '/api/public/scheduling/:id/reschedule', authority: 'capability', requestSchema: bookSlotRequestSchema, responseSchema: rescheduleResponseSchema },
+  { method: 'POST', path: '/api/public/scheduling/:id/cancel', authority: 'capability', requestSchema: null, responseSchema: cancelBookingResponseSchema },
+  { method: 'POST', path: '/api/public/scheduling/:id/decline', authority: 'capability', requestSchema: null, responseSchema: declineInvitationResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/withdraw', authority: 'capability', requestSchema: withdrawConsentRequestSchema, responseSchema: withdrawConsentResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/links/:linkId/import', authority: 'capability', requestSchema: importCandidateLinkRequestSchema, responseSchema: importCandidateLinkResponseSchema },
   { method: 'POST', path: '/api/public/scheduling/:id/uploads', authority: 'capability', requestSchema: createUploadIntentRequestSchema, responseSchema: createUploadIntentResponseSchema },

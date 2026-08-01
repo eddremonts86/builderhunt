@@ -26,6 +26,15 @@ import { safeHttpHref } from '~/shared/lib/url-safety'
  * 3. **Consent is collected before times are shown.** Not for legal ceremony — it is so a candidate
  *    who is not willing to accept a required purpose finds that out before investing in choosing a
  *    slot, rather than at the last click.
+ *
+ * A fourth, added later (plans/UI Wave 3 "Implement atomic candidate rescheduling"): **changing a
+ * confirmed time never cancels first.** The old flow was cancel-then-book — two separate requests,
+ * with a real window between them where the candidate held no appointment at all, and any failure
+ * of the second request left them with nothing. `startReschedule`/`confirmReschedule` instead call
+ * `/reschedule`, which swaps the booking to the new slot inside one transaction and rolls back
+ * entirely on conflict — `booking` in this component's state is never cleared until that request has
+ * actually succeeded, so a 409, a rate limit, or a dropped connection leaves the original time intact
+ * both on the server and on screen.
  */
 
 interface InvitationDto {
@@ -61,7 +70,7 @@ interface BookingDto {
   alreadyBooked?: boolean
 }
 
-type Stage = 'loading' | 'unavailable' | 'details' | 'choosing' | 'booked'
+type Stage = 'loading' | 'unavailable' | 'details' | 'choosing' | 'booked' | 'rescheduling'
 
 export interface CandidatePortalProps {
   invitationId: string
@@ -252,6 +261,61 @@ export function CandidatePortal({ invitationId, fetcher, initialSecret }: Candid
       }
       if (!response.ok) {
         setError('We could not confirm that time. Please try another one.')
+        return
+      }
+
+      setBooking(body as unknown as BookingDto)
+      await refreshInvitation()
+      setStage('booked')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Opens the new-time picker without touching the existing booking — see the module doc comment. */
+  function startReschedule() {
+    setError(null)
+    setSelectedSlot(null)
+    setStage('rescheduling')
+    void loadSlots()
+  }
+
+  async function confirmReschedule() {
+    if (!selectedSlot) return
+    setBusy(true)
+    setError(null)
+    try {
+      const response = await call(`${base}/reschedule`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          slotId: selectedSlot.slotId,
+          slotStartsAt: selectedSlot.startsAt,
+          submissionVersion: 1,
+          consentReceiptIds: receiptIds,
+          idempotencyKey: `${invitationId}-reschedule-${selectedSlot.slotId}`,
+        }),
+      })
+      const body = await response.json().catch(() => ({})) as Record<string, unknown>
+
+      if (response.status === 409) {
+        // The service already rolled back the whole attempt — the original booking is exactly as
+        // it was. Show the refreshed times rather than a dead end.
+        const alternatives = (body.alternatives as SlotDto[] | undefined) ?? []
+        setSlots(alternatives)
+        setSelectedSlot(null)
+        setError('That time was just taken. Here are the times still available.')
+        return
+      }
+      if (response.status === 422) {
+        setError('A required agreement is missing or was withdrawn. Please review your agreements.')
+        return
+      }
+      if (!response.ok) {
+        // Network failure, rate limit, or anything else: nothing was committed server-side, so the
+        // original booking is untouched. Stay on this screen rather than silently returning to
+        // "booked" with the old time, which would look like the request had simply been ignored.
+        setError('We could not move your interview. Your original time is still booked — try again.')
         return
       }
 
@@ -501,8 +565,54 @@ export function CandidatePortal({ invitationId, fetcher, initialSecret }: Candid
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" disabled={busy} onClick={cancel}>
-              Cancel or choose another time
+            <Button type="button" variant="secondary" disabled={busy} onClick={startReschedule}>
+              Choose a different time
+            </Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={cancel}>
+              Cancel interview
+            </Button>
+          </div>
+        </section>
+      ) : null}
+
+      {stage === 'rescheduling' ? (
+        <section className="space-y-4">
+          <h2 className="text-lg font-semibold text-bh-text">Choose a new time</h2>
+          <p className="text-sm text-bh-text-muted">
+            Your current time stays booked until you confirm a new one.
+          </p>
+
+          <div>
+            <Label htmlFor="candidate-reschedule-timezone">Show times in</Label>
+            <select
+              id="candidate-reschedule-timezone"
+              className="mt-1 w-full rounded-md border border-bh-border bg-bh-surface px-3 py-2 text-sm"
+              value={timezone}
+              onChange={(event) => setTimezone(event.target.value)}
+            >
+              {timezones.map((zone) => (
+                <option key={zone} value={zone}>{zone}</option>
+              ))}
+            </select>
+          </div>
+
+          {error ? <p className="text-sm text-bh-danger" role="alert">{error}</p> : null}
+
+          <SlotPicker
+            slots={slots}
+            timezone={timezone}
+            loading={slotsLoading}
+            selectedSlotId={selectedSlot?.slotId ?? null}
+            onSelect={setSelectedSlot}
+            disabled={busy}
+          />
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={!selectedSlot || busy} onClick={confirmReschedule}>
+              {busy ? 'Moving…' : 'Confirm new time'}
+            </Button>
+            <Button type="button" variant="ghost" disabled={busy} onClick={() => { setError(null); setSelectedSlot(null); setStage('booked') }}>
+              Keep my current time
             </Button>
           </div>
         </section>
