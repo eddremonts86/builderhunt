@@ -4,6 +4,7 @@ import {
   availabilityOverrides,
   availabilityPolicies,
   availabilityRules,
+  calendarEvents,
   candidateLinks,
   candidateSubmissions,
   organizations,
@@ -334,13 +335,21 @@ export interface PublicInvitationDto {
   policyVersion: string
   version: number
   expiresAt: Date | null
+  /**
+   * The confirmed appointment, once booked — otherwise a candidate who closes the tab and reopens
+   * the link days later (to check the time, or to reschedule) sees "Your interview is confirmed"
+   * with no date at all: nothing else in this DTO carries it, and `CandidatePortal`'s own `booking`
+   * state is only ever populated by a fresh confirm/reschedule response in that same session.
+   */
+  booking: { eventId: string; startsAt: Date; endsAt: Date; timezone: string } | null
 }
 
 /**
  * Resolves an emailed capability to its invitation by SHA-256 hash. Returns `null` — never a
- * distinguishable error — for unknown, revoked, expired, or already-booked invitations, so a
- * caller cannot probe which of those a given secret hit. The organizer's identity, the
- * organization, and the stored hash itself are all absent from the returned DTO.
+ * distinguishable error — for unknown, revoked, or expired invitations, so a caller cannot probe
+ * which of those a given secret hit. The organizer's identity, the organization, and the stored
+ * hash itself are all absent from the returned DTO; the joined event contributes only its own
+ * start/end/timezone, never `owner_user_id` or anything else that would identify the organizer.
  */
 export async function findInvitationByCapabilityHash(
   transaction: TenantTransaction,
@@ -362,8 +371,16 @@ export async function findInvitationByCapabilityHash(
       version: schedulingInvitations.version,
       expiresAt: schedulingInvitations.expiresAt,
       revokedAt: schedulingInvitations.revokedAt,
+      bookedEventId: schedulingInvitations.bookedEventId,
+      bookingStartsAt: calendarEvents.startsAt,
+      bookingEndsAt: calendarEvents.endsAt,
+      bookingTimezone: calendarEvents.timezone,
     })
     .from(schedulingInvitations)
+    .leftJoin(calendarEvents, and(
+      eq(calendarEvents.organizationId, schedulingInvitations.organizationId),
+      eq(calendarEvents.id, schedulingInvitations.bookedEventId),
+    ))
     .where(eq(schedulingInvitations.capabilityHash, capabilityHash))
     .limit(1)
 
@@ -372,8 +389,21 @@ export async function findInvitationByCapabilityHash(
   if (row.expiresAt !== null && row.expiresAt <= now) return null
   if (row.status === 'expired' || row.status === 'revoked' || row.status === 'declined') return null
 
-  const { revokedAt: _revokedAt, ...dto } = row
-  return dto
+  const {
+    revokedAt: _revokedAt,
+    bookedEventId,
+    bookingStartsAt,
+    bookingEndsAt,
+    bookingTimezone,
+    ...dto
+  } = row
+
+  return {
+    ...dto,
+    booking: bookedEventId && bookingStartsAt && bookingEndsAt
+      ? { eventId: bookedEventId, startsAt: bookingStartsAt, endsAt: bookingEndsAt, timezone: bookingTimezone ?? row.timezone }
+      : null,
+  }
 }
 
 /** Resolves the owning organization for a capability-authenticated request, so the route can enter tenant context server-side. */

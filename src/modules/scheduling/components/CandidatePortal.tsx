@@ -50,6 +50,9 @@ interface InvitationDto {
   policyVersion: string
   noticeVersion: string
   requiredPurposes: string[]
+  /** The confirmed appointment, once booked — present on every load, not only right after a fresh
+   *  confirm/reschedule in this session, so a returning candidate sees their actual time. */
+  booking?: { eventId: string; startsAt: string; endsAt: string; timezone: string } | null
   consents?: {
     id: string
     purpose: string
@@ -170,6 +173,7 @@ export function CandidatePortal({ invitationId, fetcher, initialSecret }: Candid
         if (satisfied) {
           setReceiptIds(liveConsents.map((consent) => consent.id))
           if (dto.status === 'booked') {
+            if (dto.booking) setBooking(dto.booking)
             setStage('booked')
           } else {
             setStage('choosing')

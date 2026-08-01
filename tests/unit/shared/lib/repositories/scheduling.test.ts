@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createDisposableTestDatabase } from '~/shared/lib/db/create-disposable-test-database'
-import { authUsers, organizations, privacyConsents } from '~/shared/lib/db/schema'
+import { authUsers, calendarEvents, organizations, privacyConsents, userCalendars } from '~/shared/lib/db/schema'
 import {
   appendConsentDecision,
   deleteSubmission,
@@ -209,6 +209,38 @@ describe('invitations (public capability view)', () => {
     const created = await db.transaction((tx) => insertInvitation(tx, invitationInput({ capabilityHash: hashOf(secret) })))
     const tenant = await db.transaction((tx) => findInvitationTenantByCapabilityHash(tx, hashOf(secret)))
     expect(tenant).toEqual({ organizationId: ORG_A, ownerUserId: OWNER, id: created.id })
+  })
+
+  it('carries the booked event start/end/timezone so a reopened link still shows the confirmed time', async () => {
+    const secret = 'booked-secret'
+    const created = await db.transaction((tx) => insertInvitation(tx, invitationInput({ capabilityHash: hashOf(secret) })))
+
+    const [calendar] = await db.insert(userCalendars).values({
+      organizationId: ORG_A, ownerUserId: OWNER, name: 'Cal', timezone: 'Europe/Copenhagen', isDefault: true,
+    }).returning({ id: userCalendars.id })
+    const startsAt = new Date('2027-06-01T09:00:00.000Z')
+    const endsAt = new Date('2027-06-01T10:00:00.000Z')
+    const [event] = await db.insert(calendarEvents).values({
+      organizationId: ORG_A, calendarId: calendar.id, ownerUserId: OWNER,
+      type: 'interview', status: 'scheduled', title: 'Interview',
+      startsAt, endsAt, timezone: 'America/New_York', allDay: false, busy: true,
+    }).returning({ id: calendarEvents.id })
+
+    await db.transaction((tx) => updateInvitationStateWithVersion(tx, ORG_A, OWNER, created.id, 1, {
+      status: 'booked', bookedEventId: event.id, bookedAt: new Date(),
+    }))
+
+    const dto = await db.transaction((tx) => findInvitationByCapabilityHash(tx, hashOf(secret), new Date()))
+    expect(dto?.booking).toEqual({ eventId: event.id, startsAt, endsAt, timezone: 'America/New_York' })
+    expect(dto).not.toHaveProperty('organizationId')
+    expect(dto).not.toHaveProperty('ownerUserId')
+  })
+
+  it('leaves booking null for an invitation that was never booked', async () => {
+    const secret = 'unbooked-secret'
+    await db.transaction((tx) => insertInvitation(tx, invitationInput({ capabilityHash: hashOf(secret), status: 'sent' } as never)))
+    const dto = await db.transaction((tx) => findInvitationByCapabilityHash(tx, hashOf(secret), new Date()))
+    expect(dto?.booking).toBeNull()
   })
 })
 
