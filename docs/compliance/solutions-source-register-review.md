@@ -18,8 +18,38 @@ approve and switch on a crawl.
 
 ## The register as it stands
 
-Twelve sources. Seven are enabled, five are not, and three of the five have no adapter at all — registering a
-source and being able to ingest from it are different things.
+Nineteen sources since migration 0139 added the seven job APIs. Registering a source and being able to ingest
+from it are different things, and being able to ingest is different again from having permission.
+
+---
+
+## A finding from the first real run, 2026-08-02
+
+`jobtech_dev_jobs`, `themuse_jobs` and `arbeitsagentur_jobs` — the three that need no credential — were enabled
+and run locally. All three ingested cleanly: 25 components each, **zero capability claims**, and
+`emptyAfterFieldFilter: 0`, so the register's `allowed_fields` and the adapters' `metadataKeys` agree. The data
+then showed something the register notes had assumed away.
+
+**`companyName` is not always a company.** Sweden and Germany both list sole traders under a natural person's
+name. Three of the first twenty JobTech employers were `Surname, Firstname` — `Västhede, Thomas`,
+`Lakhwani, Naresh Teku`, `Karolak, Agnieszka` — and the sampled Arbeitsagentur posting was
+`Carmen von den Driesch`. Those land in `solution_components.display_name` and in the version metadata, which
+are **global-public** tables with no organization scoping.
+
+The existing justification for storing employer names came from `jobindex_roles`: "company names are corporate
+identifiers, not personal data." That is true of Danish registered company names and is **not** true here. A
+sole trader's business name is their name.
+
+What a reviewer has to decide, and engineering deliberately has not:
+
+- Is a sole trader's business name, published by a state employment service in a public job advertisement,
+  personal data we may store and index?
+- If so, does Article 14 notification reach them, given they never provided the data to us?
+- Is a filter the answer — refusing an employer name shaped like a personal name — or is that both unreliable
+  and the wrong shape, since the posting is still theirs either way?
+
+Not fixed in code before the answer, on purpose. A heuristic dropping `Surname, Firstname` would silently lose
+real one-person businesses from the catalog, which is a product decision wearing a privacy costume.
 
 ---
 
