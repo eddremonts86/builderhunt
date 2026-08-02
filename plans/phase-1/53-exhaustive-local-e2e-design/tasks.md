@@ -109,7 +109,19 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=1`: 44 passed, 2 skipped.
 
-  **Still open in this task:** `privacy.spec.ts`, `account.spec.ts`.
+  **`tests/e2e/api/privacy.spec.ts` landed — 10 passing, green on the first run.**
+
+  A data export is a GDPR right and simultaneously the most concentrated pile of one person's data the product
+  ever produces, so three properties carry it. **Redaction** is asserted against the serialized body rather
+  than a remembered field list — substring matching over the whole payload, blunt on purpose, because the
+  danger is a future column joining the export by accident. **404 rather than 403** for another user's export,
+  identical in status and body to a fabricated id, because an export id existing says a specific person
+  exercised a specific right at a specific time. And the **24-hour throttle returns `existingId`**, which is
+  the difference between a throttle and a data-subject right denied by a rate limiter: a user who clicks twice
+  must reach the export they already have. The throttle is also proved per-user, so one account cannot deny
+  the export right to every other one.
+
+  **Still open in this task:** `account.spec.ts`.
 
 - [ ] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)
