@@ -341,11 +341,34 @@
   - Verify: the check fails against one deliberately-unhandled method, passes after the helper lands, and
     `GET` on a PATCH-only route answers 405 with `Allow`.
 
-- [ ] **Signed Stripe webhooks: raw-body signature verification, duplicate handling, secret rotation, internal re-routing**
+- [x] **Signed Stripe webhooks: raw-body signature verification, duplicate handling, secret rotation, internal re-routing**
   - Files: `tests/e2e/api/webhooks-stripe.spec.ts` (new); `scripts/check-route-coverage.mjs` (verify the public-allowlist entry for `src/routes/api/webhooks/stripe.ts` survives; do not edit)
   - Do: For every documented event type in `webhook-handlers.ts` (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.created`, `payment_intent.succeeded`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`, `account.updated`), build a real Stripe-shaped payload signed with the harness's `signStripeWebhook` helper using the **same** `STRIPE_WEBHOOK_SECRET` the harness is configured with, POST it to `/api/webhooks/stripe`, and assert: (1) `200` with `{received: true, eventId: 'evt_...'}`, (2) one `billing_webhook_events` row persisted with `payloadEncrypted` populated (the row is the **only** persistence — the route never writes subscriptions/credits/ledger), (3) calling `POST /api/admin/billing/run-worker` once after the webhook processes the row into DB effects (task 6 covers the full worker matrix; this task's webhook receive is only the inlet). Then cover the rejection paths: missing `stripe-signature` header → 400 with `code: missing_signature`; valid signature with a timestamp outside the 5-minute tolerance → 400 with `code: stale_timestamp`; signature signed with a stale `STRIPE_WEBHOOK_SECRET_PREVIOUS` but with a **current** timestamp → 200 (rotation window accepts both); wrong `api_version` in the payload → 400 with `code: wrong_api_version`; livemode mismatch → 400 with `code: wrong_livemode`; duplicate `event.id` delivery → 200 with `duplicate: true` and **no** second `billing_webhook_events` row. Cover the `X-Request-Id` header forwarding: a request with `X-Request-Id: req-test-1` is logged under that id (assert by reading the test's captured `console.error` from the `withStrictConsole` helper). Cover the no-content-type fallback: a webhook with `Content-Type: application/octet-stream` and a body that is **valid** JSON still parses (Stripe sometimes sends bytes). Cover the no-user-session property: the handler succeeds with no `auth-session` cookie set; assert by stripping the cookie from the request and confirming the 200 still returns.
   - Verify (RED): `pnpm test:e2e tests/e2e/api/webhooks-stripe.spec.ts` — fails RED on file absence. The spec asserts real `Stripe.webhooks.constructEvent` signatures over real bytes (no mock signing) — the existing `tests/unit/routes/api/webhooks/stripe.test.ts` unit tests cover the typed-error → 400 mapping with a mocked `receiveStripeWebhook`, but this task verifies the actual `Stripe.webhooks.constructEvent` path against the real library with real signing.
   - Independent boundary: this task owns **only** `tests/e2e/api/webhooks-stripe.spec.ts`. Task 6 covers the worker that consumes these persisted rows; task 4 covers the API routes that the worker's effects reach.
+
+  **Done 2026-08-02: `tests/e2e/api/webhooks-stripe.spec.ts` — 10 passing.**
+
+  This is the only unauthenticated write in the product: no session, no tenant, no CSRF token. The signature
+  *is* the authorization, so the file is mostly refusals, one per way a signature can be wrong — absent, made
+  with the wrong secret, made over **different bytes** (the forgery the raw-body read exists to stop), stale,
+  from the wrong livemode, and for an unexpected API version. The last two are *correctly signed* and still
+  refused, because a signature proves origin, not relevance: a live-mode event applied to test data writes real
+  money records from the wrong world.
+
+  Also covered: the previous secret still verifies, so a rotation window does not silently drop payments; a
+  retried delivery is recorded once, asserted against the inbox rather than trusting two 200s; and a refusal
+  echoes neither the payload nor the signature.
+
+  Signing is hand-written HMAC rather than Stripe's SDK helper, deliberately — a test that signed with the same
+  helper the server verifies with would hide a bug in that helper, because both sides would be wrong together.
+
+  Two findings about the seam itself, recorded in the spec so they are not rediscovered: the server verifies
+  with `STRIPE_WEBHOOK_SECRET`, while `E2E_STRIPE_WEBHOOK_SECRET` is a read-only accessor pointing the other
+  way (it tells a harness what to sign with, and setting only it makes correct signatures fail); and the inbox
+  deduplicates on `stripe_event_id`, not on the row's own `id`.
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 293 passed, 5 skipped.
 
 - [ ] **Workers and replay: claim/lease/dead-letter processing, dead-letter recovery, event replay idempotency**
   - Files: `tests/e2e/api/billing-worker.spec.ts` (new), `tests/e2e/api/billing-replay.spec.ts` (new)
