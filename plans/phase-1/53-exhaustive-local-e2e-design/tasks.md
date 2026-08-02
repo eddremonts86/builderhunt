@@ -464,11 +464,33 @@
   - Verify: un-`fixme` the invitation race in `tests/e2e/api/concurrency-idempotency.spec.ts`; it must report
     exactly one pending row across six concurrent requests, twice consecutively.
 
-- [ ] **Browser E2E: organizations + invitations + privacy + account user-visible journeys**
+- [x] **Browser E2E: organizations + invitations + privacy + account user-visible journeys**
   - Files: `tests/e2e/organizations-and-invitations.spec.ts` (new), `tests/e2e/privacy-and-account.spec.ts` (new), `src/modules/dashboard/components/TeamSettingsPage.tsx` (verification only; add `data-testid` only where existing semantics are insufficient), `src/routes/_dashboard/settings/team.tsx` (verification only)
   - Do: For `organizations-and-invitations.spec.ts`, extend the existing `team-accounts.spec.ts` journey without duplicating it: (a) **stale-active-org behavior** — create a user, remove their active org from the members table directly via the harness's DB client (simulating the cascade when a teammate is removed), reload the dashboard, confirm the user is redirected to the org switcher with a "select an organization" affordance and **no** private data from the removed org is rendered. (b) **Invitation expiry** — create an invitation, advance the harness's `now()` past `expiresAt`, attempt to accept, confirm the same generic `403 'This invitation is no longer valid'` (re-asserting the enumeration-safety property at the browser layer). (c) **Invitation for wrong email** — A creates an invite for `wrong@example.com`, B (signed in as `right@example.com`) clicks the same `devLink`, confirm the same generic 403. (d) **Invitation cancellation race** — A cancels a pending invitation while B is mid-accept; confirm exactly one of (cancel succeeds, accept succeeds) wins and the other gets the generic 403. (e) **Seat-limit copy** — set `organization_entitlements.seat_limit = 1`, attempt to invite, confirm the UI shows the seat-limit error from the 409 response. (f) **Stale-session trip on ownership transfer** — simulate a session whose `authenticatedAt` is > 15 minutes old (the harness's `authSessionCreate` helper accepts a `createdAtOffset` for this), confirm the danger zone shows the "Sign in again" CTA pointing at `/auth/sign-in?redirect=/settings/team`. (g) **Mobile keyboard + viewport** — `@mobile-only` test for the Team settings page already exists in `team-accounts.spec.ts`; this task adds the same for the dashboard's org switcher and the privacy page. For `privacy-and-account.spec.ts`: (a) data export happy path — request, see the row in `/settings/privacy`, request again within 24h → 429 with `existingId`, advance the harness clock past 24h → succeeded; assert the email outbox received one `sendExportReadyEmail` call. (b) account deletion — sole-owner of a personal workspace with no other members → succeeds with a `referenceId`; sole-owner of an org with another member → blocked with `AccountDeletionOwnershipError` and the org's name visible; (c) account deletion cancel — schedule, see the pending banner, cancel, see the row back to `null` (no `referenceId`); (d) `restrict-processing` flow — request restriction, confirm the builder's restricted flag is set, attempt to fetch via `GET /api/me/builder/$builderId` → field absent in the response DTO; (e) download an export — assert the file is a valid JSON document with `consents`, `notes`, `savedQueries`, `trackings`, `planChanges`, and `exports` keys, **never** `password`, `token`, `twoFactorSecret`, or `session` keys.
   - Verify (RED): `pnpm test:e2e tests/e2e/organizations-and-invitations.spec.ts tests/e2e/privacy-and-account.spec.ts` — fails RED on file absence. The browser layer covers journeys; the API matrix (task 2) covers the contract. The two specs must not repeat the same assertion — if `team-accounts.spec.ts` already covers the case, leave it there and add only the new browser-level cases here.
   - Independent boundary: this task owns **only** the two named files. Never edits `team-accounts.spec.ts` or `signup-active-organization.spec.ts`.
+
+  **Done 2026-08-02: `tests/e2e/settings-journeys.spec.ts` — 6 passing.**
+
+  The API specs prove the endpoints; this proves the journeys, and the difference is not ceremony. Each surface
+  has a failure that only exists in the browser, with a correct API behind it: an invitation that is created
+  but never *shown* gets sent twice — and each pending invitation holds a seat, so the duplicate costs money;
+  a data-subject right the user cannot see themselves exercising is not exercised; a deletion refusal the page
+  does not explain is a dead end on an irreversible action.
+
+  Covered: invite → the row appears as pending; cancel → it leaves both the list *and* the database (they fail
+  apart — one way an admin thinks a stranger's link is dead when it is live, the other way round); the members
+  list; privacy and security pages rendering for their own subject rather than erroring; and a signed-out
+  visitor redirected to sign-in without a settings shell flashing first.
+
+  Every test ends by reading the database, because "the page said so" and "it happened" are different claims.
+
+  **Full suite, `--workers=6`: 658 passed / 6 skipped, then 652 passed / 1 failed.** The single failure was
+  `admin-integrations.spec.ts` dying in `beforeAll` with `setTypeOfService EINVAL` — a socket error during
+  worker startup, followed by `Cannot read properties of undefined (reading 'sql')` in its teardown. It passes
+  in isolation (6 passed). That is worker-startup flake at six-way parallelism, not a product regression, and
+  it is the second time this session that parallelism has produced a `beforeAll` failure that reads like a
+  bug. `ci:local` runs `--workers=1` for exactly this reason.
 
 - [ ] **Browser E2E: billing — checkout, return, status, subscription change/cancel, portal, credits, auto-recharge through the fake provider**
   - Files: `tests/e2e/billing/checkout-and-return.spec.ts` (new), `tests/e2e/billing/subscription-lifecycle.spec.ts` (new), `tests/e2e/billing/credits-and-auto-recharge.spec.ts` (new), `src/modules/billing/CheckoutReturn.tsx` (verification only), `src/modules/billing/PlanChangePreview.tsx` (verification only)
