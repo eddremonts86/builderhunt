@@ -289,14 +289,13 @@ test.describe('invitation ids are capabilities', () => {
     expect(row?.status, "B's invitation survived A's attempt").not.toBe('cancelled')
   })
 
-  test.fixme('a refused resend or cancel does not reveal whether the invitation id is real', async () => {
+  test('a refused resend or cancel does not reveal whether the invitation id is real', async () => {
     /**
-     * **Found by this matrix, deliberately not fixed here.**
+     * **Found by this matrix, and fixed.**
      *
-     * Both `POST` (resend) and `DELETE` (cancel) on `/api/organizations/invitations/:id` answer **403** for an
-     * invitation that exists in another organization and **404** for one that does not exist at all. The
-     * refusals themselves are correct — nothing is resent, nothing is cancelled, and the check below proves
-     * B's invitation survives. The *difference between them* is the defect.
+     * Both `POST` (resend) and `DELETE` (cancel) used to answer **403** for an invitation in another
+     * organization and **404** for one that does not exist. The refusals themselves were correct — nothing was
+     * resent or cancelled — and the *difference between them* was the defect.
      *
      * An id space that answers 403-versus-404 is an enumeration oracle: a caller with any session can sweep
      * ids and learn which are real without ever reading one. A real invitation id is not nothing — it says an
@@ -306,9 +305,9 @@ test.describe('invitation ids are capabilities', () => {
      * That was wrong: the run showed both methods behave the same way. Recorded because the wrong version
      * would have sent the next reader to fix one route and declare the other fine.
      *
-     * Plan 53's rule for this task forbids production edits inside the matrix, so this is `fixme` rather than
-     * a patch, and it is carried as a follow-up in
-     * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`.
+     * `requireMembershipOrNotFound` in `src/shared/lib/auth/organization-lifecycle.ts` now answers 404 when the
+     * caller is not a member of the invitation's organization. A *member* who lacks the role still gets 403,
+     * and should: they can already see the invitation in their own list, so the status tells them nothing.
      */
     const theirs = await invite(harness.b, inviteeEmail('oracle'))
     const fabricated = `inv-${'0'.repeat(theirs.id.length - 4)}`

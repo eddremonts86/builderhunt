@@ -163,6 +163,31 @@ async function requireMembership(
   return membership
 }
 
+/**
+ * Membership, but a non-member is told the resource does not exist.
+ *
+ * For anything addressed by an id a stranger could guess, "403 you are not a member" and "404 no such thing"
+ * must be the same answer. Otherwise the pair is an enumeration oracle: sweep the id space, and every 403
+ * confirms a real record. For invitations that is not abstract — a real invitation id says an organization is
+ * hiring, that someone is mid-onboarding, and it is the id an acceptance link carries.
+ *
+ * A *member* who lacks the role still gets 403 from `requireElevated`, and should: they can already see the
+ * invitation in their own organization's list, so the status code tells them nothing new.
+ *
+ * Found by `tests/e2e/api/organizations-invitations.spec.ts`, which probes a real foreign id and a fabricated
+ * one and requires the two answers to be indistinguishable.
+ */
+async function requireMembershipOrNotFound(
+  deps: LifecycleDependencies,
+  userId: string,
+  organizationId: string,
+  notFoundMessage: string,
+): Promise<MembershipRecord> {
+  const membership = await deps.findMembership(userId, organizationId)
+  if (!membership) throw new OrganizationLifecycleError(notFoundMessage, 404)
+  return membership
+}
+
 function requireElevated(membership: MembershipRecord): void {
   if (membership.role !== 'owner' && membership.role !== 'admin') {
     throw new OrganizationLifecycleError(GENERIC_MEMBERSHIP_ERROR, 403)
@@ -302,7 +327,12 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     const session = await requireSession(request, deps)
     const invitation = await deps.getInvitation(invitationId)
     if (!invitation) throw new OrganizationLifecycleError('Invitation not found', 404)
-    const membership = await requireMembership(deps, session.userId, invitation.organizationId)
+    const membership = await requireMembershipOrNotFound(
+      deps,
+      session.userId,
+      invitation.organizationId,
+      'Invitation not found',
+    )
     requireElevated(membership)
     await requireRateLimit(deps, 'org-invite', `${session.userId}:${invitation.organizationId}`, 20, 60 * 60)
 
@@ -352,7 +382,12 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
     const session = await requireSession(request, deps)
     const invitation = await deps.getInvitation(invitationId)
     if (!invitation) throw new OrganizationLifecycleError('Invitation not found', 404)
-    const membership = await requireMembership(deps, session.userId, invitation.organizationId)
+    const membership = await requireMembershipOrNotFound(
+      deps,
+      session.userId,
+      invitation.organizationId,
+      'Invitation not found',
+    )
     requireElevated(membership)
 
     await deps.cancelInvitationRecord(invitation.id)

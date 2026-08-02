@@ -152,7 +152,13 @@
      the request schema — field name, type, min and max length — out of the difference between 400 and 401.
      Authentication was never bypassed; the leak was the *difference*. `organizations.spec.ts` asserts it
      directly now instead of carrying a `fixme`.
-  2. Resend and cancel leak invitation-id existence via 403-vs-404 — still open, `test.fixme`.
+  2. ~~Resend and cancel leak invitation-id existence via 403-vs-404.~~ **Fixed 2026-08-02.**
+     `requireMembershipOrNotFound` in `src/shared/lib/auth/organization-lifecycle.ts` answers **404** when the
+     caller is not a member of the invitation's organization, so a real foreign id is indistinguishable from a
+     fabricated one. A *member* who lacks the role still gets 403 from `requireElevated`, and should — they can
+     already see the invitation in their own list, so the status tells them nothing new. The e2e assertion is
+     no longer a `fixme`, and the unit test that pinned the old 403 now pins 404 with the reasoning written
+     beside it rather than being quietly flipped.
   3. `GET /api/me/builder/:id` answers with HTML — still open, covered by the route-method sweep task.
 
 - [x] **API E2E matrix: platform-admin routes and admin authorization boundaries**

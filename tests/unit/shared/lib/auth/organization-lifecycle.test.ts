@@ -237,6 +237,13 @@ describe('cancelInvitation', () => {
     // being canceled belongs to 'org-2' — cancelInvitation must check
     // membership against the INVITATION's organization, never the caller's
     // own/active one, or any admin could cancel any other org's invites.
+    //
+    // The refusal is **404, not 403**, and that is deliberate. 403-for-real and 404-for-absent would make the
+    // pair an enumeration oracle: sweep invitation ids, and every 403 confirms a real one — which says an
+    // organization is hiring and someone is mid-onboarding. A non-member is told the invitation does not
+    // exist. A *member* lacking the role still gets 403 from `requireElevated`, correctly: they can already
+    // see it in their own list. Changed 2026-08-02 after
+    // `tests/e2e/api/organizations-invitations.spec.ts` measured the leak.
     const deps = buildDeps({
       getInvitation: vi.fn().mockResolvedValue(invitation({ organizationId: 'org-2' })),
       findMembership: vi.fn(async (_userId: string, organizationId: string) =>
@@ -245,7 +252,7 @@ describe('cancelInvitation', () => {
     })
     const lifecycle = createOrganizationLifecycle(deps)
 
-    await expect(lifecycle.cancelInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 403 })
+    await expect(lifecycle.cancelInvitation(request, 'invite-1')).rejects.toMatchObject({ status: 404 })
     expect(deps.cancelInvitationRecord).not.toHaveBeenCalled()
   })
 })

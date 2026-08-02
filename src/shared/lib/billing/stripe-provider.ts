@@ -63,11 +63,17 @@ function e2eScenarioKey(): string {
   return prefix ? `${prefix}:e2e:billing-scenario` : 'e2e:billing-scenario'
 }
 
-function parseScenario(raw: string | null | undefined): BillingScenario | undefined {
+/**
+ * `source` is in the message on purpose: the value can now arrive from two places, and an operator staring at
+ * a failure needs to know which one to correct. Naming `E2E_BILLING_SCENARIO` also keeps the error greppable —
+ * a unit test asserts that string, and it is right to, because a message that does not name what to change is
+ * a message that sends someone reading source code.
+ */
+function parseScenario(raw: string | null | undefined, source: string): BillingScenario | undefined {
   if (raw === undefined || raw === null || raw === '' || raw === 'success') return undefined
   if (!E2E_BILLING_SCENARIOS.has(raw)) {
     throw new Error(
-      `Unknown E2E billing scenario "${raw}" — expected one of: ${Array.from(E2E_BILLING_SCENARIOS).join(', ')}`,
+      `Unknown billing scenario "${raw}" from ${source} — expected one of: ${Array.from(E2E_BILLING_SCENARIOS).join(', ')}`,
     )
   }
   return raw as BillingScenario
@@ -80,11 +86,11 @@ async function currentE2EDefaultScenario(): Promise<BillingScenario | undefined>
   try {
     const redis = await getRedis()
     const override = await redis?.get(e2eScenarioKey())
-    if (override) return parseScenario(override)
+    if (override) return parseScenario(override, `${e2eScenarioKey()} (Redis; overrides E2E_BILLING_SCENARIO)`)
   } catch {
     // fall through to the environment default
   }
-  return parseScenario(process.env.E2E_BILLING_SCENARIO)
+  return parseScenario(process.env.E2E_BILLING_SCENARIO, 'E2E_BILLING_SCENARIO')
 }
 
 /**
