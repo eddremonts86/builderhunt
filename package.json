@@ -22,6 +22,7 @@
     "test:security": "vitest run tests/unit/security",
     "test:rls": "pnpm test:rls:local",
     "test:e2e": "playwright test --project=chromium --project=mobile",
+    "test:e2e:coverage": "node scripts/check-e2e-route-coverage.mjs",
     "test:a11y": "node tests/regression/test-accessibility.mjs",
     "db:up": "docker inspect workspace-postgres --format '{{.State.Running}}' 2>/dev/null | grep -q true || docker compose --profile standalone up -d db",
     "db:down": "docker compose down",

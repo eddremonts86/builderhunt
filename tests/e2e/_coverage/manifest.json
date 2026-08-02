@@ -1,0 +1,1409 @@
+{
+  "generatedFrom": "src/routes/api",
+  "routes": {
+    "/api/admin/abuse/clusters": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/abuse": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/activity/run-retention": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/alerts/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/analytics/run-retention": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/accounting-export": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/configuration": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/disputes": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/events/$eventId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/api/billing-worker-replay.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/billing/events/$eventId/replay": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/api/billing-worker-replay.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/billing/events": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/api/billing-worker-replay.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/billing/metrics": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/reconcile": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/billing/refunds": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/billing/risk-exceptions": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/billing/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/api/billing-worker-replay.spec.ts",
+        "tests/e2e/billing-operations.spec.ts"
+      ]
+    },
+    "/api/admin/builder-claims/$claimId/revoke": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/builder-claims": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/calendar/run-reminders": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/calendar/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/calendar.spec.ts"
+      ]
+    },
+    "/api/admin/changelog/$id": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/changelog": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/devpost/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/discovery/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/documents/run-web-imports": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/documents/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/documents.spec.ts"
+      ]
+    },
+    "/api/admin/embeddings/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/enrichment/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/human-links": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/incidents/$id": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/admin/incidents": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/admin/integrations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-integrations.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/interviews/run-retention": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/admin/legal/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics/conversion": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/metrics/trust": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/operations/$jobKey": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-operations.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/operations/$jobKey/run": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-operations.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/operations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-operations.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/operations/sync-schedules": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-operations.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/plan-requests": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/roadmap/$id": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/roadmap": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/search-sources": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/seo": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/seo-indexing.spec.ts"
+      ]
+    },
+    "/api/admin/solutions/gold-briefs": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/solutions/sources": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/sprints/run-worker": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/status/snapshot": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/users/$userId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-users.spec.ts",
+        "tests/e2e/api/admin.spec.ts"
+      ]
+    },
+    "/api/admin/users": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-users.spec.ts",
+        "tests/e2e/api/admin.spec.ts",
+        "tests/e2e/harness/fixtures.spec.ts"
+      ]
+    },
+    "/api/ai/complete": {
+      "status": "missing"
+    },
+    "/api/ai/config": {
+      "status": "missing"
+    },
+    "/api/ai/embed": {
+      "status": "missing"
+    },
+    "/api/alerts/$id": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/alerts/$id/test-send": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/alerts": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/alerts/test-trigger": {
+      "status": "missing"
+    },
+    "/api/alerts/triggers/$id": {
+      "status": "missing"
+    },
+    "/api/alerts/triggers": {
+      "status": "missing"
+    },
+    "/api/alerts/triggers/unread-count": {
+      "status": "missing"
+    },
+    "/api/analytics/conversion": {
+      "status": "missing"
+    },
+    "/api/auth/$": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/harness/fixtures.spec.ts",
+        "tests/e2e/signup-active-organization.spec.ts"
+      ]
+    },
+    "/api/billing/auto-recharge": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/checkout/credits": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-checkout-scenarios.spec.ts",
+        "tests/e2e/api/billing-scenario-channel.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts"
+      ]
+    },
+    "/api/billing/checkout/status": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/checkout/subscription": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts",
+        "tests/e2e/api/billing-subscription-scenarios.spec.ts"
+      ]
+    },
+    "/api/billing/contact": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/contact/verify": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/disputes": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/portal": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/refunds": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/subscription/cancel": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts"
+      ]
+    },
+    "/api/billing/subscription/change": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts"
+      ]
+    },
+    "/api/billing/subscription/preview": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/api/billing-subscription-change-scenarios.spec.ts"
+      ]
+    },
+    "/api/billing/summary": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-authorization.spec.ts",
+        "tests/e2e/billing-credits.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/claim": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/claim/verify": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/enrichment": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/evidence-refresh": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/evidence/$evidenceId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/evidence": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/fingerprint": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/hygiene": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/notes": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/synergy": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/timeline": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/$builderId/views": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts",
+        "tests/e2e/profile-view-analytics.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/builders/claim/verify": {
+      "status": "missing"
+    },
+    "/api/builders/recent": {
+      "status": "missing"
+    },
+    "/api/builders/track": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/calendar/availability": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/calendar.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/calendar/availability/overrides": {
+      "status": "missing"
+    },
+    "/api/calendar/events/$eventId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/calendar.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/calendar/events": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/calendar.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/calendar/export[.]ics": {
+      "status": "missing"
+    },
+    "/api/calendar/feed": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/calendar.spec.ts"
+      ]
+    },
+    "/api/calendar/notifications": {
+      "status": "missing"
+    },
+    "/api/changelog/$slug": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/changelog": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/consent": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/public-and-consent.spec.ts"
+      ]
+    },
+    "/api/dashboard/stats": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/dashboard-and-navigation.spec.ts"
+      ]
+    },
+    "/api/e2e/outbox": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/alerts.spec.ts",
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/export/builders": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/feeds/$searchId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/public-feeds-and-og.spec.ts"
+      ]
+    },
+    "/api/fingerprint/match": {
+      "status": "missing"
+    },
+    "/api/incidents": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/brief/$version": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/brief": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/finalize": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/participants/$participantId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/participants": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/report": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/segments": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/session": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/suggestions": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/$interviewId/transcription-token": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts"
+      ]
+    },
+    "/api/interviews/shared": {
+      "status": "missing"
+    },
+    "/api/lists/$listId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/lists/$listId/items/$itemId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/lists/$listId/items": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/lists": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/builder-workspace-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/me/builder-claims/$claimId/portfolio": {
+      "status": "missing"
+    },
+    "/api/me/builder-claims/$claimId/portfolio/publish": {
+      "status": "missing"
+    },
+    "/api/me/builder-claims/$claimId/portfolio/unpublish": {
+      "status": "missing"
+    },
+    "/api/me/builder/$builderId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/profile-enrichment-privacy.spec.ts"
+      ]
+    },
+    "/api/me/builder/$builderId/evidence-provenance": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/profile-enrichment-privacy.spec.ts"
+      ]
+    },
+    "/api/me/builder/$builderId/restrict-processing": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/profile-enrichment-privacy.spec.ts"
+      ]
+    },
+    "/api/me/builder": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/profile-enrichment-privacy.spec.ts"
+      ]
+    },
+    "/api/me/builders": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts"
+      ]
+    },
+    "/api/me/data-export/$id": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/privacy.spec.ts"
+      ]
+    },
+    "/api/me/data-export": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/privacy.spec.ts"
+      ]
+    },
+    "/api/me/delete-account": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts"
+      ]
+    },
+    "/api/me/plan-changes": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts"
+      ]
+    },
+    "/api/me/sessions": {
+      "status": "missing"
+    },
+    "/api/me/stepup": {
+      "status": "missing"
+    },
+    "/api/onboarding/complete": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/onboarding/skip": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/onboarding/status": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/organizations/activity": {
+      "status": "missing"
+    },
+    "/api/organizations/deletion": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations.spec.ts"
+      ]
+    },
+    "/api/organizations/deletion/immediate": {
+      "status": "missing"
+    },
+    "/api/organizations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/api/organizations.spec.ts",
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/harness/fixtures.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts",
+        "tests/e2e/team-accounts.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations/$invitationId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-invitations.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations/$invitationId/accept": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-invitations.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/concurrency-idempotency.spec.ts",
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/organizations-invitations.spec.ts",
+        "tests/e2e/auth-and-sessions.spec.ts",
+        "tests/e2e/settings-journeys.spec.ts",
+        "tests/e2e/team-accounts.spec.ts"
+      ]
+    },
+    "/api/organizations/invitations/mine": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-invitations.spec.ts"
+      ]
+    },
+    "/api/organizations/members/$memberId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/dashboard-and-navigation.spec.ts"
+      ]
+    },
+    "/api/organizations/switch": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations.spec.ts"
+      ]
+    },
+    "/api/organizations/team": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/organizations.spec.ts",
+        "tests/e2e/harness/fixtures.spec.ts"
+      ]
+    },
+    "/api/organizations/transfer-ownership-preview": {
+      "status": "missing"
+    },
+    "/api/organizations/transfer-ownership": {
+      "status": "missing"
+    },
+    "/api/plans/me": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts"
+      ]
+    },
+    "/api/plans/request-upgrade": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts"
+      ]
+    },
+    "/api/portfolio/$claimId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/admin-claims.spec.ts"
+      ]
+    },
+    "/api/privacy/profile-removal": {
+      "status": "missing"
+    },
+    "/api/privacy/profile-removal/verify": {
+      "status": "missing"
+    },
+    "/api/public/scheduling/$invitationId/book": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/cancel": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/decline": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/links/$linkId/import": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/reschedule": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/session": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/slots": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/submission": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/uploads": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/uploads/$documentId/complete": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/public/scheduling/$invitationId/withdraw": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/billing-credits.spec.ts",
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-live.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-reschedule.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/queries/$id/feed-capability": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/queries/$id/share": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/queries/$id/visibility": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/exports.spec.ts"
+      ]
+    },
+    "/api/queries": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/dashboard-and-navigation.spec.ts",
+        "tests/e2e/exports.spec.ts",
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/recommendations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/dashboard-and-navigation.spec.ts"
+      ]
+    },
+    "/api/roadmap": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-and-consent.spec.ts"
+      ]
+    },
+    "/api/scheduling/invitations/$invitationId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-organizer.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/scheduling/invitations/$invitationId/documents/$documentId/download": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-organizer.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/scheduling/invitations/$invitationId/revoke": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-organizer.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/scheduling/invitations/$invitationId/send": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-organizer.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/scheduling/invitations": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/documents.spec.ts",
+        "tests/e2e/interview-privacy.spec.ts",
+        "tests/e2e/scheduling-organizer.spec.ts",
+        "tests/e2e/scheduling.spec.ts"
+      ]
+    },
+    "/api/search/builders": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/onboarding.spec.ts"
+      ]
+    },
+    "/api/search/semantic": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/semantic-search.spec.ts"
+      ]
+    },
+    "/api/solutions/billing-state": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/solutions.spec.ts"
+      ]
+    },
+    "/api/solutions/briefs.$briefId": {
+      "status": "missing"
+    },
+    "/api/solutions/briefs": {
+      "status": "missing"
+    },
+    "/api/solutions/config": {
+      "status": "missing"
+    },
+    "/api/solutions/generate": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/solutions.spec.ts"
+      ]
+    },
+    "/api/solutions/runs.$runId": {
+      "status": "missing"
+    },
+    "/api/solutions/runs": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/account.spec.ts",
+        "tests/e2e/solutions.spec.ts"
+      ]
+    },
+    "/api/sprints/$sprintId": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/sprints/$sprintId/results": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/sprints": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/cross-tenant.spec.ts"
+      ]
+    },
+    "/api/sprints/preview": {
+      "status": "missing"
+    },
+    "/api/status": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/status/subscribe": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/public-content.spec.ts"
+      ]
+    },
+    "/api/webhooks/stripe": {
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/billing-worker-replay.spec.ts",
+        "tests/e2e/api/webhooks-stripe.spec.ts",
+        "tests/e2e/harness/fakes.spec.ts"
+      ]
+    },
+    "/api/work-samples/$id": {
+      "status": "missing"
+    },
+    "/api/work-samples/analyze": {
+      "status": "missing"
+    },
+    "/api/work-samples": {
+      "status": "missing"
+    }
+  },
+  "note": "Generated by scripts/check-e2e-route-coverage.mjs. A route is 'covered' when some spec under tests/e2e/ contains its path as a literal string -- a reference check, not a behavioural one. It answers 'has anyone looked at this route', which is the question that goes unanswered as a codebase grows. 'n/a' requires a written reason; an exemption list without reasons is a place to hide routes."
+}
