@@ -185,6 +185,24 @@
   - Verify (RED): `pnpm test:e2e tests/e2e/api/billing-*.spec.ts` — fails RED on file absence. The 5 files together cover 7 routes × 6 provider scenarios × 4 principals = ~170 assertions; the harness's `withFakeBillingProvider()` fixture scopes the in-memory provider state per test so concurrent scenarios don't bleed.
   - Independent boundary: this task owns **only** the five `tests/e2e/api/billing-*` files. The fake provider itself is read-only here; if a real bug is found in `fake-provider.ts` (e.g. a scenario that doesn't match the comment), capture as a fixme and a separate task.
 
+  **Started 2026-08-02: `tests/e2e/api/billing-authorization.spec.ts` — 31 passing.** The authorization floor,
+  not the scenario matrix.
+
+  The scenario work this task is really about — every route through `FakeBillingProvider`'s six scenarios
+  (`success`, `sca_required`, `decline`, `timeout`, `delayed`, `out_of_order`), asserting what each does to the
+  ledger — is **still open**, and is the five files the task names.
+
+  What landed first is the floor underneath it, because these routes move money: a scenario test proves a
+  decline grants no credits, and says nothing about whether a stranger could reach the endpoint at all. All 15
+  endpoints across 13 files are probed for anonymous refusal, and each is probed with a body naming another
+  organization to prove the organization always comes from the principal. Table compared against the
+  filesystem, same as `admin.spec.ts`, so a new billing endpoint with no probe fails here.
+
+  One route is deliberately not refused: `GET /api/billing/contact/verify` is a click-through target from an
+  email, opened in a browser with no session, and it redirects to sign-in with a callback. Asserting 401 there
+  would be asserting against the feature. It is marked `anonymous: 'link'` and probed for the property that
+  matters instead — a tokenless click neither verifies anything nor names anyone.
+
 - [ ] **Signed Stripe webhooks: raw-body signature verification, duplicate handling, secret rotation, internal re-routing**
   - Files: `tests/e2e/api/webhooks-stripe.spec.ts` (new); `scripts/check-route-coverage.mjs` (verify the public-allowlist entry for `src/routes/api/webhooks/stripe.ts` survives; do not edit)
   - Do: For every documented event type in `webhook-handlers.ts` (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.created`, `payment_intent.succeeded`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`, `account.updated`), build a real Stripe-shaped payload signed with the harness's `signStripeWebhook` helper using the **same** `STRIPE_WEBHOOK_SECRET` the harness is configured with, POST it to `/api/webhooks/stripe`, and assert: (1) `200` with `{received: true, eventId: 'evt_...'}`, (2) one `billing_webhook_events` row persisted with `payloadEncrypted` populated (the row is the **only** persistence — the route never writes subscriptions/credits/ledger), (3) calling `POST /api/admin/billing/run-worker` once after the webhook processes the row into DB effects (task 6 covers the full worker matrix; this task's webhook receive is only the inlet). Then cover the rejection paths: missing `stripe-signature` header → 400 with `code: missing_signature`; valid signature with a timestamp outside the 5-minute tolerance → 400 with `code: stale_timestamp`; signature signed with a stale `STRIPE_WEBHOOK_SECRET_PREVIOUS` but with a **current** timestamp → 200 (rotation window accepts both); wrong `api_version` in the payload → 400 with `code: wrong_api_version`; livemode mismatch → 400 with `code: wrong_livemode`; duplicate `event.id` delivery → 200 with `duplicate: true` and **no** second `billing_webhook_events` row. Cover the `X-Request-Id` header forwarding: a request with `X-Request-Id: req-test-1` is logged under that id (assert by reading the test's captured `console.error` from the `withStrictConsole` helper). Cover the no-content-type fallback: a webhook with `Content-Type: application/octet-stream` and a body that is **valid** JSON still parses (Stripe sometimes sends bytes). Cover the no-user-session property: the handler succeeds with no `auth-session` cookie set; assert by stripping the cookie from the request and confirming the 200 still returns.
