@@ -245,6 +245,11 @@ export function filterToAllowedFields(
 export const SOLUTION_ADAPTERS: readonly string[] = [
   'huggingface_models', 'npm_registry', 'jobindex_roles',
   'arbeitnow_jobs', 'remoteok_jobs', 'jobicy_jobs', 'himalayas_jobs',
+  // The credentialed batch. Listed here so the admin surface stops reporting "no connector" for them — but
+  // every one ships disabled, and four of the seven have never run against a live authenticated endpoint.
+  // `credentialed-job-feeds.ts` says which is which at the top of the file.
+  'jobtech_dev_jobs', 'themuse_jobs', 'arbeitsagentur_jobs',
+  'adzuna_jobs', 'usajobs_jobs', 'france_travail_jobs', 'infojobs_jobs',
 ]
 
 /**

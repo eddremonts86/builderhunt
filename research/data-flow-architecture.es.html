@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BuilderHunt — Flujo de datos y arquitectura de scraping</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --bg-alt: #efeae0;
+      --surface: #ffffff;
+      --line: #e3dcc9;
+      --line-soft: #ece5d4;
+      --ink: #1a1d24;
+      --ink-2: #3a4256;
+      --muted: #7c7a72;
+      --primary: #c97b3f;
+      --primary-2: #e07338;
+      --primary-soft: #f3e2d2;
+      --accent-2: #2f6f5e;
+      --warn: #b06367;
+      --shadow-1: 0 2px 8px rgba(0,0,0,.04);
+      --shadow-2: 0 4px 16px -2px rgba(0,0,0,.06);
+      --shadow-3: 0 12px 32px -8px rgba(0,0,0,.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+      position: relative;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      top: -200px; left: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(192,115,56,.07) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::after {
+      content: "";
+      position: fixed;
+      bottom: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(47,111,94,.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    main { position: relative; z-index: 1; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+    @media (min-width: 768px) { .container { padding: 0 32px; } }
+
+    .hero {
+      padding: 80px 0 56px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .hero-eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .hero-eyebrow::before {
+      content: "";
+      width: 6px; height: 6px;
+      background: var(--primary);
+      border-radius: 50%;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(32px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+      max-width: 880px;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--primary);
+    }
+    .hero p.lede {
+      font-size: 17px;
+      color: var(--ink-2);
+      max-width: 720px;
+      line-height: 1.6;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 28px;
+      margin-top: 32px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .meta-row span strong {
+      color: var(--ink);
+      font-weight: 600;
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    section { padding: 64px 0; }
+    section + section { border-top: 1px solid var(--line-soft); }
+
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(24px, 3vw, 32px);
+      letter-spacing: -0.005em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2 .layer-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      color: var(--ink);
+      letter-spacing: -0.005em;
+    }
+    p { color: var(--ink-2); margin-bottom: 12px; }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: var(--line-soft);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--ink);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px 28px;
+      box-shadow: var(--shadow-1);
+      margin: 16px 0;
+    }
+    .card.tight { padding: 18px 22px; }
+    .card-warn {
+      background: #fdf6f3;
+      border: 1px solid #e9c9bd;
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin: 18px 0;
+      font-size: 14px;
+      color: #6e3a2a;
+    }
+    .card-warn strong { color: var(--warn); }
+
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px;
+      margin: 24px 0;
+      box-shadow: var(--shadow-1);
+      overflow-x: auto;
+    }
+    .diagram-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .mermaid {
+      text-align: center;
+      font-family: 'Outfit', sans-serif !important;
+    }
+    .mermaid svg { max-width: 100%; height: auto; }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .source-pill {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .source-pill:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-2);
+    }
+    .source-pill .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent-2);
+    }
+    .source-pill.blocked .dot { background: var(--warn); }
+    .source-pill.api .dot { background: var(--primary); }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      row-gap: 8px;
+      column-gap: 16px;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    .kv dt {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .kv dd { margin: 0; color: var(--ink-2); }
+
+    .tbl {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+    .tbl th, .tbl td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .tbl th {
+      background: var(--bg-alt);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .tbl td { color: var(--ink-2); }
+    .tbl tr:last-child td { border-bottom: 0; }
+    .tbl td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .pill.on { background: #d8ead8; color: #2f6f5e; }
+    .pill.off { background: #f5d8d4; color: #b06367; }
+    .pill.dim { background: var(--line-soft); color: var(--muted); }
+
+    nav.toc {
+      position: sticky;
+      top: 0;
+      background: rgba(247, 245, 240, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line-soft);
+      z-index: 100;
+      padding: 14px 0;
+    }
+    nav.toc .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      align-items: center;
+      font-size: 13px;
+    }
+    nav.toc .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-right: 8px;
+    }
+    nav.toc a {
+      color: var(--ink-2);
+      text-decoration: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      transition: all 0.15s;
+      font-weight: 500;
+    }
+    nav.toc a:hover {
+      background: var(--primary-soft);
+      color: var(--primary);
+    }
+
+    footer {
+      padding: 48px 0 64px;
+      border-top: 1px solid var(--line-soft);
+      font-size: 13px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 56px 0 40px; }
+      section { padding: 40px 0; }
+      .kv { grid-template-columns: 1fr; }
+      .meta-row { gap: 18px; }
+      .diagram { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="toc">
+    <div class="container">
+      <span class="label">Secciones</span>
+      <a href="#overview">Visión general</a>
+      <a href="#sources">Fuentes</a>
+      <a href="#search">Búsqueda en vivo</a>
+      <a href="#discovery">Worker de discovery</a>
+      <a href="#enrichment">Worker de enrichment</a>
+      <a href="#content">Sync de contenido</a>
+      <a href="#db">Persistencia</a>
+      <a href="#safety">Capa de seguridad</a>
+      <a href="#ops">Operaciones</a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="container">
+        <div class="hero-eyebrow">Arquitectura · Documentación interna</div>
+        <h1>Cómo BuilderHunt <em>importa, scrapea y decide</em> qué se convierte en un perfil de builder.</h1>
+        <p class="lede">
+          Tres rutas de ingestión comparten una única capa de seguridad: una búsqueda federada en vivo sobre 15 fuentes,
+          un worker asíncrono de discovery que calienta el índice semántico cada 15 minutos, y un pipeline de
+          enrichment con policy gate que re-valida la identidad pública de cada builder. El diagrama de abajo
+          mapea cada pieza — desde la ruta que recibe una consulta, hasta el conector que llama a GitHub, hasta la fila
+          que aterriza en Postgres.
+        </p>
+        <div class="meta-row">
+          <span><strong>Stack</strong>TanStack Start · Drizzle · Postgres · React 19</span>
+          <span><strong>Fuentes activas</strong>15 (3 bloqueadas)</span>
+          <span><strong>Workers</strong>Discovery · Enrichment · Sync de contenido</span>
+          <span><strong>Spec</strong>plans/phase-1/42-stealth-scraping</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- OVERVIEW -->
+    <section id="overview">
+      <div class="container">
+        <h2><span class="layer-num">00</span>Visión general del sistema</h2>
+        <p>Tres pipelines independientes escriben en una única base de datos compartida. Cada uno corre con su
+          propio trigger, su propio presupuesto de rate y su propia capa de políticas. La búsqueda en vivo es
+          síncrona y acotada a la request; los workers son asíncronos y por lotes.</p>
+
+        <div class="diagram">
+          <div class="diagram-title">Arquitectura end-to-end</div>
+          <div class="mermaid">
+flowchart TB
+  User(["Reclutador / miembro"]):::user
+  Cron(["Scheduler · 15 min"]):::cron
+
+  subgraph LIVE["Búsqueda en vivo (acotada a la request)"]
+    direction TB
+    QR["/api/queries<br/>+ /api/search"]:::api
+    Search["searchBuilders<br/>(src/lib/search)"]:::orchestrator
+    Sources["15 conectores fuente<br/>src/lib/sources/*.ts"]:::connectors
+  end
+
+  subgraph ASYNC["Workers asíncronos"]
+    direction TB
+    DiscW["Discovery worker<br/>src/lib/discovery/worker.ts"]:::worker
+    EnrichW["Enrichment worker<br/>src/lib/enrichment/worker.ts"]:::worker
+    SyncW["Content sync<br/>scripts/db/sync-platform-content.ts"]:::worker
+  end
+
+  subgraph SAFETY["Capa de seguridad"]
+    direction TB
+    Robots["Caché de robots.txt<br/>(según RFC 9309)"]:::safety
+    Net["safeFetch<br/>(SSRF + host allowlist + byte cap)"]:::safety
+    Pol["Registro de políticas de fuente<br/>(compile-time + runtime)"]:::safety
+    Res["Resolver determinístico<br/>(score → accept/review/reject)"]:::safety
+  end
+
+  DB[("Postgres · Drizzle ORM<br/>enrichment_jobs, enrichment_evidence,<br/>builder_embeddings, builder_identities,<br/>organization_builders, changelog, roadmap_items")]:::db
+
+  UI["Superficies de salida<br/>/builders/$id · /changelog · /roadmap<br/>/admin/enrichment · /admin/discovery"]:::ui
+
+  User -->|consulta escrita| QR
+  QR --> Search --> Sources
+  Sources -->|payload de evidencia| Search -->|resultados rankeados| UI
+
+  Cron --> DiscW
+  DiscW -->|búsqueda federada por celda| Search
+  DiscW -->|write-through de stubs| DB
+
+  User -->|refresh / claim| EnrichW
+  EnrichW --> Pol
+  Pol -->|conectores habilitados| Net
+  Net -->|chequeo de robots| Robots
+  Net -->|evidencia obtenida| Res
+  Res -->|accepted/review/rejected| DB
+  Res --> DB
+
+  GitFs[("content/changelog/*.md<br/>content/roadmap/*.md")]:::fs
+  GitFs --> SyncW --> DB
+  DB --> UI
+
+  classDef user fill:#fff,stroke:#c97b3f,stroke-width:2px,color:#1a1d24
+  classDef cron fill:#fff,stroke:#2f6f5e,stroke-width:2px,color:#1a1d24
+  classDef api fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px,color:#1a1d24
+  classDef orchestrator fill:#fef3e8,stroke:#e07338,stroke-width:2px,color:#1a1d24
+  classDef connectors fill:#fff,stroke:#c97b3f,stroke-width:1.5px,color:#1a1d24
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px,color:#1a1d24
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px,color:#6e3a2a
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px,color:#1a1d24
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px,color:#1a1d24
+  classDef fs fill:#fff,stroke:#2f6f5e,stroke-width:1.5px,color:#1a1d24,stroke-dasharray:3 2
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Las tres rutas de ingestión independientes</h3>
+          <dl class="kv">
+            <dt>Ruta 1 — Búsqueda en vivo</dt>
+            <dd>El usuario escribe una consulta → <code>/api/queries</code> o <code>/api/search</code> →
+              el orquestador <code>searchBuilders()</code> reparte en paralelo a los 15 conectores fuente →
+              los resultados se normalizan a <code>RawBuilder</code> y se devuelven. Esta ruta no persiste nada
+              más allá de analítica.</dd>
+            <dt>Ruta 2 — Discovery worker</dt>
+            <dd>Un cron cada 15 min recorre la <code>DISCOVERY_MATRIX</code> curada (30 topics × 4 grupos de fuentes)
+              → para cada celda ejecuta <code>searchBuilders()</code> → escribe con write-through los resultados
+              con <code>kind === 'person'</code> en <code>builder_embeddings</code> como stubs (sin payload
+              completo). Infraestructura pura, sin llamadas a LLMs.</dd>
+            <dt>Ruta 3 — Enrichment worker</dt>
+            <dd>El usuario dispara "Refresh public evidence" sobre un builder trackeado → se encola una fila en
+              <code>enrichment_jobs</code> → el worker reclama la fila con un lease → por cada conector permitido,
+              <code>safeFetch()</code> obtiene el registro público → el resolver puntúa de forma determinística →
+              la evidencia se persiste con su ventana de retención (30d raw, 180d accepted).</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- SOURCES -->
+    <section id="sources">
+      <div class="container">
+        <h2><span class="layer-num">01</span>15 conectores fuente · una única forma</h2>
+        <p>Cada fuente implementa el mismo contrato: input <code>{keywords, sources, perPage}</code> → output
+          <code>RawBuilder[]</code>. La forma está definida en <code>src/lib/sources/types.ts</code> y el comentario
+          sobre <code>BuilderKind</code> es inusualmente explícito sobre el modo de fallo que previene:</p>
+
+        <div class="card tight">
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; color: var(--ink);">
+            <span style="color: var(--primary);">/**</span><br>
+            <span style="color: var(--primary);">&nbsp;* <code>organization</code> was added after 30 of 60 GitHub results turned out to be repositories and one of the</span><br>
+            <span style="color: var(--primary);">&nbsp;* "people" was a company account. A recruiter searching for people must not be shown either,</span><br>
+            <span style="color: var(--primary);">&nbsp;* and merging either into a canonical human is not a subtle error.</span><br>
+            <span style="color: var(--primary);">&nbsp;*/</span><br>
+            <span style="color: var(--ink-2);">export type</span> BuilderKind = <span style="color: var(--primary);">'person'</span> | <span style="color: var(--primary);">'repo'</span> | <span style="color: var(--primary);">'organization'</span>
+          </p>
+        </div>
+
+        <h3>Fuentes activas</h3>
+        <div class="source-grid">
+          <div class="source-pill api"><span class="dot"></span>github</div>
+          <div class="source-pill api"><span class="dot"></span>gitlab</div>
+          <div class="source-pill api"><span class="dot"></span>codeberg</div>
+          <div class="source-pill api"><span class="dot"></span>sourcehut</div>
+          <div class="source-pill api"><span class="dot"></span>hn</div>
+          <div class="source-pill api"><span class="dot"></span>reddit</div>
+          <div class="source-pill api"><span class="dot"></span>devto</div>
+          <div class="source-pill api"><span class="dot"></span>hashnode</div>
+          <div class="source-pill api"><span class="dot"></span>stackoverflow</div>
+          <div class="source-pill api"><span class="dot"></span>npm</div>
+          <div class="source-pill api"><span class="dot"></span>huggingface</div>
+          <div class="source-pill api"><span class="dot"></span>lobsters</div>
+          <div class="source-pill api"><span class="dot"></span>devpost</div>
+          <div class="source-pill api"><span class="dot"></span>producthunt</div>
+          <div class="source-pill api"><span class="dot"></span>bluesky</div>
+        </div>
+
+        <h3>Bloqueadas a compile-time</h3>
+        <p>Estos conectores están definidos como políticas pero su entrada con <code>status: 'blocked'</code> en
+          <code>src/lib/enrichment/policies.ts</code> hace que el registry no pueda ejecutarlos nunca — independientemente
+          del env o del allowlist de runtime. La razón está registrada en <code>permissionReference</code> con
+          enlace a los términos del proveedor.</p>
+        <div class="source-grid">
+          <div class="source-pill blocked"><span class="dot"></span>linkedin</div>
+          <div class="source-pill blocked"><span class="dot"></span>x</div>
+          <div class="source-pill blocked"><span class="dot"></span>facebook</div>
+          <div class="source-pill blocked"><span class="dot"></span>instagram</div>
+        </div>
+
+        <div class="card-warn">
+          <strong>Regla dura.</strong> Un conector sin entrada en el registro de políticas, o con
+          <code>status !== 'enabled'</code>, queda deshabilitado. El allowlist de runtime
+          <code>ENRICHMENT_ALLOWED_CONNECTORS</code> solo puede <em>restringir</em> el conjunto habilitado
+          en compile-time — nunca puede reactivar un conector bloqueado. Cubierto por
+          <code>policies.test.ts</code> como la "garantía de fail-closed".
+        </div>
+      </div>
+    </section>
+
+    <!-- LIVE SEARCH -->
+    <section id="search">
+      <div class="container">
+        <h2><span class="layer-num">02</span>Ruta 1 · Búsqueda federada en vivo</h2>
+        <p>Disparada por un reclutador desde el dashboard. Síncrona. Por request: una llamada al orquestador,
+          N llamadas en paralelo a los conectores, normalización, ranking, respuesta.</p>
+
+        <div class="diagram">
+          <div class="diagram-title">Secuencia de búsqueda en vivo</div>
+          <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as Usuario
+  participant R as /api/queries / /api/search
+  participant T as requireTenantPrincipal
+  participant S as searchBuilders
+  participant C as Conectores fuente (en paralelo)
+  participant P as Superficie de perfil
+
+  U->>R: consulta + filtros
+  R->>T: authn + tenant context
+  T-->>R: principal { orgId, userId }
+  R->>R: rateLimit + chequeo de entitlement
+  R->>S: { keywords, sources, perPage }
+  par paralelo por fuente
+    S->>C: searchUsers(keywords, source=Github)
+    S->>C: searchUsers(keywords, source=GitLab)
+    S->>C: searchUsers(keywords, source=HN)
+    S->>C: searchUsers(keywords, source=...)
+  end
+  C-->>S: RawBuilder[] (o vacío en error)
+  S->>S: hydrate + dedupe + score
+  S-->>R: builders rankeados
+  R-->>U: JSON · tenant-scoped
+  U->>P: abre /builders/$id
+  P-->>U: perfil + tarjetas de actividad reciente
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Detalles clave de implementación</h3>
+          <dl class="kv">
+            <dt>Cortesía por fuente</dt>
+            <dd>Cada conector tiene su propio rate limit y uso de tokens. GitHub usa <code>api.github.com/search/users</code>
+              con el qualifier <code>type:user</code> + hidratación vía <code>/users/{login}</code> (una llamada por
+              resultado — el endpoint de búsqueda no envía <em>ningún</em> display name, bio ni location, solo login +
+              avatar + html_url).</dd>
+            <dt>HN usa Algolia, no Firebase</dt>
+            <dd>La API Firebase de HN no tiene búsqueda full-text; el conector usa <code>hn.algolia.com/api/v1/search</code>
+              con <code>tags=(story,comment)</code> y agrega los hits por autor (count, best title, recency, top
+              points). El HTML crudo de bios/comments se limpia a texto plano.</dd>
+            <dt>Esta ruta no persiste datos</dt>
+            <dd>La búsqueda en vivo es de solo lectura. Los únicos writes que dispara son eventos analíticos. Para
+              que un builder quede "trackeado", el usuario debe añadirlo explícitamente a una lista — eso es lo
+              que crea la fila en <code>organization_builders</code> y siembra la cola de enrichment.</dd>
+            <dt>Aislamiento de fallos</dt>
+            <dd>Un conector que lanza excepción o devuelve <code>[]</code> se loga y se salta — nunca aborta la
+              búsqueda. El usuario ve las fuentes que respondieron, nunca las que no.</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- DISCOVERY -->
+    <section id="discovery">
+      <div class="container">
+        <h2><span class="layer-num">03</span>Ruta 2 · Discovery worker proactivo</h2>
+        <p>Calienta el índice de búsqueda semántico <em>antes</em> de que los usuarios reales busquen. Lo dispara
+          un scheduler externo cada 15 minutos vía el endpoint HTTP-cron de admin. Sin LLMs, sin writes por
+          usuario, infraestructura pura.</p>
+
+        <div class="diagram">
+          <div class="diagram-title">Discovery worker — una ejecución</div>
+          <div class="mermaid">
+flowchart LR
+  Cron["Scheduler<br/>(15 min)"]:::cron -->|HTTP POST| EP["/api/admin/discovery/run-worker<br/>o /api/admin/operations/$jobKey"]:::api
+  EP -->|disparo| DW["runDiscoveryWorker()"]:::orchestrator
+  DW -->|cargar cursor| DB[("discovery_state<br/>cursor + stats")]:::db
+  DW -->|for i in 0..CELLS_PER_RUN| Cell["cellAt(cursor)"]:::orchestrator
+  Cell -->|keywords + sources| SB["searchBuilders()"]:::worker
+  SB -->|RawBuilder[]| Filter["filtra kind==='person'"]:::worker
+  Filter -->|N personas| Cap{"¿capado?<br/>redis:discovery:stubs:DATE"}:::safety
+  Cap -->|no| Upsert["upsertEmbeddingStubs(N)"]:::db
+  Cap -->|sí| Skip["salta celda"]:::worker
+  Upsert --> DB2[("builder_embeddings<br/>(stubs, sin payload completo)")]:::db
+  Skip --> Next
+  Upsert --> Next["nextCursor + persist state"]:::orchestrator
+  Next --> DB
+  Next --> Report["{ cellsRun, upserted, capped }"]:::ui
+
+  classDef cron fill:#fff,stroke:#2f6f5e,stroke-width:2px
+  classDef api fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef orchestrator fill:#fef3e8,stroke:#e07338,stroke-width:2px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>La matriz</h3>
+          <p>Se construye de forma determinística a partir de 30 topics curados × 4 grupos de fuentes. Cada topic
+            produce dos celdas (grupos de fuentes adyacentes, rotados según el índice del topic) para que ningún
+            topic repita un grupo y todos los grupos se ejerciten de forma equilibrada a lo largo de la matriz.</p>
+          <table class="tbl">
+            <thead>
+              <tr><th>Grupo</th><th>Fuentes</th><th>Por qué agrupadas</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><strong>code</strong></td><td class="mono">github · gitlab · codeberg</td><td>Plataformas de hosting de código</td></tr>
+              <tr><td><strong>community</strong></td><td class="mono">hn · reddit · lobsters</td><td>Discusión en agregadores</td></tr>
+              <tr><td><strong>content</strong></td><td class="mono">devto · stackoverflow</td><td>Artículo largo + Q&amp;A</td></tr>
+              <tr><td><strong>registries</strong></td><td class="mono">npm · huggingface</td><td>Releases de paquetes / modelos</td></tr>
+            </tbody>
+          </table>
+          <h3>Cuenta de pacing (según spec)</h3>
+          <p>≤ 4 fuentes por celda, secuencial entre celdas (nunca paralelo entre celdas), capeado a
+            <code>DISCOVERY_DAILY_STUB_CAP</code> stubs por día. El cursor en <code>discovery_state</code> envuelve
+            módulo la longitud de la matriz; una key desconocida resetea a 0. El contador de stubs en Redis tiene
+            un TTL de 2 días (cubre desfases de reloj) y cae a un mapa en memoria cuando Redis no está
+            configurado.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENRICHMENT -->
+    <section id="enrichment">
+      <div class="container">
+        <h2><span class="layer-num">04</span>Ruta 3 · Public profile enrichment</h2>
+        <p>El pipeline más cuidadosamente delimitado. Se dispara cuando un miembro de una organización pulsa
+          "Refresh public evidence" sobre un builder trackeado. Reclama un job, ejecuta los conectores
+          permitidos, hace fetch con la capa completa de seguridad, puntúa con un resolver determinístico y
+          persiste la evidencia.</p>
+
+        <div class="card-warn">
+          <strong>Estado en producción (spec §0).</strong> code-complete-dark a 2026-07-20: fases 0–6
+          implementadas, pero <code>ENRICHMENT_ENABLED=false</code> en todos los entornos. El canario de 7 días,
+          los tests de fixtures de RLS y la aprobación de copy legal siguen siendo huecos explícitos. La spec
+          está en <code>plans/phase-1/42-stealth-scraping/spec.md</code>; el nombre del directorio
+          <code>stealth-scraping</code> es legacy — el copy de producto debe usar <em>Public Profile
+          Enrichment</em>.
+        </div>
+
+        <div class="diagram">
+          <div class="diagram-title">Job de enrichment — ciclo de vida completo</div>
+          <div class="mermaid">
+flowchart TB
+  subgraph Trigger["Disparo"]
+    UI["El miembro pulsa Refresh<br/>+ envía URL(s)"]:::user
+    UI -->|encolar| Job[("enrichment_jobs<br/>(queued, lease)")]:::db
+  end
+
+  subgraph Worker["Worker · runEnrichmentWorker()"]
+    Reclaim["reclaimExpiredLeases"]:::worker
+    Claim["claimDueEnrichmentJobs<br/>(FOR UPDATE SKIP LOCKED)"]:::worker
+    Restrict{"¿isBuilderProcessingRestricted?"}:::safety
+    Conns["getExecutableConnectors<br/>(policy ∩ allowlist)"]:::safety
+    Process["processEnrichmentJob"]
+    Retent["runEnrichmentRetentionPass<br/>(30d raw · 180d accepted)"]:::worker
+  end
+
+  subgraph PerConnector["Por conector · secuencial"]
+    Sup{"¿connector.supports(target)?"}:::safety
+    Fetch["safeFetch(url, allowedHosts)"]:::safety
+    subgraph Safety["Capa de seguridad (network.ts)"]
+      S1["Solo HTTPS"]:::safety
+      S2["DNS solo IP pública"]:::safety
+      S3["sin credenciales en URL"]:::safety
+      S4["máx 3 redirects<br/>+ revalidar host"]:::safety
+      S5["timeout 10s"]:::safety
+      S6["byte cap 2 MB"]:::safety
+      S7["allowlist de content-type"]:::safety
+    end
+    Robots["isPathAllowedByRobots<br/>(caché 1h, fail-closed)"]:::safety
+    Parse["parse + normalize → EnrichmentEvidencePayload"]:::worker
+    Hash["computeEvidenceContentHash"]:::worker
+    Res["resolveEnrichmentCandidate<br/>(score, signal, contradiction)"]:::worker
+    Persist["persistEnrichmentEvidence<br/>(resolution, confidence, expiresAt)"]:::db
+  end
+
+  subgraph Outcomes["Outcomes del job"]
+    OK["succeeded"]:::db
+    Par["partial"]:::db
+    Fail["failed"]:::db
+    Retry["retry con backoff<br/>5m → 30m → 2h"]:::safety
+  end
+
+  Job --> Reclaim --> Claim
+  Claim --> Restrict
+  Restrict -->|sí| Fail
+  Restrict -->|no| Conns
+  Conns -->|sin conectores| Fail
+  Conns --> Process
+  Process --> Sup
+  Sup -->|no| Conns
+  Sup -->|sí| Fetch
+  Fetch --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+  S7 --> Robots
+  Robots -->|disallowed| Conns
+  Robots -->|no_robots_file o allowed| Parse
+  Parse --> Hash --> Res --> Persist --> Conns
+  Conns -->|todo hecho| Outcomes
+  Outcomes --> Retent
+
+  classDef user fill:#fff,stroke:#c97b3f,stroke-width:2px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>El resolver — determinístico, versionado, sin LLM</h3>
+        <p>Cada candidato a evidencia se puntúa contra el target. La puntuación es una suma de basis points
+          (máx. 10.000) sobre señales independientes:</p>
+        <table class="tbl">
+          <thead>
+            <tr><th>Señal</th><th>Puntos</th><th>Disparador</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>verified_owner_cross_link</code></td><td class="mono">10000</td><td>El dueño del perfil envió la URL</td></tr>
+            <tr><td><code>exact_stable_source_id</code></td><td class="mono">10000</td><td>El source ID del candidato coincide con el del target</td></tr>
+            <tr><td><code>exact_username_reciprocal_link</code></td><td class="mono">9500</td><td>Mismo username Y existe link recíproco</td></tr>
+            <tr><td><code>exact_username</code></td><td class="mono">4000</td><td>Mismo username, sin link recíproco aún</td></tr>
+            <tr><td><code>exact_full_name</code></td><td class="mono">2500</td><td>El display name normalizado coincide</td></tr>
+            <tr><td><code>organization_agreement</code></td><td class="mono">2000</td><td>La org auto-declarada coincide con la org conocida</td></tr>
+            <tr><td><code>location_agreement</code></td><td class="mono">1000</td><td>La location normalizada coincide</td></tr>
+            <tr><td><code>topic_overlap</code></td><td class="mono">0–1000</td><td>Ratio Jaccard × 1000</td></tr>
+          </tbody>
+        </table>
+        <div class="card">
+          <dl class="kv">
+            <dt>accept_threshold</dt><dd>≥ 9.000 bps + ≥ 2 match signals (o flag de verified_owner en solitario)</dd>
+            <dt>review_threshold</dt><dd>≥ 7.000 bps y por debajo de accept</dd>
+            <dt>name_and_org_mismatch_cap</dt><dd>Si tanto el nombre como la organización difieren, los bps totales
+              se capean a 6.900 sin importar el resto de señales</dd>
+            <dt>forced_reject</dt><dd><code>conflicting_stable_source_id</code> o <code>verified_owner_rejected</code>
+              siempre ganan</dd>
+            <dt>resolver_version</dt><dd>1 — persistido con cada fila de evidencia para que el scoring se pueda
+              re-ejecutar de forma determinística</dd>
+          </dl>
+        </div>
+
+        <h3>Retry y retención</h3>
+        <div class="card">
+          <dl class="kv">
+            <dt>Backoff determinístico</dt><dd>5 min → 30 min → 2 h ante <code>rate_limited</code> o
+              <code>upstream_unavailable</code>. Tras <code>ENRICHMENT_MAX_ATTEMPTS</code> el job queda
+              <code>failed</code>.</dd>
+            <dt>Lease</dt><dd>Cada job reclamado lleva un lease (<code>ENRICHMENT_LEASE_SECONDS</code>). Si el worker
+              se cae, <code>reclaimExpiredEnrichmentLeases</code> pasa el job a la siguiente ejecución.</dd>
+            <dt>Pase de retención</dt><dd>Tras cada batch, se eliminan en lotes de 500 las filas con más de
+              <code>ENRICHMENT_RAW_RETENTION_DAYS</code> (30 d) para evidencia cruda y
+              <code>ENRICHMENT_ACCEPTED_RETENTION_DAYS</code> (180 d) para evidencia aceptada.</dd>
+            <dt>Cascada de restricción del sujeto</dt><dd>Si se restringe el procesamiento de un builder, se
+              cancelan todos los jobs activos para esa identidad y se purga toda la evidencia en cada
+              organización — no solo en la que lo pidió.</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTENT SYNC -->
+    <section id="content">
+      <div class="container">
+        <h2><span class="layer-num">05</span>Ruta 4 · Sync de contenido de plataforma</h2>
+        <p>No es scraping propiamente dicho — es un sync de archivos a base de datos para las páginas públicas
+          <code>/changelog</code> y <code>/roadmap</code>. La fuente de verdad vive en git; la base de datos es
+          el read model.</p>
+
+        <div class="diagram">
+          <div class="diagram-title">Flujo del sync de contenido</div>
+          <div class="mermaid">
+flowchart LR
+  F1["content/changelog/*.md"]:::fs
+  F2["content/roadmap/*.md"]:::fs
+  Script["scripts/db/sync-platform-content.ts<br/>(pnpm content:sync)"]:::worker
+  D1[("changelog table")]:::db
+  D2[("roadmap_items table")]:::db
+  Public["/changelog + /roadmap<br/>(rutas públicas)"]:::ui
+
+  F1 --> Script
+  F2 --> Script
+  Script -->|id determinístico<br/>content-changelog-&lt;slug&gt;| D1
+  Script -->|id determinístico<br/>content-roadmap-&lt;slug&gt;| D2
+  D1 --> Public
+  D2 --> Public
+
+  classDef fs fill:#fff,stroke:#2f6f5e,stroke-width:1.5px,stroke-dasharray:3 2
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Garantías que aplica el script</h3>
+          <dl class="kv">
+            <dt>Idempotente</dt><dd>Volver a ejecutarlo no cambia nada salvo que un archivo haya cambiado</dd>
+            <dt>Respeta el ámbito</dt><dd>No toca filas que no le pertenecen. Las filas gestionadas por archivo
+              tienen IDs determinísticos (<code>content-changelog-&lt;slug&gt;</code>,
+              <code>content-roadmap-&lt;slug&gt;</code>); las filas creadas en el admin UI tienen IDs aleatorios
+              y se respetan, incluso con <code>--prune</code></dd>
+            <dt>shipped_at preservado</dt><dd>Se establece una sola vez, en la ejecución que ve
+              <code>status: shipped</code> por primera vez, y nunca se recalcula. Redesplegar no desplaza la fecha
+              de "shipped"</dd>
+            <dt>Votos preservados</dt><dd>Los votos del roadmap sobreviven porque los IDs son estables</dd>
+            <dt>Dirección inversa</dt><dd><code>--export</code> escribe filas de la DB de vuelta a archivos,
+              útil para la primera migración desde admin-UI a contenido gestionado por archivos</dd>
+            <dt>Por rol</dt><dd>Conecta como <code>DATABASE_PLATFORM_URL</code> (el rol al que la migración 0012
+              concede INSERT/UPDATE/DELETE sobre estas tres tablas) o cae a <code>DATABASE_URL</code> (el owner
+              de la DB en local)</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- PERSISTENCE -->
+    <section id="db">
+      <div class="container">
+        <h2><span class="layer-num">06</span>Persistencia · qué aterriza en Postgres</h2>
+        <p>Un único schema de Drizzle, muchas tablas. RLS fuerza el aislamiento por tenant en cada fila salvo
+          en las tablas a nivel de plataforma (changelog, roadmap, discovery_state).</p>
+
+        <table class="tbl">
+          <thead>
+            <tr><th>Tabla</th><th>La escribe</th><th>Propósito</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">enrichment_jobs</td>
+              <td>rutas / worker</td>
+              <td>Cola de refresh de evidencia con leases, intentos y status</td>
+            </tr>
+            <tr>
+              <td class="mono">enrichment_evidence</td>
+              <td>worker · resolver</td>
+              <td>Evidencia puntuada con content hash, fuente, expiresAt y resolver_version</td>
+            </tr>
+            <tr>
+              <td class="mono">builder_embeddings</td>
+              <td>discovery worker</td>
+              <td>Stubs del índice de búsqueda (sin payload completo) para que el índice semántico esté pre-calentado</td>
+            </tr>
+            <tr>
+              <td class="mono">builder_identities</td>
+              <td>usuario / enrichment</td>
+              <td>Registro canónico de persona tras la resolución de identidad cross-source</td>
+            </tr>
+            <tr>
+              <td class="mono">organization_builders</td>
+              <td>usuario / API</td>
+              <td>Join con scope de tenant: qué organizaciones siguen a qué builder</td>
+            </tr>
+            <tr>
+              <td class="mono">discovery_state</td>
+              <td>discovery worker</td>
+              <td>Fila única con cursor + stats de ejecuciones (runs, upserted, errors)</td>
+            </tr>
+            <tr>
+              <td class="mono">changelog</td>
+              <td>content sync</td>
+              <td>Entradas de changelog público (IDs determinísticos a partir de los archivos markdown)</td>
+            </tr>
+            <tr>
+              <td class="mono">roadmap_items</td>
+              <td>content sync + admin</td>
+              <td>Roadmap con <code>shipped_at</code> fijado una vez y preservado</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SAFETY GATE -->
+    <section id="safety">
+      <div class="container">
+        <h2><span class="layer-num">07</span>Capa de seguridad · la política que dice no</h2>
+        <p>La característica más importante del pipeline de enrichment no es lo que hace, sino lo que se niega
+          a hacer. El registro de políticas y la capa <code>safeFetch</code> son las únicas dos cosas que un
+          autor de conectores tiene que entender.</p>
+
+        <h3>La política de doble capa</h3>
+        <div class="diagram">
+          <div class="diagram-title">Intersección de compile-time y runtime</div>
+          <div class="mermaid">
+flowchart LR
+  subgraph Compile["Compile-time (src/lib/enrichment/policies.ts)"]
+    SP["SOURCE_POLICIES<br/>(objeto congelado)"]:::safety
+    R1["¿reviewExpiresAt en el futuro?"]:::safety
+    R2["¿status === 'enabled'?"]:::safety
+    R3["¿no está en HARD_BLOCKED?"]:::safety
+    R4["¿lawfulBasisReference definido?"]:::safety
+  end
+
+  subgraph Runtime["Runtime (env var)"]
+    Env["ENRICHMENT_ALLOWED_CONNECTORS"]:::worker
+  end
+
+  Graph["getExecutableConnectors()"]:::orchestrator
+  Conns["conectores que efectivamente corren"]:::worker
+
+  SP --> R1 --> R2 --> R3 --> R4
+  Env --> Graph
+  R4 -->|set en compile-time| Graph
+  Graph -->|intersección| Conns
+
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef orchestrator fill:#fef3e8,stroke:#e07338,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>La capa safeFetch (network.ts)</h3>
+        <p>Cada request saliente desde un conector debe pasar por <code>safeFetch()</code>. El test
+          <code>registry.test.ts</code> lo fuerza con un escaneo estático: cualquier fuente de conector que
+          llame a <code>fetch</code> directamente falla el test. La capa completa:</p>
+        <table class="tbl">
+          <thead>
+            <tr><th>Capa</th><th>Qué fuerza</th><th>Por qué</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Validación de URL</td><td>Solo HTTPS, solo IP pública, sin credenciales en la URL</td>
+              <td>SSRF: evita que el worker se convierta en proxy hacia red interna o endpoints de metadata</td></tr>
+            <tr><td>Host allowlist</td><td><code>allowedHosts</code> por política de fuente, con match de subdominio</td>
+              <td>Defensa en profundidad — aunque la validación pase, el host debe estar pre-declarado</td></tr>
+            <tr><td>Redirects</td><td>máx 3 saltos, host revalidado en cada salto</td>
+              <td>Previene SSRF basado en redirects (fetch A → 302 → B donde B es interno)</td></tr>
+            <tr><td>Timeout</td><td>10 s</td><td>El worker se mantiene acotado</td></tr>
+            <tr><td>Byte cap</td><td>2 MB</td><td>Previene agotamiento de memoria y mantiene payloads razonables</td></tr>
+            <tr><td>Allowlist de content-type</td><td>json · html · plain (+ extras opt-in por llamada)</td>
+              <td>Rechaza binarios; el adaptador RSS de Jobindex opta por <code>application/rss+xml</code> por llamada</td></tr>
+            <tr><td>Charset fallback</td><td>El charset declarado gana; si no, el fallback por llamada</td>
+              <td>Feeds legacy declaran ISO-8859-1 en el prologo; decodificar como UTF-8 corrompe los caracteres daneses de forma permanente</td></tr>
+          </tbody>
+        </table>
+
+        <h3>robots.txt — fail-closed con tres outcomes distintos</h3>
+        <div class="card">
+          <p>El comentario sobre <code>RobotsDecision</code> es inusualmente explícito sobre un bug sutil que
+            se arregló:</p>
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; color: var(--ink);">
+            <span style="color: var(--primary);">/**</span><br>
+            <span style="color: var(--primary);">&nbsp;* <code>unavailable</code> used to mean two different things, and the</span><br>
+            <span style="color: var(--primary);">&nbsp;* difference matters. RFC 9309 §2.3.1.3 is explicit: a 4xx on</span><br>
+            <span style="color: var(--primary);">&nbsp;* <code>/robots.txt</code> means the crawler <strong>may access any resource</strong>.</span><br>
+            <span style="color: var(--primary);">&nbsp;* Collapsing that into the same value as a timeout forced every</span><br>
+            <span style="color: var(--primary);">&nbsp;* caller to choose between refusing most of the public web and</span><br>
+            <span style="color: var(--primary);">&nbsp;* ignoring genuine failures.</span><br>
+            <span style="color: var(--primary);">&nbsp;*/</span>
+          </p>
+          <table class="tbl" style="margin-top: 16px;">
+            <thead>
+              <tr><th>Outcome</th><th>Significado</th><th>Comportamiento del conector</th></tr>
+            </thead>
+            <tbody>
+              <tr><td><code>allowed</code></td><td>El sitio respondió 2xx, el path pasa las reglas específicas de UA</td>
+                <td>Proceder con el fetch</td></tr>
+              <tr><td><code>no_robots_file</code></td><td>El sitio respondió 4xx — RFC 9309 dice: <em>permiso</em></td>
+                <td>Proceder (los callers conservadores pueden seguir negando)</td></tr>
+              <tr><td><code>disallowed</code></td><td>Una regla específica de UA hizo match con un <code>Disallow</code></td>
+                <td>Rechazar el fetch</td></tr>
+              <tr><td><code>unavailable</code></td><td>Timeout, 5xx u otro fallo real</td>
+                <td>Rechazar el fetch (fail-closed)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Lo que la spec prohíbe de forma tajante</h3>
+        <div class="card-warn">
+          <strong>Prohibiciones absolutas (spec §3).</strong> Nada de CAPTCHA solving · nada de
+          Playwright/Patchright/Selenium · nada de WARP/Tor/residential proxying · nada de importar session
+          cookies · nada de Google dorking · nada de scraping de páginas de resultados de búsqueda · nada de
+          retrieval automatizado a LinkedIn/X/Facebook/Instagram · nada de outreach automatizado · nada de
+          inferencia de atributos protegidos · nada de compartir globalmente decisiones de matching locales de
+          la organización.
+        </div>
+      </div>
+    </section>
+
+    <!-- OPS -->
+    <section id="ops">
+      <div class="container">
+        <h2><span class="layer-num">08</span>Operaciones · cómo se invoca cada worker</h2>
+        <p>Los workers no los arranca la app en el boot. Los dispara un scheduler externo (típicamente el
+          HTTP-cron de la plataforma) golpeando endpoints de admin. Cada ruta admin es un handler fino que
+          importa la función del worker y devuelve su resultado como JSON.</p>
+
+        <table class="tbl">
+          <thead>
+            <tr><th>Ruta</th><th>Worker</th><th>Cadencia</th><th>Devuelve</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="mono">/api/admin/discovery/run-worker</td>
+              <td><code>runDiscoveryWorker()</code></td>
+              <td>Cada 15 min</td>
+              <td><code>{ cellsRun, resultsSeen, upserted, cursor, capped }</code></td>
+            </tr>
+            <tr>
+              <td class="mono">/api/admin/enrichment/*</td>
+              <td><code>runEnrichmentWorker()</code></td>
+              <td>On-demand (refresh) + programado para planes elegibles</td>
+              <td><code>{ claimed, processed, succeeded, partial, failed, leasesReclaimed, evidenceAccepted, evidenceReview, retentionEvidenceDeleted, retentionJobsDeleted }</code></td>
+            </tr>
+            <tr>
+              <td class="mono">/api/admin/operations/$jobKey</td>
+              <td>Específico del job</td>
+              <td>Manual + bajo schedule</td>
+              <td>Resultado del job + historial de lastRunAt</td>
+            </tr>
+            <tr>
+              <td class="mono"><code>pnpm content:sync</code></td>
+              <td>Script de sync</td>
+              <td>Manual + hook de pre-deploy</td>
+              <td><code>{ inserted, updated, pruned }</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Capa de settings</h3>
+        <div class="card">
+          <dl class="kv">
+            <dt><code>ENRICHMENT_ENABLED</code></dt><dd>Switch maestro. <code>false</code> en todos los entornos hasta
+              que pase el canario de 7 días</dd>
+            <dt><code>ENRICHMENT_ALLOWED_CONNECTORS</code></dt><dd>CSV de IDs de conectores. No puede habilitar un
+              conector que no esté habilitado en compile-time</dd>
+            <dt><code>ENRICHMENT_BATCH_SIZE</code></dt><dd>Cuántos jobs reclamar por ejecución</dd>
+            <dt><code>ENRICHMENT_LEASE_SECONDS</code></dt><dd>Cuánto se retiene un claim antes de que otro worker
+              pueda reclamarlo</dd>
+            <dt><code>ENRICHMENT_MAX_ATTEMPTS</code></dt><dd>Tras este número de fallos, el job queda
+              <code>failed</code> permanentemente</dd>
+            <dt><code>ENRICHMENT_RAW_RETENTION_DAYS</code></dt><dd>30 días — para evidencia que <em>no</em> se aceptó</dd>
+            <dt><code>ENRICHMENT_ACCEPTED_RETENTION_DAYS</code></dt><dd>180 días — para evidencia aceptada</dd>
+            <dt><code>DISCOVERY_CELLS_PER_RUN</code></dt><dd>Cuántas celdas de la matriz recorrer por ejecución</dd>
+            <dt><code>DISCOVERY_DAILY_STUB_CAP</code></dt><dd>Techo duro de stubs por día para acotar el gasto
+              de APIs de terceros</dd>
+            <dt><code>ENRICHMENT_USER_AGENT</code></dt><dd>Override del UA por defecto
+              (<code>BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)</code>)</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        Generado a partir de <code>src/lib/{enrichment,discovery,sources,github}/</code>,
+        <code>scripts/db/sync-platform-content.ts</code>, <code>src/routes/api/admin/</code> y
+        <code>plans/phase-1/42-stealth-scraping/spec.md</code>. Refrescar tras cualquier cambio estructural
+        en el pipeline de enrichment o en el conjunto de conectores fuente.
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#fef3e8',
+        primaryTextColor: '#1a1d24',
+        primaryBorderColor: '#c97b3f',
+        lineColor: '#7c7a72',
+        secondaryColor: '#f0ebe0',
+        tertiaryColor: '#fff',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: {
+        curve: 'basis',
+        padding: 12,
+        nodeSpacing: 40,
+        rankSpacing: 50,
+      },
+      sequence: {
+        actorMargin: 60,
+        messageMargin: 40,
+        boxMargin: 10,
+        boxTextMargin: 5,
+      },
+    });
+  </script>
+</body>
+</html>

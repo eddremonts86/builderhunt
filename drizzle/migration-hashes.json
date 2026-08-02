@@ -556,6 +556,10 @@
     "0138_solution_gold_briefs": {
       "sql": "833d5c8b3e6422294ea07b8b86fc6d966a36dba11c446ae5feed7f01b0171933",
       "snapshot": "5975c850bc19123b39d9bda80267f09760693bc284b0d8b8caa5e8fc43551177"
+    },
+    "0139_credentialed_job_sources": {
+      "sql": "60a20c34fc48bda88bb66166bebe7d6c12631f6134043c7c5dc852db736e7486",
+      "snapshot": "dc21276f6866f6fa3e2c08e5f915f6c4bfd990c087cb147f71a3ca66180b97ac"
     }
   }
 }

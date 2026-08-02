@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BuilderHunt — Resumen para inversor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --bg-alt: #efeae0;
+      --surface: #ffffff;
+      --line: #e3dcc9;
+      --line-soft: #ece5d4;
+      --ink: #1a1d24;
+      --ink-2: #3a4256;
+      --muted: #7c7a72;
+      --primary: #c97b3f;
+      --primary-2: #e07338;
+      --primary-soft: #f3e2d2;
+      --accent-2: #2f6f5e;
+      --warn: #b06367;
+      --shadow-1: 0 2px 8px rgba(0,0,0,.04);
+      --shadow-2: 0 4px 16px -2px rgba(0,0,0,.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ""; position: fixed; top: -200px; left: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(192,115,56,.07) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: ""; position: fixed; bottom: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(47,111,94,.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    main { position: relative; z-index: 1; }
+    .container { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+    @media (min-width: 768px) { .container { padding: 0 32px; } }
+
+    .hero {
+      padding: 100px 0 72px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .eyebrow::before {
+      content: ""; width: 6px; height: 6px; background: var(--primary); border-radius: 50%;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(36px, 5.5vw, 60px);
+      line-height: 1.05;
+      letter-spacing: -0.012em;
+      margin-bottom: 28px;
+      max-width: 820px;
+    }
+    .hero h1 em { font-style: italic; color: var(--primary); }
+    .hero .thesis {
+      font-size: 18px;
+      color: var(--ink-2);
+      max-width: 720px;
+      line-height: 1.6;
+    }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 36px;
+      margin-top: 40px;
+      padding-top: 28px;
+      border-top: 1px dashed var(--line);
+    }
+    .meta-row .stat strong {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: 32px;
+      color: var(--ink);
+      display: block;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .meta-row .stat span {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .meta-row .stat strong .unit {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+
+    section { padding: 72px 0; }
+    section + section { border-top: 1px solid var(--line-soft); }
+
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(28px, 3.5vw, 38px);
+      letter-spacing: -0.005em;
+      margin-bottom: 16px;
+      line-height: 1.1;
+    }
+    h2 .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 500;
+      margin-right: 12px;
+      vertical-align: middle;
+    }
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      color: var(--ink);
+      letter-spacing: -0.005em;
+    }
+    p { color: var(--ink-2); margin-bottom: 14px; line-height: 1.65; }
+    p.lede { font-size: 17px; color: var(--ink-2); }
+    strong { color: var(--ink); font-weight: 600; }
+    em.t { font-style: italic; color: var(--primary); }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: var(--line-soft);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--ink);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px 32px;
+      box-shadow: var(--shadow-1);
+      margin: 20px 0;
+    }
+    .card.tight { padding: 20px 24px; }
+    .card .pull {
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      line-height: 1.35;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+
+    .pullquote {
+      border-left: 3px solid var(--primary);
+      padding: 12px 0 12px 24px;
+      margin: 28px 0;
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .pullquote cite {
+      display: block;
+      font-family: 'Outfit', sans-serif;
+      font-style: normal;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 28px 0;
+    }
+    .metric {
+      padding: 24px 20px;
+      border-right: 1px solid var(--line-soft);
+    }
+    .metric:last-child { border-right: 0; }
+    .metric .v {
+      font-family: 'DM Serif Display', serif;
+      font-size: 36px;
+      line-height: 1;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .metric .v .unit {
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      color: var(--muted);
+      margin-left: 3px;
+    }
+    .metric .l {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px;
+      margin: 24px 0;
+      box-shadow: var(--shadow-1);
+      overflow-x: auto;
+    }
+    .diagram-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .mermaid { text-align: center; font-family: 'Outfit', sans-serif !important; }
+    .mermaid svg { max-width: 100%; height: auto; }
+
+    .source-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+      margin: 16px 0;
+    }
+    .source-pill {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .source-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--accent-2);
+    }
+    .source-pill.blocked .dot { background: var(--warn); }
+
+    .pillars {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .pillar {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 20px 22px;
+    }
+    .pillar .ico {
+      width: 32px; height: 32px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      margin-bottom: 12px;
+    }
+    .pillar h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--ink);
+    }
+    .pillar p {
+      font-size: 13px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .tbl {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+    .tbl th, .tbl td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .tbl th {
+      background: var(--bg-alt);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .tbl td { color: var(--ink-2); }
+    .tbl tr:last-child td { border-bottom: 0; }
+    .tbl td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+    .tbl td.price { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--ink); }
+
+    .phase-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .phase-list li {
+      position: relative;
+      padding: 14px 0 14px 32px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .phase-list li:last-child { border-bottom: 0; }
+    .phase-list li::before {
+      content: "";
+      position: absolute;
+      left: 0; top: 18px;
+      width: 16px; height: 16px;
+      border: 2px solid var(--primary);
+      border-radius: 50%;
+      background: var(--surface);
+    }
+    .phase-list li::after {
+      content: "";
+      position: absolute;
+      left: 7px; top: 24px;
+      width: 2px; height: 100%;
+      background: var(--line-soft);
+    }
+    .phase-list li:last-child::after { display: none; }
+    .phase-list li strong { color: var(--ink); font-weight: 600; }
+    .phase-list li .meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      margin-left: 8px;
+    }
+
+    nav.toc {
+      position: sticky; top: 0;
+      background: rgba(247, 245, 240, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line-soft);
+      z-index: 100;
+      padding: 12px 0;
+    }
+    nav.toc .container {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      font-size: 12.5px;
+    }
+    nav.toc .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-right: 8px;
+    }
+    nav.toc a {
+      color: var(--ink-2);
+      text-decoration: none;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    nav.toc a:hover { background: var(--primary-soft); color: var(--primary); }
+
+    .ask {
+      background: linear-gradient(135deg, #fef3e8 0%, #f5e6d0 100%);
+      border: 1px solid var(--primary);
+      border-radius: 18px;
+      padding: 40px 44px;
+      margin: 32px 0;
+    }
+    .ask h2 { color: var(--ink); margin-bottom: 16px; }
+    .ask p { color: var(--ink-2); font-size: 16px; }
+
+    footer {
+      padding: 48px 0 56px;
+      border-top: 1px solid var(--line-soft);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .confidential {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--warn);
+      padding: 6px 14px;
+      border: 1px solid var(--warn);
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 64px 0 48px; }
+      section { padding: 48px 0; }
+      .meta-row { gap: 20px; }
+      .ask { padding: 28px 24px; }
+    }
+
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      body::before, body::after { display: none; }
+      nav.toc { display: none; }
+      section { padding: 28pt 0; page-break-inside: avoid; }
+      .hero { padding: 40pt 0 24pt; }
+      .card, .diagram, .pillars, .metrics, .ask, .pillar, .metric { 
+        box-shadow: none; 
+        page-break-inside: avoid;
+      }
+      h2 { page-break-after: avoid; }
+      a { color: var(--ink); text-decoration: underline; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="toc">
+    <div class="container">
+      <span class="label">Resumen</span>
+      <a href="#thesis">Tesis</a>
+      <a href="#problem">Problema</a>
+      <a href="#product">Producto</a>
+      <a href="#moat">Moat</a>
+      <a href="#business">Modelo</a>
+      <a href="#technical">Técnica</a>
+      <a href="#traction">Tracción</a>
+      <a href="#vision">Visión</a>
+      <a href="#ask">Ronda</a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="container">
+        <div class="confidential">Confidencial — Resumen para inversor</div>
+        <div class="eyebrow">BuilderHunt · Oportunidad en ronda seed</div>
+        <h1>La capa de recruiting de <em>prueba de trabajo</em> para la era post-LinkedIn.</h1>
+        <p class="thesis">
+          BuilderHunt encuentra a los desarrolladores que <em>están shippeando ahora mismo</em> — a través de
+          15 fuentes públicas — y convierte la pregunta "¿quién está construyendo activamente en X hoy?" en una
+          búsqueda de 30 segundos en lugar de una cacería de 30 minutos con operadores booleanos en cinco
+          pestañas. Estamos construyendo la capa de infraestructura que el mercado de contratación nativo en IA y
+          first-party open-source va a exigir.
+        </p>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="v">15</div>
+            <div class="l">Fuentes públicas de developers indexadas</div>
+          </div>
+          <div class="metric">
+            <div class="v">$19<span class="unit">/mes</span></div>
+            <div class="l">Plan Pro (vs $170/mes de LinkedIn Recruiter)</div>
+          </div>
+          <div class="metric">
+            <div class="v">100<span class="unit">%</span></div>
+            <div class="l">Adquisición de datos con policy gate</div>
+          </div>
+          <div class="metric">
+            <div class="v">0</div>
+            <div class="l">Conectores que violan ToS en producción</div>
+          </div>
+        </div>
+
+        <div class="meta-row">
+          <div class="stat"><strong>Estado</strong><span>Beta pública, gratis durante el seeding</span></div>
+          <div class="stat"><strong>Stack</strong><span>TanStack Start · Postgres · React 19</span></div>
+          <div class="stat"><strong>Fase</strong><span>Seed — pre-tracción, construyendo los rieles</span></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- THESIS -->
+    <section id="thesis">
+      <div class="container">
+        <h2><span class="num">01</span>Tesis en una frase</h2>
+        <p class="lede">
+          La credencial que importa en software es la <em>prueba de trabajo activo</em> — y la credencial
+          que importa en recruiting es la capacidad de encontrar esa prueba rápido. BuilderHunt es la capa de
+          infraestructura que convierte la actividad pública de los developers en el nuevo currículum.
+        </p>
+
+        <div class="pullquote">
+          "Los currículums mienten. La historia de git, no. Y ahora mismo, nadie está indexando bien la
+          segunda para la forma en que los equipos realmente contratan."
+          <cite>— El insight de BuilderHunt</cite>
+        </div>
+
+        <p>
+          Cualquier ejecutivo que haya contratado a un ingeniero senior en los últimos cinco años tiene la misma
+          historia: un currículum perfecto en keywords que pasó la entrevista bien y rindió por debajo de lo
+          esperado el día uno. La historia opuesta es más rara pero más diagnóstica — el contribuidor sin
+          credenciales formales cuyos commits, comentarios y velocidad de respuesta lo hacían obviamente
+          merecedor de una conversación. Construimos el motor de búsqueda para la segunda historia.
+        </p>
+      </div>
+    </section>
+
+    <!-- PROBLEM -->
+    <section id="problem">
+      <div class="container">
+        <h2><span class="num">02</span>El dolor del mercado es viejo, grande y no resuelto</h2>
+        <p>
+          La contratación de developers es un mercado de <strong>más de 30.000 millones de dólares al año a
+          nivel global</strong> y las herramientas incumbent (LinkedIn Recruiter, Indeed, Glassdoor) comparten
+          todas el mismo modelo: búsqueda por keywords sobre perfiles estáticos auto-reportados. Ese modelo no
+          ha mejorado en una década y fue diseñado para un mundo diferente — uno donde las carreras eran
+          lineales y la actividad open-source era un afterthought.
+        </p>
+
+        <h3>Tres problemas estructurales del status quo</h3>
+        <div class="pillars">
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            </div>
+            <h4>Keywords, no comportamiento</h4>
+            <p>La búsqueda booleana en LinkedIn encuentra palabras en currículums, no a gente que de verdad escribe Rust en producción. La señal que los reclutadores quieren — actividad reciente de shipping — es invisible para las herramientas dominantes.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <h4>Evidencia fragmentada</h4>
+            <p>La gente que vale la pena no vive en una sola plataforma. Un maintainer senior de Rust está en GitHub. Un experto de dominio responde en Stack Overflow. Una voz emergente está en DEV.to. Cruzar manualmente cinco pestañas por candidato no escala más allá de la tercera búsqueda.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>
+            </div>
+            <h4>Sin señal en tiempo real</h4>
+            <p>Cuando un nuevo maintainer de una librería popular empieza a buscar trabajo, no hay notificación. La contratación es reactiva; los mejores candidatos se van en 72 horas.</p>
+          </div>
+        </div>
+
+        <p>
+          Las herramientas que más se acercan — <strong>LinkedIn Recruiter</strong> a $170/mes por seat y
+          <strong>SeekOut</strong> a precio enterprise — resuelven el problema de las keywords a escala pero
+          son estructuralmente incapaces de resolver el problema del comportamiento. Indexan currículums, no
+          logs de git.
+        </p>
+      </div>
+    </section>
+
+    <!-- PRODUCT -->
+    <section id="product">
+      <div class="container">
+        <h2><span class="num">03</span>El producto: búsqueda federada de prueba de trabajo</h2>
+        <p>
+          Un reclutador escribe <code>"rust webassembly"</code>. En segundos, BuilderHunt devuelve un shortlist
+          rankeado de developers que <em>están shippeando ahora</em> en esa intersección — a través de 15
+          fuentes — con evidencia adjunta a cada resultado. Una búsqueda, una pantalla, una decisión.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Una consulta, 15 fuentes, un shortlist rankeado</div>
+          <div class="mermaid">
+flowchart LR
+  U["Reclutador escribe<br/>'rust webassembly'"]:::user
+  O["searchBuilders()<br/>(orquestador federado)"]:::orchestrator
+  S["15 conectores fuente<br/>(en paralelo)"]:::connectors
+  R["Normalizar →<br/>dedupe → score<br/>(ponderado por recency)"]:::worker
+  Out["Shortlist rankeado<br/>+ tarjetas de evidencia"]:::ui
+
+  U --> O --> S --> R --> Out
+
+  S -. "github · gitlab · codeberg<br/>sourcehut · npm · huggingface<br/>hn · reddit · lobsters<br/>devto · hashnode · stackoverflow<br/>devpost · producthunt · bluesky" .- S
+
+  classDef user fill:#fff,stroke:#c97b3f,stroke-width:2px
+  classDef orchestrator fill:#fef3e8,stroke:#e07338,stroke-width:2px
+  classDef connectors fill:#fff,stroke:#c97b3f,stroke-width:1.5px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px
+          </div>
+        </div>
+
+        <h3>Qué significa "evidencia" en nuestro modelo</h3>
+        <p>
+          Cada resultado es un <code>RawBuilder</code> con una forma normalizada. Esa forma se diseña
+          alrededor de una regla dura que descubrimos por las malas y luego documentamos en el propio tipo:
+        </p>
+        <div class="card">
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; line-height: 1.7; color: var(--ink);">
+            <span style="color: var(--primary);">/**</span><br>
+            <span style="color: var(--primary);">&nbsp;* <code>organization</code> was added after 30 of 60 GitHub results</span><br>
+            <span style="color: var(--primary);">&nbsp;* turned out to be repositories and one of the "people" was a</span><br>
+            <span style="color: var(--primary);">&nbsp;* company account. A recruiter searching for people must not</span><br>
+            <span style="color: var(--primary);">&nbsp;* be shown either, and merging either into a canonical human</span><br>
+            <span style="color: var(--primary);">&nbsp;* is not a subtle error.</span><br>
+            <span style="color: var(--primary);">&nbsp;*/</span><br>
+            <span style="color: var(--ink-2);">export type</span> BuilderKind = <span style="color: var(--primary);">'person'</span> | <span style="color: var(--primary);">'repo'</span> | <span style="color: var(--primary);">'organization'</span>
+          </p>
+        </div>
+        <p>
+          El sistema de tipos es la spec. Esto es lo que parece un producto de datos guiado por ingeniería.
+        </p>
+
+        <h3>Índice activo, hoy</h3>
+        <div class="source-grid">
+          <div class="source-pill"><span class="dot"></span>github</div>
+          <div class="source-pill"><span class="dot"></span>gitlab</div>
+          <div class="source-pill"><span class="dot"></span>codeberg</div>
+          <div class="source-pill"><span class="dot"></span>sourcehut</div>
+          <div class="source-pill"><span class="dot"></span>hn</div>
+          <div class="source-pill"><span class="dot"></span>reddit</div>
+          <div class="source-pill"><span class="dot"></span>devto</div>
+          <div class="source-pill"><span class="dot"></span>hashnode</div>
+          <div class="source-pill"><span class="dot"></span>stackoverflow</div>
+          <div class="source-pill"><span class="dot"></span>npm</div>
+          <div class="source-pill"><span class="dot"></span>huggingface</div>
+          <div class="source-pill"><span class="dot"></span>lobsters</div>
+          <div class="source-pill"><span class="dot"></span>devpost</div>
+          <div class="source-pill"><span class="dot"></span>producthunt</div>
+          <div class="source-pill"><span class="dot"></span>bluesky</div>
+        </div>
+        <p>
+          Ese es el set completo. Ni LinkedIn, ni X, ni Facebook — por diseño. Las razones están documentadas
+          por conector en un registro de fuentes público, con enlaces a los ToS relevantes. La mayoría de
+          competidores en este espacio o ignoran esto o fingen ignorarlo. Nosotros tratamos compliance como un
+          moat.
+        </p>
+      </div>
+    </section>
+
+    <!-- MOAT -->
+    <section id="moat">
+      <div class="container">
+        <h2><span class="num">04</span>El moat: seis cosas que los competidores no pueden copiar rápido</h2>
+
+        <div class="pillars">
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            </div>
+            <h4>1. 15 conectores fuente</h4>
+            <p>Cada conector maneja su propio rate limit, modelo de auth y particularidades de data shape (HN necesita Algolia porque Firebase no tiene full-text search; GitHub necesita hidratación porque el endpoint de búsqueda no envía display name). Seis meses de ingeniería enfocada, no un fin de semana.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+            </div>
+            <h4>2. Resolución de identidad</h4>
+            <p>La identidad cross-source es el problema más difícil. Usamos un resolver determinístico, versionado, que puntúa 7+ señales de match y rechaza matches con discrepancia tanto en nombre como en organización — no un LLM, por diseño, para que el log de auditoría sea reproducible.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <h4>3. Postura de compliance</h4>
+            <p>Registro de políticas en compile-time, intersección con allowlist en runtime, hard-blocked list de LinkedIn/X/FB/IG con motivos. Caché de robots.txt que distingue "ausente" de "no disponible" según RFC 9309. Esto es raro en nuestra categoría y reduce el riesgo en ventas enterprise.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18"/></svg>
+            </div>
+            <h4>4. Multi-tenancy desde el día uno</h4>
+            <p>Row-level security en cada tabla con scope de tenant. Historial de búsqueda, listas de builders, evidencia y notas con scope de organización. Un único codebase compartido sirve a miles de clientes con aislamiento estricto de datos — la tabla se fuerza a nivel de base de datos, no de aplicación.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+            </div>
+            <h4>5. Desarrollo guiado por spec</h4>
+            <p>Cada feature sale detrás de un trío versionado de spec.md + task.md + implementation_plan.md. El mismo patrón se usa a lo largo de 50+ fases completadas. Inversores y adquirentes pueden leer la spec para entender la intención, no solo el código para entender el comportamiento.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h4>6. Product pull inbound</h4>
+            <p>Roadmap público con votos de usuarios. Changelog público. Status page público. Discusión pública de tradeoffs. La misma transparencia que vuelve el producto creíble para usuarios técnicos vuelve la empresa legible para compradores técnicos — y para adquirentes.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUSINESS -->
+    <section id="business">
+      <div class="container">
+        <h2><span class="num">05</span>Modelo de negocio: posicionados contra el impuesto de LinkedIn</h2>
+        <p>
+          Freemium clásico. Gratis para empezar, para que cualquiera pueda probar el valor en su propia
+          búsqueda; los planes de pago desbloquean escala, alertas y colaboración en equipo. El plan Pro a
+          <strong>$19/mes</strong> es el movimiento estratégico — es <strong>nueve veces más barato</strong> que
+          LinkedIn Recruiter Lite y sirve al comprador que los reclutadores realmente quieren: reclutadores
+          técnicos en solitario, founders haciendo sus primeras 10 contrataciones y equipos de DevRel / comunidad.
+        </p>
+
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Free</th>
+              <th>Pro</th>
+              <th>Team</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Precio</strong></td>
+              <td>$0</td>
+              <td class="price">$19<span style="font-size:12px;color:var(--muted)">/mes</span><br><span style="font-size:11px;color:var(--muted);font-family:Outfit">$182/año</span></td>
+              <td class="price">$99<span style="font-size:12px;color:var(--muted)">/mes</span><br><span style="font-size:11px;color:var(--muted);font-family:Outfit">$950/año</span></td>
+            </tr>
+            <tr>
+              <td>Búsquedas guardadas</td>
+              <td>3</td>
+              <td>50</td>
+              <td>200</td>
+            </tr>
+            <tr>
+              <td>Builders guardados</td>
+              <td>50</td>
+              <td>Ilimitados</td>
+              <td>Ilimitados</td>
+            </tr>
+            <tr>
+              <td>Alertas inteligentes por keyword</td>
+              <td>–</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Búsqueda semántica</td>
+              <td>–</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Code fingerprinting</td>
+              <td>–</td>
+              <td>✅</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Seats de equipo</td>
+              <td>–</td>
+              <td>–</td>
+              <td>Hasta 10</td>
+            </tr>
+            <tr>
+              <td>Búsquedas y listas compartidas</td>
+              <td>–</td>
+              <td>–</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Análisis de work-sample</td>
+              <td>–</td>
+              <td>–</td>
+              <td>✅</td>
+            </tr>
+            <tr>
+              <td>Feed de actividad</td>
+              <td>–</td>
+              <td>–</td>
+              <td>✅</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>Unit economics que podemos defender</h3>
+        <p>
+          Como estamos mediados por API en cada fuente, nuestro coste marginal por búsqueda está dominado por
+          la cuota de APIs de terceros — no por compute. Con caché agresivo (TTL de 5 min en Redis para
+          resultados, 24h para enrichment, backoff determinístico para mantenernos dentro del rate limit de
+          cada fuente), un cliente Pro a $19/mes nos cuesta céntimos servirlo. La pregunta económica
+          interesante no es si la unidad funciona, sino lo rápido que convertimos usuarios free a Pro una vez
+          que el flujo de búsqueda guardada demuestra valor — y nuestros planes de fase tratan eso como la
+          palanca principal de growth.
+        </p>
+      </div>
+    </section>
+
+    <!-- TECHNICAL -->
+    <section id="technical">
+      <div class="container">
+        <h2><span class="num">06</span>Nivel técnico: el código es el pitch</h2>
+        <p>
+          La mayoría de los pitch pre-seed terminan aquí con un logo wall. El nuestro no, porque la profundidad
+          técnica es en sí misma el diferenciador. Tres cosas que los inversores deberían mirar:
+        </p>
+
+        <h3>1. El pipeline de ingestión de datos está gated por política, no viola ToS</h3>
+        <p>
+          Cada request saliente desde un conector pasa por <code>safeFetch()</code>, un cliente HTTP
+          reforzado que fuerza solo-HTTPS, resolución DNS solo a IP pública, host allowlists, revalidación
+          de redirects, timeouts de 10 segundos, byte cap de 2 MB y allowlist de content-type. Un test
+          estático en el registry falla cualquier conector que llame a <code>fetch</code> directamente. La
+          caché de robots.txt distingue <em>ausente</em> de <em>no disponible</em> según RFC 9309, con un
+          comentario en el código que documenta el bug exacto que arregla esa distinción.
+        </p>
+
+        <h3>2. El registro de políticas es un gate duro, no una wish list</h3>
+        <p>
+          LinkedIn, X, Facebook e Instagram están definidos como políticas con <code>status: 'blocked'</code> y
+          un enlace a los ToS relevantes en <code>permissionReference</code>. El allowlist de runtime solo
+          puede restringir el conjunto habilitado en compile-time; no puede reactivar un conector bloqueado.
+          Esta es la "garantía de fail-closed" y está cubierta por unit tests.
+        </p>
+
+        <div class="card">
+          <p style="font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 1.7; color: var(--ink);">
+            <span style="color: var(--ink-2);">SOURCE_POLICIES = {</span><br>
+            <span>&nbsp;&nbsp;github:&nbsp;{ <span style="color: var(--accent-2);">status</span>: <span style="color: var(--primary);">'enabled'</span>, <span style="color: var(--accent-2);">acquisitionMode</span>: <span style="color: var(--primary);">'official_api'</span>, … },</span><br>
+            <span>&nbsp;&nbsp;linkedin: { <span style="color: var(--accent-2);">status</span>: <span style="color: var(--warn);">'blocked'</span>, <span style="color: var(--accent-2);">permissionReference</span>: <span style="color: var(--primary);">'https://www.linkedin.com/legal/crawling-terms — no permission on file'</span> },</span><br>
+            <span>}</span>
+          </p>
+        </div>
+
+        <h3>3. El roadmap está en el producto, no en el deck</h3>
+        <p>
+          Más de 50 fases se han enviado en este formato: un spec.md, un task.md, un implementation_plan.md.
+          El mismo patrón se usa para todo, desde la búsqueda original de 12 fuentes hasta el pipeline de
+          enrichment actual hasta el trabajo de seguridad-y-multitenancy. El roadmap público tiene votos
+          de usuarios. Los inversores pueden verificar la velocidad de ejecución directamente — no hacen
+          falta updates trimestrales.
+        </p>
+
+        <ul class="phase-list">
+          <li><strong>security-and-multitenancy</strong> <span class="meta">phase-1/01</span> — el cimiento; sin esto, no hay venta B2B</li>
+          <li><strong>postgresql-18-upgrade + production-infrastructure</strong> <span class="meta">phase-1/02-03</span></li>
+          <li><strong>legal-and-compliance</strong> <span class="meta">phase-1/04</span> — la postura GDPR que reduce riesgo enterprise</li>
+          <li><strong>12 integraciones de fuentes</strong> <span class="meta">phase-1/09-21</span> — el moat, construido conector a conector</li>
+          <li><strong>ai-expansion, semantic-search, proactive-discovery</strong> <span class="meta">phase-1/21-23</span> — los agentes que surfacean candidatos</li>
+          <li><strong>stripe-billing-platform + pricing-and-billing</strong> <span class="meta">phase-1/30-31</span></li>
+          <li><strong>public profile enrichment</strong> <span class="meta">phase-1/42</span> — el refresh gated por política que cierra el loop</li>
+          <li><strong>calendar + scheduling + interview intelligence</strong> <span class="meta">phase-1/44</span> — el workflow más allá de la búsqueda</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- TRACTION -->
+    <section id="traction">
+      <div class="container">
+        <h2><span class="num">07</span>Tracción: building in public, deliberadamente</h2>
+        <p>
+          Estamos pre-revenue y pre-tracción. Esto no es una disculpa; es la estrategia. BuilderHunt se está
+          construyendo <em>en público</em> — roadmap público con votos, changelog público, status page
+          público, discusiones públicas de tradeoffs en la documentación — porque el comprador de este
+          producto es técnico, y la credibilidad que viene de "puedes leer la spec y el código" vale más que
+          cualquier presupuesto de marketing en nuestra fase.
+        </p>
+
+        <h3>Qué hay ya en producción</h3>
+        <div class="pillars">
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>App en producción</h4>
+            <p>Live en <code>builderhunt.dev</code> con búsqueda completa, búsquedas guardadas, perfiles de builder, alertas, billing y consola de admin. <strong>Status page público.</strong></p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>15 conectores fuente en producción</h4>
+            <p>Ninguno requiere autenticación para usarse. Tokens opcionales levantan los rate limits. Cero conectores que violen ToS; la hard-blocked list es feature, no constraint.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>Capa de datos multi-tenant</h4>
+            <p>Row-level security en cada tabla de tenant. Datos con scope de organización y aislamiento estricto. Listo para ventas B2B desde el día uno.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>Billing y entitlements</h4>
+            <p>Integración con Stripe, cambios de plan, manejo de trial / past-due, workflow de plan-request. Pricing en vivo, el camino de Free a Pro a Team es real.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>Discovery worker</h4>
+            <p>Indexado proactivo en background de 30 topics × 4 grupos de fuentes cada 15 minutos. El índice semántico está pre-calentado antes de que los usuarios reales busquen — la búsqueda se siente instantánea porque la pagamos en cron.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <h4>Public profile enrichment (code-complete)</h4>
+            <p>Refresh gated por política, respetuoso con robots, con guarda SSRF, de la evidencia pública de un builder trackeado. A la espera del canario de producción; la spec es la ley.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VISION -->
+    <section id="vision">
+      <div class="container">
+        <h2><span class="num">08</span>Visión: de búsqueda a workflow</h2>
+        <p>
+          La búsqueda es la cuña. La empresa es el workflow. El roadmap ya está en el producto, y tres de
+          los siguientes cuatro movimientos son obvios:
+        </p>
+
+        <div class="pillars">
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            </div>
+            <h4>Sprints de sourcing con IA</h4>
+            <p>Un agente que toma un brief de hiring y devuelve un shortlist con evidencia, citas y borradores de outreach — en 10 minutos, no 10 horas. La postura de compliance significa que el agente puede ser honesto sobre lo que sabe vs. lo que está infiriendo.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            </div>
+            <h4>Outreach con consent integrado</h4>
+            <p>Redacta el primer mensaje, aloja la respuesta, y se queda dentro del carril de legitimate interest del GDPR. El mismo policy gate que protege la adquisición de datos protege el outreach — cada mensaje enviado tiene una fila de auditoría.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <h4>Colaboración en equipo</h4>
+            <p>Listas compartidas, handoffs, notas de entrevistador, calendar scheduling e interview intelligence — el workflow que convierte un resultado de búsqueda en una contratación. El plan Team está construido para esto y el modelo de datos ya lo soporta.</p>
+          </div>
+          <div class="pillar">
+            <div class="ico">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            </div>
+            <h4>Verticales adyacentes</h4>
+            <p>El mismo plumbing de datos indexa diseñadores (Dribbble, Behance), investigadores (arXiv, ORCID), practitioners de ML (Hugging Face, Papers With Code) e investigadores de seguridad. El primer vertical es hiring; el segundo, matching de co-founders; el tercero, grants y funding.</p>
+          </div>
+        </div>
+
+        <h3>Por qué ahora</h3>
+        <p>
+          Tres vectores de timing convergen en 2026:
+        </p>
+        <ol style="margin: 12px 0 12px 24px; color: var(--ink-2); line-height: 1.7;">
+          <li><strong>La IA está haciendo que las credenciales sean menos fiables.</strong> Un auto-reportado "experto en orquestación de LLMs" es ahora más difícil de verificar que nunca. La prueba de actividad de shipping reciente es la única señal que escala.</li>
+          <li><strong>Open source es el nuevo currículum.</strong> Un developer que mantiene una librería popular tiene más señal que un CV. Las empresas que descifren cómo descubrirlos primero contratarán a los ingenieros senior de la próxima década.</li>
+          <li><strong>Los reguladores están cerrando las zonas grises.</strong> El AI Act, la enforcement del GDPR y la muerte de las APIs de datos públicos de consumo (LinkedIn, Glassdoor, Indeed cerraron el acceso de lectura) hacen que una plataforma de datos compliance-first sea un moat permanente, no temporal.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ASK -->
+    <section id="ask">
+      <div class="container">
+        <div class="ask">
+          <h2>La ronda</h2>
+          <p>
+            Estamos levantando una <strong>ronda seed</strong> para convertir la plataforma que hemos
+            construido en un motor de growth product-led: convertir el plan free en un funnel self-serve,
+            enviar el workflow de outreach que cierra el loop de búsqueda a primer mensaje, y asentar la
+            postura de compliance como activo de ventas para los primeros contratos enterprise.
+          </p>
+          <p>
+            Lo que podemos enseñarte en el producto en vivo hoy: 15 conectores fuente, 50+ fases guiadas
+            por spec, RLS multi-tenant, sistema de billing respaldado por Stripe y un roadmap público con
+            votos de usuarios. En lo que nos ayudarías es en el go-to-market que convierte esto en una
+            empresa.
+          </p>
+          <p>
+            <strong>Contacto:</strong> <a href="mailto:hello@builderhunt.dev" style="color: var(--primary); text-decoration: none; font-weight: 500;">hello@builderhunt.dev</a>
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        BuilderHunt · Resumen para inversor confidencial · Este documento y los datos que contiene son solo
+        para el destinatario nombrado. El código fuente, las specs y el producto en vivo se referencian a
+        lo largo de todo el documento; todo es auditable.
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#fef3e8',
+        primaryTextColor: '#1a1d24',
+        primaryBorderColor: '#c97b3f',
+        lineColor: '#7c7a72',
+        secondaryColor: '#f0ebe0',
+        tertiaryColor: '#fff',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: { curve: 'basis', padding: 12, nodeSpacing: 40, rankSpacing: 50 },
+    });
+  </script>
+</body>
+</html>

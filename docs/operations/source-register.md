@@ -287,3 +287,29 @@ source and rejected on two grounds:
    regardless of score, by design. Its only sound use would be generating candidates for that review
    queue, which is a small amount of code over `safeFetch` and needs no AGPL dependency, webdriver, or
    OCR layer.
+
+
+## The credentialed batch (migration 0139, 2026-08-02)
+
+Seven sources registered **disabled**. Four of the seven parse a shape taken from published documentation
+rather than from a response anyone has seen, and `src/lib/solutions/sources/credentialed-job-feeds.ts` states
+which is which in its header table.
+
+| Source | Credential | Shape evidence |
+| --- | --- | --- |
+| `jobtech_dev_jobs` | none (optional `JOBTECH_DEV_API_KEY` raises limits) | live probe 2026-08-02 |
+| `themuse_jobs` | none for page 1 (`MUSE_API_KEY` raises limits) | live probe 2026-08-02 |
+| `arbeitsagentur_jobs` | public client key, hard-coded | live probe 2026-08-02 |
+| `adzuna_jobs` | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`, `ADZUNA_COUNTRY` | published docs, never run |
+| `usajobs_jobs` | `USAJOBS_API_KEY`, `USAJOBS_USER_AGENT` | published docs, never run |
+| `france_travail_jobs` | `FRANCE_TRAVAIL_ACCESS_TOKEN` | published docs, never run |
+| `infojobs_jobs` | `INFOJOBS_CLIENT_ID`, `INFOJOBS_CLIENT_SECRET` | published docs, never run |
+
+**Enabling one is a two-step act.** Turn it on, then run it and look at what landed — the first run is the test
+these adapters never had. A documented shape that turns out to be wrong fails loudly as
+`unexpected_response_shape` rather than reporting a successful run that stored nothing.
+
+**`france_travail_jobs` is registered but not yet runnable.** Its auth is OAuth2 client-credentials, so the
+bearer token is short-lived and cannot be a static environment variable. The adapter reads
+`FRANCE_TRAVAIL_ACCESS_TOKEN`, which means something else has to mint it, and that exchange is not implemented.
+Stated rather than stubbed: a token-fetching stub would be the least-tested code in the file.
