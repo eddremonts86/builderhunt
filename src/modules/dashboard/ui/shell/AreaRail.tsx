@@ -33,7 +33,7 @@ export function AreaRail({
       // through the rest of the column.
       className="flex h-full flex-col gap-0.5 bg-bh-bg-alt border-r border-bh-border py-2"
     >
-      <Tooltip label="Back to home">
+      <Tooltip label="Back to home" placement="right">
         <Link
           to="/"
           aria-label="BuilderHunt home"
@@ -87,8 +87,22 @@ function RailItem({
     0,
   )
 
+  /**
+   * The pages, not the sections.
+   *
+   * This listed group names first — Admin showed "Operations · Money · Public" — which names filing cabinets
+   * rather than destinations. Nobody navigates to Operations; they navigate to Sources, or Refunds, or
+   * Incidents. The hover asks *where can I go from here*, so it answers with the routes.
+   *
+   * Truncated with a count rather than clipped: "and 4 more" is information, a cut-off list is a bug.
+   */
+  const pages = area.items.map((item) => item.label)
+  const contents = pages.length > 10
+    ? [...pages.slice(0, 10), `and ${pages.length - 10} more`]
+    : pages
+
   return (
-    <Tooltip label={area.label}>
+    <Tooltip label={area.label} items={contents} placement="right">
       <Link
         to={area.items[0]?.to ?? '/dashboard'}
         aria-label={area.label}

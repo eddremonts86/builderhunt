@@ -15,6 +15,9 @@ La taxonomía propuesta para el MVP es:
 - `hiring`: founders, responsables de contratación y recruiters que buscan builders.
 - `investing`: inversores, scouts y analistas que buscan builders, equipos o proyectos.
 - `building`: builders/developers que quieren reclamar, enriquecer y distribuir su perfil.
+  El segmento cubre dos sub-modalidades: (a) builders con huella pública que pueden
+  reclamar y verificar; (b) builders sin huella pública que crean perfil desde cero
+  (cubierto por [`07-perfiles-autogestionados`](./07-perfiles-autogestionados/spec.md)).
 - `other`: salida explícita para casos todavía no comprendidos.
 
 `user` no se usa como segmento porque no describe un trabajo ni una necesidad: todos los
@@ -30,6 +33,13 @@ anteriores son usuarios.
    transcripción de entrevistas en `src/shared/lib/interview-api.ts`.
 6. La personalización debe producir diferencias útiles de workflow, no solo cambiar títulos.
 7. Toda afirmación de mercado debe clasificarse como evidencia, inferencia o hipótesis.
+8. **Cobertura universal en matching**: cualquier ruta, worker, agente o job que produzca una
+   lista de candidatos, matches o builders relevantes debe considerar perfiles
+   auto-gestionados (`selfManagedProfiles`) con `visibility = 'public'`, con las
+   mismas reglas de inclusión, exclusión, dedup, ranking y marca visual que los
+   builders con `builder_claims` verificada. Detalle y checklist en
+   [`07-perfiles-autogestionados/spec.md`](./07-perfiles-autogestionados/spec.md)
+   §"Principio de cobertura universal en matching".
 
 ## Planes
 
@@ -41,6 +51,7 @@ anteriores son usuarios.
 | 4 | [`04-dashboard-personalizado`](./04-dashboard-personalizado/spec.md) | Presets de widgets y acciones por segmento |
 | 5 | [`05-roles-internos-plataforma`](./05-roles-internos-plataforma/spec.md) | RBAC interno auditable y de mínimo privilegio |
 | 6 | [`06-landing-segmentada`](./06-landing-segmentada/spec.md) | Mensajes y páginas de conversión por ICP |
+| 7 | [`07-perfiles-autogestionados`](./07-perfiles-autogestionados/spec.md) | Perfiles para builders sin huella pública (CV + adjuntos) |
 
 ## Dependencias
 
@@ -52,11 +63,22 @@ flowchart LR
   R --> L["06 Landing"]
   S --> L
   P["05 Roles internos"]
+  S --> SP["07 Perfiles<br/>auto-gestionados"]
+  O --> SP
+  D --> SP
+  L --> SP
+  P1_36["phase-1/36<br/>claimable-profiles"] --> SP
+  P1_37["phase-1/37<br/>portfolio-builder"] --> SP
 ```
 
 Roles internos puede ejecutarse independientemente, pero por riesgo de seguridad debe tener su
 propia revisión y despliegue. Landing puede empezar con prototipos después de investigación, pero la
 persistencia de la selección y el handoff a signup dependen del contrato de segmentación.
+
+`07-perfiles-autogestionados` depende además de los planes `36-claimable-profiles`,
+`37-portfolio-builder` y `38-work-sample` de la fase 1 (modelos canónicos y DTOs públicos).
+Sin esos, no se puede integrar el perfil auto-gestionado con la búsqueda, el portfolio,
+ni la ruta de promoción a claim.
 
 ## Orden recomendado de entrega
 
@@ -90,6 +112,17 @@ persistencia de la selección y el handoff a signup dependen del contrato de seg
 - desplegar en modo sombra y luego enforcement;
 - conservar un mecanismo de emergencia documentado.
 
+### Ola F — abrir el segmento `building` a quien no tiene huella
+
+- introducir `selfManagedProfiles` y `selfManagedAttachments` con su propia
+  capa de seguridad (misma capa safe-deliver que el resto, validada contra
+  magic bytes, antivirus obligatorio);
+- renderizar perfiles auto-gestionados con chip "Self-managed" — nunca con el
+  badge "verified" de los builders con claim;
+- integrar con `04-dashboard-personalizado` y `06-landing-segmentada` para que
+  el segmento `building` cubra también a personas sin actividad pública;
+- permitir promoción futura a `builder_claims` sin perder adjuntos ni bio.
+
 ## Criterio global de éxito
 
 - existe una única fuente de verdad para el segmento;
@@ -98,4 +131,13 @@ persistencia de la selección y el handoff a signup dependen del contrato de seg
 - cambiar de segmento no pierde datos ni cambia permisos;
 - los usuarios sin segmento conservan una experiencia completa;
 - las rutas internas rechazan en servidor a quien no tenga permiso;
-- todos los cambios pasan tests, build, controles de tenancy y smoke tests reales.
+- todos los cambios pasan tests, build, controles de tenancy y smoke tests reales;
+- una persona sin huella pública puede tener perfil público y descubrible en
+  BuilderHunt, con adjuntos, sin que ese perfil compita visualmente con un
+  builder con `builder_claims` verificada;
+- un perfil auto-gestionado puede migrar a `builder_claims` verificada sin
+  perder adjuntos, bio ni handle;
+- cualquier nueva superficie de matching que se introduzca en planes futuros
+  cumple la checklist de 5 preguntas del principio de cobertura universal
+  (ver `07-perfiles-autogestionados/spec.md` §"Principio de cobertura
+  universal en matching") y consume `includeSelfManagedInResults`.

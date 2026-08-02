@@ -223,6 +223,345 @@ debe ser consistente con la de enrichment, no improvisada.
   rate-limited a 5 por día por usuario).
 - `PATCH /api/self-managed/visibility` — cambiar `public` / `unlisted` / `draft`.
 
+## Superficies de búsqueda y descubrimiento — cobertura integral
+
+La regla es: cualquier superficie de la app que hoy devuelve un builder con
+`builder_claims` debe poder devolver también un perfil auto-gestionado, identificado
+con el chip "Self-managed". La integración no es opcional en ninguna de las rutas
+existentes. Esta sección enumera cada superficie, su contrato de integración y los
+riesgos específicos.
+
+### 1. Búsqueda federada en vivo
+
+- **Ruta**: `POST /api/search/builders` → `searchBuilders()` en `src/lib/search.ts`.
+- **Integración**: añadir `'self-managed'` al enum `SOURCE_NAMES` en
+  `src/lib/sources/types.ts`. Crear `src/lib/sources/self-managed.ts` con un connector
+  que **no hace red** — lee directamente de `selfManagedProfiles` con
+  `visibility = 'public'` y `scanStatus = 'clean'` (o `null` para perfiles sin
+  adjuntos). Cada perfil emitido es un `RawBuilder` con `kind: 'person'`,
+  `source: 'self-managed'`, `sourceId: profile.id`, `username: profile.handle`,
+  `displayName`, `bio`, `topics`. El `metadata` incluye el handle, el conteo de
+  adjuntos, los `services` resueltos y el flag `isSelfManaged: true`.
+- **Ranking**: el score del connector usa `relevanceScore` ya calculado en
+  `relevance_search_index` o, si no existe, un score base 0.5 con boost por
+  match en `services` (×1.4) y `topics` (×1.2). Sin boost por recency de actividad
+  pública (no aplica); se usa la fecha `updatedAt` del perfil como fallback.
+- **Rate limit**: el connector es local pero debe respetar el
+  `CONNECTOR_TIMEOUT_MS` (8 s, ver `src/lib/search.ts`) y devolver
+  `{ health: 'failed', detail: 'self-managed query timeout' }` si excede.
+- **Dedup**: extender `deduplicateBuilders()` en `src/lib/dedup.ts` para que
+  los perfiles auto-gestionados no se fusionen con builders con claim por
+  coincidencia de username. La clave de dedup es
+  `(source, sourceId)` para auto-gestionados, no `(displayName, source)`.
+- **Filtro de suppressed**: `filterSuppressed()` en
+  `src/shared/lib/profile-suppression.ts` debe cubrir también
+  `selfManagedProfiles.deletedAt IS NOT NULL`.
+
+### 2. Búsqueda semántica
+
+- **Ruta**: `POST /api/search/semantic` (ver `src/routes/api/search/semantic.ts` y
+  `src/lib/semantic/`).
+- **Integración**: el connector `self-managed` llama a
+  `upsertEmbeddingStubs()` en `src/lib/semantic/index-writer.ts` con los mismos
+  campos que un builder con claim (`id`, `displayName`, `topics`, `services`,
+  texto del bio). El `kind` se setea a `self-managed-person` para que el
+  `semantic-search.ts` lo pueda etiquetar en los resultados.
+- **Re-indexación**: trigger por evento (insert/update de perfil o adjunto con
+  `scanStatus = 'clean'`). El `discovery worker` nocturno corrige los
+  `pending_scan` que pasen a `clean`.
+
+### 3. Recomendaciones "For you"
+
+- **Ruta**: `GET /api/recommendations/` (ver `src/routes/api/recommendations/index.ts`).
+- **Integración**: tras re-ejecutar las saved queries via `searchBuilders()`, el
+  filtrado por `trackedBuilderIds` debe excluir solo builders ya seguidos, no
+  perfiles auto-gestionados. La capa de dedup post-query los acepta sin cambios.
+- **Toggle**: añadir query param `includeSelfManaged: boolean` (default `true`).
+  Si el usuario lo desactiva, el filtrado aplica
+  `result.kind !== 'self-managed-person'` antes del ranking. El toggle se persiste
+  en `user_preferences` (existente) bajo la key
+  `recommendations.includeSelfManaged`.
+
+### 4. Sourcing sprints — generación de shortlist
+
+- **Ruta**: `src/lib/sprints/results.ts` y `src/routes/api/sprints/`.
+- **Integración**: el `sprint.queries[]` re-ejecuta `searchBuilders()` por query, y
+  el shortlist se construye por intersección + scoring. Los perfiles
+  auto-gestionados entran al mismo pool y compiten por slots.
+- **Configuración por sprint**: añadir `sprintConfig.includeSelfManaged: boolean`
+  (default `true`). Si `false`, el shortlist se filtra por
+  `result.metadata?.isSelfManaged !== true`.
+- **UI**: el sprint summary muestra cuántos slots vienen de builders con claim
+  verificada y cuántos de auto-gestionados. Métrica para que el recruiter entienda
+  la composición de su shortlist.
+
+### 5. Alert matching — saved search alerts
+
+- **Ruta**: `src/lib/alerts/worker.ts`.
+- **Integración**: cuando un perfil auto-gestionado se crea o actualiza con
+  `visibility = 'public'`, el worker de alerts evalúa todas las saved searches
+  y dispara alertas según las mismas reglas que para builders con claim.
+- **Trigger de "novedad"**: para builders con claim, el alert se basa en
+  "este builder no estaba en el shortlist la última vez que se ejecutó la query".
+  Para auto-gestionados, el evento relevante es `insert/update` con
+  `visibility` que pasa a `public` o un cambio material (nuevo adjunto `clean`,
+  cambio en `services` o `topics`). El worker de alerts escucha los triggers de
+  DB o el outbox de eventos de self-managed.
+- **Suppression**: aplicar la misma ventana de supresión (default 7 días) para
+  evitar alert-spam cuando un usuario edita su propio perfil.
+
+### 6. Discovery worker — indexación proactiva
+
+- **Ruta**: `src/lib/discovery/worker.ts` + `src/lib/discovery/matrix.ts`.
+- **Integración**: ya cubierta en spec §"Indexación y búsqueda". El `SOURCE_NAMES`
+  recibe `'self-managed'` y el `DISCOVERY_MATRIX` añade una entrada para
+  `topics = ['translation', 'design', 'writing', 'consulting', ...]` con
+  `sources: ['self-managed']`. La celda se ejecuta como las demás y respeta el
+  `DISCOVERY_DAILY_STUB_CAP`.
+
+### 7. Solutions — inteligencia de soluciones
+
+- **Ruta**: `/api/solutions/briefs`, `/api/solutions/generate`,
+  `src/lib/solutions/sources/*` (jobindex, npm, huggingface, etc.).
+- **Integración conceptual**: Solutions es la superficie de la app donde un usuario
+  describe un problema o necesidad y recibe un paquete que combina AI tools,
+  documentación, feeds de empleo y **personas que pueden ejecutar el trabajo**.
+  Los perfiles auto-gestionados son la pieza de "personas que pueden ejecutar
+  el trabajo" para briefs que mencionan habilidades no técnicas (traducción,
+  redacción, diseño, mentoring, etc.).
+- **Cómo se añade**: el composer de solutions
+  (`src/lib/solutions/composer/`) recibe una nueva fuente `self-managed` con
+  `kind: 'people'`. Cuando un brief se genera, el composer incluye personas
+  auto-gestionadas cuyo `services` intersecta con los `brief.requirements[]`.
+- **Visibilidad en el brief output**: las personas auto-gestionadas se renderizan
+  en una sección "People who can do this" con su chip "Self-managed" y un
+  disclaimer "These profiles are not source-verified; review attached work
+  samples before engaging". El cliente del brief puede hacer click en cada
+  perfil para ir a `/u/$handle`.
+- **Regla de oro**: las personas auto-gestionadas **nunca** aparecen como
+  reemplazo de AI tools o de documentación en un brief; son una categoría
+  adicional, no una sustitución.
+
+### 8. Sourcing workspace y talent market intelligence
+
+- **Ruta**: `plans/phase-4/sourcing-*` y
+  `plans/phase-4/talent-market-intelligence`. Pendientes de implementación
+  a la fecha de este plan.
+- **Integración esperada**: ambos agregan builders en series temporales y
+  distribuciones. Los perfiles auto-gestionados deben contar en los totales
+  con un breakdown separado. La métrica "active builders in X" debe tener
+  siempre un componente "with verified claim" y otro "self-managed", nunca
+  fusionarlos.
+- **Acción contractual para planes futuros**: cuando estos planes se
+  redacten, deben referenciar este spec y consumir el
+  `kind: 'self-managed-person'` sin asumir que todo builder tiene
+  `builder_claims`.
+
+### 9. Look-alike sourcing
+
+- **Ruta**: `plans/phase-4/look-alike-sourcing`. Pendiente.
+- **Integración esperada**: cuando un usuario marca "encuéntrame gente
+  parecida a este builder", el algoritmo debe considerar perfiles
+  auto-gestionados cuyo vector (bio + services + topics) sea similar. La
+  confianza del match se etiqueta explícitamente como "Self-managed
+  similarity" vs "Claimed similarity".
+
+### 10. Builder profile pages y cross-links
+
+- **Ruta actual**: `src/routes/builders/$builderId.tsx` (perfiles con claim).
+- **Ruta nueva**: `src/routes/u/$handle.tsx` (perfiles auto-gestionados).
+- **Cross-linking**: una página de perfil con claim puede tener una sección
+  "People like this (self-managed)" que muestra hasta 3 perfiles
+  auto-gestionados cuyo `services` o `topics` solape. Un perfil
+  auto-gestionado puede tener una sección "Also active on" que apunta a su
+  `builder_claims` cuando exista.
+- **SEO**: el sitemap incluye ambos tipos. Las URLs canónicas son
+  `/builders/$builderId` (claim) y `/u/$handle` (auto-gestionado), nunca
+  se mezclan.
+
+### Garantía común a todas las superficies
+
+- Cualquier resultado `kind: 'self-managed-person'` se renderiza con el
+  chip "Self-managed" sin excepción. El chip nunca se omite por error
+  visual.
+- Los resultados auto-gestionados se pueden filtrar pero **nunca se
+  ocultan por defecto** en una superficie donde antes aparecía el
+  universo completo de builders. Para excluir, el usuario debe hacerlo
+  explícitamente (toggle o query param).
+- Las métricas D7/D30 de cada superficie deben segmentar
+  auto-gestionados vs claimed desde el día uno, para que el equipo
+  pueda detectar si la introducción diluye engagement o lo amplía.
+
+## Principio de cobertura universal en matching
+
+> Esta sección codifica una regla de arquitectura. Aplica a este plan y a
+> cualquier plan futuro de BuilderHunt que introduzca una nueva superficie
+> de matching. No es una lista cerrada: es un principio que obliga a
+> responder una pregunta antes de cerrar cualquier feature de
+> descubrimiento.
+
+**Regla**: cualquier código, ruta, worker, brief, agente o job que
+produzca una lista de "candidatos", "matches", "personas relevantes" o
+cualquier conjunto ordenado de builders, **debe considerar perfiles
+auto-gestionados** (`selfManagedProfiles` con `visibility = 'public'`)
+como fuente de datos válida, con las mismas reglas de inclusión,
+exclusión, dedup, ranking, y marca visual que los builders con
+`builder_claims` verificada.
+
+La regla aplica tanto a un usuario humano buscando en la UI como a
+un agente o worker ejecutando un job en background. No hay diferencia
+de trato por quién inicia el matching.
+
+### Por qué es un principio, no una lista
+
+Las superficies de matching no se descubren de antemano. Un plan
+nuevo en phase-3 o phase-4 puede introducir un "JD-to-candidates
+matcher" o un "collaboration graph" sin que este plan pueda
+anticiparlo. Documentar 10 superficies es un snapshot; un principio
+es una invariante que sobrevive a la introducción de futuras
+superficies. Sin el principio, cada plan futuro puede olvidar
+silenciosamente la cobertura de auto-gestionados.
+
+### Cómo se aplica en código
+
+- **Helper único**: cualquier nueva superficie consume
+  `includeSelfManagedInResults(results, options)` definido en
+  `src/lib/search/self-managed-coverage.ts`. El helper inyecta los
+  perfiles auto-gestionados relevantes en la posición correcta del
+  ranking, aplica el toggle si está desactivado, y garantiza que cada
+  resultado `kind: 'self-managed-person'` lleva el campo
+  `metadata.isSelfManaged = true` y los flags que la UI necesita.
+- **Test de invariante**: la suite
+  `tests/unit/search/self-managed-coverage.test.ts` verifica que
+  `includeSelfManagedInResults` cumple el contrato para al menos los
+  siguientes escenarios: dedup contra builders con claim, toggle
+  `includeSelfManaged = false`, ranking preservado, exclusion por
+  `visibility != 'public'`, exclusion por `scanStatus = 'infected'`.
+- **Checklist de review**: cualquier PR que añada un nuevo endpoint
+  o worker de matching debe incluir un test que verifica la cobertura
+  de self-managed. El checklist se aplica en `CODEOWNERS` y en el
+  review template de GitHub.
+
+### Cómo se aplica en planes futuros
+
+Todo plan de phase-3 o phase-4 que introduzca una superficie de
+matching debe responder estas cinco preguntas en su `spec.md`. Si
+alguna respuesta es "no aplica", debe justificarse explícitamente.
+
+1. ¿La nueva superficie incluye `selfManagedProfiles` con
+   `visibility = 'public'` en su pool de candidatos?
+2. ¿El output renderiza cada resultado `kind: 'self-managed-person'`
+   con el chip "Self-managed"?
+3. ¿Existe un toggle (`includeSelfManaged: boolean`, o equivalente)
+   para que el usuario pueda excluirlos, y el default es `true`?
+4. ¿La telemetría de la superficie emite el evento
+   `surface_result_rendered` con `kind` segmentado?
+5. ¿Existe al menos un test E2E o de integración que verifica la
+   cobertura?
+
+El conjunto de cinco preguntas se referencia desde este spec como
+**"checklist de cobertura universal en matching"**. Sucesión de
+planes que la adopten: cualquier plan que cierre una nueva superficie
+de matching con respuestas afirmativas a las cinco preguntas hereda
+automáticamente la compatibilidad con perfiles auto-gestionados.
+
+### Reglas derivadas explícitas
+
+- **No hay "auto-gestionado vs AI tools"** en un brief. En la
+  superficie de `solutions`, las personas auto-gestionadas conviven
+  con AI tools y documentación, pero como **categoría disjunta** (ver
+  Fase 4b.6). El principio de cobertura universal no rompe la
+  separación de categorías: una persona no es una AI tool, ni
+  viceversa.
+- **Las constraints de privacidad se respetan siempre**. Un usuario
+  con `visibility = 'draft'` o con su `delete-account` en proceso
+  nunca aparece en ninguna superficie, aunque el principio
+  obligue a considerarlos. La cobertura se aplica sobre el conjunto
+  de filas elegibles, no sobre todas las filas.
+- **El toggle global de cobertura existe en `user_preferences`**
+  bajo `search.includeSelfManaged` (default `true`). Si el usuario
+  lo desactiva, todas las superficies lo respetan. La métrica
+  segmentada sigue emitiendo, pero los valores para
+  `self-managed-person` se reportan como 0 para ese usuario.
+- **El toggle por superficie sigue funcionando**. Una superficie
+  concreta puede tener su propio toggle más granular (por ejemplo
+  `recommendations.includeSelfManaged`). El toggle global solo se
+  aplica si el toggle por superficie no está definido.
+
+### Anti-patterns explícitos (no hacer)
+
+- **No** iterar el pool de builders y aplicar `WHERE
+  builder_claims.verified_at IS NOT NULL` para "asegurar" la
+  calidad. Eso excluye a los auto-gestionados.
+- **No** cachear un snapshot del pool que no incluye
+  `selfManagedProfiles`. La caché invalida por evento o tiene TTL
+  documentado y se invalida en cada insert/update de
+  `selfManagedProfiles`.
+- **No** asumir `kind: 'person'` para builders; verificar también
+  `kind: 'self-managed-person'`. Las dos ramas deben estar cubiertas.
+- **No** usar la palabra "verified" o el badge verde para
+  auto-gestionados en ningún contexto (UI, copy, telemetría,
+  exports). La marca "Self-managed" es exclusiva.
+- **No** devolver auto-gestionados en una superficie sin un toggle
+  para excluirlos. La regla opuesta también es un anti-pattern: no
+  excluir por defecto.
+
+### Cómo este principio se conecta con planes existentes
+
+- `phase-1/36-claimable-profiles/spec.md`: añade al final una nota
+  referenciando este principio. La nota dice: "cualquier ruta que
+  liste builders con claim debe, por el principio de cobertura
+  universal, considerar también perfiles auto-gestionados. Ver
+  phase-2/07-perfiles-autogestionados/spec.md §Principio de
+  cobertura universal en matching."
+- `phase-1/37-portfolio-builder/spec.md`: añade nota análoga
+  referenciando el principio.
+- `phase-1/38-work-sample/spec.md`: añade nota análoga.
+- `phase-2/02-segmentacion-usuarios/spec.md`: el segmento `building`
+  cubre las dos sub-modalidades (con y sin huella). La cobertura
+  universal es un corolario.
+- `phase-2/03-onboarding-segmentado/spec.md`: el flujo bifurcado
+  garantiza que el usuario sin huella llega a la nueva ruta sin
+  quedar excluido.
+- `phase-2/04-dashboard-personalizado/spec.md`: el segmento
+  `building` debe tener widgets que muestren también perfiles
+  auto-gestionados propios del usuario y ajenos relevantes.
+- `phase-2/06-landing-segmentada/spec.md`: la página `/for/builders`
+  menciona la cobertura universal como promesa de producto.
+
+### Cómo este principio se conecta con planes futuros
+
+- `phase-4/jd-to-candidates-matching`: el matching debe incluir
+  perfiles auto-gestionados cuyo `services` y `topics` matcheen
+  con el JD. La confianza del match se etiqueta explícitamente
+  como "self-managed" vs "claimed".
+- `phase-4/look-alike-sourcing`: ver Fase 4b.8. Vector de similitud
+  distinto por tipo, etiqueta de output distinta, pero ambos en
+  la misma lista de resultados.
+- `phase-4/collaboration-graph`: el grafo de colaboración incluye
+  aristas a perfiles auto-gestionados cuando hay match en
+  `services` o `topics` comunes. Las aristas llevan la marca
+  "self-managed" en su tooltip.
+- `phase-4/match-evidence-panel`: cuando un match incluye un
+  perfil auto-gestionado, el panel muestra los adjuntos limpios
+  como evidencia, con la marca "declarado por el dueño".
+- `phase-4/talent-market-intelligence`: ver Fase 4b.7. Métricas
+  segmentadas por `kind`.
+- Cualquier plan nuevo que introduzca matching: el `spec.md` debe
+  responder las cinco preguntas de la checklist.
+
+### Una nota sobre el nombre
+
+Este plan usa el término **"perfiles auto-gestionados"** para
+referirse a `selfManagedProfiles`. En el copy de producto y en
+conversaciones informales, también aparece como **"self-hosted
+profiles"** (aclaración del propietario del producto). Ambos
+términos designan la misma entidad. En el código, en los
+identificadores, en la taxonomía de `kind` y en la documentación
+técnica se usa **"self-managed"** por consistencia con la
+nomenclatura inglesa del codebase. En el copy de UI se puede
+usar "Self-managed" como chip visible para el usuario.
+
 ## Indexación y búsqueda
 
 El perfil auto-gestionado se inyecta en el mismo índice de búsqueda que los builders
