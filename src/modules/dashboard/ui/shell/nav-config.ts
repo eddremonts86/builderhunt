@@ -16,7 +16,7 @@ import {
   Activity, AlertTriangle, BadgeCheck, BookOpen, CalendarDays, CircleUser, Cog, Compass, CreditCard,
   Download, Gauge, Globe, History, Inbox, Layers, LayoutDashboard, Lightbulb, ListChecks, Mail, Map, Plug, Plus, RotateCcw,
   Mic, Send,
-  Search, Shield, ShieldAlert, ShieldCheck, Siren, Users,
+  Search, Shield, ShieldAlert, ShieldCheck, Siren, Users, FlaskConical,
 } from 'lucide-react'
 
 type IconComponent = React.ComponentType<{ className?: string }>
@@ -140,6 +140,9 @@ export const NAV_AREAS: readonly NavArea[] = [
       { to: '/admin/operations', label: 'Operations', icon: Cog, group: 'Operations' },
       { to: '/admin/integrations', label: 'Integrations', icon: Plug, group: 'Operations' },
       { to: '/admin/sources', label: 'Sources', icon: Globe, group: 'Operations' },
+      // Registered rather than reachable only by URL: an admin page nobody can navigate to is a page nobody
+      // uses, and the gold set only produces value when a curator actually writes judgments into it.
+      { to: '/admin/solutions-gold-set', label: 'Gold set', icon: FlaskConical, group: 'Operations' },
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
       { to: '/admin/plan-requests', label: 'Plan requests', icon: Inbox, group: 'Operations', badge: 'planRequests' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },

@@ -57,11 +57,16 @@ const zodEnv = z.object({
   MINIMAX_API_KEY: z.string().optional(),
   MINIMAX_BASE_URL: z.string().default('https://api.minimax.io'),
   MINIMAX_MODEL: z.string().default('MiniMax-M3'),
-  // PLACEHOLDER cost estimates for the abuse-and-usage-integrity "G7" margin monitor — not
-  // confirmed MiniMax M3 pricing, a rough order-of-magnitude stand-in (similar-tier model pricing)
-  // until real pricing is provisioned. Update before relying on `abuse/margin.ts` for anything
-  // beyond its own unit tests; nothing in production reads these yet (see `abuse/margin.ts`'s
-  // header comment for why).
+  // MiniMax M3 list pricing, checked against the published rate card on 2026-08-02: $0.30 per 1M input
+  // tokens and $1.20 per 1M output tokens, which is 0.03¢ and 0.12¢ per 1K.
+  //
+  // These began as rough order-of-magnitude placeholders and the comment said so. They turn out to be
+  // exactly right — the guess matched the list price to the digit — so what changes here is the
+  // *provenance*, not the numbers: `docs/operations/solutions-cost-certification.md` can now cite a
+  // published rate instead of a stand-in.
+  //
+  // Still list price, not an invoice. Volume tiers, committed-use discounts and currency conversion all
+  // move the real figure, so a cost certification signed off a production bill remains a separate step.
   MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS: z.coerce.number().nonnegative().default(0.03),
   MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS: z.coerce.number().nonnegative().default(0.12),
   // Provider-cost-vs-credit-charged ratio above which `margin_drift` fires (alert only, never

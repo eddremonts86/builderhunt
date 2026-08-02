@@ -1,13 +1,13 @@
 # Solutions Intelligence — cost certification
 
-**Status: provisional, not signed.** Every figure below is computed from *declared* token budgets and the
-*placeholder* provider pricing in `env.ts`. That is enough to show the fixed prices are not obviously
-mispriced, and enough to fail loudly if a future change makes them so. It is not enough to sign a
+**Status: computed from published pricing, not from an invoice.** Every figure below uses *declared* token
+budgets and MiniMax's **published** M3 rate card, checked 2026-08-02. That is enough to show the fixed prices
+are not obviously mispriced, and enough to fail loudly if a future change makes them so. It is not enough to sign a
 certification, and plan 43's spec.md blocks launch on exactly that: "Public launch is blocked until the billing
 platform is certified and a provider-cost benchmark validates the rate card." What is still missing is listed
 under [Before this can be signed](#before-this-can-be-signed).
 
-Last recomputed: 2026-08-01, against migration 0136 and rate-card version 1.
+Last recomputed: 2026-08-02, against migration 0139 and rate-card version 1.
 
 ## What is charged
 
@@ -55,9 +55,16 @@ whose price is already fixed and already confirmed by users.
 | Interpret brief | 3,000 | 900 | 0.198¢ | 0.396¢ |
 | Explain route | 2,500 | 600 | 0.147¢ | 0.294¢ |
 
-Placeholder pricing is `MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS = 0.03` and
-`MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS = 0.12`. `env.ts` documents both as rough order-of-magnitude
-stand-ins, not confirmed MiniMax figures.
+Pricing is `MINIMAX_COST_PER_1K_INPUT_TOKENS_CENTS = 0.03` and
+`MINIMAX_COST_PER_1K_OUTPUT_TOKENS_CENTS = 0.12` — MiniMax M3's published list price of $0.30 per 1M input
+tokens and $1.20 per 1M output tokens, checked 2026-08-02.
+
+These constants entered the codebase as rough order-of-magnitude placeholders, and `env.ts` said so. Checking
+them against the published rate card found they were exactly right, to the digit. What changed is the
+provenance, not the arithmetic: this document now cites a published rate rather than a guess.
+
+**It is still list price, not an invoice.** Volume tiers, committed-use discounts and currency conversion all
+move the real figure, and only a bill settles it.
 
 **One call is up to two billed requests.** `minimaxChat` retries once with a JSON-correction turn when the
 first answer does not parse or validate, re-sending the whole prompt and allowing the whole output budget
@@ -87,8 +94,9 @@ its correction retry.
 | **Regenerate, worst case** | 3 explain | **0.882¢** | **13.5¢** | **0.065** | **15×** |
 | Regenerate, no provider | 0 | 0¢ | 0¢ | — | — |
 
-The break-even multiple is the number worth reading. The absolute cents are only as good as the placeholder
-constants; the multiple says how wrong those constants can be before the conclusion changes. Provider prices
+The break-even multiple is the number worth reading. The absolute cents are only as good as the pricing
+constants — now list price rather than a guess, but still not a bill — and the multiple says how wrong they can
+be before the conclusion changes. Provider prices
 would have to rise about **15×** before the worst regenerate stops paying for itself, and about **27×** for
 generate.
 
@@ -98,7 +106,8 @@ the same arithmetic past the point where it refuses — a test that can only pas
 ### Where the margin actually is
 
 The headroom is enormous, and that is a finding rather than a reassurance: it says the credit price was set for a
-much more expensive product. `interview_live_transcription` bills a credit per provider-billed minute, where a
+much more expensive product. It also survives the switch from guessed to published pricing unchanged, because
+the guess was the published number. `interview_live_transcription` bills a credit per provider-billed minute, where a
 credit maps to real per-minute vendor cost; a bounded text completion does not come close. Two consequences:
 
 - The 10-credit price is a **product** decision — what solution advice is worth — not a cost-recovery
@@ -140,8 +149,9 @@ after a price change").
 
 ## Before this can be signed
 
-1. **Real provider pricing.** Replace the placeholder `MINIMAX_COST_PER_*` constants with confirmed figures and
-   recompute this table. Until then no number here is an actual cost.
+1. **A real invoice.** The constants now match MiniMax's published list price, which is a much stronger footing
+   than the original guess — but list price is not what an account pays. One month of real billing, reconciled
+   against `billing_credit_reservations`, is what turns this from computed to certified.
 2. **A measured benchmark, not a budget ceiling.** These figures assume every call uses its entire token budget.
    Real distributions are what spec.md means by "a provider-cost benchmark validates the rate card" — run the
    60-brief suite from Phase 9 with usage capture and record p50/p95 alongside the worst case.

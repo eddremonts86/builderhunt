@@ -135,6 +135,7 @@ import { Route as DashboardListsListIdRouteImport } from './routes/_dashboard/li
 import { Route as DashboardInterviewsInvitationsRouteImport } from './routes/_dashboard/interviews/invitations'
 import { Route as DashboardAdminUsersRouteImport } from './routes/_dashboard/admin/users'
 import { Route as DashboardAdminSourcesRouteImport } from './routes/_dashboard/admin/sources'
+import { Route as DashboardAdminSolutionsGoldSetRouteImport } from './routes/_dashboard/admin/solutions-gold-set'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
 import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
@@ -931,6 +932,12 @@ const DashboardAdminSourcesRoute = DashboardAdminSourcesRouteImport.update({
   path: '/admin/sources',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
+const DashboardAdminSolutionsGoldSetRoute =
+  DashboardAdminSolutionsGoldSetRouteImport.update({
+    id: '/admin/solutions-gold-set',
+    path: '/admin/solutions-gold-set',
+    getParentRoute: () => DashboardRouteRoute,
+  } as any)
 const DashboardAdminRoadmapRoute = DashboardAdminRoadmapRouteImport.update({
   id: '/admin/roadmap',
   path: '/admin/roadmap',
@@ -1854,6 +1861,7 @@ export interface FileRoutesByFullPath {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
   '/admin/sources': typeof DashboardAdminSourcesRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
@@ -2134,6 +2142,7 @@ export interface FileRoutesByTo {
   '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
   '/admin/sources': typeof DashboardAdminSourcesRoute
   '/admin/users': typeof DashboardAdminUsersRoute
   '/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
@@ -2417,6 +2426,7 @@ export interface FileRoutesById {
   '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
+  '/_dashboard/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
   '/_dashboard/admin/sources': typeof DashboardAdminSourcesRoute
   '/_dashboard/admin/users': typeof DashboardAdminUsersRoute
   '/_dashboard/interviews/invitations': typeof DashboardInterviewsInvitationsRoute
@@ -2700,6 +2710,7 @@ export interface FileRouteTypes {
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
+    | '/admin/solutions-gold-set'
     | '/admin/sources'
     | '/admin/users'
     | '/interviews/invitations'
@@ -2980,6 +2991,7 @@ export interface FileRouteTypes {
     | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
+    | '/admin/solutions-gold-set'
     | '/admin/sources'
     | '/admin/users'
     | '/interviews/invitations'
@@ -3262,6 +3274,7 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/plan-requests'
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
+    | '/_dashboard/admin/solutions-gold-set'
     | '/_dashboard/admin/sources'
     | '/_dashboard/admin/users'
     | '/_dashboard/interviews/invitations'
@@ -4576,6 +4589,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminSourcesRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
+    '/_dashboard/admin/solutions-gold-set': {
+      id: '/_dashboard/admin/solutions-gold-set'
+      path: '/admin/solutions-gold-set'
+      fullPath: '/admin/solutions-gold-set'
+      preLoaderRoute: typeof DashboardAdminSolutionsGoldSetRouteImport
+      parentRoute: typeof DashboardRouteRoute
+    }
     '/_dashboard/admin/roadmap': {
       id: '/_dashboard/admin/roadmap'
       path: '/admin/roadmap'
@@ -5695,6 +5715,7 @@ interface DashboardRouteRouteChildren {
   DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
+  DashboardAdminSolutionsGoldSetRoute: typeof DashboardAdminSolutionsGoldSetRoute
   DashboardAdminSourcesRoute: typeof DashboardAdminSourcesRoute
   DashboardAdminUsersRoute: typeof DashboardAdminUsersRoute
   DashboardInterviewsInvitationsRoute: typeof DashboardInterviewsInvitationsRoute
@@ -5735,6 +5756,7 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
+  DashboardAdminSolutionsGoldSetRoute: DashboardAdminSolutionsGoldSetRoute,
   DashboardAdminSourcesRoute: DashboardAdminSourcesRoute,
   DashboardAdminUsersRoute: DashboardAdminUsersRoute,
   DashboardInterviewsInvitationsRoute: DashboardInterviewsInvitationsRoute,
