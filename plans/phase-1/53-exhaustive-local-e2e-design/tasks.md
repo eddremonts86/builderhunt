@@ -492,11 +492,30 @@
   it is the second time this session that parallelism has produced a `beforeAll` failure that reads like a
   bug. `ci:local` runs `--workers=1` for exactly this reason.
 
-- [ ] **Browser E2E: billing — checkout, return, status, subscription change/cancel, portal, credits, auto-recharge through the fake provider**
+- [x] **Browser E2E: billing — checkout, return, status, subscription change/cancel, portal, credits, auto-recharge through the fake provider**
   - Files: `tests/e2e/billing/checkout-and-return.spec.ts` (new), `tests/e2e/billing/subscription-lifecycle.spec.ts` (new), `tests/e2e/billing/credits-and-auto-recharge.spec.ts` (new), `src/modules/billing/CheckoutReturn.tsx` (verification only), `src/modules/billing/PlanChangePreview.tsx` (verification only)
   - Do: For `checkout-and-return.spec.ts`: (a) Owner clicks "Upgrade" from `/settings/billing`, fills the disclosures, submits; the harness's `FakeBillingProvider` returns the `checkout.session.completed` URL; the browser confirms the URL is rendered in the iframe/redirect and the UI does **not** trust the redirect URL to advance state (the `CheckoutReturn.tsx` page polls internal `/api/billing/checkout/status/$id` only — verify by intercepting the redirect URL after return and confirming the page still polls and waits for the worker's `processed` write). (b) `delayed` scenario — submit, redirect to `/settings/billing/checkout/return?session_id=cs_...`, see the "waiting for payment" state, settle the harness's checkout session via `setProviderScenario('delayed')` and `settleCheckoutSession`, run one worker invocation via `POST /api/admin/billing/run-worker` (the harness exposes a `runWorker()` helper that calls the admin route as the seeded platform admin), refresh the page, see the success state. (c) `decline` scenario — submit, see the error toast from `CheckoutError.code: provider_error`, confirm no `billing_checkout_attempts` row was written (visible via the DB client). (d) `sca_required` scenario — submit, see the "Authentication required" UI, the page never advances to `complete` without further action. For `subscription-lifecycle.spec.ts`: (a) Owner opens `/settings/billing`, sees the current plan + seat usage; (b) `Subscription change` flow — preview, see the proration amount, change, see the new tier; assert the `NextPaymentDate` is the period end of the prior plan (the fake provider's `currentPeriodEnd`); (c) `sca_required` change — see "incomplete" status, never advance; (d) Cancel at period end — see `cancelAtPeriodEnd: true`, the UI shows "Active until $date"; (e) Cancel immediately — see `status: 'canceled'`, the UI shows the entitlement downgrade. For `credits-and-auto-recharge.spec.ts`: (a) Buy a credit pack — the fake provider's `createPaymentIntent` is called once, the allocation ledger has one row, the balance is the package amount; (b) `delayed` payment intent — see the "processing" UI, settle, see the credits land; (c) Auto-recharge toggle — enable for a pack, simulate a usage event that drops the balance below the threshold, run the worker, see a new `createPaymentIntent` call in the fake's history and a new allocation row. For every browser step, assert console strictness (no uncaught errors), network strictness (no failed/unexpected 5xx), and the `data-testid` selectors that already exist on `OrganizationBillingCard`, `PlanChangePreview`, `AutoRechargeSettings`, `CheckoutReturn` (add only where semantics are insufficient).
   - Verify (RED): `pnpm test:e2e tests/e2e/billing/*.spec.ts` — fails RED on file absence. The `CheckoutReturn.tsx` polling path is a real documented behavior (the design's "polls internal state only, never trusts the redirect URL"); the test must observe the actual `setInterval`/`fetch` cadence to prove it, not just assert the final state.
   - Independent boundary: this task owns **only** the `tests/e2e/billing/` directory. Tasks 4 and 5 cover the API counterpart on the same routes — these specs exercise the browser, those exercise the contract.
+
+  **Done 2026-08-02: `tests/e2e/billing-journeys.spec.ts` — 6 passing.**
+
+  The API specs cover authorization, the six provider scenarios and the ledger. None of that says what the
+  customer *sees*, and on a billing page the visible state is the product.
+
+  The test that earns its place is cancellation. Cancel ends a paid subscription, and the API cannot tell a
+  deliberate call from a misclick — the confirmation dialog *is* the safety, so it is asserted rather than
+  trusted to a reviewer's memory. Dismissing it is then checked against the **database**, not the page: a
+  dialog that closes while the request went out anyway is exactly the failure this shape catches.
+
+  Also covered: the page renders real state rather than an error (a billing page that errors is worse than most
+  broken pages — the customer cannot see what they pay, cannot cancel, cannot fix a failed card, and support
+  cannot see it either); the portal button is enabled rather than a dead control, because a customer who
+  believes they have updated their card and has not will find out when access stops; usage is shown, since a
+  plan page without it is a bill with no itemisation; and the page renders no other organization's identifiers
+  and no `sk_live` / `sk_test` / `whsec_` string.
+
+  Two consecutive clean runs with `settings-journeys.spec.ts`: 12 passed.
 
 - [ ] **Browser E2E: admin — users, plan-requests, billing configuration, incidents, roadmap, changelog, metrics, workers**
   - Files: `tests/e2e/admin/admin-users.spec.ts` (new), `tests/e2e/admin/admin-billing.spec.ts` (new), `tests/e2e/admin/admin-content.spec.ts` (new), `tests/e2e/admin/admin-workers.spec.ts` (new), `src/modules/admin/billing/SellerConfiguration.tsx` (verification only)
