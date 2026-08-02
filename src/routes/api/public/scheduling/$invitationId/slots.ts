@@ -36,10 +36,22 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/slots
           const result = await withCapabilityRequest(request, params.invitationId, async ({ transaction, tenant }) => {
             const invitation = await findInvitationByCapabilityHash(transaction, tenant.capabilityHash, new Date())
             if (!invitation) return null
-            // Already booked or declined invitations offer nothing: the candidate's next action is
-            // cancel or reschedule, not pick.
-            if (invitation.status === 'booked') return { slots: [] }
 
+            /**
+             * A booked invitation still answers with times.
+             *
+             * It used to return an empty list on the reasoning that "the candidate's next action is
+             * cancel or reschedule, not pick" — but rescheduling *is* picking. `CandidatePortal`'s
+             * `startReschedule()` opens the new-time picker and calls this endpoint to fill it, so the
+             * empty list made the move unreachable through the UI: an empty picker, no error, and a
+             * `POST /reschedule` that no candidate could ever produce. Found by
+             * `tests/e2e/scheduling-reschedule.spec.ts`, which could not get a second slot to move to.
+             *
+             * The candidate's own appointment is naturally absent from the result — it makes the
+             * organizer busy — which is the right answer for a picker asking where else you could go.
+             * The service releases it before recomputing, so the same time remains reachable through a
+             * cancel-and-rebook if that is what the candidate wants.
+             */
             const derived = await querySlots(transaction, {
               organizationId: tenant.organizationId,
               ownerUserId: tenant.ownerUserId,

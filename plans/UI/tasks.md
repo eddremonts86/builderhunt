@@ -277,9 +277,20 @@
     confirmation, a stale confirmed price refused, explicit save, and a saved run that cannot be edited.
   - **Added** `tests/e2e/builder-workspace-navigation.spec.ts` for journeys 1 and 8, which had no coverage at
     all — `exports.spec.ts` was the only spec that even mentioned a shortlist, and it tests the download.
+  - **Added** `tests/e2e/scheduling-reschedule.spec.ts` for journey 6's *atomic reschedule* half: the move
+    itself, the rollback when the new time is gone, consent re-verified rather than inherited, and the
+    capability boundary on the highest-value write a stranger can reach. Five tests, green twice
+    consecutively alongside `scheduling.spec.ts` and `scheduling-organizer.spec.ts` (18 passed).
+
+    It found a defect that made the feature unreachable. `GET /api/public/scheduling/:id/slots`
+    short-circuited to an empty list for any invitation in `booked` — "the candidate's next action is
+    cancel or reschedule, not pick" — but `CandidatePortal.startReschedule()` fills its new-time picker
+    from that endpoint. A candidate wanting to move a confirmed interview saw an empty picker, no error,
+    and could never produce the `POST /reschedule` the service was built to serve. The endpoint now
+    computes real availability for a booked invitation; the candidate's own appointment is naturally
+    absent from it, which is the right answer for a picker asking where *else* you could go.
+
   - **Still missing, and named rather than implied:**
-    - Journey 6's *atomic reschedule* half. `scheduling.spec.ts` covers booking, races and idempotency; the
-      word "reschedule" appears in no e2e spec, while task #50 marks the feature complete.
     - Journey 1's *browser* hop. The API-level assertions are in place — the shortlist contains the builder and
       the workspace answers for it — but the click-through timed out waiting for the member link and I did not
       get it green. The spec says so in its own comment rather than implying the journey is covered.
