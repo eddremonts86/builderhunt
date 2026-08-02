@@ -121,7 +121,33 @@
   must reach the export they already have. The throttle is also proved per-user, so one account cannot deny
   the export right to every other one.
 
-  **Still open in this task:** `account.spec.ts`.
+  **`tests/e2e/api/account.spec.ts` landed — 17 passing, 1 `fixme`. Task 1's four files are complete.**
+
+  Everything under `/api/me` is keyed by the session *user*, not by an active organization, so a bug here is
+  not "A read B's organization" but "A read B" — every assertion runs on that axis. Account deletion gets the
+  most care: the sole-owner-with-other-members refusal is asserted to carry `organizations[]`, because a bare
+  409 leaves a user holding a legal right they cannot exercise and no way to learn what to fix. Schedule and
+  cancel are asserted together on purpose, read back through the route's own `GET` rather than out of a table,
+  since that GET is what the settings page renders — a user who cannot see their pending deletion cannot stop
+  it.
+
+  One route deliberately answers a stranger instead of refusing: `GET /api/me/delete-account` returns
+  `200 {"request": null}` so a signed-out visitor's settings page renders a sign-in prompt rather than an
+  error. It leaks nothing — `null` is also what a signed-in user with no pending deletion gets. The spec first
+  asserted 401 there, which would have been pinning a status code the route deliberately does not use; it now
+  pins the property instead.
+
+  **Third finding, `test.fixme`: `GET /api/me/builder/:id` returns 200 with an HTML document.** That file
+  implements `PATCH` only, and an unimplemented method on a TanStack Start file route falls through to the
+  route *component*. A client scripting the endpoint reads 200 and concludes it received a profile. This is
+  the same defect class already fixed once this session on `PATCH /api/solutions/runs/:id`, so the follow-up
+  is **"audit every `/api` file route for unimplemented methods"**, not "add a GET here".
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 71 passed, 3 skipped, 16.7s.
+
+  **Task 1 findings summary — three, none fixed here, all `test.fixme`:** `POST /api/organizations` validates
+  before authenticating; resend and cancel leak invitation-id existence via 403-vs-404; `GET /api/me/builder/:id`
+  answers with HTML.
 
 - [ ] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)
