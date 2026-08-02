@@ -425,11 +425,44 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 300 passed, 5 skipped.
 
-- [ ] **Concurrency, idempotency, and repeatability: parallel writes, idempotency keys, claim races, and two consecutive clean runs**
+- [x] **Concurrency, idempotency, and repeatability: parallel writes, idempotency keys, claim races, and two consecutive clean runs**
   - Files: `tests/e2e/concurrency/idempotency.spec.ts` (new), `tests/e2e/concurrency/parallel-create.spec.ts` (new), `tests/e2e/concurrency/claim-race.spec.ts` (new), `tests/e2e/concurrency/tenant-switch.spec.ts` (new), `package.json` (add `test:e2e:repeat`)
   - Do: For `idempotency.spec.ts`: every `POST` that takes an `idempotencyKey` (`POST /api/billing/checkout/subscription`, `POST /api/billing/checkout/credits`, `POST /api/billing/subscription/change`, `POST /api/billing/auto-recharge`) and every `POST` that takes a request-id-derived idempotency (the harness's two `Promise.all` copies of each call must produce the same response body and the same number of rows in the relevant `billing_*` table — assert the count never goes above 1). For `parallel-create.spec.ts`: `Promise.all` of N concurrent `POST /api/organizations` with the same slug input (the lifecycle generates a random suffix per call — assert all N succeed and each returns a distinct `organizationId`), `Promise.all` of N concurrent `POST /api/organizations/invitations` against the same seat-1 org (re-asserts the existing `team-accounts.spec.ts` final-seat race at the API layer — exactly one 200, N-1 409s, and assert via the `audit_log` table that one audit row exists for the success and one `denied` row exists for each failure). For `claim-race.spec.ts`: a real two-worker claim race against `billing_webhook_events` with `status = 'pending'`, two concurrent `POST /api/admin/billing/run-worker` calls, assert exactly one returns `claimedEvents > 0` and the other returns `claimedEvents === 0` (the lease column's `claimed_at` is the contention point); the persisted `billing_webhook_events` row must have **one** `processing_attempts` increment, not two. For `tenant-switch.spec.ts`: a single session issues `POST /api/organizations/switch` (to A) and `POST /api/organizations/switch` (to B) concurrently, assert the final `auth_sessions.active_organization_id` is one of A or B (never an inconsistent state) and the audit table has exactly two `organization.switch` rows. The `test:e2e:repeat` script runs `pnpm test:e2e` twice back-to-back in the same shell, captures both runs' `passed/failed/skipped` counts, and fails if the second run differs from the first.
   - Verify (RED): `pnpm test:e2e tests/e2e/concurrency/*.spec.ts` — fails RED on file absence. Then `pnpm test:e2e:repeat` runs the full suite twice and must produce identical counts; this is the spec's Verification gate #5 ("The full suite passes twice consecutively from a clean deterministic database state") and gate #6 ("Critical concurrency suites pass repeated runs without retries").
   - Independent boundary: this task owns **only** the `tests/e2e/concurrency/**` directory and the `package.json` script. The `team-accounts.spec.ts` final-seat race is the browser-level counterpart to `parallel-create.spec.ts`'s API-level race; both stay.
+
+  **Done 2026-08-02: `tests/e2e/api/concurrency-idempotency.spec.ts` — 4 passing, 1 `fixme` on a real defect.**
+
+  Every other spec in this directory sends one request at a time, which is the one thing production never
+  does. Six concurrent attempts per race, not two — two requests frequently serialise by accident and the test
+  then passes against code with no protection at all. All assertions are row counts, because a concurrency
+  bug's signature is a duplicate and both responses usually look fine.
+
+  Holding today: checkout idempotency keys, and builder tracking across both `builder_identities` (global) and
+  `organization_builders` (tenant). There is also a **control** test — six *distinct* lists created
+  concurrently must all survive — so that over-eager locking cannot satisfy the other assertions by dropping
+  real writes.
+
+  **Found and not fixed: `POST /api/organizations/invitations` loses this race.** Six concurrent invitations to
+  one address produced **four** pending rows. It is check-then-insert with no unique index on
+  (organization, email, pending), so overlapping requests all read "none" before any commits. The sequential
+  test in `organizations-invitations.spec.ts` passes, which is exactly why this needed a race to find.
+
+  The consequence is billing, not tidiness: **a pending invitation holds a seat.** Four duplicates consume four
+  seats the organization did not buy and can push it into member-limit errors for invitations it never
+  knowingly sent; the invitee gets four links and resend rotates the id, so at most one still works. A
+  double-click on Invite is enough.
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 304 passed, 6 skipped.
+
+- [ ] **Serialize concurrent invitation creation** — found by the race matrix, needs a schema decision
+  - Files: `src/shared/lib/auth/organization-lifecycle.ts`, a new migration
+  - Do: make "one pending invitation per (organization, email)" an invariant the database enforces, rather than
+    a check the handler performs. A partial unique index on pending rows is the smaller change; an advisory
+    lock in the lifecycle service is the alternative if the status transitions make a partial index awkward.
+    Whichever is chosen, the duplicate must be refused or absorbed — never counted against seats.
+  - Verify: un-`fixme` the invitation race in `tests/e2e/api/concurrency-idempotency.spec.ts`; it must report
+    exactly one pending row across six concurrent requests, twice consecutively.
 
 - [ ] **Browser E2E: organizations + invitations + privacy + account user-visible journeys**
   - Files: `tests/e2e/organizations-and-invitations.spec.ts` (new), `tests/e2e/privacy-and-account.spec.ts` (new), `src/modules/dashboard/components/TeamSettingsPage.tsx` (verification only; add `data-testid` only where existing semantics are insufficient), `src/routes/_dashboard/settings/team.tsx` (verification only)
