@@ -145,9 +145,15 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 71 passed, 3 skipped, 16.7s.
 
-  **Task 1 findings summary — three, none fixed here, all `test.fixme`:** `POST /api/organizations` validates
-  before authenticating; resend and cancel leak invitation-id existence via 403-vs-404; `GET /api/me/builder/:id`
-  answers with HTML.
+  **Task 1 findings — three, and the first is now fixed.**
+
+  1. ~~`POST /api/organizations` validates before authenticating.~~ **Fixed 2026-08-02.** The route now checks
+     the session first, so an anonymous caller gets 401 whatever the body. The old order let a stranger read
+     the request schema — field name, type, min and max length — out of the difference between 400 and 401.
+     Authentication was never bypassed; the leak was the *difference*. `organizations.spec.ts` asserts it
+     directly now instead of carrying a `fixme`.
+  2. Resend and cancel leak invitation-id existence via 403-vs-404 — still open, `test.fixme`.
+  3. `GET /api/me/builder/:id` answers with HTML — still open, covered by the route-method sweep task.
 
 - [x] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)

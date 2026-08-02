@@ -162,23 +162,16 @@ test.describe('anonymous access', () => {
     })
   }
 
-  test.fixme('POST /api/organizations authenticates before it validates', async () => {
+  test('POST /api/organizations authenticates before it validates', async () => {
     /**
-     * **Found by this matrix, deliberately not fixed here.**
+     * Order matters here for a reason that is not obvious. With validation first, an anonymous caller gets 400
+     * for `{}` and 401 for `{ name: "x" }` — so the request schema is readable from status codes alone by
+     * someone with no session. Authentication was never bypassed; the leak was the *difference*.
      *
-     * `POST /api/organizations` runs `CreateBody.safeParse` first and returns 400 before any session lookup,
-     * so an anonymous caller gets 400 for `{}` and 401 for `{ name: "x" }`. Authentication is *not* bypassed —
-     * the lifecycle service still refuses — but the ordering makes the request schema readable without a
-     * session: an unauthenticated prober can learn the field name, its min and max length, and its type by
-     * reading status codes alone.
-     *
-     * Low severity and a one-line reordering, but plan 53's rule for this task is explicit: no production
-     * edits inside the matrix. Marked `fixme` so it is visible in the report rather than buried in a comment,
-     * and carried as a follow-up task in
-     * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`.
+     * Found by this matrix and fixed in `src/routes/api/organizations/index.ts`.
      */
     const response = await harness.anonymous.post('/api/organizations', { data: {} })
-    expect(response.status()).toBe(401)
+    expect(response.status(), 'an empty body must be refused as unauthenticated, not as invalid').toBe(401)
   })
 })
 

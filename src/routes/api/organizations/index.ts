@@ -29,6 +29,22 @@ export const Route = createFileRoute('/api/organizations/')({
 
       POST: async ({ request }) => {
         try {
+          /**
+           * Authenticate first, validate second.
+           *
+           * The other order looks harmless and is not: with validation first, an anonymous caller gets 400 for
+           * `{}` and 401 for `{ name: "x" }`, so the request schema — the field name, its type, its minimum and
+           * maximum length — is readable from status codes alone by someone with no session. Authentication is
+           * not bypassed either way, but a stranger should learn nothing about a route they cannot use.
+           *
+           * Found by `tests/e2e/api/organizations.spec.ts`, which asserts the anonymous refusal with a body the
+           * schema would accept — an empty body only proves the validator runs.
+           */
+          const session = await auth.api.getSession({ headers: request.headers })
+          if (!session?.user?.id) {
+            return Response.json({ error: 'Authentication required' }, { status: 401 })
+          }
+
           const parsed = CreateBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
