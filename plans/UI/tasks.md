@@ -268,7 +268,8 @@
 
 ## Wave 8 — Release gates
 
-- [ ] **Add complete UI journey E2E coverage** — audited; two journeys added, two still missing
+- [x] **Add complete UI journey E2E coverage** — every journey in `plan.md` now has a spec; four added, two
+  product defects found by writing them
   - Audited the eleven enumerated specs against `plan.md`'s sixteen journeys. Three of the named files do not
     exist at all: `builder-workspace-navigation.spec.ts`, `scheduling-candidate.spec.ts`,
     `interview-material-access.spec.ts`. Two of those three are covered elsewhere under different names —
@@ -290,10 +291,12 @@
     computes real availability for a booked invitation; the candidate's own appointment is naturally
     absent from it, which is the right answer for a picker asking where *else* you could go.
 
-  - **Still missing, and named rather than implied:**
-    - Journey 1's *browser* hop. The API-level assertions are in place — the shortlist contains the builder and
-      the workspace answers for it — but the click-through timed out waiting for the member link and I did not
-      get it green. The spec says so in its own comment rather than implying the journey is covered.
+  - **Added** journey 1's *browser* hop to `builder-workspace-navigation.spec.ts`: the member row is clicked,
+    the workspace opens, and the back link points at the shortlist it came from — the origin surviving the hop
+    is the assertion, since a click that lands on the right builder having forgotten where it came from is
+    still a broken journey. Green twice consecutively (4 passed). The earlier timeout was a wrong selector on
+    my side: the row's test id is built from the *list item* id, not the builder identity id, and the row is a
+    link only when the item resolves to an `organizationBuilderId`.
 
   Two defects came out of writing these. Solutions' browser tests timed out because they never dismissed the
   cookie banner and the ToS modal, which sit above the page and swallow clicks — the a11y script has always

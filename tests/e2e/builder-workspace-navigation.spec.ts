@@ -30,6 +30,7 @@ import { e2eEnv } from './harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv } from './harness/clock'
 import { createOwnerPrincipal, disposePrincipal, type FixtureContext, type Principal } from './harness/fixtures/principals'
 import { cleanupBuilderIdentity, seedTrackedBuilder } from './harness/fixtures/builders'
+import { dismissOverlays, expectStrictBrowser, gotoHydrated } from './harness/browser'
 import type { OrganizationFixture } from './harness/fixtures/organizations'
 
 interface Harness {
@@ -116,8 +117,7 @@ test.describe('tracked builder → shortlist → shortlist detail → builder wo
      * time available and did not want to ship a test whose failure I do not understand, so what remains is the
      * part I can prove: the shortlist really contains the builder, and the workspace really answers for it.
      *
-     * **The browser hop itself is still uncovered.** That is recorded in `plans/UI/tasks.md` rather than
-     * implied to be done by this file's name.
+     * The browser hop is the test below this one.
      */
     const { principal, organization, ctx } = harness
     const { builderIdentityId } = await seedTrackedBuilder(ctx, {
@@ -155,6 +155,70 @@ test.describe('tracked builder → shortlist → shortlist detail → builder wo
        * `cleanupBuilderIdentity` deletes that — so a leftover membership makes teardown throw a foreign-key
        * error that reads like a product failure. Found exactly that way on the first run.
        */
+      await harness.sql`delete from builder_list_items where builder_identity_id = ${builderIdentityId}`
+      await cleanupBuilderIdentity(harness.sql, builderIdentityId)
+    }
+  })
+
+  test('clicking the member row lands on the workspace, still knowing where it came from', async ({ browser }) => {
+    /**
+     * The hop itself, in a browser, because a link is where this journey actually lives.
+     *
+     * The assertion that matters is the second one. Wave 2's whole premise is that every surface showing a
+     * builder hands you to the same workspace *carrying where you came from* — so a click that lands on the
+     * right builder having forgotten the shortlist is still a broken journey, and nothing in the API test
+     * above can see it. `resolveSafeBuilderFrom` allowlists the origin before it becomes a link target, which
+     * is why the back link's href is worth reading rather than assuming.
+     *
+     * The member row renders as a link only when the item resolves to an `organizationBuilderId` — the
+     * tenant-scoped id `/builder/$builderId` navigates by. A builder that is in a shortlist but not tracked
+     * by the organization has none, and the row is inert text. `seedTrackedBuilder` gives us the tracked
+     * case, which is the only one the journey describes.
+     */
+    const { principal, organization, ctx } = harness
+    const { builderIdentityId } = await seedTrackedBuilder(ctx, {
+      organizationId: organization.organizationId,
+      creatorUserId: principal.userId!,
+    })
+
+    const created = await principal.api!.post('/api/lists', {
+      data: { name: 'Shortlist hop', description: null, visibility: 'organization' },
+    })
+    expect(created.status()).toBe(201)
+    const list = await created.json() as { id: string }
+    const added = await principal.api!.post(`/api/lists/${list.id}/items`, { data: { builderIdentityId } })
+    expect([200, 201]).toContain(added.status())
+
+    const context = await browser.newContext({ storageState: principal.storageState! })
+    const page = await context.newPage()
+    const guard = expectStrictBrowser(page)
+    try {
+      await gotoHydrated(page, `${harness.baseURL}/lists/${list.id}`)
+      await dismissOverlays(page)
+
+      // The page fetches its members client-side after mount, so the row is not in the first paint.
+      const row = page.locator('[data-testid^="list-item-open-"]').first()
+      await expect(row).toBeVisible({ timeout: 20_000 })
+
+      await row.click()
+
+      await expect(page).toHaveURL(/\/builder\//)
+      const back = page.getByTestId('builder-back-link')
+      await expect(back).toBeVisible({ timeout: 20_000 })
+      // Not "a back link exists" — a back link pointing at the shortlist we came from.
+      await expect(back).toHaveAttribute('href', new RegExp(`/lists/${list.id}`))
+
+      // And it is a real navigation, not a link that renders and dies: going back returns to the shortlist
+      // with the member still listed.
+      await back.click()
+      await expect(page).toHaveURL(new RegExp(`/lists/${list.id}`))
+      await expect(page.locator('[data-testid^="list-item-open-"]').first()).toBeVisible({ timeout: 20_000 })
+    } finally {
+      guard.dispose()
+      await context.close()
+      await principal.api!.delete(`/api/lists/${list.id}`).catch(() => undefined)
+      // Membership before identity: `builder_list_items_org_builder_tracked_fk` points at
+      // `organization_builders`, which `cleanupBuilderIdentity` deletes.
       await harness.sql`delete from builder_list_items where builder_identity_id = ${builderIdentityId}`
       await cleanupBuilderIdentity(harness.sql, builderIdentityId)
     }
