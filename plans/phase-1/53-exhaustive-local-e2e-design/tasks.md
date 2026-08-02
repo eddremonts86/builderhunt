@@ -205,8 +205,28 @@
   `original_units`/`remaining_units` rather than `units` — which is what lets a grant be partly spent without
   losing what was bought — and the route answers `{ checkoutUrl, status }`.
 
-  **Still open in this task:** the other routes' scenarios — subscription create/change/cancel/preview, portal,
-  refunds, auto-recharge. The pattern and the fixtures are now settled; each is the same shape as this file.
+  **Subscription checkout is done too: `tests/e2e/api/billing-subscription-scenarios.spec.ts` — 5 passing.**
+  A pack is a one-off; a subscription is a *state*, so the invariant is different: the enforced tier in
+  `organization_entitlements` must not move. Five scenarios, and note that two of them (`sca_required`,
+  `delayed`) surface as HTTP **successes** — which is exactly why the status code cannot be the assertion.
+
+  It is a separate file from change/preview because the starting states are opposite:
+  `POST /api/billing/checkout/subscription` refuses with `409 subscription_exists` when a plan already exists,
+  correctly. Keeping them together needed a load-bearing declaration order, and seeding partway through then
+  collided with `billing_customers_org_livemode_unique`. The split says out loud what the ordering hid.
+
+  **`billing-subscription-change-scenarios.spec.ts` exists and is `fixme`, for a reason worth reading.**
+  `seedActiveSubscription` writes the database rows but never creates the subscription *inside the provider*,
+  so under `E2E_MODE` the fake has never heard of it and `preview` answers `500` with no scenario set at all.
+  The `change` test asserted `>= 400`, which a 500 satisfies — so it passed while proving nothing about
+  declines. That is the false green this task exists to prevent, so both are marked rather than left running.
+  **Unblocking is one fixture change:** make `seedActiveSubscription` create the subscription through the
+  provider (or have the spec create it via checkout and settle it) so the database and the provider agree.
+
+  **Still open in this task:** portal, refunds, auto-recharge, and cancel. The pattern is settled; each is the
+  same shape as the two green files.
+
+  `tests/e2e/api/` at `--workers=6`: 283 passed, 5 skipped.
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 278 passed, 3 skipped.
 
