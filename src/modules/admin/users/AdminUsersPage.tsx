@@ -32,7 +32,7 @@ interface UserRow {
 const PLAN_COLORS: Record<PlanTier, string> = {
   free: 'text-bh-text-dim bg-bh-surface/40 border-bh-border',
   pro: 'text-bh-accent bg-bh-accent-soft border-bh-accent/30',
-  team: 'text-bh-cyan bg-bh-cyan/10 border-bh-cyan/30',
+  team: 'text-bh-cyan-text bg-bh-cyan/10 border-bh-cyan/30',
 }
 
 /** Canonical entitlement tier badge — includes Pro Max, which the legacy `PLAN_COLORS` above (a
@@ -41,7 +41,7 @@ const ENTITLEMENT_TIER_COLORS: Record<string, string> = {
   free: 'text-bh-text-dim bg-bh-surface/40 border-bh-border',
   pro: 'text-bh-accent bg-bh-accent-soft border-bh-accent/30',
   pro_max: 'text-bh-warning bg-bh-warning/10 border-bh-warning/30',
-  team: 'text-bh-cyan bg-bh-cyan/10 border-bh-cyan/30',
+  team: 'text-bh-cyan-text bg-bh-cyan/10 border-bh-cyan/30',
 }
 
 function BillingCell({ billing }: { billing: UserBillingSummary | null }) {

@@ -80,18 +80,34 @@ export function CalendarView({
       className="overflow-hidden rounded-xl border border-bh-border"
       data-testid="calendar-grid"
     >
+      {/**
+        * `role="row"` and `role="columnheader"` are not decoration here.
+        * `role="grid"` requires rows between it and its cells — without them a screen reader announces a grid
+        * with no structure and arrow-key navigation has nothing to move along. Caught by the axe gate the
+        * moment `/calendar` was added to its route matrix (plans/UI Wave 8), as two `critical` violations:
+        * `aria-required-children` on the grid and `aria-required-parent` on all 42 day cells.
+        */}
       <div
+        role="row"
         className="grid border-b border-bh-border bg-bh-surface-muted"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
       >
         {weekdayLabels.map((label, index) => (
-          <div key={`${label}-${index}`} className="px-2 py-2 text-center text-xs font-medium text-bh-text-muted">
+          <div
+            key={`${label}-${index}`}
+            role="columnheader"
+            className="px-2 py-2 text-center text-xs font-medium text-bh-text-muted"
+          >
             {label}
           </div>
         ))}
       </div>
+      {/* One `role="row"` per week. `display: contents` keeps the CSS grid layout identical — the row exists in
+          the accessibility tree and not in the visual box model, which is exactly the split that was missing. */}
       <div className="grid gap-px bg-bh-border" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
-        {days.map((day) => {
+        {chunkIntoRows(days, columns).map((week) => (
+        <div key={isoDay(week[0])} role="row" style={{ display: 'contents' }}>
+        {week.map((day) => {
           const key = isoDay(day)
           const dayItems = itemsByDay.get(key) ?? []
           const dimmed = isDimmed?.(day) ?? false
@@ -152,7 +168,24 @@ export function CalendarView({
             </div>
           )
         })}
+        </div>
+        ))}
       </div>
     </div>
   )
+}
+
+/**
+ * Splits a flat day list into weeks.
+ *
+ * `columns` rather than a hard-coded 7 because the same component renders the week view, where one row holds
+ * every day it shows. A trailing partial row is kept whole rather than padded: a padded cell would be a
+ * gridcell with no date behind it.
+ */
+function chunkIntoRows(days: readonly Date[], columns: number): Date[][] {
+  const rows: Date[][] = []
+  for (let index = 0; index < days.length; index += columns) {
+    rows.push(days.slice(index, index + columns))
+  }
+  return rows
 }

@@ -406,7 +406,7 @@ export function RoadmapManager() {
                   <span className="text-[10px] text-bh-text-dim">· order {i.sortOrder}</span>
                   {i.id.startsWith(FILE_MANAGED_PREFIX) && (
                     <span
-                      className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-bh-cyan/30 bg-bh-cyan/10 text-bh-cyan"
+                      className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-bh-cyan/30 bg-bh-cyan/10 text-bh-cyan-text"
                       title={`Defined by content/roadmap/${i.id.slice(FILE_MANAGED_PREFIX.length)}.md — edits here are overwritten by the next content:sync`}
                     >
                       in git

@@ -22,7 +22,7 @@ const TAG_COLORS: Record<string, string> = {
   feature: 'bg-bh-accent-soft text-bh-accent border-bh-accent/30',
   bugfix: 'bg-bh-warning/10 text-bh-warning border-bh-warning/30',
   breaking: 'bg-bh-danger/10 text-bh-danger border-bh-danger/30',
-  improvement: 'bg-bh-cyan/10 text-bh-cyan border-bh-cyan/30',
+  improvement: 'bg-bh-cyan/10 text-bh-cyan-text border-bh-cyan/30',
 }
 
 export const Route = createFileRoute('/_landing/changelog/')({

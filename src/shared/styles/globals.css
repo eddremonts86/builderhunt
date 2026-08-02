@@ -117,6 +117,12 @@
   --color-bh-accent-rim: rgba(255, 255, 255, 0.15);
   --color-bh-cyan: #0891b2;
   --color-bh-cyan-soft: rgba(8, 145, 178, 0.1);
+  /* Cyan as *text*. #0891b2 measured 4.4:1 against the changelog card's own tinted background — 0.1 short of
+     the 4.5:1 minimum for small text, caught by the axe gate on `/changelog` at both viewports once plans/UI
+     Wave 8 widened its route matrix. The base token stays as it is because it is a brand colour used in the
+     logo mark and the hero gradient, where contrast is not a text requirement; this one is for the cases that
+     are text, and clears 5.5:1 on every dark surface in the palette. */
+  --color-bh-cyan-text: #0ea5c4;
   --color-bh-success: #16a34a;
   --color-bh-warning: #d97706;
   /* #dc2626 measured 4.1:1 against --color-bh-bg — below the 4.5:1 text

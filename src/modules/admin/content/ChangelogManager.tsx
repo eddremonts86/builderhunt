@@ -294,7 +294,7 @@ export function ChangelogManager() {
                     // content:sync` overwrites it from the file. Saying so is
                     // cheaper than letting someone discover it after a deploy.
                     <span
-                      className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-bh-cyan/30 bg-bh-cyan/10 text-bh-cyan"
+                      className="text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border border-bh-cyan/30 bg-bh-cyan/10 text-bh-cyan-text"
                       title={`Defined by content/changelog/${e.slug}.md — edits here are overwritten by the next content:sync`}
                     >
                       in git

@@ -23,6 +23,11 @@ const ARTIFACT_DIR = 'tests/artifacts/a11y'
 const HYDRATED_SELECTOR = 'html[data-hydrated="true"]'
 
 const VIEWPORTS = [
+  // 320px is the narrowest viewport WCAG 1.4.10 (reflow) requires a page to work at, and it is where a fixed
+  // width or an unwrapped table actually shows up — 390 is forgiving enough that a layout can be broken and
+  // still look fine. Added with the overflow check below (plans/UI Wave 8's responsive gate); the a11y audit
+  // runs at all three, so a contrast or focus defect that only appears when the layout collapses is caught too.
+  { name: 'narrow', width: 320, height: 720 },
   { name: 'mobile', width: 390, height: 844 },
   { name: 'desktop', width: 1280, height: 800 },
 ]
@@ -59,6 +64,15 @@ const AUTH_ROUTES = [
   '/settings/billing',
   '/settings/privacy',
   '/settings/security',
+  // plans/UI Wave 8: the surfaces built across Waves 3-8 had no entry here, so every dialog, drawer and
+  // three-lane grid added since shipped without an axe pass. Each renders a real state for a seeded admin
+  // whose organization has no data — which is the state a new organization sees, and the one most likely to
+  // be built with placeholder markup nobody checked.
+  '/calendar',
+  '/lists',
+  '/team',
+  '/interviews',
+  '/solutions',
 ]
 
 // Every entry needs a reason and a date — this is a debt ledger, not a
@@ -193,6 +207,8 @@ async function auditRoute(page, route, viewportName) {
   // axe-core's default rule set (confirmed by enumerating every rule id the
   // default run actually executes) — enable it explicitly on top of the
   // defaults rather than replacing them with `.withTags()`.
+  const overflow = await measureHorizontalOverflow(page)
+
   const results = await new AxeBuilder({ page }).options({ rules: { 'target-size': { enabled: true } } }).analyze()
   // Filter at the node level, not the whole-violation level — a violation
   // can have some excepted nodes and some genuinely new ones on the same
@@ -204,7 +220,65 @@ async function auditRoute(page, route, viewportName) {
       nodes: v.nodes.filter((n) => !isExpected(route, { ...n, __ruleId: v.id })),
     }))
     .filter((v) => v.nodes.length > 0)
-  return { route, viewportName, failures, total: results.violations.length }
+  return { route, viewportName, failures, total: results.violations.length, overflow }
+}
+
+/**
+ * How far the document scrolls sideways, and what is sticking out.
+ *
+ * The whole check is "a page must never scroll horizontally", but a bare boolean is useless to whoever has to
+ * fix it — so the widest offending elements come back with it. Measured on `documentElement`, not on `body`:
+ * an element positioned outside the body still widens the scrollable document, and that is what the user
+ * actually experiences.
+ *
+ * A 1px tolerance, because sub-pixel rounding on fractional layouts reports 1px overflow on pages that are
+ * visually fine, and a gate that cries wolf at 1px gets switched off.
+ */
+async function measureHorizontalOverflow(page) {
+  return page.evaluate(() => {
+    const root = document.documentElement
+    const excess = root.scrollWidth - root.clientWidth
+    if (excess <= 1) return { excess: 0, offenders: [] }
+
+    const offenders = []
+    for (const element of document.querySelectorAll('body *')) {
+      const box = element.getBoundingClientRect()
+      if (box.width === 0 || box.height === 0) continue
+      if (box.right <= root.clientWidth + 1) continue
+      offenders.push({
+        selector: `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ''}` +
+          `${typeof element.className === 'string' && element.className ? `.${element.className.trim().split(/\s+/).slice(0, 3).join('.')}` : ''}`,
+        right: Math.round(box.right),
+      })
+      if (offenders.length >= 5) break
+    }
+    return { excess, offenders }
+  })
+}
+
+/**
+ * Routes that already scroll sideways, with the date they were found.
+ *
+ * A debt ledger, exactly like `EXPECTED_EXCEPTIONS` above and for the same reason: the alternative to listing
+ * them is either a gate that is red on arrival and gets switched off, or no gate at all until someone fixes
+ * five unrelated layouts. Every entry is a **real defect** — `/search` and `/calendar` overflow at 390px, which
+ * is an ordinary phone, not an edge case — and the gate still fails on any route/viewport not in this list, so
+ * nothing new can be added while these are outstanding.
+ *
+ * Found 2026-08-02 by the first run of this check (plans/UI Wave 8).
+ */
+const KNOWN_OVERFLOWS = [
+  { route: '/', viewport: 'narrow', excessPx: 50, note: 'Landing hero row does not wrap below 390px' },
+  { route: '/search', viewport: 'narrow', excessPx: 174, note: 'Featured list grid child needs min-w-0' },
+  { route: '/search', viewport: 'mobile', excessPx: 104, note: 'Same cause as narrow — broken on a real phone' },
+  { route: '/sprints', viewport: 'narrow', excessPx: 20, note: 'Header action button row does not wrap' },
+  { route: '/settings/security', viewport: 'narrow', excessPx: 32, note: 'Session row action button does not wrap' },
+  { route: '/calendar', viewport: 'narrow', excessPx: 172, note: 'View-switcher toolbar does not wrap' },
+  { route: '/calendar', viewport: 'mobile', excessPx: 102, note: 'Same cause as narrow — broken on a real phone' },
+]
+
+function isKnownOverflow(route, viewportName) {
+  return KNOWN_OVERFLOWS.some((entry) => entry.route === route && entry.viewport === viewportName)
 }
 
 async function main() {
@@ -281,14 +355,30 @@ async function main() {
   }
 
   const failedResults = allResults.filter((r) => r.failures.length > 0)
+  const allOverflowing = allResults.filter((r) => (r.overflow?.excess ?? 0) > 0)
+  const overflowing = allOverflowing.filter((r) => !isKnownOverflow(r.route, r.viewportName))
+  const knownOverflowing = allOverflowing.filter((r) => isKnownOverflow(r.route, r.viewportName))
   console.log(`\n=== SUMMARY ===\n`)
   console.log(`${allResults.length} route/viewport checks, ${failedResults.length} with critical/serious violations.`)
+  console.log(`${overflowing.length} with NEW horizontal document overflow.`)
+  if (knownOverflowing.length > 0) {
+    console.log(`${knownOverflowing.length} with known, unfixed overflow (see KNOWN_OVERFLOWS — a debt ledger, not a silencer):`)
+    for (const result of knownOverflowing) {
+      console.log(`   ${result.route} @ ${result.viewportName}: ${result.overflow.excess}px past the viewport`)
+    }
+  }
+  for (const result of overflowing) {
+    console.log(`   ${result.route} @ ${result.viewportName}: ${result.overflow.excess}px past the viewport`)
+    for (const offender of result.overflow.offenders) {
+      console.log(`      - ${offender.selector} (right edge ${offender.right}px)`)
+    }
+  }
   if (errors.length > 0) {
     console.log(`${errors.length} route/viewport checks errored (couldn't complete — see ${ARTIFACT_DIR}/errors.json), not counted as pass or fail.`)
   }
   console.log(`Sanitized artifact: ${ARTIFACT_DIR}/results.json`)
 
-  if (failedResults.length > 0 || errors.length > 0) {
+  if (failedResults.length > 0 || overflowing.length > 0 || errors.length > 0) {
     process.exitCode = 1
   }
 }
