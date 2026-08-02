@@ -185,7 +185,34 @@
   - Verify (RED): `pnpm test:e2e tests/e2e/api/billing-*.spec.ts` — fails RED on file absence. The 5 files together cover 7 routes × 6 provider scenarios × 4 principals = ~170 assertions; the harness's `withFakeBillingProvider()` fixture scopes the in-memory provider state per test so concurrent scenarios don't bleed.
   - Independent boundary: this task owns **only** the five `tests/e2e/api/billing-*` files. The fake provider itself is read-only here; if a real bug is found in `fake-provider.ts` (e.g. a scenario that doesn't match the comment), capture as a fixme and a separate task.
 
-  **Started 2026-08-02: `tests/e2e/api/billing-authorization.spec.ts` — 31 passing.** The authorization floor,
+  **Credit-pack checkout is done: `tests/e2e/api/billing-checkout-scenarios.spec.ts` — 7 passing, one file.**
+
+  All six scenarios against **one** server, which the cross-process channel made possible; the five-file split
+  this task assumed no longer applies to it. Each scenario is a distinct way a payment provider fails a
+  customer, and each has its own wrong answer: `sca_required` must not read as paid (3-D Secure has not moved
+  the money), `decline` and `timeout` must leave **no local checkout row** (a row for a payment that never
+  existed is a reconciliation ghost), `delayed` succeeds at the HTTP layer and must still grant nothing (the
+  normal case for bank transfers, and the easiest to get wrong), `out_of_order` must not leak into checkout at
+  all, and a replayed idempotency key must not become a second payment.
+
+  **Every assertion is against `billing_credit_grants`, not the status code.** The failure this surface exists
+  to prevent is credits granted without payment, and that is invisible from an HTTP response. Even the success
+  case asserts the ledger does *not* move — credits arrive when the payment settles, not when someone opens a
+  checkout and walks away.
+
+  Three wrong guesses are recorded in the file so the schema does not have to be rediscovered: there is no
+  `billing_credit_ledger` table (the ledger is grants + reservations + allocations), a grant's column is
+  `original_units`/`remaining_units` rather than `units` — which is what lets a grant be partly spent without
+  losing what was bought — and the route answers `{ checkoutUrl, status }`.
+
+  **Still open in this task:** the other routes' scenarios — subscription create/change/cancel/preview, portal,
+  refunds, auto-recharge. The pattern and the fixtures are now settled; each is the same shape as this file.
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 278 passed, 3 skipped.
+
+  ---
+
+  *Earlier slice:* **`tests/e2e/api/billing-authorization.spec.ts` — 31 passing.** The authorization floor,
   not the scenario matrix.
 
   The scenario work this task is really about — every route through `FakeBillingProvider`'s six scenarios
