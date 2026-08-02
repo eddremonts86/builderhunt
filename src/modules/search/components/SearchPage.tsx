@@ -1377,10 +1377,15 @@ function PersonResultCard({ builder, query, onTracked }: { builder: Builder; que
         )}
 
         <div className="flex-1 min-w-0">
-          {/* Row 1: name + handle (truncates) — score + view pinned right, always one line.
+          {/* Row 1: name + handle (truncates) — score + actions to the right.
               The source badge lives in the wrapping meta row below, not here — it doesn't
-              fit alongside score+view on narrow screens without squeezing the name to 0. */}
-          <div className="flex items-center gap-3">
+              fit alongside score+view on narrow screens without squeezing the name to 0.
+
+              "Always one line" was the original intent and it was wrong below ~500px: the action group is
+              ~330px of buttons and `shrink-0` made it refuse to give any of that back, so the whole document
+              scrolled sideways on a phone. Both levels wrap now; on desktop nothing moves, because there is
+              room for one line and flex-wrap only acts when there is not. */}
+          <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1 truncate">
               <span className="font-semibold text-bh-text text-sm">
                 {builder.displayName ?? builder.username}
@@ -1389,7 +1394,7 @@ function PersonResultCard({ builder, query, onTracked }: { builder: Builder; que
                 <span className="text-xs text-bh-text-dim ml-1.5">@{builder.username}</span>
               )}
             </div>
-            <div className="flex items-center gap-2.5 shrink-0">
+            <div className="flex flex-wrap items-center gap-2.5">
               {builder.similarity != null ? (
                 <span
                   className="badge inline-flex items-center gap-1 border-bh-accent/30 bg-bh-accent-soft text-bh-accent text-[11px] font-semibold"

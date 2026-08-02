@@ -313,11 +313,23 @@
   - `/search` improved by 10px with `min-w-0` on the `1fr` grid child — a grid item defaults to
     `min-width: auto` and refuses to shrink below its widest child, so the column was never actually `1fr`.
 
-  Five remain, listed in `KNOWN_OVERFLOWS` with measured numbers and what is known about each. `/search` is
-  the honest failure: something above the featured row still has an intrinsic 484px width and I did not find
-  it. The gate fails on any route/viewport not in that list, so nothing new can be added while these are
-  outstanding — but **the task's verify line is not met for the responsive half**, and this box is checked for
-  the gate existing, not for the layouts being fixed.
+  **All seven are now fixed and `KNOWN_OVERFLOWS` is empty.** The remaining five, and what each turned out to
+  be:
+
+  - `/search` (164px narrow, 94px mobile) — the score+actions group was `shrink-0` at ~330px beside a
+    truncating name, so it refused to give any width back. Both levels of the row wrap now. The original
+    comment said "always one line", which was right above ~500px and wrong below it.
+  - `/sprints` (20px) — header actions did not wrap beside the title.
+  - `/settings/security` (32px) — "Sign out everywhere else" is a long label on a `shrink-0` button. The row
+    wraps; the button keeps `shrink-0`, because squeezing that label is worse than moving it.
+  - `/` (50px) — the interesting one. `grid md:grid-cols-2 lg:grid-cols-3` has **no base `grid-cols-1`**, so
+    the implicit single column was `auto`-sized: "as wide as my widest child's min-content", which one card
+    made ~350px. Tailwind's `grid-cols-1` is `repeat(1, minmax(0, 1fr))`, and the `minmax(0, ...)` is what caps
+    it at the container.
+
+  The gate was then proven to still fail: removing `grid-cols-1` again turns the run red with
+  "1 with NEW horizontal document overflow", and restoring it turns it green — which is the first half of the
+  next task's verify line, done here because the layout was already in hand.
 
 - [ ] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
   - Files: `tests/e2e/visual/ui-coverage.spec.ts`, `.github/workflows/quality.yml`, `package.json`

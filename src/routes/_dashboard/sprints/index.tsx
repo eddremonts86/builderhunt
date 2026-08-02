@@ -104,12 +104,14 @@ function SprintsListPage() {
 
   return (
     <div data-testid="sprints-page">
-      <div className="flex items-center justify-between mb-6">
+      {/* Both levels wrap: the title and the action group as siblings, and the action group internally.
+          "Run job now" plus "New sprint" is 208px of buttons, which does not fit beside a title at 320px. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div className="flex items-center gap-2">
           <Compass className="w-5 h-5 text-bh-accent" />
           <h1 className="text-xl font-bold text-bh-text">Sourcing sprints</h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <Button
               type="button"

@@ -268,20 +268,17 @@ async function measureHorizontalOverflow(page) {
  * Found 2026-08-02 by the first run of this check (plans/UI Wave 8).
  */
 const KNOWN_OVERFLOWS = [
-  { route: '/', viewport: 'narrow', excessPx: 50, note: 'Landing hero row does not wrap below 390px' },
-  {
-    route: '/search',
-    viewport: 'narrow',
-    excessPx: 164,
-    note: 'Featured result row: the score+view group is `shrink-0` beside a truncating name, and something '
-      + 'above it still has an intrinsic 484px width. `min-w-0` on the grid child took 10px off it; the rest '
-      + 'is unfound.',
-  },
-  { route: '/search', viewport: 'mobile', excessPx: 94, note: 'Same cause as narrow — still broken on a real phone' },
-  { route: '/sprints', viewport: 'narrow', excessPx: 20, note: 'Header action button row does not wrap' },
-  { route: '/settings/security', viewport: 'narrow', excessPx: 32, note: 'Session row action button does not wrap' },
-  // `/calendar` was here at 172px (narrow) and 102px (mobile) and is fixed: the header's inner action row was
-  // one unbreakable line of four buttons inside a wrapping parent, and now wraps itself.
+  // Empty, and it should stay that way. Seven entries lived here for the length of one session — every route
+  // this gate flagged on its first run has been fixed:
+  //
+  //   /                   grid column was `auto`-sized to a 350px card; `grid-cols-1` caps it at the container
+  //   /search             action group was `shrink-0` at ~330px; both levels of the row now wrap
+  //   /sprints            header actions did not wrap beside the title
+  //   /settings/security  "Sign out everywhere else" is a long label on a shrink-0 button; the row wraps now
+  //   /calendar           four header buttons were one unbreakable line inside a wrapping parent
+  //
+  // Add an entry only with the date, the measured excess, and what is known about the cause — and treat it as
+  // debt, not as a decision.
 ]
 
 function isKnownOverflow(route, viewportName) {

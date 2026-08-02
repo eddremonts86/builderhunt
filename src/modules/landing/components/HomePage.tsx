@@ -297,7 +297,12 @@ export function HomePage() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {/* `grid-cols-1` is not redundant with the implicit single column. Without it the grid's one column
+                is `auto`-sized, which means "as wide as my widest child's min-content" — one card here has a
+                ~350px min-content width, so the column grew past a 320px viewport and took the document with
+                it. Tailwind's `grid-cols-1` is `repeat(1, minmax(0, 1fr))`, and the `minmax(0, ...)` is the
+                part that caps it at the container. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Feature 1: Multi-source discovery (Bento Large) */}
               <article className="card card-premium-glow md:col-span-2 flex flex-col justify-between bg-bh-surface p-6">
                 <div>

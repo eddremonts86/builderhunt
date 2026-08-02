@@ -99,7 +99,10 @@ export function ActiveSessionsPanel() {
 
   return (
     <section className="card p-5" data-testid="active-sessions-panel">
-      <div className="flex items-start justify-between gap-4 mb-4">
+      {/* `flex-wrap`: "Sign out everywhere else" is a long label on a `shrink-0` button, which pushed the
+          document 32px past a 320px viewport. It drops below the heading there and sits beside it everywhere
+          else — `shrink-0` stays, because squeezing that particular label is worse than moving it. */}
+      <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
         <div>
           <h2 className="font-semibold flex items-center gap-2">
             <Laptop className="w-4 h-4 text-bh-accent" aria-hidden="true" />
