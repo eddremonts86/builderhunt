@@ -227,7 +227,27 @@
 
   Option 2 is the better shape and the task's own note — "a per-call `scenario` always wins" — suggests the
   seam was designed for it. It is a production-file edit, though, which this task forbids inside the matrix,
-  so it needs to be its own task first.
+  so it needs to be its own task first. It is the one below, spelled out to the mechanism.
+
+- [ ] **Give the E2E billing provider a cross-process scenario channel** — prerequisite for the matrix above
+  - Files: `src/shared/lib/billing/stripe-provider.ts`, `tests/e2e/harness/fakes/billing.ts`
+  - **The problem, restated in one line:** the scenario is `process.env.E2E_BILLING_SCENARIO` read inside the
+    app server child, and the test worker cannot reach that child's environment after it spawns.
+  - **The mechanism, which already has a precedent in this codebase.** `src/shared/lib/rate-limit.ts` faces the
+    same two-process split and solves it with Redis: it prefixes its keys with `process.env.E2E_REDIS_PREFIX`,
+    which the harness sets per worker and the server inherits at spawn. Both processes therefore already share
+    a namespaced Redis they can both address.
+
+    So: `currentE2EDefaultScenario()` becomes async and reads `${E2E_REDIS_PREFIX}e2e:billing-scenario` first,
+    falling back to `E2E_BILLING_SCENARIO` when the key is absent. The three `override` methods already await,
+    so no signature outside this file changes. `setBillingScenario()` in the harness writes the key instead of
+    (or as well as) mutating `process.env`.
+  - **Keep the guard exactly where it is.** The lookup belongs inside
+    `E2EScenarioDefaultingFakeBillingProvider`, which is only ever constructed under `E2E_MODE === 'true'`.
+    Nothing on the production path gains a Redis read, and `RealBillingProvider` is untouched.
+  - Verify: one spec sets two different scenarios against a single server and gets two different outcomes —
+    that is the whole point, and it is impossible today. Then the five-file split in the task above collapses
+    into one.
 
 - [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
   - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
