@@ -223,8 +223,21 @@
   **Unblocking is one fixture change:** make `seedActiveSubscription` create the subscription through the
   provider (or have the spec create it via checkout and settle it) so the database and the provider agree.
 
-  **Still open in this task:** portal, refunds, auto-recharge, and cancel. The pattern is settled; each is the
-  same shape as the two green files.
+  **The scenario surface is smaller than this task assumed, and that is now measured rather than guessed.**
+  The fake provider exposes fifteen methods; the E2E subclass scenario-defaults exactly **three** —
+  `createCheckoutSession`, `createPaymentIntent`, `changeSubscription`. Everything else (`createPortalSession`,
+  `createRefund`, `cancelSubscription`, `previewSubscriptionChange`, every getter) has **no scenario
+  dimension**: passing `decline` cannot change what they do.
+
+  So "portal, refunds, auto-recharge and cancel through six scenarios" is not remaining work — it is not
+  a thing that exists. Those routes need ordinary behavioural coverage, which belongs with the routes rather
+  than in a scenario matrix, and `billing-authorization.spec.ts` already holds their authorization floor.
+  `createPaymentIntent` currently has no route caller at all.
+
+  **What genuinely remains of the scenario matrix is one item:** `changeSubscription`, blocked on the fixture
+  gap above. Both `createCheckoutSession` paths — packs and subscriptions — are covered and green.
+
+  `tests/e2e/api/` at `--workers=6`: 283 passed, 5 skipped.
 
   `tests/e2e/api/` at `--workers=6`: 283 passed, 5 skipped.
 

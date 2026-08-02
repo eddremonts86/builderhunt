@@ -65,6 +65,12 @@ async function enforcedTier(): Promise<string | null> {
  * it is why these are marked rather than left running: a test that passes for the wrong reason is worse than
  * one that is visibly pending.
  *
+ * A correction to an earlier reading of this, kept because the wrong version is the tempting one: preview does
+ * **not** route through `changeSubscription`. The provider has its own `previewSubscriptionChange`, which the
+ * E2E subclass does not scenario-default at all — only `createCheckoutSession`, `createPaymentIntent` and
+ * `changeSubscription` carry a scenario. So preview's 500 has nothing to do with `decline`; it is the fixture
+ * gap alone, in both cases.
+ *
  * **Unblocking is one fixture change:** `seedActiveSubscription` should route through the provider (or the
  * spec should create the subscription via `POST /api/billing/checkout/subscription` and settle it) so the DB
  * and the provider agree. The checkout scenarios in `billing-subscription-scenarios.spec.ts` and
