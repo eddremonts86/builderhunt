@@ -266,6 +266,18 @@
   - Do: Replace demo fixtures with real brief interpretation, clarification, explicit charge confirmation, generation progress, evidence-backed result lanes, and deterministic error/retry states. Do not duplicate plan 43's domain services.
   - Verify: real Pro/Pro Max/Team journey passes against the fake provider and real database; Free, insufficient-credit, unavailable route, stale version, and cross-tenant cases fail honestly.
 
+  **Bound, not done.** The demo fixtures are gone and the page drives the real endpoints;
+  `tests/e2e/solutions.spec.ts` proves six of the enumerated cases in a real browser against a real database —
+  the exact visible charge, no reservation before confirmation, a Free organization refused by the *server*
+  rather than only by the page, a stale confirmed price refused, nothing saved until the user saves, and a saved
+  run that cannot be edited. Reservation state is read out of `billing_credit_reservations`, not out of the UI,
+  because a reservation that is never released looks like success on screen while holding a customer's credits.
+
+  Three of the Verify line's cases have no *browser* coverage yet, and they are named rather than implied:
+  **insufficient credit** (needs the balance spent down inside the run), **cross-tenant access to a run**
+  (needs a second organization in the harness, which `startInterviewHarness` does not currently mint), and
+  **Pro Max / Team tiers** (the spec seeds `pro` only). None is blocked; each is one fixture away.
+
 ## Wave 8 — Release gates
 
 - [x] **Add complete UI journey E2E coverage** — every journey in `plan.md` now has a spec; four added, two

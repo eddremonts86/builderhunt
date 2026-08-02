@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BuilderHunt — Cómo el scraping se convierte en búsqueda</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --bg-alt: #efeae0;
+      --surface: #ffffff;
+      --line: #e3dcc9;
+      --line-soft: #ece5d4;
+      --ink: #1a1d24;
+      --ink-2: #3a4256;
+      --muted: #7c7a72;
+      --primary: #c97b3f;
+      --primary-2: #e07338;
+      --primary-soft: #f3e2d2;
+      --accent-2: #2f6f5e;
+      --warn: #b06367;
+      --shadow-1: 0 2px 8px rgba(0,0,0,.04);
+      --shadow-2: 0 4px 16px -2px rgba(0,0,0,.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ""; position: fixed; top: -200px; left: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(192,115,56,.07) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: ""; position: fixed; bottom: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(47,111,94,.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    main { position: relative; z-index: 1; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+    @media (min-width: 768px) { .container { padding: 0 32px; } }
+
+    .hero {
+      padding: 80px 0 56px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .eyebrow::before {
+      content: ""; width: 6px; height: 6px; background: var(--primary); border-radius: 50%;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(32px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+      max-width: 880px;
+    }
+    .hero h1 em { font-style: italic; color: var(--primary); }
+    .hero p.lede {
+      font-size: 17px;
+      color: var(--ink-2);
+      max-width: 720px;
+      line-height: 1.6;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 32px 0 0;
+    }
+    .metric {
+      padding: 22px 18px;
+      border-right: 1px solid var(--line-soft);
+    }
+    .metric:last-child { border-right: 0; }
+    .metric .v {
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px;
+      line-height: 1;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .metric .v .unit {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: 3px;
+    }
+    .metric .l {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    section { padding: 64px 0; }
+    section + section { border-top: 1px solid var(--line-soft); }
+
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(26px, 3.2vw, 34px);
+      letter-spacing: -0.005em;
+      margin-bottom: 14px;
+      line-height: 1.1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2 .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      color: var(--ink);
+    }
+    p { color: var(--ink-2); margin-bottom: 14px; line-height: 1.65; }
+    p.lede { font-size: 17px; color: var(--ink-2); }
+    strong { color: var(--ink); font-weight: 600; }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: var(--line-soft);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--ink);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px 28px;
+      box-shadow: var(--shadow-1);
+      margin: 16px 0;
+    }
+    .card.tight { padding: 18px 22px; }
+    .card.callout {
+      background: #fdf6f3;
+      border-color: #e9c9bd;
+    }
+    .card.callout strong { color: var(--warn); }
+
+    .pullquote {
+      border-left: 3px solid var(--primary);
+      padding: 12px 0 12px 24px;
+      margin: 28px 0;
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .pullquote cite {
+      display: block;
+      font-family: 'Outfit', sans-serif;
+      font-style: normal;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px;
+      margin: 24px 0;
+      box-shadow: var(--shadow-1);
+      overflow-x: auto;
+    }
+    .diagram-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .mermaid { text-align: center; font-family: 'Outfit', sans-serif !important; }
+    .mermaid svg { max-width: 100%; height: auto; }
+
+    .codeblock {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin: 16px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: var(--ink);
+    }
+    .codeblock .k { color: var(--accent-2); }
+    .codeblock .s { color: var(--primary); }
+    .codeblock .c { color: var(--muted); font-style: italic; }
+    .codeblock .t { color: var(--ink-2); }
+
+    .path-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 20px 0;
+    }
+    .path {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .path .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .path h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .path p {
+      font-size: 12.5px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      row-gap: 8px;
+      column-gap: 16px;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    .kv dt { color: var(--muted); font-weight: 500; }
+    .kv dd { margin: 0; color: var(--ink-2); }
+
+    .tbl {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+    .tbl th, .tbl td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .tbl th {
+      background: var(--bg-alt);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .tbl tr:last-child td { border-bottom: 0; }
+    .tbl td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+    nav.toc {
+      position: sticky; top: 0;
+      background: rgba(247, 245, 240, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line-soft);
+      z-index: 100;
+      padding: 12px 0;
+    }
+    nav.toc .container {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      font-size: 12.5px;
+    }
+    nav.toc .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-right: 8px;
+    }
+    nav.toc a {
+      color: var(--ink-2);
+      text-decoration: none;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    nav.toc a:hover { background: var(--primary-soft); color: var(--primary); }
+
+    footer {
+      padding: 48px 0 56px;
+      border-top: 1px solid var(--line-soft);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 56px 0 40px; }
+      section { padding: 44px 0; }
+      .kv { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      body::before, body::after { display: none; }
+      nav.toc { display: none; }
+      section { padding: 28pt 0; page-break-inside: avoid; }
+      .card, .diagram, .codeblock, .path { box-shadow: none; page-break-inside: avoid; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="toc">
+    <div class="container">
+      <span class="label">Secciones</span>
+      <a href="#shape">La forma</a>
+      <a href="#journey">Recorrido del dato</a>
+      <a href="#path1">Ruta 1 · Búsqueda en vivo</a>
+      <a href="#path2">Ruta 2 · Discovery</a>
+      <a href="#path3">Ruta 3 · Enrichment</a>
+      <a href="#path4">Ruta 4 · Self-managed</a>
+      <a href="#bridge">El puente</a>
+      <a href="#render">Cómo llega al usuario</a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="container">
+        <div class="eyebrow">Arquitectura · Cómo el scraping se convierte en búsqueda</div>
+        <h1>15 fuentes, 4 rutas de ingestión, <em>una sola forma</em>.</h1>
+        <p class="lede">
+          BuilderHunt tiene cuatro maneras en que el dato entra al producto: la búsqueda
+          federada en vivo, el discovery worker que calienta el índice semántico, el
+          enrichment worker que re-valida la identidad pública, y la nueva ruta de
+          perfiles auto-gestionados para personas sin huella pública. La conexión que
+          no es obvia es la pieza que sostiene las cuatro: cada ruta produce el mismo
+          <code>RawBuilder</code>, y cada búsqueda consume ese mismo
+          <code>RawBuilder</code>. Este documento hace visible ese puente.
+        </p>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="v">15</div>
+            <div class="l">Conectores fuente que producen <code>RawBuilder</code></div>
+          </div>
+          <div class="metric">
+            <div class="v">4</div>
+            <div class="l">Rutas de ingestión que convergen en la misma forma</div>
+          </div>
+          <div class="metric">
+            <div class="v">1</div>
+            <div class="l">Forma universal que las hace componibles</div>
+          </div>
+          <div class="metric">
+            <div class="v">3</div>
+            <div class="l">Valores de <code>BuilderKind</code>: person, repo, organization</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- LA FORMA -->
+    <section id="shape">
+      <div class="container">
+        <h2><span class="num">01</span>La forma es el contrato</h2>
+        <p>
+          La razón por la que 15 fuentes, 4 rutas y una sola barra de búsqueda pueden
+          funcionar juntas es que cada productor y cada consumidor se ponen de acuerdo
+          en una única forma. La forma está definida en
+          <code>src/lib/sources/types.ts</code> y el comentario sobre el tipo
+          documenta exactamente el tipo de bug que previene:
+        </p>
+
+        <div class="codeblock">
+<span class="c">/**</span><br>
+<span class="c">&nbsp;* What a search result actually is.</span><br>
+<span class="c">&nbsp;*</span><br>
+<span class="c">&nbsp;* <code>organization</code> was added after 30 of 60 GitHub results turned out</span><br>
+<span class="c">&nbsp;* to be repositories and one of the "people" was a company account. A</span><br>
+<span class="c">&nbsp;* recruiter searching for people must not be shown either, and merging</span><br>
+<span class="c">&nbsp;* either into a canonical human is not a subtle error.</span><br>
+<span class="c">&nbsp;*/</span><br>
+<span class="k">export type</span> <span class="t">BuilderKind</span> = <span class="s">'person'</span> | <span class="s">'repo'</span> | <span class="s">'organization'</span><br>
+<br>
+<span class="k">export interface</span> <span class="t">RawBuilder</span> {<br>
+&nbsp;&nbsp;<span class="k">id</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">kind</span>: <span class="t">BuilderKind</span><br>
+&nbsp;&nbsp;<span class="k">source</span>: <span class="t">SourceName</span><br>
+&nbsp;&nbsp;<span class="k">sourceId</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">username</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">displayName</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">avatarUrl</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">bio</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">profileUrl</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">followersCount</span>?: <span class="t">number</span><br>
+&nbsp;&nbsp;<span class="k">language</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">country</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">topics</span>: <span class="t">string[]</span><br>
+&nbsp;&nbsp;<span class="k">metadata</span>: <span class="t">Record&lt;string, unknown&gt;</span><br>
+}
+        </div>
+
+        <p>
+          La forma es pequeña a propósito. Lleva lo que un reclutador necesita para
+          decidir "¿esta persona merece un click?" — nombre, avatar, bio, profile URL,
+          país, temas — y nada más. Cada particularidad específica de la fuente vive
+          en <code>metadata</code> como pares clave-valor sin tipo. Añadir una nueva
+          fuente nunca requiere cambiar el pipeline de búsqueda, el dedup o el render.
+        </p>
+
+        <h3>Por qué el discriminador es <code>kind</code>, no <code>isPerson</code></h3>
+        <p>
+          Un booleano parecería más simple. No lo es. El código original solo tenía
+          <code>kind: 'person'</code> y la búsqueda devolvía 30 repositorios cuando un
+          reclutador pedía "desarrolladores de react". La lección: <strong>la ausencia
+          de un discriminador es en sí misma un bug</strong>. El tercer valor,
+          <code>'organization'</code>, existe porque GitHub devuelve empresas en las
+          respuestas de búsqueda de usuarios, y el propio <code>type</code> de la
+          respuesta de búsqueda es la única señal autoritativa (el qualifier
+          <code>type:user</code> en la query no excluye organizaciones).
+        </p>
+
+        <div class="card callout">
+          <strong>La forma es el puente.</strong> Si un productor puede emitir
+          <code>RawBuilder</code>, el resto del sistema — búsqueda, dedup, scoring,
+          render, alertas, recomendaciones, solutions — acepta el resultado sin
+          cambios. Esa es la propiedad que hace que las cuatro rutas sean
+          componibles.
+        </div>
+      </div>
+    </section>
+
+    <!-- RECORRIDO DEL DATO -->
+    <section id="journey">
+      <div class="container">
+        <h2><span class="num">02</span>El recorrido del dato, de extremo a extremo</h2>
+        <p>
+          Abajo está todo el sistema como un único diagrama. Cada caja es un archivo
+          real en <code>src/lib/</code>; cada flecha es una llamada a función o un
+          write a DB. Los cuatro productores de la izquierda convergen todos en la
+          misma forma <code>RawBuilder</code>; los tres consumidores de la derecha
+          la consumen sin saber de dónde viene.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Productores → forma → consumidores</div>
+          <div class="mermaid">
+flowchart TB
+  subgraph Producers["Productores (4 rutas)"]
+    direction TB
+    P1["Ruta 1<br/>15 conectores fuente<br/>(src/lib/sources/*.ts)"]
+    P2["Ruta 2<br/>Discovery worker<br/>(src/lib/discovery/worker.ts)"]
+    P3["Ruta 3<br/>Enrichment worker<br/>(src/lib/enrichment/worker.ts)"]
+    P4["Ruta 4 (planificada)<br/>Perfiles auto-gestionados<br/>(selfManagedProfiles)"]
+  end
+
+  Shape["Forma RawBuilder<br/>(src/lib/sources/types.ts)<br/>kind: 'person' | 'repo' | 'organization' | 'self-managed-person'"]
+
+  subgraph Consumers["Consumidores"]
+    direction TB
+    C1["searchBuilders()<br/>(src/lib/search.ts)"]
+    C2["Dedup + scoring<br/>(src/lib/dedup.ts, score.ts)"]
+    C3["UI render<br/>(BuilderCard variants)"]
+  end
+
+  P1 -->|devuelve| Shape
+  P2 -->|lee, llama a search, escribe embeddings| C1
+  P3 -->|persiste evidencia que refresca builders existentes| C1
+  P4 -->|inyecta vía un nuevo helper| C1
+
+  Shape --> C1 --> C2 --> C3
+
+  classDef producer fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef shape fill:#fff,stroke:#1a1d24,stroke-width:2.5px
+  classDef consumer fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef P1,P2,P3,P4 producer
+  classDef Shape shape
+  classDef C1,C2,C3 consumer
+          </div>
+        </div>
+
+        <p>
+          Fíjate en la asimetría: <strong>los cuatro productores convergen en la misma
+          forma, y los tres consumidores divergen de ella</strong>. Añadir un nuevo
+          productor es barato; cambiar un consumidor es caro. La forma es la
+          abstracción que carga el peso.
+        </p>
+      </div>
+    </section>
+
+    <!-- RUTA 1 -->
+    <section id="path1">
+      <div class="container">
+        <h2><span class="num">03</span>Ruta 1 · Búsqueda federada en vivo</h2>
+        <p>
+          La ruta que la mayoría de los usuarios experimenta directamente. Un
+          reclutador escribe una consulta. En segundos, 15 conectores se disparan en
+          paralelo. Cada uno devuelve su propia rodaja de <code>RawBuilder</code> (o
+          nada, si la fuente falló o el usuario la desactivó). El orquestador une y
+          rankea. Nada se persiste en esta ruta.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Ruta 1 — secuencia</div>
+          <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as Usuario
+  participant R as /api/search/builders
+  participant S as searchBuilders()
+  participant C as 15 conectores (en paralelo)
+  participant D as dedup + score
+
+  U->>R: consulta + filtros
+  R->>S: { keywords, sources, perPage }
+  par por cada fuente
+    S->>C: searchUsers(query, source=github)
+    S->>C: searchUsers(query, source=gitlab)
+    S->>C: search(query, source=hn)
+    S->>C: search(query, source=...)
+  end
+  C-->>S: RawBuilder[] de cada uno
+  S->>D: unión → dedup → recency-score
+  D-->>R: builders rankeados
+  R-->>U: JSON
+          </div>
+        </div>
+
+        <h3>De qué es responsable cada conector</h3>
+        <p>
+          Cada conector acepta el mismo input y devuelve la misma forma. Es libre de
+          hacer las llamadas HTTP que necesite, transformar la respuesta como quiera
+          y meter cualquier extra en <code>metadata</code>. El orquestador no sabe
+          (ni le importa) que el endpoint de búsqueda de GitHub no devuelve display
+          name y que el conector hace una segunda llamada a
+          <code>/users/{login}</code> para hidratarlo.
+        </p>
+
+        <div class="codeblock">
+<span class="c">// github.ts — el contrato de cada conector</span><br>
+<span class="k">export async function</span> <span class="t">searchGitHub</span>(<br>
+&nbsp;&nbsp;<span class="t">keywords</span>: <span class="t">string</span>[],<br>
+&nbsp;&nbsp;<span class="t">options</span>: { <span class="t">language</span>?: <span class="t">string</span>; <span class="t">country</span>?: <span class="t">string</span>; <span class="t">token</span>?: <span class="t">string</span> }<br>
+): <span class="t">Promise</span>&lt;<span class="t">RawBuilder</span>[]&gt; {<br>
+&nbsp;&nbsp;<span class="c">// hace la búsqueda, hidrata cada resultado,</span><br>
+&nbsp;&nbsp;<span class="c">// devuelve RawBuilder[] con kind: 'person' u 'organization'</span><br>
+}
+        </div>
+
+        <h3>De qué es responsable el orquestador</h3>
+        <p>
+          El orquestador es el único sitio que sabe que hay 15 fuentes. Su trabajo es
+          ejecutarlas en paralelo, aislar fallos, deduplicar resultados, puntuarlas por
+          recencia y devolver una lista rankeada. No parsea datos específicos de
+          ninguna fuente. Los conectores son el único lugar donde viven los datos
+          específicos de cada fuente.
+        </p>
+
+        <div class="kv">
+          <dt>Budget por conector</dt>
+          <dd><code>CONNECTOR_TIMEOUT_MS = 8000</code> en <code>src/lib/search.ts</code>. Una fuente que se cuelga nunca cuelga la búsqueda.</dd>
+          <dt>Aislamiento de fallos</dt>
+          <dd>try/catch por conector. Una respuesta rota de GitHub devuelve <code>[]</code> con un <code>SourceStatus</code>; la búsqueda sigue con 14 fuentes sanas.</dd>
+          <dt>Rate limit</dt>
+          <dd>La capa HTTP (<code>rateLimit('search-builders', ...)</code>) vive en la ruta, no en el conector. Los conectores no saben nada de rate limits de cara al usuario; solo conocen las cuotas de las APIs de terceros.</dd>
+          <dt>Cache</dt>
+          <dd>Cache de Redis sobre los resultados, TTL 5 min. El discovery worker (Ruta 2) es la cache caliente; la búsqueda en vivo es el read-through frío.</dd>
+        </div>
+
+        <h3>En esta ruta no se persiste nada</h3>
+        <p>
+          La búsqueda en vivo es de solo lectura. Los únicos writes que dispara son
+          eventos analíticos. El usuario no puede <em>añadir</em> un builder a una
+          lista desde esta ruta — eso crea una fila en
+          <code>organization_builders</code> y siembra la cola de enrichment (Ruta 3).
+          Las dos rutas están deliberadamente desacopladas: la búsqueda en vivo es
+          rápida y sin estado; el enrichment es lento y durable.
+        </p>
+      </div>
+    </section>
+
+    <!-- RUTA 2 -->
+    <section id="path2">
+      <div class="container">
+        <h2><span class="num">04</span>Ruta 2 · Discovery worker (el que calienta el índice)</h2>
+        <p>
+          La búsqueda en vivo tiene un problema de latencia: 15 llamadas HTTP en
+          paralelo, cada una sujeta a los rate limits de terceros y a la variabilidad
+          de la red. Incluso con cache de Redis de 5 min, la primera vez que un
+          reclutador busca "rust webassembly" el resultado es lo que las APIs
+          upstream devolvieron en los últimos segundos. Es el impuesto de arranque en
+          frío.
+        </p>
+
+        <p>
+          El discovery worker paga ese impuesto por adelantado. Cada 15 minutos,
+          recorre una matriz curada de topics × grupos de fuentes, vuelve a ejecutar
+          el pipeline de búsqueda y escribe los resultados a
+          <code>builder_embeddings</code> como stubs. Cuando un usuario real busca
+          un topic que el worker ya pre-calentó, el índice está listo antes de que
+          llegue la request.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Ruta 2 — una ejecución</div>
+          <div class="mermaid">
+flowchart LR
+  Cron["Scheduler<br/>(15 min)"]:::cron --> EP["/api/admin/discovery/run-worker"]:::api
+  EP --> DW["runDiscoveryWorker()"]:::worker
+  DW -->|cargar cursor| DB1[("discovery_state")]:::db
+  DW --> Cell["cellAt(cursor)"]:::worker
+  Cell --> SB["searchBuilders()"]:::worker
+  SB --> Filter["filtra kind==='person'"]:::worker
+  Filter --> Cap{"¿capado?"}:::safety
+  Cap -->|no| Upsert["upsertEmbeddingStubs(N)"]:::db
+  Cap -->|sí| Skip["salta celda"]:::worker
+  Upsert --> DB2[("builder_embeddings<br/>(stubs)")]:::db
+
+  classDef cron fill:#fff,stroke:#2f6f5e,stroke-width:2px
+  classDef api fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>Cómo usa el worker la Ruta 1</h3>
+        <p>
+          El discovery worker llama al mismo <code>searchBuilders()</code> que usa la
+          búsqueda en vivo. Esa es la conexión. El worker no es un pipeline paralelo
+          separado; es el mismo pipeline corriendo en cron con el cursor avanzando y
+          los resultados persistidos en vez de devueltos.
+        </p>
+
+        <h3>La matriz</h3>
+        <p>
+          La matriz se construye de forma determinística a partir de 30 topics
+          curados × 4 grupos de fuentes (code, community, content, registries). Cada
+          topic produce dos celdas (grupos de fuentes adyacentes, rotados por índice
+          del topic) para que cada topic se ejercite en al menos dos grupos y ningún
+          grupo quede sin atender.
+        </p>
+
+        <div class="kv">
+          <dt>Celdas por ejecución</dt>
+          <dd>Configurable vía <code>DISCOVERY_CELLS_PER_RUN</code>. Por defecto es un número pequeño (5–10) para mantenerse dentro del presupuesto de tiempo del cron.</dd>
+          <dt>Cap diario de stubs</dt>
+          <dd><code>DISCOVERY_DAILY_STUB_CAP</code> limita cuántos stubs aterrizan en el índice por día. Acota el gasto en APIs de terceros.</dd>
+          <dt>Cursor</dt>
+          <dd>Envuelve módulo la longitud de la matriz. Key desconocida resetea a 0. Estado persistido en la fila de <code>discovery_state</code>.</dd>
+          <dt>Aislamiento de fallos</dt>
+          <dd>Una celda que lanza se loga y se salta — la ejecución nunca aborta.</dd>
+        </div>
+
+        <h3>Qué se escribe</h3>
+        <p>
+          Los stubs no son objetos <code>RawBuilder</code> completos. Son campos
+          desnormalizados optimizados para el índice semántico: display name, topics,
+          bio, identidad de fuente. El registro completo vive en la fuente de
+          terceros hasta que un usuario hace click; el índice es solo la señal de
+          ranking pre-computada.
+        </p>
+      </div>
+    </section>
+
+    <!-- RUTA 3 -->
+    <section id="path3">
+      <div class="container">
+        <h2><span class="num">05</span>Ruta 3 · Enrichment worker (el re-validador)</h2>
+        <p>
+          La Ruta 1 busca lo que es público ahora. La Ruta 2 pre-calienta el índice.
+          La Ruta 3 es la re-validadora: cuando un usuario añade un builder a una
+          lista, BuilderHunt se compromete a mantener la identidad pública de ese
+          builder al día. El enrichment worker es la única ruta que hace fetch con
+          una capa de red endurecida y un policy gate.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Ruta 3 — ciclo de vida del job</div>
+          <div class="mermaid">
+flowchart TB
+  UI["Usuario añade builder a una lista"]:::user --> Job[("enrichment_jobs")]:::db
+  Job --> Claim["claimDueEnrichmentJobs<br/>(FOR UPDATE SKIP LOCKED)"]:::worker
+  Claim --> Pol["getExecutableConnectors<br/>(policy ∩ allowlist)"]:::safety
+  Pol --> Fetch["safeFetch(url, allowedHosts)"]:::safety
+  Fetch --> Robots["isPathAllowedByRobots<br/>(caché 1h, fail-closed)"]:::safety
+  Robots --> Parse["parse → EnrichmentEvidencePayload"]:::worker
+  Parse --> Res["resolveEnrichmentCandidate<br/>(score → accept/review/reject)"]:::worker
+  Res --> Persist["persistEnrichmentEvidence<br/>(retención: 30d raw, 180d accepted)"]:::db
+  Persist --> Out["outcome:<br/>succeeded | partial | retry | failed"]:::db
+
+  classDef user fill:#fff,stroke:#c97b3f,stroke-width:2px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>Por qué esta ruta es su propia cosa</h3>
+        <p>
+          La búsqueda en vivo tolera que "la fuente no haya respondido" porque el
+          usuario puede buscar otra vez en un minuto. El enrichment no puede: si
+          un builder fue añadido a una lista, el usuario espera que la identidad
+          pública se mantenga al día. Eso implica una postura de red diferente
+          (cliente endurecido, robots.txt respetado, rate limits respetados), un
+          almacenamiento diferente (evidencia durable con content hash, ventanas de
+          retención) y un modelo de concurrencia diferente (reclamar un job bajo
+          lease, fallar y dejar que otro worker lo recoja).
+        </p>
+
+        <h3>Qué hace el resolver</h3>
+        <p>
+          El resolver es una función de scoring determinística y versionada.
+          Compara la evidencia obtenida contra la identidad conocida del builder y
+          asigna una puntuación de confianza en basis points (máx. 10.000). Siete
+          señales: cross-link del dueño verificado, source ID estable exacto,
+          username exacto con link recíproco, username exacto solo, full name
+          exacto, acuerdo de organización, acuerdo de ubicación, solapamiento de
+          temas. Dos umbrales (accept ≥ 9.000, review ≥ 7.000). El resolver no
+          tiene LLM; el log de auditoría es reproducible.
+        </p>
+
+        <h3>Qué vuelve a la búsqueda</h3>
+        <p>
+          Un registro de enrichment aceptado se trata como un
+          <code>RawBuilder</code> fresco con los nuevos datos: el <code>bio</code>,
+          el <code>displayName</code> y los <code>topics</code> del builder se
+          actualizan, y el pipeline de búsqueda re-deriva su puntuación a partir
+          de la nueva evidencia. La ruta de enrichment es la única que <em>mutaba</em>
+          lo que la búsqueda devuelve.
+        </p>
+      </div>
+    </section>
+
+    <!-- RUTA 4 -->
+    <section id="path4">
+      <div class="container">
+        <h2><span class="num">06</span>Ruta 4 · Perfiles auto-gestionados (planificada)</h2>
+        <p>
+          Una cuarta ruta se abre para personas que no tienen huella pública en
+          ninguna de las 15 fuentes. Un traductor (es, en, fr), un diseñador sin
+          Dribbble, un investigador con publicaciones en repositorios no
+          indexados — pueden crear un perfil desde cero, subir muestras de
+          trabajo y hacerse descubribles en BuilderHunt.
+        </p>
+
+        <p>
+          El insight arquitectónico es que la nueva ruta usa <strong>la misma
+          forma</strong> con un nuevo valor del discriminador:
+          <code>kind: 'self-managed-person'</code>. El conector que inyecta estos
+          perfiles al índice de búsqueda no hace una llamada de red; lee de la
+          tabla <code>selfManagedProfiles</code> directamente y emite objetos
+          <code>RawBuilder</code>. El pipeline de búsqueda no nota la diferencia.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Ruta 4 — misma forma, nuevo discriminador</div>
+          <div class="mermaid">
+flowchart LR
+  DB[("selfManagedProfiles<br/>(visibility = 'public')")]:::db
+  Conn["Conector: self-managed<br/>(sin red, lee DB)"]:::producer
+  Shape["RawBuilder<br/>kind: 'self-managed-person'<br/>metadata.isSelfManaged: true"]
+  Search["searchBuilders()<br/>(sin cambios)"]:::consumer
+  Render["BuilderCard<br/>variant='self-managed'<br/>chip: 'Self-managed'"]:::ui
+
+  DB --> Conn --> Shape --> Search --> Render
+
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef producer fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef consumer fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px
+          </div>
+        </div>
+
+        <h3>Qué cambia y qué no</h3>
+        <table class="tbl">
+          <thead><tr><th>Capa</th><th>Qué cambia</th><th>Qué no cambia</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Forma</strong></td>
+              <td>Nuevo <code>kind: 'self-managed-person'</code></td>
+              <td>La estructura de <code>RawBuilder</code> es idéntica</td>
+            </tr>
+            <tr>
+              <td><strong>Búsqueda</strong></td>
+              <td>Nuevo connector <code>self-managed.ts</code> que lee de DB</td>
+              <td>El orquestador <code>searchBuilders()</code> no cambia</td>
+            </tr>
+            <tr>
+              <td><strong>Dedup</strong></td>
+              <td>Clave de dedup <code>(source, sourceId)</code> para self-managed</td>
+              <td>El pipeline de dedup no cambia</td>
+            </tr>
+            <tr>
+              <td><strong>Scoring</strong></td>
+              <td>Boost ×1.4 si matchea <code>services</code>, ×1.2 si matchea <code>topics</code></td>
+              <td>La fórmula de recency-weighted score no cambia</td>
+            </tr>
+            <tr>
+              <td><strong>Render</strong></td>
+              <td>Chip "Self-managed" en lugar de "Verified"</td>
+              <td>Layout de la card, dedup, filtros no cambian</td>
+            </tr>
+            <tr>
+              <td><strong>Índice semántico</strong></td>
+              <td><code>upsertEmbeddingStubs</code> con el nuevo <code>kind</code></td>
+              <td>Esquema del índice y ranking no cambian</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>La conexión con el scraping, replanteada</h3>
+        <p>
+          Los perfiles auto-gestionados no son scraping. Son user-submitted. Pero
+          entran por la misma forma, el mismo dedup, el mismo scoring, el mismo
+          render. Desde el punto de vista del pipeline de búsqueda, la nueva ruta
+          es solo un decimosexto conector que por casualidad lee de una tabla
+          local en vez de una API HTTP. La distinción "scrapeado vs no
+          scrapeado" se preserva en el campo <code>metadata</code> y se renderiza
+          como chip — pero el resto del sistema no lo sabe ni le importa.
+        </p>
+      </div>
+    </section>
+
+    <!-- EL PUENTE -->
+    <section id="bridge">
+      <div class="container">
+        <h2><span class="num">07</span>El puente — qué hace que las cuatro rutas sean el mismo sistema</h2>
+        <p>
+          La conexión entre scraping y búsqueda no es una única pieza de código; es
+          un conjunto de invariantes que las cuatro rutas cumplen. Cuando una nueva
+          ruta se une al sistema, tiene que pasar cada uno de estos gates. Cuando
+          una ruta existente se desvía, los gates fallan ruidosamente.
+        </p>
+
+        <div class="pullquote">
+          Si un productor puede emitir <code>RawBuilder</code>, el resto del
+          sistema acepta el resultado sin cambios. Eso es lo único que las
+          cuatro rutas tienen en común, y es lo único que necesitan.
+        </div>
+
+        <h3>Los cinco invariantes</h3>
+        <div class="card">
+          <dl class="kv">
+            <dt>1. La forma</dt>
+            <dd>Cada output es un <code>RawBuilder</code> con un <code>kind</code>, <code>source</code> y <code>sourceId</code> válidos. Una nueva ruta que no emita esta forma no es una nueva ruta.</dd>
+            <dt>2. La clave de dedup</dt>
+            <dd>Cada output tiene una tupla estable <code>(source, sourceId)</code>. Esto es lo que hace que el dedup funcione entre rutas y entre la búsqueda en vivo y el índice caliente.</dd>
+            <dt>3. La señal de recencia</dt>
+            <dd>Cada output tiene un equivalente de <code>lastSeen</code> significativo (computado desde el timestamp de actividad de la fuente, desde <code>updatedAt</code> del perfil, o desde <code>observedAt</code> de la evidencia de enrichment). Sin recencia no hay ranking.</dd>
+            <dt>4. El discriminador</dt>
+            <dd>Cada output se etiqueta honestamente: <code>kind: 'person'</code> solo cuando la entidad subyacente es una persona, <code>'self-managed-person'</code> solo cuando es declarada por el usuario, <code>'repo'</code> u <code>'organization'</code> en otro caso. Mentir sobre <code>kind</code> es el bug original que motivó el tipo.</dd>
+            <dt>5. El contrato de render</dt>
+            <dd>Cada output se renderiza a través de <code>&lt;BuilderCard variant&gt;</code> con un chip que nombra el kind. Un resultado sin chip no es un resultado válido.</dd>
+          </dl>
+        </div>
+
+        <h3>Cómo se ve el puente en código</h3>
+        <p>
+          El puente es un único contrato, estrecho. Se hace cumplir en tres
+          sitios:
+        </p>
+
+        <div class="codeblock">
+<span class="c">// 1. La forma (src/lib/sources/types.ts)</span><br>
+<span class="k">export interface</span> <span class="t">RawBuilder</span> { <span class="c">/* ... */</span> }<br>
+<br>
+<span class="c">// 2. La comprobación de productor (src/lib/search.ts)</span><br>
+<span class="c">// searchBuilders() consume FusedBuilder[], que extiende RawBuilder</span><br>
+<span class="c">// con los campos de scoring. Todo lo que produce RawBuilder encaja.</span><br>
+<span class="k">export type</span> <span class="t">FusedBuilder</span> = <span class="t">RawBuilder</span> &amp; { <span class="c">/* score fields */</span> }<br>
+<br>
+<span class="c">// 3. El contrato de render (src/modules/search/components/BuilderCard.tsx)</span><br>
+<span class="c">// Cada variant renderiza un chip; el chip es obligatorio por el componente,</span><br>
+<span class="c">// no por el call site, así que un chip olvidado rompe el build.</span><br>
+<span class="k">type</span> <span class="t">BuilderCardProps</span> = { <span class="t">builder</span>: <span class="t">FusedBuilder</span>; <span class="t">chip</span>: <span class="t">BuilderChip</span> }
+        </div>
+
+        <p>
+          Los tres sitios son mínimos a propósito. La forma es pequeña. La
+          comprobación de productor es una extensión de tipo. El contrato de
+          render es un prop obligatorio. Cualquier cosa más sería una pista de
+          que el puente está haciendo demasiado.
+        </p>
+
+        <h3>Qué rompe el puente</h3>
+        <div class="card callout">
+          <strong>Tres formas en que el puente se rompe, y cómo se ve cada una en
+          producción.</strong>
+          <ul style="margin: 12px 0 0 18px; color: var(--ink-2); line-height: 1.7;">
+            <li><strong>Una fuente emite una persona donde debería emitir una organización</strong> — los reclutadores ven una empresa en su shortlist de "desarrolladores de react". Este fue el bug original.</li>
+            <li><strong>Una nueva ruta devuelve <code>kind: 'person'</code> pero no tiene <code>lastSeen</code></strong> — el resultado puntúa cero en recencia, se hunde al final de cada lista y parece roto para el usuario.</li>
+            <li><strong>Un resultado self-managed se renderiza sin chip</strong> — el usuario no puede distinguirlo de un builder verificado. El principio de cobertura universal falla; la nueva ruta se degrada en una versión peor de la antigua.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- RENDER -->
+    <section id="render">
+      <div class="container">
+        <h2><span class="num">08</span>Cómo llega un resultado al usuario</h2>
+        <p>
+          El último paso del recorrido es el que el usuario realmente ve. Cada
+          resultado de búsqueda, sin importar de qué ruta venga, pasa por el
+          mismo pipeline de render. El pipeline es pequeño y honesto: muestra lo
+          que el resultado es, de dónde viene y cuánta confianza tiene el sistema
+          sobre él.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Pipeline de render</div>
+          <div class="mermaid">
+flowchart LR
+  R["FusedBuilder"]:::input --> Card["&lt;BuilderCard variant=...&gt;"]:::component
+  Card -->|si kind=='person'| VerifiedChip["badge: verified"]:::chip
+  Card -->|si kind=='self-managed-person'| SelfChip["chip: Self-managed"]:::chip
+  Card -->|si kind=='organization'| OrgChip["chip: Organization"]:::chip
+  Card -->|si kind=='repo'| RepoChip["chip: Repo"]:::chip
+  Card --> Profile["/builders/$builderId<br/>o /u/$handle"]:::link
+
+  classDef input fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef component fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef chip fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef link fill:#fff,stroke:#2f6f5e,stroke-width:1.5px
+          </div>
+        </div>
+
+        <h3>Qué codifica el chip</h3>
+        <p>
+          El chip no es decoración. Es una única pieza de metadatos que
+          desambigua cuatro tipos de resultado de un vistazo. La jerarquía
+          visual importa: el badge "verified" es verde (el único sitio donde se
+          permite verde en una builder card); el chip "Self-managed" es
+          secundario; "Repo" y "Organization" son neutros. Un usuario que
+          aprende lo que significan estos chips puede decidir en 200 ms.
+        </p>
+
+        <h3>Qué codifica la URL</h3>
+        <p>
+          Un resultado con <code>kind: 'person' | 'repo' | 'organization'</code>
+          enlaza a <code>/builders/$builderId</code> (la ruta de builder
+          existente). Un resultado con <code>kind: 'self-managed-person'</code>
+          enlaza a <code>/u/$handle</code> (la nueva ruta). Las URLs son
+          deliberadamente disjuntas para que una misma identidad no pueda
+          pretender ser dos cosas distintas por confusión de URL.
+        </p>
+
+        <h3>Lo que el sistema de búsqueda le debe al usuario</h3>
+        <p>
+          Al usuario se le deben tres cosas, sin importar de qué ruta venga el
+          resultado: (1) un chip honesto sobre qué tipo de entidad es; (2) un
+          enlace a un perfil real que explique el resultado; (3) las mismas
+          reglas de scoring, dedup y ranking que cualquier otro resultado. Si
+          falta alguna de las tres, el puente está roto.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        Generado a partir de <code>src/lib/sources/</code>, <code>src/lib/search.ts</code>,
+        <code>src/lib/discovery/</code>, <code>src/lib/enrichment/</code> y
+        <code>plans/phase-2/07-perfiles-autogestionados/spec.md</code>. Refrescar
+        tras cualquier cambio estructural en la forma, el orquestador de búsqueda,
+        la matriz de discovery o el enrichment worker.
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#fef3e8',
+        primaryTextColor: '#1a1d24',
+        primaryBorderColor: '#c97b3f',
+        lineColor: '#7c7a72',
+        secondaryColor: '#f0ebe0',
+        tertiaryColor: '#fff',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: { curve: 'basis', padding: 12, nodeSpacing: 40, rankSpacing: 50 },
+      sequence: { actorMargin: 60, messageMargin: 40, boxMargin: 10, boxTextMargin: 5 },
+    });
+  </script>
+</body>
+</html>

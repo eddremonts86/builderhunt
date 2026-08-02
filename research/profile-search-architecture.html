@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BuilderHunt — How scraping becomes search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #f7f5f0;
+      --bg-alt: #efeae0;
+      --surface: #ffffff;
+      --line: #e3dcc9;
+      --line-soft: #ece5d4;
+      --ink: #1a1d24;
+      --ink-2: #3a4256;
+      --muted: #7c7a72;
+      --primary: #c97b3f;
+      --primary-2: #e07338;
+      --primary-soft: #f3e2d2;
+      --accent-2: #2f6f5e;
+      --warn: #b06367;
+      --shadow-1: 0 2px 8px rgba(0,0,0,.04);
+      --shadow-2: 0 4px 16px -2px rgba(0,0,0,.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: 'Outfit', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    body::before {
+      content: ""; position: fixed; top: -200px; left: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(192,115,56,.07) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: ""; position: fixed; bottom: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(47,111,94,.06) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    main { position: relative; z-index: 1; }
+    .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+    @media (min-width: 768px) { .container { padding: 0 32px; } }
+
+    .hero {
+      padding: 80px 0 56px;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 18px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .eyebrow::before {
+      content: ""; width: 6px; height: 6px; background: var(--primary); border-radius: 50%;
+    }
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(32px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+      max-width: 880px;
+    }
+    .hero h1 em { font-style: italic; color: var(--primary); }
+    .hero p.lede {
+      font-size: 17px;
+      color: var(--ink-2);
+      max-width: 720px;
+      line-height: 1.6;
+    }
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 32px 0 0;
+    }
+    .metric {
+      padding: 22px 18px;
+      border-right: 1px solid var(--line-soft);
+    }
+    .metric:last-child { border-right: 0; }
+    .metric .v {
+      font-family: 'DM Serif Display', serif;
+      font-size: 32px;
+      line-height: 1;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    .metric .v .unit {
+      font-family: 'Outfit', sans-serif;
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: 3px;
+    }
+    .metric .l {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+
+    section { padding: 64px 0; }
+    section + section { border-top: 1px solid var(--line-soft); }
+
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-weight: 400;
+      font-size: clamp(26px, 3.2vw, 34px);
+      letter-spacing: -0.005em;
+      margin-bottom: 14px;
+      line-height: 1.1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    h2 .num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      letter-spacing: 0.05em;
+      background: var(--primary-soft);
+      color: var(--primary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+    h3 {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      color: var(--ink);
+    }
+    p { color: var(--ink-2); margin-bottom: 14px; line-height: 1.65; }
+    p.lede { font-size: 17px; color: var(--ink-2); }
+    strong { color: var(--ink); font-weight: 600; }
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88em;
+      background: var(--line-soft);
+      padding: 1px 6px;
+      border-radius: 3px;
+      color: var(--ink);
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px 28px;
+      box-shadow: var(--shadow-1);
+      margin: 16px 0;
+    }
+    .card.tight { padding: 18px 22px; }
+    .card.callout {
+      background: #fdf6f3;
+      border-color: #e9c9bd;
+    }
+    .card.callout strong { color: var(--warn); }
+
+    .pullquote {
+      border-left: 3px solid var(--primary);
+      padding: 12px 0 12px 24px;
+      margin: 28px 0;
+      font-family: 'DM Serif Display', serif;
+      font-size: 22px;
+      line-height: 1.4;
+      color: var(--ink);
+    }
+    .pullquote cite {
+      display: block;
+      font-family: 'Outfit', sans-serif;
+      font-style: normal;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 12px;
+    }
+
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 28px;
+      margin: 24px 0;
+      box-shadow: var(--shadow-1);
+      overflow-x: auto;
+    }
+    .diagram-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+    .mermaid { text-align: center; font-family: 'Outfit', sans-serif !important; }
+    .mermaid svg { max-width: 100%; height: auto; }
+
+    .codeblock {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 22px;
+      margin: 16px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      overflow-x: auto;
+      color: var(--ink);
+    }
+    .codeblock .k { color: var(--accent-2); }
+    .codeblock .s { color: var(--primary); }
+    .codeblock .c { color: var(--muted); font-style: italic; }
+    .codeblock .t { color: var(--ink-2); }
+
+    .path-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin: 20px 0;
+    }
+    .path {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+    .path .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--primary);
+      margin-bottom: 8px;
+      display: inline-block;
+    }
+    .path h4 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .path p {
+      font-size: 12.5px;
+      color: var(--ink-2);
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 200px 1fr;
+      row-gap: 8px;
+      column-gap: 16px;
+      margin: 12px 0;
+      font-size: 14px;
+    }
+    .kv dt { color: var(--muted); font-weight: 500; }
+    .kv dd { margin: 0; color: var(--ink-2); }
+
+    .tbl {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      margin: 16px 0;
+      font-size: 13.5px;
+    }
+    .tbl th, .tbl td {
+      padding: 12px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--line-soft);
+    }
+    .tbl th {
+      background: var(--bg-alt);
+      font-weight: 600;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+    }
+    .tbl tr:last-child td { border-bottom: 0; }
+    .tbl td.mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+    nav.toc {
+      position: sticky; top: 0;
+      background: rgba(247, 245, 240, 0.94);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line-soft);
+      z-index: 100;
+      padding: 12px 0;
+    }
+    nav.toc .container {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      font-size: 12.5px;
+    }
+    nav.toc .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+      color: var(--muted); margin-right: 8px;
+    }
+    nav.toc a {
+      color: var(--ink-2);
+      text-decoration: none;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-weight: 500;
+    }
+    nav.toc a:hover { background: var(--primary-soft); color: var(--primary); }
+
+    footer {
+      padding: 48px 0 56px;
+      border-top: 1px solid var(--line-soft);
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    @media (max-width: 768px) {
+      .hero { padding: 56px 0 40px; }
+      section { padding: 44px 0; }
+      .kv { grid-template-columns: 1fr; }
+    }
+    @media print {
+      body { background: #fff; font-size: 11pt; }
+      body::before, body::after { display: none; }
+      nav.toc { display: none; }
+      section { padding: 28pt 0; page-break-inside: avoid; }
+      .card, .diagram, .codeblock, .path { box-shadow: none; page-break-inside: avoid; }
+      h2 { page-break-after: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="toc">
+    <div class="container">
+      <span class="label">Sections</span>
+      <a href="#shape">The shape</a>
+      <a href="#journey">Data journey</a>
+      <a href="#path1">Path 1 · Live search</a>
+      <a href="#path2">Path 2 · Discovery</a>
+      <a href="#path3">Path 3 · Enrichment</a>
+      <a href="#path4">Path 4 · Self-managed</a>
+      <a href="#bridge">The bridge</a>
+      <a href="#render">How a result renders</a>
+    </div>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div class="container">
+        <div class="eyebrow">Architecture · How scraping becomes search</div>
+        <h1>15 sources, 4 ingestion paths, <em>one shape</em>.</h1>
+        <p class="lede">
+          BuilderHunt has four ways data lands in the product: live federated search, the
+          discovery worker that warms the semantic index, the enrichment worker that re-validates
+          public identity, and the new self-managed profile path for people without a public
+          footprint. The connection that isn't obvious is the one piece that holds all four
+          together: every path produces the same <code>RawBuilder</code> shape, and every search
+          consumes that same shape. This document makes that bridge visible.
+        </p>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="v">15</div>
+            <div class="l">Source connectors producing <code>RawBuilder</code></div>
+          </div>
+          <div class="metric">
+            <div class="v">4</div>
+            <div class="l">Ingestion paths converging on the same shape</div>
+          </div>
+          <div class="metric">
+            <div class="v">1</div>
+            <div class="l">Universal shape that makes them composable</div>
+          </div>
+          <div class="metric">
+            <div class="v">3</div>
+            <div class="l"><code>BuilderKind</code> values: person, repo, organization</div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- THE SHAPE -->
+    <section id="shape">
+      <div class="container">
+        <h2><span class="num">01</span>The shape is the contract</h2>
+        <p>
+          The reason 15 sources, 4 paths, and one search bar can cohere is that every producer
+          and every consumer agrees on a single shape. The shape is defined in
+          <code>src/lib/sources/types.ts</code> and the comment on the type
+          documents exactly the kind of bug it prevents:
+        </p>
+
+        <div class="codeblock">
+<span class="c">/**</span><br>
+<span class="c">&nbsp;* What a search result actually is.</span><br>
+<span class="c">&nbsp;*</span><br>
+<span class="c">&nbsp;* <code>organization</code> was added after 30 of 60 GitHub results turned out</span><br>
+<span class="c">&nbsp;* to be repositories and one of the "people" was a company account. A</span><br>
+<span class="c">&nbsp;* recruiter searching for people must not be shown either, and merging</span><br>
+<span class="c">&nbsp;* either into a canonical human is not a subtle error.</span><br>
+<span class="c">&nbsp;*/</span><br>
+<span class="k">export type</span> <span class="t">BuilderKind</span> = <span class="s">'person'</span> | <span class="s">'repo'</span> | <span class="s">'organization'</span><br>
+<br>
+<span class="k">export interface</span> <span class="t">RawBuilder</span> {<br>
+&nbsp;&nbsp;<span class="k">id</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">kind</span>: <span class="t">BuilderKind</span><br>
+&nbsp;&nbsp;<span class="k">source</span>: <span class="t">SourceName</span><br>
+&nbsp;&nbsp;<span class="k">sourceId</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">username</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">displayName</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">avatarUrl</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">bio</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">profileUrl</span>: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">followersCount</span>?: <span class="t">number</span><br>
+&nbsp;&nbsp;<span class="k">language</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">country</span>?: <span class="t">string</span><br>
+&nbsp;&nbsp;<span class="k">topics</span>: <span class="t">string[]</span><br>
+&nbsp;&nbsp;<span class="k">metadata</span>: <span class="t">Record&lt;string, unknown&gt;</span><br>
+}
+        </div>
+
+        <p>
+          The shape is small on purpose. It carries what a recruiter needs to decide "is this
+          person worth a click" — name, avatar, bio, profile URL, country, topics — and nothing
+          more. Every source-specific quirk lives in <code>metadata</code> as untyped
+          key-value pairs. Adding a new source never requires changing the search pipeline, the
+          dedup, or the renderer.
+        </p>
+
+        <h3>Why the discriminator is <code>kind</code>, not <code>isPerson</code></h3>
+        <p>
+          A boolean would seem simpler. It's not. The original code had only <code>kind: 'person'</code>
+          and the search returned 30 repositories when recruiters asked for "react developers". The
+          lesson: <strong>the absence of a discriminator is itself a bug</strong>. The third
+          value, <code>'organization'</code>, exists because GitHub returns companies in
+          user-search responses, and the search endpoint's own <code>type</code> field is the
+          only authoritative signal (the <code>type:user</code> query qualifier does not
+          exclude organizations).
+        </p>
+
+        <div class="card callout">
+          <strong>The shape is the bridge.</strong> If a producer can output <code>RawBuilder</code>,
+          the rest of the system — search, dedup, scoring, render, alerts, recommendations,
+          solutions — accepts the result with zero changes. That is the property that makes the
+          four paths composable.
+        </div>
+      </div>
+    </section>
+
+    <!-- DATA JOURNEY -->
+    <section id="journey">
+      <div class="container">
+        <h2><span class="num">02</span>The data journey, end-to-end</h2>
+        <p>
+          Below is the whole system as one diagram. Every box is a real file in
+          <code>src/lib/</code>; every arrow is a function call or DB write. The four
+          producers on the left all converge on the same <code>RawBuilder</code> shape; the
+          three consumers on the right all consume it without knowing where it came from.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Producers → shape → consumers</div>
+          <div class="mermaid">
+flowchart TB
+  subgraph Producers["Producers (4 paths)"]
+    direction TB
+    P1["Path 1<br/>15 source connectors<br/>(src/lib/sources/*.ts)"]
+    P2["Path 2<br/>Discovery worker<br/>(src/lib/discovery/worker.ts)"]
+    P3["Path 3<br/>Enrichment worker<br/>(src/lib/enrichment/worker.ts)"]
+    P4["Path 4 (planned)<br/>Self-managed profiles<br/>(selfManagedProfiles)"]
+  end
+
+  Shape["RawBuilder shape<br/>(src/lib/sources/types.ts)<br/>kind: 'person' | 'repo' | 'organization' | 'self-managed-person'"]
+
+  subgraph Consumers["Consumers"]
+    direction TB
+    C1["searchBuilders()<br/>(src/lib/search.ts)"]
+    C2["Dedup + scoring<br/>(src/lib/dedup.ts, score.ts)"]
+    C3["UI render<br/>(BuilderCard variants)"]
+  end
+
+  P1 -->|returns| Shape
+  P2 -->|reads, calls search, writes embeddings| C1
+  P3 -->|persists evidence that refreshes existing builders| C1
+  P4 -->|injects via new helper| C1
+
+  Shape --> C1 --> C2 --> C3
+
+  classDef producer fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef shape fill:#fff,stroke:#1a1d24,stroke-width:2.5px
+  classDef consumer fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef P1,P2,P3,P4 producer
+  classDef Shape shape
+  classDef C1,C2,C3 consumer
+          </div>
+        </div>
+
+        <p>
+          Notice the asymmetry: <strong>all four producers converge on the same shape, and all
+          three consumers diverge from it</strong>. Adding a new producer is cheap; changing a
+          consumer is expensive. The shape is the load-bearing abstraction.
+        </p>
+      </div>
+    </section>
+
+    <!-- PATH 1: LIVE SEARCH -->
+    <section id="path1">
+      <div class="container">
+        <h2><span class="num">03</span>Path 1 · Live federated search</h2>
+        <p>
+          The path most users experience directly. A recruiter types a query. Within seconds,
+          15 connectors fire in parallel. Each returns its own slice of <code>RawBuilder</code>
+          (or nothing, if the source failed or the user disabled it). The orchestrator merges
+          and ranks the union. Nothing is persisted on this path.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Path 1 — sequence</div>
+          <div class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant R as /api/search/builders
+  participant S as searchBuilders()
+  participant C as 15 connectors (parallel)
+  participant D as dedup + score
+
+  U->>R: typed query + filters
+  R->>S: { keywords, sources, perPage }
+  par for each source
+    S->>C: searchUsers(query, source=github)
+    S->>C: searchUsers(query, source=gitlab)
+    S->>C: search(query, source=hn)
+    S->>C: search(query, source=...)
+  end
+  C-->>S: RawBuilder[] from each
+  S->>D: union → dedup → recency-score
+  D-->>R: ranked builders
+  R-->>U: JSON
+          </div>
+        </div>
+
+        <h3>What each connector is responsible for</h3>
+        <p>
+          Each connector accepts the same input and returns the same shape. It is free to
+          make however many HTTP calls it needs, transform the response however it wants,
+          and stuff anything extra into <code>metadata</code>. The orchestrator does not
+          know or care that GitHub's search endpoint returns no display name and that the
+          connector makes a second call to <code>/users/{login}</code> to hydrate it.
+        </p>
+
+        <div class="codeblock">
+<span class="c">// github.ts — every connector's contract</span><br>
+<span class="k">export async function</span> <span class="t">searchGitHub</span>(<br>
+&nbsp;&nbsp;<span class="t">keywords</span>: <span class="t">string</span>[],<br>
+&nbsp;&nbsp;<span class="t">options</span>: { <span class="t">language</span>?: <span class="t">string</span>; <span class="t">country</span>?: <span class="t">string</span>; <span class="t">token</span>?: <span class="t">string</span> }<br>
+): <span class="t">Promise</span>&lt;<span class="t">RawBuilder</span>[]&gt; {<br>
+&nbsp;&nbsp;<span class="c">// make the search call, hydrate each result,</span><br>
+&nbsp;&nbsp;<span class="c">// return RawBuilder[] with kind: 'person' or 'organization'</span><br>
+}
+        </div>
+
+        <h3>What the orchestrator is responsible for</h3>
+        <p>
+          The orchestrator is the only place that knows there are 15 sources. Its job is to
+          run them in parallel, isolate failures, dedupe results, score them by recency,
+          and return a ranked list. It does not parse source-specific data. The connectors
+          are the only place where source-specific data lives.
+        </p>
+
+        <div class="kv">
+          <dt>Per-connector budget</dt>
+          <dd><code>CONNECTOR_TIMEOUT_MS = 8000</code> in <code>src/lib/search.ts</code>. A hanging source never hangs the search.</dd>
+          <dt>Failure isolation</dt>
+          <dd>Per-connector try/catch. A broken GitHub response returns <code>[]</code> with a <code>SourceStatus</code>; the search continues with 14 healthy sources.</dd>
+          <dt>Rate limiting</dt>
+          <dd>The HTTP layer (<code>rateLimit('search-builders', ...)</code>) lives in the route, not the connector. Connectors don't know about user-facing rate limits; they only know about third-party API quotas.</dd>
+          <dt>Caching</dt>
+          <dd>Redis cache on results, 5-minute TTL. The discovery worker (Path 2) is the warm cache; the live search is the cold read-through.</dd>
+        </div>
+
+        <h3>No data is persisted on this path</h3>
+        <p>
+          Live search is read-only. The only writes it triggers are analytics events. The
+          user cannot <em>add</em> a builder to a list from this path — that creates a row
+          in <code>organization_builders</code> and seeds the enrichment job queue (Path 3).
+          The two paths are deliberately decoupled: live search is fast and stateless;
+          enrichment is slow and durable.
+        </p>
+      </div>
+    </section>
+
+    <!-- PATH 2: DISCOVERY -->
+    <section id="path2">
+      <div class="container">
+        <h2><span class="num">04</span>Path 2 · Discovery worker (the index warmer)</h2>
+        <p>
+          Live search has a latency problem: 15 parallel HTTP calls, each subject to
+          third-party rate limits and network jitter. Even with a 5-minute Redis cache, the
+          first time a recruiter searches for "rust webassembly", the result is what
+          upstream APIs returned within the last few seconds. That's the cold-start tax.
+        </p>
+
+        <p>
+          The discovery worker pays that tax in advance. Every 15 minutes, it walks a curated
+          matrix of topics × source groups, re-runs the search pipeline, and writes the
+          results to <code>builder_embeddings</code> as stubs. When a real user searches
+          for a topic the worker has already pre-warmed, the index is ready before the
+          request arrives.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Path 2 — one run</div>
+          <div class="mermaid">
+flowchart LR
+  Cron["Scheduler<br/>(15 min)"]:::cron --> EP["/api/admin/discovery/run-worker"]:::api
+  EP --> DW["runDiscoveryWorker()"]:::worker
+  DW -->|load cursor| DB1[("discovery_state")]:::db
+  DW --> Cell["cellAt(cursor)"]:::worker
+  Cell --> SB["searchBuilders()"]:::worker
+  SB --> Filter["filter kind==='person'"]:::worker
+  Filter --> Cap{"capped?"}:::safety
+  Cap -->|no| Upsert["upsertEmbeddingStubs(N)"]:::db
+  Cap -->|yes| Skip["skip cell"]:::worker
+  Upsert --> DB2[("builder_embeddings<br/>(stubs)")]:::db
+
+  classDef cron fill:#fff,stroke:#2f6f5e,stroke-width:2px
+  classDef api fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>How the worker uses Path 1</h3>
+        <p>
+          The discovery worker calls the same <code>searchBuilders()</code> that the live
+          search uses. That is the connection. The worker is not a separate parallel
+          pipeline; it is the same pipeline running on a cron with the cursor advanced
+          and the results persisted instead of returned.
+        </p>
+
+        <h3>The matrix</h3>
+        <p>
+          The matrix is built deterministically from 30 curated topics × 4 source groups
+          (code, community, content, registries). Each topic produces two cells (adjacent
+          source groups, rotated per topic index) so every topic is exercised across at
+          least two groups and no group starves.
+        </p>
+
+        <div class="kv">
+          <dt>Cells per run</dt>
+          <dd>Configurable via <code>DISCOVERY_CELLS_PER_RUN</code>. Default is small (5–10) to stay inside cron time budgets.</dd>
+          <dt>Daily stub cap</dt>
+          <dd><code>DISCOVERY_DAILY_STUB_CAP</code> hard-limits how many stubs land in the index per day. Bounds third-party API spend.</dd>
+          <dt>Cursor</dt>
+          <dd>Wraps modulo matrix length. Unknown key resets to 0. State persisted in <code>discovery_state</code> row.</dd>
+          <dt>Failure isolation</dt>
+          <dd>A cell that throws is logged and skipped — the run never aborts.</dd>
+        </div>
+
+        <h3>What gets written</h3>
+        <p>
+          The stubs are not full <code>RawBuilder</code> objects. They are denormalized
+          fields optimized for the semantic index: display name, topics, bio, source
+          identity. The full record lives in the third-party source until a user
+          clicks through; the index is just the pre-computed ranking signal.
+        </p>
+      </div>
+    </section>
+
+    <!-- PATH 3: ENRICHMENT -->
+    <section id="path3">
+      <div class="container">
+        <h2><span class="num">05</span>Path 3 · Enrichment worker (the re-validator)</h2>
+        <p>
+          Path 1 searches what's currently public. Path 2 pre-warms the index. Path 3 is the
+          re-validator: when a user adds a builder to a list, BuilderHunt commits to keeping
+          that builder's public identity fresh. The enrichment worker is the only path that
+          fetches with a hardened network envelope and a policy gate.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Path 3 — job lifecycle</div>
+          <div class="mermaid">
+flowchart TB
+  UI["User adds builder to list"]:::user --> Job[("enrichment_jobs")]:::db
+  Job --> Claim["claimDueEnrichmentJobs<br/>(FOR UPDATE SKIP LOCKED)"]:::worker
+  Claim --> Pol["getExecutableConnectors<br/>(policy ∩ allowlist)"]:::safety
+  Pol --> Fetch["safeFetch(url, allowedHosts)"]:::safety
+  Fetch --> Robots["isPathAllowedByRobots<br/>(cache 1h, fail-closed)"]:::safety
+  Robots --> Parse["parse → EnrichmentEvidencePayload"]:::worker
+  Parse --> Res["resolveEnrichmentCandidate<br/>(score → accept/review/reject)"]:::worker
+  Res --> Persist["persistEnrichmentEvidence<br/>(retention: 30d raw, 180d accepted)"]:::db
+  Persist --> Out["outcome:<br/>succeeded | partial | retry | failed"]:::db
+
+  classDef user fill:#fff,stroke:#c97b3f,stroke-width:2px
+  classDef worker fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef safety fill:#fdf6f3,stroke:#b06367,stroke-width:1.5px
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+          </div>
+        </div>
+
+        <h3>Why this path is its own thing</h3>
+        <p>
+          Live search tolerates "the source didn't answer" because the user can search
+          again in a minute. Enrichment cannot: if a builder was added to a list, the user
+          expects the public identity to stay current. That implies a different network
+          posture (hardened client, robots.txt honored, rate limits respected), a
+          different storage (durable evidence with content hash, retention windows), and a
+          different concurrency model (claim a job under a lease, fail and let another
+          worker pick it up).
+        </p>
+
+        <h3>What the resolver does</h3>
+        <p>
+          The resolver is a deterministic, versioned scoring function. It compares the
+          fetched evidence against the builder's known identity and assigns a confidence
+          score in basis points (max 10,000). Seven signals: verified-owner cross-link,
+          exact stable source ID, exact username with reciprocal link, exact username
+          alone, exact full name, organization agreement, location agreement, topic
+          overlap. Two thresholds (accept at ≥9,000, review at ≥7,000). The resolver
+          has no LLM; the audit log is reproducible.
+        </p>
+
+        <h3>What flows back into search</h3>
+        <p>
+          An accepted enrichment record is treated as a fresh <code>RawBuilder</code> with
+          the new data: the builder's <code>bio</code>, <code>displayName</code>, and
+          <code>topics</code> are updated, and the search pipeline re-derives its score
+          from the new evidence. The enrichment path is the only one that <em>mutates</em>
+          what the search returns.
+        </p>
+      </div>
+    </section>
+
+    <!-- PATH 4: SELF-MANAGED -->
+    <section id="path4">
+      <div class="container">
+        <h2><span class="num">06</span>Path 4 · Self-managed profiles (planned)</h2>
+        <p>
+          A fourth path opens up for people who have no public footprint in any of the 15
+          sources. A translator (es, en, fr), a designer without a Dribbble, a researcher
+          with publications in non-indexed repositories — they can create a profile from
+          scratch, upload work samples, and become discoverable in BuilderHunt.
+        </p>
+
+        <p>
+          The architectural insight is that the new path uses <strong>the same shape</strong>
+          with a new discriminator value: <code>kind: 'self-managed-person'</code>. The
+          connector that injects these profiles into the search index does not make a
+          network call; it reads from the <code>selfManagedProfiles</code> table directly
+          and emits <code>RawBuilder</code> objects. The search pipeline does not know
+          the difference.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Path 4 — same shape, new discriminator</div>
+          <div class="mermaid">
+flowchart LR
+  DB[("selfManagedProfiles<br/>(visibility = 'public')")]:::db
+  Conn["Connector: self-managed<br/>(no network, reads DB)"]:::producer
+  Shape["RawBuilder<br/>kind: 'self-managed-person'<br/>metadata.isSelfManaged: true"]
+  Search["searchBuilders()<br/>(no change)"]:::consumer
+  Render["BuilderCard<br/>variant='self-managed'<br/>chip: 'Self-managed'"]:::ui
+
+  DB --> Conn --> Shape --> Search --> Render
+
+  classDef db fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef producer fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef consumer fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef ui fill:#f0ebe0,stroke:#c97b3f,stroke-width:1.5px
+          </div>
+        </div>
+
+        <h3>What changes and what doesn't</h3>
+        <table class="tbl">
+          <thead><tr><th>Layer</th><th>What changes</th><th>What doesn't</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Shape</strong></td>
+              <td>New <code>kind: 'self-managed-person'</code></td>
+              <td><code>RawBuilder</code> structure is identical</td>
+            </tr>
+            <tr>
+              <td><strong>Search</strong></td>
+              <td>New connector <code>self-managed.ts</code> reads from DB</td>
+              <td><code>searchBuilders()</code> orchestrator is unchanged</td>
+            </tr>
+            <tr>
+              <td><strong>Dedup</strong></td>
+              <td>New dedup key <code>(source, sourceId)</code> for self-managed</td>
+              <td>Dedup pipeline is unchanged</td>
+            </tr>
+            <tr>
+              <td><strong>Scoring</strong></td>
+              <td>Boost ×1.4 on <code>services</code> match, ×1.2 on <code>topics</code> match</td>
+              <td>Recency-weighted score formula is unchanged</td>
+            </tr>
+            <tr>
+              <td><strong>Render</strong></td>
+              <td>Chip "Self-managed" instead of "Verified"</td>
+              <td>Card layout, dedup, filters are unchanged</td>
+            </tr>
+            <tr>
+              <td><strong>Semantic index</strong></td>
+              <td><code>upsertEmbeddingStubs</code> called with new <code>kind</code></td>
+              <td>Index schema and ranking are unchanged</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h3>The connection to scraping, restated</h3>
+        <p>
+          Self-managed profiles are not scraping. They are user-submitted. But they enter
+          the same shape, the same dedup, the same scoring, the same render. From the
+          search pipeline's point of view, the new path is just a sixteenth source that
+          happens to read from a local table instead of an HTTP API. The "scraped vs.
+          not scraped" distinction is preserved in the <code>metadata</code> field and
+          rendered as a chip — but the rest of the system doesn't know or care.
+        </p>
+      </div>
+    </section>
+
+    <!-- THE BRIDGE -->
+    <section id="bridge">
+      <div class="container">
+        <h2><span class="num">07</span>The bridge — what makes the four paths the same system</h2>
+        <p>
+          The connection between scraping and search is not a single piece of code; it is a
+          set of invariants that all four paths uphold. When a new path joins the system,
+          it has to pass each of these gates. When an existing path drifts, the gates
+          fail loudly.
+        </p>
+
+        <div class="pullquote">
+          If a producer can output <code>RawBuilder</code>, the rest of the system
+          accepts the result with zero changes. That is the only thing all four
+          paths have in common, and it is the only thing they need.
+        </div>
+
+        <h3>The five invariants</h3>
+        <div class="card">
+          <dl class="kv">
+            <dt>1. The shape</dt>
+            <dd>Every output is a <code>RawBuilder</code> with a valid <code>kind</code>, <code>source</code>, and <code>sourceId</code>. A new path that doesn't emit this shape is not a new path.</dd>
+            <dt>2. The dedup key</dt>
+            <dd>Every output has a stable <code>(source, sourceId)</code> tuple. This is what makes dedup work across paths and across the live-search and warm-index layers.</dd>
+            <dt>3. The recency signal</dt>
+            <dd>Every output has a meaningful <code>lastSeen</code>-equivalent (computed from the source's own activity timestamp, the profile's <code>updatedAt</code>, or the enrichment evidence's <code>observedAt</code>). No recency = no ranking.</dd>
+            <dt>4. The discriminator</dt>
+            <dd>Every output tags itself honestly: <code>kind: 'person'</code> only when the underlying entity is a person, <code>'self-managed-person'</code> only when user-declared, <code>'repo'</code> or <code>'organization'</code> otherwise. Lying about <code>kind</code> is the original bug that motivated the type.</dd>
+            <dt>5. The render contract</dt>
+            <dd>Every output renders through <code>&lt;BuilderCard variant&gt;</code> with a chip that names the kind. A result without a chip is not a valid result.</dd>
+          </dl>
+        </div>
+
+        <h3>What the bridge looks like in code</h3>
+        <p>
+          The bridge is a single, narrow contract. It's enforced in three places:
+        </p>
+
+        <div class="codeblock">
+<span class="c">// 1. The shape (src/lib/sources/types.ts)</span><br>
+<span class="k">export interface</span> <span class="t">RawBuilder</span> { <span class="c">/* ... */</span> }<br>
+<br>
+<span class="c">// 2. The producer check (src/lib/search.ts)</span><br>
+<span class="c">// searchBuilders() consumes FusedBuilder[], which extends RawBuilder</span><br>
+<span class="c">// with the scoring fields. Anything that produces RawBuilder can plug in.</span><br>
+<span class="k">export type</span> <span class="t">FusedBuilder</span> = <span class="t">RawBuilder</span> &amp; { <span class="c">/* score fields */</span> }<br>
+<br>
+<span class="c">// 3. The render contract (src/modules/search/components/BuilderCard.tsx)</span><br>
+<span class="c">// Every variant renders a chip; the chip is required by the component,</span><br>
+<span class="c">// not by the call site, so a forgotten chip breaks the build.</span><br>
+<span class="k">type</span> <span class="t">BuilderCardProps</span> = { <span class="t">builder</span>: <span class="t">FusedBuilder</span>; <span class="t">chip</span>: <span class="t">BuilderChip</span> }
+        </div>
+
+        <p>
+          The three places are minimal on purpose. The shape is small. The producer
+          check is one type extension. The render contract is one required prop.
+          Anything more would be a hint that the bridge is doing too much.
+        </p>
+
+        <h3>What breaks the bridge</h3>
+        <div class="card callout">
+          <strong>Three ways the bridge breaks, and what each looks like in production.</strong>
+          <ul style="margin: 12px 0 0 18px; color: var(--ink-2); line-height: 1.7;">
+            <li><strong>A source emits a person where it should emit an organization</strong> — recruiters see a company in their "react developers" shortlist. This was the original bug.</li>
+            <li><strong>A new path returns <code>kind: 'person'</code> but has no <code>lastSeen</code></strong> — the result scores zero on recency, sinks to the bottom of every list, and looks broken to the user.</li>
+            <li><strong>A self-managed result is rendered without a chip</strong> — the user can't tell it apart from a verified builder. The principle of coverage universal fails; the new path degrades into a worse version of the old one.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOW A RESULT RENDERS -->
+    <section id="render">
+      <div class="container">
+        <h2><span class="num">08</span>How a result reaches the user</h2>
+        <p>
+          The last step of the journey is the one the user actually sees. Every search
+          result, regardless of which path produced it, goes through the same render
+          pipeline. The pipeline is small and honest: it shows what the result is, where
+          it came from, and how confident the system is about it.
+        </p>
+
+        <div class="diagram">
+          <div class="diagram-title">Render pipeline</div>
+          <div class="mermaid">
+flowchart LR
+  R["FusedBuilder"]:::input --> Card["&lt;BuilderCard variant=...&gt;"]:::component
+  Card -->|if kind=='person'| VerifiedChip["badge: verified"]:::chip
+  Card -->|if kind=='self-managed-person'| SelfChip["chip: Self-managed"]:::chip
+  Card -->|if kind=='organization'| OrgChip["chip: Organization"]:::chip
+  Card -->|if kind=='repo'| RepoChip["chip: Repo"]:::chip
+  Card --> Profile["/builders/$builderId<br/>or /u/$handle"]:::link
+
+  classDef input fill:#fff,stroke:#1a1d24,stroke-width:2px
+  classDef component fill:#f0ebe0,stroke:#7c7a72,stroke-width:1.5px
+  classDef chip fill:#fef3e8,stroke:#c97b3f,stroke-width:1.5px
+  classDef link fill:#fff,stroke:#2f6f5e,stroke-width:1.5px
+          </div>
+        </div>
+
+        <h3>What the chip encodes</h3>
+        <p>
+          The chip is not decoration. It is a single piece of metadata that disambiguates
+          four kinds of result with one glance. The visual hierarchy matters: the
+          "verified" badge is green (the only place green is allowed on a builder card);
+          the "Self-managed" chip is secondary; "Repo" and "Organization" are neutral.
+          A user who learns what these chips mean can make a decision in 200 ms.
+        </p>
+
+        <h3>What the URL encodes</h3>
+        <p>
+          A result with <code>kind: 'person' | 'repo' | 'organization'</code> links to
+          <code>/builders/$builderId</code> (the existing builder route). A result with
+          <code>kind: 'self-managed-person'</code> links to <code>/u/$handle</code>
+          (the new route). The URLs are deliberately disjoint so a single identity cannot
+          pretend to be two different things via URL confusion.
+        </p>
+
+        <h3>What the search system owes the user</h3>
+        <p>
+          The user is owed three things, regardless of which path produced the result:
+          (1) an honest chip about what kind of entity it is; (2) a link to a real profile
+          that explains the result; (3) the same scoring, dedup, and ranking rules as
+          every other result. If any of those three is missing, the bridge is broken.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div class="container">
+        Generated from <code>src/lib/sources/</code>, <code>src/lib/search.ts</code>,
+        <code>src/lib/discovery/</code>, <code>src/lib/enrichment/</code>, and
+        <code>plans/phase-2/07-perfiles-autogestionados/spec.md</code>. Refresh after
+        any structural change to the shape, the search orchestrator, the discovery
+        matrix, or the enrichment worker.
+      </div>
+    </footer>
+  </main>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#fef3e8',
+        primaryTextColor: '#1a1d24',
+        primaryBorderColor: '#c97b3f',
+        lineColor: '#7c7a72',
+        secondaryColor: '#f0ebe0',
+        tertiaryColor: '#fff',
+        fontFamily: 'Outfit, system-ui, sans-serif',
+        fontSize: '13px',
+      },
+      flowchart: { curve: 'basis', padding: 12, nodeSpacing: 40, rankSpacing: 50 },
+      sequence: { actorMargin: 60, messageMargin: 40, boxMargin: 10, boxTextMargin: 5 },
+    });
+  </script>
+</body>
+</html>

@@ -146,9 +146,25 @@ export function SearchPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
   }, [])
-  const [activeSources, setActiveSources] = React.useState<Set<Source>>(
-    new Set(DEFAULT_ACTIVE_SOURCES),
-  )
+  /**
+   * A `?sources=` deep link (e.g. from Admin Integrations) decides the initial selection, not an effect.
+   *
+   * It used to be applied in a mount effect, which meant the persist effect below ran first — with the
+   * five-source default still in state — and wrote *that* to `localStorage` before the re-render wrote the
+   * requested source over it. Two writes per deep link, the first one wrong. A tab closed in that window left
+   * the user's saved filters replaced by defaults, and it is what made
+   * `admin-integrations.spec.ts` read `["github","reddit","hn","devto","lobsters"]` where the link said gitlab.
+   *
+   * A lazy initializer removes the window rather than narrowing it: the first render already has the right
+   * value, so the first persist is the only persist. Route search params are available during render on both
+   * server and client, so this stays hydration-safe — unlike `localStorage`, which is restored in an effect
+   * below precisely because it is not.
+   */
+  const [activeSources, setActiveSources] = React.useState<Set<Source>>(() => {
+    const requested = search.sources?.split(',').map((entry) => entry.trim()) ?? []
+    const valid = requested.filter((entry): entry is Source => (ALL_SOURCES as string[]).includes(entry))
+    return new Set(valid.length > 0 ? valid : DEFAULT_ACTIVE_SOURCES)
+  })
   const [sortBy, setSortBy] = React.useState<SortBy>('score')
   const [activeTab, setActiveTab] = React.useState<ResultTab>('people')
   const [recent, setRecent] = React.useState<string[]>([])
@@ -240,17 +256,6 @@ export function SearchPage() {
     } catch {
       // ignore
     }
-  }, [])
-
-  /* Mount: a `?sources=` deep link (e.g. from Admin Integrations) wins over whatever was
-     persisted locally — a link that says "show me github" must not silently show yesterday's
-     five-source default instead. Only when absent does localStorage restoration below apply. */
-  React.useEffect(() => {
-    if (!search.sources) return
-    const requested = search.sources.split(',').map((s) => s.trim())
-    const valid = requested.filter((s): s is Source => (ALL_SOURCES as string[]).includes(s))
-    if (valid.length > 0) setActiveSources(new Set(valid))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally run once on mount
   }, [])
 
   /* Mount: restore sources/location/language from localStorage. A plain
