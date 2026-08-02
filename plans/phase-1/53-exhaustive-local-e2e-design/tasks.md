@@ -203,6 +203,32 @@
   would be asserting against the feature. It is marked `anonymous: 'link'` and probed for the property that
   matters instead — a tokenless click neither verifies anything nor names anyone.
 
+  **The constraint that shapes the remaining work — read this before writing the scenario files.**
+
+  The scenario seam is an **environment variable read inside the app server process**:
+  `src/shared/lib/billing/stripe-provider.ts` reads `process.env.E2E_BILLING_SCENARIO` at call time, and the
+  app under test is a separate `vite dev` child spawned by `startWorkerServer`. That child inherits
+  `process.env` **at spawn**. `setBillingScenario()` mutates the *test worker's* env, which the already-running
+  child never sees — and `startWorkerServer` memoizes one server per worker index, so a spec cannot restart it
+  to pick up a new value.
+
+  So a scenario cannot be flipped between tests in one file. It is fixed for the lifetime of the server, which
+  means **one scenario per spec file** — and that, not arbitrary decomposition, is why this task names five.
+  The obvious-looking alternative (call `setBillingScenario()` in a `beforeEach`) compiles, runs, and asserts
+  nothing: every test would silently run under whichever scenario was in force when the server booted.
+
+  Two ways forward, and picking one is the first decision of the next session:
+
+  1. **One file per scenario**, each setting `process.env.E2E_BILLING_SCENARIO` before `startWorkerServer` —
+     works today, no harness change, five servers' worth of boot time.
+  2. **Give the fake provider a per-request channel** (a header the E2E-only subclass honours, the way the
+     per-call `scenario` argument already wins over the env default). One server, scenarios flippable per
+     test, and a small, E2E-only change to a file that already carries an E2E-only seam.
+
+  Option 2 is the better shape and the task's own note — "a per-call `scenario` always wins" — suggests the
+  seam was designed for it. It is a production-file edit, though, which this task forbids inside the matrix,
+  so it needs to be its own task first.
+
 - [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
   - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
   - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
