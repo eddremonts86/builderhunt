@@ -268,7 +268,12 @@
 
 ## Wave 8 — Release gates
 
-- [ ] **Add complete UI journey E2E coverage**
+- [ ] **Add complete UI journey E2E coverage** — Solutions added, the enumerated specs not audited
+  - `tests/e2e/solutions.spec.ts` is new (plan 43 Phase 8) and covers the paid journey end to end: the exact
+    visible charge, no reservation before confirmation, a stale confirmed price refused, explicit save, and a
+    saved run that cannot be edited. The eleven specs this task enumerates were not re-audited against
+    `plan.md`'s journey list, and running the selected suite twice consecutively — the verify line — needs the
+    e2e harness this session did not run.
   - Files: `tests/e2e/builder-workspace-navigation.spec.ts`, `tests/e2e/calendar.spec.ts`, `tests/e2e/scheduling-candidate.spec.ts`, `tests/e2e/interview-material-access.spec.ts`, `tests/e2e/profile-enrichment-privacy.spec.ts`, `tests/e2e/profile-view-analytics.spec.ts`, `tests/e2e/admin-claims.spec.ts`, `tests/e2e/admin-operations.spec.ts`, `tests/e2e/billing-operations.spec.ts`, `tests/e2e/exports.spec.ts`, `tests/e2e/public-content.spec.ts`
   - Do: Cover every journey enumerated in `plan.md` with real Postgres, real runtime roles, deterministic provider/email seams, desktop and mobile projects, and no broad mocks.
   - Verify: run the selected suite twice consecutively with zero retries and no unexpected console/network errors.
@@ -314,12 +319,34 @@
   outstanding — but **the task's verify line is not met for the responsive half**, and this box is checked for
   the gate existing, not for the layouts being fixed.
 
-- [ ] **Add visual snapshots and route-structure checks to CI**
+- [ ] **Add visual snapshots and route-structure checks to CI** — route-graph done; visual blocked on Linux baselines
   - Files: `tests/e2e/visual/ui-coverage.spec.ts`, `.github/workflows/quality.yml`, `package.json`
   - Do: Snapshot Calendar views/agenda, Operations, Integrations, Claims, status form, and public mobile navigation; require route-graph and visual structural checks in CI.
   - Verify: intentionally change one key layout and one route to prove each gate fails, restore baselines, then run `pnpm test:visual` and `node scripts/check-ui-route-graph.mjs`.
 
-- [ ] **Run the full completion gate and reconcile source plans**
+  **Half of this is already in CI.** `pnpm security:ui-route-graph` runs in `quality.yml` (line 100) and passes
+  today — 337 known route forms, verified 2026-08-02. So the route-structure half of the task is done and has
+  been for a while; what is missing is the visual half.
+
+  **The visual half has a real blocker, not just remaining work.** Playwright names baselines per project *and*
+  per OS, so a baseline generated on macOS is not the file CI compares against on Linux. Adding
+  `pnpm test:visual` to the workflow without committed Linux baselines makes CI red on its first run — for a
+  missing file, not a design regression, which is the fastest way to get a gate disabled. Generating them needs
+  either a Linux runner or the Playwright Docker image.
+
+  The authenticated surfaces the task lists (Calendar, Operations, Integrations, Claims) also need the
+  per-worker harness — disposable database, seeded principal, app server — which `tests/e2e/visual/public-surfaces.spec.ts`
+  deliberately avoids so a screenshot diff means "the design changed" rather than "the fixture data changed".
+  That tension is the design question to settle before writing `ui-coverage.spec.ts`: either seed fixtures
+  deterministic enough to snapshot, or snapshot empty states only.
+
+- [ ] **Run the full completion gate and reconcile source plans** — requires the full pipeline
+  - Blocked by instruction, not by work: this task's verify line is `pnpm ci:local` plus the e2e, a11y, visual
+    and build suites, and the maintainer asked for targeted runs only during this session. The pieces that
+    *are* runnable have been run and are green — `pnpm test:a11y` (81 checks, 0 violations),
+    `pnpm security:ui-route-graph` (337 route forms), `pnpm type-check`, `pnpm lint`, and the full unit suite
+    (5,619 tests). What has not run here: `pnpm test:e2e`, `pnpm test:visual`, `pnpm build` as part of the
+    gate, and `pnpm ci:local` end to end.
   - Files: `plans/UI/spec.md`, `plans/UI/plan.md`, `plans/UI/tasks.md`, affected `plans/phase-1/*/{spec,plan,tasks}.md`, `plans/_meta/app-reality.md`, `plans/_meta/phase-1-order.md`
   - Do: Run all commands from `plan.md`; update checked Phase 1 claims that were contradicted by the audit, especially Calendar and Status subscription; record exact browser/runtime evidence and leave genuinely external/elapsed-time work unchecked.
   - Verify: `pnpm plans:check-order`, `pnpm plans:check-tasks`, `pnpm type-check`, `pnpm lint`, `pnpm test`, `pnpm test:e2e`, `pnpm test:a11y`, `pnpm test:visual`, `pnpm build`, and `pnpm ci:local` are green; core UI journeys pass twice consecutively.
