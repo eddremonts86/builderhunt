@@ -34,7 +34,33 @@ test.beforeAll(async () => {
   harness = await startInterviewHarness({ scope: 'scen' })
   await seedActiveSubscription(harness, { tier: 'pro' })
   await grantInterviewCredits(harness, 100)
+  await seedSellerProfile()
 })
+
+/**
+ * The row without which every pack checkout answers `503 billing_disabled`.
+ *
+ * `resolvePackCheckout` refuses before it reaches the provider unless a seller profile exists and its
+ * `country_allowlist` contains the requested country — correct, because selling into a country you have not
+ * registered to sell in is a tax problem, not a feature flag. No harness fixture seeded one, which is what
+ * blocked the first version of this spec.
+ *
+ * Inline here rather than in the harness on purpose: it is one insert and this is the only spec that needs it
+ * today. The billing scenario matrix will need it too, and that is the moment to lift it into
+ * `tests/e2e/harness/fixtures/`, with a caller to justify the shape.
+ */
+async function seedSellerProfile(): Promise<void> {
+  await harness.sql`
+    insert into billing_seller_profiles (
+      version, legal_name, public_business_address, establishment_country,
+      support_email, statement_descriptor, country_allowlist, effective_at, created_by_user_id
+    ) values (
+      1, 'E2E Seller ApS', 'Testvej 1, 2100 København', 'DK',
+      'billing@e2e.invalid', 'E2E BUILDERHUNT', '["DK"]'::jsonb, now(), ${harness.owner.userId!}
+    )
+    on conflict do nothing
+  `
+}
 
 test.afterAll(async () => {
   // Never leave a scenario pinned for whatever runs next in this worker.
@@ -75,28 +101,7 @@ async function checkout(idempotencyKey: string) {
   return { status: response.status(), body: await response.text() }
 }
 
-test.fixme('the scenario key changes what the running server does', async () => {
-  /**
-   * **Written, runs, and currently blocked on a fixture — not on the code under test.**
-   *
-   * `POST /api/billing/checkout/credits` refuses with `503 billing_disabled` before it ever reaches the
-   * provider, because `resolvePackCheckout` requires a row in `billing_seller_profiles` (seller identity,
-   * country allowlist, per-catalog Stripe price ids) and no harness fixture seeds one. Two earlier attempts
-   * are recorded in the assertions below so the next reader does not repeat them: the return URLs must be
-   * same-origin, and the idempotency key must differ per call or the second request replays the first.
-   *
-   * So the scenario channel is **plumbed but unproven end to end**. What *is* verified: both sides build the
-   * identical key (`${prefix}:e2e:billing-scenario`) from the same prefix the harness passes to the server as
-   * `E2E_REDIS_PREFIX`; the shared-Redis arrangement is the one `src/shared/lib/rate-limit.ts` already relies
-   * on across the same two processes; and with no key set, behaviour is unchanged across 288 tests.
-   *
-   * What is not verified is the last mile — that a written key actually reaches the fake provider. Until this
-   * test runs, no scenario spec should be written on top of the channel, because the fallback to the
-   * environment makes a dead channel indistinguishable from a working one with no scenario set.
-   *
-   * **Unblocking it is one fixture:** `seedBillingSellerProfile(harness, { countryAllowlist: ['DK'] })` plus
-   * test price ids for `starter_300`. That is the next step, and it belongs in the harness rather than here.
-   */
+test('the scenario key changes what the running server does', async () => {
   /**
    * `decline` makes the fake provider throw `BillingProviderError` before creating anything, so the route
    * turns it into a `provider_error` (502). `success` — the absence of a key — completes.
