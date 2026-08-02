@@ -65,6 +65,28 @@
   - Verify (RED): `pnpm test:e2e tests/e2e/api/organizations.spec.ts tests/e2e/api/organizations-invitations.spec.ts tests/e2e/api/privacy.spec.ts tests/e2e/api/account.spec.ts` — fails RED on the harness's pre-existing `tests/e2e/` directory because the files don't exist yet; each spec asserts the full matrix above. The first run's expected failure count is `(4 files × N scenarios)`. The GREEN path is satisfied entirely by the existing route + foundation code (no production code changes); any genuine bug found during this matrix must be captured as a `test.fixme` and a separate follow-up task, never silently edited here.
   - Independent boundary: this task owns **only** `tests/e2e/api/organizations*`, `tests/e2e/api/privacy*`, `tests/e2e/api/account*`. The browser-level team-accounts journey stays in `tests/e2e/team-accounts.spec.ts` (existing); this task reuses the same `seedOrganization`/`seedPersonalUser` harness from task 1 but never touches the existing UI spec.
 
+  **Started 2026-08-02: `tests/e2e/api/organizations.spec.ts` landed — 21 passing, 1 `fixme`.**
+
+  Covers `GET/POST/DELETE /api/organizations`, `POST /api/organizations/switch`,
+  `GET /api/organizations/team` and `DELETE /api/organizations/deletion`: anonymous refusal on all six with a
+  body the schema would *accept* (an empty body only proves the validator runs), A never sees B's organization
+  in the list, the create DTO carries no `stripeCustomerId`/`deletionRequestedAt`, five invalid-body shapes,
+  a caller-supplied `id`/`slug` ignored rather than honoured, switch changing what the *next* tenant-scoped read
+  answers for, switching into B's organization refused on membership rather than existence, the team payload
+  free of `password`/`sessionToken`/`twoFactorSecret`, and delete proving it is **not addressable by id** — a
+  body naming B's organization schedules the caller's own and leaves B's untouched in
+  `organization_deletion_requests`.
+
+  **One finding, captured as `test.fixme` rather than fixed here, per this task's own rule.**
+  `POST /api/organizations` runs `CreateBody.safeParse` before any session lookup, so an anonymous caller gets
+  400 for `{}` and 401 for `{ name: "x" }`. Authentication is not bypassed — the lifecycle service still
+  refuses — but the ordering lets an unauthenticated prober read the request schema (field name, min/max
+  length, type) out of status codes alone. One-line reordering; needs its own task.
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=1`: 27 passed, 1 skipped.
+
+  **Still open in this task:** `organizations-invitations.spec.ts`, `privacy.spec.ts`, `account.spec.ts`.
+
 - [ ] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)
   - Do: For every method of `src/routes/api/admin/users/index.ts` (GET), `src/routes/api/admin/users/$userId.ts` (PATCH), `src/routes/api/admin/plan-requests/index.ts` (GET/POST), `src/routes/api/admin/billing/configuration.ts` (GET/PATCH), `src/routes/api/admin/billing/run-worker.ts` (POST), `src/routes/api/admin/billing/events/$eventId/replay.ts` (POST), `src/routes/api/admin/changelog/index.ts` (GET/POST), `src/routes/api/admin/changelog/$id.ts` (PATCH), `src/routes/api/admin/roadmap/index.ts` (GET/POST), `src/routes/api/admin/roadmap/$id.ts` (PATCH), `src/routes/api/admin/incidents/index.ts` (GET/POST), `src/routes/api/admin/incidents/$id.ts` (PATCH), `src/routes/api/admin/metrics/index.ts` (GET), `src/routes/api/admin/alerts/run-worker.ts` (POST), `src/routes/api/admin/discovery/run-worker.ts` (POST), `src/routes/api/admin/embeddings/run-worker.ts` (POST), `src/routes/api/admin/enrichment/run-worker.ts` (POST), `src/routes/api/admin/sprints/run-worker.ts` (POST), `src/routes/api/admin/legal/run-worker.ts` (POST): assert (1) anonymous → 401, (2) non-admin authenticated user → 403 (using every non-admin role from the harness; verify the same response body for member vs. admin vs. owner to confirm anti-enumeration), (3) platform admin → 200/201 with response-schema assertions, (4) cron principal via `tryCronPrincipal` (`src/shared/lib/auth/cron.ts`) → 200 with the same summary shape, (5) PATCH/POST bodies with invalid zod schema → 400, (6) cross-tenant: platform admin running on tenant A's principal still operates on the named target id (the platform role is system-wide — confirm this is the intended behavior and document it inline). The metrics route additionally asserts the response shape includes `inProcess`, `db.totalUsers`, `db.activeUsers24h`, `db.activeUsers7d`, `discovery.cursor`, and `server.nodeVersion` — never asserting the exact numeric value, only the schema/presence. The billing run-worker route additionally asserts it returns the documented `WorkerRunSummary` key set (`claimedEvents`, `processedEvents`, `deferredEvents`, `retryScheduledEvents`, `deadLetteredEvents`, `expiredGrants`, `annualGrantsIssued`, `paymentBlocksApplied`, `autoRechargeTriggered`).
