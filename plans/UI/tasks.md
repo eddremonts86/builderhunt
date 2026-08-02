@@ -384,8 +384,20 @@
   The authenticated surfaces the task lists (Calendar, Operations, Integrations, Claims) also need the
   per-worker harness — disposable database, seeded principal, app server — which `tests/e2e/visual/public-surfaces.spec.ts`
   deliberately avoids so a screenshot diff means "the design changed" rather than "the fixture data changed".
-  That tension is the design question to settle before writing `ui-coverage.spec.ts`: either seed fixtures
-  deterministic enough to snapshot, or snapshot empty states only.
+
+  **That question is now settled: empty states only** (maintainer's call, 2026-08-02), and
+  `tests/e2e/visual/empty-states.spec.ts` implements it. Five surfaces a brand-new organization actually lands
+  on — Overview, Shortlists, Alerts, Interviews, Exports — captured on desktop and mobile against a freshly
+  created org on a disposable database, so "empty" is a fact on every run rather than whatever the last
+  developer left in a shared database. Populated surfaces stay out on purpose: their content is fixture data,
+  and every fixture edit would repaint a baseline for reasons no reviewer can tell apart from a regression.
+
+  One nondeterminism had to be handled rather than tolerated: the harness gives each organization a random
+  name suffix, which renders in the topbar switcher. It is masked. Leaning on the 1% diff ratio to absorb it
+  would have spent the same tolerance that is supposed to be catching regressions.
+
+  `pnpm test:visual` is green locally: 22 checks (12 public + 10 empty), stable across consecutive runs.
+  Wiring it into `quality.yml` still waits on the Linux baselines above.
 
 - [ ] **Run the full completion gate and reconcile source plans** — run once: 18 of 21 steps green
   - `pnpm ci:local` was run end to end on 2026-08-02. **18 steps passed, 3 failed**, and two of the three were
