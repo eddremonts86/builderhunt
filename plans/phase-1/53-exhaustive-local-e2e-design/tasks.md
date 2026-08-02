@@ -248,6 +248,18 @@
   - Verify: one spec sets two different scenarios against a single server and gets two different outcomes —
     that is the whole point, and it is impossible today. Then the five-file split in the task above collapses
     into one.
+  - **Status 2026-08-02: plumbed, and the proof is blocked on a fixture rather than on the code.**
+    `src/shared/lib/billing/stripe-provider.ts` reads the key; `setServerBillingScenario()` in
+    `tests/e2e/harness/fakes/billing.ts` writes it; both build `${prefix}:e2e:billing-scenario` from the same
+    prefix the harness passes as `E2E_REDIS_PREFIX`; with no key set, 288 tests are unchanged.
+    `tests/e2e/api/billing-scenario-channel.spec.ts` is the proof and is `test.fixme`: it cannot reach the
+    provider because `POST /api/billing/checkout/credits` answers `503 billing_disabled` first —
+    `resolvePackCheckout` needs a `billing_seller_profiles` row and no fixture seeds one.
+  - **Next step, and it is small:** add `seedBillingSellerProfile(harness, { countryAllowlist: ['DK'] })` to
+    the harness with test price ids for `starter_300`, then un-`fixme` that spec. **Write no scenario spec
+    before it passes** — the provider falls back to the environment when the key is missing, so a dead channel
+    and a working one with no scenario set are indistinguishable, and every scenario test built on an unproven
+    channel would silently assert against `success`.
 
 - [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
   - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
