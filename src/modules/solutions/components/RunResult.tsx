@@ -90,7 +90,10 @@ export function RunResult({
         </p>
       )}
 
-      <div className="flex items-center justify-between gap-3">
+      {/* `flex-wrap`: the heading plus the sort control is 332px, which pushed the document 12px past a 320px
+          viewport — caught by the responsive gate on the *locked* Solutions page, where the demo run renders
+          this component for a visitor who has not paid. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold flex items-center gap-2">
           <Layers className="w-5 h-5 text-bh-accent" aria-hidden="true" />
           Three ways to do this

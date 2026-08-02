@@ -20,8 +20,16 @@ import { join, relative } from 'node:path'
 const root = process.cwd()
 const sourceRoot = join(root, 'src')
 
-// Whole-file exemptions for call sites that are legitimately NOT a
-// tenant-billed feature — every entry must justify why.
+// Whole-file exemptions. Two shapes qualify, and every entry must say which and why.
+//
+//   1. The call is legitimately NOT a tenant-billed feature.
+//   2. The call IS billed, but by an enclosing boundary this file-local check cannot see — in which case the
+//      entry must name where the metering is and what proves it.
+//
+// Shape 2 was added for Solutions (plan 43 Phase 7). Its two provider wrappers are deliberately decoupled from
+// billing: `interpret.ts` imports no billing at all, and a test asserts the absence of the import, because that
+// is the mechanism behind "charge nothing before confirmation". Putting a `reserveCredits` call into the same
+// function to satisfy a grep would invert the design the gate is meant to protect.
 const fileAllowlist = new Map([
   [
     'src/lib/semantic/embed-worker.ts',
@@ -30,6 +38,14 @@ const fileAllowlist = new Map([
   [
     'src/routes/api/ai/embed.ts',
     'platform-admin-only embedding backfill operator surface, not a tenant-billed feature (requirePlatformAdminPrincipal + rate limit)',
+  ],
+  [
+    'src/lib/solutions/ai/interpret.ts',
+    'billed by the caller: every invocation runs inside withSolutionsCredits\' work callback (modules/solutions/server/generate.ts). This module imports no billing on purpose — tests/unit/lib/solutions/ai-interpret.test.ts asserts the absent import, and tests/unit/modules/solutions/generate.test.ts asserts a reserved row exists before the interpreting stage runs',
+  ],
+  [
+    'src/lib/solutions/ai/explain.ts',
+    'billed by the caller: same withSolutionsCredits boundary as interpret.ts, asserted by tests/unit/modules/solutions/generate.test.ts ("has a reserved row by the time interpretation starts") and by the billing suite\'s ordering test',
   ],
 ])
 

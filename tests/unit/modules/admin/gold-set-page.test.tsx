@@ -92,7 +92,7 @@ describe('the form', () => {
 
     expect(sent).not.toBeNull()
     expect(sent).not.toHaveProperty('authorship')
-    expect((sent as { briefText: string }).briefText).toBe('Translate 40 pages into Danish')
+    expect((sent as unknown as { briefText: string }).briefText).toBe('Translate 40 pages into Danish')
   })
 
   it('refuses to submit without a brief or a capability', async () => {
