@@ -29,6 +29,7 @@ import { publicDb } from '../db/client'
 import { builderIdentities, builderSourceSnapshots, identityDeclaredLinks } from '../db/schema'
 import { extractDeclaredLinks, type DeclaredLink } from '~/lib/identity/declared-links'
 import { isSuppressed } from '../profile-suppression'
+import { builderIdentityIdFor } from './builder-identity-id'
 import { randomId } from '~/lib/utils'
 
 /** The minimized public facts one observation carries. Never a raw upstream response body. */
@@ -134,7 +135,18 @@ export async function recordSourceObservation(
       return { status: 'skipped', reason: 'processing_restricted' } as const
     }
 
-    const builderIdentityId = existing?.id ?? randomId()
+    /**
+     * A new identity gets the derived id, not a random one.
+     *
+     * `trackOrganizationBuilder` derives `sha256(source\0sourceId)` and then writes
+     * `organization_builders.builder_identity_id`. When this path created the row first with a random
+     * id, that write pointed at an id no row had — a foreign-key violation, a 500, and a Track button
+     * that silently gave up. See `builder-identity-id.ts` for the full account.
+     *
+     * `existing?.id` still wins, so rows already carrying a random id keep it and nothing has to be
+     * migrated; only rows created from here on are consistent by construction.
+     */
+    const builderIdentityId = existing?.id ?? builderIdentityIdFor(observation.source, observation.sourceId)
     if (existing) {
       await tx
         .update(builderIdentities)

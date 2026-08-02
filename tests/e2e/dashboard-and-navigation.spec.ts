@@ -33,6 +33,7 @@ loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace, redis } from './harness/cache'
+import { seedFeaturedSearchCache } from './harness/fixtures/search-cache'
 import { startWorkerServer, stopWorkerServer } from './harness/server'
 import { e2eEnv } from './harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv } from './harness/clock'
@@ -343,8 +344,12 @@ async function seedOwnerDashboard(): Promise<void> {
   // pipeline — seed its exact cache key with candidates that are NOT
   // tracked (tracked ones are excluded by the API).
   await seedSearchCache(searchCacheKey([ownerQueryName], 20, ['github']), ownerRecommended)
+  // `/search` searches on mount; unseeded that runs live and renders third-party avatars. See the
+  // helper for the full account of why this made an unrelated navigation test fail.
+  await seedFeaturedSearchCache(harness.redisPrefix)
   ownerSeeded = true
 }
+
 
 /* ─────────────────────────────── tests ─────────────────────────────── */
 

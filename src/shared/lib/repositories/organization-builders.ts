@@ -1,6 +1,6 @@
-import { createHash } from 'node:crypto'
 import { and, count, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicDb, TenantTransaction } from '../db/client'
+import { builderIdentityIdFor } from './builder-identity-id'
 import {
   builderIdentities,
   builderNotes,
@@ -335,9 +335,22 @@ export async function trackOrganizationBuilder(
   transaction: TenantTransaction,
   input: TrackOrganizationBuilderInput,
 ) {
-  const identityId = createHash('sha256')
-    .update(`${input.source}\0${input.sourceId}`)
-    .digest('hex')
+  /**
+   * The row's own id if it already exists, and only then the derived one.
+   *
+   * The upsert below conflicts on `(source, source_id)`, so when a row is already there it updates
+   * *that* row and leaves its primary key alone. Assuming the derived id afterwards is what produced
+   * the foreign-key violation described in `builder-identity-id.ts`: discovery had already written the
+   * identity under a random id, and `organization_builders` was then pointed at an id no row has.
+   */
+  const [known] = await transaction.select({ id: builderIdentities.id })
+    .from(builderIdentities)
+    .where(and(
+      eq(builderIdentities.source, input.source),
+      eq(builderIdentities.sourceId, input.sourceId),
+    ))
+    .limit(1)
+  const identityId = known?.id ?? builderIdentityIdFor(input.source, input.sourceId)
 
   await transaction.insert(builderIdentities).values({
     id: identityId,

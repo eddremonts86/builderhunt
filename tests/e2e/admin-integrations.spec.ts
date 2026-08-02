@@ -15,6 +15,7 @@ loadHarnessEnv()
 
 import { acquireWorkerDatabase, dropWorkerDatabase } from './harness/database'
 import { acquireWorkerRedis, dropWorkerRedisNamespace } from './harness/cache'
+import { seedFeaturedSearchCache } from './harness/fixtures/search-cache'
 import { startWorkerServer, stopWorkerServer } from './harness/server'
 import { e2eEnv } from './harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv } from './harness/clock'
@@ -65,6 +66,11 @@ test.beforeAll(async () => {
     await seedConsent(sql, { userId: admin.userId!, document: 'tos', version: CURRENT_CONSENT_VERSIONS.tos, acceptedAt: clock.now() })
 
     harness = { workerIndex, databaseName: database.databaseName, redisPrefix: cache.prefix, baseURL: server.baseURL, sql, ctx, owner, organization, admin }
+
+    // The Search-link test lands on `/search`, which searches on mount. Left live, its results carry
+    // third-party avatars and the strict guard records egress — which is why that test passed alone
+    // and failed under parallel load.
+    await seedFeaturedSearchCache(cache.prefix)
     await fetch(`${server.baseURL}/`).then((r) => r.text()).catch(() => undefined)
   } catch (error) {
     await sql?.end({ timeout: 5 }).catch(() => undefined)
