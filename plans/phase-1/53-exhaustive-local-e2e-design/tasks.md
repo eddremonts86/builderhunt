@@ -203,6 +203,24 @@
   would be asserting against the feature. It is marked `anonymous: 'link'` and probed for the property that
   matters instead — a tokenless click neither verifies anything nor names anyone.
 
+- [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
+  - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
+  - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
+    through to the route *component*, so the request gets **200 with an HTML document** instead of 405 with an
+    `Allow` header. A client scripting the endpoint reads 200 and concludes it succeeded. It was hit twice
+    independently this session — `PATCH /api/solutions/runs/:id` (fixed in plans/UI Wave 8) and
+    `GET /api/me/builder/:id` (`test.fixme` in `tests/e2e/api/account.spec.ts`) — which is the point at which
+    a third instance stops being a coincidence.
+  - **Measured 2026-08-02:** 202 route files under `src/routes/api/`. Every one declares at least one handler,
+    so there is no wholly-unreachable route. But **83 of them declare only non-GET handlers**, and a `GET` to
+    any of those returns an HTML page with 200 today. Not all 83 are equally exposed — some are only ever
+    reached by a form post — but 83 is the surface, not the two we happened to trip over.
+  - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
+    rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
+    `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
+  - Verify: the check fails against one deliberately-unhandled method, passes after the helper lands, and
+    `GET` on a PATCH-only route answers 405 with `Allow`.
+
 - [ ] **Signed Stripe webhooks: raw-body signature verification, duplicate handling, secret rotation, internal re-routing**
   - Files: `tests/e2e/api/webhooks-stripe.spec.ts` (new); `scripts/check-route-coverage.mjs` (verify the public-allowlist entry for `src/routes/api/webhooks/stripe.ts` survives; do not edit)
   - Do: For every documented event type in `webhook-handlers.ts` (`checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `customer.subscription.created`, `payment_intent.succeeded`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.closed`, `account.updated`), build a real Stripe-shaped payload signed with the harness's `signStripeWebhook` helper using the **same** `STRIPE_WEBHOOK_SECRET` the harness is configured with, POST it to `/api/webhooks/stripe`, and assert: (1) `200` with `{received: true, eventId: 'evt_...'}`, (2) one `billing_webhook_events` row persisted with `payloadEncrypted` populated (the row is the **only** persistence — the route never writes subscriptions/credits/ledger), (3) calling `POST /api/admin/billing/run-worker` once after the webhook processes the row into DB effects (task 6 covers the full worker matrix; this task's webhook receive is only the inlet). Then cover the rejection paths: missing `stripe-signature` header → 400 with `code: missing_signature`; valid signature with a timestamp outside the 5-minute tolerance → 400 with `code: stale_timestamp`; signature signed with a stale `STRIPE_WEBHOOK_SECRET_PREVIOUS` but with a **current** timestamp → 200 (rotation window accepts both); wrong `api_version` in the payload → 400 with `code: wrong_api_version`; livemode mismatch → 400 with `code: wrong_livemode`; duplicate `event.id` delivery → 200 with `duplicate: true` and **no** second `billing_webhook_events` row. Cover the `X-Request-Id` header forwarding: a request with `X-Request-Id: req-test-1` is logged under that id (assert by reading the test's captured `console.error` from the `withStrictConsole` helper). Cover the no-content-type fallback: a webhook with `Content-Type: application/octet-stream` and a body that is **valid** JSON still parses (Stripe sometimes sends bytes). Cover the no-user-session property: the handler succeeds with no `auth-session` cookie set; assert by stripping the cookie from the request and confirming the 200 still returns.
