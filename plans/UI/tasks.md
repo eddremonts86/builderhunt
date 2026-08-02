@@ -411,7 +411,25 @@
   `pnpm test:visual` is green locally: 22 checks (12 public + 10 empty), stable across consecutive runs.
   Wiring it into `quality.yml` still waits on the Linux baselines above.
 
-- [ ] **Run the full completion gate and reconcile source plans** — run once: 18 of 21 steps green
+- [x] **Run the full completion gate and reconcile source plans** — green: 21 of 21 steps, e2e 355 passed
+
+  **2026-08-02, second run: every step passes.** `pnpm ci:local` end to end, then `--from e2e` after the one
+  fix below. E2E is 355 passed / 0 failed in 7.6 minutes at `--workers=1`, the a11y gate 81 checks with zero
+  violations and zero overflow, and `build` clean.
+
+  The single failure the full run produced was a real defect, not flake: the `?sources=` deep link from Admin
+  Integrations lost to the persist effect, so `localStorage` held the five-source default instead of the source
+  the link named. Fixed by deciding the initial selection in a lazy initializer rather than a mount effect —
+  see `src/modules/search/components/SearchPage.tsx`.
+
+  **A note on how not to run this.** An earlier attempt ran the suite with Playwright's default parallelism
+  while a dev server was up: 2 hours, 16 failures, 126 tests never started. Every one of those 16 was a
+  `beforeAll` hook — `CONNECT_TIMEOUT localhost:5432` and "Worker Vite did not become healthy" — i.e. the
+  machine ran out of Postgres connections and ports, not the product breaking. `ci:local` passes
+  `--workers=1` for exactly this reason; the same suite then finishes in 7.6 minutes. Do not read a parallel
+  local run as a signal.
+
+  *Superseded record of the first run:*
   - `pnpm ci:local` was run end to end on 2026-08-02. **18 steps passed, 3 failed**, and two of the three were
     defects in this session's own work rather than pre-existing:
 
