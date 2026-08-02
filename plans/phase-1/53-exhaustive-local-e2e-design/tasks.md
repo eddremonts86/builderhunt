@@ -85,7 +85,31 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=1`: 27 passed, 1 skipped.
 
-  **Still open in this task:** `organizations-invitations.spec.ts`, `privacy.spec.ts`, `account.spec.ts`.
+  **`tests/e2e/api/organizations-invitations.spec.ts` landed — 17 passing, 1 `fixme`.**
+
+  An invitation is the one object here that deliberately crosses a tenant boundary, so the properties differ
+  from the rest of the matrix. Covered: anonymous refusal on all five routes; the organization invited into
+  comes from the session and an `organizationId` in the body is ignored; five invalid bodies, including
+  `role: 'owner'`, which is outside the enum on purpose because ownership moves through transfer-ownership and
+  its recent-auth requirement; no password/session/2FA field in the payload; A refused on B's invitation with
+  B's row surviving; cancel really cancelling; resend **rotating** the invitation; and `mine` answering by
+  verified email rather than by organization.
+
+  **Second finding, `test.fixme` per this task's rule: an enumeration oracle on invitation ids.** Both
+  `POST` (resend) and `DELETE` (cancel) on `/api/organizations/invitations/:id` answer **403** for an
+  invitation that exists in another organization and **404** for one that does not exist at all. The refusals
+  are correct; the difference between them is not. Any session can sweep the id space and learn which ids are
+  real — and a real invitation id says an organization is hiring and someone is mid-onboarding.
+
+  Three of the spec's own assumptions were wrong before the routes were, and each is now recorded in the file
+  so the next reader does not restore them: resend rotates the id rather than reusing it (right — it kills the
+  link already in an inbox), a pending invitation holds a seat (right — otherwise an organization
+  oversubscribes), and `seat_limit` is capped at 10 by
+  `organization_entitlements_seat_limit_check`.
+
+  Two consecutive clean runs of `tests/e2e/api/` at `--workers=1`: 44 passed, 2 skipped.
+
+  **Still open in this task:** `privacy.spec.ts`, `account.spec.ts`.
 
 - [ ] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)
