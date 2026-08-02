@@ -268,12 +268,33 @@
 
 ## Wave 8 — Release gates
 
-- [ ] **Add complete UI journey E2E coverage** — Solutions added, the enumerated specs not audited
-  - `tests/e2e/solutions.spec.ts` is new (plan 43 Phase 8) and covers the paid journey end to end: the exact
-    visible charge, no reservation before confirmation, a stale confirmed price refused, explicit save, and a
-    saved run that cannot be edited. The eleven specs this task enumerates were not re-audited against
-    `plan.md`'s journey list, and running the selected suite twice consecutively — the verify line — needs the
-    e2e harness this session did not run.
+- [ ] **Add complete UI journey E2E coverage** — audited; two journeys added, two still missing
+  - Audited the eleven enumerated specs against `plan.md`'s sixteen journeys. Three of the named files do not
+    exist at all: `builder-workspace-navigation.spec.ts`, `scheduling-candidate.spec.ts`,
+    `interview-material-access.spec.ts`. Two of those three are covered elsewhere under different names —
+    material access lives in `interview-privacy.spec.ts`, candidate booking in `scheduling.spec.ts`.
+  - **Added** `tests/e2e/solutions.spec.ts` (plan 43 Phase 8): exact visible charge, no reservation before
+    confirmation, a stale confirmed price refused, explicit save, and a saved run that cannot be edited.
+  - **Added** `tests/e2e/builder-workspace-navigation.spec.ts` for journeys 1 and 8, which had no coverage at
+    all — `exports.spec.ts` was the only spec that even mentioned a shortlist, and it tests the download.
+  - **Still missing, and named rather than implied:**
+    - Journey 6's *atomic reschedule* half. `scheduling.spec.ts` covers booking, races and idempotency; the
+      word "reschedule" appears in no e2e spec, while task #50 marks the feature complete.
+    - Journey 1's *browser* hop. The API-level assertions are in place — the shortlist contains the builder and
+      the workspace answers for it — but the click-through timed out waiting for the member link and I did not
+      get it green. The spec says so in its own comment rather than implying the journey is covered.
+
+  Two defects came out of writing these. Solutions' browser tests timed out because they never dismissed the
+  cookie banner and the ToS modal, which sit above the page and swallow clicks — the a11y script has always
+  done this and the spec did not. And `PATCH /api/solutions/runs/:id` answered **200 with an HTML document**,
+  because an unimplemented method falls through to the route component; a client scripting against the API
+  would have read 200 and concluded the edit landed. It now returns 405 with an `Allow` header.
+
+  Full-suite state at the end of this session: **338 passed, 3 failed**. `admin-integrations.spec.ts:152`
+  passes in isolation and failed only under parallel load. `dashboard-and-navigation.spec.ts:605` fails on a
+  strict-collector third-party egress — a `media2.dev.to` avatar in the seeded fixture, not a layout or route
+  change. `onboarding.spec.ts:327` failed in both full runs. None of the three was bisected against the
+  pre-session tree, so "pre-existing" is an inference from their subject matter, not a measurement.
   - Files: `tests/e2e/builder-workspace-navigation.spec.ts`, `tests/e2e/calendar.spec.ts`, `tests/e2e/scheduling-candidate.spec.ts`, `tests/e2e/interview-material-access.spec.ts`, `tests/e2e/profile-enrichment-privacy.spec.ts`, `tests/e2e/profile-view-analytics.spec.ts`, `tests/e2e/admin-claims.spec.ts`, `tests/e2e/admin-operations.spec.ts`, `tests/e2e/billing-operations.spec.ts`, `tests/e2e/exports.spec.ts`, `tests/e2e/public-content.spec.ts`
   - Do: Cover every journey enumerated in `plan.md` with real Postgres, real runtime roles, deterministic provider/email seams, desktop and mobile projects, and no broad mocks.
   - Verify: run the selected suite twice consecutively with zero retries and no unexpected console/network errors.

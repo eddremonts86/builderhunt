@@ -33,7 +33,7 @@ import {
   stopInterviewHarness,
   type InterviewHarness,
 } from './harness/fixtures/interviews'
-import { gotoHydrated } from './harness/browser'
+import { dismissOverlays, gotoHydrated } from './harness/browser'
 
 let harness: InterviewHarness
 
@@ -73,6 +73,7 @@ test.describe('solutions generation', () => {
     const page = await context.newPage()
     try {
       await gotoHydrated(page, `${harness.baseURL}/solutions`)
+      await dismissOverlays(page)
 
       await page.getByTestId('brief-description-input').fill('Translate 200 product pages into German')
       await page.getByTestId('brief-continue-button').click()
@@ -113,6 +114,7 @@ test.describe('solutions generation', () => {
     const page = await context.newPage()
     try {
       await gotoHydrated(page, `${harness.baseURL}/solutions`)
+      await dismissOverlays(page)
       await page.getByTestId('brief-description-input').fill('Translate 40 pages into Danish')
       await page.getByTestId('brief-continue-button').click()
 
@@ -189,6 +191,7 @@ test.describe('solutions generation', () => {
     const page = await context.newPage()
     try {
       await gotoHydrated(page, `${harness.baseURL}/solutions`)
+      await dismissOverlays(page)
       await page.getByTestId('brief-description-input').fill('Translate a 20-page manual into Spanish')
       await page.getByTestId('brief-continue-button').click()
       await page.getByTestId('charge-confirm-button').click()
@@ -223,7 +226,10 @@ test.describe('solutions generation', () => {
       const patch = await context.request.patch(`${harness.baseURL}/api/solutions/runs/${run.id}`, {
         data: { compositionHash: 'rewritten' },
       })
-      expect([404, 405]).toContain(patch.status())
+      // 405 with an `Allow` header, not a 404 and not a silent 200: the immutability is a contract the API
+      // states, and a client scripting against it deserves to be told which methods exist.
+      expect(patch.status()).toBe(405)
+      expect(patch.headers()['allow']).toContain('DELETE')
 
       const remove = await context.request.delete(`${harness.baseURL}/api/solutions/runs/${run.id}`)
       expect(remove.status()).toBe(204)

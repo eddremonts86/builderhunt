@@ -80,6 +80,22 @@ export const Route = createFileRoute('/api/solutions/runs/$runId')({
           return Response.json({ error: 'Failed to record feedback' }, { status: 500 })
         }
       },
+      /**
+       * A stored run is immutable, and this says so with a status instead of by omission.
+       *
+       * Without an explicit handler the framework answers an unimplemented method with **200 and an HTML
+       * document** — found by the e2e spec that asserted a PATCH is refused. A client scripting against this
+       * API would read 200 and conclude the edit landed. 405 with `Allow` is the answer that is both true and
+       * actionable.
+       */
+      PATCH: () => Response.json(
+        { error: 'A saved run is immutable. Delete it and generate a new one.', code: 'method_not_allowed' },
+        { status: 405, headers: { allow: 'GET, POST, DELETE' } },
+      ),
+      PUT: () => Response.json(
+        { error: 'A saved run is immutable. Delete it and generate a new one.', code: 'method_not_allowed' },
+        { status: 405, headers: { allow: 'GET, POST, DELETE' } },
+      ),
       DELETE: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)
