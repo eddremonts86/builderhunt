@@ -668,7 +668,10 @@ export function CalendarPage(props: CalendarPageProps = {}) {
           </h1>
           <p className="mt-1 text-sm text-bh-text-muted">Your private schedule. Only you and people you invite can see these events.</p>
         </div>
-        <div className="flex items-center gap-2">
+        {/* `flex-wrap`: four action buttons in a row are 492px wide, so this pushed the document 102px past a
+            390px phone — an ordinary phone, not an edge case. The header itself already wraps; this inner row
+            did not, so it stayed one unbreakable line inside a wrapping parent. */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="secondary" onClick={() => setNotificationsOpen(true)} data-testid="calendar-notifications-toggle" aria-label={notificationUnread > 0 ? `Notifications, ${notificationUnread} unread` : 'Notifications'}>
             <Bell className="size-4" aria-hidden />
             {notificationUnread > 0 && (

@@ -269,12 +269,19 @@ async function measureHorizontalOverflow(page) {
  */
 const KNOWN_OVERFLOWS = [
   { route: '/', viewport: 'narrow', excessPx: 50, note: 'Landing hero row does not wrap below 390px' },
-  { route: '/search', viewport: 'narrow', excessPx: 174, note: 'Featured list grid child needs min-w-0' },
-  { route: '/search', viewport: 'mobile', excessPx: 104, note: 'Same cause as narrow — broken on a real phone' },
+  {
+    route: '/search',
+    viewport: 'narrow',
+    excessPx: 164,
+    note: 'Featured result row: the score+view group is `shrink-0` beside a truncating name, and something '
+      + 'above it still has an intrinsic 484px width. `min-w-0` on the grid child took 10px off it; the rest '
+      + 'is unfound.',
+  },
+  { route: '/search', viewport: 'mobile', excessPx: 94, note: 'Same cause as narrow — still broken on a real phone' },
   { route: '/sprints', viewport: 'narrow', excessPx: 20, note: 'Header action button row does not wrap' },
   { route: '/settings/security', viewport: 'narrow', excessPx: 32, note: 'Session row action button does not wrap' },
-  { route: '/calendar', viewport: 'narrow', excessPx: 172, note: 'View-switcher toolbar does not wrap' },
-  { route: '/calendar', viewport: 'mobile', excessPx: 102, note: 'Same cause as narrow — broken on a real phone' },
+  // `/calendar` was here at 172px (narrow) and 102px (mobile) and is fixed: the header's inner action row was
+  // one unbreakable line of four buttons inside a wrapping parent, and now wraps itself.
 ]
 
 function isKnownOverflow(route, viewportName) {
@@ -365,6 +372,9 @@ async function main() {
     console.log(`${knownOverflowing.length} with known, unfixed overflow (see KNOWN_OVERFLOWS — a debt ledger, not a silencer):`)
     for (const result of knownOverflowing) {
       console.log(`   ${result.route} @ ${result.viewportName}: ${result.overflow.excess}px past the viewport`)
+      for (const offender of result.overflow.offenders) {
+        console.log(`      - ${offender.selector} (right edge ${offender.right}px)`)
+      }
     }
   }
   for (const result of overflowing) {

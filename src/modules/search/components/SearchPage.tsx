@@ -1139,7 +1139,10 @@ function LandingState({
 }) {
   return (
     <div className="grid lg:grid-cols-[1fr_260px] gap-8 mt-2">
-      <div className="space-y-8">
+      {/* `min-w-0`: a grid item defaults to `min-width: auto`, which means it refuses to shrink below its
+          widest child. One wide row in the featured list therefore pushed the whole column — and the document —
+          104px past a 390px phone. The column is meant to be `1fr`, and this is what makes it actually be one. */}
+      <div className="min-w-0 space-y-8">
         {/* Featured — a few real, live results before you've typed anything */}
         {featured.length > 0 && (
           <section aria-labelledby="featured-heading">

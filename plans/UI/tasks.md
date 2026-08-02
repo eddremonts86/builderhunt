@@ -297,12 +297,22 @@
 
   Result: **81 route/viewport checks, 0 critical/serious violations** (up from 54 checks before).
 
-  **The responsive half is measured, and it is failing.** A 320px viewport and a horizontal-document-overflow
-  check now run on every route, and the first run found seven overflows — including `/search` and `/calendar`
-  at **390px**, which is an ordinary phone rather than an edge case. They are listed in `KNOWN_OVERFLOWS` with
-  the date and the suspected cause, and the gate fails on any route/viewport not in that list, so nothing new
-  can be added while these are outstanding. The task's verify line is therefore **not** met for the responsive
-  half: five unrelated layouts need fixing, and this box is checked for the gate, not for the layouts.
+  **The responsive half is measured, and it is partly failing.** A 320px viewport and a
+  horizontal-document-overflow check now run on every route. The first run found seven overflows — including
+  `/search` and `/calendar` at **390px**, an ordinary phone rather than an edge case.
+
+  Two are fixed:
+
+  - `/calendar` (172px narrow, 102px mobile) — the header's inner action row was one unbreakable line of four
+    buttons *inside* a wrapping parent. It now wraps itself, and both viewports are clean.
+  - `/search` improved by 10px with `min-w-0` on the `1fr` grid child — a grid item defaults to
+    `min-width: auto` and refuses to shrink below its widest child, so the column was never actually `1fr`.
+
+  Five remain, listed in `KNOWN_OVERFLOWS` with measured numbers and what is known about each. `/search` is
+  the honest failure: something above the featured row still has an intrinsic 484px width and I did not find
+  it. The gate fails on any route/viewport not in that list, so nothing new can be added while these are
+  outstanding — but **the task's verify line is not met for the responsive half**, and this box is checked for
+  the gate existing, not for the layouts being fixed.
 
 - [ ] **Add visual snapshots and route-structure checks to CI**
   - Files: `tests/e2e/visual/ui-coverage.spec.ts`, `.github/workflows/quality.yml`, `package.json`
