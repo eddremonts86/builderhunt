@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 18 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 14 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 183 covered, 1 exempt, 18 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 187 covered, 1 exempt, 14 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -509,8 +509,26 @@
       cache, the 3-per-hour limit or the success shape would make every run bill MiniMax and depend on github.com.
       Those branches want an AI provider fake first; the warning is in the spec's docblock so the next person does
       not widen the entitlement to "fix" the coverage.
-  - Remaining clusters: alerts (4), ai (3), solutions (3), calendar (2), plus `builders/claim/verify`,
-    `builders/recent`, `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
+  - **Done: the four `alerts` trigger routes** (`tests/e2e/api/alerts-triggers.spec.ts`, 9 passing). A trigger names
+    a builder an organization is watching, so a cross-tenant leak here is competitive intelligence rather than a
+    stray row.
+    - `PATCH /api/alerts/triggers/:id` answers `200 { ok: false }` for another organization's trigger — not 404 or
+      403 — so a real-but-foreign id and a fabricated one must be indistinguishable. Compared as whole responses,
+      status and body, since a differing status separates them just as well as a differing body. The foreign row is
+      then checked to still be unread: `{ ok: false }` over a completed write would look identical from outside.
+    - `unread-count` is seeded three ways at once (A unread, B unread, A already-read) and A's number must move by
+      exactly one. All three together are what separates "counts correctly" from "counts everything".
+    - **The negative control here is worth recording rather than hiding.** Deleting the `organizationId` filter from
+      `markOrganizationTriggerRead` does *not* break the cross-tenant test, because `alert_triggers_app_update`
+      independently scopes every UPDATE to `app.organization_id`. That is defence in depth working: either lock can
+      be removed and the boundary holds, which is why a single-line removal cannot demonstrate the test's value. The
+      assertion is still live — the test above it proves `read_at` does flip for the caller's own row, so finding a
+      foreign row still null is a real observation and not a query that never runs.
+    - Two fixture facts, both recorded in the spec: `alerts.keywords` is `jsonb`, not `text[]`; and
+      `alert_triggers.builder_id` has a foreign key to `builders` (the org-scoped legacy table), not to
+      `builder_identities`, so the row a trigger points at must exist first.
+  - Remaining clusters: ai (3), solutions (3), calendar (2), plus `builders/claim/verify`, `builders/recent`,
+    `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 

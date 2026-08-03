@@ -357,6 +357,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/alerts-triggers.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts"
       ]
     },
@@ -364,6 +365,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/alerts-triggers.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts"
       ]
     },
@@ -371,20 +373,33 @@
       "status": "covered",
       "specs": [
         "tests/e2e/alerts.spec.ts",
+        "tests/e2e/api/alerts-triggers.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts"
       ]
     },
     "/api/alerts/test-trigger": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/alerts-triggers.spec.ts"
+      ]
     },
     "/api/alerts/triggers/$id": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/alerts-triggers.spec.ts"
+      ]
     },
     "/api/alerts/triggers": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/alerts-triggers.spec.ts"
+      ]
     },
     "/api/alerts/triggers/unread-count": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/alerts-triggers.spec.ts"
+      ]
     },
     "/api/analytics/conversion": {
       "status": "n/a",
