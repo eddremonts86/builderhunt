@@ -30,6 +30,7 @@ import { startWorkerServer, stopWorkerServer } from '../harness/server'
 import { e2eEnv } from '../harness/env'
 import { ensureFixedTimeEnv, fixedClockFromEnv } from '../harness/clock'
 import {
+  createMemberPrincipal,
   createOwnerPrincipal,
   disposePrincipal,
   type FixtureContext,
@@ -50,6 +51,8 @@ interface Harness {
   sql: Sql
   a: Tenant
   b: Tenant
+  /** Kept so a test that needs its own extra principal can make one without re-deriving the fixture context. */
+  ctx: FixtureContext
   /** No cookies at all — the 401 baseline every route below is measured against. */
   anonymous: APIRequestContext
 }
@@ -85,6 +88,7 @@ test.beforeAll(async () => {
       sql,
       a: { principal: a.principal, organization: a.organization },
       b: { principal: b.principal, organization: b.organization },
+      ctx,
       anonymous: await playwrightRequest.newContext({ baseURL: server.baseURL }),
     }
   } catch (error) {
@@ -433,5 +437,69 @@ test.describe('validation still runs, once the caller is known', () => {
       { data: { role: 'owner' } },
     )
     expect(response.status(), await response.text()).toBe(400)
+  })
+})
+
+/**
+ * `GET /api/organizations/transfer-ownership-preview` — the billing figures shown before confirming a transfer.
+ *
+ * Its doc comment makes two promises that a read-only route can still break. The first is authority: it carries the
+ * same `organization:transfer` permission as the destructive POST, because seeing the card and the next charge is
+ * the same decision as making it — an admin who cannot transfer must not be able to read the preview either. The
+ * second is masking: the payment method is `{ brand, last4 }` and nothing else, so the route can never become a way
+ * to read a PAN, an expiry, or a billing address out of Stripe.
+ *
+ * Masking is asserted as an exact key set rather than by looking for a card number. "No PAN present" passes
+ * trivially on a fixture with no card; "these two keys and no others" holds whether or not a card exists, and is
+ * what actually fails if someone widens the DTO later.
+ */
+test.describe('GET /api/organizations/transfer-ownership-preview', () => {
+  test('refuses a request with no session', async () => {
+    const response = await harness.anonymous.get('/api/organizations/transfer-ownership-preview')
+    expect(response.status()).toBe(401)
+  })
+
+  test('refuses an admin who lacks organization:transfer, even though the route only reads', async () => {
+    const admin = await createMemberPrincipal(harness.ctx, harness.a.organization.organizationId, 'admin')
+    try {
+      const response = await admin.api!.get('/api/organizations/transfer-ownership-preview')
+      expect(response.status(), await response.text()).toBe(403)
+    } finally {
+      await disposePrincipal(admin)
+    }
+  })
+
+  test('gives the owner the documented shape, with the payment method masked to brand and last4', async () => {
+    const response = await harness.a.principal.api!.get('/api/organizations/transfer-ownership-preview')
+    expect(response.status(), await response.text()).toBe(200)
+    const preview = await response.json() as {
+      hasBillingCustomer: boolean
+      paymentMethod: Record<string, unknown> | null
+      tier: string
+      billingPeriod: string
+      currentPeriodEnd: string | null
+    }
+
+    expect(preview).toHaveProperty('hasBillingCustomer')
+    expect(preview).toHaveProperty('paymentMethod')
+    expect(typeof preview.tier).toBe('string')
+    expect(typeof preview.billingPeriod).toBe('string')
+
+    /**
+     * Consistency first, because this one always runs: claiming no billing customer while still handing back a card
+     * would be a leak with a clean-looking body. Then the masking guarantee, as the whole key set — an added
+     * `expMonth` or `country` fails here, where a "does the body contain digits" check would not.
+     *
+     * On this fixture `paymentMethod` is null: the fake provider only knows customers it created itself, so a
+     * directly-seeded `billing_customers` row does not give it a card to summarise. Reaching the masked branch
+     * needs a customer created *through* the provider, which is a checkout flow and belongs to the billing specs.
+     * The key-set assertion is kept rather than dropped so that it starts working the moment such a fixture exists.
+     */
+    if (!preview.hasBillingCustomer) {
+      expect(preview.paymentMethod, 'no billing customer must mean no card in the payload').toBeNull()
+    }
+    if (preview.paymentMethod !== null) {
+      expect(Object.keys(preview.paymentMethod).sort()).toEqual(['brand', 'last4'])
+    }
   })
 })

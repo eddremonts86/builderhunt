@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 14 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 13 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 187 covered, 1 exempt, 14 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 188 covered, 1 exempt, 13 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -527,8 +527,23 @@
     - Two fixture facts, both recorded in the spec: `alerts.keywords` is `jsonb`, not `text[]`; and
       `alert_triggers.builder_id` has a foreign key to `builders` (the org-scoped legacy table), not to
       `builder_identities`, so the row a trigger points at must exist first.
+  - **Done: `transfer-ownership-preview`** (appended to `tests/e2e/api/organizations.spec.ts`, 29 passing in that
+    file). The natural pair to the immediate-deletion coverage above, and its doc makes two promises a *read-only*
+    route can still break.
+    - Authority: it carries the same `organization:transfer` permission as the destructive POST, because seeing the
+      card and the next charge is the same decision as making it. An **admin** is refused. Negative control:
+      removing the `can()` check hands that admin a 200 with the billing figures.
+    - Masking: the payment method is `{ brand, last4 }` and nothing else, asserted as an exact key set rather than
+      by hunting for a card number — "no PAN present" passes trivially on a fixture with no card, where "these two
+      keys and no others" holds either way and is what fails if the DTO is widened.
+    - **One assertion turned out not to run, and is now honest about it.** The fake provider only knows customers it
+      created itself, so a directly-seeded `billing_customers` row gives it no card to summarise and
+      `paymentMethod` is null here. Added instead an invariant that always runs — reporting no billing customer must
+      mean no card in the payload, which would otherwise be a leak with a clean-looking body — and recorded that
+      reaching the masked branch needs a customer created *through* a checkout flow, which belongs to the billing
+      specs. The key-set assertion is kept so it starts working the moment such a fixture exists.
   - Remaining clusters: ai (3), solutions (3), calendar (2), plus `builders/claim/verify`, `builders/recent`,
-    `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
+    `fingerprint/match`, `interviews/shared`, `sprints/preview`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 

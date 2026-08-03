@@ -1113,7 +1113,10 @@
       ]
     },
     "/api/organizations/transfer-ownership-preview": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations.spec.ts"
+      ]
     },
     "/api/organizations/transfer-ownership": {
       "status": "covered",
