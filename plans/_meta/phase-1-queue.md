@@ -11,7 +11,10 @@ each plan's `NN-` directory prefix comes from, and its counts are newer than the
 `exhaustive-local-e2e-design` 10/3, not 12/0). Plan names below are written without their
 number prefix; the directories on disk carry it.
 
-**Snapshot: 2026-07-27.** 53 plans, 749 tasks, 581 done (78%), 168 open, 26 plans fully closed.
+**Snapshot: 2026-08-03.** 54 plans, 781 tasks, 723 done (93%), 58 open, 38 plans fully closed.
+
+Every table below this line is older than that count and disagrees with it. They are kept for the *ordering*
+rationale, which is still useful; take no number from them. Regenerate with the command below.
 (Stale on both axes now: `03-postgres-18-upgrade` joined phase-1 from phase-2 on 2026-07-28, making
 it 54 plans and 787 tasks, and it is absent from every table below.)
 Counts are `- [ ]` / `- [x]` lines in each plan's checklist. Regenerate with:

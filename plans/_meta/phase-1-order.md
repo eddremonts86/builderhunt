@@ -9,8 +9,15 @@ The same number is the review order. Auditing plan-vs-reality top-to-bottom mean
 read a plan after the plans it builds on, so "this claims to be implemented" can be checked
 against a foundation you have already verified rather than assumed.
 
-**Snapshot: 2026-07-29 (second pass).** 54 plans, 779 tasks, 627 done (80%), 152 open, 26 plans with
-zero open tasks.
+**Snapshot: 2026-08-03.** 54 plans, 781 tasks, 723 done (93%), 58 open, **38 plans with zero open tasks**.
+
+Regenerate with the one-liner in [`phase-1-queue.md`](./phase-1-queue.md) rather than trusting this line — it
+is a snapshot, and every snapshot in this file has been wrong within a week of being written.
+
+The jump from 152 open to 58 is one long execution session, not a redefinition: plan 53's API and browser
+matrices, plans 51 and 52 closed, and three defects the matrices found fixed in production code. Two tasks were
+*added* in the same session — an `/api` route-method sweep and a concurrent-invitation constraint — both from
+findings, which is why the total moved 779 → 781 while the open count fell.
 
 ## Executable in order, 01 → 54
 
