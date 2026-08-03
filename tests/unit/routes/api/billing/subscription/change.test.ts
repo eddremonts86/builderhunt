@@ -3,7 +3,7 @@ import type { TenantPrincipal } from '~/shared/lib/authorization/permissions'
 
 const mocks = vi.hoisted(() => ({
   requireTenantPrincipal: vi.fn(),
-  withTenantContext: vi.fn(),
+  withWorkerOrganization: vi.fn(),
   changeSubscription: vi.fn(),
   getBillingProvider: vi.fn(),
 }))
@@ -13,8 +13,21 @@ vi.mock('~/shared/lib/auth/tenant-principal', async (importOriginal) => {
   return { ...actual, requireTenantPrincipal: mocks.requireTenantPrincipal }
 })
 
-vi.mock('~/shared/lib/db/tenant-context', () => ({
-  withTenantContext: mocks.withTenantContext,
+/**
+ * The route runs its work in a **worker-role** transaction, not the caller's.
+ *
+ * `builderhunt_app` holds SELECT only on `billing_subscriptions` (drizzle/0028 keeps the provider mirror and
+ * the credit ledger writable by the worker alone), so under `withTenantContext` this route answered
+ * 500 `permission denied` to every owner in production — invisible to this suite, which connects as the
+ * migration superuser. Authorization still happens in full at the route; `withWorkerOrganization` only
+ * supplies the privileged transaction, scoped to one organization by `app.organization_id`.
+ *
+ * Mocked here rather than exercised: these tests are about status-code mapping, and the role separation itself
+ * is only provable against real Postgres roles — which is what
+ * `tests/e2e/api/billing-subscription-change-scenarios.spec.ts` does.
+ */
+vi.mock('~/shared/lib/repositories/billing-worker', () => ({
+  withWorkerOrganization: mocks.withWorkerOrganization,
 }))
 
 vi.mock('~/shared/lib/billing/subscription-changes', async (importOriginal) => {
@@ -54,7 +67,7 @@ async function callRoute(body: unknown): Promise<Response> {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.withTenantContext.mockImplementation((_principal: TenantPrincipal, fn: (tx: unknown) => unknown) => fn({}))
+  mocks.withWorkerOrganization.mockImplementation((_organizationId: string, fn: (tx: unknown) => unknown) => fn({}))
   mocks.getBillingProvider.mockReturnValue({})
 })
 

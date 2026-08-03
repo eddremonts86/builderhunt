@@ -25,6 +25,7 @@ const publicAllowlist = new Map([
   ['src/routes/api/feeds/$searchId.ts', 'documented public RSS feed, gated by a capability token rather than a session'],
   ['src/routes/api/webhooks/stripe.ts', 'Stripe cannot hold a user session — Stripe-Signature verification (receiveStripeWebhook) is the entire authentication mechanism, enforced before any DB write'],
   ['src/routes/api/e2e/outbox.ts', 'E2E-only email-outbox debug seam; hard-gated on E2E_MODE=true and returns a bare 404 for every method in any other mode'],
+  ['src/routes/api/e2e/billing-provider.ts', 'E2E-only seam that tells the in-memory FakeBillingProvider a seeded subscription exists; same hard E2E_MODE=true gate as outbox.ts, a bare 404 otherwise, and it can only ever reach the fake — getBillingProvider() never returns the real Stripe adapter while E2E_MODE is set'],
   ['src/routes/api/portfolio/$claimId.ts', 'fail-closed public portfolio API — reads only via getPublicPortfolioClaim, an explicit published/verified-only DTO repository; never a bare 404 vs. data distinction that would leak claim state'],
   ['src/routes/api/analytics/conversion.ts', 'fires from anonymous landing/explore/signup pages by design; validates a closed event schema server-side and never reads/returns tenant or account data'],
   ['src/routes/api/privacy/profile-removal.ts', 'deliberately unauthenticated — the person requesting removal need not have a BuilderHunt account; IP+profile rate-limited, and possessing the returned challenge is the only thing the verify step accepts as authorization'],
