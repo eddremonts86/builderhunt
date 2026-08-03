@@ -407,3 +407,31 @@ test.describe('DELETE /api/organizations', () => {
     expect(restored.status(), await restored.text()).toBeLessThan(400)
   })
 })
+
+/**
+ * The 400 half of the authenticate-before-validate fix, which only an authenticated caller can observe.
+ *
+ * Moving the guard above the parse means an anonymous request never reaches validation at all, so the unit tests
+ * that used to prove "a bad role is rejected" had to become 401 assertions. That left the validation itself
+ * unproven for these two routes — a regression that stopped validating entirely would have passed — so it is
+ * restored here, from the only vantage point where the parse actually runs.
+ *
+ * Both payloads deliberately fail the schema, so neither test can transfer ownership or change a real member's
+ * role as a side effect.
+ */
+test.describe('validation still runs, once the caller is known', () => {
+  test('POST /api/organizations/transfer-ownership refuses an empty body with 400', async () => {
+    const response = await harness.a.principal.api!.post('/api/organizations/transfer-ownership', { data: {} })
+    expect(response.status(), await response.text()).toBe(400)
+  })
+
+  test('PATCH /api/organizations/members/:id refuses a role outside the enum with 400', async () => {
+    // `owner` is outside the enum on purpose — ownership moves through transfer-ownership and its recent-auth
+    // requirement, never through a role edit.
+    const response = await harness.a.principal.api!.patch(
+      `/api/organizations/members/${harness.a.principal.userId}`,
+      { data: { role: 'owner' } },
+    )
+    expect(response.status(), await response.text()).toBe(400)
+  })
+})

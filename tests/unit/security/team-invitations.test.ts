@@ -12,11 +12,19 @@ import { Route as AcceptRoute } from '~/routes/api/organizations/invitations/$in
  * "acceptInvitation — enumeration safety" suite, along with cross-org
  * cancel and the concurrent-final-seat-on-resend race. Testing those again
  * here at the HTTP layer would just re-test the same code through an extra
- * indirection. What's specific to THIS layer: input validation happens
- * before any auth/DB work, and none of these routes accept an
- * organizationId from the client — invite resolves it from the caller's
- * own session, and resend/cancel/accept resolve it from the invitation
- * row itself (never trusting the caller's active org).
+ * indirection. What's specific to THIS layer: an unauthenticated caller is
+ * refused identically whatever the body looks like, and none of these
+ * routes accept an organizationId from the client — invite resolves it from
+ * the caller's own session, and resend/cancel/accept resolve it from the
+ * invitation row itself (never trusting the caller's active org).
+ *
+ * This block used to say "input validation happens before any auth/DB
+ * work", and the assertions enforced it. That ordering was the defect fixed
+ * on 2026-08-03: 400 for a malformed body and 401 for a well-formed one
+ * lets someone with no session read the request schema out of status codes.
+ * The 400 path is only observable once authenticated, which this layer
+ * cannot construct — it is asserted in
+ * `tests/e2e/api/organizations-invitations.spec.ts` instead.
  */
 
 function jsonRequest(body: unknown, method = 'POST'): Request {
@@ -44,14 +52,14 @@ const acceptHandlers = (AcceptRoute.options as unknown as {
 }).server.handlers
 
 describe('POST /api/organizations/invitations', () => {
-  it('rejects an invalid email before touching auth or the database', async () => {
+  it('answers an invalid email with 401, not 400 — the body is not parsed until the caller is known', async () => {
     const res = await invitationsIndexHandlers.POST({ request: jsonRequest({ email: 'not-an-email', role: 'member' }) })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(401)
   })
 
-  it('rejects an invalid role before touching auth or the database', async () => {
+  it('answers an invalid role with 401, not 400 — the body is not parsed until the caller is known', async () => {
     const res = await invitationsIndexHandlers.POST({ request: jsonRequest({ email: 'x@example.com', role: 'owner' }) })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(401)
   })
 
   it('rejects a well-formed request with no session', async () => {
