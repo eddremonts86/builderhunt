@@ -57,6 +57,8 @@ export interface InterviewHarness {
   organization: OrganizationFixture
   /** Every principal created through `addPrincipal`, disposed in `stopInterviewHarness`. */
   extraPrincipals: Principal[]
+  /** Flag writes to undo on teardown — see the note in `startInterviewHarness`. */
+  restoreEnv: Array<[string, string | undefined]>
   /** Every request context opened by `candidateContext`, disposed with the harness. */
   extraContexts: APIRequestContext[]
 }
@@ -82,7 +84,20 @@ export interface StartInterviewHarnessOptions {
  */
 export async function startInterviewHarness(options: StartInterviewHarnessOptions): Promise<InterviewHarness> {
   ensureFixedTimeEnv()
+  /**
+   * Flags are written into this worker's `process.env` because that is the only channel to the child server,
+   * which inherits it at spawn — and the prior value is remembered so `stopInterviewHarness` can put it back.
+   *
+   * Without the restore, a flag outlives the spec that set it. At `--workers=1` every spec shares one worker
+   * process, so a later spec reads a value it never asked for. That is not hypothetical: setting
+   * `STRIPE_WEBHOOK_SECRET` in `webhooks-stripe.spec.ts` made `harness/fakes.spec.ts` sign with the wrong
+   * secret against a server holding the real one, and it failed with a 400 that looked like a webhook bug.
+   * Caught by `ci:local`, which runs serially, and invisible at higher parallelism where the specs land in
+   * different workers.
+   */
+  const restoreEnv: Array<[string, string | undefined]> = []
   for (const [key, value] of Object.entries(options.flags ?? {})) {
+    restoreEnv.push([key, process.env[key]])
     process.env[key] = value
   }
 
@@ -121,6 +136,7 @@ export async function startInterviewHarness(options: StartInterviewHarnessOption
       owner,
       organization,
       extraPrincipals: [],
+      restoreEnv,
       extraContexts: [],
     }
   } catch (error) {
@@ -141,6 +157,12 @@ export async function startInterviewHarness(options: StartInterviewHarnessOption
  */
 export async function stopInterviewHarness(harness: InterviewHarness | undefined): Promise<void> {
   if (!harness) return
+  // Undo the flag writes before anything else, so an early failure below still leaves the environment clean
+  // for the next spec in this worker.
+  for (const [key, previous] of harness.restoreEnv) {
+    if (previous === undefined) delete process.env[key]
+    else process.env[key] = previous
+  }
   for (const context of harness.extraContexts) await context.dispose().catch(() => undefined)
   for (const principal of [...harness.extraPrincipals, harness.owner]) {
     await disposePrincipal(principal).catch(() => undefined)
