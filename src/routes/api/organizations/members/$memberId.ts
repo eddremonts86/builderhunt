@@ -22,10 +22,14 @@ export const Route = createFileRoute('/api/organizations/members/$memberId')({
       // client could spoof to act against an organization it isn't in.
       PATCH: async ({ request, params }) => {
         try {
+          // Authenticate before validating. A stranger must not be able to tell a real endpoint from an absent
+          // one by the shape of its complaint: parsing first answers 400 "Invalid body" to an anonymous caller,
+          // which confirms the route exists and hints at its schema, where 401 reveals nothing. Same ordering fix
+          // as `organizations/index.ts`.
+          const principal = await requireTenantPrincipal(request)
           const parsed = RoleBody.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
-          const principal = await requireTenantPrincipal(request)
           const lifecycle = await getOrganizationLifecycle()
           await lifecycle.changeMemberRole(request, principal.organizationId, params.memberId, parsed.data.role)
           return Response.json({ ok: true })

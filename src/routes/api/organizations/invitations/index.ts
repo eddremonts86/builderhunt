@@ -21,10 +21,14 @@ export const Route = createFileRoute('/api/organizations/invitations/')({
       // session (`requireTenantPrincipal`), never the request body.
       POST: async ({ request }) => {
         try {
+          // Authenticate before validating. A stranger must not be able to tell a real endpoint from an absent
+          // one by the shape of its complaint: parsing first answers 400 "Invalid body" to an anonymous caller,
+          // which confirms the route exists and hints at its schema, where 401 reveals nothing. Same ordering fix
+          // as `organizations/index.ts`.
+          const principal = await requireTenantPrincipal(request)
           const parsed = Body.safeParse(await request.json().catch(() => ({})))
           if (!parsed.success) return Response.json({ error: 'Invalid body' }, { status: 400 })
 
-          const principal = await requireTenantPrincipal(request)
           const lifecycle = await getOrganizationLifecycle()
           const invitation = await lifecycle.inviteMember(request, {
             organizationId: principal.organizationId,

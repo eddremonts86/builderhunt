@@ -240,6 +240,7 @@ step security-ui-route-graph pnpm security:ui-route-graph
 # page threw "Buffer is not defined". Type-check, lint, 4236 tests and a production build all passed.
 step security-route-client-boundary pnpm security:route-client-boundary
 step security-route-methods pnpm security:route-methods
+step security-auth-before-validate pnpm security:auth-before-validate
 step security-provider-metering pnpm security:provider-metering
 step schema-audit pnpm db:audit-schema
 step lint pnpm lint

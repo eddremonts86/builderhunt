@@ -167,6 +167,17 @@ async function refusalShape(api: APIRequestContext, method: 'POST' | 'DELETE', p
 }
 
 test.describe('anonymous access', () => {
+  test('POST /api/organizations/invitations authenticates before it validates', async () => {
+    /**
+     * With validation first, an anonymous caller gets 400 for `{}` and 401 for a well-formed invite — so the
+     * schema is readable from status codes by someone with no session. Same ordering defect as
+     * `organizations/index.ts`, fixed here too and now caught statically by
+     * `pnpm security:auth-before-validate`; this asserts the status a stranger actually gets.
+     */
+    const response = await harness.anonymous.post('/api/organizations/invitations', { data: {} })
+    expect(response.status(), 'an empty body must be refused as unauthenticated, not as invalid').toBe(401)
+  })
+
   const ROUTES = [
     { method: 'POST' as const, path: '/api/organizations/invitations', data: { email: 'x@e2e.invalid', role: 'member' } },
     { method: 'GET' as const, path: '/api/organizations/invitations/mine', data: undefined },

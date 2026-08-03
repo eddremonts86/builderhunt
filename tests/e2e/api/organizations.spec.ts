@@ -162,17 +162,31 @@ test.describe('anonymous access', () => {
     })
   }
 
-  test('POST /api/organizations authenticates before it validates', async () => {
-    /**
-     * Order matters here for a reason that is not obvious. With validation first, an anonymous caller gets 400
-     * for `{}` and 401 for `{ name: "x" }` — so the request schema is readable from status codes alone by
-     * someone with no session. Authentication was never bypassed; the leak was the *difference*.
-     *
-     * Found by this matrix and fixed in `src/routes/api/organizations/index.ts`.
-     */
-    const response = await harness.anonymous.post('/api/organizations', { data: {} })
-    expect(response.status(), 'an empty body must be refused as unauthenticated, not as invalid').toBe(401)
-  })
+  /**
+   * Order matters here for a reason that is not obvious. With validation first, an anonymous caller gets 400 for
+   * `{}` and 401 for a well-formed body — so the request schema is readable from status codes alone by someone
+   * with no session. Authentication is never bypassed; the leak is the *difference*.
+   *
+   * Found by this matrix in `organizations/index.ts`, then found again in three more handlers, each carrying a
+   * comment explaining that the organization comes from the session rather than the body — true, and beside the
+   * point. `pnpm security:auth-before-validate` now fails on the ordering statically; these assertions prove the
+   * status an anonymous caller actually receives, which the static check cannot.
+   */
+  const VALIDATE_ORDER_ROUTES = [
+    { method: 'POST', path: '/api/organizations' },
+    { method: 'POST', path: '/api/organizations/transfer-ownership' },
+    { method: 'PATCH', path: '/api/organizations/members/member-anonymous-attempt' },
+  ] as const
+
+  for (const route of VALIDATE_ORDER_ROUTES) {
+    test(`${route.method} ${route.path} authenticates before it validates`, async () => {
+      const response = await harness.anonymous.fetch(route.path, { method: route.method, data: {} })
+      expect(
+        response.status(),
+        `an empty body must be refused as unauthenticated, not as invalid (got ${response.status()})`,
+      ).toBe(401)
+    })
+  }
 })
 
 test.describe('GET /api/organizations', () => {

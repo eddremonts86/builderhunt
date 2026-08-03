@@ -83,6 +83,28 @@
   refuses — but the ordering lets an unauthenticated prober read the request schema (field name, min/max
   length, type) out of status codes alone. One-line reordering; needs its own task.
 
+  **Fixed, and then found three more times (2026-08-03).** The reordering in `organizations/index.ts` was the
+  easy part. A sweep for the same shape — a handler that validates a body *and* establishes a caller, in that
+  order — turned up three more: `organizations/transfer-ownership.ts`, `organizations/members/$memberId.ts` and
+  `organizations/invitations/index.ts`. Each carried a comment explaining that the organization comes from the
+  session rather than the body, which is true and beside the point; the leak is the *difference* between 400 and
+  401, not the tenant binding.
+
+  Four instances of a defect that is invisible in review (the two lines look interchangeable) and invisible at
+  runtime (both answers are well-formed) is what a static check is for, so
+  `scripts/check-authenticate-before-validate.mjs` now walks every handler with the TypeScript compiler and fails
+  when the first validator call precedes the first guard call. It reports **99 handlers that do both, all
+  authenticating first**, and is wired into `package.json`, `quality.yml` and `ci:local` beside the other
+  `security:*` gates. Handlers that do only one of the two are deliberately out of scope: an unauthenticated
+  public route validating its input is correct.
+
+  Both halves have negative controls. Re-introducing the ordering in `invitations/index.ts` makes the gate report
+  it by file and line; re-introducing it in `transfer-ownership.ts` makes the new e2e assertion fail with
+  `Received: 400`, which is the leak itself. The e2e side is table-driven in `organizations.spec.ts` over the
+  three `/api/organizations/*` routes plus one in `organizations-invitations.spec.ts` — the static check cannot
+  prove what status a stranger actually receives, and the spec cannot prove the ordering holds in handlers no
+  spec probes, so both are kept.
+
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=1`: 27 passed, 1 skipped.
 
   **`tests/e2e/api/organizations-invitations.spec.ts` landed — 17 passing, 1 `fixme`.**

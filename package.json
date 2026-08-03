@@ -46,6 +46,7 @@
     "security:ui-route-graph": "node scripts/check-ui-route-graph.mjs",
     "security:route-client-boundary": "node scripts/check-route-client-boundary.mjs",
     "security:route-methods": "node scripts/check-api-route-methods.mjs",
+    "security:auth-before-validate": "node scripts/check-authenticate-before-validate.mjs",
     "security:provider-metering": "node scripts/check-provider-metering.mjs",
     "security:dependencies": "pnpm audit --prod --audit-level high",
     "db:migrate": "tsx --env-file=.env scripts/db/create-db.ts && drizzle-kit migrate",
