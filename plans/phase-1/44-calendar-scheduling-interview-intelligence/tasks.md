@@ -2491,6 +2491,29 @@ Not fixed here — it predates this program and deserves its own work.
     `pnpm exec drizzle-kit check`, `pnpm test:migrations:local`, `pnpm test:rls:local`,
     `pnpm security:boundaries`, and `pnpm security:dependencies` successfully.
 
+  **`pnpm ci:local` green 2026-08-03 — `EXIT=0`, all 24 steps, zero failures.** It is a superset of the nine
+  commands listed above: `migration-integrity`, `drizzle-check`, `migrations-local`, `schema`, `rls-fixture`,
+  `rls-policies` (`test:rls:local`, against real per-role logins), `api-isolation`, `restore-rehearsal`, seven
+  `security-*` gates, `e2e-route-coverage`, `schema-audit`, `lint`, `type-check`, `unit-tests`, `e2e`,
+  `dependency-audit`, `build`, `accessibility`.
+
+  Totals: **882 e2e passing**, 403 unit test files (2 skipped), 0 lint errors (112 warnings), tsc clean.
+
+  **Two runs before this one were red, and both failures were mine rather than pre-existing** — recorded
+  because "the gate went green" is only meaningful with what it caught:
+
+  1. Eleven unit assertions in `tests/unit/routes/api/billing/subscription/{change,cancel}.test.ts` mocked
+     `withTenantContext` after those routes moved to `withWorkerOrganization`, so the real transaction ran and
+     status mapping saw 500 instead of 402/409.
+  2. `organizations-invitations.spec.ts`'s durable-audit read assertion took its connection from
+     `process.env.DATABASE_URL`, which `ci:local` deliberately keeps as the **owner**. A superuser bypasses
+     grants, so an assertion that the app role *cannot* read the trail inverted itself: green on a laptop, red
+     in the gate. It now takes the app-role URL from the harness and checks SQLSTATE 42501 specifically.
+
+  A third red run was self-inflicted and not a defect: creating a route file mid-run regenerated
+  `routeTree.gen.ts` under the live per-worker Vite servers and collapsed all 10 tests in
+  `tests/e2e/harness/browser.spec.ts`. The gate needs a quiet tree.
+
 - [ ] **Verify unit economics in test and limited live mode**
   - Files: `docs/operations/interview-runtime-verification.md`,
     `plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`
