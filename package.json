@@ -24,6 +24,7 @@
     "test:e2e": "playwright test --project=chromium --project=mobile",
     "test:e2e:coverage": "node scripts/check-e2e-route-coverage.mjs",
     "test:a11y": "node tests/regression/test-accessibility.mjs",
+    "test:conversion": "node tests/regression/test-conversion.mjs",
     "db:up": "docker inspect workspace-postgres --format '{{.State.Running}}' 2>/dev/null | grep -q true || docker compose --profile standalone up -d db",
     "db:down": "docker compose down",
     "db:generate": "drizzle-kit generate",

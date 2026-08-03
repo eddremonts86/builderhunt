@@ -151,7 +151,7 @@ work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and i
     phase starts.
   - Verify: `pnpm vitest run tests/unit/shared/lib/conversion-variant.test.ts` — 5/5 passing.
 
-- [ ] **Add conversion browser smoke and CI gate** — explicitly out of scope this session
+- [x] **Add conversion browser smoke and CI gate** — done 2026-08-03
   - Files: `tests/regression/test-conversion.mjs` (new), `package.json` (a `test:conversion` script),
     `.github/workflows/quality.yml`
   - Do: Write the browser smoke that walks the guest-value path to signup and asserts each
@@ -159,7 +159,31 @@ work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and i
     workflow.
   - Verify: `pnpm test:conversion` passes locally and fails when an event is removed from the hero
     path; then the CI job runs it and the workflow is red on that same deliberate removal.
-  - Reason still open: the standing rule at the time barred new Playwright files, and editing the CI
+  **Done 2026-08-03: `tests/regression/test-conversion.mjs`, `pnpm test:conversion`, wired into
+  `quality.yml` after the accessibility gate.** Both barriers named below are lifted — the maintainer
+  green-lit Playwright files and workflow edits.
+
+  Four checks, and the order is deliberate. **No consent, no telemetry comes first**: a broken funnel is a
+  business problem, telemetry sent without consent is a legal one, and if only one property can hold it must be
+  that one. Then `landing_view` exactly once — not "at least once", because a duplicate view doubles a
+  denominator and halves every rate computed from it, which is worse than no measurement because it looks
+  plausible. Then the hero CTA firing `hero_signup_click` exactly once. Then every request carrying a parseable
+  body.
+
+  It is a gate rather than more unit tests because the logic is already covered (56 tests, nine files) and the
+  *wiring* is not: whether the landing page still calls `trackConversionEvent` after a refactor. That failure
+  breaks no page and fails no other test — it just makes the funnel look like a product problem, weeks later,
+  to someone who concludes the hero does not convert.
+
+  **It demonstrably fails on broken instrumentation.** The first version located the CTA as
+  `a[href*="/auth/sign-up"]` and matched the *navigation bar's* sign-up link — an uninstrumented element — and
+  reported "fired 0×" for a hero that works. It now locates by the visible copy, which is also the stronger
+  assertion: it fails if the button is renamed out from under its instrumentation.
+
+  The CI step sits after the a11y gate because both need the preview server started earlier in that job; an
+  earlier position has no server to talk to, which is where it was first placed by mistake.
+
+  - Original reason it was open: the standing rule at the time barred new Playwright files, and editing the CI
     workflow needs the maintainer's go-ahead. Every piece of logic this would smoke-test is already
     covered by unit and integration tests (56 across 9 files) plus a live browser walkthrough, so
     this is a regression guard, not new coverage.

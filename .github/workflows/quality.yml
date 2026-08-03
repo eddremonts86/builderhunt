@@ -180,6 +180,15 @@ jobs:
           exit 1
       - name: Accessibility gate (axe-core, public + authenticated route matrix)
         run: pnpm test:a11y
+      - name: Conversion funnel instrumentation
+        # Placed after the accessibility gate because both need the preview server started above — an earlier
+        # position in this job has no server to talk to, which is where this step was first put by mistake.
+        #
+        # A missing conversion event breaks no page and fails no other test; it just makes the funnel look like
+        # a product problem, weeks later, to someone who concludes the hero does not convert. This notices.
+        env:
+          APP_URL: http://localhost:3000
+        run: pnpm test:conversion
       - name: Upload sanitized accessibility artifact
         if: failure()
         uses: actions/upload-artifact@v4
