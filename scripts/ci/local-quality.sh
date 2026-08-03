@@ -241,6 +241,7 @@ step security-ui-route-graph pnpm security:ui-route-graph
 step security-route-client-boundary pnpm security:route-client-boundary
 step security-route-methods pnpm security:route-methods
 step security-auth-before-validate pnpm security:auth-before-validate
+step e2e-route-coverage pnpm test:e2e:coverage
 step security-provider-metering pnpm security:provider-metering
 step schema-audit pnpm db:audit-schema
 step lint pnpm lint

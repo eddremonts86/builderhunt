@@ -345,16 +345,23 @@
       ]
     },
     "/api/ai/complete": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/ai-complete-and-embed.spec.ts"
+      ]
     },
     "/api/ai/config": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/ai-complete-and-embed.spec.ts",
         "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
       ]
     },
     "/api/ai/embed": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/ai-complete-and-embed.spec.ts"
+      ]
     },
     "/api/alerts/$id": {
       "status": "covered",
@@ -755,6 +762,7 @@
     "/api/calendar/events": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/calendar-notifications.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/calendar.spec.ts",
         "tests/e2e/interview-live.spec.ts",
@@ -775,7 +783,10 @@
       ]
     },
     "/api/calendar/notifications": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/calendar-notifications.spec.ts"
+      ]
     },
     "/api/changelog/$slug": {
       "status": "covered",

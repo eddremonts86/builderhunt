@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 3 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [x] **Give every API route an e2e spec** — 0 missing of 202 — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 198 covered, 1 exempt, 3 missing of 202.** The manifest is the source of truth
+  - **Closed 2026-08-03: 201 covered, 1 exempt, 0 missing of 202 — and `pnpm test:e2e:coverage` is now wired into `quality.yml` and `ci:local`,** which was this task's own stated condition: the gate is worth having only once the backlog it would report is empty, or it just trains people to skip it. The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -633,8 +633,35 @@
     `E2E_EMBEDDINGS_SCENARIO` (success, empty, timeout, dim mismatch) and `E2E_ENRICHMENT_SCENARIO`, each reachable
     only under `E2E_MODE=true`. Four of the seven "blocked" routes needed nothing at all — they are plain env
     readouts and principal-scoped CRUD — and the remaining AI ones need one env var, not new infrastructure.
-  - Remaining: `ai/complete` and `ai/embed` (via the scenario env vars above), and `calendar/notifications` (needs a
-    calendar event row for its `anchor_check`), plus the populated half of `interviews/shared`.
+  - **Done: `ai/complete` + `ai/embed`** (`tests/e2e/api/ai-complete-and-embed.spec.ts`, 8 passing).
+    - The headline assertion is that **a `sensitive` task is refused byte-identically to a fabricated task id**. The
+      route says why: "a caller probing this route has no business learning that the task exists." So the two
+      responses are compared whole rather than each checked against 400 — a well-meaning
+      `sensitive_task_not_allowed` would satisfy two independent 400 assertions while handing a prober the registry.
+      Negative control: introducing exactly that code fails the deep-equality check.
+    - `invalid_input` and `unknown_task` are kept distinct on purpose, and asserted so: collapsing them would make a
+      typo in a task id indistinguishable from a malformed payload.
+    - `ai/embed` is platform-admin only, and an ordinary organization owner is refused — embedding spends provider
+      budget and is not metered per organization, so a paying customer's owner is still not an operator. The success
+      path runs through `E2E_EMBEDDINGS_SCENARIO=success`, so there is no HTTP call and no dependency on a local
+      embedding server; one vector per input at the configured dimension, which matters because
+      `AIDimensionMismatchError` is a real 502 branch.
+    - **Two things this file records rather than asserts.** The gate order is deliberately *not* authenticate-first —
+      the kill switch and "unconfigured" answer 503 before `requireTenantPrincipal` — and that is fine here because
+      `GET /api/ai/config` publishes both facts anonymously by design. And the `admin.ai.embed` audit event has **no
+      durable record**: `auditPlatformAdminAction` writes through `consoleSecurityAuditSink`, which is
+      `console.log`. A first draft of the test queried an invented `platform_admin_audit` table. In production the
+      line lands in the container log, which is a trail but not a queryable or retained one — worth a deliberate
+      decision rather than an assumption.
+  - **Done: `calendar/notifications`** (`tests/e2e/api/calendar-notifications.spec.ts`, 8 passing). Both properties the
+    route claims: a foreign delivery id is indistinguishable from a fabricated one *and* stays unread, and a **cursor
+    forged from another user's row** — built by hand in the documented `<epoch-millis>.<uuid>` format, which is what
+    someone who guessed the format would do — returns nothing of theirs, because the query still filters on the
+    caller's user id. Also: a malformed cursor is a 400 rather than a silent first page, which would make a paginating
+    client loop over page one forever.
+    - Fixture fact recorded: the event anchor is created through the real `POST /api/calendar/events`, and each event
+      needs its own time slot — the route answers `409 overlap_warning` for overlaps, so a fixed slot makes the second
+      event in a file fail and take its test with it. That is how this spec's first draft failed.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 
