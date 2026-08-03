@@ -19,6 +19,7 @@
 // - query deletion cascades, same.
 
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { searchBuilders } from '~/lib/search'
 import { env } from '~/shared/lib/env'
 import { publicDb } from '~/shared/lib/db/client'
@@ -235,6 +236,9 @@ export const Route = createFileRoute('/api/feeds/$searchId')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request, params }) => {
         try {
           const ip = extractIp(request.headers)

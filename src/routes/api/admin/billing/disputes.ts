@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { listOrganizationDisputes } from '~/shared/lib/billing/disputes'
 import { withPlatformOrganization } from '~/shared/lib/repositories/billing-risk'
@@ -15,6 +16,9 @@ export const Route = createFileRoute('/api/admin/billing/disputes')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           await requirePlatformAdminPrincipal(request)

@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
@@ -11,6 +12,9 @@ export const Route = createFileRoute('/api/organizations/members/$memberId')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['PATCH', 'DELETE']),
+
       // The target member is `params.memberId` (a user id, matching
       // `OrganizationMemberDto.userId`); the organization itself always comes
       // from the caller's own session via `requireTenantPrincipal` — never

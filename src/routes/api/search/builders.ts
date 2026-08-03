@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { searchBuildersWithStatus } from '~/lib/search'
 import { recordIngestedSourceObservations, upsertEmbeddingStubs } from '~/lib/semantic/index-writer'
 import { rateLimit, getRateLimitId, getAuthedRateLimitId } from '~/shared/lib/rate-limit'
@@ -13,6 +14,9 @@ export const Route = createFileRoute('/api/search/builders')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         try {
           // Resolve the principal up front (best-effort — search also serves anonymous

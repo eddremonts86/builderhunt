@@ -9,6 +9,7 @@
  * touching it.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { randomId } from '~/lib/utils'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -36,6 +37,9 @@ export const Route = createFileRoute('/api/queries/$id/share')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST', 'DELETE']),
+
       POST: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

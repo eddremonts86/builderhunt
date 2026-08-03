@@ -4,6 +4,7 @@
  * evidence for the caller's active organization only.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { findLatestEnrichmentJob, listEnrichmentEvidence } from '~/shared/lib/repositories/enrichment'
@@ -12,6 +13,9 @@ export const Route = createFileRoute('/api/builders/$builderId/evidence/')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
 import { toInvitationSummaryDto } from '~/shared/lib/organizations/contracts'
 
@@ -6,6 +7,9 @@ export const Route = createFileRoute('/api/organizations/invitations/$invitation
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST', 'DELETE']),
+
       // Resend. Neither handler needs `requireTenantPrincipal` — the
       // lifecycle functions resolve the caller's session themselves and
       // check membership against the INVITATION's own organization (looked

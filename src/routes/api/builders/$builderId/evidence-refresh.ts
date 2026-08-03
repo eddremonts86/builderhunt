@@ -4,6 +4,7 @@
  * instead of creating a duplicate.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { randomId } from '~/lib/utils'
@@ -22,6 +23,9 @@ export const Route = createFileRoute('/api/builders/$builderId/evidence-refresh'
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

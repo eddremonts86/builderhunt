@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { env } from '~/shared/lib/env'
@@ -23,6 +24,9 @@ export const Route = createFileRoute('/api/calendar/export.ics')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           if (env.CALENDAR_ENABLED === 'false') {

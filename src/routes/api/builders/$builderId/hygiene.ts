@@ -14,6 +14,7 @@
  * re-fetching from GitHub.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { findOrganizationBuilderByIdentity, setOrganizationBuilderHygiene } from '~/shared/lib/repositories/organization-builders'
@@ -34,6 +35,9 @@ export const Route = createFileRoute('/api/builders/$builderId/hygiene')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { rateLimit } from '~/shared/lib/rate-limit'
@@ -22,6 +23,9 @@ export const Route = createFileRoute('/api/builders/$builderId/claim/verify')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

@@ -11,6 +11,7 @@
 // the account export, not this endpoint.
 
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -29,6 +30,9 @@ export const Route = createFileRoute('/api/builders/$builderId/views')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       POST: async ({ request, params }) => {
         try {
           const session = await auth.api.getSession({ headers: request.headers })

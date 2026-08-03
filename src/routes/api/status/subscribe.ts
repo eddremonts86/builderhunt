@@ -12,6 +12,7 @@
 // Rate limit is the same "public write" bucket as the rest of the
 // status surface (`/api/health`, `/api/status`).
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { env } from '~/shared/lib/env'
@@ -31,6 +32,9 @@ export const Route = createFileRoute('/api/status/subscribe')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       POST: async ({ request }) => {
         const limited = await rateLimit('status-subscribe', clientIp(request), 10, 60 * 60)
         if (!limited.allowed) {

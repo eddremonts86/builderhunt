@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { listInvitationsForEmail, toMyPendingInvitationDto } from '~/shared/lib/organizations/contracts'
 
@@ -6,6 +7,9 @@ export const Route = createFileRoute('/api/organizations/invitations/mine')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       // Always the CALLER'S OWN session email — never a client-supplied
       // address, or any authenticated user could enumerate who else has
       // been invited where. An unverified email returns an empty list

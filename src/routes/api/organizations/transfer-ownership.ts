@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { getOrganizationLifecycle, OrganizationLifecycleError } from '~/shared/lib/auth/organization-lifecycle'
@@ -13,6 +14,9 @@ export const Route = createFileRoute('/api/organizations/transfer-ownership')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       // The organization being acted on always comes from the caller's own
       // session (`requireTenantPrincipal`), never from the request body —
       // only the target member id is client-supplied, and the lifecycle

@@ -56,11 +56,28 @@
   - Do: Theme select, headline/introduction with live char counters, project checkboxes (capped at `MAX_SELECTED_PROJECTS`), Save draft / Publish / Unpublish, copy-link + view-live once published. `listVerifiedBuilderProfiles` didn't expose `claimId` at all before this pass (only the builder identity id) — added it, since the owner UI needs the claim id, not the identity id, to address the portfolio endpoints.
   - Verify: live in-browser end-to-end — loaded the real claim's draft, edited the headline, saved, published, viewed the live public page, confirmed the copy-link button and view-live link both point at the real published URL.
 
-- [ ] **Integrate AI persona as an optional read-only adapter** — not attempted
+- [x] **Integrate AI persona as an optional read-only adapter**
   - Files: `src/shared/lib/portfolio-integrations.ts`, `tests/unit/shared/lib/portfolio-integrations.test.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`
   - Do: When `ai-profile-enrichment` exists and the owner opted in, parse the existing `metadata.aiEnrichment` artifact with its exported schema and expose only summary/focus/strengths/provenance. Never invoke `profile-enrich` from a public request; omit invalid, stale-policy-disabled, or absent artifacts.
-  - Verify: `pnpm test -- tests/unit/shared/lib/portfolio-integrations.test.ts`; run with no AI files/config present, and again with valid and with invalid fixture artifacts.
-  - Reason still open: the owner draft route already reports `integrationsAvailable: { aiPersona: false }` honestly rather than a fake toggle, so nothing is broken while this is unwired. It is separable and genuinely optional per the plan's own framing.
+  - **Verified 2026-08-03**, with a negative control on each half:
+    - `tests/unit/shared/lib/portfolio-integrations.test.ts` — 22 passed (7 new), covering both available, both
+      absent, each independently, a stale-but-present artifact, malformed input, a non-empty event list whose
+      entries all fail the allowlist, and the opt-in flags being ignored.
+    - `tests/e2e/portfolio-builder.spec.ts` — 8 passed. One test walks the API through all three states against a
+      real database (no row → false; stale row → false; fresh claimant-owned row → true); the other drives `/me` in
+      a real browser and asserts the disabled toggle with its note, then flips the setting on in the database and
+      asserts the switch is still operable with the different note.
+    - Negative control: deleting `disabled={aiPersonaState.disabled}` fails the e2e on `toBeDisabled()`, so the
+      assertion is not vacuous.
+    - Two fixture facts found the hard way, both now recorded in the spec: `/me` lists claims through an inner join
+      on `published_builder_profiles`, so a claim without one never reaches the editor; and
+      `jsonb_set(…, '{portfolio,showAiPersona}', …, true)` is a silent no-op when `portfolio` itself is absent,
+      because `create_missing` only creates the final path element.
+  - Previous reason for staying open — "the route reports `integrationsAvailable: { aiPersona: false }` honestly rather
+    than a fake toggle, so nothing is broken" — **was wrong on the second half.** The field was honest and also
+    **unread**: nothing in `src/` consumed it, so both switches in `PortfolioSettings.tsx` were always live. An
+    owner could enable "Show AI-summarized profile", save, publish, and get an unchanged public page with no
+    explanation. The literal was not a placeholder waiting on a decision; it was a defect with a comment.
   - Note (2026-07-28): this task previously had no `Files`/`Do`/`Verify` of its own, while the task below it carried a body describing `metadata.aiEnrichment` under a *timeline* title — and duplicated the real timeline task after it. The body belonged here; the duplicate has been removed.
 
   **Investigated 2026-08-03 — both tasks are much smaller than "not attempted" suggests, and the remaining gap
@@ -84,11 +101,29 @@
   The fix is a repository read, and picking the right one is a decision about which projection should own it —
   not a literal to flip.
 
-  Concretely, the next step is: extend the owned-claim projection to carry the builder identity id (or its
-  `metadata.aiEnrichment` presence and a timeline-event count), then replace the literal with those two
-  booleans. The adapters need no change.
+  **Done 2026-08-03, exactly as scoped — plus the consumer, which the scoping missed.** The adapters needed no
+  change, as predicted.
 
-- [ ] **Integrate timeline without making it a hard dependency** — not attempted (`integrationsAvailable.timeline: false` is reported honestly, so nothing is broken while it is unwired)
+  - `findOwnedVerifiedClaimForPortfolio` now carries `builderIdentityId`, on its own `OwnedPortfolioClaimRow` type
+    rather than widening the shared `PortfolioClaimRow`. `getPublicPortfolioClaim` feeds a payload that is cached
+    and served to every viewer, and `getPortfolioLinkContext` exists precisely so the identity id reaches the page
+    *outside* that payload — widening the shared row would have put it one careless spread from the cache entry.
+  - `portfolioIntegrationsAvailable` (in `portfolio-integrations.ts`) answers both booleans by running the same
+    fail-closed adapters the public page runs. It deliberately **does not** thread the owner's own opt-in flags
+    through: availability answers "could this be turned on", and passing the flags would make it self-fulfilling —
+    unavailable because the toggle is off, toggle unusable because unavailable, feature unreachable forever.
+  - "Does an artifact exist" is not the test either. A stale or malformed artifact renders nothing, so reporting it
+    available would reproduce the defect one layer down: a toggle that enables cleanly and changes nothing.
+  - The route resolves the AI side through `public_claimant_owned_ai_enrichment` (0119, SECURITY DEFINER), so the
+    owner and an anonymous visitor see the same artifact rather than an RLS-narrowed subset. Both reads are
+    fail-closed and never fatal — a draft still loads if either cannot be resolved, and `false` is the safe
+    direction, since `true` promises something the published page then does not deliver.
+  - `PortfolioSettings.tsx` now consumes the field. An unavailable toggle is disabled and says why — but **only
+    while it is off**: an owner whose artifact goes stale after they enabled it must still be able to turn off a
+    section their published page is advertising, so an enabled-but-unavailable switch stays operable and explains
+    the state instead.
+
+- [x] **Integrate timeline without making it a hard dependency**
   - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
   - Do: Render public events only when owner opted in and unified-timeline is available. Preserve its lazy cache/degradation. If summary UI is exposed, call `timeline-summary` local-first through Chrome built-in AI; use the authenticated MiniMax proxy fallback and hide the control when neither tier is usable.
   - Verify: `pnpm test -- tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`; exercise Chrome-available, authenticated proxy fallback, unavailable, and dependency-absent states.

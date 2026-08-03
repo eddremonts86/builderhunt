@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { inArray } from 'drizzle-orm'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { hashSessionId } from '~/shared/lib/abuse/signals'
@@ -31,6 +32,9 @@ export const Route = createFileRoute('/api/me/sessions/')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           const authSession = await auth.api.getSession({ headers: request.headers })

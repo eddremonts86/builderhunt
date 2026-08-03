@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { getRateLimitId, rateLimit } from '~/shared/lib/rate-limit'
 import { env } from '~/shared/lib/env'
@@ -20,6 +21,9 @@ export const Route = createFileRoute('/api/privacy/profile-removal/verify')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         try {
           if (env.PROFILE_REMOVAL_ENABLED === 'false') {

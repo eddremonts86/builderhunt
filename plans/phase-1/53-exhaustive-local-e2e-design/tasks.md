@@ -340,7 +340,7 @@
     moment to lift it into `tests/e2e/harness/fixtures/` is when the matrix needs it too.
   - `tests/e2e/api/` at `--workers=6`: 271 passed, 3 skipped.
 
-- [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
+- [x] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
   - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
   - **The helper already exists (2026-08-02): `methodNotAllowed()` in `src/shared/lib/http/method-not-allowed.ts`,
     proven on `/api/me/builder/$builderId`.** What remains is the static check and the per-route decisions —
@@ -373,9 +373,43 @@
 
     `admin.spec.ts` gained a GET row per trigger, so all three probes cover them — **216 passed**.
 
-  - **Still open: 66.** `operations/$jobKey/run.ts` is deliberately excluded: it does not use the cron-or-admin
-    pair, so it is a judgement rather than part of the batch. The rest need the same per-route decision as
-    before — 405 or implement it — with the public/authenticated split above deciding which helper applies.
+  - **Done, all of it (2026-08-03) — and three of the claims above were wrong.** The remaining "66 judgements"
+    turned out to be one mechanical change, because the premise behind them did not hold.
+
+    **1. There is a framework hook.** The doc comment asserted there was none, so every rejection had to be
+    declared per method. `createStartHandler` (start-server-core) resolves a request as
+    `handlers[requestMethod] ?? handlers['ANY']`, and `ANY` is a typed member of the public `RouteMethod` union
+    (`'ANY' | 'GET' | … | 'OPTIONS' | 'HEAD'`). One `ANY` per route closes **every** method it does not
+    implement, including `OPTIONS`, `HEAD` and anything HTTP gains later. `ANY` is consulted only when no
+    specific handler matches, and `HEAD` resolves through `GET` first, so it never shadows a real handler.
+
+    **2. The surface was ~10× the stated number.** "83 of 202 files" and "66 remaining" counted the `GET`
+    dimension only. Counting every method a route fails to implement gives **712 method/route pairs across 201
+    files**. `PATCH /api/solutions/runs/:id` — one of the two original findings — was itself a non-GET, so the
+    narrow count was never the right measure.
+
+    **3. The leak that justified guard-first does not exist here.** The claim was that a bare 405 confirms a
+    route exists where a 401 would not. `platformAdminErrorResponse` maps every refusal to 401 or 403 and never
+    404, so `POST /api/admin/anything` already distinguishes a real admin route from an absent one. Guard-first
+    is still used on the 16 triggers, but for a different and smaller reason, now recorded in the helper: a
+    **consistent** refusal, where a stranger gets the same 401 for every verb rather than a 405 that reads as
+    "your credentials were fine, your verb was not".
+
+    **All 205 route files are now sealed.** A wrapper (`handlers: sealMethods({ … })`) that derived `Allow` from
+    the object's own keys was built first and abandoned: the `{ request, params }` argument of every handler is
+    *contextually* typed from `createFileRoute`, and routing the literal through a generic function severs it —
+    375 `implicitly has an 'any' type` errors, and `params.eventId` degraded to `any`. Typed handler bodies are
+    worth more than deriving one header, so `ANY: methodNotAllowed([…])` sits inside the literal and
+    `scripts/check-api-route-methods.mjs` compares every hand-written list against the handlers the file
+    declares.
+
+    The codemod was rewritten on the TypeScript compiler API after a hand-rolled scanner mis-read three files
+    whose quote and comment nesting it got wrong and reported them as having no handlers at all — the same bug
+    would have silently excluded them from the static check.
+
+    `operations/$jobKey/run.ts` needed no special judgement in the end: sealing defers no product decision, since
+    200-with-an-HTML-page is not a defensible answer for any method on any route, and implementing a method later
+    stays just as available.
   - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
     through to the route *component*, so the request gets **200 with an HTML document** instead of 405 with an
     `Allow` header. A client scripting the endpoint reads 200 and concludes it succeeded. It was hit twice
@@ -389,8 +423,32 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-  - Verify: the check fails against one deliberately-unhandled method, passes after the helper lands, and
-    `GET` on a PATCH-only route answers 405 with `Allow`.
+  - **Verified (2026-08-03).** Both halves, static and runtime, plus both negative controls:
+    - `pnpm security:route-methods` → `205 route(s) sealed with ANY; every Allow header matches its handlers`.
+      Wired into `package.json`, `.github/workflows/quality.yml` and `scripts/ci/local-quality.sh` beside
+      `security:route-client-boundary`.
+    - The gate fails on both defect shapes, checked by breaking a file each way: deleting an `ANY` reports
+      *"no ANY handler, so every method this route does not implement (GET, POST, PUT) answers 200 with an HTML
+      page"*; changing `['PATCH', 'DELETE']` to `['PATCH', 'POST']` reports both halves of the drift — Allow lists
+      a method with no handler, and an implemented method missing from Allow.
+    - `tests/e2e/api/route-method-seal.spec.ts` (new) sends `PROPFIND` — valid HTTP, implemented by nothing here —
+      to every route file's own `createFileRoute` id and asserts none answers 200 or `text/html`, and that any 405
+      carries `Allow`. Deriving paths from filenames instead does not work: TanStack reads a dot as a path
+      separator (`solutions/runs.$runId.ts` → `/api/solutions/runs/$runId`) and `[.]` as a literal dot
+      (`calendar/export[.]ics.ts` → `/api/calendar/export.ics`); the first attempt produced three URLs matching no
+      route, which answered 404-with-HTML and looked exactly like the defect under test.
+    - Negative control on the spec: removing the `ANY` from `status/index.ts` produced
+      `PROPFIND /api/status/ answered 200 text/html; charset=utf-8` — the defect's exact signature.
+    - Live server, before/after: anonymous `GET`/`PUT`/`PATCH`/`DELETE` on `/api/admin/calendar/run-reminders`
+      answer 401 (previously 200 + HTML); the same verbs with a cron token answer 405 / `Allow: POST`; public
+      routes answer 405 with a correct `Allow` (`/api/status`, `/api/changelog`, `/api/ai/config`,
+      `/api/og/blog`, `/api/webhooks/stripe`). `GET` and `HEAD` still work everywhere checked, `/api/og/explore`
+      still returns a 1200×630 PNG, and better-auth is unaffected (`get-session` 200, bad-credential sign-in 400).
+    - `OPTIONS` is the one method not verifiable in dev: Vite's middleware answers it `204` with permissive CORS
+      headers for *every* path, including paths with no route at all, so it never reaches the app. The app
+      declares no `OPTIONS` handler and no CORS of its own, so in production it reaches `ANY`.
+    - Suites: `tests/e2e/api` 357 passed / 3 skipped; full chromium e2e **741 passed / 5 skipped / 0 failed**;
+      unit 5661 passed; `tsc` 0; `eslint` 0 errors.
 
 - [x] **Signed Stripe webhooks: raw-body signature verification, duplicate handling, secret rotation, internal re-routing**
   - Files: `tests/e2e/api/webhooks-stripe.spec.ts` (new); `scripts/check-route-coverage.mjs` (verify the public-allowlist entry for `src/routes/api/webhooks/stripe.ts` survives; do not edit)

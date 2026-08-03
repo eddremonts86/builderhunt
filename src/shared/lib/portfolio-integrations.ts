@@ -124,3 +124,41 @@ export function readTimelineForPortfolio(
   }
   return out
 }
+
+/**
+ * Whether each optional integration has anything to show, for the owner's draft editor.
+ *
+ * ## The defect this closes
+ *
+ * `/api/me/builder-claims/:claimId/portfolio` returned `integrationsAvailable: { aiPersona: false, timeline: false }`
+ * as a **literal**, and nothing consumed it. So both toggles in `PortfolioSettings.tsx` were always live: an owner
+ * could switch on "Show AI-summarized profile", save, publish, and get an unchanged page with no explanation —
+ * because `readAiPersonaForPortfolio` had returned null for an artifact that was never there.
+ *
+ * ## Availability deliberately ignores the opt-in flags
+ *
+ * `readAiPersonaForPortfolio` and `readTimelineForPortfolio` take `aiPersonaEnabled` / `timelineEnabled` and
+ * return nothing when they are false. Availability must **not** pass those through: it answers "could this be
+ * turned on", not "is it on". Threading the opt-in into it makes the signal self-fulfilling — availability false
+ * because the toggle is off, toggle unusable because availability is false, and the owner can never reach the
+ * feature at all.
+ *
+ * ## Why "exists" is not the test
+ *
+ * Both fields answer whether the *rendered* output would be non-empty, by running the same fail-closed adapters
+ * the public page runs. An artifact that exists but is stale, malformed, or from a future timestamp renders
+ * nothing, so reporting it as available would reproduce the original defect one layer down: a toggle that is
+ * enabled, saves cleanly, and changes nothing on the published page.
+ */
+export function portfolioIntegrationsAvailable(input: {
+  /** The raw `metadata.aiEnrichment` artifact, as `findClaimantOwnedAiEnrichment` returns it. */
+  aiEnrichment: unknown
+  /** Timeline events already mapped to this module's field names, as the public route maps them. */
+  timelineEvents: unknown
+  now?: Date
+}): { aiPersona: boolean; timeline: boolean } {
+  return {
+    aiPersona: readAiPersonaForPortfolio(input.aiEnrichment, { now: input.now }) !== null,
+    timeline: readTimelineForPortfolio(input.timelineEvents).length > 0,
+  }
+}

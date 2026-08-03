@@ -272,3 +272,127 @@ test.describe('portfolio owner return to Account', () => {
     }
   })
 })
+
+/**
+ * Plan 37 tasks 1 & 2 — the owner's draft editor must not offer an integration that has nothing to show.
+ *
+ * `/api/me/builder-claims/:claimId/portfolio` returned `integrationsAvailable: { aiPersona: false, timeline: false }`
+ * as a literal and nothing consumed it, so both toggles were always live. An owner could switch on "Show
+ * AI-summarized profile", save, publish, and get an unchanged public page with no explanation — the adapter had
+ * quietly returned null for an artifact that was never there.
+ *
+ * Availability is resolved server-side by running the same fail-closed adapters the public page runs, against the
+ * claimant's *own* enrichment row (`public_claimant_owned_ai_enrichment`, migration 0119 — a SECURITY DEFINER
+ * function, so the owner and an anonymous visitor resolve the identical artifact rather than an RLS-narrowed one).
+ */
+test.describe('portfolio integrations availability', () => {
+  const validEnrichment = {
+    summary: 'A senior Rust engineer with deep async-runtime experience and a track record of library maintenance.',
+    estimatedSeniority: 'senior',
+    primaryFocus: 'systems programming',
+    strengths: ['rust', 'async', 'wasm'],
+    codingStyle: 'Functional, test-driven, minimal-API crates.',
+    model: 'enrich-v1',
+    version: 1,
+  }
+
+  /** An `organization_builders` row created by the claimant themselves — the only case 0119's function matches. */
+  async function seedClaimantOwnedEnrichment(builderIdentityId: string, enrichedAt: string) {
+    await harness.sql`
+      insert into organization_builders (id, organization_id, builder_identity_id, creator_user_id, visibility, status, private_metadata)
+      values (
+        ${`ob-avail-${builderIdentityId}`},
+        ${harness.organization.organizationId},
+        ${builderIdentityId},
+        ${harness.owner.userId!},
+        'private',
+        'tracked',
+        ${harness.sql.json({ aiEnrichment: { ...validEnrichment, enrichedAt } })}
+      )
+      on conflict (id) do update set private_metadata = excluded.private_metadata
+    `
+  }
+
+  async function readDraft(claimId: string) {
+    const response = await harness.owner.api!.get(`${harness.baseURL}/api/me/builder-claims/${claimId}/portfolio`)
+    expect(response.status()).toBe(200)
+    return response.json() as Promise<{ integrationsAvailable: { aiPersona: boolean; timeline: boolean } }>
+  }
+
+  test('reports aiPersona unavailable with no artifact, and available once a fresh one exists', async () => {
+    const { builderIdentityId, claimId } = await seedIdentityAndClaim({ directoryPublished: true, portfolioPublished: false })
+    try {
+      // No enrichment row at all — the state every claim starts in, and the one the literal used to hard-code.
+      expect((await readDraft(claimId)).integrationsAvailable.aiPersona).toBe(false)
+
+      // A stale artifact exists but renders nothing, so reporting it available would re-create the same defect:
+      // a toggle that enables cleanly and changes nothing. `readAiPersonaForPortfolio`'s freshness window is what
+      // decides this, and it is the reason availability runs the adapter instead of testing for presence.
+      await seedClaimantOwnedEnrichment(builderIdentityId, '2020-01-01T00:00:00.000Z')
+      expect((await readDraft(claimId)).integrationsAvailable.aiPersona).toBe(false)
+
+      // Fresh, well-formed, and owned by the claimant.
+      await seedClaimantOwnedEnrichment(builderIdentityId, fixedClockFromEnv().now().toISOString())
+      expect((await readDraft(claimId)).integrationsAvailable.aiPersona).toBe(true)
+    } finally {
+      await harness.sql`delete from organization_builders where builder_identity_id = ${builderIdentityId}`
+      await cleanupIdentity(builderIdentityId, claimId)
+    }
+  })
+
+  test('the editor disables an unavailable toggle and says why, without trapping an enabled one', async ({ browser }) => {
+    // `directoryPublished` matters: /me lists claims through an inner join on `published_builder_profiles`, so a
+    // claim without one never reaches the editor at all.
+    const { builderIdentityId, claimId } = await seedIdentityAndClaim({ directoryPublished: true, portfolioPublished: false })
+    try {
+      const context = await browser.newContext({ storageState: harness.owner.storageState! })
+      const page = await context.newPage()
+      const guard = expectStrictBrowser(page)
+      try {
+        /**
+         * `DashboardLayout` probes `GET /api/admin/incidents` on every document mount, which 403s for a
+         * non-platform-admin owner by design (see `auth-and-sessions.spec.ts`, same allowance). One per mount, and
+         * this test mounts twice — once for the unavailable-and-off state, once for unavailable-but-on.
+         */
+        guard.allowExpectedFailure(/Failed to load resource/)
+        guard.allowExpectedFailure(/Failed to load resource/)
+
+        await gotoHydrated(page, `${harness.baseURL}/me`)
+        const toggle = page.getByTestId('portfolio-show-ai-persona-toggle')
+        await expect(toggle).toBeVisible()
+
+        // Nothing to show: the toggle is inert and the page says so, rather than accepting a change that would
+        // publish an empty section.
+        await expect(toggle).toBeDisabled()
+        await expect(page.getByTestId('portfolio-ai-persona-unavailable')).toContainText('Not available yet')
+
+        /**
+         * Now the same claim with the setting already on but still nothing to show — the state an owner lands in
+         * when their artifact goes stale after they enabled it. A flatly-disabled switch here would leave them
+         * unable to turn off a section their published page still advertises, so it must stay operable.
+         */
+        await harness.sql`
+          update builder_claims
+          set metadata = jsonb_set(
+            coalesce(metadata, '{}'::jsonb),
+            '{portfolio}',
+            coalesce(metadata -> 'portfolio', '{}'::jsonb) || jsonb_build_object('showAiPersona', true),
+            true
+          )
+          where id = ${claimId}
+        `
+        await gotoHydrated(page, `${harness.baseURL}/me`)
+        const enabledToggle = page.getByTestId('portfolio-show-ai-persona-toggle')
+        await expect(enabledToggle).toBeEnabled()
+        await expect(page.getByTestId('portfolio-ai-persona-unavailable')).toContainText('Turn it off to remove it')
+
+        guard.assertClean()
+      } finally {
+        guard.dispose()
+        await context.close()
+      }
+    } finally {
+      await cleanupIdentity(builderIdentityId, claimId)
+    }
+  })
+})

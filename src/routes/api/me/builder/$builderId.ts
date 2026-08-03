@@ -15,6 +15,9 @@ export const Route = createFileRoute('/api/me/builder/$builderId')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['PATCH']),
+
       /**
        * A `GET` here used to answer **200 with an HTML document**, because an unimplemented method on a file
        * route falls through to `component: () => null`. A client reading that 200 would conclude it had

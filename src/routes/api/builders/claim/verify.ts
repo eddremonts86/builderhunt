@@ -32,6 +32,7 @@
  * cutover was committed 2026-07-26 but did not reach production until 2026-07-27.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { log } from '~/shared/lib/log'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -45,6 +46,9 @@ export const Route = createFileRoute('/api/builders/claim/verify')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         const token = new URL(request.url).searchParams.get('token')
         if (!token) return errorResponse('Missing token')

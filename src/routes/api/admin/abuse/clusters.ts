@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { findLinkedAccountClusters } from '~/shared/lib/abuse/linked-accounts'
 
@@ -8,6 +9,9 @@ export const Route = createFileRoute('/api/admin/abuse/clusters')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           await requirePlatformAdminPrincipal(request)

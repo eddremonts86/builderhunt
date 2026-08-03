@@ -15,6 +15,33 @@ interface DraftResponse {
   claimId: string
   settings: PortfolioSettingsData
   projectCandidates: PortfolioProject[]
+  /**
+   * Whether each optional integration would actually render anything for this builder — resolved server-side by
+   * running the same fail-closed adapters the public page runs.
+   *
+   * Optional because an older response shape omitted it; absent is treated as available so a stale client never
+   * locks an owner out of a toggle that works.
+   */
+  integrationsAvailable?: { aiPersona?: boolean; timeline?: boolean }
+}
+
+/**
+ * An unavailable integration disables its toggle — but only while it is off.
+ *
+ * The trap in the obvious version: an owner enables the persona, the enrichment artifact later goes stale, and a
+ * flatly-disabled switch leaves them unable to turn off something their published page is still advertising. So
+ * an enabled-but-unavailable toggle stays operable, and says what is actually happening instead.
+ */
+function integrationState(available: boolean | undefined, enabled: boolean) {
+  const usable = available !== false
+  return {
+    disabled: !usable && !enabled,
+    note: usable
+      ? null
+      : enabled
+        ? 'Nothing to show right now, so this section is hidden on your public page. Turn it off to remove it.'
+        : 'Not available yet — there is nothing to show for your profile.',
+  }
 }
 
 interface PortfolioSettingsProps {
@@ -121,6 +148,8 @@ export function PortfolioSettings({ claimId }: PortfolioSettingsProps) {
   if (!draft) return null
 
   const { settings } = draft
+  const aiPersonaState = integrationState(draft.integrationsAvailable?.aiPersona, settings.showAiPersona)
+  const timelineState = integrationState(draft.integrationsAvailable?.timeline, settings.showTimeline)
 
   return (
     <div className="card p-5 space-y-4" data-testid="portfolio-settings">
@@ -204,10 +233,16 @@ export function PortfolioSettings({ claimId }: PortfolioSettingsProps) {
           <p className="text-xs text-bh-text-dim mt-0.5">
             Shows a short AI-generated summary (focus, strengths) from your own tracked-builder enrichment. Off by default.
           </p>
+          {aiPersonaState.note && (
+            <p className="text-xs text-bh-text-dim mt-1 italic" data-testid="portfolio-ai-persona-unavailable">
+              {aiPersonaState.note}
+            </p>
+          )}
         </div>
         <Switch
           id="portfolio-show-ai-persona"
           checked={settings.showAiPersona}
+          disabled={aiPersonaState.disabled}
           onCheckedChange={(checked) => setDraft({ ...draft, settings: { ...settings, showAiPersona: checked } })}
           data-testid="portfolio-show-ai-persona-toggle"
         />
@@ -219,10 +254,16 @@ export function PortfolioSettings({ claimId }: PortfolioSettingsProps) {
           <p className="text-xs text-bh-text-dim mt-0.5">
             Shows a bounded list of your recent public activity (repos, releases, posts). Off by default.
           </p>
+          {timelineState.note && (
+            <p className="text-xs text-bh-text-dim mt-1 italic" data-testid="portfolio-timeline-unavailable">
+              {timelineState.note}
+            </p>
+          )}
         </div>
         <Switch
           id="portfolio-show-timeline"
           checked={settings.showTimeline}
+          disabled={timelineState.disabled}
           onCheckedChange={(checked) => setDraft({ ...draft, settings: { ...settings, showTimeline: checked } })}
           data-testid="portfolio-show-timeline-toggle"
         />

@@ -432,12 +432,28 @@ interface PortfolioClaimRow {
   metadata: Record<string, unknown>
 }
 
+/**
+ * The owner's draft row carries the builder identity id; the public row deliberately does not.
+ *
+ * `getPublicPortfolioClaim` feeds a payload that gets cached and served to every viewer, and
+ * `getPortfolioLinkContext` exists precisely so the identity id reaches the page *outside* that payload. Widening
+ * the shared row to hold it would put it one careless spread away from the cache entry, so the owner-only
+ * projection gets its own type instead.
+ */
+interface OwnedPortfolioClaimRow extends PortfolioClaimRow {
+  builderIdentityId: string
+}
+
 async function findOwnedVerifiedClaimForPortfolio(
   transaction: TenantTransaction,
   input: { subjectUserId: string; claimId: string },
-): Promise<PortfolioClaimRow | null> {
+): Promise<OwnedPortfolioClaimRow | null> {
   const [row] = await transaction.select({
     claimId: builderClaims.id,
+    // Carried so the owner's draft editor can answer "is there an AI-enrichment artifact / are there any
+    // timeline events for this builder". Both live against the identity row, and this projection did not expose
+    // it — which is why the route reported `integrationsAvailable` as a hard-coded false for everyone.
+    builderIdentityId: builderClaims.builderIdentityId,
     metadata: builderClaims.metadata,
     source: builderIdentities.source,
     sourceId: builderIdentities.sourceId,
@@ -464,7 +480,11 @@ export async function getPortfolioForOwner(
   if (!row) return null
   return {
     claimId: row.claimId,
+    // Server-side only: the route uses it to resolve integration availability and does not put it in the
+    // response, which has no need for it.
+    builderIdentityId: row.builderIdentityId,
     source: row.source,
+    sourceId: row.sourceId,
     username: row.username,
     displayName: row.displayName,
     avatarUrl: row.avatarUrl,

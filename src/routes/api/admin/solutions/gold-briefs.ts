@@ -16,6 +16,7 @@
  * curated one a week later, and the whole split depends on the two never mixing.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { randomUUID } from 'node:crypto'
 import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
@@ -36,6 +37,9 @@ export const Route = createFileRoute('/api/admin/solutions/gold-briefs')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST', 'DELETE']),
+
       GET: async ({ request }) => {
         try {
           const principal = await requirePlatformAdminPrincipal(request)

@@ -4,6 +4,7 @@
  * any review decision (checked before allowing accepted).
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { EvidenceReviewBody } from '~/lib/enrichment/schemas'
@@ -17,6 +18,9 @@ export const Route = createFileRoute('/api/builders/$builderId/evidence/$evidenc
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['PATCH']),
+
       PATCH: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

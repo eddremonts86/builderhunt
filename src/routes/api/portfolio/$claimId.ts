@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { publicDb } from '~/shared/lib/db/client'
 import { env } from '~/shared/lib/env'
 import { buildPublicPortfolio, parsePortfolioSettings } from '~/shared/lib/portfolio'
@@ -16,6 +17,9 @@ export const Route = createFileRoute('/api/portfolio/$claimId')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ params }) => {
         try {
           if (env.PORTFOLIOS_ENABLED === 'false') {

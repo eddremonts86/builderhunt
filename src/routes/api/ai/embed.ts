@@ -8,6 +8,7 @@
  * tenant context rather than routing through this HTTP endpoint.
  */
 import { z } from 'zod'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { createFileRoute } from '@tanstack/react-router'
 import { env } from '~/shared/lib/env'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
@@ -23,6 +24,9 @@ export const Route = createFileRoute('/api/ai/embed')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         if (env.AI_DISABLED === 'true') {
           return Response.json({ error: 'ai_disabled' }, { status: 503 })

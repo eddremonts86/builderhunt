@@ -7,6 +7,7 @@
  * the response confirms the channel is reachable without fabricating a trigger row.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
 import { findOrganizationAlert } from '~/shared/lib/repositories/organization-alerts'
@@ -21,6 +22,9 @@ export const Route = createFileRoute('/api/alerts/$id/test-send')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

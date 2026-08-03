@@ -2,6 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  portfolioIntegrationsAvailable,
   readAiPersonaForPortfolio,
   readTimelineForPortfolio,
 } from '~/shared/lib/portfolio-integrations'
@@ -126,5 +127,72 @@ describe('readTimelineForPortfolio', () => {
       id: 12345, occurredAt: '2026-07-01T00:00:00.000Z', kind: 'k', title: 't', summary: 's',
     }])
     expect(out).toEqual([])
+  })
+})
+
+
+/**
+ * `portfolioIntegrationsAvailable` — the signal the owner's draft editor uses to decide whether a toggle can do
+ * anything. It replaced a hard-coded `{ aiPersona: false, timeline: false }` that nothing consumed, which is why
+ * both toggles used to be live for everyone regardless of whether there was anything to show.
+ */
+describe('portfolioIntegrationsAvailable', () => {
+  const event = { id: 'e1', occurredAt: '2026-07-01T00:00:00.000Z', kind: 'release', title: 'v1.0', summary: 'Shipped' }
+  const now = new Date('2026-07-20T00:00:00.000Z')
+
+  it('reports both available when each would actually render something', () => {
+    expect(portfolioIntegrationsAvailable({ aiEnrichment: validPersona, timelineEvents: [event], now }))
+      .toEqual({ aiPersona: true, timeline: true })
+  })
+
+  it('reports both unavailable when there is nothing at all', () => {
+    expect(portfolioIntegrationsAvailable({ aiEnrichment: null, timelineEvents: [], now }))
+      .toEqual({ aiPersona: false, timeline: false })
+  })
+
+  it('resolves the two integrations independently', () => {
+    expect(portfolioIntegrationsAvailable({ aiEnrichment: validPersona, timelineEvents: [], now }))
+      .toEqual({ aiPersona: true, timeline: false })
+    expect(portfolioIntegrationsAvailable({ aiEnrichment: null, timelineEvents: [event], now }))
+      .toEqual({ aiPersona: false, timeline: true })
+  })
+
+  /**
+   * The whole point of running the adapters rather than testing for presence. An artifact that exists but renders
+   * nothing must report unavailable, or the toggle becomes enabled, saves cleanly, and changes nothing on the
+   * published page — the original defect, one layer down.
+   */
+  it('treats a stale artifact as unavailable even though it exists', () => {
+    expect(portfolioIntegrationsAvailable({
+      aiEnrichment: validPersona,
+      timelineEvents: [],
+      now: new Date('2027-01-01T00:00:00.000Z'),
+    }).aiPersona).toBe(false)
+  })
+
+  it('treats a malformed artifact and malformed events as unavailable', () => {
+    expect(portfolioIntegrationsAvailable({ aiEnrichment: { wrong: 'shape' }, timelineEvents: 'not an array', now }))
+      .toEqual({ aiPersona: false, timeline: false })
+  })
+
+  it('treats events that all fail the allowlist as unavailable, not merely non-empty', () => {
+    // A non-empty list whose entries readTimelineForPortfolio drops renders an empty timeline.
+    expect(portfolioIntegrationsAvailable({
+      aiEnrichment: null,
+      timelineEvents: [{ id: '', occurredAt: 'nope', kind: 'k', title: '', summary: 's' }],
+      now,
+    }).timeline).toBe(false)
+  })
+
+  /**
+   * Availability must not depend on the owner's own opt-in, or the signal is self-fulfilling: off because the
+   * toggle is off, toggle unusable because it reports off, feature unreachable forever.
+   */
+  it('ignores the opt-in flags entirely — it answers "could this be turned on"', () => {
+    const available = portfolioIntegrationsAvailable({ aiEnrichment: validPersona, timelineEvents: [event], now })
+    expect(available).toEqual({ aiPersona: true, timeline: true })
+    // Sanity check that the flags the adapters *do* honour would have suppressed both, had they been threaded in.
+    expect(readAiPersonaForPortfolio(validPersona, { now, aiPersonaEnabled: false })).toBeNull()
+    expect(readTimelineForPortfolio([event], { timelineEnabled: false })).toEqual([])
   })
 })

@@ -209,9 +209,14 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'users/index.ts', method: 'GET', path: '/api/admin/users' },
 
   /**
-   * POST-only triggers that now reject GET explicitly. Listed so all three probes cover them: a GET
-   * must be refused for a stranger by the *guard* (not a bare 405, which would confirm the route exists) and
-   * answered 405 for a real admin.
+   * POST-only triggers, whose seal runs the cron-or-admin guard before refusing the method. Listed so all three
+   * probes cover them: a `GET` is refused by the *guard* for a stranger and answered 405 for a real admin.
+   *
+   * The guard-first ordering is about a **consistent** refusal, not about hiding the route: a stranger gets the
+   * same 401 for `GET` as for `POST`, rather than a 405 that reads as "your credentials were fine, your verb was
+   * not". It does not conceal that the route exists, and an earlier version of this comment claiming otherwise
+   * was wrong — `platformAdminErrorResponse` answers 401/403 and never 404, so `POST` already distinguishes a
+   * real admin route from an absent one.
    */
   { file: 'activity/run-retention.ts', method: 'GET', path: '/api/admin/activity/run-retention' },
   { file: 'alerts/run-worker.ts', method: 'GET', path: '/api/admin/alerts/run-worker' },

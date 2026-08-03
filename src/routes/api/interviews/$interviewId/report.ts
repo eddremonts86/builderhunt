@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { editReport, generateReport } from '~/lib/interviews/report-service'
 import { briefContextForEvent } from '~/lib/interviews/brief-context'
@@ -57,6 +58,9 @@ export const Route = createFileRoute('/api/interviews/$interviewId/report')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST', 'PATCH']),
+
       GET: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

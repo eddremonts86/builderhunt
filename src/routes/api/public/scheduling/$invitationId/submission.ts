@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { recordDecisions } from '~/lib/scheduling/consent-service'
 import {
   CANDIDATE_NOTICE,
@@ -27,6 +28,9 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/submi
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['PUT']),
+
       PUT: async ({ request, params }) => {
         const refused = await guardPublicRequest(request, true)
         if (refused) return refused

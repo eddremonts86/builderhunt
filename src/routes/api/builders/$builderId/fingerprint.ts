@@ -20,6 +20,7 @@
  *   otherwise                → 200 { fingerprint, cached: false }
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -46,6 +47,9 @@ export const Route = createFileRoute('/api/builders/$builderId/fingerprint')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)

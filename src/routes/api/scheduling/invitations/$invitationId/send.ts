@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { invitationAuditDetails, markInvitationSent } from '~/lib/scheduling/invitation-service'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -49,6 +50,9 @@ export const Route = createFileRoute('/api/scheduling/invitations/$invitationId/
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           if (env.SCHEDULING_ENABLED === 'false') return schedulingDisabledResponse()

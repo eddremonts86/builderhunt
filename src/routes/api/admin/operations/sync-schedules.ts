@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auditPlatformAdminAction, platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { tryCronPrincipal } from '~/shared/lib/auth/cron'
 import { assertRegistryIsSafe } from '~/shared/lib/operational-schedules'
@@ -19,6 +20,9 @@ export const Route = createFileRoute('/api/admin/operations/sync-schedules')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       POST: async ({ request }) => {
         try {
           const principal = tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)

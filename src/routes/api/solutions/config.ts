@@ -8,12 +8,16 @@
  * (`solutions.generate.v1`/`solutions.regenerate.v1`) — see `shared/lib/solutions/config.ts`.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { getSolutionsFeatureFlags } from '~/shared/lib/solutions/config'
 
 export const Route = createFileRoute('/api/solutions/config')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: () => {
         const ready = getSolutionsFeatureFlags().paidGenerationEnabled
         return new Response(JSON.stringify({ ready }), {

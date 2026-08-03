@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { searchBuilders } from '~/lib/search'
 import type { ScoredBuilder } from '~/lib/search'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
@@ -100,6 +101,9 @@ export const Route = createFileRoute('/api/og/explore')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         const url = new URL(request.url)
         const radarSlug = url.searchParams.get('radar') ?? ''

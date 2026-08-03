@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { listPublicRoadmap, togglePublicRoadmapVote } from '~/shared/lib/repositories/public-content'
 
@@ -6,6 +7,9 @@ export const Route = createFileRoute('/api/roadmap/')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       GET: async ({ request }) => {
         try {
           const session = await auth.api.getSession({ headers: request.headers })

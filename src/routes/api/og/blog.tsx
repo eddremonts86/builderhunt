@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { getPostBySlug } from '~/shared/lib/blog'
 
 // Render the OG image as SVG, then rasterize to PNG via @resvg/resvg-js —
@@ -100,6 +101,9 @@ export const Route = createFileRoute('/api/og/blog')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         const url = new URL(request.url)
         const slug = url.searchParams.get('slug') ?? ''

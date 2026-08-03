@@ -7,6 +7,7 @@
  * flag is off, so toggling collection never breaks the pages that call it.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { env } from '~/shared/lib/env'
 import { isWithinClockSkewWindow, parseConversionEvent } from '~/shared/lib/conversion-events'
 import { recordConversionEvent } from '~/shared/lib/repositories/conversion-events'
@@ -16,6 +17,9 @@ export const Route = createFileRoute('/api/analytics/conversion')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         // Kill switch: collection off entirely. Still 200s — the caller
         // (conversion-client.ts) should never treat "disabled" as an error.

@@ -14,6 +14,7 @@
  *      AIParseError after one retry                        -> 502 ai_parse_failed
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { env } from '~/shared/lib/env'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
@@ -34,6 +35,9 @@ export const Route = createFileRoute('/api/ai/complete')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         let body: CompleteRequestBody
         try {

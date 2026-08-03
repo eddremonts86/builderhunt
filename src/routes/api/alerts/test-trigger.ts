@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { randomId } from '~/lib/utils'
 import { evaluateMatch, recordTrigger, type TriggerConditions } from '~/shared/lib/alerts'
@@ -36,6 +37,9 @@ export const Route = createFileRoute('/api/alerts/test-trigger')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         try {
           if (env.NODE_ENV === 'production') return Response.json({ error: 'Not found' }, { status: 404 })

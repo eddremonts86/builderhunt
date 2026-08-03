@@ -99,6 +99,7 @@ jobs:
       - run: pnpm security:route-coverage
       - run: pnpm security:ui-route-graph
       - run: pnpm security:route-client-boundary
+      - run: pnpm security:route-methods
       - run: pnpm security:provider-metering
       - name: Tenant schema classification
         run: pnpm db:audit-schema

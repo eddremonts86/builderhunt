@@ -1,10 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { getTeamSnapshot, requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/organizations/contracts'
 
 export const Route = createFileRoute('/api/organizations/team')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)

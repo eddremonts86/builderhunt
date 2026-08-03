@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { sendExportReadyEmail } from '~/shared/lib/email'
 import { buildExportPayload, EXPORT_TTL_MS } from '~/shared/lib/legal'
@@ -14,6 +15,9 @@ export const Route = createFileRoute('/api/me/data-export/')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       POST: async ({ request }) => {
         try {
           const session = await auth.api.getSession({ headers: request.headers })

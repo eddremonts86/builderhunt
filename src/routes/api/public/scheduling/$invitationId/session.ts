@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { withCapabilityContext } from '~/lib/scheduling/capability-context'
 import { capabilitySessionSetCookie } from '~/lib/scheduling/capability-session'
 import {
@@ -30,6 +31,9 @@ export const Route = createFileRoute('/api/public/scheduling/$invitationId/sessi
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         const refused = await guardPublicRequest(request, true)
         if (refused) return refused

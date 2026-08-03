@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { auth } from '~/shared/lib/auth/better-auth'
 import { resolveEnforcementForUser } from '~/shared/lib/abuse/enforcement'
@@ -21,6 +22,9 @@ export const Route = createFileRoute('/api/me/stepup/')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       GET: async ({ request }) => {
         try {
           const authSession = await auth.api.getSession({ headers: request.headers })

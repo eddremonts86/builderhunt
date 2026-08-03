@@ -12,50 +12,52 @@
  * implements `PATCH` only. A measurement then found **83 of 202 route files declare no GET at all**, so a
  * `GET` to any of them answers with a page today.
  *
- * ## Why a helper rather than a global fallback
+ * ## Seal a route with `ANY`
  *
- * There is no framework hook for "reject every method I did not declare" — the fallthrough target is the
- * component, and a component cannot set a status. So the rejection has to be declared per route, and the point
- * of this helper is that declaring it costs one line and cannot be got subtly wrong:
- *
- *     import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
+ * An earlier version of this file claimed there was no framework hook for "reject every method I did not
+ * declare", so every rejection had to be spelled out per method. That was wrong. `createStartHandler` resolves a
+ * request as `handlers[requestMethod] ?? handlers['ANY']`, and `ANY` is a typed member of the public `RouteMethod`
+ * union. One `ANY` therefore closes every method a route does not implement — including `OPTIONS`, `HEAD`, and
+ * any method added to HTTP later:
  *
  *     handlers: {
- *       PATCH: async ({ request }) => { ... },
- *       GET: methodNotAllowed(['PATCH']),
+ *       ANY: methodNotAllowed(['PATCH']),
+ *       PATCH: async ({ request, params }) => { ... },
  *     }
  *
- * `Allow` is required by RFC 9110 on a 405 and is the part hand-written rejections forget. It is also the only
- * machine-readable way for a caller to discover what the route *does* accept, which is what turns a refusal
- * into something actionable rather than a dead end.
+ * `ANY` is consulted only when no specific handler matches, and `HEAD` resolves through `GET` first, so sealing
+ * never shadows a real handler.
  *
- * ## Do not use this bare on an authenticated route
+ * Sealing defers no product decision: 200-with-an-HTML-page is not a defensible answer for any method on any
+ * route, so 405 is right by default everywhere, and implementing a method callers genuinely want stays just as
+ * available afterwards. The seal only removes the option of answering one by accident.
  *
- * This helper answers **before authentication** — it has no session to check. On a public or already-guarded
- * route that is exactly right. On `/api/admin/*` it is not: a 405 to an anonymous caller confirms the route
- * exists, where a 401 says nothing. That is the same leak as validating before authenticating, fixed in
- * `src/routes/api/organizations/index.ts` for exactly this reason — the refusal a stranger sees must not depend
- * on facts they are not entitled to.
+ * ## Why `allowed` is passed and not derived
  *
- * So for an authenticated route the order is: establish the caller first, *then* reject the method. There is
- * deliberately no helper for that yet, because the guard differs per route family
- * (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a capability check) and picking one for the caller
- * would be guessing. Write the two lines locally, or add a variant that takes the guard.
+ * A wrapper — `handlers: sealMethods({ ... })` — would derive `Allow` from the object's own keys and could never
+ * drift. It was built, and it does not work: the `{ request, params, context }` argument of each handler is
+ * *contextually* typed from `createFileRoute`, and routing the literal through a generic function severs that.
+ * The result was 375 `implicitly has an 'any' type` errors and, worse, the loss of per-route `params` typing —
+ * `params.eventId` becomes `any`. Type safety on every handler body is worth more than deriving one header.
+ *
+ * So `allowed` is restated, and `scripts/check-api-route-methods.mjs` compares every list against the handlers
+ * the file actually declares. Drift is caught in CI rather than prevented by construction — a weaker guarantee,
+ * bought at no cost to the handlers themselves.
  */
 
-/** The methods this codebase's API routes can declare. */
+/** The methods this codebase's API routes implement. `ANY` is the framework's catch-all, not an implementation. */
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 /**
  * Builds a handler that refuses with 405 and an accurate `Allow` header.
  *
- * `allowed` is the list of methods the route *does* implement — passed in rather than derived, because a route
- * cannot introspect its own sibling handlers, and a hard-coded list that drifts from reality is caught by the
- * static check in `scripts/check-api-route-methods.mjs`.
+ * Use it as the route's `ANY` to seal every unimplemented method at once. Use it on a *named* method when that
+ * one absence has something specific to say — "read your claimed profiles at /api/me/builders" is more use than
+ * a generic refusal, and a named handler takes precedence over `ANY`.
  *
- * `reason` is optional and worth supplying when the absence is a design decision rather than an omission: "a
- * saved run is immutable" tells a caller not to look for another way in, where a bare "method not allowed"
- * invites them to keep trying.
+ * `reason` is worth supplying when the absence is a design decision rather than an omission: "a saved run is
+ * immutable" tells a caller not to look for another way in, where a bare "method not allowed" invites them to
+ * keep trying.
  */
 export function methodNotAllowed(allowed: readonly HttpMethod[], reason?: string) {
   const allow = [...allowed].join(', ')
@@ -66,31 +68,34 @@ export function methodNotAllowed(allowed: readonly HttpMethod[], reason?: string
     )
 }
 
+/** A refusal, plus the guard it should run first, for routes that want a consistent answer to strangers. */
+export type MethodGuard = {
+  guard: (request: Request) => unknown | Promise<unknown>
+  onRefusal: (error: unknown) => Response | null | undefined
+}
+
 /**
  * A 405 that only a caller who got past the guard can see.
  *
- * The counterpart to `methodNotAllowed` for authenticated routes, and the reason it takes its guard as an
- * argument rather than choosing one: this codebase has at least three
- * (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a cron token), several routes accept more than one,
- * and each family maps its own refusals to responses. A helper that picked would be wrong somewhere.
+ * It takes its guard as an argument rather than choosing one because this codebase has at least three
+ * (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a cron token) and several routes accept more than
+ * one, so a helper that picked would be wrong somewhere. `guard` resolves for an authorized caller and throws
+ * otherwise — the same expression the route's real handler already uses; `onRefusal` is the route's existing
+ * error mapper.
  *
- * `guard` resolves for an authorized caller and throws otherwise — the same expression the route's real handler
- * already uses. `onRefusal` maps a thrown refusal to a Response, which is the route's existing error mapper. So
- * an anonymous caller gets whatever the guard says (401/403, revealing nothing about which routes exist), and an
- * authorized one gets the 405 with `Allow` that tells them what to call instead.
+ * ## What this does and does not buy
  *
- *     GET: methodNotAllowedAfter({
- *       guard: (request) => tryCronPrincipal(request) ?? requirePlatformAdminPrincipal(request),
- *       onRefusal: platformAdminErrorResponse,
- *       allowed: ['POST'],
- *     })
+ * It was added on the belief that a bare 405 leaks route existence to an anonymous caller where a 401 would not.
+ * On this codebase that is **not** true, and the claim should not be repeated: `platformAdminErrorResponse` maps
+ * every refusal to 401 or 403, never 404, so `POST /api/admin/anything` already answers 401 for a route that
+ * exists and 404 for one that does not. Existence is discoverable with or without this.
+ *
+ * What it does buy is a **consistent** refusal: on an admin-only route a stranger gets the same 401 for `GET` as
+ * for `POST`, rather than a 405 that reads as "your credentials were fine, your verb was not". The cost is a
+ * session lookup on a request that is going to be refused regardless. Worth it on `/api/admin/*`, where every method is
+ * admin-only anyway; not worth reaching for on a route that serves anonymous callers by design.
  */
-export function methodNotAllowedAfter(options: {
-  guard: (request: Request) => unknown | Promise<unknown>
-  onRefusal: (error: unknown) => Response | null | undefined
-  allowed: readonly HttpMethod[]
-  reason?: string
-}) {
+export function methodNotAllowedAfter(options: MethodGuard & { allowed: readonly HttpMethod[]; reason?: string }) {
   const reject = methodNotAllowed(options.allowed, options.reason)
   return async ({ request }: { request: Request }): Promise<Response> => {
     try {

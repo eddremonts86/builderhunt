@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { briefContextForEvent } from '~/lib/interviews/brief-context'
 import { assertTranscriptionAllowed, SessionServiceError } from '~/lib/interviews/session-service'
 import { buildSessionConfig, createSessionToken, DeepgramError } from '~/lib/interviews/transcription/deepgram'
@@ -46,6 +47,9 @@ export const Route = createFileRoute('/api/interviews/$interviewId/transcription
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request, params }) => {
         try {
           assertSameOrigin(request)

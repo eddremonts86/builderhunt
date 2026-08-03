@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { receiveStripeWebhook, WebhookRejectedError } from '~/shared/lib/billing/webhook-inbox'
 
 /**
@@ -11,6 +12,9 @@ export const Route = createFileRoute('/api/webhooks/stripe')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['POST']),
+
       POST: async ({ request }) => {
         const rawBody = await request.text()
         const signatureHeader = request.headers.get('stripe-signature')

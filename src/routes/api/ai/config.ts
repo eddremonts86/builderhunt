@@ -6,12 +6,16 @@
  * probe /api/ai/complete first. Never leaks the MiniMax key or model IDs.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { env } from '~/shared/lib/env'
 
 export const Route = createFileRoute('/api/ai/config')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: () => {
         const disabled = env.AI_DISABLED === 'true'
         const disabledTasks = env.AI_DISABLED_TASKS.split(',').map((entry) => entry.trim()).filter(Boolean)

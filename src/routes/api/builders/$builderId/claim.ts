@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { randomId } from '~/lib/utils'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -25,6 +26,9 @@ export const Route = createFileRoute('/api/builders/$builderId/claim')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET', 'POST']),
+
       /** Re-fetches the caller's own in-flight challenge — lets the claim panel survive a page reload without re-minting (and racing) a second pending claim on the same identity. */
       GET: async ({ request, params }) => {
         try {

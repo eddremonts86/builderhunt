@@ -5,6 +5,7 @@
  * other per-request field.
  */
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { platformAdminErrorResponse, requirePlatformAdminPrincipal } from '~/shared/lib/auth/platform-admin'
 import { getRemovalOperationsMetrics } from '~/shared/lib/repositories/profile-removal'
 
@@ -12,6 +13,9 @@ export const Route = createFileRoute('/api/admin/metrics/trust')({
   component: () => null,
   server: {
     handlers: {
+      // Every other method answers 405, not a 200 HTML page. See http/method-not-allowed.ts.
+      ANY: methodNotAllowed(['GET']),
+
       GET: async ({ request }) => {
         try {
           await requirePlatformAdminPrincipal(request)
