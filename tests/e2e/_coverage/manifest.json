@@ -1117,10 +1117,16 @@
       ]
     },
     "/api/privacy/profile-removal": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/privacy-profile-removal.spec.ts"
+      ]
     },
     "/api/privacy/profile-removal/verify": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/privacy-profile-removal.spec.ts"
+      ]
     },
     "/api/public/scheduling/$invitationId/book": {
       "status": "covered",

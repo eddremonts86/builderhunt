@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 25 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 23 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 176 covered, 1 exempt, 25 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 178 covered, 1 exempt, 23 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -463,7 +463,24 @@
     refusal in every log while being a bypass. Negative control: making the wrong-password path set the cookie
     fails that assertion with the cookie value in the diff. Two assertions were also hardened against passing
     vacuously — an empty session list, and a route that answered 429 to everything.
-  - Remaining clusters: alerts (4), work-samples (3), ai (3), solutions (3), calendar (2), privacy removal (2),
+  - **Done: `/api/privacy/profile-removal` and `/verify`** (`tests/e2e/api/privacy-profile-removal.spec.ts`,
+    10 passing). The only unauthenticated writes in the product apart from the Stripe webhook, so the two things
+    that stand in for authentication are what get asserted: the challenge's **plaintext is never persisted** —
+    checked against the whole serialized row, not just the column expected to hold it, because the failure is the
+    plaintext appearing *anywhere* — and a **tracked identity answers identically to an unknown one**, since an
+    endpoint that takes any profile URL from anyone would otherwise be a free membership oracle for a people-search
+    index.
+    - Negative control: making the insert store the plaintext instead of its HMAC fails the first assertion.
+    - **A real defect in my own first version:** the anti-enumeration test compared two *random* URLs, so neither
+      existed in the data and it proved nothing about tracked-versus-unknown while reading as though it did. It now
+      seeds a real `builder_identities` row on the tracked side.
+    - Deliberately not covered: the `verified` and `proof_failed` branches both fetch the profile's live bio from
+      github.com, and no source-fetch fake exists yet. The spec stops at `invalid_challenge`, which returns before
+      the adapter is consulted — an e2e suite that reaches the public internet is flaky and leaks test traffic.
+    - The flags this route needs (`PROFILE_REMOVAL_ENABLED`, `PROFILE_REMOVAL_HMAC_KEY`) are snapshotted and
+      restored on teardown. The serial `tests/e2e/api` run (383 passed) is what proves that: leaked flags are
+      invisible at six workers and only surface when specs share a process.
+  - Remaining clusters: alerts (4), work-samples (3), ai (3), solutions (3), calendar (2),
     organizations activity/immediate-deletion (2), plus `builders/claim/verify`, `builders/recent`,
     `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
