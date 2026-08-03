@@ -296,6 +296,43 @@ tests/unit/shared/lib/calendar.test.ts`.
     strings). `pnpm tsc --noEmit`, `pnpm eslint`, and the full `pnpm vitest run` (2750 passed) are
     clean.
 
+  **Follow-up, recorded 2026-08-03 because nothing in these plans said it had happened: the app role could
+  not write the ledger at all, and the fix is `drizzle/0098` + `src/shared/lib/billing/credit-write-role.ts`.**
+
+  `builderhunt_app` holds SELECT only on the four credit tables (drizzle/0028, deliberately: the app reads
+  balances, the worker settles), so `goLive`'s reservation INSERT failed with **42501** for every interview —
+  invisibly, because the unit suite connects as the migration superuser and bypasses grants entirely.
+
+  `withCreditWriteRole` issues `SET LOCAL ROLE builderhunt_worker` *inside the caller's own transaction*,
+  around the credit write and nothing else, and 0098 grants **membership** rather than table privileges, so
+  the app role still cannot write by default. Two properties are what make it right rather than merely
+  working:
+
+  - **Atomicity is preserved.** The reservation and whatever the caller does next commit or roll back
+    together, so a failed session transition cannot leave an orphaned hold eating a customer's balance. A
+    separate worker-role transaction — the obvious alternative, and the one
+    `docs/operations/interview-runtime-verification.md` originally prescribed — would have lost that.
+  - **Scope is unchanged.** `app.organization_id`/`app.user_id` stay set, 0028's worker policies on the
+    credit tables still filter on the organization, and `reset role` restores the app role for the rest of
+    the transaction. This is not cosmetic: `interview_briefs_worker_all` (drizzle/0091) is
+    `USING (true) WITH CHECK (true)`, so running a whole *route* as the worker would have turned a
+    participant-scoped brief read into a **cross-tenant** one.
+
+  Verified as the real roles, twice, both inside `pnpm ci:local`: `scripts/db/verify-rls-local.mjs` asserts
+  that an unelevated insert is refused with 42501, an elevated one lands, the privilege is gone after
+  `reset role`, and an elevated insert naming another organization is still refused — a permanent negative
+  control, not a one-off. And `tests/e2e/billing-credits.spec.ts`'s "going live reserves the ceiling, and
+  finishing settles it back down" drives the product path as `builderhunt_app`: 180 units held, balance down
+  180, 12 billed minutes settled, 168 returned.
+
+  The two are individually insufficient, which is worth naming: the RLS verifier runs raw SQL, so it would stay
+  green if someone deleted `withCreditWriteRole` from the service. Removing the elevation and re-running the
+  e2e gives **500 / 42501 `permission denied for table billing_credit_reservations`** — so the e2e is what keeps
+  the product path wired to the mechanism, and it fails for the right reason.
+
+  `SENSITIVE_AI_ENABLED` and `INTERVIEW_TRANSCRIPTION_ENABLED` remain `false` in production for the AI Act
+  sign-off, which was always a separate gate from this defect.
+
 - [x] **Define provider interfaces without SDK leakage**
   - Files: `src/lib/storage/types.ts` (new), `src/lib/interviews/transcription/types.ts` (new),
     `src/lib/interviews/sensitive-ai/types.ts` (new)

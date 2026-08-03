@@ -48,6 +48,18 @@ interface Harness {
   redisPrefix: string
   baseURL: string
   sql: Sql
+  /**
+   * This worker database's **app-role** connection string.
+   *
+   * Carried on the harness rather than read from `process.env.DATABASE_URL` at assertion time, and that is not
+   * a style preference — the ambient value is the *owner* under `pnpm ci:local`, which says so in as many
+   * words: "DATABASE_URL stays the owner, as it is at job level in the workflow". A superuser bypasses every
+   * grant, so an assertion that a role *cannot* read something passes locally and silently inverts in the gate.
+   *
+   * `workerDatabaseUrls` forces this one to `builderhunt_app` for the disposable database in both
+   * environments, which is exactly the guarantee `forceRole` exists to provide.
+   */
+  appDatabaseUrl: string
   a: Tenant
   b: Tenant
   anonymous: APIRequestContext
@@ -95,6 +107,7 @@ test.beforeAll(async () => {
       redisPrefix: cache.prefix,
       baseURL: server.baseURL,
       sql,
+      appDatabaseUrl: database.urls.DATABASE_URL,
       a: { principal: a.principal, organization: a.organization },
       b: { principal: b.principal, organization: b.organization },
       anonymous: await playwrightRequest.newContext({ baseURL: server.baseURL }),
@@ -449,15 +462,34 @@ test.describe('durable security audit', () => {
      * A trail the application can read is a trail it can leak, so `builderhunt_auth` has INSERT and no SELECT — and
      * RLS grants no read policy to the writers either. Asserted through the app's own role rather than the migration
      * role this spec's `harness.sql` uses, since the migration role is a superuser and would see everything.
+     *
+     * ## This read `process.env.DATABASE_URL` and inverted itself in the gate
+     *
+     * It passed on a laptop, where `.env` names `builderhunt_app`, and failed under `pnpm ci:local`, which
+     * deliberately keeps `DATABASE_URL` as the **owner** ("DATABASE_URL stays the owner, as it is at job level
+     * in the workflow" — `scripts/ci/local-quality.sh`). A superuser bypasses grants, so the read succeeded and
+     * `rejects.toThrow()` had nothing to catch.
+     *
+     * The failure mode is worth naming because it is the one this whole suite exists to prevent, turned inward:
+     * an assertion that a role *cannot* do something is only as good as the role it actually connects as, and
+     * trusting the ambient environment for that is the same mistake `forceRole` was written to stop. So the URL
+     * now comes from the harness, which pins it per database.
+     *
+     * The error code is checked rather than just "it threw": a wrong password, a missing table or a typo would
+     * all satisfy `rejects.toThrow()` while proving nothing about the grant. **42501** is `insufficient_privilege`
+     * — the only rejection that means what this test claims.
      */
-    const appUrl = process.env.DATABASE_URL
-    expect(appUrl, 'this assertion needs the app role connection string').toBeTruthy()
-    const appSql = postgres(appUrl!, { max: 1, prepare: false })
+    const appSql = postgres(harness.appDatabaseUrl, { max: 1, prepare: false })
     try {
-      await expect(
-        appSql`select count(*) from security_audit_events`,
-        'the app role must not be able to read the audit trail',
-      ).rejects.toThrow()
+      const denial = await appSql`select count(*) from security_audit_events`.then(
+        (rows) => ({ ok: true as const, rows }),
+        (error: { code?: string }) => ({ ok: false as const, code: error?.code }),
+      )
+      expect(denial.ok, 'the app role must not be able to read the audit trail').toBe(false)
+      expect(
+        denial.ok ? undefined : denial.code,
+        'the read must be refused for lack of privilege, not by accident',
+      ).toBe('42501')
     } finally {
       await appSql.end({ timeout: 5 }).catch(() => undefined)
     }

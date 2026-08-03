@@ -293,7 +293,76 @@ deliberate rather than an omission:
   same trade the `document-worker`'s move-before-mark ordering already makes.
 - **No audio exists to back up.** There is no bucket, no key prefix and no code path that writes one.
 
-## OPEN, BLOCKING DEPLOY — the app role cannot reserve credits (found 2026-07-28, Phase 12)
+## RESOLVED — the app role cannot reserve credits (found 2026-07-28, fixed by drizzle/0098; re-verified 2026-08-03)
+
+**This is no longer open, and the section below is kept only for its reasoning.** The fix landed as
+`drizzle/0098_credit_write_role_membership.sql` plus `src/shared/lib/billing/credit-write-role.ts`, and it is
+verified as the real roles on every `pnpm ci:local` run.
+
+### What shipped, and why it is better than what this section prescribed
+
+The note below predicted "a change across `feature-authorization.ts`, `reservations.ts` and every caller of
+`withInterviewCredits`", moving the ledger write into a separate worker-role transaction. That would have been
+the wrong shape twice over, and the fix that landed avoids both problems:
+
+**It does not move the transaction.** `withCreditWriteRole` issues `SET LOCAL ROLE builderhunt_worker` *inside
+the caller's own transaction*, around the credit write and nothing else. So the property this codebase
+documents in `src/modules/interviews/billing.ts` — "a route that lets the error escape its own transaction
+rolls the reservation back wholesale" — is **preserved**, not traded away. A separate connection would have
+left an orphaned reservation eating a customer's balance whenever the session transition that follows it
+failed.
+
+**It does not widen read scope, and that mattered more than it looked.** A blanket route-level swap would have
+run the whole request as the worker role, and `interview_briefs_worker_all` (drizzle/0091) is
+`USING (true) WITH CHECK (true)` — completely unscoped. The participant-scoped read
+(`p.user_id = current_setting('app.user_id')`) would not have become organization-wide; it would have become
+**cross-tenant**. Because the elevation supplies only the *verb*, `app.organization_id` and `app.user_id` stay
+set throughout, 0028's worker policies on the credit tables still filter on the organization, and `reset role`
+restores the app role for the rest of the transaction.
+
+`drizzle/0098` grants **membership** (`GRANT builderhunt_worker TO builderhunt_app`), not table privileges.
+Membership is inert until claimed, so the app role still cannot write by default and every claim is one
+greppable call rather than an invisible privilege every future query inherits.
+
+All five credit operations go through it: `reserveCredits`, `extendReservation`, `settleReservation`,
+`releaseReservation` (`feature-authorization.ts:168, 237, 263, 285`).
+
+### The evidence, as the real roles
+
+Two independent sources, both inside `pnpm ci:local`:
+
+**`scripts/db/verify-rls-local.mjs`** connects as an actual `builderhunt_app` login and asserts four things —
+this is a permanent negative control, not a one-off check:
+
+1. an **unelevated** insert into `billing_credit_reservations` is refused with **42501**, failing loudly with
+   "0028's SELECT-only grant is gone" if it ever succeeds;
+2. an **elevated** insert lands exactly one row;
+3. after `reset role`, `has_table_privilege('billing_credit_reservations', 'INSERT')` is **false** — the
+   elevation does not leak into the rest of the transaction;
+4. an elevated insert naming **another organization** is still refused with 42501 — "elevating to the worker
+   role let the app write another organization's credits".
+
+**`tests/e2e/billing-credits.spec.ts`**, "going live reserves the ceiling, and finishing settles it back
+down", drives the product path end to end against a worker database whose URL the harness `forceRole`s to
+`builderhunt_app`: `action: 'live'` reserves the rate card's 180-unit ceiling, the reservation row is
+observable as `reserved` with `maximum_units = 180`, the balance drops by 180, and `finish` with 12 billed
+minutes settles to 12 and returns 168. A reservation that could not be written would fail at the first step.
+
+**The link between the two, proven by negative control on 2026-08-03.** Those two checks are individually
+insufficient in a way worth stating: `verify-rls-local.mjs` executes raw SQL, so it would stay green if someone
+deleted `withCreditWriteRole` from `feature-authorization.ts` — it proves the *mechanism*, not that the product
+uses it. So the elevation was removed from `reserveCredits` and the e2e re-run: `action: 'live'` answered
+**500**, with `permission denied for table billing_credit_reservations`, code **42501**, in the server log.
+Restored immediately; that file's diff is empty. The e2e test is therefore the assertion that keeps the product
+path wired to the mechanism, and it is measuring the real defect rather than passing for an unrelated reason.
+
+### What is still true from the note below
+
+`SENSITIVE_AI_ENABLED` and `INTERVIEW_TRANSCRIPTION_ENABLED` remain `false` in production — but that is now
+the **AI Act sign-off gate alone**, which is a product and legal decision, not this defect. The database side
+is done.
+
+*Original note, kept because the reasoning is what made the fix findable:*
 
 `DATABASE_URL` in `.env.production.example` is `builderhunt_app`. That role holds **SELECT only** on
 `billing_credit_reservations`, `billing_credit_grants` and `billing_credit_allocations` (drizzle/0028,
@@ -314,6 +383,9 @@ harness now forces `builderhunt_app` (`tests/e2e/harness/database.ts`, `forceRol
 surfaced this; `tests/e2e/interview-live.spec.ts`, `billing-credits.spec.ts` and
 `interview-privacy.spec.ts` fail on it today and are the reproduction.
 
+> Those three specs all pass as of 2026-08-03 — 27 tests between them. Same reproduction, answering the other
+> way now that the elevation is in place.
+
 ### The fix is not a grant
 
 `GRANT INSERT, UPDATE ON billing_credit_reservations TO builderhunt_app` would make the tests pass and
@@ -329,3 +401,10 @@ every caller of `withInterviewCredits`, and it is not done.
 **Until it is, no interview AI feature may be enabled in production.** `SENSITIVE_AI_ENABLED` and
 `INTERVIEW_TRANSCRIPTION_ENABLED` must stay `false`, which is also where the AI Act sign-off gate
 leaves them.
+
+> **Superseded.** The paragraph above is the only part of this note that is now wrong in substance, and it is
+> worth saying why rather than deleting it: it assumed the correct shape was a worker-role *transaction*, and
+> concluded the change was large. `SET LOCAL ROLE` inside the caller's transaction is the smaller and safer
+> answer — it borrows the verb without moving the boundary or widening the scope — so the change was five call
+> sites and one new module rather than a rework of every `withInterviewCredits` caller. The flags stay `false`
+> for the AI Act sign-off, which was always a separate gate.
