@@ -11,6 +11,20 @@ export function ensureProtocol(url: string): string {
 const zodEnv = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  /**
+   * Which database this process is pointed at, declared rather than guessed.
+   *
+   * Only production sets `production`. It exists so the Stripe cross-check below can tell a production
+   * database from any other one without parsing the connection string: a host substring is a guess that is
+   * wrong in both directions — a staging host containing "prod" reads as production, and a production host
+   * behind a pooler or an IP does not. Getting that wrong here means either charging real cards from staging
+   * or writing test-mode objects against real customers, so it is declared explicitly.
+   *
+   * Absent means "not production", which is the safe default: the check below only ever rejects a
+   * live-key/non-prod-marker or test-key/prod-marker pairing, so forgetting to set it can never permit a live
+   * key — it can only refuse one.
+   */
+  DB_ENV_MARKER: z.enum(['production', 'staging', 'development', 'test']).optional(),
   DATABASE_MIGRATION_URL: z.string().min(1).optional(),
   DATABASE_AUTH_URL: z.string().min(1).optional(),
   DATABASE_WORKER_URL: z.string().min(1).optional(),
@@ -336,6 +350,62 @@ const zodEnv = z.object({
       message:
         'A live Stripe secret key must never be present outside NODE_ENV=production — remove it from '
         + 'the local env file and use the sk_test_ key (production reads its own from Coolify)',
+    })
+  }
+
+  /**
+   * The Stripe key's mode and the database it will write against must agree.
+   *
+   * `NODE_ENV` is not enough, and that is the whole reason this exists. It says how the *code* is built, not
+   * which data the process is holding: `NODE_ENV=production` is exactly what a staging deployment runs, and a
+   * developer investigating a production incident may legitimately set it locally. Neither says whether
+   * `DATABASE_URL` names the real customer database.
+   *
+   * The two failures this closes are asymmetric but both irreversible:
+   *
+   * - **`sk_live_` against a non-production database.** Real cards get charged for objects nobody can
+   *     reconcile, because the subscriptions and grants they belong to live in a database that is not the one
+   *     support and finance read. A copy-pasted secret into staging is all it takes; staging *is* built with
+   *     `NODE_ENV=production`, so the guard above waves it through.
+   * - **`sk_test_` against the production database.** Test-mode Stripe objects are written against real
+   *     customers' rows. Nothing is charged, which is what makes it insidious: the damage is a production
+   *     ledger quietly carrying references to objects that only exist in test mode, discovered at
+   *     reconciliation.
+   *
+   * `DB_ENV_MARKER` is a declaration rather than a substring match on the connection string — see its own
+   * comment for why guessing is wrong in both directions. Absent is treated as "not production", so a missing
+   * marker can only ever refuse a live key, never permit one.
+   *
+   * Both directions abort at boot. A misconfiguration that is caught on the first request has already had a
+   * chance to move money.
+   */
+  const stripeKeyMode = data.STRIPE_SECRET_KEY?.startsWith('sk_live_')
+    ? 'live'
+    : data.STRIPE_SECRET_KEY?.startsWith('sk_test_')
+      ? 'test'
+      : null
+  const databaseIsProduction = data.DB_ENV_MARKER === 'production'
+
+  if (stripeKeyMode === 'live' && !databaseIsProduction) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STRIPE_SECRET_KEY'],
+      message:
+        'A live Stripe secret key is paired with a database that is not marked production '
+        + `(DB_ENV_MARKER=${data.DB_ENV_MARKER ?? 'unset'}). Real cards would be charged against rows the `
+        + 'production ledger does not contain. Set DB_ENV_MARKER=production only on the deployment that owns '
+        + 'the real customer database, and use sk_test_ everywhere else.',
+    })
+  }
+
+  if (stripeKeyMode === 'test' && databaseIsProduction) {
+    context.addIssue({
+      code: 'custom',
+      path: ['STRIPE_SECRET_KEY'],
+      message:
+        'A test-mode Stripe secret key is paired with the production database (DB_ENV_MARKER=production). '
+        + 'Nothing would be charged, but the production ledger would accumulate references to Stripe objects '
+        + 'that exist only in test mode. Use the sk_live_ key against the production database.',
     })
   }
 

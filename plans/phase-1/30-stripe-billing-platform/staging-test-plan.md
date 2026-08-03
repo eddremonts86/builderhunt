@@ -27,7 +27,7 @@ checked.
 | --- | --- | --- |
 | `BillingProvider` contract (15 methods) | `src/shared/lib/billing/provider.ts` | stable |
 | `FakeBillingProvider` with scenario injection | `src/shared/lib/billing/fake-provider.ts` | stable |
-| `RealBillingProvider` against Stripe test API | `src/shared/lib/billing/real-provider.ts` | certified in `real-provider.test.ts` (15/15 methods against live test-mode API) |
+| `RealBillingProvider` against Stripe test API | `src/shared/lib/billing/real-provider.ts` | certified in `real-provider.test.ts` — **7 cases exercising 14 provider methods** against the live test-mode API (re-run 2026-08-03, 7/7 in 15s). Corrected from "15/15 methods": the adapter implements 15, the suite drives 14 of them; `getDefaultPaymentMethodSummary` is the one it does not call directly. |
 | `E2E_BILLING_SCENARIO` channel (Redis) | `src/shared/lib/billing/stripe-provider.ts` | stable, used by every e2e billing spec |
 | `E2E_MODE=true` short-circuits to fake | `stripe-provider.ts:136` | stable, keeps e2e hermetic |
 | `stripe-sandbox-certification` CI job | `.github/workflows/quality.yml` | runs on `STRIPE_SANDBOX_SECRET_KEY`, `continue-on-error: true` |
@@ -234,6 +234,32 @@ nothing).
 
 ## 5. Test Clocks — scenarios still to certify
 
+> **Closed 2026-08-03: `test-clock-lifecycle.test.ts` is 7/7 against the real test-mode API.** Four of the six
+> below were implemented; the other two needed a decision rather than code, recorded here rather than silently
+> skipped.
+>
+> **Implemented** — §5.1 monthly anniversary (two consecutive advances, three distinct contiguous billing
+> windows), §5.2 annual anniversary (2026-01-15 → 2027-01-15, same calendar date), §5.5 trial-to-active
+> conversion with a real non-zero invoice, §5.4 dunning (a card that still declines never reads `active` again,
+> and leaves an unpaid invoice behind).
+>
+> **§5.3 leap year / month-end: already certified**, by the pre-existing "Jan 31 → Feb 28" case. A second copy
+> with a different start date would add a minute of network runtime and no evidence.
+>
+> **§5.6 dispute: not a Test Clock concern, and this document contradicts itself about it.** A dispute is not a
+> time-based event — nothing advances a clock to produce one. The assertion §5.6 actually asks for ("the linked
+> pack grant is revoked but the subscription itself is unaffected, per `disputes.ts`") is our own code's
+> response to a `charge.dispute.*` webhook, and `tests/unit/shared/lib/billing/disputes.test.ts` covers it
+> deterministically in 14 tests, including duplicate-delivery idempotency and the no-linked-grant case. §9 of
+> this very document also says **"Do not automate disputes and refunds through scripts"** — so §5.6 asks for
+> exactly what §9 forbids. §9 is right; §5.6 should be read as "dispute handling needs evidence", which it has.
+>
+> **One finding worth keeping.** §5.1's first version asserted distinct `invoice.period_start` values and failed
+> with "expected 2 to be 3". Probing the real objects showed the creation invoice's own period is a *zero-length*
+> window at the creation instant, colliding with the first cycle invoice's start; the real service window lives
+> on the **line item**, and Stripe bills in advance. A grant-window derivation reading `invoice.period_start`
+> would look correct and be wrong.
+
 Today `test-clock-lifecycle.test.ts` covers 3 cases (create + renew + upgrade
 + downgrade + cancel — all with `pm_card_visa`). The launch register
 (`stripe-launch-register.md`) requires evidence for the full set below. Each
@@ -299,6 +325,20 @@ end-to-end. Webhooks arrive at the staging URL within seconds of every
 test-mode action.
 
 ## 7. The cross-check gap in `env.ts`
+
+> **Closed 2026-08-03.** Implemented in `src/shared/lib/env.ts` with `DB_ENV_MARKER`, exactly as specified
+> below — a declared marker rather than a substring match, both directions failing closed at boot, and absent
+> treated as "not production" so a missing marker can only ever *refuse* a live key.
+>
+> Verified through the real parser across all four pairings: `live + staging` REFUSED, `test + production`
+> REFUSED, `live + production` BOOTS, `test + development` BOOTS. Six cases added to
+> `tests/unit/shared/lib/env.security.test.ts` (86 passing).
+>
+> **Operational consequence, stated because it is a deploy-time behaviour change:** a production deployment that
+> switches to `sk_live_` without `DB_ENV_MARKER=production` will now **fail to start**. That is the intended
+> trade — the alternative is charging real cards against a database the production ledger does not read.
+> `.env.production.example` sets it and says so; production today runs `STRIPE_BILLING_ENABLED=false` with no
+> key, so nothing changes until the phase-5 switch.
 
 `env.ts:332` correctly rejects `sk_live_` outside `NODE_ENV=production`.
 **It does not** validate that an `sk_test_` key is paired with a non-prod

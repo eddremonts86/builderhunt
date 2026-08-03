@@ -129,6 +129,82 @@ describe('stripe billing security (plan: stripe-billing-platform)', () => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
   })
 
+  /**
+   * The Stripe key mode must agree with the database the process is pointed at
+   * (`plans/phase-1/30-stripe-billing-platform/staging-test-plan.md` §7).
+   *
+   * `NODE_ENV` cannot carry this, which is the whole reason the check exists: staging is *built* with
+   * `NODE_ENV=production`, so the pre-existing "live key outside production" guard waves a copy-pasted
+   * `sk_live_` through on any staging deployment. What matters is which data the process holds, and that is
+   * declared by `DB_ENV_MARKER` rather than guessed from the connection host — a staging host containing
+   * "prod" would read as production, and a production host behind a pooler would not.
+   *
+   * Both directions are asserted because they fail differently. A live key on a non-production database
+   * charges real cards for rows the production ledger does not contain. A test key on the production database
+   * charges nothing, which is what makes it insidious: the real ledger accumulates references to Stripe
+   * objects that exist only in test mode, and nobody finds out until reconciliation.
+   */
+  const STRIPE_ENABLED = {
+    STRIPE_BILLING_ENABLED: 'true',
+    STRIPE_WEBHOOK_SECRET: 'whsec_abc123',
+    STRIPE_API_VERSION: '2025-01-01.acacia',
+    WEBHOOK_PAYLOAD_ENCRYPTION_KEY: VALID_ENCRYPTION_KEY,
+  }
+
+  it('rejects a live key against a database that is not marked production', () => {
+    // NODE_ENV=production on purpose: this is exactly the staging shape the older guard cannot catch.
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      ...STRIPE_ENABLED,
+      STRIPE_SECRET_KEY: 'sk_live_abc123',
+      DB_ENV_MARKER: 'staging',
+    })).toThrow(/not marked production/)
+  })
+
+  it('rejects a live key when the marker is missing entirely', () => {
+    // Absent means "not production", so forgetting the marker refuses a live key rather than permitting one.
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      ...STRIPE_ENABLED,
+      STRIPE_SECRET_KEY: 'sk_live_abc123',
+    })).toThrow(/DB_ENV_MARKER=unset/)
+  })
+
+  it('rejects a test key against the production database', () => {
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      ...STRIPE_ENABLED,
+      STRIPE_SECRET_KEY: 'sk_test_abc123',
+      DB_ENV_MARKER: 'production',
+    })).toThrow(/exist only in test mode/)
+  })
+
+  it('accepts the two configurations that actually make sense', () => {
+    // Production: live key, production database.
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      ...STRIPE_ENABLED,
+      STRIPE_SECRET_KEY: 'sk_live_abc123',
+      DB_ENV_MARKER: 'production',
+    })).not.toThrow()
+
+    // Everywhere else: test key, anything but the production database.
+    for (const marker of ['staging', 'development', 'test'] as const) {
+      expect(() => parseEnvironment({
+        ...productionEnvironment,
+        ...STRIPE_ENABLED,
+        STRIPE_SECRET_KEY: 'sk_test_abc123',
+        DB_ENV_MARKER: marker,
+      }), `sk_test_ with DB_ENV_MARKER=${marker} must be allowed`).not.toThrow()
+    }
+  })
+
+  it('says nothing about the pairing when no Stripe key is configured', () => {
+    // The check is about a key's mode, not about `DB_ENV_MARKER` on its own. A production deployment with
+    // billing still switched off must boot.
+    expect(() => parseEnvironment({ ...productionEnvironment, DB_ENV_MARKER: 'production' })).not.toThrow()
+  })
+
   // Unlike enrichment, this must fail closed in every environment, not just
   // production — sandbox testing with real Stripe test keys happens well
   // before the plan's live-rollout phase.

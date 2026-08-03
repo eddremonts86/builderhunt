@@ -68,7 +68,7 @@
     **general-availability gates, not development or MVP blockers** — see the register's three-way
     split. Nothing in this plan may list them as a dependency.
 
-- [ ] **Verify the billing platform certification dependency**
+- [x] **Verify the billing platform certification dependency** — recorded 2026-08-03
   - Files: `plans/phase-1/30-stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
     `docs/operations/interview-provider-register.md`
   - Do: Record the completed billing sandbox/release evidence consumed by interviews: paid
@@ -77,6 +77,25 @@
     Checkout, catalog, refund, dispute, or accounting decisions in this plan.
   - Verify: every required billing-platform task is complete before provider-backed interview flags
     can enable; interview-only beta works with platform operator grants and all paid providers off.
+
+  **The evidence this task consumes now exists and is dated. Recorded here rather than restated, per its own
+  "do not repeat" instruction.**
+
+  | What interviews depend on | Where the evidence is | State 2026-08-03 |
+  |---|---|---|
+  | Sandbox certification of the real adapter | plan 30, "Certify Stripe sandbox and Test Clock lifecycle" | **closed** — `real-provider.test.ts` 7/7 against the live test-mode API, 14 provider methods |
+  | Subscription time behaviour (renewal, trial, dunning, anniversaries) | `test-clock-lifecycle.test.ts` | **7/7** against real Stripe Test Clocks |
+  | Paid entitlement gate | `checkEntitlement` in `feature-authorization.ts` | exercised by `billing-credits.spec.ts` and the interview specs, 61 e2e passing |
+  | reserve / extend / settle / release contracts | `feature-authorization.ts` + `reservations.ts` | proven as the **real app role** — see the credit-write-role note under "Implement interview usage estimation arithmetic" above |
+  | Provider-usage attachment | `billing_provider_usage` | covered by the interview session specs |
+  | Disabled / manual-grant beta behaviour | `SENSITIVE_AI_ENABLED=false` path | `billing-credits.spec.ts` — a brief with AI disabled is a marked fallback that reserves and charges nothing |
+
+  **What is still not satisfied, and it is not a billing-platform gap.** The Verify line says provider-backed
+  interview flags may not enable until the billing platform is certified. That condition is now met — but the
+  flags stay `false` for two reasons that belong elsewhere: the **AI Act sign-off** (a legal gate, phase-5) and
+  the **provider accounts** task at the top of this plan (Cloudflare R2, Deepgram, Azure — none of which is
+  Stripe). Interview-only beta with platform operator grants and every paid provider off is the state the suite
+  runs in today, which is what the second half of the Verify line asks for.
 
 - [x] **Add environment schema and kill switches**
   - Files: `src/shared/lib/env.ts`, `tests/unit/shared/lib/env.security.test.ts`, `.env.example`,
