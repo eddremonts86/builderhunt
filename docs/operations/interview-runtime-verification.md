@@ -8,9 +8,78 @@ someone ticks "Also share tab audio".
 
 This document is the procedure for finding that out, and the register of what was found.
 
-> **Status: not yet executed.** The runbook below is complete; no session has been run. The results
-> tables are empty on purpose — see [Recording results](#recording-results). Running this needs physical
-> hardware and consenting human participants, so it cannot be automated or inferred.
+> **Status: the live session has not been run.** The runbook below is complete; no session with human
+> participants has taken place. The results tables are empty on purpose — see
+> [Recording results](#recording-results). That part needs physical hardware and consenting people, so it
+> cannot be automated or inferred.
+>
+> The parts that *can* be measured without people have been, on 2026-08-03 — see
+> [Automated performance and concurrency results](#automated-performance-and-concurrency-results-2026-08-03)
+> and [Adversarial and boundary suite](#adversarial-and-boundary-suite-2026-08-03) below.
+
+## Automated performance and concurrency results (2026-08-03)
+
+`pnpm bench:interviews`, on a local Postgres, against the spec's own targets. Each benchmark creates a
+disposable database, applies the whole migration chain, seeds realistic volume, discards warm-up iterations
+and reports query counts next to latencies so a change in *shape* shows up even when the wall clock does not.
+
+| Benchmark | Metric | Target | Measured |
+|---|---|---|---|
+| `calendar-feed` | 31-day range read, p95 | < 500 ms | **2.7 ms** |
+| `calendar-feed` | statements per read | flat, no N+1 | **4, flat** |
+| `calendar-feed` | widest allowed span (400 days, 197 events) | no unbounded growth | **2.7 ms** |
+| `scheduling-booking` | 14-day busy-range read, p95 | < 750 ms | **1.9 ms** |
+| `scheduling-booking` | 8 concurrent bookers on one slot | zero double booking | **1 winner, 1 row** |
+| `transcript-segments` | acknowledged segment persistence | ≥ 99.9% | **1800/1800 = 100%** |
+| `transcript-segments` | replayed batches absorbed | no duplicates | **12 replays, 1800 rows** |
+| `transcript-segments` | full 1800-segment transcript read | no unbounded growth | **2.6 ms** |
+
+Latencies are three orders of magnitude inside their targets, which is worth reading correctly: it means
+the targets are not currently the binding constraint, not that the queries are extraordinary. The numbers
+that carry real information are the *shapes* — 4 statements per calendar read regardless of range, one
+winner out of eight concurrent bookers, and 1800 persisted out of 1800 acknowledged with 12 redeliveries
+absorbed.
+
+Both benchmarks run as the migration role, so **RLS policy evaluation is not included in any number above**.
+That is stated in each benchmark's own output too. It is a deliberate limitation: these measure query and
+lock behaviour, and folding policy cost in would make a regression in either invisible.
+
+### Four defects in the benchmarks themselves, found by running them
+
+They had never executed. Written earlier against an assumed schema and never invoked, so each assumption
+that was wrong stayed wrong:
+
+1. **`pnpm bench:interviews` failed immediately** on a normal checkout — these are plain `node` scripts, so
+   nothing loads `.env` for them the way dotenvx does for vite/vitest/playwright. The harness now falls back
+   to reading `DATABASE_MIGRATION_URL` from `.env`, the same way `scripts/ci/local-quality.sh` does.
+2. **Drizzle's migrator left the connection unable to serialize `Date`.** Running `migrate()` through the
+   same postgres.js client made every later `${someDate}` arrive at `Buffer.byteLength` as a Date object and
+   throw `ERR_INVALID_ARG_TYPE`. Reproduced in isolation — the identical insert succeeds on a fresh client
+   and fails on a migrated one. The migrator now gets its own connection, which is the fix rather than
+   stringifying 22 call sites and leaving the trap armed for the next benchmark.
+3. **`availability_rules.time_zone` does not exist** — the column is `timezone`.
+4. **`interview_sessions` was missing three NOT NULL columns** (`provider`, `consent_notice_version`,
+   `capture_capability`), and `transcript_segments`' real unique index is on
+   `(organization_id, session_id, provider_segment_id)`, not `(session_id, provider_segment_id)`, so the
+   idempotent `ON CONFLICT` matched nothing.
+
+## Adversarial and boundary suite (2026-08-03)
+
+| Gate | Result |
+|---|---|
+| `pnpm security:boundaries` | **pass** — tenant boundary ratchet, 0 legacy imports tracked |
+| `pnpm security:dependencies` | **pass** — `pnpm audit --prod --audit-level high` clean; 3 findings, all below the threshold (2 low, 1 moderate) |
+| `pnpm test:rls:local` | see the completion-gate record below — runs inside `pnpm ci:local` against real per-role logins |
+| Calendar / scheduling / documents / interview-live / interview-privacy / billing-credits e2e | **61 passing** |
+
+Case coverage across the e2e suite, counted by grep so the number is checkable rather than asserted:
+capability handling in 13 specs, replay in 14, tenant A/B in 5, CSRF in 2, and one each for EICAR, upload
+polyglot and signed-URL leakage.
+
+**Three of the listed cases have no spec under their own name**: prompt injection, SSRF, and stale
+membership. They are named here rather than quietly counted as covered — the honest state is "not
+demonstrably covered by a spec that says so", and a suite whose matrix is padded is worse than one with a
+short list and an accurate one.
 
 ## Why this cannot be automated
 

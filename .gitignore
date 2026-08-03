@@ -32,3 +32,8 @@ tests/e2e/harness/.e2e-leftovers.log
 tests/artifacts/
 # lhci's own working directory, written next to the config it reads.
 .lighthouseci/
+
+# Created by a container-side `pnpm install` when the repo is bind-mounted into the Playwright
+# image (see plans/phase-1/50-audit-visual-system for the visual-baseline recipe). 674 MB of
+# content-addressed blobs; it belongs to whichever machine installed, never to the repo.
+.pnpm-store/

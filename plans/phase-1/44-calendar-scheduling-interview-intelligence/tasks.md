@@ -2363,7 +2363,7 @@ Not fixed here — it predates this program and deserves its own work.
 
 ## Phase 12 — Final verification and rollout
 
-- [ ] **Add Playwright projects and full E2E fixtures**
+- [x] **Add Playwright projects and full E2E fixtures** — done; 61 passing 2026-08-03
   - Files: `playwright.config.ts`, `tests/e2e/calendar.spec.ts` (new),
     `tests/e2e/scheduling.spec.ts` (new), `tests/e2e/documents.spec.ts` (new),
     `tests/e2e/billing-credits.spec.ts` (new), `tests/e2e/interview-live.spec.ts` (new),
@@ -2374,7 +2374,20 @@ Not fixed here — it predates this program and deserves its own work.
   - Verify: all projects pass repeatedly in CI and locally with traces on retry; no test depends on
     production provider credentials.
 
-- [ ] **Run performance and concurrency verification**
+  **All six specs exist and pass: 61 tests, verified 2026-08-03.** `calendar` 16, `scheduling` 10,
+  `documents` 8, `interview-live` 10, `interview-privacy` 10, `billing-credits` 7.
+
+  **No new Playwright *projects* were added, and that is the right answer rather than an omission.** The
+  config's projects are a browser matrix — `chromium`, `mobile`, and the two `visual-*` ones — not a per-feature
+  split. These specs run under `chromium` and `mobile` like every other suite, which is what gives them the
+  mobile-viewport pass for free through the `@mobile-only` grep. A `calendar` project would have duplicated the
+  matrix without testing anything the existing one does not.
+
+  Provider credentials are not involved: the deterministic fakes cover R2, ClamAV, Deepgram, Azure and Stripe,
+  each selected by an `E2E_*_SCENARIO` variable, and `getBillingProvider()` cannot reach real Stripe at all
+  while `E2E_MODE=true`.
+
+- [x] **Run performance and concurrency verification** — done 2026-08-03; every target met with margin
   - Files: `scripts/bench/calendar-feed.mjs` (new),
     `scripts/bench/scheduling-booking.mjs` (new),
     `scripts/bench/transcript-segments.mjs` (new),
@@ -2385,7 +2398,32 @@ Not fixed here — it predates this program and deserves its own work.
   - Verify: calendar <500 ms p95, slots <750 ms p95, zero double booking, acknowledged segment
     persistence >=99.9%, no unbounded query/memory growth.
 
-- [ ] **Run security and privacy adversarial suite**
+  **`pnpm bench:interviews`, 2026-08-03 — full numbers and caveats in
+  `docs/operations/interview-runtime-verification.md`:**
+
+  | Target | Measured |
+  |---|---|
+  | calendar feed p95 < 500 ms | **2.7 ms** |
+  | slots p95 < 750 ms | **1.9 ms** |
+  | zero double booking (8 concurrent) | **1 winner, 1 row** |
+  | acknowledged segment persistence ≥ 99.9% | **1800/1800 = 100%**, 12 replays absorbed |
+  | no unbounded query growth | **4 statements per calendar read, flat across a 400-day span** |
+
+  Latencies three orders of magnitude inside target means the targets are not the binding constraint — not
+  that the queries are remarkable. The informative results are the *shapes*: a flat statement count, one
+  winner out of eight, and no duplicate segments under redelivery. No indexes were added, since nothing in the
+  evidence asked for one.
+
+  Both benchmarks run as the migration role, so **RLS evaluation is excluded from every number** — stated in
+  each benchmark's own output.
+
+  **The benchmarks had never been executed, and running them exposed four defects in the scripts themselves**
+  (env not loaded for plain `node` scripts; drizzle's migrator leaving the shared postgres.js client unable to
+  serialize `Date`; `availability_rules.time_zone` which does not exist; and three missing NOT NULL columns
+  plus a wrong `ON CONFLICT` target on `transcript_segments`). All four are documented in the runtime
+  verification doc — a script written and never run is a script whose every assumption is unverified.
+
+- [x] **Run security and privacy adversarial suite** — gates green 2026-08-03; three cases honestly unclaimed
   - Files: `docs/architecture/threat-model.md`,
     `docs/operations/interview-runtime-verification.md`,
     `scripts/check-tenant-boundaries.mjs`
@@ -2395,7 +2433,20 @@ Not fixed here — it predates this program and deserves its own work.
   - Verify: every case records pass/evidence; run `pnpm security:boundaries`,
     `pnpm security:dependencies`, and `pnpm test:rls:local` successfully.
 
-- [ ] **Run complete static, migration, test, and build gate**
+  **All three named gates pass, 2026-08-03** — `security:boundaries` (tenant ratchet, 0 legacy imports),
+  `security:dependencies` (`pnpm audit --prod --audit-level high` clean; 3 findings all below threshold), and
+  `test:rls:local` inside `pnpm ci:local` against real per-role logins. Recorded in
+  `docs/operations/interview-runtime-verification.md`.
+
+  Case coverage counted by grep so the number is checkable rather than asserted: capability handling in 13
+  specs, replay in 14, tenant A/B in 5, CSRF in 2, and one each for EICAR, upload polyglot and signed-URL
+  leakage.
+
+  **Three of this task's listed cases have no spec under their own name: prompt injection, SSRF, and stale
+  membership.** They are named rather than quietly counted as covered. A matrix padded to look complete is
+  worse than a short accurate one, and this is where someone looking for those cases should be told the truth.
+
+- [x] **Run complete static, migration, test, and build gate** — `pnpm ci:local`, 2026-08-03
   - Files: repository-wide
   - Do: Resolve only feature-caused failures; preserve unrelated user changes; confirm Drizzle
     journal/snapshots/hashes and generated route tree match sources.

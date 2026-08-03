@@ -43,7 +43,7 @@ await withBenchDatabase('scheduling_booking', async ({ sql, counter }) => {
 
   await sql`
     insert into availability_rules
-      (id, organization_id, owner_user_id, time_zone, weekdays, local_start, local_end, slot_minutes,
+      (id, organization_id, owner_user_id, timezone, weekdays, local_start, local_end, slot_minutes,
        buffer_before_minutes, buffer_after_minutes, min_notice_minutes, horizon_days, enabled)
     values (gen_random_uuid(), ${ORGANIZATION}, ${USER}, 'Europe/Copenhagen', '{1,2,3,4,5}',
             '09:00', '17:00', 30, 0, 0, 0, 60, true)

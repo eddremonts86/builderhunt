@@ -120,7 +120,7 @@
   - Verify: live 320/375px checks on this page are clean after the fix; CLS/state-transition audit
     not performed.
 
-- [ ] **Make visual and structural checks required in CI**
+- [x] **Make visual and structural checks required in CI** — done 2026-08-03, both directions proven
   - Files: `.github/workflows/quality.yml`, `tests/e2e/visual/**` (the committed `*-linux.png` baselines)
   - Do: Generate the Linux snapshot baselines once inside the CI environment (or the matching
     Playwright container), commit the `*-linux.png` files, then add the `pnpm test:visual` step to the
@@ -140,6 +140,52 @@ on 2026-07-29, deliberately not as a checkbox: a deployed release to compare aga
 deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
 work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
 
+
+  **Done 2026-08-03. 16 Linux baselines committed, `pnpm test:visual` is a required CI step, and the gate is
+  proven able to fail.**
+
+  ### What was generated, and where
+
+  All 22 snapshots (16 baseline names across the desktop and mobile projects) were captured inside
+  `mcr.microsoft.com/playwright:v1.61.1-jammy` — the image matching this repo's pinned Playwright, so the
+  browser build producing the baseline is the one CI compares against. Anything else and the first CI run
+  fails on antialiasing.
+
+  ### Both directions, which is the part that makes it a gate
+
+  - **Passes unchanged:** 22 passed on a re-run with nothing modified.
+  - **Fails on a real change:** appending `body { padding-top: 1px }` to `src/shared/styles/globals.css` failed
+    **14 of 22**. Reverted immediately; `git diff` on that file is empty.
+
+  A visual gate that cannot fail is decoration, so the second half was the precondition for turning the step
+  on — not an afterthought.
+
+  ### Two things worth knowing for the next person
+
+  **`--network host` is what made the authenticated suite work.** `public-surfaces.spec.ts` needs no database
+  and generated cleanly with the repo bind-mounted and the host reached through `host.docker.internal`.
+  `empty-states.spec.ts` does need one, and over that boundary it failed twice: first on Redis
+  (`ECONNREFUSED 127.0.0.1:6379` — running `pnpm exec playwright test` directly skips the dotenvx injection
+  that `pnpm test:e2e` performs, so the spawned server never saw `REDIS_URL`), then on sign-up 500s from the
+  per-worker auth roles. Docker Desktop 29.6.2 supports `--network host` on macOS, and with it the unmodified
+  `.env` works because `localhost` means the same thing in both places. That is the recipe; the
+  `host.docker.internal` rewriting was a dead end.
+
+  **`node_modules` must be masked.** The host's are macOS-built; an anonymous volume at `/work/node_modules`
+  plus `pnpm install --frozen-lockfile` inside the container keeps the two from colliding, and leaves the
+  host's install untouched.
+
+  ### The CI step
+
+  `.github/workflows/quality.yml`, immediately before the accessibility artifact upload, with a
+  `visual-diffs` artifact (`test-results/`, 14-day retention) uploaded on failure the way `a11y-results`
+  already is — a screenshot regression is unreviewable without the expected/actual/diff triplet.
+
+  It stands up its own `vite dev` through the config's `webServer` rather than reusing the production preview
+  the accessibility gate starts. Deliberate: the baselines were captured against the dev server, and a
+  production build differs in ways that have nothing to do with the design system.
+
+  *Original note, kept for the reasoning:*
 
   **Unblocked 2026-08-03: Docker is available on this machine (29.6.2), which was the blocker's blocker.** The
   note above says this needs "either a Linux runner or the Playwright Docker image" — the image route is now

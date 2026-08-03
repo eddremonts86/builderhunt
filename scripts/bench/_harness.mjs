@@ -26,6 +26,7 @@
  * and discarded, which is stated in the output rather than left implicit.
  */
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import postgres from 'postgres'
 
 /** Percentile from an unsorted sample, nearest-rank. */
@@ -82,9 +83,33 @@ export function statementCounter() {
  * would fold policy evaluation into every number without any of the benches being about policies.
  * That is a deliberate limitation and it is printed with the results.
  */
+/**
+ * `DATABASE_MIGRATION_URL` from the environment, falling back to `.env`.
+ *
+ * Without the fallback, `pnpm bench:interviews` fails immediately on a normal checkout: these are plain `node`
+ * scripts, so nothing loads `.env` for them the way dotenvx does for vite/vitest/playwright, and the plan
+ * documents the command as runnable. A benchmark whose numbers require an undocumented `export` first is a
+ * benchmark nobody re-runs, which defeats the point of having a baseline.
+ *
+ * Read with a line match rather than a dotenv dependency, exactly as `scripts/ci/local-quality.sh` does for the
+ * same variable — one convention for one file.
+ */
+function resolveAdminUrl() {
+  if (process.env.DATABASE_MIGRATION_URL) return process.env.DATABASE_MIGRATION_URL
+  try {
+    const envFile = readFileSync(new URL('../../.env', import.meta.url), 'utf8')
+    const match = /^DATABASE_MIGRATION_URL=(.*)$/m.exec(envFile)
+    return match?.[1]?.trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function withBenchDatabase(label, fn) {
-  const adminUrl = process.env.DATABASE_MIGRATION_URL
-  if (!adminUrl) throw new Error('DATABASE_MIGRATION_URL is required')
+  const adminUrl = resolveAdminUrl()
+  if (!adminUrl) {
+    throw new Error('DATABASE_MIGRATION_URL is required — set it in the environment or in .env')
+  }
 
   const databaseName = `builderhunt_bench_${label}_${randomUUID().replace(/-/g, '').slice(0, 16)}`
   const admin = postgres(adminUrl, { max: 1, prepare: false })
@@ -95,17 +120,33 @@ export async function withBenchDatabase(label, fn) {
     await admin.unsafe(`CREATE DATABASE ${databaseName}`)
     const url = new URL(adminUrl)
     url.pathname = `/${databaseName}`
+    /**
+     * The migrator gets its own connection, and that is not tidiness — it is the fix for a real failure.
+     *
+     * Running drizzle's `migrate()` through the same postgres.js client leaves that client unable to serialize
+     * `Date` parameters: every later `${someDate}` arrives at `Buffer.byteLength` as a Date object and throws
+     * `ERR_INVALID_ARG_TYPE`. Reproduced in isolation — the identical insert succeeds on a fresh client and
+     * fails on a migrated one — which is why all three benchmarks had never actually run to completion.
+     *
+     * Not worked around by stringifying 22 call sites: that would have left the trap armed for the next
+     * benchmark someone adds. `prepare` is left at its default too; flipping it changes nothing here, which
+     * was checked before settling on this.
+     */
+    const migrator = postgres(url.toString(), { max: 1, onnotice: () => {} })
+    try {
+      // Reuses the app's own migrator so the schema and indexes under test are the deployed ones.
+      const { drizzle } = await import('drizzle-orm/postgres-js')
+      const { migrate } = await import('drizzle-orm/postgres-js/migrator')
+      await migrate(drizzle(migrator), { migrationsFolder: './drizzle' })
+    } finally {
+      await migrator.end({ timeout: 10 }).catch(() => {})
+    }
+
     sql = postgres(url.toString(), {
       max: 8,
-      prepare: false,
       onnotice: () => {},
       debug: () => counter.onQuery(),
     })
-
-    // Reuses the app's own migrator so the schema and indexes under test are the deployed ones.
-    const { drizzle } = await import('drizzle-orm/postgres-js')
-    const { migrate } = await import('drizzle-orm/postgres-js/migrator')
-    await migrate(drizzle(sql), { migrationsFolder: './drizzle' })
 
     return await fn({ sql, counter, databaseName })
   } finally {

@@ -51,9 +51,10 @@ await withBenchDatabase('transcript_segments', async ({ sql, counter }) => {
   `
   const [session] = await sql`
     insert into interview_sessions
-      (organization_id, event_id, owner_user_id, state, capture_mode, language, started_at,
-       retention_expires_at, version)
-    values (${ORGANIZATION}, ${event.id}, ${USER}, 'live', 'remote_call', 'en', now(),
+      (organization_id, event_id, owner_user_id, state, capture_mode, language, provider,
+       consent_notice_version, capture_capability, started_at, retention_expires_at, version)
+    values (${ORGANIZATION}, ${event.id}, ${USER}, 'live', 'remote_call', 'en', 'deepgram',
+            'bench-notice-v1', 'microphone_and_shared_audio_available', now(),
             now() + interval '90 days', 1)
     returning id
   `
@@ -88,7 +89,7 @@ await withBenchDatabase('transcript_segments', async ({ sql, counter }) => {
     const rows = batchAt(offset)
     const { elapsedMs } = await timeIt(() => sql`
       insert into transcript_segments ${sql(rows)}
-      on conflict (session_id, provider_segment_id) do nothing
+      on conflict (organization_id, session_id, provider_segment_id) do nothing
     `)
     samples.push(elapsedMs)
     // Acknowledged: the server returned success, so the client will never resend these.
@@ -98,7 +99,7 @@ await withBenchDatabase('transcript_segments', async ({ sql, counter }) => {
       // The redelivery a reconnecting client performs. Must not duplicate and must not fail.
       await sql`
         insert into transcript_segments ${sql(rows)}
-        on conflict (session_id, provider_segment_id) do nothing
+        on conflict (organization_id, session_id, provider_segment_id) do nothing
       `
       replayedBatches += 1
     }
