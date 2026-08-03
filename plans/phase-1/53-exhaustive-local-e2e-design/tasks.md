@@ -445,6 +445,30 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
+- [ ] **Give the 25 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+  - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
+  - **Measured 2026-08-03: 176 covered, 1 exempt, 25 missing of 202.** The manifest is the source of truth
+    (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
+    backlog only trains people to skip it.
+  - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
+    the migration superuser and bypass grants and RLS — three defects have hidden that way. So an exemption citing
+    a unit test is not a disposition, it is the gap restated. Only one exemption is recorded so far and it does not
+    cite a unit test: `/api/analytics/conversion`, proven by `tests/regression/test-conversion.mjs` driving a real
+    browser.
+  - **Done: `/api/me/sessions` and `/api/me/stepup`** (`tests/e2e/api/account-security.spec.ts`, 11 passing). Each
+    had one property only a real request could establish: the sessions payload deliberately carries raw session
+    tokens (that is how the browser calls better-auth's `revokeSession`), so it is asserted that a second signed-in
+    user's session never appears in it by id or by token — which needs two genuinely authenticated users; and a
+    failed step-up must set no `bh_stepup` cookie, since a 401 that still granted the cookie would look like a
+    refusal in every log while being a bypass. Negative control: making the wrong-password path set the cookie
+    fails that assertion with the cookie value in the diff. Two assertions were also hardened against passing
+    vacuously — an empty session list, and a route that answered 429 to everything.
+  - Remaining clusters: alerts (4), work-samples (3), ai (3), solutions (3), calendar (2), privacy removal (2),
+    organizations activity/immediate-deletion (2), plus `builders/claim/verify`, `builders/recent`,
+    `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
+  - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
+    `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
+
   - **Verified (2026-08-03).** Both halves, static and runtime, plus both negative controls:
     - `pnpm security:route-methods` → `205 route(s) sealed with ANY; every Allow header matches its handlers`.
       Wired into `package.json`, `.github/workflows/quality.yml` and `scripts/ci/local-quality.sh` beside
