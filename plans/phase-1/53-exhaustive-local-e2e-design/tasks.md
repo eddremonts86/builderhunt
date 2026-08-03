@@ -346,6 +346,18 @@
     proven on `/api/me/builder/$builderId`.** What remains is the static check and the per-route decisions —
     for each of the other 82, whether the absent method should 405 or actually be implemented. That judgement is
     the work; the rejection is one line.
+  - **A trap found 2026-08-03, before doing the sweep: the bare helper is wrong on authenticated routes.** It
+    answers *before* authentication, because it has no session to check. On `/api/admin/*` that means a 405 to an
+    anonymous caller **confirms the route exists**, where a 401 reveals nothing — the same leak as validating
+    before authenticating, which was fixed in `src/routes/api/organizations/index.ts` for exactly this reason.
+
+    So the sweep is not "add one line to 82 files". Public and already-guarded routes take the helper as it is;
+    authenticated ones must establish the caller first and reject the method second, and the guard differs by
+    route family (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a capability check). About 15 of the
+    82 are `/api/admin/*` POST-only triggers (`run-worker`, `run-retention`, `run-reminders`, `$jobKey/run`),
+    which look like the easiest batch and are precisely the ones this applies to.
+
+    The helper's own doc comment now says this, so the trap is where someone doing the sweep will read it.
   - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
     through to the route *component*, so the request gets **200 with an HTML document** instead of 405 with an
     `Allow` header. A client scripting the endpoint reads 200 and concludes it succeeded. It was hit twice

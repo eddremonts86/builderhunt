@@ -28,6 +28,19 @@
  * `Allow` is required by RFC 9110 on a 405 and is the part hand-written rejections forget. It is also the only
  * machine-readable way for a caller to discover what the route *does* accept, which is what turns a refusal
  * into something actionable rather than a dead end.
+ *
+ * ## Do not use this bare on an authenticated route
+ *
+ * This helper answers **before authentication** — it has no session to check. On a public or already-guarded
+ * route that is exactly right. On `/api/admin/*` it is not: a 405 to an anonymous caller confirms the route
+ * exists, where a 401 says nothing. That is the same leak as validating before authenticating, fixed in
+ * `src/routes/api/organizations/index.ts` for exactly this reason — the refusal a stranger sees must not depend
+ * on facts they are not entitled to.
+ *
+ * So for an authenticated route the order is: establish the caller first, *then* reject the method. There is
+ * deliberately no helper for that yet, because the guard differs per route family
+ * (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a capability check) and picking one for the caller
+ * would be guessing. Write the two lines locally, or add a variant that takes the guard.
  */
 
 /** The methods this codebase's API routes can declare. */
