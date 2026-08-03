@@ -172,17 +172,27 @@ Se copia deliberadamente, y se cita en el comentario de cada tabla nueva:
 
 ### Qué se puede entregar si el pipeline de documentos sigue sin escribirse
 
-**Fases 1 a 4 completas.** El perfil profesional manual, los hechos confirmados, el compositor
-determinista, el CV base con cobertura de hechos al 100%, el editor, el validador de verdad, los
-renderers PDF/TXT/HTML y el export son **independientes del upload**. Una persona puede teclear su
-experiencia y descargar un PDF sin que exista un solo byte en object storage.
+**Fases 1 a 4 completas, y 4b con una salvedad.** El perfil profesional manual, los hechos
+confirmados, el compositor determinista, el CV base con cobertura de hechos al 100%, el editor, el
+validador de verdad, los renderers PDF/TXT/HTML y el export son **independientes del upload**. Una
+persona puede teclear su experiencia y descargar un PDF sin que exista un solo byte en object storage.
 
-Lo que queda bloqueado es exactamente: subir un CV existente (Fase 5) y, por lo tanto, la task
+De la Fase 4b, la higiene determinista y el matcher de keywords tampoco dependen del upload. La única
+pieza que sí depende es `measureParseFidelity`, porque necesita el extractor de texto de PDF. Ver la
+decisión de adelantar sólo el extractor en el [plan](./plan.md) §Fase 4b: `pdfjs-dist` sin storage ni
+ClamAV es una dependencia de parseo, no del pipeline de documentos.
+
+Lo que queda bloqueado es exactamente: subir un CV existente (**Fase 6**) y, por lo tanto, la task
 `career-facts-extract`. La UI muestra el área de upload deshabilitada con el motivo, no un botón que
-falla. **Este plan no implementa el adaptador de storage**: si al llegar a la Fase 5 sigue sin
-existir, la Fase 5 se implementa completa incluyendo los tres adaptadores contra el contrato ya
-definido en `src/lib/storage/types.ts` (tareas 30–32), pero eso es trabajo adicional que la
-estimación de la fase debe reflejar.
+falla. **Este plan no implementa el adaptador de storage**: si al llegar a la Fase 6 sigue sin
+existir, la Fase 6 se implementa completa incluyendo los tres adaptadores contra el contrato ya
+definido en `src/lib/storage/types.ts`, pero eso es trabajo adicional que la estimación de la fase
+debe reflejar.
+
+**Y se prueba, no se afirma.** Que este camino siga entero es hoy una promesa de documento que nadie
+ejecuta. Un job de CI corre el E2E de las fases 3, 4 y 4b con `CANDIDATE_UPLOADS_ENABLED=false` — el
+flag ya existe — igual que ya se corre con `AI_DISABLED=true`. Sin ese job, "el producto es entregable
+sin upload" es exactamente la clase de afirmación que se rompe en silencio.
 
 > Nota para `plans/phase-2/README.md` (no editable desde este plan): su línea "private R2 foundation"
 > es incorrecta por partida doble. El almacenamiento previsto es **MinIO privado autoalojado**
@@ -624,6 +634,7 @@ Un CV emitido. Inmutable en contenido una vez `content_sha256` está fijado.
 | `generation_run_id` | `uuid` | sí | FK compuesta a `resume_generation_runs` `set null` |
 | `verification_status` | `text` default `'unverified'` | no | `unverified \| verified \| failed` |
 | `unsupported_claim_count` | `integer` default `0` | no | |
+| `unresolved_placeholder_count` | `integer` default `0` | no | huecos de métrica sin resolver; ver §Capa 0 |
 | `claim_count` | `integer` default `0` | no | |
 | `export_state` | `text` default `'draft'` | no | `draft \| exportable \| stale \| archived` |
 | `stale_reason` | `text` | sí | `fact_changed \| fact_deleted \| job_version_changed` |
@@ -642,6 +653,7 @@ check (verification_status in ('unverified','verified','failed'))
 check (export_state in ('draft','exportable','stale','archived'))
 check (content_sha256 ~ '^[a-f0-9]{64}$')
 check (claim_count >= 0 and unsupported_claim_count >= 0 and unsupported_claim_count <= claim_count)
+check (unresolved_placeholder_count >= 0)
 -- Una variante adaptada nombra su oferta y la versión exacta de la oferta; una base, ninguna.
 check ((kind = 'tailored') = (job_opportunity_version_id is not null))
 check (job_opportunity_version_id is null or job_opportunity_id is not null)
@@ -649,8 +661,26 @@ check (job_opportunity_version_id is null or job_opportunity_id is not null)
 check (verification_status <> 'verified' or unsupported_claim_count = 0)
 check ((verification_status = 'verified') = (verified_at is not null))
 check (export_state <> 'exportable' or verification_status = 'verified')
+-- Un hueco de métrica sin resolver no bloquea `verified` (no es un claim sin respaldo), pero sí el export.
+check (export_state <> 'exportable' or unresolved_placeholder_count = 0)
 check ((export_state = 'stale') = (stale_reason is not null))
 ```
+
+**Límite conocido de la puerta de verdad, escrito para que nadie lo descubra tarde.** Los tres checks
+de arriba operan sobre **enteros que escribe la aplicación**: Postgres no puede recorrer el `content`
+jsonb y recomputar la cobertura por sí mismo. Es decir, la capa 4 garantiza *"si los contadores dicen
+que hay un claim sin respaldo, el export es imposible"*, **no** *"los contadores son correctos"*. Un
+`validateResumeTruth` con un bug que escriba `0` abriría la puerta.
+
+Esto no se puede cerrar en DDL sin un trigger, y un trigger que parsee jsonb en cada escritura es peor
+que el problema. Se cierra por otro lado, y por eso importa que ambas cosas existan:
+
+- `validateResumeTruth` es una **función pura** con test de propiedad: para todo `content` generado, el
+  recuento de nodos sin `factIds` coincide con `unsupported_claim_count`. Es la única pieza cuyo bug
+  sería silencioso, así que es la que lleva el test más fuerte del plan.
+- El gate de release `unsupported claim rate = 0` recomputa la cobertura **desde el `content`
+  persistido**, ignorando los contadores. Una deriva entre columna y contenido aparece ahí como fallo,
+  no como un CV mal exportado.
 
 **GRANTs**: `builderhunt_app` SELECT/INSERT/UPDATE/DELETE. `builderhunt_worker` SELECT/INSERT/UPDATE
 (el batch genera y verifica), sin DELETE.
@@ -1068,6 +1098,37 @@ Determinismo: viewport fijo, CSS de impresión fijo, `preferCSSPageSize: true`,
 `displayHeaderFooter: false`, sin red. El hash de identidad de un CV es el
 `resume_versions.content_sha256` del DTO, no los bytes del PDF (que llevan fecha de creación).
 
+#### El endurecimiento se afirma con tests, no con buenas intenciones
+
+Toda la tabla de arriba es **configuración en línea**. Borrar `javaScriptEnabled: false` en un refactor
+no rompe ninguna prueba: el PDF sigue generándose y sigue pasando extracción de texto. Es la única
+superficie de seguridad de este plan cuya mitigación era exclusivamente "lo escribimos en el spec", y
+eso no es una mitigación.
+
+Se arregla separando la construcción de las opciones de su uso, para poder afirmarlas sin lanzar
+Chromium:
+
+```ts
+// src/shared/lib/resumes/render-options.ts (new) — puro, sin importar playwright
+export function buildResumeRenderOptions(): ResumeRenderOptions { /* … */ }
+```
+
+Tres gates, todos en el cierre de la Fase 4:
+
+1. **Test unitario sobre el objeto de opciones**: afirma `javaScriptEnabled === false`, que el
+   `launch()` **no** lleva `--no-sandbox`, que el timeout es 15 s, y que se registra un `route` que
+   aborta toda petición.
+2. **Test unitario sobre el HTML**: `renderResumeHtml` emite el `<meta http-equiv="Content-Security-Policy">`
+   con `default-src 'none'`, y un hecho que contenga `<script>alert(1)</script>` o
+   `<img src="http://evil/">` aparece **escapado** en la salida.
+3. **Regla en `scripts/check-tenant-boundaries.mjs`**: bajo `src/**/resumes/**` se prohíben los
+   literales `--no-sandbox` y `javaScriptEnabled: true`. Es una comprobación de texto, del mismo tipo
+   que las reglas de rol y de importación que el script ya hace.
+
+Lo que estos tests **no** prueban: que Chromium sea seguro. Prueban que no lo estamos usando de la
+forma insegura que ya decidimos evitar. Es un alcance modesto y es el que importa: el fallo probable no
+es un 0-day, es un PR que quita una línea sin saber por qué estaba.
+
 **TXT** — generado desde el mismo DTO, sin dependencias: una columna, encabezados convencionales,
 sin tablas, sin caracteres de caja, sin viñetas Unicode exóticas. Es el formato ATS-friendly real.
 
@@ -1119,17 +1180,27 @@ export const hygieneFindingSchema = z.object({
   checkId: z.string().max(64),            // estable y versionado; entra en la telemetría
   category: z.enum(['parse','sections','content','tailoring']),
   severity: z.enum(['blocker','warning','info']),
-  // ANCLA OBLIGATORIA: sin ella el hallazgo no se muestra. Ver §Por qué el ancla es obligatoria.
   anchor: z.object({
     sectionIndex: z.number().int().nonnegative().nullable(),
     entryIndex: z.number().int().nonnegative().nullable(),
     claimId: claimIdSchema.nullable(),
     quote: z.string().min(1).max(200).nullable(),
-  }),
+  }).refine(
+    // EL INVARIANTE, en el esquema y no en una convención. Los cuatro campos son nullable por
+    // separado porque cada check ancla distinto (uno por sección, otro por cita literal), pero los
+    // cuatro nulos a la vez es exactamente el caso que esta sección existe para prohibir.
+    (a) => a.sectionIndex !== null || a.entryIndex !== null || a.claimId !== null || a.quote !== null,
+    { message: 'anchor_required: un hallazgo sin localización no se emite' },
+  ),
   message: z.string().max(240),
   fix: z.enum(['manual','deterministic','ai_suggested']),
 })
 ```
+
+El `.refine()` es el mecanismo; el descarte en `evaluateResumeHygiene` es la red de seguridad, no la
+defensa. Sin el primero, "el ancla es obligatoria" sería una convención que un check nuevo puede
+incumplir sin que nada falle — que es precisamente el modo de fallo que describe §Por qué el ancla es
+obligatoria.
 
 Las cuatro categorías se reportan **por separado**, cada una con `passed / total`. No se suman, no se
 promedian y no se convierten en un 0–100. Un agregado invita exactamente a la lectura que el
@@ -1424,6 +1495,36 @@ botones, no tooltips a secas.
 
 ---
 
+## Guardas mecánicas
+
+Cuatro reglas nuevas en `scripts/check-tenant-boundaries.mjs` (script que ya existe y ya hace
+comprobaciones de esta clase: reglas de rol, de importación y de literales) más un script propio.
+Existen porque cada una sustituye una prohibición que hasta ahora sólo estaba escrita en prosa, y una
+prosa no sobrevive a un refactor.
+
+Todas activas desde el cierre de la **Fase 2**, no al final: una frontera que se añade después de que
+el código exista es una frontera que ya se cruzó.
+
+| # | Regla | Qué prohíbe | Riesgo que cubre |
+| --- | --- | --- | --- |
+| 1 | **Sin employer-side desde career** | Bajo `src/**/{career,resumes}/**` y `src/routes/api/career/**`: importar `candidateDocuments`, `candidateSubmissions`, `pipeline*`, `organizationBuilders` o cualquier tabla ATS, en forma estática **o** dinámica | Reutilizar `candidate_documents` "porque se parece", y cualquier lectura cruzada de sujeto |
+| 2 | **Sin caché sin tenant** | En el mismo alcance: importar o llamar `getCached`/`setCached`. La caché de este dominio pasa por `tenantAiCacheKey`, sin excepción | Un CV filtrado entre tenants por una clave sin `organizationId` |
+| 3 | **Sin renderer laxo** | Bajo `src/**/resumes/**`: los literales `--no-sandbox` y `javaScriptEnabled: true` | Endurecimiento del renderer borrado en un refactor |
+| 4 | **Prefijo de dominio** | Todo identificador exportado **nuevo** que este plan añada a `schema.ts`, `tasks.ts`, `rate-cards.ts` y `permissions.ts` casa con `^(career\|resume)` | Colisión con los planes hermanos en los cuatro ficheros que los tres editan a la vez |
+| 5 | `check-forbidden-claims.mjs` `(new)` | Las cifras de §Copia prohibida en `src/**`, copy y prompts | Heredar el marketing del miedo al ATS |
+
+Sobre la regla 2, que es la que más se va a discutir: `getCached` seguirá existiendo y seguirá siendo
+correcto para otros dominios. Su clave es `ai:cache:{taskId}:{hash(input)}`
+(`src/shared/lib/ai/cache.ts`) y **no incluye la organización**, lo que en este dominio significa que
+dos personas con la misma experiencia podrían compartir un CV. La regla es de alcance, no un juicio
+sobre el helper.
+
+Sobre la regla 4: es una comprobación de texto, no un análisis de tipos, así que tendrá falsos
+negativos. Se acepta — su valor es cazar el copy-paste evidente en un fichero que tres planes tocan a
+la vez, no demostrar unicidad.
+
+---
+
 ## Privacidad y retención
 
 - **Consentimiento versionado antes de la primera salida al proveedor.** El modal nombra: qué campos
@@ -1477,6 +1578,17 @@ producto** — ni en UI, ni en marketing, ni en un prompt:
 | "el 75 % de los CVs son rechazados automáticamente" | Rastreada a un *sales pitch* de un vendor de **2012**, de una empresa **cerrada en 2013**. No es un estudio |
 | "el 98,4 % de las Fortune 500 usan ATS" | Autorreferencial, sin verificación independiente |
 | "los reclutadores dedican 6 segundos a un CV" | Describe un *skim* humano, no una regla de parseo |
+| "puntuación ATS" / "ATS score" como número propio | No existe; ver §No objetivos |
+
+**Con gate, porque una lista en un spec no la lee quien escribe la copia.**
+`scripts/check-forbidden-claims.mjs` `(new)`, en `pnpm ci:local`, escanea `src/**` más los ficheros de
+copy y de prompts buscando los patrones de arriba (`/75\s*%/` en contexto de rechazo, `/98[.,]4/`,
+`/\b6\s+(seconds|segundos)\b/`, `/ATS\s+score/i`) y falla con el número de línea y el motivo. Es un
+grep con allowlist —este spec y el documento de investigación están exentos, porque explican por qué
+están prohibidas— del mismo tipo que las reglas que `check-tenant-boundaries.mjs` ya ejecuta.
+
+El gate es compartido con [`delegated-job-applications`](../delegated-job-applications/spec.md): la
+lista vive aquí y aplica a los dos dominios. Un escáner por plan se desincronizaría.
 
 Lo que sí se puede afirmar con procedencia: **23 de 25 reclutadores (92 %) dicen que sus sistemas no
 auto-rechazan por formato, contenido ni diseño**; sólo el 8 % tiene auto-rechazo configurado. El

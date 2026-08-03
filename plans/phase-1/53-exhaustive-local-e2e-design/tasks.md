@@ -646,7 +646,15 @@
       path runs through `E2E_EMBEDDINGS_SCENARIO=success`, so there is no HTTP call and no dependency on a local
       embedding server; one vector per input at the configured dimension, which matters because
       `AIDimensionMismatchError` is a real 502 branch.
-    - **Two things this file records rather than asserts.** The gate order is deliberately *not* authenticate-first —
+    - **The kill switch now has its own file** (`tests/e2e/api/ai-kill-switch.spec.ts`, 3 passing), because
+      `E2E_AI_TASK_SCENARIO` is read by the *server* process at spawn — one value per spec file, so covering
+      `disabled` here would have forced the other ten assertions onto an abnormal path. It asserts that an anonymous
+      and an authenticated caller receive the **identical** 503: a switch that only stopped signed-in callers would
+      leave the expensive path open to anyone who had not signed in. Negative control: moving the switch after
+      `requireTenantPrincipal` makes the anonymous caller get 401, so the assertion genuinely pins the ordering. A
+      third assertion pins the *reasoning* — `ai/config` publishing `disabled` anonymously is what makes the 503 safe
+      to show, so if that ever changes, this is where someone notices the ordering started leaking.
+    - **One thing this file records rather than asserts.** The gate order is deliberately *not* authenticate-first —
       the kill switch and "unconfigured" answer 503 before `requireTenantPrincipal` — and that is fine here because
       `GET /api/ai/config` publishes both facts anonymously by design. And the `admin.ai.embed` audit event has **no
       durable record**: `auditPlatformAdminAction` writes through `consoleSecurityAuditSink`, which is
