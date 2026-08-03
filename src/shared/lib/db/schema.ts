@@ -122,6 +122,25 @@ export const organizationInvitations = pgTable(
   (table) => [
     index('organization_invitations_email_idx').on(table.organizationId, table.email),
     index('organization_invitations_expires_idx').on(table.expiresAt),
+    /**
+     * At most one *pending* invitation per (organization, email).
+     *
+     * `inviteMember` read "is there a pending one?" and then inserted, which is correct in every sequential test
+     * and wrong the moment two requests overlap: both read "none" before either commits. Measured 2026-08-02 —
+     * six concurrent invitations to one address produced four pending rows.
+     *
+     * That is not cosmetic: a pending invitation holds a seat, so duplicates consume seats the organization did
+     * not buy and can push it into `member limit` errors for invitations it never knowingly sent. The invitee
+     * gets four links and resend rotates the id, so at most one still works by the time they click. A
+     * double-click on Invite is enough to get here.
+     *
+     * Partial rather than total, because accepted/rejected/canceled rows are history and must be allowed to
+     * accumulate — re-inviting someone who declined has to stay possible. `resendInvitation` already cancels
+     * before it re-creates, so it does not collide with this.
+     */
+    uniqueIndex('organization_invitations_one_pending_unique')
+      .on(table.organizationId, table.email)
+      .where(sql`${table.status} = 'pending'`),
     check('organization_invitations_role_check', sql`${table.role} is null or ${table.role} in ('admin', 'member')`),
     check('organization_invitations_status_check', sql`${table.status} in ('pending', 'accepted', 'rejected', 'canceled')`),
   ],
@@ -4022,5 +4041,45 @@ export const solutionGoldBriefs = pgTable(
     check('solution_gold_briefs_authorship_check', sql`${table.authorship} in ('synthetic', 'human')`),
     check('solution_gold_briefs_text_length_check', sql`char_length(${table.briefText}) between 1 and 4000`),
     index('solution_gold_briefs_authorship_idx').on(table.authorship, table.createdAt),
+  ],
+)
+
+/**
+ * Durable security-audit trail (`security_audit_events`).
+ *
+ * `emitSecurityAudit` has always taken its sink as a parameter, and the only implementation was
+ * `consoleSecurityAuditSink` — a `console.log`. Plan 32 hit that while building denial clustering, confirmed no
+ * durable table existed, and routed around it with Redis counters. This is the table it named.
+ *
+ * Deliberately **no foreign keys** on `organizationId` / `actorUserId`. An audit trail has to outlive its subjects:
+ * a cascade would delete the record of what an organization did at the moment the organization is deleted, which is
+ * exactly when the record matters most. The ids are recorded as they were, not as joinable references.
+ *
+ * Grants (in the accompanying SQL migration, not expressible here): the app role gets **INSERT only** — a trail the
+ * request path can read back is a trail it can leak, and `emitSecurityAudit` never needs to read. The
+ * platform-admin role gets SELECT for the operational surface, and the worker role DELETE for retention. No UPDATE
+ * for anyone: an audit row that can be edited is not evidence.
+ */
+export const securityAuditEvents = pgTable(
+  'security_audit_events',
+  {
+    id: text('id').primaryKey(),
+    organizationId: text('organization_id'),
+    actorUserId: text('actor_user_id'),
+    action: text('action').notNull(),
+    targetType: text('target_type').notNull(),
+    targetId: text('target_id'),
+    result: text('result').notNull(),
+    requestId: text('request_id').notNull(),
+    details: jsonb('details').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // The three questions this table exists to answer: what happened to this organization, what did this actor do,
+    // and who did X. Each is a range scan over time, so each index leads with its key and orders by `created_at`.
+    index('security_audit_events_org_idx').on(table.organizationId, table.createdAt),
+    index('security_audit_events_actor_idx').on(table.actorUserId, table.createdAt),
+    index('security_audit_events_action_idx').on(table.action, table.createdAt),
+    check('security_audit_events_result_check', sql`${table.result} in ('allowed', 'denied', 'failed')`),
   ],
 )

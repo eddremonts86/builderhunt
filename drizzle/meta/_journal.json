@@ -981,6 +981,13 @@
       "when": 1785674191856,
       "tag": "0139_credentialed_job_sources",
       "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1785769001118,
+      "tag": "0140_invitation_race_and_security_audit",
+      "breakpoints": true
     }
   ]
 }

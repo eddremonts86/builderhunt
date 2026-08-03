@@ -138,10 +138,10 @@ test('tracking the same builder six times at once tracks it once', async () => {
   expect(tracked[0]?.count, 'a race tracked the same builder twice').toBe('1')
 })
 
-test.fixme('inviting the same address six times at once leaves one pending invitation', async () => {
+test('inviting the same address six times at once leaves one pending invitation', async () => {
   /**
-   * **This race is real and currently loses. Measured 2026-08-02: six concurrent invitations to one address
-   * produced four pending rows.**
+   * **Fixed 2026-08-03 by `organization_invitations_one_pending_unique` (migration 0140).** Before it, this race
+   * lost: measured 2026-08-02, six concurrent invitations to one address produced four pending rows.
    *
    * `POST /api/organizations/invitations` reads whether a pending invitation exists and then inserts. That is
    * correct in every sequential test — including the one in `organizations-invitations.spec.ts`, which passes
@@ -156,10 +156,11 @@ test.fixme('inviting the same address six times at once leaves one pending invit
    * How you get here without trying: a double-click on Invite, a form resubmitted on a flaky connection, or
    * two admins inviting the same new hire in the same minute.
    *
-   * Not fixed here — plan 53's rule for these matrices is that a production edit belongs in its own task, and
-   * this one has a schema decision in it (a partial unique index on pending invitations versus an advisory
-   * lock in the lifecycle service). Carried as a task in
-   * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`.
+   * The schema decision went to the partial unique index rather than an advisory lock: the index makes the bad state
+   * impossible at the DDL level, where a lock only makes it unlikely and has to be remembered at every new call site.
+   * `inviteMember` absorbs the resulting violation and returns the winner's invitation, so the loser of the race
+   * still gets a successful answer — the caller asked for "this person is invited", and that is now true — and no
+   * second email goes out.
    */
   const email = `${uniqueId('race-invite').toLowerCase()}@e2e.invalid`
   const results = await race(() =>

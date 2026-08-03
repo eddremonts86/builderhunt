@@ -412,3 +412,54 @@ test.describe('GET /api/organizations/invitations/mine', () => {
     )
   })
 })
+
+/**
+ * The audit trail is now durable, and this is what proves it.
+ *
+ * `emitSecurityAudit` always took its sink as a parameter, and the only implementation was `console.log`. Plan 32 hit
+ * that while building denial clustering, confirmed no durable table existed, and routed around it with Redis counters.
+ * Migration 0140 adds `security_audit_events`, and this asserts a real row lands — because the sink deliberately
+ * swallows insert failures (an audit problem must not fail the action being audited), which means a missing grant or a
+ * missing table would leave the feature silently console-only, exactly as before, with every test still green.
+ *
+ * The writer is `builderhunt_auth`, not `builderhunt_app`: the lifecycle dependencies write through `authDb`. That is
+ * the detail this test exists to pin — granting `app` alone was the mistake it would have caught.
+ */
+test.describe('durable security audit', () => {
+  test('inviting a member writes an audit row that can be queried afterwards', async () => {
+    const email = `${uniqueId('audit-invite').toLowerCase()}@e2e.invalid`
+    const response = await harness.a.principal.api!.post('/api/organizations/invitations', {
+      data: { email, role: 'member' },
+    })
+    expect(response.status(), await response.text()).toBe(200)
+    const invitation = await response.json() as { id: string }
+
+    const rows = await harness.sql<{ action: string; result: string; actor_user_id: string | null; details: unknown }[]>`
+      select action, result, actor_user_id, details
+      from security_audit_events
+      where action = 'organization.invite' and target_id = ${invitation.id}
+    `
+    expect(rows, 'the invite must have left exactly one audit row').toHaveLength(1)
+    expect(rows[0]!.result).toBe('allowed')
+    expect(rows[0]!.actor_user_id, 'the trail is useless without who did it').toBe(harness.a.principal.userId)
+  })
+
+  test('the request path can write the trail but cannot read it back', async () => {
+    /**
+     * A trail the application can read is a trail it can leak, so `builderhunt_auth` has INSERT and no SELECT — and
+     * RLS grants no read policy to the writers either. Asserted through the app's own role rather than the migration
+     * role this spec's `harness.sql` uses, since the migration role is a superuser and would see everything.
+     */
+    const appUrl = process.env.DATABASE_URL
+    expect(appUrl, 'this assertion needs the app role connection string').toBeTruthy()
+    const appSql = postgres(appUrl!, { max: 1, prepare: false })
+    try {
+      await expect(
+        appSql`select count(*) from security_audit_events`,
+        'the app role must not be able to read the audit trail',
+      ).rejects.toThrow()
+    } finally {
+      await appSql.end({ timeout: 5 }).catch(() => undefined)
+    }
+  })
+})

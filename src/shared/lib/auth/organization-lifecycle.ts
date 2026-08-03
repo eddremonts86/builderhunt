@@ -1,5 +1,5 @@
 import { emitSecurityAudit, type SecurityAuditSink } from '../security/audit'
-import { consoleSecurityAuditSink } from '../security/audit-sink'
+import { createDatabaseSecurityAuditSink } from '../security/audit-sink'
 import { ORGANIZATION_MEMBERSHIP_LIMIT } from './organization-options'
 import type { OrganizationRole, TenantPrincipal } from '../authorization/permissions'
 import type { PlanStatus } from '../billing-shared'
@@ -126,6 +126,14 @@ export interface LifecycleDependencies {
     inviterId: string
   }): Promise<InvitationRecord>
   getInvitation(invitationId: string): Promise<InvitationRecord | null>
+  /**
+   * The pending invitation for (organization, email), if one exists.
+   *
+   * Only consulted after `organization_invitations_one_pending_unique` rejects a concurrent insert, to return the
+   * winner instead of a 500. Optional so the many existing fake-deps unit tests keep compiling — same reason
+   * `onMembershipDenied` is optional on `TenantPrincipalDependencies`.
+   */
+  findPendingInvitation?(organizationId: string, email: string): Promise<InvitationRecord | null>
   cancelInvitationRecord(invitationId: string): Promise<void>
   acceptInvitationRecord(invitationId: string, userId: string): Promise<void>
   removeMemberRecord(organizationId: string, userId: string): Promise<void>
@@ -140,6 +148,30 @@ export interface LifecycleDependencies {
   rateLimit(scope: string, id: string, limit: number, windowSeconds: number): Promise<{ allowed: boolean }>
   audit: SecurityAuditSink
   now(): Date
+}
+
+/**
+ * Whether a failed insert is the pending-invitation unique violation rather than any other error.
+ *
+ * Matched on SQLSTATE `23505` plus the constraint name, so a different unique violation on the same table — or a
+ * future one — is still surfaced rather than silently treated as "someone else already invited them". The driver
+ * sometimes nests the real error under `cause`, so both are inspected; the same shape
+ * `repositories/status-subscribers.ts` already handles.
+ */
+function isPendingInvitationConflict(error: unknown): boolean {
+  const candidates: unknown[] = [error]
+  if (error && typeof error === 'object' && 'cause' in error) candidates.push((error as { cause: unknown }).cause)
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue
+    const code = (candidate as { code?: unknown }).code
+    const constraint = (candidate as { constraint_name?: unknown; constraint?: unknown })
+    const name = typeof constraint.constraint_name === 'string'
+      ? constraint.constraint_name
+      : typeof constraint.constraint === 'string' ? constraint.constraint : ''
+    if (code === '23505' && name === 'organization_invitations_one_pending_unique') return true
+    if (candidate instanceof Error && /organization_invitations_one_pending_unique/.test(candidate.message)) return true
+  }
+  return false
 }
 
 function requestIdFrom(request: Request): string {
@@ -233,6 +265,8 @@ async function audit(
     targetId: string | null
     result: 'allowed' | 'denied' | 'failed'
     requestId: string
+    /** Redacted by `emitSecurityAudit` before it reaches any sink — safe for small, non-PII context. */
+    details?: Record<string, unknown>
   },
 ): Promise<void> {
   await emitSecurityAudit(input, deps.audit)
@@ -306,6 +340,31 @@ export function createOrganizationLifecycle(deps: LifecycleDependencies) {
           requestId: requestIdFrom(request),
         })
         throw new OrganizationLifecycleError('This organization has reached its member limit', 409)
+      }
+      /**
+       * A concurrent invite to the same address lost the race against
+       * `organization_invitations_one_pending_unique`. The index is what makes duplicates impossible; this is what
+       * makes losing graceful — the caller asked for "this person is invited", and that is now true, so returning
+       * the winner's invitation is the honest answer rather than a 500 for an outcome that succeeded.
+       *
+       * Deliberately **no second email**: the winning request already sent one, and the whole point of the index is
+       * that the invitee receives one working link instead of four, at most one of which still resolves.
+       */
+      if (isPendingInvitationConflict(error)) {
+        const existing = await deps.findPendingInvitation?.(input.organizationId, email)
+        if (existing) {
+          await audit(deps, {
+            organizationId: input.organizationId,
+            actorUserId: session.userId,
+            action: 'organization.invite',
+            targetType: 'invitation',
+            targetId: existing.id,
+            result: 'allowed',
+            requestId: requestIdFrom(request),
+            details: { deduplicated: true },
+          })
+          return existing
+        }
       }
       throw error
     }
@@ -894,7 +953,53 @@ export async function getOrganizationLifecycle(): Promise<OrganizationLifecycle>
       return rateLimit(scope, id, limit, windowSeconds)
     },
 
-    audit: consoleSecurityAuditSink,
+    /**
+     * Only reached when `organization_invitations_one_pending_unique` rejected a concurrent insert, so this reads the
+     * row that won the race. Same `authDb` connection as every other invitation read in this block.
+     */
+    async findPendingInvitation(organizationId, email) {
+      const [row] = await authDb
+        .select()
+        .from(organizationInvitations)
+        .where(and(
+          eq(organizationInvitations.organizationId, organizationId),
+          eq(organizationInvitations.email, email),
+          eq(organizationInvitations.status, 'pending'),
+        ))
+        .limit(1)
+      if (!row) return null
+      return {
+        id: row.id,
+        organizationId: row.organizationId,
+        organizationName: '',
+        email: row.email,
+        role: (row.role ?? 'member') as InvitableRole,
+        // The query filters on it, so the literal is a fact rather than a cast that hides a wider type.
+        status: 'pending' as const,
+        expiresAt: row.expiresAt,
+        inviterId: row.inviterId,
+      }
+    },
+
+    /**
+     * Durable now, not just logged. The insert is best-effort and never fails the caller — see
+     * `createDatabaseSecurityAuditSink`. `authDb` is the connection every other write in this block already uses, and
+     * the app role has INSERT and deliberately no SELECT on this table, so this must never use `.returning()`.
+     */
+    audit: createDatabaseSecurityAuditSink(async (event) => {
+      await authDb.insert(schema.securityAuditEvents).values({
+        id: event.id,
+        organizationId: event.organizationId,
+        actorUserId: event.actorUserId,
+        action: event.action,
+        targetType: event.targetType,
+        targetId: event.targetId,
+        result: event.result,
+        requestId: event.requestId,
+        details: event.details,
+        createdAt: event.createdAt,
+      })
+    }),
 
     now() {
       return new Date()

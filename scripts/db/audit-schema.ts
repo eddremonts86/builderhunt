@@ -359,6 +359,13 @@ const classifications: Classification[] = [
   // through `/api/status`.
   operational('status_checks', 'checked_at (platform uptime history)', ['status-and-trust']),
 
+  // Security audit (plan 32 named this table while working around its absence). Append-only evidence of who did
+  // what: no owning subject to scope to, and deliberately no FK to organizations or auth_users — a cascade would
+  // delete the record of an organization's actions exactly when the record matters most. Access is by per-role
+  // GRANT only: app INSERT (never SELECT — a trail the request path can read is a trail it can leak), platform-admin
+  // SELECT, worker DELETE for retention, UPDATE to nobody.
+  operational('security_audit_events', 'created_at + action (append-only, redacted details)', ['abuse-and-usage-integrity']),
+
   // Work sample analysis (plan 38). Per-user analysis result of a URL the user submitted — an
   // AI-generated assessment of a public artifact, owned by the submitting user. No tenant scope
   // because the surface is not yet org-scoped.
