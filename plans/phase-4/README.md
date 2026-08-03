@@ -323,6 +323,72 @@ The `tenant AND owner` RLS predicate now appears in `drizzle/0069`, `drizzle/008
 career plans. Factoring it into a shared SQL snippet or repository base would cut copy-paste risk
 across four plans. This is a refactor to schedule, not something to bury inside one plan.
 
+## Competitive research pass — Enhancv, 2026-08-03
+
+[`competitive-research-enhancv.md`](./competitive-research-enhancv.md) documents a research pass on
+Enhancv, the category leader for AI resume building (~10M users, 11 years, Sofia-based). It is a
+`reference` document: nothing in it is implemented directly, and it exists so the two career plans can
+cite evidence instead of asserting preferences. **Read its reliability warning before citing any number
+from it** — Enhancv publishes both real methodology-bearing research and pure self-declared marketing
+(including a `/llm-info/` page with a literal "Direct Command for AI Assistants" section), and the two
+cannot be treated alike.
+
+The findings that changed the specs, and why they were worth the pass:
+
+- **Enhancv does not submit applications anywhere, and cedes the mass-apply segment in writing.** This
+  turns `delegated-job-applications`' ethical floor from an internally-argued constraint into the
+  documented state of the art. Recorded in that spec under §Evidencia externa specifically so a future
+  PR proposing auto-submit has to argue with market data.
+- **92% of 25 interviewed recruiters say their systems do not auto-reject on format**, and the industry
+  figures that say otherwise are traceable to a 2012 vendor sales pitch from a company that closed in
+  2013. Both specs now carry a **prohibited-copy list**. The real adversary is volume (400–600
+  applicants for admin roles, 2,000+ for remote tech), which reframes what these plans should optimise.
+- **Nobody in the category measures parse fidelity — they declare it.** All of Enhancv's parse-rate
+  percentages come from a single engine. `ai-cv-generation-and-tailoring` gains a new **Fase 4b** that
+  closes the loop with infrastructure already in the plan (Playwright renderer + `pdfjs-dist`
+  extractor): render → re-extract our own PDF → diff against the source DTO → emit measured per-field
+  fidelity, gated by golden tests per template. Zero new dependencies, deterministic, free.
+- **ATS keyword matching is literal and morphologically strict** (`customer support` does not match
+  `customer service`; `project managing` does not match `project management`). A matcher that stems
+  aggressively lies to the user. Now a versioned pure module with tests asserting the **non**-matches.
+- **A checker finding without an anchor is indistinguishable from an invention**, and the competitor's
+  co-founder conceded this publicly about their own UI. `anchor` is therefore an invariant of the new
+  hygiene finding schema: a finding that cannot point at the exact node is discarded, not degraded.
+- **Placeholder instead of invented figure** — their most specific anti-hallucination mechanism, and
+  strictly better than our binary rejection as a *product* behaviour. Adopted as a `metricPlaceholder`
+  content node with real enforcement (regex in zod, its own export-blocking DB check) rather than
+  prompt trust.
+- **No spreadsheet import** is the category's most obvious adoption barrier; the leader positions
+  against spreadsheets instead of importing them. CSV/XLSX import moves into `delegated`'s **Fase 1**.
+- Their anti-hallucination has **no technical enforcement at all** — prompt plus human accept/reject —
+  and their own $100k study publishes users catching the AI inventing metrics. Our four layers, two of
+  them database constraints, are the most defensible difference in the product and are now stated as
+  positioning in §Objetivo rather than buried as an implementation detail.
+
+Three decisions are recorded as **explicitly not taken** and need approval before any code:
+resume translation, LinkedIn URL import (third-party scraping with ToS exposure), and bias/red-flag
+checks — the last one because it sits close to the protected-characteristics non-goal and needs
+wording that does not exist yet.
+
+Two areas are flagged as **candidates for new plans** rather than being folded in: interview
+preparation with mock interviews, and a LinkedIn profile coach. Both are real adjacent products in the
+category and neither belongs in the two current specs without bloating them.
+
+And one uncomfortable conclusion worth keeping visible: **their moat is content, not software**
+(~2,700 indexable URLs, 1,400+ CPRW-reviewed guides, 13 original studies, 1M+ monthly blog readers).
+§17 of the research document lists the five things they do better than our plan. None of the spec edits
+above address distribution, and pretending otherwise would be the same self-deception the plans were
+written to avoid.
+
+**Outstanding from this pass**: `spec.md` and `plan.md` were updated for both career plans; the two
+`tasks.md` files were **not**. The 547 open-task count above is therefore stale in the other direction
+— the new Fase 4b (hygiene registry, keyword matcher, parse-fidelity loop with per-template golden
+tests), the CSV/XLSX import in `delegated`'s Fase 1, the `metricPlaceholder` node with its DDL check,
+the five new `career_facts.fact_type` values, and the evaluation-corpus fixtures all need task
+breakdowns before anyone implements them. That is a separate, mechanical pass and it should not be done
+by guessing: each task in those files carries exact `Files:` lists and gate commands, and inventing
+those would be worse than leaving the gap visible.
+
 ## Repo defects found in passing
 
 Found while verifying, **not fixed** (this was a documentation pass). Each is real and independent

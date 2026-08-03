@@ -31,6 +31,30 @@ Que una persona pueda:
 7. exportar PDF y TXT ATS-friendly;
 8. borrar y exportar todo lo anterior.
 
+### Los dos lectores
+
+Marco que este plan adopta explícitamente, y que la categoría entera ya asume sin escribirlo: **cada
+candidatura tiene dos lectores**. Primero un parser extrae la estructura; después una persona decide
+si llama. Un CV que optimiza sólo para el primero llega ilegible; uno que optimiza sólo para el
+segundo puede no llegar. Cada decisión de template, de validación y de tailoring de este spec se
+justifica contra uno de los dos lectores, y las que sirven a los dos se marcan como tal.
+
+### Dónde está la ventaja defendible
+
+Tres cosas de este diseño no son mejoras incrementales sobre el estado del arte, sino diferencias de
+categoría. Se escriben aquí porque hoy están enterradas como detalles de ingeniería y merecen guiar
+el producto ([research §8, §9, §16](../competitive-research-enhancv.md)):
+
+1. **La veracidad es un constraint, no un prompt.** El líder de la categoría fundamenta su
+   anti-alucinación en instrucciones al modelo más un checkpoint humano, sin verificación
+   post-generación — y publica en su propia investigación que la IA *"inventa métricas que no estaban
+   en tu CV"*. Aquí hay cuatro capas de las cuales dos son de base de datos (§Mecanismo de veracidad).
+   Un claim sin hecho no es improbable: es un error de Postgres.
+2. **El sujeto es un grafo de hechos, no un montón de ficheros.** `career_facts` permite razonar sobre
+   la experiencia completa de la persona en cada adaptación. Los productos que guardan N versiones de
+   CV como documentos independientes tienen que elegir uno para comparar contra una oferta.
+3. **La fidelidad de parseo se mide, no se declara.** Ver §Higiene estructural y fidelidad de parseo.
+
 ## No objetivos
 
 - **Inventar o "mejorar" credenciales.** Es el no objetivo que define el producto.
@@ -38,14 +62,32 @@ Que una persona pueda:
 - **DOCX y templates personalizados en MVP.** Ver §Rendering: no hay escritor DOCX en
   `package.json` y añadir uno es una decisión de supply chain que este plan no toma. Se difiere al
   plan sucesor nombrado `resume-server-rendering`.
-- **OCR de escaneos.** El parser determinista sólo cubre PDF con capa de texto, DOCX y TXT.
-- **"ATS score" universal.** No existe. Se garantiza higiene estructural, no ranking.
+- **OCR de escaneos.** El parser determinista sólo cubre PDF con capa de texto, DOCX y TXT. Matiz de
+  redacción: el diagnóstico que se le muestra a la persona dice que **nosotros** no podemos leer un
+  escaneo, no que ningún ATS pueda. Textkernel, RChilli y Affinda sí ejecutan OCR, y afirmar lo
+  contrario sería un consejo falso ([research §5.7](../competitive-research-enhancv.md)).
+- **"ATS score" universal.** No existe, y el líder de la categoría lo admite por escrito: *"there's
+  no such thing as an ATS score — no tool online that provides a score gives an actual score"*
+  ([research §4.3](../competitive-research-enhancv.md)). Se garantiza higiene estructural verificable
+  y **fidelidad de parseo medida sobre nuestro propio pipeline** (§Higiene estructural y fidelidad de
+  parseo), nunca un pronóstico de ranking en el ATS de un tercero.
 - **Compartir CVs con employers desde la app.** El export es un archivo que baja el usuario.
 - **Reutilizar `candidate_documents`.** Ver §Decisión sobre el foundation de documentos.
 - **Escribir en tablas employer-side.** Ninguna escritura a `pipeline_*`, `candidate_submissions`,
   `organization_builders` ni tablas ATS. Sujeto distinto, consentimiento distinto.
 - **Optimizar por características protegidas.** Ni edad, género, foto, nacionalidad ni salud entran
-  en ningún prompt ni en ninguna fórmula.
+  en ningún prompt ni en ninguna fórmula. **Decisión pendiente y explícitamente no tomada aquí**:
+  detectar lenguaje que *expone* a la persona a sesgo (fechas que revelan edad, huecos de empleo)
+  sin puntuarlo ni usarlo para rankear *podría* ser compatible con este no objetivo, pero exige una
+  redacción que hoy no existe. Hasta que se apruebe, no se implementa
+  ([research §16 #33](../competitive-research-enhancv.md)).
+- **Secciones de personalidad.** Nada de *My Time*, *Life Philosophy*, *Day of My Life* ni
+  equivalentes. Son el rasgo más comentado de Enhancv y el más criticado por reclutadores para
+  perfiles profesionales ([research §15.11](../competitive-research-enhancv.md)).
+- **Barras de rating de skills.** `career_facts.skill_level` existe como dato para ordenar y filtrar;
+  **ningún template lo renderiza como barra, estrellas ni porcentaje**. La evidencia de reclutadores
+  en contra es abrumadora y el propio dato es indefendible ante una pregunta ("¿qué es un 4 de 5 en
+  inglés?").
 
 ## Historias de usuario
 
@@ -294,6 +336,49 @@ ofrece exactamente dos acciones:
 
 No hay tercera opción. No existe "exportar de todos modos".
 
+### Capa 0 — el hueco de métrica declarado, para no tener que rechazar
+
+El rechazo de la salida entera (capa 2) es correcto para seguridad y malo para producto: la persona
+ve un fallo, no una ruta de reparación. La causa más frecuente de que un modelo invente es que la
+frase *pide* un número que el modelo no puede conocer ("reduje el tiempo de preparación un 40 %"
+sobre alguien que nunca dio esa cifra). Enhancv resuelve esto con el mecanismo más específico de todo
+su producto: *"when a line needs a number the tool cannot know, it drops in a **placeholder** instead
+of inventing the figure"* ([research §8.1](../competitive-research-enhancv.md)).
+
+Se adopta, con enforcement real en lugar de confianza en el prompt. `resumeContentSchema` admite un
+nodo hermano del bullet:
+
+```ts
+const metricPlaceholderSchema = z.object({
+  claimId: claimIdSchema,
+  // El texto va SIN la cifra, con el hueco marcado. El prompt lo exige y zod lo verifica.
+  template: z.string().min(10).max(300).regex(/\{\{metric\}\}/),
+  prompt: z.string().min(5).max(160),   // "¿En cuánto se redujo? Sólo si lo sabes."
+  factIds: factIdsSchema,              // el hueco cuelga de un hecho real; no es un claim libre
+  unit: z.string().max(30).nullish(),
+})
+```
+
+Propiedades que lo hacen seguro:
+
+- **No es un claim.** No afirma nada cuantificado, así que no puede ser una alucinación. El `factId`
+  obligatorio garantiza que el *contexto* sí está respaldado.
+- **No exporta.** `validateResumeTruth` cuenta los placeholders sin resolver en una columna nueva
+  `unresolved_placeholder_count`, y el check de la capa 4 se amplía:
+
+```sql
+check (export_state <> 'exportable' or unresolved_placeholder_count = 0)
+```
+
+- **Se resuelve por la persona, o desaparece.** Dos acciones: *rellenar* (crea o actualiza un
+  `career_facts.metrics` y convierte el nodo en un bullet normal con su `factId`) o *quitar el hueco*
+  (reescribe la frase sin la métrica, determinista, sin llamar al modelo).
+- **Cambia el incentivo del prompt.** Ante la duda, el modelo tiene una salida honesta disponible que
+  además parsea. Hoy su única salida ante la duda es inventar o dejar la frase pobre.
+
+Esto no relaja ninguna capa: un `metricPlaceholder` con `{{metric}}` ya sustituido por texto libre
+falla el regex, y un bullet normal con una cifra sin hecho que la respalde sigue cayendo en capa 2.
+
 ### Datos que salen del servidor
 
 A ningún proveedor externo se envía: email, teléfono, dirección, URLs de perfil personales, fecha de
@@ -383,7 +468,7 @@ sistema propone y todavía no lo es.
 | `id` | `uuid` PK | no | |
 | `organization_id` / `owner_user_id` | `text` | no | |
 | `profile_id` | `uuid` | no | FK compuesta a `career_profiles(organization_id, id)` cascade |
-| `fact_type` | `text` | no | ver check |
+| `fact_type` | `text` | no | ver check — 12 tipos |
 | `status` | `text` default `'proposed'` | no | `proposed \| confirmed \| rejected \| superseded` |
 | `source_kind` | `text` | no | `manual \| user_asserted \| document_extraction \| builder_profile_import` |
 | `source_document_id` | `uuid` | sí | FK compuesta a `career_documents(organization_id, id)` `set null` |
@@ -409,7 +494,8 @@ index career_facts_owner_status_idx  on (organization_id, owner_user_id, status,
 index career_facts_profile_idx       on (organization_id, profile_id)
 index career_facts_source_doc_idx    on (organization_id, source_document_id)
 
-check (fact_type in ('employment','project','education','certification','skill','language','achievement'))
+check (fact_type in ('employment','project','education','certification','skill','language','achievement',
+                     'award','publication','volunteering','patent','course'))
 check (status in ('proposed','confirmed','rejected','superseded'))
 check (source_kind in ('manual','user_asserted','document_extraction','builder_profile_import'))
 check (sensitivity in ('normal','high'))
@@ -757,6 +843,62 @@ permite config versionada validada fuera de columnas tipadas mientras no sea una
 relacional ni datos de autorización — y aquí `resume_versions.template_key` referencia una constante
 de código validada por zod en cada escritura, no una fila.
 
+Cada entrada declara metadatos que no son decorativos: son lo que los golden tests de
+`measureParseFidelity` afirman por template (§Higiene estructural y fidelidad de parseo).
+
+```ts
+export type ResumeTemplate = {
+  key: 'ats_plain' | 'compact'
+  version: number
+  columns: 1 | 2
+  // Invariantes verificables, no aspiraciones. Cada una tiene su check en el registro de higiene.
+  contactInBody: true              // nunca en header/footer: el fallo que archiva CVs como "anonymous"
+  splitsSectionAcrossColumns: false // una sección nunca se parte; el reading order queda coherente
+  skillsAsDiscreteItems: true       // el peor campo parseado de la categoría necesita tratamiento propio
+  rendersSkillLevelAsBar: false     // no objetivo explícito
+  topThird: readonly ['headline', 'summary', 'keyAchievements']
+}
+```
+
+### El tercio superior es una invariante, no una preferencia estética
+
+De los dos lectores (§Objetivo), el humano decide en los primeros segundos y **mira el tercio
+superior**. La práctica del mercado es explícita: el tailoring trabaja *"on both readers at once: the
+top third that wins the recruiter's first seconds, and the bullets and skills an ATS scans for"*
+([research §10.6](../competitive-research-enhancv.md)).
+
+Por tanto: `headline`, `summary` y `keyAchievements` ocupan el tercio superior en **todos** los
+templates, y `resume-tailor` tiene como requisito de salida que el contenido más relevante para la
+oferta llegue ahí. No es una sugerencia al modelo: `validateResumeTruth` ya recorre el contenido y
+puede afirmarlo.
+
+### `keyAchievements` — sección derivada, no un tipo de hecho nuevo
+
+Es una **vista** de `career_facts` ya confirmados: selecciona y reordena los 3–5 hechos de mayor
+impacto para la oferta y los coloca arriba. No crea claims, así que **no toca el contrato de verdad**:
+cada línea sigue colgando de su `factId` original, y su `claimId` se genera igual que cualquier otro.
+
+Esto es deliberadamente distinto de "generar una sección de logros". Generar inventaría; derivar no
+puede.
+
+### Cuántos templates, honestamente
+
+Dos built-ins es poco. La comparación real de mercado no es "cientos" —eso es marketing— sino
+**14–23 templates** según la propia tabla del líder, que además tiene **menos que todos sus
+competidores** (14 frente a 18–44) ([research §10.1](../competitive-research-enhancv.md)). Dos siguen
+siendo pocos para cubrir a la vez sectores conservadores (banca, gobierno, legal, salud) y el resto.
+
+Se acepta a propósito para el MVP, porque un template mal medido es peor que un template ausente:
+cada uno añade una matriz de golden tests de fidelidad de parseo. La expansión pertenece a
+`resume-server-rendering`, con el gate de fidelidad ya en su sitio.
+
+Advertencia de diseño para esa expansión: el asunto de **una vs dos columnas está genuinamente en
+disputa** ([research §5.2, §15.11](../competitive-research-enhancv.md)). Enhancv mide 95 % en una
+columna contra 98 % en dos y lo defiende agresivamente; Jobscan afirma lo contrario y una prueba
+independiente de junio de 2026 encontró que un layout de dos columnas fue el único en levantar una
+bandera crítica de parseo. No adoptamos la certeza de ninguno de los dos bandos: adoptamos la
+medición propia, que es precisamente para lo que existe `measureParseFidelity`.
+
 ---
 
 ## Tasks de IA
@@ -808,7 +950,8 @@ const factIdsSchema = z.array(z.uuid()).min(1).max(6)   // .min(1) = un claim si
 // 1. career-facts-extract
 export const careerFactsExtractOutputSchema = z.object({
   facts: z.array(z.object({
-    factType: z.enum(['employment','project','education','certification','skill','language','achievement']),
+    factType: z.enum(['employment','project','education','certification','skill','language','achievement',
+                      'award','publication','volunteering','patent','course']),
     label: z.string().min(1).max(200),
     organizationName: z.string().max(200).nullish(),
     roleTitle: z.string().max(200).nullish(),
@@ -939,6 +1082,198 @@ el producto sigue siendo completo: PDF para humanos, TXT para ATS.
 No se promete compatibilidad con "todos los ATS". Se garantiza: texto seleccionable, una columna,
 encabezados convencionales, sin tablas ni cajas de texto, nombres de archivo saneados.
 
+### El render no es la extracción — y la aceptación afirma sobre la extracción
+
+Hallazgo de campo que este spec adopta como regla ([research §5.5](../competitive-research-enhancv.md)):
+en una prueba real contra un ATS de producción, el dashboard mostró literalmente *"we're unable to
+display this resume on this browser"* mientras el sistema **ya había extraído y verificado
+correctamente las tecnologías del candidato**. El pipeline de previsualización y el de extracción son
+independientes.
+
+Consecuencia operativa: ningún criterio de aceptación de este plan se escribe sobre "se ve bien". Se
+escriben sobre **qué texto se puede recuperar del PDF**. Un fallo de preview es un bug de UI; un fallo
+de extracción es un fallo de producto.
+
+Corolario para el diagnóstico al usuario: un campo que no aparece en la vista del reclutador **no
+implica** que no se parseó. iCIMS aplica *resume redaction* (elimina nombre, dirección, educación y
+fechas de la primera vista) y Jobvite tiene "Bias Blocker" — *"not because the system failed to read
+them, but because it was built not to show them"*. Nunca se le dice a la persona que un ATS "no leyó"
+algo por evidencia de ausencia.
+
+---
+
+## Higiene estructural y fidelidad de parseo
+
+Determinista, versionado, gratis, sin IA y sin créditos. Se entrega en la **Fase 4b** del
+[plan](./plan.md), inmediatamente después del primer PDF descargable, y es lo que convierte el camino
+gratuito en algo que alguien recomendaría. La sección existe porque la alternativa de mercado —un
+número agregado sin metodología publicada— es tanto menos honesta como más fácil de superar.
+
+### El contrato: cobertura por categoría, nunca un número solo
+
+`src/shared/lib/resumes/hygiene.ts` `(new)` exporta `evaluateResumeHygiene(content, rendered)` y una
+constante `HYGIENE_RULESET_VERSION`. Devuelve **hallazgos**, no una puntuación:
+
+```ts
+export const hygieneFindingSchema = z.object({
+  checkId: z.string().max(64),            // estable y versionado; entra en la telemetría
+  category: z.enum(['parse','sections','content','tailoring']),
+  severity: z.enum(['blocker','warning','info']),
+  // ANCLA OBLIGATORIA: sin ella el hallazgo no se muestra. Ver §Por qué el ancla es obligatoria.
+  anchor: z.object({
+    sectionIndex: z.number().int().nonnegative().nullable(),
+    entryIndex: z.number().int().nonnegative().nullable(),
+    claimId: claimIdSchema.nullable(),
+    quote: z.string().min(1).max(200).nullable(),
+  }),
+  message: z.string().max(240),
+  fix: z.enum(['manual','deterministic','ai_suggested']),
+})
+```
+
+Las cuatro categorías se reportan **por separado**, cada una con `passed / total`. No se suman, no se
+promedian y no se convierten en un 0–100. Un agregado invita exactamente a la lectura que el
+no objetivo de "ATS score" prohíbe.
+
+Las categorías que el mercado pone detrás del muro de pago —red flags de reclutador, sesgo,
+señales de seniority ([research §4.1](../competitive-research-enhancv.md))— **no** están en este
+registro. Dos de ellas colisionan con el no objetivo de características protegidas y la tercera es
+juicio editorial, no higiene verificable.
+
+### Por qué el ancla es obligatoria
+
+El fallo de producto más dañino documentado en la categoría es un checker que reporta problemas que
+la persona no puede encontrar: *"el checker dice que hay 2 palabras repetidas, 'Designed' 4 veces —
+no he usado esa palabra ni una vez"*. El cofundador del competidor lo concedió públicamente: el
+diseño *"era alarmista sin ser específico"* y *"hacía sentir como una máquina tragamonedas en vez de
+un diagnóstico"* ([research §15.5](../competitive-research-enhancv.md)).
+
+Un hallazgo sin localización es indistinguible de una invención, y la persona lo detecta. De ahí:
+**`anchor` con al menos un campo no nulo es un invariante**; un hallazgo que no sabe señalar dónde
+está el problema se descarta en `evaluateResumeHygiene`, no se muestra degradado.
+
+### Categoría `parse` — fidelidad medida, no declarada
+
+Aquí está la diferencia de categoría. El estado del arte declara "90%+ de parse rate" sin publicar ni
+un dato por campo, y todos sus porcentajes provienen de **un solo motor**
+([research §9](../competitive-research-enhancv.md)). Nosotros ya tenemos las dos mitades de un bucle
+cerrado en el plan y no las hemos conectado:
+
+- **Fase 4** renderiza el PDF con Playwright.
+- **Fase 6** trae un extractor de texto de PDF (`pdfjs-dist`).
+
+`measureParseFidelity(contentDto, pdfBytes)` renderiza, **re-extrae nuestro propio PDF con nuestro
+propio extractor**, y compara campo a campo contra el DTO de origen:
+
+| Campo comprobado | Criterio de recuperación |
+| --- | --- |
+| Nombre y bloque de contacto | Presentes en los *text runs* del **cuerpo**, no sólo en un header/footer |
+| Cada encabezado de sección | Recuperado literal y en el orden del DTO |
+| Cada `entry.headline` | Recuperado, y asociado a su sección correcta |
+| Cada `bullet.text` | Recuperado íntegro; sin fusión con el bullet vecino |
+| Cada skill | Recuperada como **ítem discreto**, no dentro de un párrafo |
+| Fechas | Un solo formato en todo el documento; toda fecha de fin explícita salvo `is_current` |
+| Orden de lectura | La secuencia extraída coincide con la secuencia del DTO |
+
+Salida: `parse_fidelity` como `{ recovered, total, byField }` más la lista de campos perdidos con su
+`anchor`. Es un número que **sí** significa algo verificable: *de los N campos que pusimos, nuestro
+extractor recupera N*.
+
+**Límite que se escribe junto a la cifra, siempre.** Nuestro extractor no es el ATS del empleador. La
+afirmación defendible es "tu PDF conserva la información en la capa de texto y lo demostramos", nunca
+"pasarás el ATS de Workday". Cualquier copia de UI que insinúe lo segundo es un bug.
+
+**Gate de CI, no sólo feature.** Un golden test por template renderiza un CV de fixture y afirma
+`recovered === total`. Un cambio de CSS que rompa el orden de lectura lo caza el test, no la persona
+tras no recibir respuesta a cuarenta candidaturas.
+
+### Checks deterministas de las otras tres categorías
+
+Derivados de modos de fallo con mecánica documentada
+([research §5.4](../competitive-research-enhancv.md)), no de opinión editorial:
+
+| `checkId` | Categoría | Qué afirma | Severidad |
+| --- | --- | --- | --- |
+| `contact_in_body` | parse | Contacto en el cuerpo, no en header/footer. El fallo real que archiva candidaturas como *"anonymous"* | blocker |
+| `text_layer_present` | parse | Capa de texto no vacía con nombre, experiencia y skills | blocker |
+| `reading_order_stable` | parse | Orden extraído == orden del DTO | blocker |
+| `section_heading_dictionary` | sections | Encabezados contra el diccionario reconocido. Un encabezado no estándar tiene **tres** fallos distintos: se descarta, se vuelca en un *misc bucket*, o **se fusiona con una sección ajena** | warning |
+| `essential_sections` | sections | Contacto, experiencia, educación presentes | warning |
+| `skills_discrete` | sections | Skills como ítems, nunca en prosa. Es el peor campo parseado de la categoría: **65 % en una columna, 46 % en dos** | warning |
+| `date_format_single` | content | Un solo formato. Mezclar `Jan 2022` + `01/22` + `2022-present` produce duración mal calculada o **un hueco de empleo inventado** | warning |
+| `date_end_explicit` | content | Toda fecha de fin explícita salvo `is_current`; su ausencia se lee como *"still ongoing"* y genera solapamientos | warning |
+| `date_locale_unambiguous` | content | Mes escrito, no numérico: `03/04/2022` es 4-mar en US y 3-abr en Europa, y *"a parser inherits whatever locale logic it was built with"* | info |
+| `metric_placeholders_resolved` | content | Cero `metricPlaceholder` sin resolver | blocker |
+| `bullet_length` | content | Bullets cortos y consistentes | info |
+| `word_repetition` | content | Repetición con sugerencia determinista de sinónimo | info |
+| `icon_has_text_twin` | sections | Todo dato transmitido por un icono existe también como texto. Los iconos son *font glyphs* o SVG que *"render only in the file preview, not in the text extraction layer"* — ni riesgo ni ayuda, pero un dato **sólo** en icono se pierde | warning |
+| `keyword_coverage` | tailoring | Ver §Coincidencia de keywords | warning |
+| `keyword_density` | tailoring | Ningún término más de dos veces | info |
+
+### Superficie
+
+`POST /api/career/resumes/$resumeId/hygiene` (gate `resume:write`), sin créditos y disponible con
+`AI_DISABLED=true`. Se ejecuta además implícitamente antes de cada transición a `exportable`.
+
+---
+
+## Coincidencia de keywords — determinista y deliberadamente literal
+
+Módulo puro `src/shared/lib/resumes/keywords.ts` `(new)` con `KEYWORD_MATCHER_VERSION`. Existe por dos
+razones: es el fallback gratuito de `resume-job-fit-analyze` (hoy especificado sólo como "solapamiento
+de skills normalizadas", que es demasiado pobre para ser útil), y es la base de la categoría
+`tailoring` de la higiene.
+
+### La regla que define el módulo: no normalizar de más
+
+El matching de un ATS es **literal y morfológicamente sensible**
+([research §7.2](../competitive-research-enhancv.md)):
+
+- La oferta dice `customer service`, el CV dice `customer support` → **no cuenta como match**.
+- `project managing` **≠** `project management`. **Sin stemming, sin lematización.**
+
+Esto es contraintuitivo para un ingeniero, y hacerlo "mejor" es el bug: **un matcher que normaliza
+agresivamente le miente a la persona**, diciéndole que cumple un requisito que el sistema del
+empleador no va a reconocer. La normalización se limita a: minúsculas, colapso de espacios,
+normalización Unicode y guiones. Nada más. `KEYWORD_MATCHER_VERSION` se incrementa si esto cambia,
+porque cambia el significado de todo `fit_score` histórico.
+
+### Dos algoritmos, no uno
+
+| Tipo | Algoritmo | Por qué |
+| --- | --- | --- |
+| **Hard skills**, herramientas, certificaciones | Coincidencia de frase exacta contra el término de la oferta | Es lo que el parser busca. *"If the posting says 'project management', put 'project management' on the page, not only 'led projects'"* |
+| **Soft skills** | **No se listan nunca.** Se buscan como evidencia dentro de un logro | *"'Detail-oriented, team player, strong communicator' is unverifiable and forgettable, and **nobody is searching for it**"*. La salida correcta no es "leadership" sino un bullet que demuestre haber liderado |
+
+Consecuencia de producto: el módulo **jamás sugiere añadir una soft skill a una lista de skills**.
+Ante una soft skill requerida, señala qué hecho confirmado podría demostrarla.
+
+### Reglas de emisión
+
+- **Acrónimos en doble forma.** `Customer Relationship Management (CRM)`, `Search Engine Optimization
+  (SEO)`. Certificaciones con emisor y año: `Project Management Professional (PMP), Project Management
+  Institute, 2022`. Regla de espejo: replicar la nomenclatura de la oferta **incluyendo sus
+  paréntesis**.
+- **Regla de tres colocaciones.** Un término relevante aparece en summary, en skills y en un bullet de
+  experiencia, y **cada aparición aporta información nueva**. Un término tres veces haciendo trabajo
+  real vale más que el mismo término una vez en una lista aislada.
+- **Cap de densidad.** Ningún término más de **una o dos** veces. Diez repeticiones del mismo término
+  *"reads as spam to both the ATS and the recruiter"*. `keyword_density` es un check, no un consejo.
+- **Normalizaciones oferta → keyword** (deterministas y testeables):
+
+| Transformación | Ejemplo |
+| --- | --- |
+| Frase verbal → nominalización | "Analyze campaign performance" → `Campaign performance analysis` |
+| Descomposición de skill compuesta | "Strong analytical and communication skills" → `Communication skills` + `Analytical skills` |
+| Instanciación de categoría genérica | "content management systems" → las herramientas concretas que la persona **sí** tiene confirmadas |
+| Título vanity → estándar | "Growth Ninja" → `Marketing Manager (aka Growth Ninja)` |
+
+### Lo que este módulo no hace
+
+No inventa keywords. Si la oferta pide algo que ningún `career_facts` confirmado respalda, el
+resultado es un **hueco declarado**, nunca una sugerencia de añadirlo. Esa es la misma frontera que la
+capa 2 del mecanismo de veracidad, aplicada al vocabulario.
+
 ---
 
 ## Billing
@@ -1019,6 +1354,7 @@ sujeto.
 | `/api/career/resumes` | GET, POST | `resume:write`; body `{ mode: 'deterministic' \| 'ai' }` |
 | `/api/career/resumes/$resumeId` | GET, PATCH, DELETE | `resume:write`; PATCH = edición manual → nueva versión |
 | `/api/career/resumes/$resumeId/verify` | POST | `resume:write`; corre `validateResumeTruth` (+ IA opcional) |
+| `/api/career/resumes/$resumeId/hygiene` | POST | `resume:write`; determinista, **sin créditos**, activo con `AI_DISABLED=true` |
 | `/api/career/resumes/$resumeId/export` | GET | `resume:export`; `?format=pdf\|txt\|html` |
 | `/api/career/resumes/$resumeId/fit` | POST | `resume:write`; body `{ jobOpportunityId }` |
 | `/api/career/resumes/$resumeId/tailor` | POST | `resume:write` |
@@ -1126,6 +1462,95 @@ botones, no tooltips a secas.
 - ≥ 70 % de los lotes de 15 terminan `succeeded` o `partial` sin exceder `reserved_units`.
 - 0 lecturas cross-tenant y 0 lecturas de org-admin en `pnpm test:api-isolation:local`.
 - p95 de render PDF < 3 s.
+- **`recovered === total` en `measureParseFidelity` para todo template built-in.** Gate de CI.
+- **0 hallazgos de higiene sin `anchor`** en el corpus (un hallazgo sin localización no se muestra, así
+  que un valor distinto de cero significa que el filtro está descartando trabajo en silencio).
+
+### Copia prohibida
+
+Estas cifras circulan por toda la categoría, están desacreditadas
+([research §6.7](../competitive-research-enhancv.md)) y **no aparecen en ninguna superficie de este
+producto** — ni en UI, ni en marketing, ni en un prompt:
+
+| Cifra | Por qué no |
+| --- | --- |
+| "el 75 % de los CVs son rechazados automáticamente" | Rastreada a un *sales pitch* de un vendor de **2012**, de una empresa **cerrada en 2013**. No es un estudio |
+| "el 98,4 % de las Fortune 500 usan ATS" | Autorreferencial, sin verificación independiente |
+| "los reclutadores dedican 6 segundos a un CV" | Describe un *skim* humano, no una regla de parseo |
+
+Lo que sí se puede afirmar con procedencia: **23 de 25 reclutadores (92 %) dicen que sus sistemas no
+auto-rechazan por formato, contenido ni diseño**; sólo el 8 % tiene auto-rechazo configurado. El
+enemigo real de la persona es el **volumen** (400–600 candidaturas en puestos administrativos, 2.000+
+en tech remoto), no el parser. Un producto que vende miedo al ATS está vendiendo el problema
+equivocado.
+
+---
+
+## Corpus de evaluación y rúbrica
+
+Hoy el corpus sólo se menciona de pasada ("corpus de inyección", "corpus de release"). Esta sección lo
+define, porque los gates de §Métricas de éxito no se pueden ejecutar contra algo que no está
+especificado. Vive en `tests/fixtures/career-resumes/` `(new)`, sanitizado, sin datos de personas
+reales.
+
+### Ejes del corpus
+
+| Eje | Valores mínimos |
+| --- | --- |
+| Longitud | CV de 1 página · CV de 3 páginas · perfil con 2 hechos |
+| Idioma | `es` · `en` |
+| Origen | manual · extraído de PDF · extraído de DOCX |
+| Ofertas | clara · ambigua · adversarial (inyección) · con requisito de característica protegida |
+| Conflicto | fechas contradictorias · métricas contradictorias · hecho supersedido |
+| Adversarial de veracidad | `factId` inventado · `factId` de otro usuario · claim sin `factIds` · placeholder ya rellenado con texto libre |
+
+### Fixtures de fidelidad de parseo
+
+Diseño tomado de un test de campo publicado ([research §5.5](../competitive-research-enhancv.md)),
+porque el conjunto es genuinamente bueno:
+
+| Fixture | Qué prueba | Resultado esperado |
+| --- | --- | --- |
+| `plain-control.json` + `decorated.json` | **Par A/B con contenido idéntico**, uno sin decoración y otro con encabezado de color e iconos | Extracción **idéntica**. Si difieren, la decoración está comiendo datos |
+| `sidebar-sections.json` | Sección en columna lateral con encabezados propios | La sección lateral no se fusiona con el historial laboral |
+| `icon-only-datum.json` | Un dato transmitido **sólo** por un icono, sin gemelo textual | `icon_has_text_twin` dispara: es el único caso donde un icono sí pierde información |
+| `bare-minimum.json` | Cero decoración, contenido pobre | Fidelidad perfecta y aun así hallazgos de contenido. Demuestra que el problema es el contenido, no el diseño |
+| `contact-in-header.json` | Contacto en header/footer | `contact_in_body` dispara como `blocker` |
+| `mixed-dates.json` | `Jan 2022` + `01/22` + `2022-present` | `date_format_single` dispara; el hueco de empleo **no** se inventa |
+| `skills-in-prose.json` | Skills dentro de un párrafo | `skills_discrete` dispara y la recuperación de skills cae |
+| `render-fails-parse-succeeds.json` | PDF que un preview no muestra pero cuya capa de texto está intacta | **Pasa.** La aceptación afirma sobre extracción, no sobre render |
+
+### Rúbrica de calidad de contenido
+
+Umbrales con procedencia externa citable, usados **como rúbrica de evaluación, no como constraint de
+zod** ([research §10.5](../competitive-research-enhancv.md)). Un constraint duro rompería CVs legítimos;
+una rúbrica mide deriva del modelo entre versiones de prompt:
+
+| Elemento | Objetivo | Fallo |
+| --- | --- | --- |
+| Summary | 3–4 frases / **50–80 palabras**; contiene rol + años + 2–3 skills core + un logro cuantificado; situado debajo del contacto y encima de experiencia | < 30–40 palabras no da señales suficientes; > 100 se salta |
+| Bullet | Verbo de acción al inicio; una idea; resultado medible cuando el hecho lo respalda | Responsabilidad en vez de logro; voz pasiva; pronombres personales |
+| Keywords | Cobertura de los términos `must` de la oferta que **algún hecho confirmado respalda** | Un término sugerido sin hecho detrás — es el mismo fallo que la capa 2, en vocabulario |
+| Densidad | ≤ 2 apariciones por término | ≥ 3 apariciones |
+
+Blacklist léxica del corpus: buzzwords (*innovative*, *strategic*, *specialist*), jerga de
+autoevaluación, keywords de arrogancia y **pronombres personales**.
+
+Patrón de detección a evitar activamente: los reclutadores identifican salida de LLM por forma —
+*"the exact same format that I know is coming from ChatGPT. It's the five key things, each one has a
+bolded theme"*. El corpus incluye un caso que afirma que la salida **no** cae en ese molde.
+
+### Rúbrica de fit (alimenta también al plan hermano)
+
+Parejas oferta↔perfil con veredicto humano por requisito. Se mide concordancia de orden, no igualdad
+exacta de puntuación. Dos reglas de scoring reales que los reclutadores describieron y que el corpus
+simula ([research §6.2](../competitive-research-enhancv.md)):
+
+- `reject if resume match < 75 %`
+- `reject if fewer than 7 of the 10 required technical skills are present`
+
+Se simulan para saber cómo se comporta nuestra salida bajo ellas, **no** para optimizar contra ellas:
+sólo el 8 % de los empleadores las tiene activadas.
 
 ---
 

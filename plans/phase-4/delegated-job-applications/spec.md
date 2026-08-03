@@ -19,6 +19,32 @@ empleadores, afirmaciones factualmente falsas firmadas con el nombre del usuario
 preguntas sensibles que el usuario nunca autorizó, y envíos externos irreversibles que no se pueden
 deshacer.
 
+### El problema real es el volumen, no el parser
+
+Conviene fijar esto antes de diseñar, porque la categoría entera vende el problema equivocado. En un
+estudio de 25 reclutadores estadounidenses (sep–oct 2025, 10+ plataformas ATS, empresas de 120 a
+50.000+ empleados), **23 de 25 (92 %) declararon que sus sistemas no auto-rechazan por formato,
+contenido ni diseño**; sólo el 8 % tiene auto-rechazo configurado
+([research §6](../competitive-research-enhancv.md)).
+
+Lo que sí es masivo es la competencia por vacante:
+
+| Tipo de puesto | Candidatos por vacante |
+| --- | --- |
+| Entry-level / administrativo | 400–600 |
+| Soporte / customer service remoto | 1.000+ en la primera semana |
+| Tech e ingeniería remoto o híbrido | **2.000+** antes de empezar el screening |
+| Especializado / senior | < 200, pero vetados más a fondo |
+
+Y el filtro que de verdad elimina no es el parseo sino las **knockout questions** de elegibilidad
+—autorización de trabajo, licencia, ubicación, titulación—: una sola pregunta sobre sponsorship
+**elimina alrededor del 30 %** de los candidatos en roles técnicos.
+
+Consecuencia de diseño para este plan: el valor no está en "pasar el ATS". Está en (a) no gastar el
+tiempo de la persona en ofertas donde es inelegible por una razón binaria y conocible de antemano, y
+(b) llegar temprano — **52 % de los reclutadores revisa por orden de llegada**, y el consejo derivado
+es aplicar dentro de las primeras 48–72 horas. Ambas cosas son deterministas y baratas.
+
 ## Objetivo
 
 Un asistente de carrera que, dentro de un mandato explícito y revocable, **prepare** candidaturas:
@@ -74,6 +100,27 @@ redacción. El envío lo hace la persona. Este es el motivo por el que este plan
 orden de construcción: consume dos planes de carrera y su superficie de daño es la mayor de los
 tres.
 
+##### Evidencia externa: esto no es una desventaja competitiva
+
+El suelo de arriba se lee fácilmente como una limitación autoimpuesta que nos deja por detrás de
+productos "más completos". No lo es, y conviene dejar la evidencia escrita aquí para que un PR futuro
+que proponga añadir envío automático tenga que discutir con datos y no sólo con una opinión interna
+([research §3](../competitive-research-enhancv.md)):
+
+- **Enhancv**, líder de la categoría con ~10M de usuarios y 11 años de operación, **no envía ninguna
+  candidatura**. Su tracker sólo cambia una etiqueta a mano; su extensión de navegador sólo detecta y
+  guarda, sin autofill ni credenciales de portales; su job board desemboca en "preparar", no en
+  "enviar"; y su export es un PDF que la persona adjunta ella misma.
+- Se posicionan **activamente por contraste**: *"unlike mass-apply tools… quality over quantity with
+  personalized applications that get you noticed, **not flagged as spam**"*.
+- Y **ceden el segmento de aplicación masiva por escrito** en su propia comparativa competitiva, con
+  una fila de tabla que dice literalmente *"mass-application user prioritizing keyword throughput →
+  [competidor]"*.
+
+Es decir: el actor con más datos de mercado de la categoría llegó a la misma conclusión, y la tomó
+sabiendo lo que dejaba fuera. La restricción de este plan no nos sitúa detrás del estado del arte —
+**es** el estado del arte. Lo que nos diferencia no es enviar, es que la preparación sea verificable.
+
 #### Qué tendría que ser cierto para revisar este suelo
 
 Se documenta aquí para que un lector futuro sepa que fue una decisión y no un olvido. Levantar
@@ -90,9 +137,11 @@ cualquiera de los puntos 1–3 exigiría, **acumulativamente y por fuente**:
   es ejecutable.
 - **En términos de consentimiento**: un consentimiento afirmativo, versionado, por fuente y
   revocable del usuario, que declare qué datos suyos salen, hacia quién, con qué finalidad y qué
-  pasa si el envío sale mal — reutilizando el patrón de `career_processing_consents` de
-  [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), nunca un checkbox
-  en el wizard de mandato.
+  pasa si el envío sale mal — reutilizando el patrón de consentimiento de
+  [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md) (estado actual en
+  columnas de `career_profiles`, evidencia append-only en la tabla existente `user_consents`; **no**
+  hay tabla `career_processing_consents`, ver §Modelo de datos de ese spec), nunca un checkbox en el
+  wizard de mandato.
 - **Operativamente**: un canal de incidencias y retractación (cómo se retira una candidatura
   enviada por error), límites duros por día y por empresa, y un registro de auditoría que el
   usuario pueda exportar.
@@ -851,10 +900,13 @@ El modelo **no produce el número**. Devuelve evidencia por requisito; el score 
 estable, y ajustar pesos no exige otra llamada al proveedor.
 
 La entrada se construye con `buildFitInput()`, que hace un **allowlist** de tipos de hecho —
-`employment | project | education | certification | skill | language | achievement`, exactamente el
-dominio de `career_facts.type` — y no incluye contacto, foto, fecha de nacimiento, nacionalidad,
-género, estado civil ni ninguna otra característica protegida. El texto de la oferta va envuelto en
-`wrapUntrusted()` (`src/shared/lib/ai/tasks.ts`).
+`employment | project | education | certification | skill | language | achievement | award |
+publication | volunteering | patent | course`, exactamente el dominio de doce valores de
+`career_facts.fact_type` — y no incluye contacto, foto, fecha de nacimiento, nacionalidad, género,
+estado civil ni ninguna otra característica protegida. El allowlist es explícito y no se deriva del
+enum: si el plan hermano añade un tipo de hecho, **este plan tiene que decidir a mano** si entra, y
+hasta entonces no entra. El texto de la oferta va envuelto en `wrapUntrusted()`
+(`src/shared/lib/ai/tasks.ts`).
 
 **Qué NO significa el score.** Esto se escribe literalmente en la UI, no solo aquí:
 
@@ -869,6 +921,41 @@ género, estado civil ni ninguna otra característica protegida. El texto de la 
 tabla de requisitos, nunca sola. El número 0–100 aparece solo dentro del panel de evidencia, con la
 etiqueta "cobertura de requisitos publicados (0–100)". Una banda sin su tabla es un veredicto
 disfrazado y no se renderiza en ningún sitio.
+
+**El denominador es visible, siempre.** No "encaje del 70 %" sino "**7 de los 10 requisitos
+publicados**", con los tres estados de cada requisito representados de forma distinguible: cubierto,
+parcial, y **no encontrado** — este último explícitamente distinto de "no cumples". Es el patrón que
+usan los ATS reales en su propia UI de cualificaciones
+([research §16 #25](../competitive-research-enhancv.md)) y encaja tal cual con el
+`met | partial | missing | unknown` del esquema de salida. Un porcentaje sin denominador invita a
+leerse como una nota; una fracción con la lista al lado se lee como lo que es.
+
+### Pesos de `computeFitScore` — con procedencia, no inventados
+
+`FIT_WEIGHTS` no se elige por intuición. Los valores iniciales se derivan de lo que los reclutadores
+dijeron que miran, en el estudio de 25 entrevistas citado en §Problema
+([research §6.5](../competitive-research-enhancv.md)), y cada peso lleva su fuente en el código:
+
+| Criterio | % que lo mencionó | Uso en la fórmula |
+| --- | ---: | --- |
+| Estructura clara y escaneable | 92 % | No es un peso de fit: es un check de higiene del plan hermano |
+| Experiencia y skills relevantes | **88 %** | Peso dominante de los requisitos `must` |
+| Uso natural de keywords (sin stuffing) | 76 % | Vía el módulo determinista de keywords del plan hermano |
+| Bullets cortos en vez de párrafos | 72 % | Higiene, no fit |
+| Formato simple y consistente | 68 % | Higiene, no fit |
+| Una o dos páginas máximo | 64 % | Higiene, no fit |
+| Logros con resultados medibles | 52 % | Bonus sobre requisitos cubiertos con un hecho que tenga `metrics` |
+
+Los tres pesos que sí entran en `computeFitScore` son por tanto: cobertura de `must`, cobertura de
+`nice`, y presencia de métrica en la evidencia. `FIT_FORMULA_VERSION` se incrementa si cambian, porque
+cambia el significado de todo `fit_score` histórico.
+
+**Los umbrales reales del mercado se simulan, no se optimizan.** Dos reglas literales que los
+reclutadores describieron: `reject if resume match < 75 %` y `reject if fewer than 7 of the 10
+required technical skills are present`. Entran en el corpus de evaluación para saber cómo se comporta
+nuestra salida bajo ellas. **No** se convierten en objetivo de producto: sólo el 8 % de los empleadores
+tiene un umbral así activado, y optimizar contra la configuración del 8 % a costa de la honestidad
+frente al 92 % sería el intercambio equivocado.
 
 **Cómo se impugna.** Cada fila de requisito tiene "esto no es correcto". Al pulsarlo:
 `fit_contested_at`/`fit_contested_reason` se escriben, el CHECK obliga a `fit_band = NULL` y
@@ -1000,6 +1087,62 @@ es `unknown_kept`, la razón se registra y la oferta sigue adelante etiquetada. 
 publicado" es el más frecuente y descartarlo silenciosamente ocultaría buenas ofertas. La cifra de
 `unknown_kept` es una métrica de release, no ruido.
 
+### Knockouts: la clase de filtro que de verdad elimina
+
+Los filtros de arriba tratan todos los códigos como iguales. No lo son. Cuatro de ellos corresponden
+a lo que los reclutadores llaman **knockout questions**: preguntas binarias de elegibilidad que se
+aplican **antes** de que nadie lea el CV, y que **el 100 % de los reclutadores usa cuando están
+presentes** ([research §6.3](../competitive-research-enhancv.md)). Una sola pregunta sobre sponsorship
+elimina ~30 % de los candidatos en roles técnicos.
+
+`hard-filters.ts` marca por tanto cada código con su clase:
+
+| `code` | Clase | Nota |
+| --- | --- | --- |
+| `sponsorship_incompatible` | **knockout** | Autorización de trabajo / necesidad de sponsorship |
+| `explicit_legal_requirement_unmet` | **knockout** | Licencia o certificación obligatoria |
+| `location_mismatch` | **knockout** | Residencia o presencialidad exigida |
+| `employment_type_mismatch` | preferencia | Del mandato, no del empleador |
+| `salary_below_floor` | preferencia | Del mandato |
+| `company_excluded` | preferencia | Del mandato |
+| `job_expired`, `already_applied`, `duplicate_in_run` | housekeeping | Ni elegibilidad ni preferencia |
+
+Por qué importa la distinción, y es una diferencia de producto, no de implementación:
+
+- Un descarte por **knockout** es información objetiva sobre el mundo: *la persona no es elegible*.
+  Se le presenta como un hecho, y ahorrarle esa candidatura es el valor más limpio que este plan
+  entrega.
+- Un descarte por **preferencia** es información sobre su mandato: *tú dijiste que no*. Se le presenta
+  como algo que **puede cambiar**, con un enlace a la regla concreta del mandato que lo produjo. Un
+  filtro de preferencia que la persona no puede localizar ni revertir se lee como una caja negra.
+
+Consecuencia para `application_mandates`: los datos que alimentan los knockouts se recogen **una sola
+vez** —ya existen las categorías `work_authorization` y `sponsorship` en `application_answer_facts`—
+y el mandato los referencia en lugar de duplicarlos. La persona no responde a la misma pregunta de
+elegibilidad en cada candidatura.
+
+Nada de esto relaja `unknown_kept`: un knockout con **cualquiera** de los dos lados desconocido sigue
+siendo `unknown_kept`. La clase cambia cómo se explica un descarte, nunca si se descarta.
+
+### Recencia como input de ranking
+
+**52 % de los reclutadores revisa por orden de llegada**; 36 % dice que no cambia nada
+([research §6.6](../competitive-research-enhancv.md)). Nadie dice que aplicar tarde ayude. La
+recomendación derivada es aplicar dentro de las primeras **48–72 horas**.
+
+Es la señal de ranking más barata que existe —ya tenemos la fecha de publicación en
+`job_opportunities`— y hoy no se usa:
+
+- La edad del anuncio entra en el orden de la shortlist como desempate, **nunca** sustituyendo al fit.
+  Una oferta fresca con encaje bajo no sube por encima de una buena oferta de hace una semana.
+- `application_candidates` muestra la edad del anuncio en la cola de revisión, y las de menos de 72 h
+  se marcan visualmente.
+- Si la fecha de publicación es desconocida, no se penaliza ni se premia: mismo criterio que
+  `unknown_kept`.
+
+Límite honesto: esto es correlación reportada por reclutadores, no un experimento. Se implementa como
+desempate y aviso, no como una promesa de resultado.
+
 ---
 
 ## Handoff al portal
@@ -1025,6 +1168,50 @@ Prefill por extensión: fuera de este plan. Si algún día se aprueba en
 exige es: iniciado por un clic del usuario, muestra todos los valores antes de escribirlos, deja en
 blanco lo desconocido y todo lo `sensitive`/`never_autofill`, no toca CAPTCHA ni login, y el submit
 final lo pulsa la persona.
+
+A ese contrato se añade una cláusula de **alcance de escaneo**, tomada de la única formulación buena
+que existe en la categoría ([research §16 #27](../competitive-research-enhancv.md)): la extensión
+escanea **sólo en busca de términos relacionados con empleo** (`application`, `interview`, `employer`,
+`offer` y equivalentes localizados), la persona controla qué se guarda, y **los sitios no relacionados
+no se almacenan en ninguna capacidad**. Una extensión con permiso de lectura sobre todo el navegador de
+alguien que está buscando trabajo en secreto es exactamente el tipo de superficie que este plan existe
+para no crear. La cláusula se escribe aquí, no allí, porque es este plan el que consume el prefill y
+por tanto el que tiene que rechazarlo si no la cumple.
+
+---
+
+## Importar un historial que ya existe
+
+La persona que más necesita este producto **ya lleva un registro**: una hoja de cálculo con 40 u 80
+filas de candidaturas. Es la barrera de adopción más obvia de la categoría y nadie la ha resuelto — el
+líder no ofrece ningún camino de migración y se posiciona en contra de las hojas de cálculo
+(*"stop using scattered spreadsheets"*) en lugar de importarlas
+([research §16 #24](../competitive-research-enhancv.md)). Pedirle a alguien que reteclee 80 filas para
+probar un producto es pedirle que no lo pruebe.
+
+Import CSV/XLSX a `job_applications`, en la **Fase 1**, porque es determinista, no necesita IA, no
+necesita red y no depende de billing:
+
+- **Mapeo de columnas explícito y revisable.** Se detectan encabezados por heurística
+  (empresa, puesto, fecha, estado, URL, notas), se muestra el mapeo propuesto, y la persona lo corrige
+  antes de importar. Nada se escribe hasta que confirma.
+- **Previsualización con conteos.** Cuántas filas se crearán, cuántas se saltan y por qué.
+- **Estados desconocidos no se inventan.** Un valor de estado que no mapea al dominio de
+  `job_applications.status` cae en `discovered` y se marca en la previsualización. Nunca se adivina que
+  "waiting" significa `submitted_by_user`.
+- **Sin oferta asociada es válido.** `job_opportunity_id` es nullable en una candidatura importada: la
+  persona apuntó una empresa y un puesto, no una URL canónica. Enlazarla después es opcional.
+- **Idempotente.** `Idempotency-Key` por import; reimportar el mismo archivo no duplica filas. La
+  clave de deduplicación por fila es `(owner, empresa normalizada, puesto normalizado)`, y las
+  colisiones se reportan como saltadas, no se fusionan.
+- **Ningún estado de envío se fabrica.** Una fila importada que la persona marca como enviada entra
+  como `submitted_by_user` con el evento `manual.self_reported_submission` y `actor_kind = 'user'` —
+  igual que si lo hubiera marcado a mano. **Nunca** `confirmed_submitted`, que exige evidencia externa.
+- **Límite duro** de filas por import, para que un archivo grande no se convierta en un problema de
+  memoria ni en una vía de abuso.
+
+El import es también la prueba más rápida de que el tracker de la Fase 1 es un producto real: si algo
+que ya funciona en una hoja de cálculo no se puede traer, no hemos hecho nada mejor que la hoja.
 
 ---
 
@@ -1162,6 +1349,29 @@ work). `application_events.payload` está sujeto a la misma lista y se valida co
   admin de la organización recibe `404`.
 - Resultados de entrevista **solo** si el usuario los registra voluntariamente. El sistema nunca
   los infiere.
+- Filas importadas desde hoja de cálculo por usuario, y cuántos de esos usuarios siguen activos a los
+  14 días. Es la métrica que dice si el import resolvió una barrera real o sólo añadió superficie.
+
+### Sin respuesta: derivado, nunca un estado
+
+El silencio del empleador es el resultado más frecuente de una candidatura y hoy no se puede medir:
+`job_applications.status` tiene `closed_rejected` para un rechazo explícito, pero la mayoría de las
+candidaturas nunca reciben nada. Sin poder distinguir "sin respuesta todavía" de "sin respuesta nunca",
+no hay analítica de embudo posible.
+
+La solución **no** es un estado nuevo. Un estado `ghosted` obligaría a decidir cuándo escribirlo, quién
+lo escribe y qué pasa si el empleador responde después — y un worker escribiendo "te ignoraron" en la
+fila de alguien es un mal diseño de producto además de un mal diseño de datos.
+
+Es una **derivación de sólo lectura** sobre datos que ya existen: una candidatura en
+`submitted_by_user` o `confirmed_submitted` cuyo `application_events` más reciente tiene más de *N*
+días sin evento del empleador se computa como *sin respuesta* en las vistas de embudo. Nada se
+escribe, nada cambia de estado, y si llega una respuesta la derivación se corrige sola.
+
+Frontera con el no objetivo de analítica agregada: esto es **el embudo propio de la persona** —cuántas
+enviadas, cuántas con respuesta, en cuánto tiempo—, nunca una comparación con otros usuarios ni con
+"candidatos similares". El sistema no tiene otros candidatos y fingir que los tiene seguiría siendo una
+mentira de producto.
 
 ---
 

@@ -68,6 +68,28 @@ proveedor y cero créditos.** El producto ya es útil aquí.
 bullet sin `factIds` deja `verification_status = 'failed'` y que el `check` de BD rechaza
 `export_state = 'exportable'`; el PDF pasa extracción de texto.
 
+### Fase 4b — higiene estructural, keywords deterministas y fidelidad de parseo
+
+**Sigue sin IA, sin créditos y sin red.** `evaluateResumeHygiene` con su registro versionado de checks
+—cada hallazgo con `anchor` obligatoria—, el módulo puro `keywords.ts` con
+`KEYWORD_MATCHER_VERSION`, `measureParseFidelity` cerrando el bucle render→re-extracción→diff, la ruta
+`POST …/hygiene`, y los golden tests de fidelidad por template.
+
+Se separa de la Fase 4 porque `measureParseFidelity` necesita el extractor de PDF que la Fase 6 trae
+para los uploads. Dos caminos posibles y la decisión se toma al implementar: adelantar sólo el
+extractor (`pdfjs-dist`, sin storage ni ClamAV) a esta fase, o mover 4b después de la 6. **Adelantar
+el extractor es la opción preferida**: desbloquea el diferenciador medible sin arrastrar los tres
+adaptadores de la Fase 6.
+
+**Salida**: la persona ve, gratis y sin IA, qué falla en su CV con el fragmento exacto señalado, y una
+cifra de fidelidad de parseo que **nosotros medimos** en lugar de declarar. Es el gancho de
+adquisición del producto (§Higiene estructural y fidelidad de parseo del spec).
+**Criterio de cierre**: `recovered === total` en los golden tests de `ats_plain` y `compact`; el par
+A/B `plain-control`/`decorated` produce extracción **idéntica**; el fixture `render-fails-parse-succeeds`
+**pasa**; un hallazgo sin `anchor` no se emite (test unitario); `keywords.ts` afirma que
+`customer support` **no** hace match con `customer service` y que `project managing` **no** hace match
+con `project management`.
+
 ### Fase 5 — IA de composición y revisión
 
 Rate cards, límites de plan, `resume-base-compose` y `resume-quality-review` en el registry, la capa
@@ -145,7 +167,10 @@ y monitorización de coste por proveedor.
 | 13 | **La caché filtra un CV entre tenants** | Media (la API genérica invita al fallo) | Crítico | Prohibido `getCached`/`setCached` (clave `ai:cache:{taskId}:{hash}` sin organización, `cache.ts:43`); obligatorio `tenantAiCacheKey` con `ownerUserId` en el input canónico | Un test unitario afirma que dos sujetos con input idéntico producen claves distintas |
 | 14 | **Cinco tasks comparten un presupuesto** y una consume el de las demás | Media | Medio | `allowances` por task y por tier en el registry, más rate cards independientes por operación; el lote tiene su propia operación y su propio techo | El presupuesto es por task, no por plan; agotar `resume-tailor` no bloquea `resume-quality-review` |
 | 15 | **Conflictos de merge** con los otros dos planes de carrera en 8 archivos compartidos | Alta | Bajo | Prefijos `career`/`resume` en todo identificador; superficies compartidas listadas en spec.md | Los conflictos serán textuales, no semánticos |
-| 16 | **El plan free queda muerto** con `STRIPE_BILLING_ENABLED=false` y nadie puede autoupgradearse | Alta | Alto: la feature no se usa | El camino determinista completo (perfil, hechos, CV base, editor, validador, PDF, TXT, 3 versiones) es gratis | Lo de pago es la asistencia de IA y el lote, no el producto |
+| 16 | **El plan free queda muerto** con `STRIPE_BILLING_ENABLED=false` y nadie puede autoupgradearse | Alta | Alto: la feature no se usa | El camino determinista completo (perfil, hechos, CV base, editor, validador, higiene, keywords, fidelidad de parseo, PDF, TXT, 3 versiones) es gratis | Lo de pago es la asistencia de IA y el lote, no el producto |
+| 17 | **El checker reporta un problema que la persona no encuentra** y deja de confiar en el producto entero | Alta si no se diseña contra ello | Alto: es el fallo de producto mejor documentado de la categoría — el cofundador del competidor lo concedió públicamente ("alarmista sin ser específico", "una máquina tragamonedas en vez de un diagnóstico") | `anchor` con al menos un campo no nulo es invariante de `hygieneFindingSchema`; un hallazgo que no sabe señalar dónde está el problema **se descarta**, no se muestra degradado | Se prefiere reportar menos y exacto antes que más y vago. La métrica "0 hallazgos sin anchor" existe para detectar que el filtro está comiendo trabajo en silencio |
+| 18 | **El matcher de keywords normaliza de más** y le dice a la persona que cumple un requisito que el ATS del empleador no reconocerá | Alta (es el instinto natural del ingeniero: añadir stemming "mejora" el recall) | Alto: consejo falso con consecuencia real para la persona, y no genera ningún error | Normalización limitada a minúsculas, espacios, Unicode y guiones; tests que afirman explícitamente los **no-match** (`customer support` ≠ `customer service`, `project managing` ≠ `project management`); `KEYWORD_MATCHER_VERSION` en toda salida persistida | Se acepta peor recall aparente a cambio de honestidad. El matching de un ATS es literal, y fingir lo contrario sería optimizar la métrica equivocada |
+| 19 | **Se hereda el marketing del miedo al ATS** ("75 % rechazado automáticamente", "98,4 % de las Fortune 500", "6 segundos") | Alta (circula por toda la categoría y suena creíble) | Medio-alto: vende el problema equivocado y es refutable públicamente — la cifra del 75 % viene de un *pitch* de vendor de 2012 de una empresa cerrada en 2013 | Lista de copia prohibida en spec.md §Métricas de éxito; el dato que sí se puede afirmar es que 92 % de reclutadores **no** auto-rechaza por formato | El enemigo de la persona es el volumen (2.000+ candidaturas en tech remoto), no el parser. Decir la verdad aquí es además el posicionamiento más defendible |
 
 ---
 
@@ -164,6 +189,9 @@ Recuperación hacia adelante, nunca down-migrations (`_meta/security-policy.md` 
   quien tenga el enlace, y los datos permanecen.
 - **Fase 4** se revierte quitando el botón de export. Las versiones ya emitidas siguen legibles en el
   editor; nada se borra.
+- **Fase 4b** se revierte quitando el panel de higiene de la UI. La ruta sigue sirviendo a quien tenga
+  el enlace, `evaluateResumeHygiene` es una función pura sin efectos, y los golden tests de fidelidad
+  siguen corriendo en CI aunque la feature esté oculta — que es justo donde aportan más valor.
 - **Fase 5** se apaga con `AI_DISABLED_TASKS=resume-base-compose,resume-quality-review`. La UI cae
   al compositor determinista **sin degradar el producto**: es exactamente el camino de la Fase 4.
   Las reservas en vuelo se liberan; ninguna versión ya generada se toca.

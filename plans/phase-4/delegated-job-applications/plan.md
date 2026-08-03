@@ -49,15 +49,22 @@ owner-only en `permissions.ts`. Repositorios bajo `withTenantContext`. CRUD y m�
 Tablero personal en `/career/applications`. Banco de respuestas con la categoría `never_autofill`
 que no puede almacenar valor. Línea de tiempo de eventos.
 
-**Salida**: una persona registra a mano las candidaturas que envía por su cuenta, las enlaza a
-ofertas de su workspace, y ve su historial. Esto es útil el día 1 y no depende de que el billing
-esté activo, que hoy no lo está (`STRIPE_BILLING_ENABLED = false`).
+Incluye el **import CSV/XLSX** (§Importar un historial que ya existe): mapeo de columnas revisable,
+previsualización con conteos, idempotente por `Idempotency-Key`, sin fabricar estados de envío. Está
+en esta fase a propósito y no más tarde: es determinista, no toca IA ni red, y sin él el tracker le
+pide a alguien que ya lleva 80 filas en una hoja de cálculo que las reteclee para probarnos.
+
+**Salida**: una persona registra a mano las candidaturas que envía por su cuenta —o **trae las que ya
+tenía apuntadas**—, las enlaza a ofertas de su workspace, y ve su historial. Esto es útil el día 1 y no
+depende de que el billing esté activo, que hoy no lo está (`STRIPE_BILLING_ENABLED = false`).
 
 **Criterio de salida**:
 `pnpm test:rls:local && pnpm test:api-isolation:local && pnpm test:migration-integrity` verdes con
 la nueva `checkApplications()`, incluida la prueba de que un admin de la organización recibe `404`;
-E2E crear → mover → marcar enviada → archivar; `pnpm security:boundaries` con la regla nueva de
-"sin envío externo" activa desde este momento, no al final.
+E2E crear → mover → marcar enviada → archivar; E2E de import que trae un CSV de 50 filas, lo reimporta
+y **no duplica**, y demuestra que un estado desconocido cae en `discovered` en vez de adivinarse;
+`pnpm security:boundaries` con la regla nueva de "sin envío externo" activa desde este momento, no al
+final.
 
 **Rollback**: quitar la entrada de nav y la ruta oculta la feature. Las tablas quedan vacías y
 aisladas; nada existente cambia de comportamiento.
@@ -186,7 +193,7 @@ encuentra texto de carta, respuesta ni CV.
 
 | # | Riesgo | Probabilidad | Radio de impacto | Mitigación | Decisión tomada |
 | --- | --- | --- | --- | --- | --- |
-| 1 | Alguien "mejora" el producto añadiendo envío automático en una iteración futura | Media | Catastrófico: daño reputacional al usuario ante empleadores reales, posible infracción de términos, irreversible | El suelo ético está en `spec.md` §No objetivos con las condiciones exactas para revisarlo; `allowed_actions` no admite `'submit'` a nivel de CHECK; `scripts/check-tenant-boundaries.mjs` prohíbe cualquier salida no-`GET` desde el dominio | Se elige la restricción en DDL y en CI antes que la advertencia en prosa. Una prosa se ignora en un PR; un CHECK no |
+| 1 | Alguien "mejora" el producto añadiendo envío automático en una iteración futura | Media | Catastrófico: daño reputacional al usuario ante empleadores reales, posible infracción de términos, irreversible | El suelo ético está en `spec.md` §No objetivos con las condiciones exactas para revisarlo; `allowed_actions` no admite `'submit'` a nivel de CHECK; `scripts/check-tenant-boundaries.mjs` prohíbe cualquier salida no-`GET` desde el dominio. Añadido: `spec.md` §Evidencia externa documenta que el líder de la categoría (~10M usuarios, 11 años) tampoco envía y **cede el segmento mass-apply por escrito** — quien proponga lo contrario discute con datos de mercado, no con una preferencia interna | Se elige la restricción en DDL y en CI antes que la advertencia en prosa. Una prosa se ignora en un PR; un CHECK no |
 | 2 | El gate de aprobación se vuelve saltable por un bug de aplicación | Media | Alto: se envía material que el usuario no leyó | Cuatro mecanismos independientes en la base de datos (evento inmutable, CHECK de estado, policy que impide al worker escribir aprobaciones, hash generado sobre contenido INSERT-only) | Se rechaza el diseño de "flag `approved` en la fila", que un `UPDATE` descuidado activa. Un `NOT NULL` que apunta a una fila append-only, no |
 | 3 | Grants olvidados: funciona como owner, `42501` como `builderhunt_app`/`builderhunt_worker` | **Alta** — es el modo de fallo documentado de este repo (`app-reality.md` constraint 7, cinco bugs reales en una sesión) | Alto: la feature falla en producción y no en CI | Migración de RLS+grants dedicada por fase, tabla de grants por rol explícita en `spec.md`, y `checkApplications()` en `scripts/db/verify-api-isolation-local.mjs` conectada como los roles reales antes de cerrar cada fase | Se exige que cada fase con tabla nueva cierre con la comprobación de aislamiento, no que se acumulen al final |
 | 4 | El score de fit se lee como un veredicto sobre la persona | **Alta** | Alto: daño de producto directo al usuario, difícil de detectar porque no genera errores | Banda en vez de número por defecto; la banda nunca se renderiza sin la tabla de requisitos; copia obligatoria de qué NO significa; ruta de impugnación que retira la candidata del ranking | Se acepta el coste de UI (más superficie, más texto) a cambio de que el número nunca aparezca desnudo |
@@ -203,6 +210,9 @@ encuentra texto de carta, respuesta ni CV.
 | 15 | Migración a mano sin snapshot deja `pnpm test:migration-integrity` en rojo | Media (`0045` lo hizo) | Bajo | Toda migración se acuña con `drizzle-kit generate --custom`; snapshot, journal y `migration-hashes.json` aparecen en el `Files:` de cada tarea | Sin excepción para las de solo grants |
 | 16 | Colisión de merge con los dos planes hermanos en `schema.ts`, `tasks.ts`, `permissions.ts`, `rate-cards.ts` | **Alta** — los tres tocan los mismos cuatro ficheros | Bajo, pero costoso en tiempo | Identificadores únicos por plan; este plan posee solo `candidate-job-fit` y `application-cover-letter`; los conectores viven en `src/lib/applications/` (new), no en `src/lib/jobs/` (new, del plan hermano); el campo de propietario reutiliza `creatorUserId` en vez de añadir uno nuevo | Se acepta un nombre de campo menos claro a cambio de no colisionar. Si el hermano añade `ownerUserId`, este plan lo adopta |
 | 17 | Alcance que se desliza hacia "delegación total por lote" durante la fase 6 | Media | Alto | La fase 6 añade descubrimiento y cadencia, nunca aprobación ni envío; el wizard no tiene casilla de envío porque el dominio de `allowed_actions` no la admite | La ausencia del valor en el CHECK es la defensa; no hay que recordar no marcarla |
+| 18 | El producto **hereda el marketing del miedo al ATS** y vende el problema equivocado | Alta (circula por toda la categoría) | Medio-alto: la persona optimiza formato cuando su problema son 2.000 competidores por vacante, y las cifras son refutables públicamente | `spec.md` §Problema fija el dato real (**92 % de reclutadores no auto-rechaza por formato**) y los volúmenes por tipo de puesto; la lista de copia prohibida vive en el spec hermano y aplica a los dos | Se prefiere decir la verdad incómoda ("hay 2.000 candidatos, no un robot que te odia") porque además es lo que hace útiles los knockouts y la recencia |
+| 19 | El import de hoja de cálculo **fabrica estados de envío** que la persona no afirmó | Media | Alto: el sistema afirmaría que algo se envió cuando sólo hay una celda que decía "waiting" | Un estado que no mapea al dominio cae en `discovered` y se marca en la previsualización; `confirmed_submitted` es **inalcanzable** por import (exige evidencia externa); toda fila marcada como enviada entra con `actor_kind = 'user'` | Se prefiere importar de menos y que la persona corrija, antes que adivinar. Adivinar aquí es la misma clase de error que inventar un claim en un CV |
+| 20 | Un estado `ghosted` escrito por un worker en la fila de alguien | Media (es la solución obvia y equivocada) | Medio: mal diseño de datos y de producto a la vez — obliga a decidir cuándo, quién y qué pasa si el empleador responde después | "Sin respuesta" es una **derivación de sólo lectura** sobre `application_events`, nunca una columna ni un estado; si llega respuesta, se corrige sola | Se rechaza que el sistema escriba "te ignoraron" en el registro de nadie |
 
 ---
 

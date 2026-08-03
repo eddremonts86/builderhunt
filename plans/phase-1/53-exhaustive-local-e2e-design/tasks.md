@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 10 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 7 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 191 covered, 1 exempt, 10 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 194 covered, 1 exempt, 7 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -585,8 +585,31 @@
       empty-by-default case is asserted for both tenants. The populated case needs a booked interview with
       `event_participants.material_access_granted` set for a non-owner, which the interview harness already builds —
       noted as the remaining half rather than duplicated here.
-  - Remaining clusters: ai (3), solutions (3), `calendar/notifications`, plus `builders/claim/verify`,
-    `fingerprint/match`, `sprints/preview`, and the populated half of `interviews/shared`.
+  - **Done: `builders/claim/verify`, `fingerprint/match`, `sprints/preview`**
+    (`tests/e2e/api/claim-verify-fingerprint-sprints.spec.ts`, 11 passing).
+    - **`claim/verify` carries a credential in its query string**, and every one of its four outcomes is a 302 — so
+      `Referrer-Policy: no-referrer` and `Cache-Control: no-store` are load-bearing, not decorative: without the
+      first the token travels to the next page in a `Referer` header, without the second it sits in a shared cache.
+      Asserted across all three reachable branches, because a refactor adding one more early return is exactly how a
+      single branch loses them. Also: an unauthenticated claimer's token survives the sign-in detour in
+      `callbackURL`, a live token verifies and clears `verification_secret_hash` so the link cannot be replayed, and
+      a **genuinely expired** claim is byte-identical to a token that never existed.
+    - **A first draft of the anti-enumeration test had it backwards.** It asserted the message does not contain
+      "expired"; the route answers "This claim link is invalid or has expired" precisely so it names *both* and
+      confirms neither. Naming both is the mechanism. The test now seeds a real expired claim and compares the two
+      responses instead of reasoning from the wording.
+    - **`hashClaimSecret` cannot be imported into a spec** — that module transitively validates the server env and
+      throws a `ZodError` in the Playwright process, which surfaces as "No tests found" rather than an import error.
+      The formula is mirrored locally, and the drift risk that creates has a nasty shape: a changed prefix would make
+      every seeded claim look *unknown* rather than expired, leaving the indistinguishability test comparing two
+      unknowns and still passing. The live-claim test is the guard — verified by changing the prefix to `v2`, which
+      fails it with the claim-error redirect.
+    - **`fingerprint/match` answers `insufficient_density` with HTTP 200**, a refusal shaped as a success. A client
+      checking `response.ok` reads a 200 with an empty `matches` array and reports "no matches found" when the truth
+      is "not enough data to look". Pinned exactly, since it is the kind of contract someone later "corrects" to a
+      4xx and breaks every caller that learned to read the body.
+  - Remaining clusters: ai (3), solutions (3), `calendar/notifications`, and the populated half of
+    `interviews/shared` — the first six behind an AI provider fake, the seventh behind a calendar-event fixture.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 
