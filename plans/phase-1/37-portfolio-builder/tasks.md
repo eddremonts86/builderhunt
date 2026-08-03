@@ -63,6 +63,31 @@
   - Reason still open: the owner draft route already reports `integrationsAvailable: { aiPersona: false }` honestly rather than a fake toggle, so nothing is broken while this is unwired. It is separable and genuinely optional per the plan's own framing.
   - Note (2026-07-28): this task previously had no `Files`/`Do`/`Verify` of its own, while the task below it carried a body describing `metadata.aiEnrichment` under a *timeline* title — and duplicated the real timeline task after it. The body belonged here; the duplicate has been removed.
 
+  **Investigated 2026-08-03 — both tasks are much smaller than "not attempted" suggests, and the remaining gap
+  is one specific thing.**
+
+  `src/shared/lib/portfolio-integrations.ts` already exists and already does the work both tasks describe:
+  `readAiPersonaForPortfolio` parses `metadata.aiEnrichment`, honours an opt-out, and rejects a stale artifact;
+  `readTimelineForPortfolio` filters to public-safe fields and caps the list. Both fail closed to `null` / `[]`
+  on anything malformed, which is the degradation the tasks ask for. `tests/unit/shared/lib/portfolio-integrations.test.ts`
+  exercises them 25 times.
+
+  **What is actually missing is the availability signal, and it is hard-coded.**
+  `src/routes/api/me/builder-claims/$claimId/portfolio.ts:42` returns
+  `integrationsAvailable: { aiPersona: false, timeline: false }` as a literal. So the owner-facing draft always
+  says "not available" even where an enrichment artifact exists, and the adapters are never reached.
+
+  **Why this was left rather than guessed at.** Reporting availability honestly means answering "does an
+  enrichment artifact / do public timeline events exist *for this builder*", and the owned-claim projection does
+  not currently carry the identity row those live on. Getting it wrong in the optimistic direction is the bad
+  direction: an owner would be shown a persona toggle for data that does not exist, on their own public profile.
+  The fix is a repository read, and picking the right one is a decision about which projection should own it —
+  not a literal to flip.
+
+  Concretely, the next step is: extend the owned-claim projection to carry the builder identity id (or its
+  `metadata.aiEnrichment` presence and a timeline-event count), then replace the literal with those two
+  booleans. The adapters need no change.
+
 - [ ] **Integrate timeline without making it a hard dependency** — not attempted (`integrationsAvailable.timeline: false` is reported honestly, so nothing is broken while it is unwired)
   - Files: `src/shared/lib/portfolio-integrations.ts`, `src/modules/builder-profile/components/PublicPortfolio.tsx`, `src/modules/builder-profile/components/PortfolioTimelineSlot.tsx`, `tests/unit/modules/builder-profile/components/PortfolioTimelineSlot.test.tsx`
   - Do: Render public events only when owner opted in and unified-timeline is available. Preserve its lazy cache/degradation. If summary UI is exposed, call `timeline-summary` local-first through Chrome built-in AI; use the authenticated MiniMax proxy fallback and hide the control when neither tier is usable.
