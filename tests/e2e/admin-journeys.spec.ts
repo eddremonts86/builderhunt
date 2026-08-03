@@ -48,10 +48,16 @@ test.afterAll(async () => {
   await stopInterviewHarness(harness)
 })
 
-/** Every admin page that declares a page-level test id, with the route that reaches it. */
+/**
+ * Every admin page that declares a page-level test id, with the route that reaches it.
+ *
+ * `/admin/plan-requests` was removed on 2026-08-03: the self-service upgrade queue it managed could not be fed
+ * — `LegacyPlanMutationDisabledError` refused every request once billing was enabled — so the screen reviewed
+ * an empty list by construction. Granting a tier by hand now happens on `/admin/users`, against the
+ * organization that is actually entitled.
+ */
 const PAGES = [
   { path: '/admin/users', testId: 'admin-users-page' },
-  { path: '/admin/plan-requests', testId: 'admin-plan-requests-page' },
   { path: '/admin/incidents', testId: 'admin-incidents-page' },
   { path: '/admin/roadmap', testId: 'admin-roadmap-page' },
   { path: '/admin/changelog', testId: 'admin-changelog-page' },

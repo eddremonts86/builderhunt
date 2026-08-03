@@ -23,9 +23,6 @@ import {
   organizationBuilders,
   organizationMembers,
   organizations,
-  planChanges,
-  planRequests,
-  plans,
   publishedBuilderProfiles,
   savedQueries,
   sourcingSprints,
@@ -61,15 +58,6 @@ export const updateAccountExportRequest = (
   input: Partial<typeof dataExportRequests.$inferInsert>,
 ) => accountDb.update(dataExportRequests).set(input).where(eq(dataExportRequests.id, id))
 
-export const listAccountPlanChanges = (userId: string) => accountDb.select({
-  id: planChanges.id,
-  fromPlan: planChanges.fromPlan,
-  toPlan: planChanges.toPlan,
-  changedBy: planChanges.changedBy,
-  reason: planChanges.reason,
-  createdAt: planChanges.createdAt,
-}).from(planChanges).where(eq(planChanges.userId, userId)).orderBy(desc(planChanges.createdAt)).limit(20)
-
 export async function loadAccountExportSource(userId: string) {
   const [user] = await authDb.select({
     id: authUsers.id,
@@ -82,7 +70,7 @@ export async function loadAccountExportSource(userId: string) {
   }).from(authUsers).where(eq(authUsers.id, userId)).limit(1)
   if (!user) return null
 
-  const [account, consents, claimRequests, claims, profileViews, deletion, memberships, plan, requests, changes] = await Promise.all([
+  const [account, consents, claimRequests, claims, profileViews, deletion, memberships] = await Promise.all([
     authDb.select({
       providerId: authAccounts.providerId,
       password: authAccounts.password,
@@ -133,22 +121,6 @@ export async function loadAccountExportSource(userId: string) {
     }).from(organizationMembers)
       .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
       .where(eq(organizationMembers.userId, userId)),
-    accountDb.select({
-      plan: plans.plan,
-      status: plans.status,
-      planEndsAt: plans.planEndsAt,
-      trialEndsAt: plans.trialEndsAt,
-      createdAt: plans.createdAt,
-      updatedAt: plans.updatedAt,
-    }).from(plans).where(eq(plans.userId, userId)).limit(1),
-    accountDb.select({
-      id: planRequests.id,
-      requestedPlan: planRequests.requestedPlan,
-      status: planRequests.status,
-      message: planRequests.message,
-      createdAt: planRequests.createdAt,
-    }).from(planRequests).where(eq(planRequests.userId, userId)),
-    listAccountPlanChanges(userId),
   ])
 
   // `builders` is tenant-private with RLS forced on organization_id — a plain
@@ -208,9 +180,18 @@ export async function loadAccountExportSource(userId: string) {
     deletion: deletion[0] ?? null,
     organizationMemberships: memberships,
     trackedBuilders,
-    plan: plan[0] ?? null,
-    planChanges: changes,
-    planRequests: requests,
+    /*
+     * `plan`, `planChanges` and `planRequests` were part of this export until 2026-08-03, sourced from the
+     * per-user `plans`/`plan_changes`/`plan_requests` tables. All three tables are gone, and none of them had a
+     * single row — `plan_changes` had no writer at all, so this section always returned an empty array while
+     * looking like it delivered something.
+     *
+     * A data subject's entitlement now lives on the organization they own, which the memberships above already
+     * identify; and the trail of operator-granted changes lives in `security_audit_events`, readable by a
+     * platform admin. Neither is reproduced here: that table deliberately grants no SELECT to the request path,
+     * and building a SECURITY DEFINER reader to serve a section that has never held data would be
+     * infrastructure for an empty array.
+     */
     /**
      * Interviews this user ran, as *their* data.
      *

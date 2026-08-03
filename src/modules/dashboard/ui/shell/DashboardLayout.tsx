@@ -32,7 +32,6 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = React.useState(false)
   const [navOpen, setNavOpen] = React.useState(false)
   const [unreadAlertsCount, setUnreadAlertsCount] = React.useState(0)
-  const [planRequestsCount, setPlanRequestsCount] = React.useState(0)
 
   React.useEffect(() => {
     fetch('/api/admin/incidents', { credentials: 'include' })
@@ -53,34 +52,13 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
       .catch(() => setUnreadAlertsCount(0))
   }, [location.pathname, signingOut])
 
-  // Admin-only counter, so it is never requested for tenant users — an
-  // unconditional fetch would 403 on every navigation for most of the userbase.
-  React.useEffect(() => {
-    if (!isAdmin) {
-      setPlanRequestsCount(0)
-      return
-    }
-    // GET /api/admin/plan-requests takes no filters — it returns the latest 200
-    // rows of every status — so "needs attention" is counted here rather than
-    // badging the endpoint's raw length, which would never reach zero.
-    fetch('/api/admin/plan-requests', { credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: unknown) => {
-        const pending = Array.isArray(rows)
-          ? rows.filter((row) => (row as { status?: string }).status === 'pending').length
-          : 0
-        setPlanRequestsCount(pending)
-      })
-      .catch(() => setPlanRequestsCount(0))
-  }, [isAdmin, location.pathname])
-
   const entityLabel = useCurrentEntityBreadcrumbLabel()
   const areas = visibleAreas(isAdmin)
   const activeArea = resolveActiveArea(location.pathname, isAdmin)
   const crumbs = resolveBreadcrumbSegments(location.pathname, isAdmin, entityLabel)
   const badges = React.useMemo(
-    () => ({ unreadAlerts: unreadAlertsCount, planRequests: planRequestsCount }),
-    [unreadAlertsCount, planRequestsCount],
+    () => ({ unreadAlerts: unreadAlertsCount }),
+    [unreadAlertsCount],
   )
 
   const handleSignOut = async () => {

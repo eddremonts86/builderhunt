@@ -82,14 +82,21 @@ export function recordConsent(userId: string, document: ConsentDocument, version
 export async function buildExportPayload(userId: string) {
   const source = await loadAccountExportSource(userId)
   if (!source) return null
-  const { trackedBuilders, plan, planChanges, planRequests, ...accountSubject } = source
+  const { trackedBuilders, ...accountSubject } = source
   return {
     exportedAt: new Date().toISOString(),
     accountSubject,
     trackedBuilders,
-    plan,
-    planChanges,
-    planRequests,
+    /*
+     * `plan`, `planChanges` and `planRequests` were top-level keys here until 2026-08-03, lifted out of the
+     * subject so they read as first-class sections. They came from the per-user `plans`/`plan_changes`/
+     * `plan_requests` tables, which are gone — and which held no rows, `plan_changes` having no writer at all.
+     * The export therefore promised three sections and delivered three empty ones.
+     *
+     * Entitlement is a property of the organization a subject owns; the memberships inside `accountSubject`
+     * identify it. The trail of operator-granted changes lives in `security_audit_events`, which grants the
+     * request path no SELECT on purpose.
+     */
     tenantDataNotice: 'Organization resources require a separately authorized organization export.',
   }
 }

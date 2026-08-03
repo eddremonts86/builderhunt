@@ -28,7 +28,7 @@ export interface NavItem {
   /** Optional group heading rendered above this item in the level-2 panel. */
   group?: string
   /** Which live counter feeds this item's badge, if any. */
-  badge?: 'unreadAlerts' | 'planRequests'
+  badge?: 'unreadAlerts'
   /**
    * Exact-match activation. Needed for an item whose path prefixes a sibling's
    * (`/settings/billing` vs `/settings/billing/return`) and for area landing
@@ -144,7 +144,6 @@ export const NAV_AREAS: readonly NavArea[] = [
       // uses, and the gold set only produces value when a curator actually writes judgments into it.
       { to: '/admin/solutions-gold-set', label: 'Gold set', icon: FlaskConical, group: 'Operations' },
       { to: '/admin/users', label: 'Users', icon: Users, group: 'Operations' },
-      { to: '/admin/plan-requests', label: 'Plan requests', icon: Inbox, group: 'Operations', badge: 'planRequests' },
       { to: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, group: 'Operations' },
       { to: '/admin/claims', label: 'Claims', icon: BadgeCheck, group: 'Operations' },
       { to: '/admin/abuse', label: 'Abuse console', icon: Siren, group: 'Operations' },

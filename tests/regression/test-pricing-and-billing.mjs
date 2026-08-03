@@ -133,39 +133,19 @@ async function run() {
   check('/api/plans/me returns pricing', !!meRes.pricing)
 
   // ====================================================================
-  // /api/plans/request-upgrade as user
+  // /api/plans/request-upgrade — REMOVED 2026-08-03
   //
-  // Asserts the legacy self-service path still works — this script only runs against a dev
-  // environment with STRIPE_BILLING_ENABLED=false (this repo's own default). Once that flag flips to
-  // 'true' (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after
-  // canonical cutover"), this same request instead returns 409 with `migrationGuidance: true` and a
-  // `checkoutUrl` — see `platform-billing.test.ts`'s `shouldBlockLegacyPlanMutations` and
-  // `request-upgrade.test.ts`/`admin/plan-requests/index.test.ts` for that behavior's real coverage.
+  // This block drove the legacy self-service upgrade request and asserted a 200 plus idempotency. The route is
+  // gone with the `plan_requests` table: `LegacyPlanMutationDisabledError` already refused every request
+  // whenever `STRIPE_BILLING_ENABLED` was true, so the queue it fed could not be fed, and the admin screen that
+  // reviewed it was reviewing an empty list by construction.
+  //
+  // Worth recording rather than silently deleting: the note that used to sit here said this script "only runs
+  // against a dev environment with STRIPE_BILLING_ENABLED=false (this repo's own default)". That default had
+  // already flipped to `true` in `.env`, so these two checks were asserting a 200 from a path that answers 409 —
+  // this script simply was not being run. Upgrading is Checkout now; `tests/e2e/api/billing-*.spec.ts` covers it
+  // against the deterministic provider.
   // ====================================================================
-  console.log('\n🛒 User requests upgrade to team')
-  const requestRes = await page.evaluate(async () => {
-    const r = await fetch('/api/plans/request-upgrade', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestedPlan: 'team', message: 'e2e test request' }),
-    })
-    return { status: r.status, body: await r.json() }
-  })
-  check('request upgrade returns 200', requestRes.status === 200, `status: ${requestRes.status}`)
-  check('request returns id', !!requestRes.body.id, `body: ${JSON.stringify(requestRes.body)}`)
-
-  // Idempotent: submit again, should return same request
-  const requestRes2 = await page.evaluate(async () => {
-    const r = await fetch('/api/plans/request-upgrade', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestedPlan: 'team' }),
-    })
-    return r.json()
-  })
-  check('second request is idempotent', requestRes2.alreadyPending === true, `body: ${JSON.stringify(requestRes2)}`)
 
   // ====================================================================
   // /admin/users — list & edit

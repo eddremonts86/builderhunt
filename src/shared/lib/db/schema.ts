@@ -982,38 +982,29 @@ export const deletionRequests = pgTable('deletion_requests', {
 })
 
 // ---------------------------------------------------------------------------
-// Pricing & Plans (Plan: pricing-and-billing, admin-managed, no Stripe)
+// Pricing & Plans
 // ---------------------------------------------------------------------------
-
-export const plans = pgTable('plans', {
-  userId: text('user_id').primaryKey().references(() => authUsers.id, { onDelete: 'cascade' }),
-  plan: text('plan').notNull().default('free'), // 'free' | 'pro' | 'team'
-  status: text('status').notNull().default('active'), // 'active' | 'past_due' | 'canceled' | 'trialing'
-  planEndsAt: timestamp('plan_ends_at', { withTimezone: true }),
-  trialEndsAt: timestamp('trial_ends_at', { withTimezone: true }),
-  notes: text('notes'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const planChanges = pgTable('plan_changes', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
-  fromPlan: text('from_plan'),
-  toPlan: text('to_plan').notNull(),
-  changedBy: text('changed_by').notNull(), // admin userId
-  reason: text('reason'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
-
-export const planRequests = pgTable('plan_requests', {
-  id: text('id').primaryKey(),
-  userId: text('user_id').notNull().references(() => authUsers.id, { onDelete: 'cascade' }),
-  requestedPlan: text('requested_plan').notNull(), // 'pro' | 'team'
-  status: text('status').notNull().default('pending'), // 'pending' | 'approved' | 'declined'
-  message: text('message'),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+//
+// `plans`, `plan_changes` and `plan_requests` were dropped on 2026-08-03. They were the pre-organization,
+// admin-managed billing surface: a plan keyed by **user**, its change log, and a self-service upgrade queue.
+//
+// All three were already dead rather than merely legacy, which is what made removing them safe:
+//
+//   - `plans`          — 0 rows. Read by the admin users list and the privacy export; written only by
+//                        `setPlatformUserPlan`.
+//   - `plan_changes`   — 0 rows, and **no writer at all**. Its only remaining reference was the privacy
+//                        export reading a table nothing filled.
+//   - `plan_requests`  — 0 rows. `LegacyPlanMutationDisabledError` refused every new request whenever
+//                        `STRIPE_BILLING_ENABLED` was true, so the queue could not be fed and the admin
+//                        screen that managed it was reviewing an empty list by construction.
+//
+// What replaced each of them, by intent rather than by name:
+//
+//   - entitlement state    → `organizationEntitlements` below, against the organization that is actually
+//                            entitled instead of a user who may belong to several.
+//   - operator grants      → `repositories/operator-grants.ts`.
+//   - the change trail     → `securityAuditEvents`, which `auditPlatformAdminAction` now writes durably.
+//   - upgrade requests     → Checkout.
 
 export const organizationEntitlements = pgTable(
   'organization_entitlements',

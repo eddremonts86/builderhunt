@@ -23,7 +23,7 @@ export function MobileNavDrawer({
   areas: readonly NavArea[]
   activeAreaId: string
   pathname: string
-  badges: { unreadAlerts: number; planRequests: number }
+  badges: { unreadAlerts: number }
 }) {
   const [mounted, setMounted] = React.useState(false)
   const reduceMotion = useReducedMotion()

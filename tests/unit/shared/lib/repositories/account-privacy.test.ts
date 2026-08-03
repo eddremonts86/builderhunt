@@ -5,7 +5,6 @@ const accountRoutes = [
   'src/routes/api/consent/index.ts',
   'src/routes/api/me/data-export/index.ts',
   'src/routes/api/me/data-export/$id.ts',
-  'src/routes/api/me/plan-changes/index.ts',
   'src/shared/lib/legal.ts',
 ]
 

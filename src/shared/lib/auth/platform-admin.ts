@@ -1,5 +1,45 @@
 import { emitSecurityAudit } from '../security/audit'
-import { consoleSecurityAuditSink } from '../security/audit-sink'
+import { createDatabaseSecurityAuditSink } from '../security/audit-sink'
+import * as schema from '../db/schema'
+import { workerDb } from '../db/worker-db'
+
+/**
+ * Platform-admin actions land in `security_audit_events` as real rows, not just log lines.
+ *
+ * They were console-only until 2026-08-03, which was a gap rather than a decision: this is the audit trail for
+ * the most privileged actor in the system — granting an entitlement with no payment behind it, revoking a claim,
+ * pausing a worker — and a trail that exists only in stdout cannot answer a question asked a month later.
+ * `organization-lifecycle.ts` had already been moved to the durable sink; this call site was left behind.
+ *
+ * ## Why `workerDb` and not a new grant
+ *
+ * The table's privilege split is deliberate: `builderhunt_auth`/`_app`/`_worker` hold INSERT and no SELECT,
+ * `builderhunt_platform`/`_platform_admin` hold SELECT and no INSERT. A trail the reading role can also write is
+ * one it can tamper with, and a trail the request path can read is one it can leak.
+ *
+ * Granting `builderhunt_platform` INSERT would have collapsed that split for the one role that can read
+ * everything. `builderhunt_worker` already has INSERT, and a platform-admin action is exactly what that identity
+ * is for — privileged and outside any single tenant's scope. So this needs no migration and changes no
+ * privilege.
+ *
+ * A failed insert never propagates (see `createDatabaseSecurityAuditSink`): every caller is recording something
+ * that already happened, and turning a bookkeeping failure into a user-visible error would leave the action
+ * committed *and* unrecorded.
+ */
+const platformAdminAuditSink = createDatabaseSecurityAuditSink(async (event) => {
+  await workerDb.insert(schema.securityAuditEvents).values({
+    id: event.id,
+    organizationId: event.organizationId,
+    actorUserId: event.actorUserId,
+    action: event.action,
+    targetType: event.targetType,
+    targetId: event.targetId,
+    result: event.result,
+    requestId: event.requestId,
+    details: event.details,
+    createdAt: event.createdAt,
+  })
+})
 import { RECENT_AUTH_MAX_AGE_SECONDS } from './organization-lifecycle'
 
 /**
@@ -118,7 +158,7 @@ export async function auditPlatformAdminAction(
       requestId: principal.requestId,
       details: input.details,
     },
-    consoleSecurityAuditSink,
+    platformAdminAuditSink,
   )
 }
 

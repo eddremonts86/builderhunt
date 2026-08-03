@@ -373,12 +373,24 @@ describe('buildExportPayload', () => {
 
     expect(result).not.toBeNull()
     expect(Object.keys(result!)).toEqual(
-      expect.arrayContaining(['trackedBuilders', 'plan', 'planChanges', 'planRequests', 'accountSubject', 'exportedAt']),
+      expect.arrayContaining(['trackedBuilders', 'accountSubject', 'exportedAt']),
     )
     expect(result!.trackedBuilders).toEqual([{ id: 'builder-1', source: 'github', username: 'ada' }])
-    expect(result!.plan).toEqual({ plan: 'pro', status: 'active' })
-    expect(result!.planChanges).toEqual([{ id: 'change-1', fromPlan: 'free', toPlan: 'pro' }])
-    expect(result!.planRequests).toEqual([{ id: 'request-1', requestedPlan: 'team', status: 'pending' }])
+
+    /*
+     * `plan`, `planChanges` and `planRequests` were asserted here as top-level sections. They are gone with the
+     * per-user `plans`/`plan_changes`/`plan_requests` tables (2026-08-03) — and it is worth noting that this test
+     * *stubbed* their contents, so it proved the payload had the right shape while the real tables held no rows
+     * and `plan_changes` had no writer at all. The export promised three sections and delivered three empty ones.
+     *
+     * Asserted as absence rather than deleted, so a future change that reintroduces a plan section at the top
+     * level has to say why: entitlement belongs to the organization a subject owns (identified by the
+     * memberships inside `accountSubject`), and the operator-grant trail lives in `security_audit_events`, which
+     * grants the request path no SELECT by design.
+     */
+    expect(result).not.toHaveProperty('plan')
+    expect(result).not.toHaveProperty('planChanges')
+    expect(result).not.toHaveProperty('planRequests')
     // The account-subject-only fields stay nested, not duplicated at the top level.
     expect(result!.accountSubject).not.toHaveProperty('trackedBuilders')
     expect(result!.accountSubject.user).toEqual({ id: 'user-1', name: 'Ada', email: 'ada@example.com' })

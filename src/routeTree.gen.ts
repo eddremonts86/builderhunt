@@ -78,7 +78,6 @@ import { Route as ApiSearchSemanticRouteImport } from './routes/api/search/seman
 import { Route as ApiSearchBuildersRouteImport } from './routes/api/search/builders'
 import { Route as ApiPrivacyProfileRemovalRouteImport } from './routes/api/privacy/profile-removal'
 import { Route as ApiPortfolioClaimIdRouteImport } from './routes/api/portfolio/$claimId'
-import { Route as ApiPlansRequestUpgradeRouteImport } from './routes/api/plans/request-upgrade'
 import { Route as ApiPlansMeRouteImport } from './routes/api/plans/me'
 import { Route as ApiOrganizationsTransferOwnershipPreviewRouteImport } from './routes/api/organizations/transfer-ownership-preview'
 import { Route as ApiOrganizationsTransferOwnershipRouteImport } from './routes/api/organizations/transfer-ownership'
@@ -139,7 +138,6 @@ import { Route as DashboardAdminSourcesRouteImport } from './routes/_dashboard/a
 import { Route as DashboardAdminSolutionsGoldSetRouteImport } from './routes/_dashboard/admin/solutions-gold-set'
 import { Route as DashboardAdminRoadmapRouteImport } from './routes/_dashboard/admin/roadmap'
 import { Route as DashboardAdminRefundsRouteImport } from './routes/_dashboard/admin/refunds'
-import { Route as DashboardAdminPlanRequestsRouteImport } from './routes/_dashboard/admin/plan-requests'
 import { Route as DashboardAdminOperationsRouteImport } from './routes/_dashboard/admin/operations'
 import { Route as DashboardAdminMetricsRouteImport } from './routes/_dashboard/admin/metrics'
 import { Route as DashboardAdminIntegrationsRouteImport } from './routes/_dashboard/admin/integrations'
@@ -154,7 +152,6 @@ import { Route as ApiSchedulingInvitationsIndexRouteImport } from './routes/api/
 import { Route as ApiOrganizationsInvitationsIndexRouteImport } from './routes/api/organizations/invitations/index'
 import { Route as ApiMeStepupIndexRouteImport } from './routes/api/me/stepup/index'
 import { Route as ApiMeSessionsIndexRouteImport } from './routes/api/me/sessions/index'
-import { Route as ApiMePlanChangesIndexRouteImport } from './routes/api/me/plan-changes/index'
 import { Route as ApiMeDeleteAccountIndexRouteImport } from './routes/api/me/delete-account/index'
 import { Route as ApiMeDataExportIndexRouteImport } from './routes/api/me/data-export/index'
 import { Route as ApiMeBuildersIndexRouteImport } from './routes/api/me/builders/index'
@@ -166,7 +163,6 @@ import { Route as ApiAlertsTriggersIndexRouteImport } from './routes/api/alerts/
 import { Route as ApiAdminUsersIndexRouteImport } from './routes/api/admin/users/index'
 import { Route as ApiAdminSeoIndexRouteImport } from './routes/api/admin/seo/index'
 import { Route as ApiAdminRoadmapIndexRouteImport } from './routes/api/admin/roadmap/index'
-import { Route as ApiAdminPlanRequestsIndexRouteImport } from './routes/api/admin/plan-requests/index'
 import { Route as ApiAdminOperationsIndexRouteImport } from './routes/api/admin/operations/index'
 import { Route as ApiAdminMetricsIndexRouteImport } from './routes/api/admin/metrics/index'
 import { Route as ApiAdminIntegrationsIndexRouteImport } from './routes/api/admin/integrations/index'
@@ -639,11 +635,6 @@ const ApiPortfolioClaimIdRoute = ApiPortfolioClaimIdRouteImport.update({
   path: '/api/portfolio/$claimId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPlansRequestUpgradeRoute = ApiPlansRequestUpgradeRouteImport.update({
-  id: '/api/plans/request-upgrade',
-  path: '/api/plans/request-upgrade',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPlansMeRoute = ApiPlansMeRouteImport.update({
   id: '/api/plans/me',
   path: '/api/plans/me',
@@ -954,12 +945,6 @@ const DashboardAdminRefundsRoute = DashboardAdminRefundsRouteImport.update({
   path: '/admin/refunds',
   getParentRoute: () => DashboardRouteRoute,
 } as any)
-const DashboardAdminPlanRequestsRoute =
-  DashboardAdminPlanRequestsRouteImport.update({
-    id: '/admin/plan-requests',
-    path: '/admin/plan-requests',
-    getParentRoute: () => DashboardRouteRoute,
-  } as any)
 const DashboardAdminOperationsRoute =
   DashboardAdminOperationsRouteImport.update({
     id: '/admin/operations',
@@ -1034,11 +1019,6 @@ const ApiMeSessionsIndexRoute = ApiMeSessionsIndexRouteImport.update({
   path: '/api/me/sessions/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiMePlanChangesIndexRoute = ApiMePlanChangesIndexRouteImport.update({
-  id: '/api/me/plan-changes/',
-  path: '/api/me/plan-changes/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiMeDeleteAccountIndexRoute = ApiMeDeleteAccountIndexRouteImport.update({
   id: '/api/me/delete-account/',
   path: '/api/me/delete-account/',
@@ -1095,12 +1075,6 @@ const ApiAdminRoadmapIndexRoute = ApiAdminRoadmapIndexRouteImport.update({
   path: '/api/admin/roadmap/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAdminPlanRequestsIndexRoute =
-  ApiAdminPlanRequestsIndexRouteImport.update({
-    id: '/api/admin/plan-requests/',
-    path: '/api/admin/plan-requests/',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiAdminOperationsIndexRoute = ApiAdminOperationsIndexRouteImport.update({
   id: '/api/admin/operations/',
   path: '/api/admin/operations/',
@@ -1864,7 +1838,6 @@ export interface FileRoutesByFullPath {
   '/admin/integrations': typeof DashboardAdminIntegrationsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/operations': typeof DashboardAdminOperationsRoute
-  '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
@@ -1925,7 +1898,6 @@ export interface FileRoutesByFullPath {
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
-  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -2057,7 +2029,6 @@ export interface FileRoutesByFullPath {
   '/api/admin/integrations/': typeof ApiAdminIntegrationsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
   '/api/admin/operations/': typeof ApiAdminOperationsIndexRoute
-  '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
@@ -2069,7 +2040,6 @@ export interface FileRoutesByFullPath {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
-  '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
@@ -2146,7 +2116,6 @@ export interface FileRoutesByTo {
   '/admin/integrations': typeof DashboardAdminIntegrationsRoute
   '/admin/metrics': typeof DashboardAdminMetricsRoute
   '/admin/operations': typeof DashboardAdminOperationsRoute
-  '/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/admin/refunds': typeof DashboardAdminRefundsRoute
   '/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
@@ -2206,7 +2175,6 @@ export interface FileRoutesByTo {
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
-  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -2338,7 +2306,6 @@ export interface FileRoutesByTo {
   '/api/admin/integrations': typeof ApiAdminIntegrationsIndexRoute
   '/api/admin/metrics': typeof ApiAdminMetricsIndexRoute
   '/api/admin/operations': typeof ApiAdminOperationsIndexRoute
-  '/api/admin/plan-requests': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo': typeof ApiAdminSeoIndexRoute
   '/api/admin/users': typeof ApiAdminUsersIndexRoute
@@ -2350,7 +2317,6 @@ export interface FileRoutesByTo {
   '/api/me/builders': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account': typeof ApiMeDeleteAccountIndexRoute
-  '/api/me/plan-changes': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations': typeof ApiOrganizationsInvitationsIndexRoute
@@ -2431,7 +2397,6 @@ export interface FileRoutesById {
   '/_dashboard/admin/integrations': typeof DashboardAdminIntegrationsRoute
   '/_dashboard/admin/metrics': typeof DashboardAdminMetricsRoute
   '/_dashboard/admin/operations': typeof DashboardAdminOperationsRoute
-  '/_dashboard/admin/plan-requests': typeof DashboardAdminPlanRequestsRoute
   '/_dashboard/admin/refunds': typeof DashboardAdminRefundsRoute
   '/_dashboard/admin/roadmap': typeof DashboardAdminRoadmapRoute
   '/_dashboard/admin/solutions-gold-set': typeof DashboardAdminSolutionsGoldSetRoute
@@ -2492,7 +2457,6 @@ export interface FileRoutesById {
   '/api/organizations/transfer-ownership': typeof ApiOrganizationsTransferOwnershipRoute
   '/api/organizations/transfer-ownership-preview': typeof ApiOrganizationsTransferOwnershipPreviewRoute
   '/api/plans/me': typeof ApiPlansMeRoute
-  '/api/plans/request-upgrade': typeof ApiPlansRequestUpgradeRoute
   '/api/portfolio/$claimId': typeof ApiPortfolioClaimIdRoute
   '/api/privacy/profile-removal': typeof ApiPrivacyProfileRemovalRouteWithChildren
   '/api/search/builders': typeof ApiSearchBuildersRoute
@@ -2624,7 +2588,6 @@ export interface FileRoutesById {
   '/api/admin/integrations/': typeof ApiAdminIntegrationsIndexRoute
   '/api/admin/metrics/': typeof ApiAdminMetricsIndexRoute
   '/api/admin/operations/': typeof ApiAdminOperationsIndexRoute
-  '/api/admin/plan-requests/': typeof ApiAdminPlanRequestsIndexRoute
   '/api/admin/roadmap/': typeof ApiAdminRoadmapIndexRoute
   '/api/admin/seo/': typeof ApiAdminSeoIndexRoute
   '/api/admin/users/': typeof ApiAdminUsersIndexRoute
@@ -2636,7 +2599,6 @@ export interface FileRoutesById {
   '/api/me/builders/': typeof ApiMeBuildersIndexRoute
   '/api/me/data-export/': typeof ApiMeDataExportIndexRoute
   '/api/me/delete-account/': typeof ApiMeDeleteAccountIndexRoute
-  '/api/me/plan-changes/': typeof ApiMePlanChangesIndexRoute
   '/api/me/sessions/': typeof ApiMeSessionsIndexRoute
   '/api/me/stepup/': typeof ApiMeStepupIndexRoute
   '/api/organizations/invitations/': typeof ApiOrganizationsInvitationsIndexRoute
@@ -2716,7 +2678,6 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/metrics'
     | '/admin/operations'
-    | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/solutions-gold-set'
@@ -2777,7 +2738,6 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership'
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
-    | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
@@ -2909,7 +2869,6 @@ export interface FileRouteTypes {
     | '/api/admin/integrations/'
     | '/api/admin/metrics/'
     | '/api/admin/operations/'
-    | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/seo/'
     | '/api/admin/users/'
@@ -2921,7 +2880,6 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
-    | '/api/me/plan-changes/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
@@ -2998,7 +2956,6 @@ export interface FileRouteTypes {
     | '/admin/integrations'
     | '/admin/metrics'
     | '/admin/operations'
-    | '/admin/plan-requests'
     | '/admin/refunds'
     | '/admin/roadmap'
     | '/admin/solutions-gold-set'
@@ -3058,7 +3015,6 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership'
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
-    | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
@@ -3190,7 +3146,6 @@ export interface FileRouteTypes {
     | '/api/admin/integrations'
     | '/api/admin/metrics'
     | '/api/admin/operations'
-    | '/api/admin/plan-requests'
     | '/api/admin/roadmap'
     | '/api/admin/seo'
     | '/api/admin/users'
@@ -3202,7 +3157,6 @@ export interface FileRouteTypes {
     | '/api/me/builders'
     | '/api/me/data-export'
     | '/api/me/delete-account'
-    | '/api/me/plan-changes'
     | '/api/me/sessions'
     | '/api/me/stepup'
     | '/api/organizations/invitations'
@@ -3282,7 +3236,6 @@ export interface FileRouteTypes {
     | '/_dashboard/admin/integrations'
     | '/_dashboard/admin/metrics'
     | '/_dashboard/admin/operations'
-    | '/_dashboard/admin/plan-requests'
     | '/_dashboard/admin/refunds'
     | '/_dashboard/admin/roadmap'
     | '/_dashboard/admin/solutions-gold-set'
@@ -3343,7 +3296,6 @@ export interface FileRouteTypes {
     | '/api/organizations/transfer-ownership'
     | '/api/organizations/transfer-ownership-preview'
     | '/api/plans/me'
-    | '/api/plans/request-upgrade'
     | '/api/portfolio/$claimId'
     | '/api/privacy/profile-removal'
     | '/api/search/builders'
@@ -3475,7 +3427,6 @@ export interface FileRouteTypes {
     | '/api/admin/integrations/'
     | '/api/admin/metrics/'
     | '/api/admin/operations/'
-    | '/api/admin/plan-requests/'
     | '/api/admin/roadmap/'
     | '/api/admin/seo/'
     | '/api/admin/users/'
@@ -3487,7 +3438,6 @@ export interface FileRouteTypes {
     | '/api/me/builders/'
     | '/api/me/data-export/'
     | '/api/me/delete-account/'
-    | '/api/me/plan-changes/'
     | '/api/me/sessions/'
     | '/api/me/stepup/'
     | '/api/organizations/invitations/'
@@ -3582,7 +3532,6 @@ export interface RootRouteChildren {
   ApiOrganizationsTransferOwnershipRoute: typeof ApiOrganizationsTransferOwnershipRoute
   ApiOrganizationsTransferOwnershipPreviewRoute: typeof ApiOrganizationsTransferOwnershipPreviewRoute
   ApiPlansMeRoute: typeof ApiPlansMeRoute
-  ApiPlansRequestUpgradeRoute: typeof ApiPlansRequestUpgradeRoute
   ApiPortfolioClaimIdRoute: typeof ApiPortfolioClaimIdRoute
   ApiPrivacyProfileRemovalRoute: typeof ApiPrivacyProfileRemovalRouteWithChildren
   ApiSearchBuildersRoute: typeof ApiSearchBuildersRoute
@@ -3680,7 +3629,6 @@ export interface RootRouteChildren {
   ApiAdminIntegrationsIndexRoute: typeof ApiAdminIntegrationsIndexRoute
   ApiAdminMetricsIndexRoute: typeof ApiAdminMetricsIndexRoute
   ApiAdminOperationsIndexRoute: typeof ApiAdminOperationsIndexRoute
-  ApiAdminPlanRequestsIndexRoute: typeof ApiAdminPlanRequestsIndexRoute
   ApiAdminRoadmapIndexRoute: typeof ApiAdminRoadmapIndexRoute
   ApiAdminSeoIndexRoute: typeof ApiAdminSeoIndexRoute
   ApiAdminUsersIndexRoute: typeof ApiAdminUsersIndexRoute
@@ -3692,7 +3640,6 @@ export interface RootRouteChildren {
   ApiMeBuildersIndexRoute: typeof ApiMeBuildersIndexRoute
   ApiMeDataExportIndexRoute: typeof ApiMeDataExportIndexRoute
   ApiMeDeleteAccountIndexRoute: typeof ApiMeDeleteAccountIndexRoute
-  ApiMePlanChangesIndexRoute: typeof ApiMePlanChangesIndexRoute
   ApiMeSessionsIndexRoute: typeof ApiMeSessionsIndexRoute
   ApiMeStepupIndexRoute: typeof ApiMeStepupIndexRoute
   ApiOrganizationsInvitationsIndexRoute: typeof ApiOrganizationsInvitationsIndexRoute
@@ -4203,13 +4150,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPortfolioClaimIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/plans/request-upgrade': {
-      id: '/api/plans/request-upgrade'
-      path: '/api/plans/request-upgrade'
-      fullPath: '/api/plans/request-upgrade'
-      preLoaderRoute: typeof ApiPlansRequestUpgradeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/plans/me': {
       id: '/api/plans/me'
       path: '/api/plans/me'
@@ -4630,13 +4570,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardAdminRefundsRouteImport
       parentRoute: typeof DashboardRouteRoute
     }
-    '/_dashboard/admin/plan-requests': {
-      id: '/_dashboard/admin/plan-requests'
-      path: '/admin/plan-requests'
-      fullPath: '/admin/plan-requests'
-      preLoaderRoute: typeof DashboardAdminPlanRequestsRouteImport
-      parentRoute: typeof DashboardRouteRoute
-    }
     '/_dashboard/admin/operations': {
       id: '/_dashboard/admin/operations'
       path: '/admin/operations'
@@ -4735,13 +4668,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMeSessionsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/me/plan-changes/': {
-      id: '/api/me/plan-changes/'
-      path: '/api/me/plan-changes'
-      fullPath: '/api/me/plan-changes/'
-      preLoaderRoute: typeof ApiMePlanChangesIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/me/delete-account/': {
       id: '/api/me/delete-account/'
       path: '/api/me/delete-account'
@@ -4817,13 +4743,6 @@ declare module '@tanstack/react-router' {
       path: '/api/admin/roadmap'
       fullPath: '/api/admin/roadmap/'
       preLoaderRoute: typeof ApiAdminRoadmapIndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/admin/plan-requests/': {
-      id: '/api/admin/plan-requests/'
-      path: '/api/admin/plan-requests'
-      fullPath: '/api/admin/plan-requests/'
-      preLoaderRoute: typeof ApiAdminPlanRequestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/admin/operations/': {
@@ -5732,7 +5651,6 @@ interface DashboardRouteRouteChildren {
   DashboardAdminIntegrationsRoute: typeof DashboardAdminIntegrationsRoute
   DashboardAdminMetricsRoute: typeof DashboardAdminMetricsRoute
   DashboardAdminOperationsRoute: typeof DashboardAdminOperationsRoute
-  DashboardAdminPlanRequestsRoute: typeof DashboardAdminPlanRequestsRoute
   DashboardAdminRefundsRoute: typeof DashboardAdminRefundsRoute
   DashboardAdminRoadmapRoute: typeof DashboardAdminRoadmapRoute
   DashboardAdminSolutionsGoldSetRoute: typeof DashboardAdminSolutionsGoldSetRoute
@@ -5773,7 +5691,6 @@ const DashboardRouteRouteChildren: DashboardRouteRouteChildren = {
   DashboardAdminIntegrationsRoute: DashboardAdminIntegrationsRoute,
   DashboardAdminMetricsRoute: DashboardAdminMetricsRoute,
   DashboardAdminOperationsRoute: DashboardAdminOperationsRoute,
-  DashboardAdminPlanRequestsRoute: DashboardAdminPlanRequestsRoute,
   DashboardAdminRefundsRoute: DashboardAdminRefundsRoute,
   DashboardAdminRoadmapRoute: DashboardAdminRoadmapRoute,
   DashboardAdminSolutionsGoldSetRoute: DashboardAdminSolutionsGoldSetRoute,
@@ -6214,7 +6131,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOrganizationsTransferOwnershipPreviewRoute:
     ApiOrganizationsTransferOwnershipPreviewRoute,
   ApiPlansMeRoute: ApiPlansMeRoute,
-  ApiPlansRequestUpgradeRoute: ApiPlansRequestUpgradeRoute,
   ApiPortfolioClaimIdRoute: ApiPortfolioClaimIdRoute,
   ApiPrivacyProfileRemovalRoute: ApiPrivacyProfileRemovalRouteWithChildren,
   ApiSearchBuildersRoute: ApiSearchBuildersRoute,
@@ -6316,7 +6232,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAdminIntegrationsIndexRoute: ApiAdminIntegrationsIndexRoute,
   ApiAdminMetricsIndexRoute: ApiAdminMetricsIndexRoute,
   ApiAdminOperationsIndexRoute: ApiAdminOperationsIndexRoute,
-  ApiAdminPlanRequestsIndexRoute: ApiAdminPlanRequestsIndexRoute,
   ApiAdminRoadmapIndexRoute: ApiAdminRoadmapIndexRoute,
   ApiAdminSeoIndexRoute: ApiAdminSeoIndexRoute,
   ApiAdminUsersIndexRoute: ApiAdminUsersIndexRoute,
@@ -6328,7 +6243,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeBuildersIndexRoute: ApiMeBuildersIndexRoute,
   ApiMeDataExportIndexRoute: ApiMeDataExportIndexRoute,
   ApiMeDeleteAccountIndexRoute: ApiMeDeleteAccountIndexRoute,
-  ApiMePlanChangesIndexRoute: ApiMePlanChangesIndexRoute,
   ApiMeSessionsIndexRoute: ApiMeSessionsIndexRoute,
   ApiMeStepupIndexRoute: ApiMeStepupIndexRoute,
   ApiOrganizationsInvitationsIndexRoute: ApiOrganizationsInvitationsIndexRoute,

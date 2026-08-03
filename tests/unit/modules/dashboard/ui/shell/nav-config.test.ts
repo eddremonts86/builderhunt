@@ -44,7 +44,10 @@ describe('resolveActiveArea', () => {
 
   it('resolves admin routes for admins', () => {
     expect(resolveActiveArea('/admin/disputes', true).id).toBe('admin')
-    expect(resolveActiveArea('/admin/plan-requests', true).id).toBe('admin')
+    // `/admin/plan-requests` was the second path asserted here. The page is gone (2026-08-03) with the legacy
+    // per-user plan surface, so `/admin/users` — where the operator grant now lives — is the sibling that keeps
+    // this test measuring "more than one admin path resolves" rather than one lucky match.
+    expect(resolveActiveArea('/admin/users', true).id).toBe('admin')
   })
 
   it('falls back to the first visible area for an unmapped path', () => {

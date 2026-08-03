@@ -19,7 +19,7 @@ export function AreaRail({
 }: {
   areas: readonly NavArea[]
   activeAreaId: string
-  badges: { unreadAlerts: number; planRequests: number }
+  badges: { unreadAlerts: number }
   onNavigate?: () => void
 }) {
   const body = areas.filter((area) => !area.footer)
@@ -75,7 +75,7 @@ function RailItem({
 }: {
   area: NavArea
   active: boolean
-  badges: { unreadAlerts: number; planRequests: number }
+  badges: { unreadAlerts: number }
   onNavigate?: () => void
 }) {
   const Icon = area.icon

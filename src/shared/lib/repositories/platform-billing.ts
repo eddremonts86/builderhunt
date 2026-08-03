@@ -3,7 +3,7 @@ import { randomId } from '~/lib/utils'
 import { env } from '../env'
 import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
-import { authUsers, onboardingProgress, planChanges, planRequests, plans } from '../db/schema'
+import { authUsers, onboardingProgress } from '../db/schema'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
 /**
@@ -33,101 +33,25 @@ function assertLegacyPlanMutationsEnabled(): void {
   if (shouldBlockLegacyPlanMutations(env.STRIPE_BILLING_ENABLED)) throw new LegacyPlanMutationDisabledError()
 }
 
-export async function getPlatformUserPlan(userId: string | null | undefined): Promise<UserPlan | null> {
-  if (!userId) return null
-  const [row] = await platformDb.select().from(plans).where(eq(plans.userId, userId)).limit(1)
-  if (!row) {
-    await platformDb.insert(plans).values({ userId, plan: 'free', status: 'active' }).onConflictDoNothing()
-    return { userId, plan: 'free', status: 'active', planEndsAt: null, trialEndsAt: null, notes: null }
-  }
-  return {
-    userId: row.userId,
-    plan: row.plan as PlanTier,
-    status: row.status as PlanStatus,
-    planEndsAt: row.planEndsAt?.toISOString() ?? null,
-    trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
-    notes: row.notes,
-  }
-}
-
-export async function setPlatformUserPlan(
-  userId: string,
-  newPlan: PlanTier,
-  changedBy: string,
-  reason?: string,
-  planEndsAt?: Date,
-) {
-  const from = (await getPlatformUserPlan(userId))?.plan ?? 'free'
-
-  // A personal organization can carry real seats above its own tier's usual
-  // limit (an admin grant can raise `seat_limit` independent of `tier` — see
-  // 0022's sync function) — so shrinking the tier back down must not be
-  // allowed to silently strand members over the new, smaller limit. Checked
-  // via authDb (organization-lifecycle.ts), not platformDb: this connection's
-  // role has no grant on organization_members, by design (least privilege).
-  const { personalOrganizationId } = await import('../migration/backfill')
-  const { assertSeatLimitDowngradeIsSafe } = await import('../auth/organization-lifecycle')
-  await assertSeatLimitDowngradeIsSafe(personalOrganizationId(userId), PLAN_SEAT_LIMITS[newPlan])
-
-  await platformDb.transaction(async (tx) => {
-    await tx.insert(plans).values({ userId, plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null })
-      .onConflictDoUpdate({
-        target: plans.userId,
-        set: { plan: newPlan, status: 'active', planEndsAt: planEndsAt ?? null, updatedAt: new Date() },
-      })
-    await tx.insert(planChanges).values({ id: randomId(), userId, fromPlan: from, toPlan: newPlan, changedBy, reason: reason ?? null })
-    // Keeps the user's personal organization's `organization_entitlements` row
-    // — the table every actual feature/seat-limit check reads — in sync with
-    // this admin grant. Without this, the two only ever matched by
-    // coincidence (see 0022's migration comment); this is the only ongoing
-    // writer, via a SECURITY DEFINER function since builderhunt_platform has
-    // no direct grant on organization_entitlements.
-    await tx.execute(sql`
-      select sync_personal_organization_entitlement(
-        ${userId}, ${newPlan}, 'active', ${PLAN_SEAT_LIMITS[newPlan]}, ${planEndsAt?.toISOString() ?? null}
-      )
-    `)
-  })
-  return { from, to: newPlan }
-}
-
-export async function requestPlatformPlanUpgrade(userId: string, requestedPlan: 'pro' | 'team', message?: string) {
-  assertLegacyPlanMutationsEnabled()
-  const [existing] = await platformDb.select({ id: planRequests.id }).from(planRequests)
-    .where(and(eq(planRequests.userId, userId), eq(planRequests.status, 'pending'))).limit(1)
-  if (existing) return { id: existing.id, alreadyPending: true }
-  const id = randomId()
-  await platformDb.insert(planRequests).values({ id, userId, requestedPlan, message: message ?? null })
-  return { id, alreadyPending: false }
-}
-
-export async function resolvePlatformPlanRequest(id: string, status: 'approved' | 'declined') {
-  assertLegacyPlanMutationsEnabled()
-  await platformDb.update(planRequests).set({ status }).where(eq(planRequests.id, id))
-}
-
-export async function findPlatformPlanRequest(id: string) {
-  const [row] = await platformDb.select().from(planRequests).where(eq(planRequests.id, id)).limit(1)
-  return row ?? null
-}
-
-export async function listPlatformUsersWithPlans() {
+/**
+ * Every account, newest first — with no plan columns.
+ *
+ * This used to left-join the legacy per-user `plans` table and surface `plan`/`status`/`planEndsAt` alongside
+ * each user. Those three fields were a second, weaker answer to a question `getPlatformUserBillingSummary`
+ * already answers properly: entitlement lives on the organization, and the summary reports it together with its
+ * *provenance* (Stripe-backed, manually granted, or expired). Keeping both meant the admin list could show a
+ * user as `pro` from one source while the workspace they actually work in was `free`.
+ *
+ * `listPlatformUsersWithBilling` composes this with that summary, which is the only shape callers use.
+ */
+export async function listPlatformUsers() {
   const rows = await platformDb.select({
     userId: authUsers.id,
     name: authUsers.name,
     email: authUsers.email,
     createdAt: authUsers.createdAt,
-    plan: plans.plan,
-    status: plans.status,
-    planEndsAt: plans.planEndsAt,
-  }).from(authUsers).leftJoin(plans, eq(plans.userId, authUsers.id)).orderBy(desc(authUsers.createdAt))
-  return rows.map((row) => ({
-    ...row,
-    plan: (row.plan ?? 'free') as PlanTier,
-    status: row.status ?? 'active',
-    createdAt: row.createdAt.toISOString(),
-    planEndsAt: row.planEndsAt?.toISOString() ?? null,
-  }))
+  }).from(authUsers).orderBy(desc(authUsers.createdAt))
+  return rows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() }))
 }
 
 export type UserBillingProvenance = 'canonical' | 'manual_exception' | 'expired_exception' | 'no_organization'
@@ -205,9 +129,15 @@ export interface PlatformUserWithBilling {
   name: string
   email: string
   createdAt: string
-  plan: PlanTier
-  status: string
-  planEndsAt: string | null
+  /**
+   * The canonical entitlement of the organization this user owns, or `null` when they own none.
+   *
+   * `plan`, `status` and `planEndsAt` used to sit alongside it, read from the legacy per-user `plans` table.
+   * They are gone: two sources for one question meant the list could show a user as `pro` while the workspace
+   * they actually work in was `free`, and only one of those could be acted on. Whatever the UI needs — tier,
+   * status, period end, whether Stripe is behind it — is inside `billing`, together with the provenance that
+   * says which of those it is.
+   */
   billing: PlatformUserBillingSummary | null
 }
 
@@ -216,24 +146,10 @@ export interface PlatformUserWithBilling {
  * per-key fan-out), since the underlying read is a SECURITY DEFINER function call, not a joinable
  * table this connection has a grant on. */
 export async function listPlatformUsersWithBilling(): Promise<PlatformUserWithBilling[]> {
-  const users = await listPlatformUsersWithPlans()
+  const users = await listPlatformUsers()
   const now = new Date()
   const billing = await Promise.all(users.map((u) => getPlatformUserBillingSummary(u.userId, now)))
   return users.map((u, i) => ({ ...u, billing: billing[i] ?? null }))
-}
-
-export function listPlatformPlanRequests() {
-  return platformDb.select({
-    id: planRequests.id,
-    userId: planRequests.userId,
-    requestedPlan: planRequests.requestedPlan,
-    status: planRequests.status,
-    message: planRequests.message,
-    createdAt: planRequests.createdAt,
-    userName: authUsers.name,
-    userEmail: authUsers.email,
-  }).from(planRequests).leftJoin(authUsers, eq(authUsers.id, planRequests.userId))
-    .orderBy(desc(planRequests.createdAt)).limit(200)
 }
 
 export async function getPlatformAccountMetrics(oneDayAgo: Date, oneWeekAgo: Date) {

@@ -13,7 +13,7 @@ export function AreaPanel({
 }: {
   area: NavArea
   pathname: string
-  badges: { unreadAlerts: number; planRequests: number }
+  badges: { unreadAlerts: number }
   onNavigate?: () => void
   className?: string
 }) {
