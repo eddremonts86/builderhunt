@@ -31,7 +31,7 @@
   - Verify: `grep HUGGINGFACE_TOKEN .env.example` prints the documented line.
   - **Done.**
 
-- [ ] **(Optional) Enrich top authors with avatar + real followers**
+- [x] **(Optional) Enrich top authors with avatar + real followers**
   - Files: `src/lib/sources/huggingface.ts`
   - Do: after author aggregation, for the top 5 authors by total downloads call
     `GET https://huggingface.co/api/users/{username}/overview` in parallel (try/catch per
@@ -39,3 +39,52 @@
     with the real `numFollowers`, keeping the aggregate values in `metadata`.
   - Verify: search "llama" with only the HF pill active; the top author cards show avatars;
     when the overview endpoint is blocked (e.g. offline), results equal today's output.
+
+  **Done 2026-08-03, with one addition the task text could not have anticipated.**
+
+  `HF_ENRICH_LIMIT = 5` authors by total downloads get a profile lookup, in one parallel burst, each call
+  independently caught and bounded by a 4s timeout. `avatarUrl` and `numFollowers` replace the aggregate's
+  likes-proxy `followersCount`; every aggregate figure stays in `metadata`, plus a `followersSource` marker so a
+  reader can tell a real follower count from the proxy.
+
+  ### The addition: most top authors are organizations, and they 404 on `/api/users`
+
+  Checked live before writing anything, per this repo's standing discipline. `/api/users/{name}/overview` works
+  unauthenticated and returns exactly the two fields this task wants — but the highest-download authors on
+  Hugging Face are overwhelmingly *organizations*, and every one of them answers **404** there. Enriching only
+  through the users endpoint would therefore have left precisely the authors this feature exists for with no
+  avatar, which is the opposite of its intent.
+
+  Organizations answer on `/api/organizations/{name}/overview` with an `avatarUrl` but **no follower count at
+  all** — they report `numUsers`/`numModels` instead. So the connector tries users first (the only account kind
+  that reports followers, which is what makes the real figure reachable) and falls back to organizations for the
+  avatar alone. Calling `numUsers` a follower count would be inventing a metric, so an organization keeps the
+  likes proxy and `followersSource` stays absent.
+
+  ### Live evidence, `searchHuggingFace(['llama'])` on 2026-08-03
+
+  ```
+  meta-llama     avatar=YES  followers=25364  source=likes-proxy         (organization, 404 on /api/users)
+  NousResearch   avatar=YES  followers=666    source=likes-proxy         (organization)
+  dphn           avatar=YES  followers=308    source=likes-proxy         (organization)
+  DavidAU        avatar=YES  followers=6390   source=huggingface_profile (user; likes proxy was 651)
+  mlabonne       avatar=YES  followers=8190   source=huggingface_profile (user; likes proxy was 201)
+  --- past the limit: pangram, nvidia, Moore2877 — no avatar, untouched
+  ```
+
+  Three of the top five are organizations, including the first. Under a users-only implementation those three
+  would have had no avatar.
+
+  ### Tests
+
+  `tests/unit/lib/sources/huggingface.test.ts` — 5 passing, all against a stubbed `fetch` (pinning real
+  usernames would fail the day someone gains a follower):
+
+  - a user account's real follower count replaces the proxy, and `totalLikes` survives in `metadata`;
+  - the organizations fallback supplies an avatar and never a follower count, and users are tried first;
+  - **both endpoints failing produces output byte-identical to no enrichment** — the degradation contract, and
+    the half that is invisible while the endpoint is up;
+  - at most `HF_ENRICH_LIMIT` authors are enriched, asserted from the outside (the sixth author has no avatar
+    even though the stub would have supplied one);
+  - the positional zip never gives an author another author's avatar — a defect that would produce a perfectly
+    plausible-looking page.

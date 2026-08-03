@@ -4,14 +4,39 @@ import type { RawBuilder } from '~/lib/sources/types'
 /**
  * SourceHut source — small-but-loyal OSS forge.
  *
- * The SourceHut GraphQL endpoint (meta.sr.ht/query) requires auth.
- * Without a SOURCEHUT_TOKEN, every request returns 401 Unauthorized.
+ * The SourceHut GraphQL endpoint (meta.sr.ht/query) requires auth. Without a `SOURCEHUT_TOKEN`, every request
+ * returns 401 Unauthorized.
  *
  * v1 strategy: graceful degradation.
  * - Source is fully wired (pill, icon, badge, scoring, env var)
- * - The handler returns [] if no token is configured OR if the API
- *   returns an auth error
- * - When SOURCEHUT_TOKEN is set, search becomes available
+ * - The handler returns [] if no token is configured OR if the API returns an auth error
+ *
+ * ## ⚠ Verified 2026-08-03: this connector cannot return results even with a valid token
+ *
+ * The query below asks meta.sr.ht for `users(search: $q, first: $first)`. **That field does not exist.**
+ * meta.sr.ht's published schema (docs.sourcehut.org/meta.sr.ht) exposes an account-management API only — its
+ * entire `Query` type is `me`, `loginSecurity`, `myOauthGrant`, `oauthClient*`, `oauthGrants`,
+ * `personalAccessTokens`, `pgpKey*`, `sshKey*`, `userByEmail`, `userByID`, `version` and the webhook fields.
+ * There is no user search of any kind, and no `search:` argument anywhere in the schema.
+ *
+ * So `gql()` receives a GraphQL error, returns `null` on the `data.errors` branch, and `searchSourceHut`
+ * answers `[]` — indistinguishable from "no token configured". The degradation is what has been hiding this:
+ * the source has never been able to produce a result, and the absence of a token meant nobody could tell.
+ *
+ * git.sr.ht is the same story for repositories: its `Query` type is `gitWebhooks`, `me`,
+ * `redirectByDiskPath`, `repositoryByDiskPath`, `user`, `userWebhook(s)`, `version` and `webhook`. Repositories
+ * are reachable only through `me { repositories }` or `user(username) { repositories }` — you must already know
+ * whose repositories you want. There is no keyword search over repositories, which is what the plan's optional
+ * "emit repo results from git.sr.ht" task assumed.
+ *
+ * **What is actually possible** is exact resolution, not search: `userByEmail`/`userByID` on meta.sr.ht and
+ * `user(username) { repositories }` on git.sr.ht. That would make SourceHut an enrichment/verification source
+ * (the shape `profile-proof.ts` implements for other forges) rather than a discovery source. It is a product
+ * decision, not a code fix — see the plan for the three options.
+ *
+ * Left pointed at the non-existent field rather than silently rewritten, because every rewrite still returns
+ * `[]` and a wrong query that is honestly documented is easier to act on than a different wrong query that
+ * looks deliberate. Same reasoning as the Hashnode connector's header.
  *
  * Spec reference: plans/phase-1/11-sourcehut-integration/spec.md
  */

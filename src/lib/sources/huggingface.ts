@@ -16,6 +16,26 @@ import type { RawBuilder } from '~/lib/sources/types'
  * user base. This is a known limitation; a real user-profile lookup would
  * need an HF API token (out of scope per spec).
  *
+ * ## Top-author enrichment
+ *
+ * The aggregate above gives an author a `followersCount` of total *likes*, which is a proxy standing in for a
+ * number HF will actually tell us. `/api/users/{name}/overview` returns `numFollowers` and `avatarUrl`
+ * unauthenticated, so the top `HF_ENRICH_LIMIT` authors by downloads get their real figures. Everything the
+ * aggregate computed stays in `metadata`, so nothing is lost and a card can still show "12 models, 4.2M
+ * downloads" next to a real follower count.
+ *
+ * **Organizations are why this is two endpoints, not one.** Checked live on 2026-08-03: the highest-download
+ * authors on HF are overwhelmingly organizations — `meta-llama`, `mistralai`, `Qwen` — and every one of them
+ * **404s** on `/api/users/…`. Enriching only through the users endpoint would therefore have left exactly the
+ * authors this feature exists for without an avatar, which is the opposite of the intent. Organizations answer
+ * on `/api/organizations/{name}/overview` with an `avatarUrl` but **no follower count at all** (they report
+ * `numUsers`/`numModels` instead), so an org gets its avatar and keeps the likes proxy. Claiming `numUsers` as
+ * followers would be inventing a metric.
+ *
+ * Enrichment is strictly additive and never load-bearing: each lookup is independently caught and bounded by
+ * its own timeout, and a total failure leaves the result identical to the unenriched output. A search must not
+ * get slower or emptier because a decoration endpoint is unavailable.
+ *
  * Spec reference: plans/phase-1/13-huggingface-integration/spec.md
  */
 interface HFModel {
@@ -126,6 +146,77 @@ function aggregateAuthor(author: string, m: HFModel, byName: Map<string, AuthorA
   byName.set(author, entry)
 }
 
+/** How many top authors get a profile lookup. Five keeps the added latency to one parallel burst. */
+export const HF_ENRICH_LIMIT = 5
+
+/** Enrichment is decoration; it must never hold a search open. */
+const HF_OVERVIEW_TIMEOUT_MS = 4000
+
+/** What a profile lookup can contribute. `numFollowers` is absent for organizations — see the file header. */
+interface HFAuthorOverview {
+  avatarUrl?: string
+  numFollowers?: number
+}
+
+async function fetchJson(url: string): Promise<unknown | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), HF_OVERVIEW_TIMEOUT_MS)
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'BuilderHunt/1.0 (huggingface source)', ...authHeaders() },
+      signal: controller.signal,
+    })
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+/**
+ * A user first, then an organization. The order matters and is not arbitrary: a *user* is the only kind of
+ * account that reports followers, so asking there first is what makes the real figure reachable at all. An
+ * organization is the fallback, and it can only ever contribute an avatar.
+ */
+async function fetchAuthorOverview(username: string): Promise<HFAuthorOverview | null> {
+  const user = await fetchJson(`${HF_BASE}/users/${encodeURIComponent(username)}/overview`) as
+    { avatarUrl?: unknown; numFollowers?: unknown } | null
+  if (user) {
+    return {
+      avatarUrl: typeof user.avatarUrl === 'string' ? user.avatarUrl : undefined,
+      numFollowers: typeof user.numFollowers === 'number' ? user.numFollowers : undefined,
+    }
+  }
+
+  const org = await fetchJson(`${HF_BASE}/organizations/${encodeURIComponent(username)}/overview`) as
+    { avatarUrl?: unknown } | null
+  if (org) {
+    return { avatarUrl: typeof org.avatarUrl === 'string' ? org.avatarUrl : undefined }
+  }
+  return null
+}
+
+/**
+ * Replaces the likes proxy with the real follower count where HF supplies one, and attaches the avatar.
+ *
+ * `totalLikes` stays in `metadata` regardless, so the proxy remains visible next to whatever replaced it —
+ * a card that used to show likes-as-followers can still show likes, labelled correctly.
+ */
+function enrichPersonBuilder(builder: RawBuilder, overview: HFAuthorOverview | null): RawBuilder {
+  if (!overview) return builder
+  return {
+    ...builder,
+    avatarUrl: overview.avatarUrl ?? builder.avatarUrl,
+    followersCount: overview.numFollowers ?? builder.followersCount,
+    metadata: {
+      ...builder.metadata,
+      ...(overview.numFollowers === undefined ? {} : { followersSource: 'huggingface_profile' as const }),
+    },
+  }
+}
+
 function authorToPersonBuilder(a: AuthorAggregate): RawBuilder {
   const pipelineList = Array.from(a.allPipelines).slice(0, 3).join(', ')
   const bio =
@@ -185,9 +276,25 @@ export async function searchHuggingFace(
   // Sort models by downloads
   const sortedModels = [...models].sort((a, b) => b.downloads - a.downloads)
 
+  const people = authorList.map(authorToPersonBuilder)
+
+  /**
+   * Enrich the top authors only, and never let it change the shape of the answer.
+   *
+   * `Promise.all` over already-caught lookups, so one slow or missing profile costs this burst its own timeout
+   * and nothing else. The zip below is positional against `people.slice(0, HF_ENRICH_LIMIT)` — the same array,
+   * in the same order, so an author can never be given another author's avatar.
+   */
+  const overviews = await Promise.all(
+    people.slice(0, HF_ENRICH_LIMIT).map((person) => fetchAuthorOverview(person.username)),
+  )
+  for (const [index, overview] of overviews.entries()) {
+    people[index] = enrichPersonBuilder(people[index]!, overview)
+  }
+
   // People first, then repos
   const all: RawBuilder[] = [
-    ...authorList.map(authorToPersonBuilder),
+    ...people,
     ...sortedModels.map(modelToRepoBuilder),
   ]
 
