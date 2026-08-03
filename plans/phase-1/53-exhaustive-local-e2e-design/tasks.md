@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 7 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 3 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 194 covered, 1 exempt, 7 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 198 covered, 1 exempt, 3 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -608,8 +608,33 @@
       checking `response.ok` reads a 200 with an empty `matches` array and reports "no matches found" when the truth
       is "not enough data to look". Pinned exactly, since it is the kind of contract someone later "corrects" to a
       4xx and breaks every caller that learned to read the body.
-  - Remaining clusters: ai (3), solutions (3), `calendar/notifications`, and the populated half of
-    `interviews/shared` — the first six behind an AI provider fake, the seventh behind a calendar-event fixture.
+  - **Done: `solutions/briefs`, `solutions/briefs/$briefId`, `ai/config`, `solutions/config`**
+    (`tests/e2e/api/solutions-briefs-and-configs.spec.ts`, 11 passing).
+    - **`cache-control: public` is a promise about the payload**, and that is what the two config routes are checked
+      against: a shared cache does not know who asked, so if any field varied by session it would hand one caller's
+      answer to another. The bodies are compared as raw text, anonymous versus authenticated — key order changing
+      would itself mean the body is built per-request.
+    - `ai/config` reports `serverAI: Boolean(env.MINIMAX_API_KEY)` — the fact of configuration, not the
+      configuration. Checked against the **real** key's value rather than a guess at what a key looks like, because a
+      route whose whole job is describing setup is where a secret gets echoed back by accident. The key set is
+      asserted exactly, so an added field is a deliberate new public disclosure rather than a silent one.
+    - Briefs: 422 (not 400) for a well-formed request failing a domain schema, with the issue list capped at five;
+      tenant-scoped list; full read/rename/delete; and another tenant's brief answering **404 on all three verbs**,
+      indistinguishable from a fabricated id. All three are probed because `PATCH` reaches its 404 through
+      `SolutionsRepositoryError`'s code mapping rather than a null check, so a single spot-check would leave that path
+      unproven. B's brief is then re-read to confirm the refusals were not partially applied.
+    - **One test was deleted rather than kept.** It claimed "generation does not create a brief" and proved it by
+      reading the list twice and checking the count had not moved — true of any list nobody wrote to. Proving that
+      claim needs a real generation under `E2E_AI_TASK_SCENARIO=success`, which belongs with the generate route's
+      coverage; the file now says so instead of carrying a no-op with a confident name.
+  - **Correction to this task's own notes: nothing here was ever blocked on building an AI provider fake.** That was
+    asserted three times across the session and was wrong every time. Deterministic fakes already exist from
+    "Wave 1 Task 4 — external fakes": `E2E_AI_TASK_SCENARIO` (success, disabled, budget_exceeded, unsupported),
+    `E2E_EMBEDDINGS_SCENARIO` (success, empty, timeout, dim mismatch) and `E2E_ENRICHMENT_SCENARIO`, each reachable
+    only under `E2E_MODE=true`. Four of the seven "blocked" routes needed nothing at all — they are plain env
+    readouts and principal-scoped CRUD — and the remaining AI ones need one env var, not new infrastructure.
+  - Remaining: `ai/complete` and `ai/embed` (via the scenario env vars above), and `calendar/notifications` (needs a
+    calendar event row for its `anchor_check`), plus the populated half of `interviews/shared`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 

@@ -348,7 +348,10 @@
       "status": "missing"
     },
     "/api/ai/config": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
+      ]
     },
     "/api/ai/embed": {
       "status": "missing"
@@ -1441,17 +1444,27 @@
       ]
     },
     "/api/solutions/briefs/$briefId": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
+      ]
     },
     "/api/solutions/briefs": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
+      ]
     },
     "/api/solutions/config": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/solutions-briefs-and-configs.spec.ts"
+      ]
     },
     "/api/solutions/generate": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/solutions-briefs-and-configs.spec.ts",
         "tests/e2e/solutions.spec.ts"
       ]
     },
