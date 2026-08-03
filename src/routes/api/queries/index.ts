@@ -4,15 +4,12 @@ import { randomId } from '~/lib/utils'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { PLAN_LIMITS } from '~/shared/lib/billing-shared'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
-import { env } from '~/shared/lib/env'
-import { resolveTenantReadMode } from '~/shared/lib/migration/tenant-flags'
 import { rateLimit } from '~/shared/lib/rate-limit'
 import { getOrganizationEntitlement, resolveLegacyPlanTier } from '~/shared/lib/repositories/entitlements'
 import {
   countSavedQueries,
   createSavedQuery,
   deleteSavedQuery,
-  listLegacySavedQueries,
   listSavedQueries,
 } from '~/shared/lib/repositories/saved-queries'
 // `~/shared/lib/repositories/public-radars` imports `publicDb`, which eagerly
@@ -30,15 +27,20 @@ export const Route = createFileRoute('/api/queries/')({
       GET: async ({ request }) => {
         try {
           const principal = await requireTenantPrincipal(request)
-          // `legacy` shows only what this member saved; `canonical` shows the
-          // whole organization's saved searches. The switch stays so the
-          // runbook's rollback (flip back to `legacy`) remains available.
-          const readMode = resolveTenantReadMode(env, { canonicalReady: env.TENANT_CANONICAL_READY })
-          const queries = await withTenantContext(principal, (tx) => (
-            readMode === 'canonical'
-              ? listSavedQueries(tx, principal.organizationId)
-              : listLegacySavedQueries(tx, principal.userId, principal.organizationId)
-          ))
+          /**
+           * A saved search belongs to the organization, full stop.
+           *
+           * This used to branch on `TENANT_READ_MODE`: `legacy` returned only what the calling member had
+           * saved, `canonical` the whole organization's. The switch existed as the tenant cutover's rollback.
+           * It was retired on 2026-08-03 — there are no real users to roll back for, and the two answers
+           * diverge *by design* for any organization with two contributing members, so "flip back to legacy" was
+           * never a recovery from a bug. It was a second, quieter product.
+           *
+           * Keeping it also meant the shared-workspace promise depended on an environment variable: a
+           * deployment that never set `TENANT_READ_MODE=canonical` silently hid teammates' saved searches from
+           * each other, which is the feature, not a fallback.
+           */
+          const queries = await withTenantContext(principal, (tx) => listSavedQueries(tx, principal.organizationId))
           const { listPublicRadarSlugsForSavedQueryIds } = await import('~/shared/lib/repositories/public-radars')
           const radarSlugs = await listPublicRadarSlugsForSavedQueryIds(queries.map((query) => query.id))
           return Response.json(queries.map((query) => ({

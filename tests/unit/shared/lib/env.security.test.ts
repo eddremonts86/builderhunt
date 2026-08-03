@@ -17,23 +17,12 @@ describe('production environment security', () => {
   it('accepts separated runtime and migration identities', () => {
     const parsed = parseEnvironment(productionEnvironment)
     expect(parsed.DATABASE_WORKER_URL).toContain('builderhunt_worker')
-    expect(parsed).toMatchObject({
-      TENANT_READ_MODE: 'legacy',
-      TENANT_CANONICAL_READY: false,
-    })
-  })
-
-  it('parses explicit tenant migration gates without permissive boolean coercion', () => {
-    expect(parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'true' }).TENANT_CANONICAL_READY).toBe(true)
-    expect(() => parseEnvironment({ ...productionEnvironment, TENANT_CANONICAL_READY: 'yes' })).toThrow()
-    expect(() => parseEnvironment({ ...productionEnvironment, TENANT_READ_MODE: 'on' })).toThrow()
-  })
-
-  it('keeps booting an environment still set to the retired shadow read mode', () => {
-    // Deployed environments may still carry `TENANT_READ_MODE=shadow`. Narrowing
-    // the enum without this would crash-loop them on the next release.
-    expect(parseEnvironment({ ...productionEnvironment, TENANT_READ_MODE: 'shadow' }).TENANT_READ_MODE)
-      .toBe('legacy')
+    expect(parsed.DATABASE_URL).toContain('builderhunt_app')
+    expect(parsed.DATABASE_MIGRATION_URL).toContain('migration_operator')
+    // The retired tenant-migration flags used to be asserted here. They are gone from the schema entirely
+    // (2026-08-03), so zod strips them and there is nothing left to pin — see the note in `env.ts`.
+    expect(parsed).not.toHaveProperty('TENANT_READ_MODE')
+    expect(parsed).not.toHaveProperty('TENANT_CANONICAL_READY')
   })
 
   it.each([

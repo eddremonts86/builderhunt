@@ -47,13 +47,16 @@ fail on.
    named error listing any table that still holds a null tenant, so a forgotten backfill fails
    fast instead of surfacing as a bare constraint violation on whichever table Postgres reached
    first.
-4. Switch one surface at a time from `legacy` to `canonical` via `TENANT_READ_MODE`. Canonical
-   reads are rejected while `TENANT_CANONICAL_READY` is false. Observe denial rate, latency, and
-   policy query plans after each surface.
+4. ~~Switch one surface at a time from `legacy` to `canonical` via `TENANT_READ_MODE`.~~ **Done and
+   retired, 2026-08-03.** Reads are canonical unconditionally; `TENANT_READ_MODE` and
+   `TENANT_CANONICAL_READY` no longer exist. There was only ever one surface behind the flag —
+   `GET /api/queries` — and its two answers ("the saved searches I created" vs "my organization's")
+   diverge by design for any organization with two contributing members, so the flag was not a
+   rollback but a second product. Keeping it also made the shared-workspace promise depend on a
+   deployment remembering to set a variable.
 
-Rollback before contract is application compatibility: return the affected read flag to
-`legacy`, diagnose, and migrate forward. Do not disable RLS and do not restore owner credentials
-to the web service.
+Rollback before contract is application compatibility: diagnose and migrate forward. There is no read
+flag to return to. Do not disable RLS and do not restore owner credentials to the web service.
 
 Legacy drops, organization purge, conflict disposition, and credential cutover require explicit
 environment-owner approval plus a fresh verified restore point.

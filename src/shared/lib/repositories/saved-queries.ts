@@ -85,12 +85,6 @@ export function listRecentSavedQueries(
  * see every org's saved searches merged together, regardless of which
  * organization is currently active.
  */
-export function listLegacySavedQueries(transaction: TenantTransaction, userId: string, organizationId: string) {
-  return transaction.select().from(savedQueries)
-    .where(and(eq(savedQueries.userId, userId), eq(savedQueries.organizationId, organizationId)))
-    .orderBy(savedQueries.createdAt)
-}
-
 export async function countSavedQueries(transaction: TenantTransaction, organizationId: string) {
   const [row] = await transaction.select({ value: count() }).from(savedQueries)
     .where(eq(savedQueries.organizationId, organizationId))

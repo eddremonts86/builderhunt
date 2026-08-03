@@ -39,17 +39,18 @@ const zodEnv = z.object({
   // endpoints unattended (see src/shared/lib/auth/cron.ts). Optional: when
   // unset, only a platform-admin session can run the workers.
   CRON_SECRET: z.string().optional(),
-  /**
-   * `shadow` is retired and accepted only so an already-deployed environment
-   * still boots. It compared a legacy read against a canonical one and returned
-   * the legacy rows, so folding it into `legacy` preserves the exact behaviour.
-   * `TENANT_WRITE_MODE` is gone entirely: every insert has written
-   * `organization_id` for a long time, so it never selected anything. Zod
-   * strips it if a deployment still sets it.
+  /*
+   * `TENANT_READ_MODE` and `TENANT_CANONICAL_READY` are gone (2026-08-03), along with `TENANT_WRITE_MODE`
+   * before them. Zod strips any of the three if a deployment still sets one, so nothing fails to boot.
+   *
+   * The read mode selected between "the saved searches I created" and "my organization's saved searches" on a
+   * single route, and existed as the tenant cutover's rollback. It was never a rollback: those two answers
+   * diverge by design for any organization with two contributing members, so flipping back to `legacy` would
+   * not have recovered from a bug — it would have switched to a different product. Meanwhile the
+   * shared-workspace promise silently depended on a deployment remembering to set it.
+   *
+   * Saved searches are organization-scoped unconditionally now. See `src/routes/api/queries/index.ts`.
    */
-  TENANT_READ_MODE: z.enum(['legacy', 'shadow', 'canonical']).default('legacy')
-    .transform((value) => (value === 'shadow' ? 'legacy' as const : value)),
-  TENANT_CANONICAL_READY: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
   // BETTER_AUTH_SECRET is the canonical name
   BETTER_AUTH_SECRET: z.string().optional(),
   APP_URL: z.string().min(1, 'APP_URL is required').transform(ensureProtocol),

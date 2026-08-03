@@ -54,10 +54,11 @@ tables and exits non-zero, so it cannot be used as a release gate until that bac
 Adding the missing rows is tracked work, not an oversight to rediscover.
 
 The tenant-column half of the cutover is **done**: `organization_id` is `NOT NULL` on all seven
-tenant-private tables (`drizzle/0081_wakeful_butterfly.sql`). What remains is the contract phase —
-dropping the legacy `user_id` columns — and flipping reads to canonical mode (`TENANT_READ_MODE`
-still defaults to `legacy`). `builders` and the legacy plan surfaces stay marked as transition
-findings until then.
+tenant-private tables (`drizzle/0081_wakeful_butterfly.sql`). Reads went canonical on 2026-08-03 and the
+`TENANT_READ_MODE`/`TENANT_CANONICAL_READY` switch was removed with them — see
+`docs/operations/tenant-cutover.md` step 4. What remains is the contract phase: dropping the legacy
+`user_id` columns and the `plans`/`plan_requests` tables. `builders` and the legacy plan surfaces stay
+marked as transition findings until that lands.
 
 Authorization must never depend on `metadata`, `payload`, `topics`, `keywords`, selections, or other
 JSON fields. Future tables must be added here before their migration is accepted and must document
