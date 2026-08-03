@@ -503,6 +503,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -517,6 +518,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -531,6 +533,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -545,6 +548,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -559,6 +563,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -573,6 +578,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -587,6 +593,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -601,6 +608,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -615,6 +623,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -629,6 +638,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -643,6 +653,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -657,6 +668,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -671,6 +683,7 @@
       "status": "covered",
       "specs": [
         "tests/e2e/admin-claims.spec.ts",
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
         "tests/e2e/builder-workspace-navigation.spec.ts",
@@ -685,7 +698,10 @@
       "status": "missing"
     },
     "/api/builders/recent": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts"
+      ]
     },
     "/api/builders/track": {
       "status": "covered",
@@ -801,6 +817,7 @@
     "/api/interviews/$interviewId/brief/$version": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -809,6 +826,7 @@
     "/api/interviews/$interviewId/brief": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -817,6 +835,7 @@
     "/api/interviews/$interviewId/finalize": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -825,6 +844,7 @@
     "/api/interviews/$interviewId/participants/$participantId": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -833,6 +853,7 @@
     "/api/interviews/$interviewId/participants": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -841,6 +862,7 @@
     "/api/interviews/$interviewId/report": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -849,6 +871,7 @@
     "/api/interviews/$interviewId/segments": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -857,6 +880,7 @@
     "/api/interviews/$interviewId/session": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -865,6 +889,7 @@
     "/api/interviews/$interviewId/suggestions": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -873,6 +898,7 @@
     "/api/interviews/$interviewId/transcription-token": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
@@ -881,13 +907,17 @@
     "/api/interviews": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts",
         "tests/e2e/billing-credits.spec.ts",
         "tests/e2e/interview-live.spec.ts",
         "tests/e2e/interview-privacy.spec.ts"
       ]
     },
     "/api/interviews/shared": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/builders-recent-and-shared-interviews.spec.ts"
+      ]
     },
     "/api/lists/$listId": {
       "status": "covered",

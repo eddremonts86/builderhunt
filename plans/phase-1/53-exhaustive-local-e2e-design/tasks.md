@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 12 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 10 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 189 covered, 1 exempt, 12 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 191 covered, 1 exempt, 10 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -565,8 +565,28 @@
     event first. Worth doing next in the same file, together with the two properties that route actually claims: an
     unowned notification id comes back unmarked and indistinguishable from a nonexistent one, and a forged keyset
     cursor can only move the caller's own window.
+  - **Done: `builders/recent` + `interviews/shared`** (`tests/e2e/api/builders-recent-and-shared-interviews.spec.ts`,
+    7 passing).
+    - `builders/recent` runs every row through `filterSuppressed`, which is the **read side of profile removal**:
+      once someone proves control of their profile they must stop appearing in the lists organizations browse. That
+      cannot be seen from either feature alone — one writes the suppression, the other honours it. An unsuppressed
+      builder in the same response is what makes the absence evidence of filtering rather than of an empty list.
+      Negative control: replacing `filterSuppressed(rows)` with `rows` fails the assertion with the suppressed
+      identity in the received array.
+    - Also asserted: the route exposes `identityId` separately from `id`, and the two differ. Documented on the
+      route because the profile pages key on `builder_identities.id`, so a list returning only
+      `organization_builders.id` builds links that 404.
+    - **The 60-second suppression cache shapes how this had to be written**, and the reason is in the spec:
+      `loadActiveSuppressionKeys` caches inside the app process, so seeding a suppression after a request has warmed
+      that cache leaves the builder visible for up to a minute — a test written that way fails intermittently in a
+      way that looks like a product bug. Everything is seeded before the first request instead.
+    - `interviews/shared` is scoped by an active material grant rather than ownership, so the risk is the inverse of
+      the usual one: not showing too little, but leaking an interview to someone whose grant was never made. The
+      empty-by-default case is asserted for both tenants. The populated case needs a booked interview with
+      `event_participants.material_access_granted` set for a non-owner, which the interview harness already builds —
+      noted as the remaining half rather than duplicated here.
   - Remaining clusters: ai (3), solutions (3), `calendar/notifications`, plus `builders/claim/verify`,
-    `builders/recent`, `fingerprint/match`, `interviews/shared`, `sprints/preview`.
+    `fingerprint/match`, `sprints/preview`, and the populated half of `interviews/shared`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 
