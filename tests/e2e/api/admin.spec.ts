@@ -207,6 +207,28 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'status/snapshot.ts', method: 'POST', path: '/api/admin/status/snapshot' },
   { file: 'users/$userId.ts', method: 'PATCH', path: '/api/admin/users/absent-id' },
   { file: 'users/index.ts', method: 'GET', path: '/api/admin/users' },
+
+  /**
+   * POST-only triggers that now reject GET explicitly. Listed so all three probes cover them: a GET
+   * must be refused for a stranger by the *guard* (not a bare 405, which would confirm the route exists) and
+   * answered 405 for a real admin.
+   */
+  { file: 'activity/run-retention.ts', method: 'GET', path: '/api/admin/activity/run-retention' },
+  { file: 'alerts/run-worker.ts', method: 'GET', path: '/api/admin/alerts/run-worker' },
+  { file: 'analytics/run-retention.ts', method: 'GET', path: '/api/admin/analytics/run-retention' },
+  { file: 'billing/run-worker.ts', method: 'GET', path: '/api/admin/billing/run-worker' },
+  { file: 'calendar/run-reminders.ts', method: 'GET', path: '/api/admin/calendar/run-reminders' },
+  { file: 'calendar/run-worker.ts', method: 'GET', path: '/api/admin/calendar/run-worker' },
+  { file: 'devpost/run-worker.ts', method: 'GET', path: '/api/admin/devpost/run-worker' },
+  { file: 'discovery/run-worker.ts', method: 'GET', path: '/api/admin/discovery/run-worker' },
+  { file: 'documents/run-web-imports.ts', method: 'GET', path: '/api/admin/documents/run-web-imports' },
+  { file: 'documents/run-worker.ts', method: 'GET', path: '/api/admin/documents/run-worker' },
+  { file: 'embeddings/run-worker.ts', method: 'GET', path: '/api/admin/embeddings/run-worker' },
+  { file: 'enrichment/run-worker.ts', method: 'GET', path: '/api/admin/enrichment/run-worker' },
+  { file: 'interviews/run-retention.ts', method: 'GET', path: '/api/admin/interviews/run-retention' },
+  { file: 'legal/run-worker.ts', method: 'GET', path: '/api/admin/legal/run-worker' },
+  { file: 'sprints/run-worker.ts', method: 'GET', path: '/api/admin/sprints/run-worker' },
+  { file: 'status/snapshot.ts', method: 'GET', path: '/api/admin/status/snapshot' },
 ]
 
 const ADMIN_ROUTE_DIR = 'src/routes/api/admin'

@@ -358,6 +358,24 @@
     which look like the easiest batch and are precisely the ones this applies to.
 
     The helper's own doc comment now says this, so the trap is where someone doing the sweep will read it.
+  - **16 of the 82 are done (2026-08-03).** `methodNotAllowedAfter()` was added for exactly this shape: it takes
+    the route's own guard and its own error mapper, so an anonymous caller gets the guard's 401/403 and only an
+    authorized one sees the 405. No guard is chosen for the caller, because this codebase has at least three and
+    several routes accept more than one.
+
+    Applied to every `/api/admin/*` POST-only trigger — the `run-worker`, `run-retention`, `run-reminders`,
+    `run-web-imports` and `status/snapshot` family. All 16 share an identical guard
+    (`tryCronPrincipal(request) ?? await requirePlatformAdminPrincipal(request)`) and mapper
+    (`platformAdminErrorResponse`), which is what made them a batch rather than 16 judgements.
+
+    The failure this closes is specific: a monitor pointed at a POST-only trigger used to get **200 with an HTML
+    page** and would record the worker as healthy while never having run it.
+
+    `admin.spec.ts` gained a GET row per trigger, so all three probes cover them — **216 passed**.
+
+  - **Still open: 66.** `operations/$jobKey/run.ts` is deliberately excluded: it does not use the cron-or-admin
+    pair, so it is a judgement rather than part of the batch. The rest need the same per-route decision as
+    before — 405 or implement it — with the public/authenticated split above deciding which helper applies.
   - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
     through to the route *component*, so the request gets **200 with an HTML document** instead of 405 with an
     `Allow` header. A client scripting the endpoint reads 200 and concludes it succeeded. It was hit twice

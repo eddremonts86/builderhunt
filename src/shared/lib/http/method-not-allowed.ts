@@ -65,3 +65,41 @@ export function methodNotAllowed(allowed: readonly HttpMethod[], reason?: string
       { status: 405, headers: { allow } },
     )
 }
+
+/**
+ * A 405 that only a caller who got past the guard can see.
+ *
+ * The counterpart to `methodNotAllowed` for authenticated routes, and the reason it takes its guard as an
+ * argument rather than choosing one: this codebase has at least three
+ * (`requireTenantPrincipal`, `requirePlatformAdminPrincipal`, a cron token), several routes accept more than one,
+ * and each family maps its own refusals to responses. A helper that picked would be wrong somewhere.
+ *
+ * `guard` resolves for an authorized caller and throws otherwise — the same expression the route's real handler
+ * already uses. `onRefusal` maps a thrown refusal to a Response, which is the route's existing error mapper. So
+ * an anonymous caller gets whatever the guard says (401/403, revealing nothing about which routes exist), and an
+ * authorized one gets the 405 with `Allow` that tells them what to call instead.
+ *
+ *     GET: methodNotAllowedAfter({
+ *       guard: (request) => tryCronPrincipal(request) ?? requirePlatformAdminPrincipal(request),
+ *       onRefusal: platformAdminErrorResponse,
+ *       allowed: ['POST'],
+ *     })
+ */
+export function methodNotAllowedAfter(options: {
+  guard: (request: Request) => unknown | Promise<unknown>
+  onRefusal: (error: unknown) => Response | null | undefined
+  allowed: readonly HttpMethod[]
+  reason?: string
+}) {
+  const reject = methodNotAllowed(options.allowed, options.reason)
+  return async ({ request }: { request: Request }): Promise<Response> => {
+    try {
+      await options.guard(request)
+    } catch (error) {
+      // The guard's own answer, unchanged. A generic 403 here would lose the distinction between "not signed
+      // in" and "signed in but not allowed", which is the difference between "log in" and "ask someone".
+      return options.onRefusal(error) ?? Response.json({ error: 'forbidden' }, { status: 403 })
+    }
+    return reject()
+  }
+}
