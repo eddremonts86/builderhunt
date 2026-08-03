@@ -421,17 +421,36 @@ export async function anonymousContext(harness: InterviewHarness): Promise<APIRe
  *
  * Stripe is never called. The rows are what a completed checkout leaves behind, and forging a webhook
  * to produce them would be testing the webhook.
+ *
+ * ## The provider is told too, and that is not cosmetic
+ *
+ * These rows carry an invented `stripe_subscription_id`. Under `E2E_MODE` the provider behind every billing
+ * route is the in-memory `FakeBillingProvider`, which has never heard of it — so any route that asks the
+ * provider to *act* on the subscription (`preview`, `cancel`) missed its map and answered **500**. Two tests in
+ * `billing-subscription-change-scenarios.spec.ts` sat `fixme` for exactly that, and one of them would have
+ * passed on the 500 while proving nothing, because it only asserted `>= 400`.
+ *
+ * So the seed now also tells the provider, through `POST /api/e2e/billing-provider` — the fake lives in the
+ * server process and a spec cannot reach its memory directly. Every existing caller keeps working: the extra
+ * provider state is inert for anything that never makes a provider call.
+ *
+ * Best-effort on purpose. Most callers of this fixture want an entitlement, not a provider — the interview and
+ * solutions specs never touch `preview`/`cancel` — so a seeding failure must not take their `beforeAll` down.
+ * The billing specs that *do* depend on it assert against the provider's answer, where a missed seed shows up
+ * as the 500 it always was rather than as silence.
  */
 export async function seedActiveSubscription(
   harness: InterviewHarness,
   options: { tier?: 'pro' | 'pro_max' | 'team'; interval?: 'monthly' | 'annual' } = {},
-): Promise<void> {
+): Promise<SeededSubscription> {
   const tier = options.tier ?? 'team'
   const interval = options.interval ?? 'monthly'
   const customerId = uniqueId('bcust')
+  const stripeCustomerId = `cus_${customerId}`
+  const stripeSubscriptionId = `sub_${uniqueId('s')}`
   await harness.sql`
     insert into billing_customers (id, organization_id, livemode, stripe_customer_id)
-    values (${customerId}, ${harness.organization.organizationId}, false, ${`cus_${customerId}`})
+    values (${customerId}, ${harness.organization.organizationId}, false, ${stripeCustomerId})
     on conflict (id) do nothing
   `
   await harness.sql`
@@ -440,8 +459,19 @@ export async function seedActiveSubscription(
        stripe_subscription_id, stripe_status, current_period_start, current_period_end)
     values (${uniqueId('bsub')}, ${harness.organization.organizationId}, ${customerId}, false,
             ${`${tier}_${interval}`}, ${tier}, ${interval}, 1,
-            ${`sub_${uniqueId('s')}`}, 'active', now() - interval '1 day', now() + interval '30 days')
+            ${stripeSubscriptionId}, 'active', now() - interval '1 day', now() + interval '30 days')
   `
+  await harness.owner.api!
+    .post('/api/e2e/billing-provider', { data: { subscriptionId: stripeSubscriptionId } })
+    .catch(() => undefined)
+  return { stripeSubscriptionId, stripeCustomerId, catalogKey: `${tier}_${interval}` }
+}
+
+/** What `seedActiveSubscription` wrote, for a spec that needs to name the subscription it is acting on. */
+export interface SeededSubscription {
+  stripeSubscriptionId: string
+  stripeCustomerId: string
+  catalogKey: string
 }
 
 /**

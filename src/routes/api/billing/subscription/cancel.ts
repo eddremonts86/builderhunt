@@ -4,7 +4,7 @@ import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/a
 import { BillingAuthorizationError, requireBillingPermission } from '~/shared/lib/billing/permissions'
 import { getBillingProvider } from '~/shared/lib/billing/stripe-provider'
 import { cancelSubscriptionAtPeriodEnd, SubscriptionChangeError, type SubscriptionChangeErrorCode } from '~/shared/lib/billing/subscription-changes'
-import { withTenantContext } from '~/shared/lib/db/tenant-context'
+import { withWorkerOrganization } from '~/shared/lib/repositories/billing-worker'
 
 const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, number> = {
   no_active_subscription: 409,
@@ -22,6 +22,11 @@ const SUBSCRIPTION_CHANGE_ERROR_STATUS: Record<SubscriptionChangeErrorCode, numb
  * immediate) — no body is required or read, matching `provider.cancelSubscription`'s own
  * `{subscriptionId, atPeriodEnd}` shape, which carries no idempotency key because a second call
  * while already scheduled is naturally a no-op, not a distinct action to dedupe.
+ *
+ * Runs in a worker-role transaction for the same reason `change.ts` does: `markBillingSubscriptionCancelAtPeriodEnd`
+ * updates `billing_subscriptions`, on which `builderhunt_app` holds SELECT only, so under `withTenantContext`
+ * this route answered 500 `permission denied` to every owner who clicked cancel. Authorization happens first and
+ * in full; `withWorkerOrganization` keeps every row scoped to this organization through the worker RLS policies.
  */
 export const Route = createFileRoute('/api/billing/subscription/cancel')({
   component: () => null,
@@ -36,7 +41,7 @@ export const Route = createFileRoute('/api/billing/subscription/cancel')({
           requireBillingPermission(principal, 'billing:mutate')
 
           const provider = getBillingProvider()
-          const result = await withTenantContext(principal, (tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
+          const result = await withWorkerOrganization(principal.organizationId, (tx) => cancelSubscriptionAtPeriodEnd(tx, principal, { provider }))
           return Response.json(result)
         } catch (error) {
           if (error instanceof TenantAuthorizationError || error instanceof BillingAuthorizationError) {

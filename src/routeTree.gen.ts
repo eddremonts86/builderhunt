@@ -97,6 +97,7 @@ import { Route as ApiFingerprintMatchRouteImport } from './routes/api/fingerprin
 import { Route as ApiFeedsSearchIdRouteImport } from './routes/api/feeds/$searchId'
 import { Route as ApiExportBuildersRouteImport } from './routes/api/export/builders'
 import { Route as ApiE2eOutboxRouteImport } from './routes/api/e2e/outbox'
+import { Route as ApiE2eBillingProviderRouteImport } from './routes/api/e2e/billing-provider'
 import { Route as ApiDashboardStatsRouteImport } from './routes/api/dashboard/stats'
 import { Route as ApiChangelogSlugRouteImport } from './routes/api/changelog/$slug'
 import { Route as ApiCalendarNotificationsRouteImport } from './routes/api/calendar/notifications'
@@ -735,6 +736,11 @@ const ApiExportBuildersRoute = ApiExportBuildersRouteImport.update({
 const ApiE2eOutboxRoute = ApiE2eOutboxRouteImport.update({
   id: '/api/e2e/outbox',
   path: '/api/e2e/outbox',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiE2eBillingProviderRoute = ApiE2eBillingProviderRouteImport.update({
+  id: '/api/e2e/billing-provider',
+  path: '/api/e2e/billing-provider',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDashboardStatsRoute = ApiDashboardStatsRouteImport.update({
@@ -1900,6 +1906,7 @@ export interface FileRoutesByFullPath {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
@@ -2180,6 +2187,7 @@ export interface FileRoutesByTo {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
@@ -2465,6 +2473,7 @@ export interface FileRoutesById {
   '/api/calendar/notifications': typeof ApiCalendarNotificationsRoute
   '/api/changelog/$slug': typeof ApiChangelogSlugRoute
   '/api/dashboard/stats': typeof ApiDashboardStatsRoute
+  '/api/e2e/billing-provider': typeof ApiE2eBillingProviderRoute
   '/api/e2e/outbox': typeof ApiE2eOutboxRoute
   '/api/export/builders': typeof ApiExportBuildersRoute
   '/api/feeds/$searchId': typeof ApiFeedsSearchIdRoute
@@ -2749,6 +2758,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
@@ -3029,6 +3039,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
@@ -3313,6 +3324,7 @@ export interface FileRouteTypes {
     | '/api/calendar/notifications'
     | '/api/changelog/$slug'
     | '/api/dashboard/stats'
+    | '/api/e2e/billing-provider'
     | '/api/e2e/outbox'
     | '/api/export/builders'
     | '/api/feeds/$searchId'
@@ -3551,6 +3563,7 @@ export interface RootRouteChildren {
   ApiCalendarNotificationsRoute: typeof ApiCalendarNotificationsRoute
   ApiChangelogSlugRoute: typeof ApiChangelogSlugRoute
   ApiDashboardStatsRoute: typeof ApiDashboardStatsRoute
+  ApiE2eBillingProviderRoute: typeof ApiE2eBillingProviderRoute
   ApiE2eOutboxRoute: typeof ApiE2eOutboxRoute
   ApiExportBuildersRoute: typeof ApiExportBuildersRoute
   ApiFeedsSearchIdRoute: typeof ApiFeedsSearchIdRoute
@@ -4321,6 +4334,13 @@ declare module '@tanstack/react-router' {
       path: '/api/e2e/outbox'
       fullPath: '/api/e2e/outbox'
       preLoaderRoute: typeof ApiE2eOutboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/e2e/billing-provider': {
+      id: '/api/e2e/billing-provider'
+      path: '/api/e2e/billing-provider'
+      fullPath: '/api/e2e/billing-provider'
+      preLoaderRoute: typeof ApiE2eBillingProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/dashboard/stats': {
@@ -6173,6 +6193,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCalendarNotificationsRoute: ApiCalendarNotificationsRoute,
   ApiChangelogSlugRoute: ApiChangelogSlugRoute,
   ApiDashboardStatsRoute: ApiDashboardStatsRoute,
+  ApiE2eBillingProviderRoute: ApiE2eBillingProviderRoute,
   ApiE2eOutboxRoute: ApiE2eOutboxRoute,
   ApiExportBuildersRoute: ApiExportBuildersRoute,
   ApiFeedsSearchIdRoute: ApiFeedsSearchIdRoute,

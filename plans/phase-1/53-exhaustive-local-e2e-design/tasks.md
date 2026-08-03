@@ -218,13 +218,90 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 239 passed, 3 skipped, 19.6s.
 
-- [ ] **Billing API E2E: checkout, status, portal, subscription change/cancel/preview, credits, auto-recharge through the deterministic fake provider**
+- [x] **Billing API E2E: checkout, status, portal, subscription change/cancel/preview, credits, auto-recharge through the deterministic fake provider**
   - Files: `tests/e2e/api/billing-checkout.spec.ts` (new), `tests/e2e/api/billing-subscription.spec.ts` (new), `tests/e2e/api/billing-credits.spec.ts` (new), `tests/e2e/api/billing-portal.spec.ts` (new), `tests/e2e/api/billing-auto-recharge.spec.ts` (new), `src/shared/lib/billing/stripe-provider.ts` (only if task 1's `getBillingProviderForTesting` seam is missing)
   - Do: Install the `FakeBillingProvider` from the harness on every test. For every scenario in `FakeBillingProvider`'s `BillingScenario` union (`success | decline | timeout | delayed | sca_required | out_of_order`), drive the corresponding route and assert the response: `POST /api/billing/checkout/subscription` with `scenario=success` returns the session URL and creates one `billing_checkout_attempts` row; `decline`/`timeout` → 502 with `code: provider_error` and **no** `billing_checkout_attempts` row written; `delayed` returns `{status: 'open'}` and the harness's `settleCheckoutSession` flip → `status: 'complete'` triggers the `checkout.session.completed` webhook (task 5) and the row's `subscription_id` is populated; `sca_required` returns `{status: 'open', requiresAction: true}` and never resolves to `complete` without an explicit `settleCheckoutSession` call. Cover `POST /api/billing/checkout/credits` symmetrically with `success`/`decline`/`timeout`/`delayed`. Cover `GET /api/billing/checkout/status/$id` returning the same DTO schema for `pending|open|complete|failed` states. Cover `POST /api/billing/portal` with `invalid_url` (returns 400 with `code: invalid_url`), `no_customer` (404 with `code: no_customer`), and `success` (returns the fake-provider URL). For `POST /api/billing/subscription/change`, exercise `preview → change` (assert `previewSubscriptionChange` and `changeSubscription` are called with the same `idempotencyKey` and the second call returns the cached result), `sca_required` change (the subscription lands in `incomplete` and the response's `status` is `incomplete`, matching `fake-provider.ts`'s comment); `decline`/`timeout` → 502 with no DB write. `POST /api/billing/subscription/cancel` with `atPeriodEnd: true` (response status remains `active`, `cancelAtPeriodEnd: true`) and `atPeriodEnd: false` (`status: 'canceled'`). `POST /api/billing/subscription/preview` with a `fingerprint` mismatch (the route's anti-stale-preview guard) → 409. `POST /api/billing/auto-recharge` with a body that exceeds the rate card's `MAX_AUTO_RECHARGE_AMOUNT_CENTS` → 422 with the documented error code. For every route, additionally assert: anonymous → 401, member role in a free org → 403 (the `billing:mutate` permission gate), admin role in a free org → 403 (only owner can mutate billing — matches `permissions.ts`'s `rolePermissionTable`), tenant A principal using tenant B's `subscriptionId`/`customerId` → 404 (not 403 — confirm the tenant catch is via `withTenantContext` and that the second tenant's row is never leaked via timing-attack on the response body).
   - Verify (RED): `pnpm test:e2e tests/e2e/api/billing-*.spec.ts` — fails RED on file absence. The 5 files together cover 7 routes × 6 provider scenarios × 4 principals = ~170 assertions; the harness's `withFakeBillingProvider()` fixture scopes the in-memory provider state per test so concurrent scenarios don't bleed.
   - Independent boundary: this task owns **only** the five `tests/e2e/api/billing-*` files. The fake provider itself is read-only here; if a real bug is found in `fake-provider.ts` (e.g. a scenario that doesn't match the comment), capture as a fixme and a separate task.
 
-  **Credit-pack checkout is done: `tests/e2e/api/billing-checkout-scenarios.spec.ts` — 7 passing, one file.**
+  **Closed 2026-08-03. 83 passing across seven files, and it found a defect that made the entire owner-facing
+  subscription surface unusable in production.**
+
+  ### The defect, because it is the reason this task existed
+
+  `POST /api/billing/subscription/change` and `/cancel` answered **500 `permission denied for table
+  billing_subscriptions`** to every owner. `builderhunt_app` holds SELECT only on that table — drizzle/0028
+  deliberately keeps the provider mirror and the credit ledger writable by the worker alone, so that no request
+  path can ever declare an organization paid — but both routes ran their writes under `withTenantContext`.
+
+  Three writes were affected: `applyImmediateSubscriptionChange` (upgrade), `scheduleBillingSubscriptionChange`
+  (downgrade), `markBillingSubscriptionCancelAtPeriodEnd` (cancel). Between them that is every plan change an
+  owner can make. A mid-period upgrade would have failed twice over, since `grantCredits` writes
+  `billing_credit_grants` and `billing_ledger_entries`, on which the app role is also SELECT-only.
+
+  **The unit suite could not have caught it.** `tests/unit/shared/lib/billing/subscription-changes.test.ts`
+  covers these paths thoroughly and passes — it connects as the migration superuser, which bypasses grants and
+  RLS entirely. This is the third defect in this repo to hide behind that, and it is the argument for the whole
+  E2E layer in one line.
+
+  **The fix is the codebase's own pattern, not a new grant:** authorize the caller fully at the route
+  (`requireTenantPrincipal` + `requireBillingPermission`), then run the privileged work inside
+  `withWorkerOrganization`, whose `set_config('app.organization_id', …)` keeps every worker RLS policy scoping
+  rows to that one organization. `organizations/deletion.ts` already cancels a subscription exactly this way,
+  for a strictly more dangerous operation. Widening the app role's grant would have handed the whole request
+  surface write access to the money tables in order to fix two routes.
+
+  ### The fixture gap, which had two tests passing for the wrong reason
+
+  `seedActiveSubscription` wrote our rows with an invented `stripe_subscription_id` that the in-memory fake
+  provider had never heard of, so `preview` and `cancel` 500'd at the provider lookup. The declined-change test
+  asserted `>= 400`, which a 500 satisfies — so it passed while proving nothing about declines, and both tests
+  sat `fixme`. The seed now also tells the provider through `POST /api/e2e/billing-provider`, an E2E-only seam
+  gated the same way as `api/e2e/outbox.ts`. It seeds via `changeSubscription` — the one provider method that
+  already materializes an unknown subscription — so no new fake-provider surface exists, and the unit suite
+  seeds the same provider the same way.
+
+  ### Four drifts between this task's text and the code
+
+  Recorded rather than coded around; the tests follow the code, since a test written to wrong task text just
+  produces a useless red:
+
+  1. `POST /api/billing/auto-recharge` — the route is **GET/PUT**. There is no POST.
+  2. An over-cap amount answers **400 `invalid_monthly_cap`**, not 422, and the ceiling is
+     `ROLLING_RISK_MAX_AMOUNT_CENTS` (100 000 cents), not `MAX_AUTO_RECHARGE_AMOUNT_CENTS`. Sharing the constant
+     with the rolling pack-charge limit is deliberate: a cap above the risk ceiling would be a promise the
+     charge path could not keep.
+  3. `GET /api/billing/checkout/status/$id` has no `$id`. The route ignores every query parameter, and that is
+     the point — the customer's own browser returns to that URL, so `?status=success` must mean nothing.
+  4. `POST /api/billing/subscription/preview` does not take a fingerprint. It accepts `{newCatalogKey}` only;
+     the stale-preview guard lives on `change`, and is asserted there with a forged fingerprint.
+
+  ### One asymmetry pinned rather than assumed
+
+  A successful change moves `billing_subscriptions.catalog_key` and grants the proration credits, but
+  deliberately does **not** move `organization_entitlements`. Only `projectSubscriptionEntitlement` writes that
+  table, and its only callers are the three webhook handlers, because Stripe is authoritative for the fields a
+  projection needs. The test asserts the entitlement stays put, so a future change that starts writing it from
+  the request path fails there and has to argue for itself instead of quietly becoming a second writer that can
+  disagree with the webhook.
+
+  ### The files
+
+  - `billing-authorization.spec.ts` — the anonymous floor across all 15 billing routes, plus a
+    filesystem-versus-table check so a new billing endpoint with no authorization probe fails here.
+  - `billing-checkout-scenarios.spec.ts` — credit-pack checkout, all six provider scenarios.
+  - `billing-subscription-scenarios.spec.ts` — subscription checkout.
+  - `billing-subscription-change-scenarios.spec.ts` — preview, the stale-fingerprint 409, decline/timeout as
+    402 `payment_failed`, `sca_required` as 402 `requires_action`, the applied upgrade and its replay, and both
+    cancel paths.
+  - `billing-portal-and-auto-recharge.spec.ts` — the Portal's off-origin refusal (`invalid_url`, distinguished
+    from a schema failure by its code), `no_customer`, owner-only enforcement; auto-recharge off by default,
+    the cap ceiling, the off-session consent literal, enable/disable with a recorded consent version; and the
+    checkout status ignoring forged parameters.
+  - `billing-scenario-channel.spec.ts`, `billing-worker-replay.spec.ts` — the Redis scenario channel and
+    webhook replay.
+
+  **Credit-pack checkout was done first: `tests/e2e/api/billing-checkout-scenarios.spec.ts` — 7 passing, one file.**
 
   All six scenarios against **one** server, which the cross-process channel made possible; the five-file split
   this task assumed no longer applies to it. Each scenario is a distinct way a payment provider fails a
@@ -814,7 +891,7 @@
 
   Two consecutive clean runs of `tests/e2e/api/` at `--workers=6`: 304 passed, 6 skipped.
 
-- [ ] **Serialize concurrent invitation creation** — found by the race matrix, needs a schema decision
+- [x] **Serialize concurrent invitation creation** — done 2026-08-03, with the negative control recorded
   - Files: `src/shared/lib/auth/organization-lifecycle.ts`, a new migration
   - Do: make "one pending invitation per (organization, email)" an invariant the database enforces, rather than
     a check the handler performs. A partial unique index on pending rows is the smaller change; an advisory
@@ -822,6 +899,34 @@
     Whichever is chosen, the duplicate must be refused or absorbed — never counted against seats.
   - Verify: un-`fixme` the invitation race in `tests/e2e/api/concurrency-idempotency.spec.ts`; it must report
     exactly one pending row across six concurrent requests, twice consecutively.
+  **Landed 2026-08-03 as `drizzle/0140_invitation_race_and_security_audit.sql`.** The partial unique index the
+  note below settled on is what shipped:
+
+  ```sql
+  create unique index organization_invitations_one_pending_unique
+    on organization_invitations (organization_id, email) where status = 'pending';
+  ```
+
+  Both items the note flagged as "decisions rather than typing" were taken:
+
+  1. **Existing duplicates are collapsed before the index is created**, in the same migration, and the *newest*
+     survives — resend rotates the id, so the older links are already dead. Cancelling them records what was
+     already true rather than losing anything.
+  2. **`inviteMember` absorbs the unique violation** — `isPendingInvitationConflict` matches SQLSTATE 23505 plus
+     the constraint name, and the loser of the race returns the winning invitation with no second email. A
+     constraint that turned a double-click into a 500 would have traded one bad outcome for another.
+
+  **Verified with a negative control, which is the part that matters.** The race test in
+  `concurrency-idempotency.spec.ts` is no longer `fixme` and reports exactly one pending row across six
+  concurrent requests. With the index commented out it reports **"Expected: 1 / Received: 4"** — so the test is
+  measuring the defect, not the absence of one.
+
+  The TTY blocker below was real. It was resolved by Edd running `drizzle-kit generate` interactively, but only
+  after repairing the snapshot chain it exposed: snapshot 0139 described 106 tables while the database had 124,
+  which is why the first generated migration was 439 lines re-creating tables that already existed.
+
+  *Original note, kept for its reasoning:*
+
   - **Attempted 2026-08-03 and backed out, with the design settled.** The intended change is a *partial* unique
     index — `unique (organization_id, email) where status = 'pending'`. Partial rather than total because the
     history matters: an organization can legitimately hold many `accepted` or `cancelled` invitations for the
@@ -927,8 +1032,27 @@
 
   Two consecutive clean runs of all three journey specs: 36 passed, 1 skipped.
 
-- [ ] **Coverage manifest, CI wiring, and the two consecutive clean runs gate** — manifest done and measuring;
-  CI wiring deliberately not switched on yet
+- [x] **Coverage manifest, CI wiring, and the two consecutive clean runs gate** — closed 2026-08-03: the 34 are
+  dispositioned and the gate is on
+
+  **Final measurement, 2026-08-03: 202 covered, 1 exempt, 0 missing of 203 routes.** The gate runs in CI
+  (`.github/workflows/quality.yml`, `pnpm test:e2e:coverage`) and in `pnpm ci:local`. It was turned on only once
+  it was green, which was the whole plan — see the note below on why a gate that is red on arrival gets disabled
+  rather than satisfied.
+
+  The one exemption is written down rather than assumed, and `pnpm test:e2e:repeat` supplies the
+  two-consecutive-clean-runs behaviour the original task text asked for.
+
+  Two corrections found while closing it, both in the measuring instrument rather than the product:
+
+  - `routePathFor` derived route paths from **filenames**, so every dotted path was mis-resolved and the script
+    reported gaps that did not exist and missed routes that did. It now reads the literal argument to
+    `createFileRoute`, which is the only authoritative statement of a route's path.
+  - The count above moved from 202 to 203 routes because closing the billing task added
+    `POST /api/e2e/billing-provider`, an E2E-only seam. A new route arriving as `missing` until someone
+    disposes of it is exactly the behaviour the manifest was built for.
+
+  *Original note, kept because the ordering argument is the reusable part:*
 
   **The manifest exists and works: `scripts/check-e2e-route-coverage.mjs` + `tests/e2e/_coverage/manifest.json`,
   wired as `pnpm test:e2e:coverage`.** First measurement, 2026-08-02: **168 of 202 API routes covered, 34
