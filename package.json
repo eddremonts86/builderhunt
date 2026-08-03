@@ -76,7 +76,7 @@
     "@fullcalendar/interaction": "^6.1.21",
     "@fullcalendar/list": "^6.1.21",
     "@fullcalendar/react": "^6.1.21",
-    "@fullcalendar/rrule": "^6.1.21",
+    "@fullcalendar/rrule": "^7.0.2",
     "@fullcalendar/timegrid": "^6.1.21",
     "@js-temporal/polyfill": "^0.5.1",
     "@radix-ui/react-checkbox": "^1.3.8",
