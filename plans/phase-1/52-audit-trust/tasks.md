@@ -57,7 +57,7 @@
   - Scope decision: enforcement covers every surface spec.md names by name. It does **not** additionally cascade-delete the canonical `organization_builders`/`builder_identities` rows security-and-multitenancy's still-in-progress dual-write migration is populating in parallel with the legacy `builders` table — doing so would need new DELETE grants/RLS policies on tables owned by that separate, currently-mid-cutover plan (`organization_builders` has a `RESTRICT` FK to `builder_identities`, so a full purge needs a cross-org sweep there too before the identity row itself can go). `listRecentOrganizationBuilders`/`listOrganizationBuilders` (the `/api/builders/recent` and `/api/export/builders` routes) already read-time filter through `filterSuppressed`, so a suppressed identity is invisible on every currently-shipped surface even though its canonical-table row isn't cascade-deleted yet. Revisit once security-and-multitenancy's task 17/18 canonical cutover lands.
   - Verify: `pnpm vitest run tests/unit/lib/search.test.ts` and the full suite — all passing; `tsc --noEmit` clean across every touched file.
 
-- [ ] **Add trust runtime gates and redacted metrics** — not attempted
+- [x] **Add trust runtime gates and redacted metrics** — done 2026-08-03
   - Files: `src/routes/api/admin/metrics/index.ts`, `src/shared/lib/repositories/profile-removal.ts`,
     `tests/unit/security/profile-removal-metrics-redaction.test.ts` (new)
   - Do: Expose removal-request counts by state and by source on the admin metrics endpoint, carrying
@@ -67,6 +67,31 @@
   - Verify: `pnpm vitest run tests/unit/security/profile-removal-metrics-redaction.test.ts` asserts
     the payload contains counts and no field that could identify a requester, and that the block is
     absent when the flag is off. `pnpm security:route-coverage` still passes.
+
+  **Done 2026-08-03.** `getRemovalRequestMetrics` in `src/shared/lib/repositories/profile-removal.ts` returns
+  `byStatus`, `bySource` and `total` — nothing else. `src/routes/api/admin/metrics/index.ts` includes the block
+  only when `PROFILE_REMOVAL_ENABLED === 'true'`.
+
+  **Absent, not zero, while the feature is off.** With removals disabled nobody can file one, so an all-zeros
+  block would be a lie of implication: a dashboard would render "0 pending" and an operator would conclude the
+  queue is empty rather than that the door is shut. Omitting the key is the only answer that cannot be misread.
+
+  **What is deliberately missing, each for its own reason.** No requester identity *including the hashed email*
+  — a hash is not anonymous, it is a join key: two systems holding the same hash can be correlated, and an
+  operator with a candidate address can confirm a match by hashing it themselves. No profile URL or source id,
+  because that pair identifies the person as precisely as a name. No free-text reason: people explain themselves
+  in those fields, often about harassment or safety, and that text has exactly one legitimate reader — whoever
+  processes the request. No per-request timestamps, since a `createdAt` plus a source narrows a request to one
+  person on a quiet day.
+
+  **The test is written as a denial, not a confirmation.** It seeds a row where every field is a recognisable
+  canary and requires that none appears anywhere in the serialized payload. A test listing the fields it expects
+  would pass forever while a future column joined the aggregate by accident; a test listing the values that must
+  never appear fails the moment one does, whatever it is called and however deeply nested. A companion assertion
+  pins the *shape* — exactly three keys — so a new field cannot be published without someone deciding it is safe.
+
+  Verified: 4 tests pass; `security:route-coverage` valid (202 routes); `tests/unit/security` and
+  `tests/unit/routes/api/admin` together 490 passed; tsc 0, eslint 0.
 
 Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
 on 2026-07-29, deliberately not as a checkbox: the maintainer's decision on `PROFILE_REMOVAL_ENABLED`. It waits on a live

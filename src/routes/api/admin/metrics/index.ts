@@ -4,6 +4,8 @@ import { evaluateBillingAlerts, getBillingOperationsMetrics } from '~/shared/lib
 import { metrics } from '~/shared/lib/metrics'
 import { getOnboardingActivationMetrics, getPlatformAccountMetrics } from '~/shared/lib/repositories/platform-billing'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
+import { env } from '~/shared/lib/env'
+import { getRemovalRequestMetrics } from '~/shared/lib/repositories/profile-removal'
 
 export const Route = createFileRoute('/api/admin/metrics/')({
   component: () => null,
@@ -26,6 +28,18 @@ export const Route = createFileRoute('/api/admin/metrics/')({
           const discovery = await getDiscoveryState().catch(() => null)
           const billingMetrics = await getBillingOperationsMetrics()
 
+          /**
+           * Absent, not zero, while the feature is off.
+           *
+           * `PROFILE_REMOVAL_ENABLED === 'false'` means no one can file a removal request, so a `removals`
+           * block reading all-zeros would be a lie of implication: a dashboard would render "0 pending" and an
+           * operator would conclude the queue is empty rather than that the door is shut. Omitting the key is
+           * the only answer that cannot be misread.
+           */
+          const removals = env.PROFILE_REMOVAL_ENABLED === 'true'
+            ? await getRemovalRequestMetrics().catch(() => null)
+            : null
+
           const activationRate7d = accountMetrics.newUsersLast7d > 0
             ? onboardingMetrics.onboardingCompletedLast7d / accountMetrics.newUsersLast7d
             : null
@@ -41,6 +55,9 @@ export const Route = createFileRoute('/api/admin/metrics/')({
               totalBuilders: null,
               totalNotes: null,
             },
+            // plans/phase-1/52-audit-trust §"Add trust runtime gates and redacted metrics" — counts and
+            // states only. See `getRemovalRequestMetrics` for what is deliberately absent and why.
+            ...(removals ? { removals } : {}),
             discovery: discovery && {
               cursor: discovery.cursor,
               lastCellKey: discovery.lastCellKey,

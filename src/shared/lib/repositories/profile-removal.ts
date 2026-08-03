@@ -303,3 +303,63 @@ export async function deleteBuildersAcrossOrganizations(
   }
   return deleted
 }
+
+/**
+ * Counts of removal requests, grouped by state and by source. Nothing else.
+ *
+ * ## What is deliberately absent, and why each one
+ *
+ * A removal request is someone asking not to be in a product. The request itself is therefore *more* sensitive
+ * than the profile it concerns — it reveals that a specific person objects to being indexed, which is exactly
+ * the kind of fact an operator has no business browsing. So this returns numbers, and the omissions are the
+ * design:
+ *
+ * - **No requester identity, not even the hashed email.** A hash is still a join key: two dashboards holding
+ *   the same hash can be correlated, and an operator with a candidate address can confirm a match by hashing
+ *   it. Counts cannot be correlated with anything.
+ * - **No profile URL or source id.** The pair identifies the person as precisely as a name would.
+ * - **No free-text reason.** People explain themselves in these fields, sometimes at length and often about
+ *   harassment or safety. That text has one legitimate reader — whoever processes the request — and a metrics
+ *   endpoint is not it.
+ * - **No timestamps per request.** A `createdAt` plus a source narrows a request to one person on a quiet day.
+ *
+ * What remains is enough to answer the only operational questions a dashboard should ask: is the queue growing,
+ * and is one source producing most of it.
+ */
+export interface RemovalRequestMetrics {
+  byStatus: Record<RemovalRequestStatus, number>
+  bySource: Array<{ source: string; count: number }>
+  total: number
+}
+
+export async function getRemovalRequestMetrics(
+  db: PostgresJsDatabase<Record<string, never>> = publicDb,
+): Promise<RemovalRequestMetrics> {
+  const [statusRows, sourceRows] = await Promise.all([
+    db.execute<{ status: string; count: string }>(
+      sql`select status, count(*)::text as count from profile_removal_requests group by status`,
+    ),
+    db.execute<{ source: string; count: string }>(
+      sql`select source, count(*)::text as count from profile_removal_requests group by source order by 2 desc`,
+    ),
+  ])
+
+  // Every status is present with a zero rather than omitted. A missing key reads as "no data" and invites a
+  // dashboard to render a gap where the honest answer is "none yet".
+  const byStatus: Record<RemovalRequestStatus, number> = {
+    pending: 0,
+    verified: 0,
+    rejected: 0,
+    expired: 0,
+  }
+  for (const row of statusRows as unknown as Array<{ status: string; count: string }>) {
+    if (row.status in byStatus) byStatus[row.status as RemovalRequestStatus] = Number(row.count)
+  }
+
+  const bySource = (sourceRows as unknown as Array<{ source: string; count: string }>).map((row) => ({
+    source: row.source,
+    count: Number(row.count),
+  }))
+
+  return { byStatus, bySource, total: Object.values(byStatus).reduce((sum, count) => sum + count, 0) }
+}
