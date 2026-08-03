@@ -484,6 +484,26 @@
     Whichever is chosen, the duplicate must be refused or absorbed — never counted against seats.
   - Verify: un-`fixme` the invitation race in `tests/e2e/api/concurrency-idempotency.spec.ts`; it must report
     exactly one pending row across six concurrent requests, twice consecutively.
+  - **Attempted 2026-08-03 and backed out, with the design settled.** The intended change is a *partial* unique
+    index — `unique (organization_id, email) where status = 'pending'`. Partial rather than total because the
+    history matters: an organization can legitimately hold many `accepted` or `cancelled` invitations for the
+    same address over time, and only the live one is unique.
+
+    It is backed out because **`pnpm exec drizzle-kit generate` cannot be run here.** It opens an interactive
+    prompt (`Interactive prompts require a TTY terminal`), and under a pty it hangs waiting for an answer this
+    session cannot give. Hand-writing the SQL is not a workaround: drizzle hashes migration content against
+    `drizzle/meta/*_snapshot.json`, so a migration written without its matching snapshot fails
+    `drizzle-kit check` — which `ci:local` runs — and a wrong migration on this repo is fatal in production.
+
+    So the schema edit was reverted rather than left half-applied. **Two things are needed beyond the index,
+    and both are decisions rather than typing:**
+    1. Existing duplicates must be collapsed *before* the index is created, or the migration fails on any
+       database that already has them. Which duplicate survives is a product decision — probably the newest,
+       since resend rotates the id and the older links are already dead.
+    2. `inviteMember` must absorb the unique violation and return the existing invitation instead of surfacing a
+       500. A constraint that turns a double-click into an error page trades one bad outcome for another.
+
+    Run `pnpm exec drizzle-kit generate` interactively, answer its prompt, and the rest is the two items above.
 
 - [x] **Browser E2E: organizations + invitations + privacy + account user-visible journeys**
   - Files: `tests/e2e/organizations-and-invitations.spec.ts` (new), `tests/e2e/privacy-and-account.spec.ts` (new), `src/modules/dashboard/components/TeamSettingsPage.tsx` (verification only; add `data-testid` only where existing semantics are insufficient), `src/routes/_dashboard/settings/team.tsx` (verification only)
