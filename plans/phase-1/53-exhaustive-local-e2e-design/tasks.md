@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 13 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 12 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 188 covered, 1 exempt, 13 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 189 covered, 1 exempt, 12 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -542,8 +542,31 @@
       mean no card in the payload, which would otherwise be a leak with a clean-looking body — and recorded that
       reaching the masked branch needs a customer created *through* a checkout flow, which belongs to the billing
       specs. The key-set assertion is kept so it starts working the moment such a fixture exists.
-  - Remaining clusters: ai (3), solutions (3), calendar (2), plus `builders/claim/verify`, `builders/recent`,
-    `fingerprint/match`, `interviews/shared`, `sprints/preview`.
+  - **Done: `calendar/availability/overrides`** (`tests/e2e/api/calendar-availability-overrides.spec.ts`, 8 passing).
+    The route's doc stakes its correctness on an optimistic-concurrency claim — both verbs route through the same
+    versioned write as a full PUT, because "a bare insert or delete would leave the version untouched, so a client
+    holding the previous version would keep believing its copy was current". That is invisible in review: a bare
+    insert and a versioned write both return the saved override, and only the version number separates them.
+    - Asserted in both halves: adding *and* deleting an override advance the version, and a stale version is refused
+      with `409 state_changed` while changing nothing. The failure being guarded is not a crash — it is two people
+      editing one availability policy where the second silently discards the first.
+    - Also: one override per local date replaces rather than duplicates (documented, since "blocked all day" and
+      "available 14:00–16:00" cannot both hold), and the `.strict()` body rejects an unknown field.
+    - **The negative control found a defect in my own test first.** Run alone with `--grep`, the stale-version test
+      failed on its own precondition rather than on the 409: it relied on an earlier test in the file having written,
+      so the initial policy's version 1 made `version - 1` zero. It now seeds its own write, and the control then
+      lands where it should — removing the conflict throw makes the test fail on the 409 assertion. A test that only
+      works as part of a sequence misleads whoever runs it alone.
+    - Fixture fact recorded in the spec: `availabilityOverrideInputSchema` is `.strict()` and cross-validated —
+      `blocked` requires both times null, `available` requires `localEnd > localStart`, and `timeZone` is required.
+      An invented `{ blocked: true }` shape returns a 400 listing five field errors.
+  - **`calendar/notifications` is still open, with a reason.** Its feed reads `calendar_notification_deliveries`,
+    whose `anchor_check` requires every row to hang off an event or an invitation, so seeding one needs a calendar
+    event first. Worth doing next in the same file, together with the two properties that route actually claims: an
+    unowned notification id comes back unmarked and indistinguishable from a nonexistent one, and a forged keyset
+    cursor can only move the caller's own window.
+  - Remaining clusters: ai (3), solutions (3), `calendar/notifications`, plus `builders/claim/verify`,
+    `builders/recent`, `fingerprint/match`, `interviews/shared`, `sprints/preview`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 

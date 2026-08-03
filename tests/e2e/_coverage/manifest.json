@@ -698,13 +698,17 @@
     "/api/calendar/availability": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/calendar-availability-overrides.spec.ts",
         "tests/e2e/calendar.spec.ts",
         "tests/e2e/scheduling-reschedule.spec.ts",
         "tests/e2e/scheduling.spec.ts"
       ]
     },
     "/api/calendar/availability/overrides": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/calendar-availability-overrides.spec.ts"
+      ]
     },
     "/api/calendar/events/$eventId": {
       "status": "covered",
