@@ -380,14 +380,84 @@ And one uncomfortable conclusion worth keeping visible: **their moat is content,
 above address distribution, and pretending otherwise would be the same self-deception the plans were
 written to avoid.
 
-**Outstanding from this pass**: `spec.md` and `plan.md` were updated for both career plans; the two
-`tasks.md` files were **not**. The 547 open-task count above is therefore stale in the other direction
-— the new Fase 4b (hygiene registry, keyword matcher, parse-fidelity loop with per-template golden
-tests), the CSV/XLSX import in `delegated`'s Fase 1, the `metricPlaceholder` node with its DDL check,
-the five new `career_facts.fact_type` values, and the evaluation-corpus fixtures all need task
-breakdowns before anyone implements them. That is a separate, mechanical pass and it should not be done
-by guessing: each task in those files carries exact `Files:` lists and gate commands, and inventing
-those would be worse than leaving the gap visible.
+### Enforcement audit, same pass
+
+The risk tables were then audited by enforcement strength, because "every risk has a mitigation" says
+nothing about whether the mitigation holds. The ladder used: **L1** a DDL constraint makes the bad state
+impossible · **L2** a CI gate fails the build · **L3** a runtime assertion throws · **L4** the protection
+is that something doesn't exist · **L5** prose a PR author can ignore.
+
+| Level | Before | After |
+| --- | ---: | ---: |
+| L1 — DDL | 17 | 17 |
+| L2 — CI gate | 11 | 15 |
+| L3 — runtime | 3 | 4 |
+| L4 — design | 3 | **0** |
+| L5 — prose only | 5 | **0** |
+
+The audit also found **eleven mitigations that claimed a mechanism the specs never specified**, two of
+them introduced by this pass. Both classes are now fixed or honestly downgraded. The ones worth knowing
+about, because they were silent:
+
+- `delegated` risk 7 claimed "tenant AND owner in all seven tables" — false for `builderhunt_worker`,
+  whose policies are tenant-only. The conjunction holds for `builderhunt_app`; what actually protects
+  the worker path is `assertCareerOrganizationIsPersonal`, a runtime assertion.
+- The cover letter has **two** truth layers where the CV has four: `cover_letter_fact_ids` is a bare
+  `jsonb` with no FK and no link table, which **breaks published contract #7** of the sibling spec. Not
+  fixed in this pass — it needs a new table and changes the declared "seven tables" count.
+- The `getCached`/`setCached` prohibition (cross-tenant CV leak, rated *critical*) had **no enforcement
+  of any kind**: prose in the spec, and `getCached` still exported with an organisation-free key. Now a
+  boundary rule.
+- The PDF renderer hardening had **no test at all**. Deleting `javaScriptEnabled: false` broke nothing —
+  the PDF still rendered and still passed text extraction. Now a pure options module with three gates.
+- My own `metricPlaceholder` export-blocking CHECK was a **no-op**: the node was never wired into
+  `resumeContentSchema`, so the counter could never be non-zero. Now a discriminated union.
+- Two of my own "Con gate" claims were prose in future tense — the exact sin they claimed to correct.
+  Now named scripts (`test:e2e:career-free-path`, `test:e2e:applications-free-path`) wired into specific
+  phase exit criteria.
+
+**Outstanding, and it is the real gap**: `spec.md` and `plan.md` were updated for both career plans;
+the two `tasks.md` files were **not**, and this repo has `scripts/check-plan-tasks.mjs` precisely
+because a plan is meant to be executable literally. Nothing currently creates:
+
+- `src/shared/lib/resumes/render-options.ts` and its three gates
+- the four new rules in `check-tenant-boundaries.mjs`, plus `CAREER_DOMAIN_GLOBS`
+- `scripts/check-forbidden-claims.mjs` and its wiring into `scripts/ci/local-quality.sh`
+- `scripts/baselines/career-identifiers.json`
+- `pnpm test:e2e:career-free-path` / `pnpm test:e2e:applications-free-path`
+- `src/modules/applications/ui/fit-band.tsx` and its component test
+- Fase 4b in full (hygiene registry, keyword matcher, parse-fidelity loop, per-template golden tests)
+- the CSV/XLSX import in `delegated`'s Fase 1
+- the `metricPlaceholder` node, the `unresolved_placeholder_count` column, and the changed
+  `validateResumeTruth` return contract
+- the five new `career_facts.fact_type` values
+- the evaluation-corpus fixtures
+
+Worse, one existing task is now actively wrong: `delegated`'s `tasks.md` has a task titled **"Activar
+las dos guardas mecánicas de frontera"** while its spec now specifies six.
+
+**Closed 2026-08-03**: both `tasks.md` files were brought in line. Everything on that list now has a
+task with a real `Files:` set and a `Verify:` command — **+17 tasks** (`ai-cv` 61 → 75, `delegated`
+57 → 60), including a new **Fase 4b** section, the CSV import, the boundary rules with their baseline,
+the free-path scripts, `<FitBand>`, and `application_kit_claim_facts`.
+
+While doing it, two more real defects surfaced and were fixed:
+
+- The two plans **contradicted each other on cache usage**. This spec banned `getCached`/`setCached`
+  outright while `delegated`'s own task calls `getCached` with an explicit `tenantAiCacheKey` — which is
+  the *safe* form. The rule now bans the direct **import** inside the career domain and routes it through
+  a four-line wrapper, because a grep cannot reliably tell the safe call from the unsafe one. The
+  sibling's legitimate use is untouched.
+- The cover letter's new `restrict` FK to `career_facts` creates a **cross-plan delete ordering
+  dependency**: `career_facts` cannot be deleted until this domain has dropped its kits. That is now
+  written into the hard-delete task and its `checkLegalRunWorker` fixture, rather than being discovered
+  by an unremovable account in production.
+
+**On the task count in the header**: it says 547, and the real current total across the thirteen
+feature plans is **522**. The header figure was already stale before this pass — it appears to have
+included the 39 tasks of `postgres-18-upgrade`, which moved to phase-1 on 2026-07-28. Recounting the
+header is left as a separate correction, since it touches numbers claimed for plans this pass never
+opened.
 
 ## Repo defects found in passing
 

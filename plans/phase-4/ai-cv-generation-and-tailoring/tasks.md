@@ -20,7 +20,8 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
 
 - [ ] **Aprobar el contrato de verdad y la clasificación de datos de carrera**
   - Files: `docs/architecture/resume-truth-contract.md` (new), `docs/architecture/career-data-classification.md` (new), `docs/architecture/data-classification.md`, `docs/operations/external-services-register.md`
-  - Do: Escribir la taxonomía de los siete `fact_type`, la máquina de estados
+  - Do: Escribir la taxonomía de los **doce** `fact_type` (los siete originales más `award`,
+    `publication`, `volunteering`, `patent`, `course`), la máquina de estados
     `proposed → confirmed | rejected | superseded`, la definición operativa de "unsupported claim",
     las cuatro capas del mecanismo de veracidad (spec.md §Mecanismo de veracidad) y **la lista
     cerrada de campos que salen al proveedor**: `roleTitle`, `organizationName`, `startDate`,
@@ -41,7 +42,10 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     `check (claim_id ~ '^c[0-9a-f]{12}$')`), `canonicalResumeContentHash(content)` (sha256 de
     `canonicalJson`, reutilizando `canonicalJson` de `src/shared/lib/ai/cache.ts:25`),
     `factSetHash(factIds)` y las transiciones puras `canConfirmFact`, `canSupersedeFact`,
-    `nextExportState`.
+    `nextExportState`. `resumeContentSchema` usa una **unión discriminada por `kind`** entre
+    `resumeBulletSchema` (`kind: 'bullet'`) y `metricPlaceholderNodeSchema`
+    (`kind: 'metric_placeholder'`, con `template` obligado por regex a contener `{{metric}}`): sin la
+    unión ningún contenido válido puede llevar un placeholder y su `check` de export sería un no-op.
   - Verify: `pnpm type-check`.
 
 - [ ] **Testear los contratos**
@@ -51,7 +55,9 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     de arrays; `resumeContentSchema` **rechaza** un bullet con `factIds: []` y con `factIds`
     ausente; rechaza campos desconocidos (`.strict()`); acepta `summary: null`;
     `canConfirmFact('rejected')` es false; `nextExportState` nunca devuelve `'exportable'` con
-    `unsupportedClaimCount > 0`.
+    `unsupportedClaimCount > 0` **ni con `unresolvedPlaceholderCount > 0`**; un
+    `metric_placeholder` cuyo `template` ya no contiene `{{metric}}` (es decir, alguien metió la cifra
+    como texto libre) **no parsea**.
   - Verify: `pnpm test -- tests/unit/shared/lib/resumes/contracts.test.ts`.
 
 - [ ] **Construir el corpus de evaluación sanitizado**
@@ -96,11 +102,15 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
 
 - [ ] **Añadir las cuatro tablas de CV al schema**
   - Files: `src/shared/lib/db/schema.ts`
-  - Do: Según spec.md tablas 5–8. Puntos que no se pueden omitir: los tres checks de la puerta de
+  - Do: Según spec.md tablas 5–8. Puntos que no se pueden omitir: los **cuatro** checks de la puerta de
     verdad en `resume_versions`
     (`verification_status <> 'verified' or unsupported_claim_count = 0`,
     `(verification_status = 'verified') = (verified_at is not null)`,
-    `export_state <> 'exportable' or verification_status = 'verified'`);
+    `export_state <> 'exportable' or verification_status = 'verified'`,
+    `export_state <> 'exportable' or unresolved_placeholder_count = 0`);
+    la columna `unresolved_placeholder_count integer NOT NULL DEFAULT 0` con
+    `check (unresolved_placeholder_count >= 0)` — un hueco de métrica sin resolver **no** bloquea
+    `verified` (no es un claim sin respaldo) pero sí el export;
     `unique (organization_id, content_sha256, kind)`; la FK compuesta a
     `job_opportunity_versions(organization_id, id)` con `onDelete('restrict')` **marcada como
     condicional** — si `job-opportunities-workspace` aún no ha aterrizado, las dos columnas
@@ -273,6 +283,49 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
   - Verify: `pnpm test:api-isolation:local` — los siete casos pasan y ninguna comprobación existente
     regresa.
 
+- [ ] **Añadir las cuatro reglas de frontera del dominio de carrera**
+  - Files: `scripts/check-tenant-boundaries.mjs`, `scripts/baselines/career-identifiers.json` (new)
+  - Do: Definir `CAREER_DOMAIN_GLOBS` **una vez** y compartirlo entre las reglas 1 y 2, porque el riesgo
+    no vive sólo en las rutas sino en los repositorios, que son los que hablan con la BD y con la caché:
+    `src/**/{career,resumes}/**`, `src/routes/api/career/**`,
+    `src/shared/lib/repositories/career-*.ts`, `src/shared/lib/resumes/**`,
+    `src/shared/lib/auth/career-principal.ts`, `src/lib/resumes/**`.
+    **(1) Sin employer-side**: en ese alcance, prohibido importar `candidateDocuments`,
+    `candidateSubmissions`, `pipeline*`, `organizationBuilders` o cualquier tabla ATS, en forma
+    estática **y** dinámica (el patrón debe cubrir `import(...)`, que es el modo de fallo que este repo
+    ya documenta). **(2) Sin caché sin tenant**: prohibido el **import directo** de
+    `getCached`/`setCached`; el dominio pasa por el envoltorio
+    `src/shared/lib/resumes/ai-cache.ts` (new), que sólo acepta una clave construida con
+    `tenantAiCacheKey` y no un `taskId` suelto (la forma abreviada produce
+    `ai:cache:{taskId}:{hash}`, `src/shared/lib/ai/cache.ts:43`, **sin la organización**, y
+    compartiría un CV entre tenants). Se prohíbe el import y no la llamada porque un grep no
+    distingue con fiabilidad la forma segura de la insegura — y el uso legítimo con clave explícita
+    del plan hermano queda intacto. **(3) Sin renderer laxo**: bajo `src/**/resumes/**`, prohibidos
+    los literales `--no-sandbox` y
+    `javaScriptEnabled: true`. **(4) Prefijo de dominio**: en `schema.ts`, `tasks.ts`, `rate-cards.ts`
+    y `permissions.ts`, todo identificador exportado que **no** esté en
+    `scripts/baselines/career-identifiers.json` debe casar con `^(career|resume)`. El baseline se
+    genera al cerrar esta fase y se regenera con un flag explícito, de modo que regenerarlo sea visible
+    en el diff de un PR.
+  - Verify: `pnpm security:boundaries` verde; y cuatro comprobaciones negativas —un fichero de prueba
+    que importe `candidateDocuments` desde `src/shared/lib/repositories/career-resumes.ts` **falla**;
+    uno que llame `getCached` en `src/lib/resumes/` **falla**; uno con `--no-sandbox` bajo
+    `src/shared/lib/resumes/` **falla**; un export sin prefijo y ausente del baseline **falla**.
+
+- [ ] **Añadir el escáner de copia prohibida**
+  - Files: `scripts/check-forbidden-claims.mjs` (new), `scripts/ci/local-quality.sh`, `package.json`
+  - Do: Escanea `src/**`, los ficheros de copy y los prompts buscando las cifras desacreditadas de
+    spec.md §Copia prohibida: `/98[.,]4/`, `/\b6\s+(seconds|segundos)\b/`, `/ATS\s+score/i`, y `/75\s*%/`
+    **sólo cuando aparece a ≤ 60 caracteres de una palabra de rechazo** (`reject`, `rechaz`,
+    `auto-reject`, `filtrad`) — el `75 %` desnudo es legítimo en cualquier otro contexto y un patrón
+    ingenuo lo convertiría en ruido. Falla con fichero, línea y motivo. Allowlist: `plans/**` y
+    `docs/**`, que son donde se explica por qué están prohibidas. Añadirlo a
+    `scripts/ci/local-quality.sh`. **Gate compartido** con
+    [`delegated-job-applications`](../delegated-job-applications/spec.md): la lista vive en este plan y
+    aplica a los dos dominios; uno por plan se desincronizaría.
+  - Verify: `pnpm ci:local` lo ejecuta; un fichero de prueba con "75% of resumes are auto-rejected"
+    **falla**; uno con "75 % de conversión" **pasa**.
+
 ---
 
 ## Fase 3 — perfil profesional manual (entregable sin IA y sin upload)
@@ -339,6 +392,17 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     recargar y verificar el estado. Comprobar que el área de upload aparece deshabilitada **con su
     motivo visible**, no como un botón que falla.
   - Verify: `pnpm exec playwright test tests/e2e/career-profile.spec.ts`.
+
+- [ ] **Crear el script del camino gratuito**
+  - Files: `package.json`, `tests/e2e/career-free-path.spec.ts` (new), `scripts/ci/local-quality.sh`
+  - Do: `pnpm test:e2e:career-free-path` fija **los tres flags que definen el camino gratuito a la
+    vez** —`CANDIDATE_UPLOADS_ENABLED=false AI_DISABLED=true STRIPE_BILLING_ENABLED=false`— y recorre lo
+    que exista en esta fase: perfil, hechos, confirmación. Afirma que **ninguna ruta responde 500** y
+    que **ninguna acción ofrecida en la UI es imposible de completar**. Se amplía en las fases 4 y 4b.
+    Existe porque "el producto es entregable sin upload y sin billing" era una promesa de documento que
+    nadie ejecutaba, y `STRIPE_BILLING_ENABLED=false` **es el estado real de producción hoy**: esto no
+    prueba un caso degradado, prueba el camino principal.
+  - Verify: `pnpm test:e2e:career-free-path`; `pnpm ci:local` lo ejecuta.
 
 ---
 
@@ -462,6 +526,46 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     404; un CV en `draft` → 409; un `title` con `../../etc/passwd` produce un nombre de archivo
     saneado.
 
+- [ ] **Extraer las opciones de render a un módulo puro y afirmarlas**
+  - Files: `src/shared/lib/resumes/render-options.ts` (new), `tests/unit/shared/lib/resumes/render-options.test.ts` (new)
+  - Do: `buildResumeRenderOptions(): ResumeRenderOptions` **sin importar `playwright`** —devuelve datos,
+    no efectos: `{ launchArgs, contextOptions: { javaScriptEnabled: false }, abortAllRequests: true,
+    timeoutMs: 15_000, pdf: { preferCSSPageSize: true, displayHeaderFooter: false } }`. `renderResumePdf`
+    pasa a consumirlo en lugar de llevar las opciones en línea. `abortAllRequests` es un booleano y no
+    un callback **a propósito**: un flag se puede afirmar en un test unitario, un `page.route`
+    registrado dentro de Playwright no.
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/render-options.test.ts` — afirma
+    `contextOptions.javaScriptEnabled === false`, `abortAllRequests === true`, `timeoutMs === 15_000`,
+    y que `launchArgs` **no** contiene `--no-sandbox`.
+
+- [ ] **Afirmar la CSP y el escapado del HTML de render**
+  - Files: `tests/unit/lib/resumes/render-html.test.ts`
+  - Do: Ampliar el test del renderer HTML: el documento emitido contiene
+    `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; …">`, y un hecho cuyo
+    `detail` sea `<script>alert(1)</script>` o `<img src="http://evil/">` aparece **escapado** en la
+    salida, no interpretado.
+  - Verify: `pnpm test -- tests/unit/lib/resumes/render-html.test.ts`.
+
+- [ ] **Cambiar el contrato de `validateResumeTruth` para contar placeholders**
+  - Files: `src/shared/lib/resumes/truth.ts`, `tests/unit/shared/lib/resumes/truth.test.ts`, `src/shared/lib/repositories/career-resumes.ts`
+  - Do: El retorno pasa a
+    `{ claimCount, unsupportedClaimCount, unsupportedClaimIds, unresolvedPlaceholderCount, issues }`.
+    `unresolvedPlaceholderCount` cuenta los nodos `kind: 'metric_placeholder'` del `content`. El
+    repositorio persiste el valor en `resume_versions.unresolved_placeholder_count`. **Sin este campo
+    nadie escribe la columna y su `check` de export no protege nada.**
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/truth.test.ts` — **test de propiedad**: para
+    todo `content` generado, el recuento de nodos sin `factIds` coincide con `unsupportedClaimCount` y
+    el de nodos `metric_placeholder` con `unresolvedPlaceholderCount`.
+
+- [ ] **Recomputar la verdad en el camino de export**
+  - Files: `src/routes/api/career/resumes/$resumeId/export.ts`, `tests/unit/routes/career-resume-export.test.ts` (new)
+  - Do: Antes de renderizar, `GET …/export` vuelve a llamar a `validateResumeTruth` sobre el `content`
+    que va a servir y aborta con **`409 { error: 'verification_stale' }`** si el resultado no coincide
+    con las columnas persistidas. Es lo que convierte la deriva entre contador y contenido en un fallo
+    visible en producción y no sólo en el corpus (spec.md §Límite conocido de la puerta de verdad).
+  - Verify: `pnpm test -- tests/unit/routes/career-resume-export.test.ts` — una fila con
+    `unsupported_claim_count = 0` pero un `content` con un bullet sin `factIds` devuelve 409, no un PDF.
+
 - [ ] **E2E del primer CV descargable sin IA**
   - Files: `tests/e2e/career-resume-manual.spec.ts` (new)
   - Do: Con `AI_DISABLED=true`: perfil con 6 hechos confirmados → crear CV base determinista →
@@ -469,6 +573,97 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     mano → comprobar que el export queda bloqueado con el motivo → convertirlo en hecho → export
     desbloqueado.
   - Verify: `pnpm exec playwright test tests/e2e/career-resume-manual.spec.ts`.
+
+- [ ] **Añadir el script del camino gratuito y ampliarlo a la Fase 4**
+  - Files: `package.json`, `tests/e2e/career-free-path.spec.ts` (new), `scripts/ci/local-quality.sh`
+  - Do: `pnpm test:e2e:career-free-path` corre este spec con **los tres flags a la vez**:
+    `CANDIDATE_UPLOADS_ENABLED=false AI_DISABLED=true STRIPE_BILLING_ENABLED=false`. Recorre perfil →
+    hechos → CV base determinista → PDF + TXT, y afirma que **ninguna ruta responde 500** y que
+    **ninguna acción ofrecida en la UI es imposible de completar** con esa configuración. Añadirlo a
+    `scripts/ci/local-quality.sh`. Cubre a la vez el riesgo 10 (el foundation de documentos nunca se
+    implementa) y el 16 (el plan free queda muerto): son el mismo fallo visto desde dos flags, y
+    `STRIPE_BILLING_ENABLED=false` **es el estado real de producción hoy**.
+  - Verify: `pnpm test:e2e:career-free-path`; y `pnpm ci:local` lo ejecuta.
+
+---
+
+## Fase 4b — higiene estructural, keywords y fidelidad de parseo
+
+**Sigue sin IA, sin créditos y sin red.** Es el gancho de adquisición del producto y el único
+diferenciador medible frente al estado del arte (spec.md §Higiene estructural y fidelidad de parseo).
+
+**Nota de dependencia**: `measureParseFidelity` necesita un extractor de texto de PDF. `pdfjs-dist` ya
+aparece como dependencia de test en la Fase 4 (el `Verify` de `render-pdf.test.ts` extrae texto con él),
+así que **adelantar sólo el extractor** —sin storage, sin ClamAV, sin worker— no arrastra nada de la
+Fase 6. Ésa es la opción preferida frente a mover esta fase después de la 6.
+
+- [ ] **Escribir el registro de checks de higiene**
+  - Files: `src/shared/lib/resumes/hygiene.ts` (new), `tests/unit/shared/lib/resumes/hygiene.test.ts` (new)
+  - Do: `HYGIENE_RULESET_VERSION`, `hygieneFindingSchema` y `evaluateResumeHygiene(content, rendered)`.
+    El `anchor` lleva **`.refine()` que rechaza los cuatro campos nulos a la vez** con el mensaje
+    `anchor_required` — el invariante va en el esquema, no en una convención, porque un check nuevo que
+    no sepa anclar debe **no parsear**. Cuatro categorías (`parse | sections | content | tailoring`)
+    reportadas por separado con `passed / total`; **prohibido** sumarlas, promediarlas o derivar un
+    0–100. Los 15 `checkId` de la tabla del spec, cada uno con su severidad.
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/hygiene.test.ts` — un hallazgo con las cuatro
+    anclas nulas **no parsea**; `evaluateResumeHygiene` descarta el que se le cuele; la salida nunca
+    contiene un campo agregado de puntuación.
+
+- [ ] **Escribir el matcher de keywords determinista**
+  - Files: `src/shared/lib/resumes/keywords.ts` (new), `tests/unit/shared/lib/resumes/keywords.test.ts` (new)
+  - Do: `KEYWORD_MATCHER_VERSION` y `matchKeywords(jobText, facts)`. Normalización **limitada a**
+    minúsculas, colapso de espacios, normalización Unicode y guiones. **Sin stemming ni
+    lematización**: el matching de un ATS es literal, y normalizar de más le dice a la persona que
+    cumple un requisito que el sistema del empleador no reconocerá. Dos algoritmos: hard skills por
+    frase exacta; soft skills **nunca como lista**, sólo como evidencia dentro de un logro. Reglas de
+    emisión: acrónimos en doble forma, regla de tres colocaciones, cap de densidad de 2. El módulo
+    **jamás sugiere una keyword que ningún hecho confirmado respalde**.
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/keywords.test.ts` — afirma explícitamente los
+    **no-match**: `customer support` ≠ `customer service`, `project managing` ≠ `project management`;
+    una soft skill requerida no produce nunca una sugerencia de lista; un término que ningún hecho
+    respalda sale como hueco declarado, no como sugerencia.
+
+- [ ] **Cerrar el bucle de fidelidad de parseo**
+  - Files: `src/shared/lib/resumes/parse-fidelity.ts` (new), `src/lib/resumes/extract-pdf-text.ts` (new), `tests/unit/shared/lib/resumes/parse-fidelity.test.ts` (new)
+  - Do: `measureParseFidelity(contentDto, pdfBytes)` renderiza, **re-extrae nuestro propio PDF con
+    nuestro propio extractor** (`pdfjs-dist`, sólo el extractor: sin storage ni scanner) y compara
+    campo a campo contra el DTO. Devuelve `{ recovered, total, byField }` más los campos perdidos con
+    su `anchor`. Comprueba: contacto en los *text runs* del **cuerpo** (no en header/footer), cada
+    encabezado de sección literal y en orden, cada `headline`, cada `bullet.text` íntegro sin fusión
+    con el vecino, cada skill como **ítem discreto**, un solo formato de fecha, y que la secuencia
+    extraída coincida con la del DTO.
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/parse-fidelity.test.ts`.
+
+- [ ] **Construir los fixtures de fidelidad y los golden tests por template**
+  - Files: `tests/fixtures/career-resumes/*.json` (new), `tests/unit/lib/resumes/template-fidelity.test.ts` (new)
+  - Do: Los ocho fixtures del spec: el **par A/B** `plain-control` + `decorated` (mismo contenido, uno
+    sin decoración), `sidebar-sections`, `icon-only-datum`, `bare-minimum`, `contact-in-header`,
+    `mixed-dates`, `skills-in-prose`, y `render-fails-parse-succeeds`. Un golden test por template
+    built-in.
+  - Verify: `pnpm test -- tests/unit/lib/resumes/template-fidelity.test.ts` — **`recovered === total`
+    para `ats_plain` y `compact`**; el par A/B produce extracción **idéntica** (si difiere, la
+    decoración está comiendo datos); `contact-in-header` dispara `contact_in_body` como `blocker`;
+    `mixed-dates` dispara `date_format_single` y **no inventa un hueco de empleo**;
+    `render-fails-parse-succeeds` **pasa** — la aceptación afirma sobre extracción, nunca sobre render.
+
+- [ ] **Declarar las invariantes de template y el tercio superior**
+  - Files: `src/shared/lib/resumes/templates.ts`, `tests/unit/shared/lib/resumes/templates.test.ts` (new)
+  - Do: Cada entrada de `RESUME_TEMPLATES` declara `columns`, `contactInBody: true`,
+    `splitsSectionAcrossColumns: false`, `skillsAsDiscreteItems: true`, `rendersSkillLevelAsBar: false`
+    y `topThird: ['headline','summary','keyAchievements']`. Añadir `keyAchievements` como sección
+    **derivada**: una vista de 3–5 `career_facts` ya confirmados, colocada en el tercio superior; no
+    crea claims, así que cada línea sigue colgando de su `factId` original.
+  - Verify: `pnpm test -- tests/unit/shared/lib/resumes/templates.test.ts` — ningún template declara
+    `rendersSkillLevelAsBar: true`; todos declaran `contactInBody: true`; `keyAchievements` sólo
+    contiene `factId` presentes en el conjunto confirmado de entrada.
+
+- [ ] **Exponer la ruta de higiene**
+  - Files: `src/routes/api/career/resumes/$resumeId/hygiene.ts` (new), `tests/e2e/career-hygiene.spec.ts` (new)
+  - Do: `POST …/hygiene` bajo `resume:write`, **sin créditos** y disponible con `AI_DISABLED=true`.
+    Se ejecuta además implícitamente antes de cada transición a `exportable`. La UI muestra cada
+    hallazgo **anclado al nodo exacto** que lo causa; un hallazgo sin ancla no llega al cliente.
+  - Verify: `pnpm exec playwright test tests/e2e/career-hygiene.spec.ts` con `AI_DISABLED=true`; y
+    `pnpm test:e2e:career-free-path` ampliado con higiene y fidelidad de parseo.
 
 ---
 
@@ -802,4 +997,4 @@ llevan snapshot**, no hay excepción. Tras cada migración, regenerar el manifie
     coverage **= 100 %**, 0 discrepancias de fecha o número, éxito de parse y de render en los 12
     perfiles, round-trip PDF/TXT, y p50/p95 de latencia y coste registrados en el documento de
     evaluación.
-  - Verify: `pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm test:migration-integrity && pnpm test:rls:local && pnpm test:api-isolation:local && pnpm security:boundaries && pnpm security:route-coverage && pnpm security:provider-metering && pnpm test:e2e`.
+  - Verify: `pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm test:migration-integrity && pnpm test:rls:local && pnpm test:api-isolation:local && pnpm security:boundaries && pnpm security:route-coverage && pnpm security:provider-metering && pnpm test:e2e && pnpm test:e2e:career-free-path && node scripts/check-forbidden-claims.mjs`.

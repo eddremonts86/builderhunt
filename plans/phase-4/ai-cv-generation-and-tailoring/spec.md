@@ -190,9 +190,26 @@ definido en `src/lib/storage/types.ts`, pero eso es trabajo adicional que la est
 debe reflejar.
 
 **Y se prueba, no se afirma.** Que este camino siga entero es hoy una promesa de documento que nadie
-ejecuta. Un job de CI corre el E2E de las fases 3, 4 y 4b con `CANDIDATE_UPLOADS_ENABLED=false` — el
-flag ya existe — igual que ya se corre con `AI_DISABLED=true`. Sin ese job, "el producto es entregable
-sin upload" es exactamente la clase de afirmación que se rompe en silencio.
+ejecuta, y esa clase de promesa se rompe en silencio.
+
+`pnpm test:e2e:career-free-path` `(new)` — un script de `package.json`, no una intención — corre el E2E
+de las fases 3, 4 y 4b con **los tres flags que definen el camino gratuito** fijados a la vez:
+
+```
+CANDIDATE_UPLOADS_ENABLED=false   AI_DISABLED=true   STRIPE_BILLING_ENABLED=false
+```
+
+Recorre: crear perfil, añadir y confirmar hechos, componer el CV base determinista, correr la higiene,
+obtener la fidelidad de parseo, y descargar PDF y TXT. Afirma que **ninguna ruta responde 500** y que
+**ninguna acción ofrecida en la UI es imposible de completar** con esa configuración.
+
+Cubre dos riesgos con un solo test, y a propósito: que el pipeline de documentos nunca se implemente, y
+que el plan gratuito quede muerto porque el billing está apagado. Son el mismo fallo visto desde dos
+flags, y `STRIPE_BILLING_ENABLED=false` **es el estado real de producción hoy**, así que este script no
+prueba un caso degradado — prueba el camino principal.
+
+Entra en el criterio de cierre de la Fase 3 (con lo que exista entonces) y se amplía en la 4 y en la
+4b. Está en `pnpm ci:local` vía `scripts/ci/local-quality.sh`.
 
 > Nota para `plans/phase-2/README.md` (no editable desde este plan): su línea "private R2 foundation"
 > es incorrecta por partida doble. El almacenamiento previsto es **MinIO privado autoalojado**
@@ -373,12 +390,17 @@ Propiedades que lo hacen seguro:
 
 - **No es un claim.** No afirma nada cuantificado, así que no puede ser una alucinación. El `factId`
   obligatorio garantiza que el *contexto* sí está respaldado.
-- **No exporta.** `validateResumeTruth` cuenta los placeholders sin resolver en una columna nueva
-  `unresolved_placeholder_count`, y el check de la capa 4 se amplía:
+- **No exporta.** `validateResumeTruth` cuenta los nodos `kind: 'metric_placeholder'` y devuelve
+  `unresolvedPlaceholderCount` junto a `claimCount` y `unsupportedClaimCount`; el repositorio lo
+  persiste en la columna `unresolved_placeholder_count`, y el check de la capa 4 se amplía:
 
 ```sql
 check (export_state <> 'exportable' or unresolved_placeholder_count = 0)
 ```
+
+  El contrato de retorno de `validateResumeTruth` cambia por tanto a
+  `{ claimCount, unsupportedClaimCount, unsupportedClaimIds, unresolvedPlaceholderCount, issues }`.
+  Sin ese campo nadie escribiría la columna y el check no protegería nada.
 
 - **Se resuelve por la persona, o desaparece.** Dos acciones: *rellenar* (crea o actualiza un
   `career_facts.metrics` y convierte el nodo en un bullet normal con su `factId`) o *quitar el hueco*
@@ -666,21 +688,28 @@ check (export_state <> 'exportable' or unresolved_placeholder_count = 0)
 check ((export_state = 'stale') = (stale_reason is not null))
 ```
 
-**Límite conocido de la puerta de verdad, escrito para que nadie lo descubra tarde.** Los tres checks
-de arriba operan sobre **enteros que escribe la aplicación**: Postgres no puede recorrer el `content`
-jsonb y recomputar la cobertura por sí mismo. Es decir, la capa 4 garantiza *"si los contadores dicen
-que hay un claim sin respaldo, el export es imposible"*, **no** *"los contadores son correctos"*. Un
-`validateResumeTruth` con un bug que escriba `0` abriría la puerta.
+**Límite conocido de la puerta de verdad, escrito para que nadie lo descubra tarde.** Dos de los checks
+de arriba —el de `unsupported_claim_count` y el de `unresolved_placeholder_count`— operan sobre
+**enteros que escribe la aplicación**: Postgres no puede recorrer el `content` jsonb y recomputar la
+cobertura por sí mismo. Es decir, la capa 4 garantiza *"si los contadores dicen que hay un claim sin
+respaldo, el export es imposible"*, **no** *"los contadores son correctos"*. Un `validateResumeTruth`
+con un bug que escriba `0` abriría la puerta. Los otros dos checks (`verified_at`, la implicación
+`exportable ⇒ verified`) no tienen este problema: sólo relacionan columnas entre sí.
 
 Esto no se puede cerrar en DDL sin un trigger, y un trigger que parsee jsonb en cada escritura es peor
-que el problema. Se cierra por otro lado, y por eso importa que ambas cosas existan:
+que el problema. Se cierra por otro lado, y por eso importan las tres cosas:
 
 - `validateResumeTruth` es una **función pura** con test de propiedad: para todo `content` generado, el
-  recuento de nodos sin `factIds` coincide con `unsupported_claim_count`. Es la única pieza cuyo bug
-  sería silencioso, así que es la que lleva el test más fuerte del plan.
-- El gate de release `unsupported claim rate = 0` recomputa la cobertura **desde el `content`
-  persistido**, ignorando los contadores. Una deriva entre columna y contenido aparece ahí como fallo,
-  no como un CV mal exportado.
+  recuento de nodos sin `factIds` coincide con `unsupportedClaimCount` y el de nodos
+  `kind: 'metric_placeholder'` con `unresolvedPlaceholderCount`. Es la única pieza cuyo bug sería
+  silencioso, así que lleva el test más fuerte del plan.
+- **Recomputación en el propio camino de export.** `GET …/export` vuelve a llamar a
+  `validateResumeTruth` sobre el `content` que va a renderizar y aborta con `409 verification_stale` si
+  el resultado no coincide con las columnas. Es lo que convierte la deriva en un fallo visible **en
+  producción**, no sólo en el corpus.
+- El gate de release `unsupported claim rate = 0` recomputa desde el `content` del **corpus**. Cubre la
+  regresión de la función, no la deriva de una fila concreta — de ahí que el punto anterior no sea
+  redundante.
 
 **GRANTs**: `builderhunt_app` SELECT/INSERT/UPDATE/DELETE. `builderhunt_worker` SELECT/INSERT/UPDATE
 (el batch genera y verifica), sin DELETE.
@@ -1003,17 +1032,28 @@ export const careerFactsExtractOutputSchema = z.object({
 
 // 2. resume-base-compose  /  4. resume-tailor (misma forma de contenido)
 const resumeBulletSchema = z.object({
+  kind: z.literal('bullet'),
   claimId: claimIdSchema, text: z.string().min(10).max(300), factIds: factIdsSchema,
 })
+// El hueco de métrica declarado (§Capa 0). Es un nodo hermano del bullet, no una variante suya:
+// discriminar por `kind` es lo que permite a validateResumeTruth contarlos por separado sin
+// heurísticas sobre el texto.
+const metricPlaceholderNodeSchema = metricPlaceholderSchema.extend({ kind: z.literal('metric_placeholder') })
+const resumeNodeSchema = z.discriminatedUnion('kind', [resumeBulletSchema, metricPlaceholderNodeSchema])
+
 export const resumeContentSchema = z.object({
   summary: z.object({ claimId: claimIdSchema, text: z.string().min(20).max(600), factIds: factIdsSchema }).nullable(),
   sections: z.array(z.object({
-    kind: z.enum(['experience','projects','education','certifications','skills','languages']),
+    kind: z.enum(['experience','projects','education','certifications','skills','languages',
+                  'awards','publications','volunteering','patents','courses','key_achievements']),
     heading: z.string().min(2).max(60),
     entries: z.array(z.object({
       factId: z.uuid(),
       headline: z.string().max(160),
-      bullets: z.array(resumeBulletSchema).max(8),
+      // Antes: `bullets: z.array(resumeBulletSchema)`. Sin la unión, ningún contenido válido podía
+      // contener un placeholder, así que `unresolved_placeholder_count` era siempre 0 y su check de
+      // export un no-op.
+      bullets: z.array(resumeNodeSchema).max(8),
     })).max(30),
   })).max(8),
   droppedFactIds: z.array(z.uuid()).max(200).default([]),
@@ -1105,25 +1145,41 @@ no rompe ninguna prueba: el PDF sigue generándose y sigue pasando extracción d
 superficie de seguridad de este plan cuya mitigación era exclusivamente "lo escribimos en el spec", y
 eso no es una mitigación.
 
-Se arregla separando la construcción de las opciones de su uso, para poder afirmarlas sin lanzar
-Chromium:
+Se arregla separando la **decisión** de configuración de su **ejecución**, para poder afirmarla sin
+lanzar Chromium. El módulo es puro y no importa `playwright`; devuelve datos que el renderer consume:
 
 ```ts
 // src/shared/lib/resumes/render-options.ts (new) — puro, sin importar playwright
+export type ResumeRenderOptions = {
+  launchArgs: readonly string[]            // el renderer hace launch({ args: [...launchArgs] })
+  contextOptions: { javaScriptEnabled: false }
+  abortAllRequests: true                   // el renderer traduce esto a page.route('**', abort)
+  timeoutMs: 15_000
+  pdf: { preferCSSPageSize: true; displayHeaderFooter: false }
+}
 export function buildResumeRenderOptions(): ResumeRenderOptions { /* … */ }
 ```
 
-Tres gates, todos en el cierre de la Fase 4:
+`abortAllRequests` es un booleano y no una función a propósito: un flag se puede afirmar en un test
+unitario, un callback registrado dentro de Playwright no.
 
-1. **Test unitario sobre el objeto de opciones**: afirma `javaScriptEnabled === false`, que el
-   `launch()` **no** lleva `--no-sandbox`, que el timeout es 15 s, y que se registra un `route` que
-   aborta toda petición.
+Tres gates, todos en el **cierre de la Fase 4** y listados en su criterio:
+
+1. **Test unitario sobre el objeto de opciones**: afirma `contextOptions.javaScriptEnabled === false`,
+   `abortAllRequests === true`, `timeoutMs === 15_000`, y que `launchArgs` **no** contiene
+   `--no-sandbox`.
 2. **Test unitario sobre el HTML**: `renderResumeHtml` emite el `<meta http-equiv="Content-Security-Policy">`
    con `default-src 'none'`, y un hecho que contenga `<script>alert(1)</script>` o
    `<img src="http://evil/">` aparece **escapado** en la salida.
 3. **Regla en `scripts/check-tenant-boundaries.mjs`**: bajo `src/**/resumes/**` se prohíben los
    literales `--no-sandbox` y `javaScriptEnabled: true`. Es una comprobación de texto, del mismo tipo
    que las reglas de rol y de importación que el script ya hace.
+
+Lo que estos tres gates **no** cubren: que el renderer consuma de verdad lo que el módulo devuelve. Un
+renderer que ignore `abortAllRequests` pasa los tres. Eso lo cubre el gate 3 sólo parcialmente, y es
+una limitación aceptada — cerrarla exigiría un test de integración que lance Chromium y observe tráfico,
+que es caro y frágil. La apuesta es que el fallo probable es un PR que borre una línea del módulo, no
+uno que reescriba el renderer para desobedecerlo.
 
 Lo que estos tests **no** prueban: que Chromium sea seguro. Prueban que no lo estamos usando de la
 forma insegura que ya decidimos evitar. Es un alcance modesto y es el que importa: el fallo probable no
@@ -1505,19 +1561,46 @@ prosa no sobrevive a un refactor.
 Todas activas desde el cierre de la **Fase 2**, no al final: una frontera que se añade después de que
 el código exista es una frontera que ya se cruzó.
 
+**El alcance (`CAREER_DOMAIN_GLOBS`) se define una vez y lo comparten las reglas 1 y 2**, porque el
+riesgo no vive sólo en las rutas: vive en los repositorios, que son los que hablan con la BD y con la
+caché.
+
+```
+src/**/{career,resumes}/**
+src/routes/api/career/**
+src/shared/lib/repositories/career-*.ts     # career-worker, career-resumes, career-profiles, career-facts
+src/shared/lib/resumes/**
+src/shared/lib/auth/career-principal.ts
+src/lib/resumes/**
+```
+
 | # | Regla | Qué prohíbe | Riesgo que cubre |
 | --- | --- | --- | --- |
-| 1 | **Sin employer-side desde career** | Bajo `src/**/{career,resumes}/**` y `src/routes/api/career/**`: importar `candidateDocuments`, `candidateSubmissions`, `pipeline*`, `organizationBuilders` o cualquier tabla ATS, en forma estática **o** dinámica | Reutilizar `candidate_documents` "porque se parece", y cualquier lectura cruzada de sujeto |
-| 2 | **Sin caché sin tenant** | En el mismo alcance: importar o llamar `getCached`/`setCached`. La caché de este dominio pasa por `tenantAiCacheKey`, sin excepción | Un CV filtrado entre tenants por una clave sin `organizationId` |
+| 1 | **Sin employer-side desde career** | En `CAREER_DOMAIN_GLOBS`: importar `candidateDocuments`, `candidateSubmissions`, `pipeline*`, `organizationBuilders` o cualquier tabla ATS, en forma estática **o** dinámica | Reutilizar `candidate_documents` "porque se parece", y cualquier lectura cruzada de sujeto |
+| 2 | **Sin caché sin tenant** | En `CAREER_DOMAIN_GLOBS`: importar `getCached`/`setCached` **directamente**. El dominio accede a la caché sólo a través del envoltorio `src/shared/lib/resumes/ai-cache.ts` (new), que exige una clave construida con `tenantAiCacheKey` y no acepta un `taskId` suelto | Un CV filtrado entre tenants por una clave sin `organizationId` |
 | 3 | **Sin renderer laxo** | Bajo `src/**/resumes/**`: los literales `--no-sandbox` y `javaScriptEnabled: true` | Endurecimiento del renderer borrado en un refactor |
-| 4 | **Prefijo de dominio** | Todo identificador exportado **nuevo** que este plan añada a `schema.ts`, `tasks.ts`, `rate-cards.ts` y `permissions.ts` casa con `^(career\|resume)` | Colisión con los planes hermanos en los cuatro ficheros que los tres editan a la vez |
+| 4 | **Prefijo de dominio** | En `schema.ts`, `tasks.ts`, `rate-cards.ts` y `permissions.ts`: todo identificador exportado que **no** esté en el snapshot de baseline debe casar con `^(career\|resume)` | Colisión con los planes hermanos en los cuatro ficheros que los tres editan a la vez |
 | 5 | `check-forbidden-claims.mjs` `(new)` | Las cifras de §Copia prohibida en `src/**`, copy y prompts | Heredar el marketing del miedo al ATS |
 
-Sobre la regla 2, que es la que más se va a discutir: `getCached` seguirá existiendo y seguirá siendo
-correcto para otros dominios. Su clave es `ai:cache:{taskId}:{hash(input)}`
-(`src/shared/lib/ai/cache.ts`) y **no incluye la organización**, lo que en este dominio significa que
-dos personas con la misma experiencia podrían compartir un CV. La regla es de alcance, no un juicio
-sobre el helper.
+La regla 4 necesita un **baseline** para poder decir "nuevo": un fichero
+`scripts/baselines/career-identifiers.json` `(new)` con la lista de identificadores exportados de esos
+cuatro ficheros en el momento de cerrar la Fase 1. Sin baseline, "identificador nuevo" no es
+computable por un grep y la regla o no detecta nada o falla sobre todo el fichero. El baseline se
+regenera con un flag explícito, y regenerarlo en un PR es visible en el diff — que es exactamente la
+señal que se quiere.
+
+Sobre la regla 2, que es la que más se va a discutir. `getCached` seguirá existiendo y seguirá siendo
+correcto en otros dominios: **acepta una clave**, y si esa clave viene de `tenantAiCacheKey` el uso es
+seguro. Lo que no es seguro es su forma abreviada, donde la clave se deriva de un `taskId` y sale
+`ai:cache:{taskId}:{hash(input)}` (`src/shared/lib/ai/cache.ts:43`) — **sin la organización**, lo que
+en este dominio significa que dos personas con la misma experiencia podrían compartir un CV.
+
+Un grep no distingue con fiabilidad una forma de la otra, así que la regla no intenta adivinar: prohíbe
+el **import directo** y obliga a pasar por un envoltorio de cuatro líneas que sólo acepta una clave ya
+construida. Es una restricción de alcance sobre nuestro propio dominio, no un juicio sobre el helper, y
+deja intacto el uso legítimo que hace
+[`delegated-job-applications`](../delegated-job-applications/spec.md) §IA, que sí llama a `getCached`
+con una clave `tenantAiCacheKey` explícita.
 
 Sobre la regla 4: es una comprobación de texto, no un análisis de tipos, así que tendrá falsos
 negativos. Se acepta — su valor es cazar el copy-paste evidente en un fichero que tres planes tocan a

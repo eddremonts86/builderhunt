@@ -48,6 +48,11 @@ const SCRIPTS_CREATED_BY_PLANS = new Map([
   ['test:e2e:coverage', '53-exhaustive-local-e2e-design'],
   ['test:e2e:nightly', '53-exhaustive-local-e2e-design'],
   ['test:conversion', '51-audit-conversion'],
+  // Phase 4's two career plans specify these as exit criteria for their own phases, and both plans say plainly that
+  // nothing creates them yet. Registered so the checker stops reporting a gap the plans already declare, while still
+  // failing if any *other* document starts telling someone to run them.
+  ['test:e2e:career-free-path', 'phase-4'],
+  ['test:e2e:applications-free-path', 'phase-4'],
 ])
 
 const scripts = new Set(Object.keys(JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).scripts))

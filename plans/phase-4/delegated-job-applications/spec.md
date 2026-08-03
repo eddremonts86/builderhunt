@@ -330,7 +330,7 @@ un cuerpo con array. La generación de kits sí puede hacerse en lote — la apr
 
 ## Modelo de datos
 
-Siete tablas nuevas. **Todas** son clase `tenant private` con propietario individual: llevan
+Ocho tablas nuevas. **Todas** son clase `tenant private` con propietario individual: llevan
 `organization_id` (`NOT NULL`) **y** `owner_user_id` (`NOT NULL`), y su predicado RLS es la
 conjunción de ambos. La forma se copia de `drizzle/0085_candidate_documents_rls_grants.sql`: allí la
 propiedad se demuestra caminando hasta `scheduling_invitations.owner_user_id`; aquí es directa,
@@ -417,7 +417,7 @@ El único es plano, no parcial: volver a aplicar a la misma oferta **reutiliza l
 vuelve a `preparing`) y el historial vive en `application_events`. Una segunda fila para la misma
 oferta sería exactamente el duplicado que este plan existe para evitar.
 
-RLS (idéntica en las siete tablas para `builderhunt_app`, solo cambia el nombre):
+RLS (idéntica en las ocho tablas para `builderhunt_app`, solo cambia el nombre):
 
 ```sql
 ALTER TABLE job_applications ENABLE ROW LEVEL SECURITY;
@@ -753,7 +753,7 @@ Versión inmutable del material de una candidatura. **INSERT-only en el contenid
 | `resume_version_id` | `uuid` | sí | FK compuesta a `resume_versions`, `ON DELETE restrict` |
 | `career_profile_version` | `integer` | sí | pin del perfil del que salieron los hechos |
 | `cover_letter_text` | `text` | sí | CHECK `length ≤ 8000` |
-| `cover_letter_fact_ids` | `jsonb` | no | default `'[]'` — procedencia por párrafo |
+| `cover_letter_fact_ids` | `jsonb` | no | default `'[]'` — proyección desnormalizada para el hash de contenido; **la procedencia autoritativa vive en `application_kit_claim_facts`** |
 | `answer_map` | `jsonb` | no | default `'{}'` — `{question_key: {answerFactId, value}}` |
 | `unresolved_questions` | `jsonb` | no | default `'[]'` |
 | `blockers` | `jsonb` | no | default `'[]'` |
@@ -824,9 +824,52 @@ CREATE POLICY application_kits_app_supersede ON application_kits
   );
 ```
 
+### 8. `application_kit_claim_facts`
+
+Existe porque sin ella **la carta tiene dos capas de veracidad donde el CV tiene cuatro**, y eso
+incumple el contrato publicado #7 de
+[`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md), que exige para las cartas
+"su propia tabla, con su propio enlace claim→fact, reutilizando `validateResumeTruth` y la forma de
+`resume_claim_facts`".
+
+Lo que había hasta ahora era `application_kits.cover_letter_fact_ids jsonb default '[]'`: sin FK, sin
+tabla de enlace y sin puerta de export. Es decir, `factIds.min(1)` en zod (capa 1) más
+`assertFactsAreConfirmed` en código (capa 2), y **nada** en la base de datos. La carta es el artefacto
+que la persona **firma con su nombre y envía a un empleador**, así que merece exactamente las mismas
+garantías que el CV, no menos.
+
+| Columna | Tipo | Null | Notas |
+| --- | --- | --- | --- |
+| `organization_id` / `owner_user_id` | `text` | no | |
+| `kit_id` | `uuid` | no | FK compuesta a `application_kits(organization_id, id)` `cascade` |
+| `claim_id` | `text` | no | `^c[0-9a-f]{12}$`, mismo formato y generador que `resume_claim_facts` |
+| `fact_id` | `uuid` | no | FK compuesta a `career_facts(organization_id, id)` **`restrict`** — borrar un hecho no puede dejar huérfana una afirmación de una carta ya enviada |
+| `support` | `text` | no | `direct \| derived` |
+| `created_at` | `timestamptz` | no | |
+
+```sql
+primary key (organization_id, kit_id, claim_id, fact_id)
+index application_kit_claim_facts_fact_idx on (organization_id, fact_id)
+
+check (claim_id ~ '^c[0-9a-f]{12}$')
+check (support in ('direct','derived'))
+```
+
+**GRANTs**: `builderhunt_app` `SELECT, INSERT`. `builderhunt_worker` `SELECT, INSERT`.
+**Ningún rol tiene `UPDATE` ni `DELETE`** — igual que `resume_claim_facts`: un enlace de procedencia se
+crea con su kit y muere con él por cascade, nunca se reescribe.
+
+Se escribe en la **misma transacción** que la fila de `application_kits`, y el ensamblado del kit falla
+—devolviendo el blocker `cover_letter_unavailable`— si algún párrafo con afirmación no tiene su enlace.
+La FK compuesta a `career_facts` hace que un `factId` inventado, borrado o de otro tenant sea un error
+de Postgres y no una línea de log, que es la capa 3 que faltaba.
+
+La capa 4 es el gate de aprobación que ya existe: `application_kits.status` no puede ser `ready` con un
+blocker abierto, y `cover_letter_text` no tiene `UPDATE` para ningún rol.
+
 ### Registro en la documentación de arquitectura
 
-Las siete tablas se registran en `docs/architecture/data-classification.md` con clase
+Las **ocho** tablas se registran en `docs/architecture/data-classification.md` con clase
 `tenant private`, clave de propiedad `organization_id + owner_user_id`, campos públicos `none`, y
 la retención de §Retención. Los permisos nuevos se registran en
 `docs/architecture/authorization-matrix.md`.
@@ -929,6 +972,29 @@ usan los ATS reales en su propia UI de cualificaciones
 ([research §16 #25](../competitive-research-enhancv.md)) y encaja tal cual con el
 `met | partial | missing | unknown` del esquema de salida. Un porcentaje sin denominador invita a
 leerse como una nota; una fracción con la lista al lado se lee como lo que es.
+
+**"La banda nunca sola" es un invariante de componente, no un acuerdo de diseño.** Es el riesgo de
+producto más grave de este plan —que el número se lea como un veredicto sobre la persona— y hasta ahora
+su única protección era una regla escrita. Una regla de composición de UI que nadie verifica se rompe
+en el primer sitio nuevo donde alguien quiera "mostrar el encaje rápido".
+
+El mecanismo: `<FitBand>` recibe `requirements` como **prop obligatoria** y lanza si llega vacía.
+
+```tsx
+// src/modules/applications/ui/fit-band.tsx (new)
+export function FitBand({ band, requirements }: FitBandProps) {
+  if (requirements.length === 0) {
+    // No es un guard defensivo: es la razón de existir del componente. Una banda sin su tabla es un
+    // veredicto disfrazado, y este plan decidió que eso no se renderiza en ningún sitio.
+    throw new Error('fit_band_requires_requirements')
+  }
+  // …
+}
+```
+
+No existe ningún otro componente que renderice `fit_band`. El test de componente que afirma que
+`<FitBand band="high" requirements={[]} />` lanza entra en el cierre de la **Fase 3**, junto al
+criterio de aceptación 9, que hasta ahora no tenía harness.
 
 ### Pesos de `computeFitScore` — con procedencia, no inventados
 
@@ -1217,7 +1283,7 @@ que ya funciona en una hoja de cálculo no se puede traer, no hemos hecho nada m
 
 ## Guardas mecánicas
 
-Cuatro comprobaciones automáticas que convierten prosa en gate de CI:
+Seis comprobaciones automáticas que convierten prosa en gate de CI:
 
 1. **Sin envío externo.** Se extiende `scripts/check-tenant-boundaries.mjs` con un escaneo: ningún
    fichero bajo `src/lib/applications/` (new), `src/shared/lib/applications/` (new) o
@@ -1232,6 +1298,22 @@ Cuatro comprobaciones automáticas que convierten prosa en gate de CI:
    en la misma función por `checkAndConsumeBudget` o `reserveCredits`. Los dos servicios de IA de
    este plan lo cumplen sin excepción en el allowlist.
 4. **Cobertura de rutas.** `pnpm security:route-coverage` cubre las rutas nuevas.
+5. **Propiedad de identificadores.** `scripts/check-tenant-boundaries.mjs` —el mismo de los puntos 1
+   y 2, no el de cobertura de rutas del punto 4— afirma que este plan sólo registra
+   `candidate-job-fit` y `application-cover-letter` en `src/shared/lib/ai/tasks.ts`, y que
+   `src/lib/applications/**` no importa de `src/lib/jobs/**` (del plan hermano) ni al contrario. Es
+   una comprobación de texto con falsos negativos conocidos; su valor es cazar el copy-paste en los
+   cuatro ficheros que los tres planes de carrera editan a la vez, no demostrar unicidad.
+6. **Copia prohibida.** `scripts/check-forbidden-claims.mjs` `(new)`, compartido con
+   [`ai-cv-generation-and-tailoring`](../ai-cv-generation-and-tailoring/spec.md) §Copia prohibida,
+   donde vive la lista. Aplica a los dos dominios: un escáner por plan se desincronizaría, y la copia
+   de esta clase se escribe con más frecuencia en la superficie de candidaturas que en la de CV.
+
+Las comprobaciones 1, 2, 5 y 6 están activas desde el cierre de la **fase 1**, antes de que exista el
+código que podrían atrapar: son grep, no cuestan nada, y una frontera añadida después de que el código
+exista es una frontera que ya se cruzó. La 3 y la 4 entran cuando hay algo que medir — la 3 con la
+primera llamada al proveedor (**fase 3**) y la 4 con las primeras rutas (**fase 1** para el tracker,
+ampliándose en cada fase que añada superficie).
 
 ---
 
@@ -1274,6 +1356,22 @@ Copia obligatoria en la UI, no negociable en revisión de diseño:
 - Los filtros duros se ejecutan **antes** que la IA, así que una oferta rechazada no cuesta nada. El
   CHECK `hard_filter_result <> 'rejected' OR fit_score IS NULL` lo hace estructural.
 - El usuario ve el coste máximo antes de lanzar un run y antes de generar un kit.
+
+**El camino gratuito se ejecuta en CI, no se supone.** `STRIPE_BILLING_ENABLED = false` es el estado
+**real de producción hoy**, así que el camino sin billing no es un caso degradado: es el camino
+principal. Que las fases 1 y 2 sigan funcionando enteras era hasta ahora una consecuencia de la
+ordenación de fases más una nota en §Casos límite — es decir, dependía de que alguien lo revisara.
+
+`pnpm test:e2e:applications-free-path` `(new)` — un script de `package.json`, no una intención — corre
+el E2E de las fases 1 y 2 con `STRIPE_BILLING_ENABLED=false` y `AI_DISABLED=true`: crear una
+candidatura a mano, **importar un CSV**, lanzar un run sobre ofertas guardadas, obtener una shortlist
+determinista con sus motivos de descarte, y llegar a `submitted_by_user`. Afirma que ninguna ruta
+responde 500 y que ninguna UI ofrece una acción que no se puede completar.
+
+Entra en el criterio de salida de la **Fase 1** (con lo que exista entonces) y se amplía en la **Fase
+2**. Está en `pnpm ci:local` vía `scripts/ci/local-quality.sh`. Es el hermano de
+`pnpm test:e2e:career-free-path` del plano de CV, y por el mismo motivo: es el test más representativo
+del despliegue actual, así que su coste de mantenimiento se paga solo.
 
 Estimación inicial, a validar en la fase 0 contra corpus real:
 

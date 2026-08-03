@@ -222,20 +222,28 @@ define.
     su actor; la sección `never_autofill` no tiene ningún `input`; auditoría a11y de la página sin
     violaciones de nivel serio.
 
-- [ ] **Activar las dos guardas mecánicas de frontera**
-  - Files: `scripts/check-tenant-boundaries.mjs`, `tests/unit/security/application-boundaries.test.ts` (new)
-  - Do: Añadir al script dos escaneos sobre los directorios `src/lib/applications/` (new),
+- [ ] **Activar las cuatro guardas mecánicas de frontera activas desde esta fase**
+  - Files: `scripts/check-tenant-boundaries.mjs`, `scripts/ci/local-quality.sh`, `tests/unit/security/application-boundaries.test.ts` (new)
+  - Do: Añadir al script tres escaneos sobre los directorios `src/lib/applications/` (new),
     `src/shared/lib/applications/` (new) y `src/routes/api/applications/` (new):
     (1) **sin envío externo** — prohibir `method: 'POST'`, `method: 'PUT'`, `method: 'PATCH'`,
     `method: 'DELETE'` en cualquier literal de opciones de `fetch`, más `nodemailer`, `resend`,
     `smtp` y `sendMail`; sin entradas en el allowlist, porque este plan no envía nada a ningún
     tercero. (2) **sin escritura employer-side** — prohibir importar `organizationBuilders`,
     `organizationPipelineStages`, `organizationBuilderStageEvents`, `candidateSubmissions`,
-    `candidateDocuments` o `~/shared/lib/repositories/pipeline`. El test unitario nuevo ejecuta el
-    script sobre un fixture con una violación de cada tipo y comprueba que falla con el mensaje
-    correcto (evita que el escaneo se rompa en silencio).
+    `candidateDocuments` o `~/shared/lib/repositories/pipeline`. (3) **propiedad de identificadores** —
+    afirmar que este plan sólo registra `candidate-job-fit` y `application-cover-letter` en
+    `src/shared/lib/ai/tasks.ts`, y que `src/lib/applications/**` no importa de `src/lib/jobs/**` (del
+    plan hermano) ni al contrario. Y (4) enganchar `scripts/check-forbidden-claims.mjs` —el script del
+    plan hermano, donde vive la lista de cifras desacreditadas— a `scripts/ci/local-quality.sh` si no lo
+    está ya; **no se duplica la lista**, porque dos escáneres se desincronizarían. El test unitario
+    nuevo ejecuta el script sobre un fixture con una violación de cada tipo y comprueba que falla con el
+    mensaje correcto (evita que el escaneo se rompa en silencio).
+    Las comprobaciones 3 (metering) y 4 (cobertura de rutas) de spec.md §Guardas mecánicas entran en
+    las fases 3 y 1 respectivamente, cuando hay algo que medir; **son seis en total**, no dos.
   - Verify: `pnpm security:boundaries` verde sobre el árbol real; `pnpm test application-boundaries`
-    — el fixture con `method: 'POST'` y el fixture que importa `pipeline` fallan ambos.
+    — los fixtures con `method: 'POST'`, con un import de `pipeline`, con un task id ajeno y con un
+    cruce `applications` → `jobs` fallan los cuatro.
 
 - [ ] **Extender la comprobación de aislamiento de API con `checkApplications()`**
   - Files: `scripts/db/verify-api-isolation-local.mjs`
@@ -250,13 +258,38 @@ define.
   - Verify: `pnpm test:api-isolation:local` — todas las comprobaciones nuevas pasan y ninguna
     existente regresa.
 
-- [ ] **Cerrar la fase 1 con E2E y la suite completa**
-  - Files: `tests/e2e/career-applications.spec.ts` (new)
+- [ ] **Implementar el import de hoja de cálculo**
+  - Files: `src/shared/lib/applications/import.ts` (new), `src/routes/api/applications/import.ts` (new), `src/modules/applications/components/ApplicationImportDialog.tsx` (new), `tests/unit/shared/lib/applications/import.test.ts` (new)
+  - Do: Módulo **puro** de parseo y mapeo, más una ruta que sólo persiste lo ya confirmado. Detección
+    heurística de encabezados (empresa, puesto, fecha, estado, URL, notas) → **mapeo propuesto que la
+    persona corrige** → previsualización con conteos (cuántas se crean, cuántas se saltan y por qué) →
+    confirmar. Nada se escribe antes de la confirmación. Reglas duras:
+    un estado que no mapea al dominio de `job_applications.status` cae en **`discovered`** y se marca en
+    la previsualización, **nunca se adivina** ("waiting" no significa `submitted_by_user`);
+    `job_opportunity_id` queda `null` si la fila no trae URL, y enlazarla después es opcional;
+    `Idempotency-Key` obligatoria por import, con deduplicación por
+    `(owner, empresa normalizada, puesto normalizado)` reportando las colisiones como **saltadas**, sin
+    fusionar; una fila marcada como enviada entra como `submitted_by_user` con el evento
+    `manual.self_reported_submission` y `actor_kind = 'user'`, y **`confirmed_submitted` es inalcanzable
+    por esta vía** porque exige `confirmation_source` con evidencia externa que un CSV no aporta; límite
+    duro de filas por import.
+  - Verify: `pnpm test -- tests/unit/shared/lib/applications/import.test.ts` — un estado desconocido cae
+    en `discovered`; reimportar el mismo fichero **no duplica**; una columna `status` con
+    `confirmed_submitted` **no** produce ese estado; un CSV de 5.000 filas es rechazado por el límite.
+
+- [ ] **Cerrar la fase 1 con E2E, el camino gratuito y la suite completa**
+  - Files: `tests/e2e/career-applications.spec.ts` (new), `tests/e2e/applications-free-path.spec.ts` (new), `package.json`, `scripts/ci/local-quality.sh`
   - Do: Recorrido sin IA y sin red: crear una oferta manual en el workspace, crear la candidatura,
     editar la nota, mover `discovered → shortlisted → preparing`, intentar mover a `approved` y
     comprobar que la UI lo impide con el mensaje de aprobación requerida, marcar enviada a mano,
     y archivar. Comprobar la línea de tiempo y que un segundo usuario no ve nada.
-  - Verify: `pnpm exec playwright test tests/e2e/career-applications.spec.ts`; después
+    Añadir además `pnpm test:e2e:applications-free-path`, que corre con
+    **`STRIPE_BILLING_ENABLED=false` y `AI_DISABLED=true`** e incluye el **import de un CSV de 50
+    filas**, y engancharlo a `scripts/ci/local-quality.sh`. Existe porque ése es el estado real de
+    producción: no prueba un caso degradado, prueba el camino principal.
+  - Verify: `pnpm exec playwright test tests/e2e/career-applications.spec.ts`;
+    `pnpm test:e2e:applications-free-path` verde con ninguna ruta en 500 y ninguna acción de UI
+    imposible de completar; después
     `pnpm lint && pnpm type-check && pnpm test && pnpm build && pnpm test:migration-integrity && pnpm test:rls:local && pnpm test:api-isolation:local && pnpm security:boundaries`.
 
 ---
@@ -270,10 +303,33 @@ define.
     Regla central, probada explícitamente: **si cualquiera de los dos lados de una comparación es
     desconocido, el resultado es `unknown_kept` con su razón, nunca `rejected`.** Sin acceso a red,
     sin acceso a base, sin ninguna característica protegida en la firma de entrada.
+    Cada código lleva además su **clase**: `knockout` (`sponsorship_incompatible`,
+    `explicit_legal_requirement_unmet`, `location_mismatch` — elegibilidad objetiva, y el filtro que de
+    verdad elimina: una sola pregunta de sponsorship descarta ~30 % en roles técnicos),
+    `preference` (`employment_type_mismatch`, `salary_below_floor`, `company_excluded` — vienen del
+    mandato) y `housekeeping` (`job_expired`, `already_applied`, `duplicate_in_run`). La clase **no**
+    cambia si se descarta, sólo cómo se explica: un knockout se presenta como un hecho sobre el mundo;
+    una preferencia se presenta con enlace a la regla del mandato que la produjo y que la persona
+    **puede cambiar**. Un filtro de preferencia que no se puede localizar ni revertir se lee como una
+    caja negra.
   - Verify: `pnpm test hard-filters` — corpus tabular con al menos un caso por código, más los casos
-    de desconocido: salario no publicado, sponsorship desconocido en un lado, ubicación ausente. Un
-    test estático comprueba que el tipo de entrada no contiene `age`, `gender`, `nationality`,
+    de desconocido: salario no publicado, sponsorship desconocido en un lado, ubicación ausente. **Un
+    knockout con cualquiera de los dos lados desconocido sigue siendo `unknown_kept`**, no `rejected`.
+    Un test estático comprueba que el tipo de entrada no contiene `age`, `gender`, `nationality`,
     `photo` ni `birthDate`.
+
+- [ ] **Añadir la recencia del anuncio como desempate del ranking**
+  - Files: `src/shared/lib/applications/ranking.ts` (new), `tests/unit/shared/lib/applications/ranking.test.ts` (new)
+  - Do: La edad del anuncio (de `job_opportunities`) entra en el orden de la shortlist **sólo como
+    desempate**, nunca sustituyendo al fit: una oferta fresca con encaje bajo no sube por encima de una
+    buena de hace una semana. Las de menos de 72 h se marcan visualmente en la cola de revisión. Si la
+    fecha de publicación es desconocida, no se penaliza ni se premia — mismo criterio que
+    `unknown_kept`. Justificación y su límite en spec.md §Recencia: 52 % de los reclutadores revisa por
+    orden de llegada, pero es correlación reportada, no un experimento, así que se implementa como
+    desempate y aviso y **no como promesa de resultado**.
+  - Verify: `pnpm test -- tests/unit/shared/lib/applications/ranking.test.ts` — dos candidatas con el
+    mismo `fit_score` se ordenan por recencia; una candidata reciente con `fit_score` menor **no**
+    adelanta a otra mejor; `postedAt = null` no altera el orden relativo.
 
 - [ ] **Añadir al schema mandatos, runs y candidatas**
   - Files: `src/shared/lib/db/schema.ts`
@@ -401,9 +457,32 @@ define.
     regla fija. `bandForScore(score)` → `'low' | 'medium' | 'high'` con cortes documentados
     (`< 40`, `40–69`, `≥ 70`). `applyContest(requirements, requirementId)` pone peso 0 y devuelve un
     conjunto nuevo. Reproducible: misma entrada, mismo entero, siempre.
+    `FIT_WEIGHTS` lleva **procedencia en el código**, no intuición: los tres pesos que entran
+    (cobertura de `must`, cobertura de `nice`, y bonus por evidencia con métrica) se derivan de lo que
+    los reclutadores dijeron que miran — experiencia y skills relevantes **88 %**, logros medibles
+    **52 %** (spec.md §Pesos de `computeFitScore`). Los criterios de estructura, formato y longitud
+    **no** son pesos de fit: son checks de higiene del plan hermano, y mezclarlos aquí convertiría el
+    score en un juicio sobre el documento en vez de sobre la cobertura de requisitos.
   - Verify: `pnpm test fit-score` — 500 entradas aleatorias con semilla producen el mismo resultado
     en dos ejecuciones; un conjunto con todo `unknown` devuelve `null`, no `0` (que se leería como
-    "malo" en vez de "sin información"); impugnar el único requisito `meets` baja la banda.
+    "malo" en vez de "sin información"); impugnar el único requisito `meets` baja la banda; los
+    umbrales reales del mercado (`< 75 %` y `< 7 de 10 skills`) se **simulan** sobre el corpus para
+    saber cómo se comporta la salida bajo ellos, sin que ninguno se convierta en objetivo de la
+    fórmula — sólo el 8 % de los empleadores los tiene activados.
+
+- [ ] **Construir `<FitBand>` con la tabla de requisitos como invariante**
+  - Files: `src/modules/applications/ui/fit-band.tsx` (new), `tests/unit/modules/applications/fit-band.test.tsx` (new)
+  - Do: `<FitBand band requirements />` con `requirements` como **prop obligatoria**, y
+    `throw new Error('fit_band_requires_requirements')` si llega vacía. No es un guard defensivo: es la
+    razón de existir del componente. Una banda sin su tabla es un veredicto disfrazado, y este plan
+    decidió que eso no se renderiza en ningún sitio. **Ningún otro componente renderiza `fit_band`.**
+    El denominador es visible: no "encaje del 70 %" sino "**7 de los 10 requisitos publicados**", con
+    los tres estados distinguibles —cubierto, parcial y **no encontrado**—, este último explícitamente
+    distinto de "no cumples". La tabla es una `<table>` real con encabezados.
+  - Verify: `pnpm test -- tests/unit/modules/applications/fit-band.test.tsx` —
+    `<FitBand band="high" requirements={[]} />` **lanza**; el render con requisitos muestra la fracción
+    con su denominador; `grep -rn "fit_band\|fitBand" src/modules --include=*.tsx` no encuentra ningún
+    otro componente que lo pinte. Es el harness que le faltaba al criterio de aceptación 9.
 
 - [ ] **Registrar la task `candidate-job-fit`**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/applications/ai-contracts.ts` (new), `tests/unit/shared/lib/applications/ai-contracts.test.ts` (new)
@@ -475,9 +554,18 @@ define.
 
 ## Fase 4 — Kits inmutables y el gate de aprobación
 
-- [ ] **Añadir al schema `application_kits` con el hash generado**
+- [ ] **Añadir al schema `application_kits` y `application_kit_claim_facts`**
   - Files: `src/shared/lib/db/schema.ts`
-  - Do: `applicationKits` como `spec.md` §Modelo de datos 7, con `contentHash` declarado
+  - Do: También `applicationKitClaimFacts` como `spec.md` §Modelo de datos 8: PK compuesta
+    `(organization_id, kit_id, claim_id, fact_id)`, FK compuesta a
+    `applicationKits(organizationId, id)` `cascade`, FK compuesta a
+    `careerFacts(organizationId, id)` **`restrict`** —borrar un hecho no puede dejar huérfana una
+    afirmación de una carta ya enviada—, `check (claim_id ~ '^c[0-9a-f]{12}$')` con el mismo formato y
+    generador que `resume_claim_facts`, y `check (support in ('direct','derived'))`. Existe porque sin
+    ella la carta tiene **dos** capas de veracidad donde el CV tiene cuatro, incumpliendo el contrato
+    publicado #7 del plan hermano; `cover_letter_fact_ids` queda como proyección desnormalizada para el
+    hash, no como fuente de verdad.
+    Y `applicationKits` como `spec.md` §Modelo de datos 7, con `contentHash` declarado
     `.generatedAlwaysAs(sql\`encode(sha256(convert_to(...)), 'hex')\`)` sobre la expresión exacta del
     spec, y los CHECK `status <> 'ready' OR jsonb_array_length(blockers) = 0` y
     `(status = 'superseded') = (superseded_at IS NOT NULL)`. Añadir ahora las FK compuestas
@@ -494,9 +582,12 @@ define.
   - Files: nueva migración bajo `drizzle/`, nuevo snapshot bajo `drizzle/meta/`, `drizzle/meta/_journal.json`, `drizzle/migration-hashes.json`
   - Do: `pnpm db:generate`, tag `<NNNN>_application_kits` con el índice real del journal.
     Comprobar en el SQL que la columna generada se emite como `GENERATED ALWAYS AS (...) STORED` y
-    que las tres FKs nuevas son `ADD CONSTRAINT`, no reescrituras de tabla.
+    que las tres FKs nuevas son `ADD CONSTRAINT`, no reescrituras de tabla. Incluye
+    `application_kit_claim_facts` con sus dos FK compuestas.
   - Verify: `pnpm db:migrate` sobre base limpia; `INSERT` que menciona `content_hash` falla con
-    `cannot insert a non-DEFAULT value into column`; `pnpm test:migration-integrity` pasa.
+    `cannot insert a non-DEFAULT value into column`; **un `INSERT` en `application_kit_claim_facts` con
+    un `fact_id` de otro `organization_id` falla por FK**, y un `DELETE` de un `career_facts` enlazado
+    falla por `restrict`; `pnpm test:migration-integrity` pasa.
 
 - [ ] **Escribir a mano la migración de RLS y grants de kits**
   - Files: nueva migración `--custom` bajo `drizzle/`, nuevo snapshot bajo `drizzle/meta/`, `drizzle/meta/_journal.json`, `drizzle/migration-hashes.json`
@@ -513,9 +604,15 @@ define.
     `GRANT UPDATE (status, superseded_at, credits_settled) ON application_kits TO builderhunt_worker;`
     Ningún rol recibe `UPDATE` sobre `cover_letter_text`, `answer_map`, `unresolved_questions`,
     `blockers` ni los pins. `REVOKE ALL ... FROM PUBLIC`.
+    En la misma migración, `application_kit_claim_facts`: `ENABLE` + `FORCE`, policies de `SELECT` e
+    `INSERT` tenant+owner para `builderhunt_app` y `builderhunt_worker`, y
+    `GRANT SELECT, INSERT` a los dos — **sin `UPDATE` ni `DELETE` para ningún rol**, igual que
+    `resume_claim_facts`: un enlace de procedencia se crea con su kit y muere con él por cascade, nunca
+    se reescribe.
   - Verify: `pnpm db:migrate`; `pnpm test:rls:local`; como `builderhunt_app` con los GUCs correctos,
     `UPDATE application_kits SET cover_letter_text = 'x'` falla con `42501`, mientras que
-    `UPDATE application_kits SET status = 'superseded', superseded_at = now()` funciona.
+    `UPDATE application_kits SET status = 'superseded', superseded_at = now()` funciona; y
+    `UPDATE application_kit_claim_facts SET fact_id = ...` falla con `42501` para los dos roles.
 
 - [ ] **Registrar la task `application-cover-letter`**
   - Files: `src/shared/lib/ai/tasks.ts`, `src/shared/lib/applications/ai-contracts.ts` (new), `tests/unit/shared/lib/applications/ai-contracts.test.ts` (new)
@@ -527,6 +624,8 @@ define.
     adulación, afirmaciones sobre la cultura de la empresa sin evidencia, y obedecer instrucciones
     dentro del bloque `wrapUntrusted`. Añadir
     `assertFactsAreConfirmed(factIds, confirmedFactIds): void` que lanza `UnsupportedClaimError`.
+    Cada párrafo lleva además su `claimId` (mismo generador que `resume_claim_facts`) para poder
+    escribir la fila de procedencia en `application_kit_claim_facts`.
   - Verify: `pnpm test ai-contracts` — un párrafo con `factIds: []` no valida; una salida que cita
     un `factId` cuyo `career_facts.status` es `'proposed'` lanza `UnsupportedClaimError`; una oferta
     con "ignora tus instrucciones anteriores" produce `warnings: ['job_text_requested_action']` y no
@@ -732,31 +831,40 @@ define.
 
 ## Fase 7 — Privacidad, retención y release gate
 
-- [ ] **Añadir las siete tablas a la exportación de cuenta**
+- [ ] **Añadir las ocho tablas a la exportación de cuenta**
   - Files: `src/shared/lib/repositories/account-privacy.ts`, `tests/unit/shared/lib/repositories/account-privacy.test.ts`
   - Do: Extender `loadAccountExportSource` con siete secciones JSON, incluidas las respuestas del
     banco y el texto íntegro de las cartas: son datos del propio interesado y no se omiten del
     export (se omiten del **log**, que es distinto). Cada sección se lee dentro del contexto de
     tenant del propietario.
   - Verify: `pnpm test account-privacy` — una cuenta con candidaturas, kits, eventos y respuestas
-    exporta las siete secciones; una cuenta sin datos de carrera exporta siete arrays vacíos, no
+    exporta las ocho secciones; una cuenta sin datos de carrera exporta ocho arrays vacíos, no
     ausencias.
 
 - [ ] **Implementar el borrado duro con el orden de FK probado**
   - Files: `src/shared/lib/repositories/account-privacy.ts`, `tests/unit/shared/lib/repositories/account-privacy.test.ts`, `scripts/db/verify-api-isolation-local.mjs`
   - Do: Dentro del bucle `withTenantContext` por membresía de `hardDeleteAccountSubject`, los siete
     pasos de `spec.md` §Retención **en ese orden exacto**: (1) `UPDATE job_applications SET approval_event_id = NULL, current_kit_id = NULL`,
-    (2) `DELETE application_events`, (3) `DELETE application_kits`, (4) `DELETE application_candidates`,
+    (2) `DELETE application_events`, (3) `DELETE application_kits` (que borra
+    `application_kit_claim_facts` por `cascade`, así que **no** necesita paso propio — pero el test debe
+    demostrarlo en vez de asumirlo, porque su FK a `career_facts` es `restrict` y un orden equivocado
+    dejaría la cuenta imborrable), (4) `DELETE application_candidates`,
     (5) `DELETE application_runs`, (6) `DELETE application_mandates`, (7) `DELETE job_applications`
     (que además borra respuestas por su propia consulta). Comentar por qué el paso 1 existe: las FK
     `restrict` desde `job_applications` hacia eventos y kits crearían un ciclo aparente y dejarían la
     cuenta imborrable, que es el fallo que `drizzle/0026_deleted_user_sentinel.sql` documenta. **No**
     se usa `DELETED_USER_SENTINEL_ID`: aquí no hay recurso propiedad de la organización que deba
     sobrevivir al usuario.
+    **Orden entre planes**: `career_facts` sólo se puede borrar **después** de que este dominio haya
+    soltado sus kits, porque `application_kit_claim_facts.fact_id` es `restrict`. El plan hermano borra
+    hechos en su propio paso; si los dos dominios existen, este bloque va antes. Es la clase de
+    dependencia que se prueba con datos, no se razona.
   - Verify: `pnpm test account-privacy`; y en `pnpm test:api-isolation:local`, extender
-    `checkLegalRunWorker` con una cuenta sembrada que tiene una aprobación, dos kits y diez eventos:
-    el borrado duro completa sin quedar bloqueado por `restrict`, y ninguna fila huérfana queda en
-    las siete tablas.
+    `checkLegalRunWorker` con una cuenta sembrada que tiene una aprobación, dos kits, **una carta con
+    tres filas de `application_kit_claim_facts` apuntando a hechos de carrera** y diez eventos: el
+    borrado duro completa sin quedar bloqueado por `restrict`, y ninguna fila huérfana queda en las ocho
+    tablas. El caso de la carta es el que importa: es el único enlace `restrict` que sale de este
+    dominio hacia el hermano.
 
 - [ ] **Enganchar la retención al barrido legal existente**
   - Files: `src/shared/lib/legal.ts`, `tests/unit/shared/lib/legal.test.ts`
