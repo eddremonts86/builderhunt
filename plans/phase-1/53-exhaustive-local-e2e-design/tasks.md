@@ -159,7 +159,12 @@
      already see the invitation in their own list, so the status tells them nothing new. The e2e assertion is
      no longer a `fixme`, and the unit test that pinned the old 403 now pins 404 with the reasoning written
      beside it rather than being quietly flipped.
-  3. `GET /api/me/builder/:id` answers with HTML — still open, covered by the route-method sweep task.
+  3. ~~`GET /api/me/builder/:id` answers with HTML.~~ **Fixed 2026-08-02**, and the mechanism for the rest of
+     the sweep now exists: `methodNotAllowed()` in `src/shared/lib/http/method-not-allowed.ts`. One line per
+     route, an accurate `Allow` header by construction — the part hand-written rejections forget, and the only
+     machine-readable way for a caller to learn what the route *does* accept. The e2e test asserts the header,
+     not just the status. The wider sweep of the other 82 remains its own task, because it is a decision per
+     route rather than one edit.
 
 - [x] **API E2E matrix: platform-admin routes and admin authorization boundaries**
   - Files: `tests/e2e/api/admin.spec.ts` (new), `src/shared/lib/auth/platform-admin.ts` (verification only)
@@ -337,6 +342,10 @@
 
 - [ ] **Sweep every `/api` file route for unimplemented methods** — found twice by the matrix, then counted
   - Files: `scripts/check-api-route-methods.mjs` (new), plus whichever routes the sweep condemns
+  - **The helper already exists (2026-08-02): `methodNotAllowed()` in `src/shared/lib/http/method-not-allowed.ts`,
+    proven on `/api/me/builder/$builderId`.** What remains is the static check and the per-route decisions —
+    for each of the other 82, whether the absent method should 405 or actually be implemented. That judgement is
+    the work; the rejection is one line.
   - **Why this is a task and not two patches.** An unimplemented method on a TanStack Start file route falls
     through to the route *component*, so the request gets **200 with an HTML document** instead of 405 with an
     `Allow` header. A client scripting the endpoint reads 200 and concludes it succeeded. It was hit twice

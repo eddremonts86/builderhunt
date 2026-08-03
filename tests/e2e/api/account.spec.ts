@@ -258,25 +258,27 @@ test.describe('claimed builder profiles', () => {
     expect(body).not.toContain(harness.solo.userId!)
   })
 
-  test.fixme('GET /api/me/builder/:id answers as an API, not with an HTML page', async () => {
+  test('GET /api/me/builder/:id answers as an API, not with an HTML page', async () => {
     /**
-     * **Found by this matrix, deliberately not fixed here.**
+     * **Found by this matrix, and fixed.**
      *
-     * `src/routes/api/me/builder/$builderId.ts` implements `PATCH` and nothing else. An unimplemented method
-     * on a TanStack Start file route falls through to the route *component*, so `GET` returns **200 with an
-     * HTML document** instead of `405` with an `Allow` header. A client scripting against this endpoint reads
-     * 200 and concludes it received a profile.
+     * `src/routes/api/me/builder/$builderId.ts` implements `PATCH` and nothing else. An unimplemented method on
+     * a TanStack Start file route falls through to the route *component*, so `GET` used to return **200 with an
+     * HTML document** instead of `405` with an `Allow` header — a client scripting the endpoint would read 200
+     * and conclude it received a profile. It now answers 405 via
+     * `methodNotAllowed` in `src/shared/lib/http/method-not-allowed.ts`.
      *
      * This is the same defect class already fixed once this session on `PATCH /api/solutions/runs/:id`
      * (plans/UI/tasks.md, Wave 8), which suggests it is worth a sweep across every `/api` file route rather
      * than a second one-off fix — the follow-up task should be "audit all API file routes for unimplemented
      * methods", not "add GET here".
      *
-     * Plan 53's rule forbids production edits inside the matrix, so this is `fixme` and is carried in
-     * `plans/phase-1/53-exhaustive-local-e2e-design/tasks.md`.
+     * The wider sweep — 83 route files declare no GET at all — remains a task, because that is a decision per
+     * route rather than one edit. This is the instance with a measured defect behind it.
      */
     const response = await harness.other.api!.get('/api/me/builder/does-not-exist-at-all')
-    expect(response.status()).toBe(405)
+    expect(response.status(), await response.text()).toBe(405)
+    expect(response.headers()['allow'], 'a 405 without Allow is a dead end for the caller').toContain('PATCH')
   })
 
   test('PATCH on a profile the caller has not claimed is refused', async () => {

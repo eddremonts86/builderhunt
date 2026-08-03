@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { methodNotAllowed } from '~/shared/lib/http/method-not-allowed'
 import { z } from 'zod'
 import { requireTenantPrincipal, TenantAuthorizationError } from '~/shared/lib/auth/tenant-principal'
 import { withTenantContext } from '~/shared/lib/db/tenant-context'
@@ -14,6 +15,17 @@ export const Route = createFileRoute('/api/me/builder/$builderId')({
   component: () => null,
   server: {
     handlers: {
+      /**
+       * A `GET` here used to answer **200 with an HTML document**, because an unimplemented method on a file
+       * route falls through to `component: () => null`. A client reading that 200 would conclude it had
+       * received a profile. Found by `tests/e2e/api/account.spec.ts`.
+       *
+       * The profile itself is readable at `/api/me/builder` and `/api/me/builders`; this route exists only to
+       * edit one, so saying that with a status is more useful than adding a redundant read.
+       */
+      GET: methodNotAllowed(['PATCH'], 'Read your claimed profiles at /api/me/builders.'),
+      DELETE: methodNotAllowed(['PATCH']),
+
       PATCH: async ({ request, params }) => {
         try {
           const principal = await requireTenantPrincipal(request)
