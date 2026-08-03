@@ -1013,22 +1013,30 @@
       ]
     },
     "/api/organizations/activity": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-activity-deletion.spec.ts"
+      ]
     },
     "/api/organizations/deletion": {
       "status": "covered",
       "specs": [
+        "tests/e2e/api/organizations-activity-deletion.spec.ts",
         "tests/e2e/api/organizations.spec.ts"
       ]
     },
     "/api/organizations/deletion/immediate": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/organizations-activity-deletion.spec.ts"
+      ]
     },
     "/api/organizations": {
       "status": "covered",
       "specs": [
         "tests/e2e/api/concurrency-idempotency.spec.ts",
         "tests/e2e/api/cross-tenant.spec.ts",
+        "tests/e2e/api/organizations-activity-deletion.spec.ts",
         "tests/e2e/api/organizations-invitations.spec.ts",
         "tests/e2e/api/organizations.spec.ts",
         "tests/e2e/auth-and-sessions.spec.ts",
@@ -1434,13 +1442,22 @@
       ]
     },
     "/api/work-samples/$id": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/work-samples.spec.ts"
+      ]
     },
     "/api/work-samples/analyze": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/work-samples.spec.ts"
+      ]
     },
     "/api/work-samples": {
-      "status": "missing"
+      "status": "covered",
+      "specs": [
+        "tests/e2e/api/work-samples.spec.ts"
+      ]
     }
   }
 }

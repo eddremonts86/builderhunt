@@ -445,9 +445,9 @@
   - Do: add a static check that every `/api` file route either declares a handler for a method or explicitly
     rejects it with 405 and an `Allow` header, then wire it into `ci:local` next to
     `security:route-coverage`. Prefer a shared helper over 83 hand-written rejections.
-- [ ] **Give the 23 remaining API routes an e2e spec** — split out of task 10's coverage manifest
+- [ ] **Give the 18 remaining API routes an e2e spec** — split out of task 10's coverage manifest
   - Files: `tests/e2e/api/*.spec.ts` (new files per cluster), `tests/e2e/_coverage/manifest.json`
-  - **Measured 2026-08-03: 178 covered, 1 exempt, 23 missing of 202.** The manifest is the source of truth
+  - **Measured 2026-08-03: 183 covered, 1 exempt, 18 missing of 202.** The manifest is the source of truth
     (`pnpm test:e2e:coverage`); it is not yet wired into CI, deliberately, because a failing gate over a known
     backlog only trains people to skip it.
   - **Nearly all 25 have unit coverage and no e2e, which on this repo is not equivalent.** Unit tests connect as
@@ -480,9 +480,37 @@
     - The flags this route needs (`PROFILE_REMOVAL_ENABLED`, `PROFILE_REMOVAL_HMAC_KEY`) are snapshotted and
       restored on teardown. The serial `tests/e2e/api` run (383 passed) is what proves that: leaked flags are
       invisible at six workers and only surface when specs share a process.
-  - Remaining clusters: alerts (4), work-samples (3), ai (3), solutions (3), calendar (2),
-    organizations activity/immediate-deletion (2), plus `builders/claim/verify`, `builders/recent`,
-    `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
+  - **Done: `organizations/activity` + `deletion/immediate`** (`tests/e2e/api/organizations-activity-deletion.spec.ts`,
+    11 passing). Both routes make a claim in a comment that only a real request can check.
+    - The activity route says it "NEVER derives the organization from anything but the principal — there is no
+      `?organizationId=` parameter, no header to spoof, no fallback". A parameter the handler never reads is
+      invisible in review and trivial to add later by accident, so B's id is passed three ways
+      (`organizationId`, `organization_id`, `orgId`) and A's feed must come back byte-identical. Isolation is
+      asserted in both directions — A's row present *and* B's absent — since an empty feed from a broken query
+      would otherwise read as proof of isolation. Also: a half-supplied keyset cursor is refused with 422 (the
+      failure a client would never notice is silently re-reading the same page), and page two cannot hand back
+      page one's row, which is the difference between keyset and offset.
+    - Immediate deletion is the most destructive endpoint in the product, and its confirmation contract exists
+      because a scripted call could skip what the UI enforces — so it is asserted *from a script*, which is the
+      thing the UI cannot prove. After every refusal the organization is checked to still exist. The success path
+      runs against a **throwaway tenant created inside the test**: it really does destroy an organization, and
+      pointing it at a shared fixture would silently break every later assertion. What protects them is a separate
+      subject, not test ordering.
+  - **Done: the three `work-samples` routes** (`tests/e2e/api/work-samples.spec.ts`, 11 passing). These are scoped
+    per **user**, not per organization, which is why a unit test is not enough: as the migration superuser it would
+    see both users' rows regardless of whether the filter did any work. Another user's analysis id answers 404
+    rather than 403 — a 403 for a real id against 404 for a fabricated one would confirm which ids exist — and the
+    refused row is checked to survive.
+    - **My assumption about `analyze` was wrong and is recorded in the spec.** It was written expecting
+      `503 unavailable` from the missing-credentials branch; `.env` supplies `MINIMAX_API_KEY` and `GITHUB_TOKEN`,
+      so that branch is unreachable and what actually answers is the entitlement gate: `429 { error: 'plan' }`,
+      since a `pro` plan's daily allowance for this task is zero.
+    - **That gate is the only thing keeping this suite offline.** Raising the fixture's tier to reach the freshness
+      cache, the 3-per-hour limit or the success shape would make every run bill MiniMax and depend on github.com.
+      Those branches want an AI provider fake first; the warning is in the spec's docblock so the next person does
+      not widen the entitlement to "fix" the coverage.
+  - Remaining clusters: alerts (4), ai (3), solutions (3), calendar (2), plus `builders/claim/verify`,
+    `builders/recent`, `fingerprint/match`, `interviews/shared`, `sprints/preview`, `solutions/config`.
   - Verify: `pnpm test:e2e:coverage` reports 0 missing, then wire it into `ci:local` and `quality.yml` beside
     `security:route-methods` — the gate is worth having only once the backlog it would report is empty.
 
