@@ -386,7 +386,8 @@
       "status": "missing"
     },
     "/api/analytics/conversion": {
-      "status": "missing"
+      "status": "n/a",
+      "reason": "Proven end-to-end by tests/regression/test-conversion.mjs, not by a Playwright spec. That gate drives a real browser through the landing and sign-up surfaces and asserts each instrumented element actually fires its event, which is the failure this route has: a missing conversion event breaks no page and fails no other test, it only makes the funnel look like nobody clicked. It runs in CI (quality.yml, after the a11y gate). A Playwright spec that POSTed the endpoint directly would assert less, since the endpoint working is not the part that goes wrong."
     },
     "/api/auth/$": {
       "status": "covered",

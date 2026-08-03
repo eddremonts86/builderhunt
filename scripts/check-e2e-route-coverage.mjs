@@ -43,8 +43,21 @@ function walk(dir, predicate) {
   })
 }
 
-/** `src/routes/api/foo/$bar/index.ts` → `/api/foo/$bar`. */
+/**
+ * The path a route serves, read from the id the file itself declares.
+ *
+ * Deriving it from the filename is wrong, and was: TanStack treats a dot in a filename as a path separator, so
+ * `solutions/runs.$runId.ts` serves `/api/solutions/runs/$runId`, and `[.]` as an escaped literal dot, so
+ * `calendar/export[.]ics.ts` serves `/api/calendar/export.ics`. The filename-derived version reported
+ * `/api/solutions/runs.$runId` and `/api/calendar/export[.]ics`, whose search keys match nothing a spec would ever
+ * write — so three routes that *are* exercised by `solutions.spec.ts` and `calendar.spec.ts` were counted missing.
+ * A report that invents gaps is worse than one that misses them: it trains people to skim the list.
+ *
+ * Falls back to the filename when a file declares no id, so a malformed route still appears rather than vanishing.
+ */
 function routePathFor(file) {
+  const declared = readFileSync(file, 'utf8').match(/createFileRoute\('([^']+)'\)/)
+  if (declared) return declared[1].replace(/\/$/, '') || '/'
   const withoutRoot = relative('src/routes', file).replace(/\.ts$/, '')
   const normalized = withoutRoot.endsWith('/index') ? withoutRoot.slice(0, -'/index'.length) : withoutRoot
   return `/${normalized}`
