@@ -140,3 +140,25 @@ on 2026-07-29, deliberately not as a checkbox: a deployed release to compare aga
 deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
 work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
 
+
+  **Unblocked 2026-08-03: Docker is available on this machine (29.6.2), which was the blocker's blocker.** The
+  note above says this needs "either a Linux runner or the Playwright Docker image" — the image route is now
+  open. Playwright is pinned at `1.61.1`, so the matching tag is
+  `mcr.microsoft.com/playwright:v1.61.1-jammy`.
+
+  **The two visual suites have very different requirements, and that split is the whole plan.** Do the cheap
+  one first.
+
+  1. **`public-surfaces.spec.ts` — 12 baselines, no database.** It imports nothing from `harness/database` or
+     `harness/server`; the config's own `webServer` serves it. Inside the container: install dependencies
+     (host `node_modules` is darwin-built and will not do), run
+     `pnpm test:visual --update-snapshots -g "public surfaces"`, and commit the `-linux.png` files. Nothing
+     external is needed.
+  2. **`empty-states.spec.ts` — 10 baselines, needs the full harness.** It acquires a disposable database and a
+     Redis namespace, so the container has to reach both. Point `DATABASE_*`/`REDIS_URL` at
+     `host.docker.internal` and confirm the host Postgres accepts connections from the container's subnet
+     before assuming the run is broken.
+
+  Once the `-linux` files exist for both, `pnpm test:visual` can join `quality.yml` — which is also the
+  remaining half of `plans/UI`'s visual task. Do not wire the step before the baselines land: a gate that is red
+  on arrival for a missing file gets disabled rather than satisfied.
