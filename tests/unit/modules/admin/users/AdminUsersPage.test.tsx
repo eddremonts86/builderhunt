@@ -23,25 +23,30 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 500): Respon
   return { ok, status, json: async () => body } as Response
 }
 
+/**
+ * Exactly what `GET /api/admin/users` returns — no more.
+ *
+ * These fixtures carried `plan`, `status` and `planEndsAt` until 2026-08-04, months after the API stopped
+ * sending them with the retirement of the per-user `plans` table. That is how this file stayed green while every
+ * manual grant in the real page answered 400: `startEdit` seeded the form from the now-absent `plan`, and a
+ * fixture that still supplied it made the bug invisible here. A fixture richer than the response it stands in
+ * for is not a fixture, it is a second implementation.
+ */
 const USERS = [
   {
     userId: 'u-canonical', name: 'Canonical Carl', email: 'carl@test.invalid', createdAt: '2027-01-01T00:00:00.000Z',
-    plan: 'pro', status: 'active', planEndsAt: null,
     billing: { organizationId: 'org-1', organizationName: 'Carl Co', entitlementTier: 'pro_max', entitlementStatus: 'active', currentPeriodEnd: null, trialEndsAt: null, provenance: 'canonical', hasActiveSubscription: true },
   },
   {
     userId: 'u-manual', name: 'Manual Mary', email: 'mary@test.invalid', createdAt: '2027-01-01T00:00:00.000Z',
-    plan: 'team', status: 'active', planEndsAt: null,
     billing: { organizationId: 'org-2', organizationName: 'Mary Co', entitlementTier: 'team', entitlementStatus: 'active', currentPeriodEnd: '2099-01-01T00:00:00.000Z', trialEndsAt: null, provenance: 'manual_exception', hasActiveSubscription: false },
   },
   {
     userId: 'u-expired', name: 'Expired Eve', email: 'eve@test.invalid', createdAt: '2027-01-01T00:00:00.000Z',
-    plan: 'pro', status: 'active', planEndsAt: null,
     billing: { organizationId: 'org-3', organizationName: 'Eve Co', entitlementTier: 'pro', entitlementStatus: 'active', currentPeriodEnd: '2020-01-01T00:00:00.000Z', trialEndsAt: null, provenance: 'expired_exception', hasActiveSubscription: false },
   },
   {
     userId: 'u-none', name: 'Orgless Otto', email: 'otto@test.invalid', createdAt: '2027-01-01T00:00:00.000Z',
-    plan: 'free', status: 'active', planEndsAt: null,
     billing: null,
   },
 ]
@@ -92,6 +97,45 @@ describe('AdminUsersPage', () => {
 
     await act(async () => (testId('admin-user-edit') as HTMLButtonElement)?.click())
     expect((testId('admin-user-save') as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('sends a tier the route will accept, seeded from the canonical entitlement', async () => {
+    /**
+     * The test this file was missing, and its absence cost a working feature.
+     *
+     * Nothing here asserted the *shape* of the PATCH body, so when the API dropped the per-user `plan` field the
+     * form began posting `plan: undefined` — dropped by `JSON.stringify`, rejected by the route's schema, shown
+     * to the operator as "Failed: 400". Every assertion in this file still passed.
+     *
+     * `u-canonical` is deliberately the row under test: its organization is on `pro_max`, a tier the select
+     * cannot offer because only Stripe can produce it. The form must fall back to a tier that *is* grantable
+     * rather than post the current one.
+     */
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ users: USERS }))
+      .mockResolvedValueOnce(jsonResponse({ ok: true, to: 'free' }))
+      .mockResolvedValueOnce(jsonResponse({ users: USERS }))
+    vi.stubGlobal('fetch', fetchMock)
+    await render()
+
+    await act(async () => (container!.querySelectorAll('[data-testid="admin-user-edit"]')[0] as HTMLButtonElement).click())
+    const reasonInput = testId('admin-user-reason') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(reasonInput, 'paid by bank transfer')
+      reasonInput.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      (testId('admin-user-save') as HTMLButtonElement).click()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    const patchCall = fetchMock.mock.calls.find((call) => (call[1] as RequestInit | undefined)?.method === 'PATCH')
+    expect(patchCall, 'Save must issue a PATCH').toBeTruthy()
+    const body = JSON.parse((patchCall![1] as RequestInit).body as string) as { plan?: string; reason?: string }
+    expect(['free', 'pro', 'team'], `posted plan: ${String(body.plan)}`).toContain(body.plan)
+    expect(body.reason).toBe('paid by bank transfer')
+    expect(testId('admin-users-success')).toBeTruthy()
   })
 
   it('surfaces a step-up rejection distinctly rather than a fake success', async () => {

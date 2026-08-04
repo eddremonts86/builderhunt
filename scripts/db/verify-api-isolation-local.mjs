@@ -5,9 +5,9 @@
 // `withTenantContext`/RLS policy would actually produce in production.
 //
 // Scope: saved-queries, organization-alerts, builder tracking/notes/claim,
-// sprints (list/detail/results), builder enrichment/evidence, plans/plan-changes,
-// builder export, organization team/members, admin content management
-// (changelog/incidents/roadmap/users/plan-requests), dashboard stats/
+// sprints (list/detail/results), builder enrichment/evidence, the entitlement
+// read (`/api/plans/me`), builder export, organization team/members, admin
+// content management (changelog/incidents/roadmap/users), dashboard stats/
 // recent-builders/recommendations, subject-only `/api/me/**` routes
 // (data-export, delete-account, verified builder claims, evidence-provenance,
 // restrict-processing, org-tracked builders), the two grant-only public
@@ -80,8 +80,6 @@ const IDS = {
   sprintResultA: 'iso-sprint-result-a',
   enrichmentJobA: 'iso-enrichment-job-a',
   evidenceA: 'aaaaaaaa-1111-4aaa-8aaa-aaaaaaaaaaaa',
-  planChangeA: 'iso-plan-change-a',
-  planChangeB: 'iso-plan-change-b',
   recsQueryA: 'iso-recs-query-a',
 }
 
@@ -187,12 +185,6 @@ async function seed() {
       'https://github.com/iso-a', 'iso-evidence-hash-a', ${owner.json({})}, 9000, 1, ${owner.json({})},
       '[]'::jsonb, '[]'::jsonb, 'review', now(), now() + interval '30 days', now()
     )
-  `
-  await owner`
-    insert into plan_changes (id, user_id, from_plan, to_plan, changed_by, reason, created_at)
-    values
-      (${IDS.planChangeA}, ${IDS.userA}, 'free', 'pro', ${IDS.userA}, 'iso test A', now()),
-      (${IDS.planChangeB}, ${IDS.userB}, 'free', 'pro', ${IDS.userB}, 'iso test B', now())
   `
   // `recsQueryA` is NOT seeded here — checkRecommendationsScoping inserts it
   // itself, lazily, right before it runs. Seeding it up front would give org
@@ -597,41 +589,22 @@ async function checkBuilderClaim() {
   }
 }
 
-async function checkPlansAndPlanChanges() {
+/**
+ * The entitlement read.
+ *
+ * This function used to cover three more routes — `/api/me/plan-changes`, `/api/plans/request-upgrade` and the
+ * `plan_changes`/`plan_requests` rows behind them. All of it went away with the legacy per-user plan surface
+ * (2026-08-03): the request queue could not be fed while billing was enabled, `plan_changes` had no writer at
+ * all, and every table involved held zero rows. Dropping those probes is not a loss of coverage, because the
+ * thing they covered no longer exists — the audited grant path they were adjacent to is exercised in
+ * `checkAdminContentManagement` below, against the organization that is actually entitled.
+ */
+async function checkPlansMe() {
   const { Route: PlanMeRoute } = await import('../../src/routes/api/plans/me.ts')
   const { GET: planMeGET } = PlanMeRoute.options.server.handlers
 
   const planA = await (await planMeGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/plans/me') })).json()
   record('plans/me: A\'s seatsUsed reflects only org A\'s membership', planA.plan?.seatsUsed === 1, JSON.stringify(planA.plan))
-
-  const { Route: PlanChangesRoute } = await import('../../src/routes/api/me/plan-changes/index.ts')
-  const { GET: planChangesGET } = PlanChangesRoute.options.server.handlers
-
-  const changesA = await (await planChangesGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/me/plan-changes') })).json()
-  record('plan-changes: A sees only A\'s own plan-change history', Array.isArray(changesA) && changesA.length === 1 && changesA[0].id === IDS.planChangeA, JSON.stringify(changesA))
-
-  const changesB = await (await planChangesGET({ request: sessionRequest('iso-session-token-b', 'https://iso.test/api/me/plan-changes') })).json()
-  record('plan-changes: B sees only B\'s own plan-change history', Array.isArray(changesB) && changesB.length === 1 && changesB[0].id === IDS.planChangeB, JSON.stringify(changesB))
-
-  const { Route: RequestUpgradeRoute } = await import('../../src/routes/api/plans/request-upgrade.ts')
-  const { POST: requestUpgradePOST } = RequestUpgradeRoute.options.server.handlers
-
-  const upgradeResp = await requestUpgradePOST({
-    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/plans/request-upgrade', {
-      method: 'POST',
-      body: JSON.stringify({ requestedPlan: 'pro' }),
-    }),
-  })
-  const upgradeBody = await upgradeResp.json()
-  record('plan request-upgrade: A can request an upgrade', upgradeResp.status === 200 && upgradeBody.ok === true, JSON.stringify(upgradeBody))
-
-  // Guarded: a missing `id` used to be interpolated straight into the query, so a failed upgrade
-  // aborted the whole run with an opaque `UNDEFINED_VALUE` from the driver instead of reporting which
-  // check failed. A harness should always be able to say what went wrong.
-  const requestRow = upgradeBody.id
-    ? (await owner`select user_id from plan_requests where id = ${upgradeBody.id}`)[0]
-    : null
-  record('plan request-upgrade: stored request is owned by A, not B', requestRow?.user_id === IDS.userA, JSON.stringify({ requestRow, upgradeId: upgradeBody.id ?? null }))
 }
 
 async function checkExportBuilders() {
@@ -761,36 +734,48 @@ async function checkAdminContentManagement() {
   const { Route: UserItemRoute } = await import('../../src/routes/api/admin/users/$userId.ts')
   const { PATCH: userPATCH } = UserItemRoute.options.server.handlers
 
-  await userPATCH({
-    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users/x', { method: 'PATCH', body: JSON.stringify({ plan: 'pro' }) }),
+  /**
+   * The operator grant, through the real handler as the real role.
+   *
+   * Rewritten 2026-08-04, and the rewrite is the point. This used to assert `user.plan === 'pro'` from a
+   * per-**user** `plans` row. Entitlement is per organization, so the grant now resolves the organization the
+   * user owns and writes there — which means this probe finally asserts something enforcement actually reads,
+   * and it does so through `builderhunt_platform`. That matters: the first version of the new grant wrote
+   * `organization_entitlements` directly and answered 42501 for this exact role, and no unit test could see it.
+   */
+  const grantResponse = await userPATCH({
+    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users/x', {
+      method: 'PATCH',
+      body: JSON.stringify({ plan: 'pro', reason: 'iso isolation probe' }),
+    }),
     params: { userId: IDS.userA },
   })
-  const usersAfter = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
-  const planA = usersAfter.users.find((u) => u.userId === IDS.userA)
-  const planB = usersAfter.users.find((u) => u.userId === IDS.userB)
+  const grantBody = await grantResponse.json()
   record(
-    'admin users: plan change targets only the specified user, not the other',
-    planA?.plan === 'pro' && planB?.plan !== 'pro',
-    JSON.stringify({ planA, planB }),
+    'admin users: the grant succeeds as builderhunt_platform (not 42501 through a direct table write)',
+    grantResponse.status === 200 && grantBody.to === 'pro',
+    JSON.stringify({ status: grantResponse.status, body: grantBody }),
   )
 
-  const { Route: PlanRequestsRoute } = await import('../../src/routes/api/admin/plan-requests/index.ts')
-  const { POST: planRequestsResolve } = PlanRequestsRoute.options.server.handlers
-  const [pendingRequest] = await owner`
-    insert into plan_requests (id, user_id, requested_plan, status) values (${IDS.planChangeB + '-req'}, ${IDS.userB}, 'team', 'pending') returning id
-  `
-  const resolveResp = await (await planRequestsResolve({
-    request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/plan-requests', {
-      method: 'POST', body: JSON.stringify({ requestId: pendingRequest.id, decision: 'approved' }),
-    }),
-  })).json()
-  const usersAfterResolve = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
-  const resolvedPlanB = usersAfterResolve.users.find((u) => u.userId === IDS.userB)
+  const usersAfter = await (await usersGET({ request: sessionRequest('iso-session-token-a', 'https://iso.test/api/admin/users') })).json()
+  const billingA = usersAfter.users.find((u) => u.userId === IDS.userA)?.billing
+  const billingB = usersAfter.users.find((u) => u.userId === IDS.userB)?.billing
   record(
-    'admin plan-requests: approving B\'s request sets B\'s plan, not A\'s',
-    resolveResp.ok === true && resolvedPlanB?.plan === 'team',
-    JSON.stringify({ resolveResp, resolvedPlanB }),
+    'admin users: the grant lands on A\'s organization only, never B\'s',
+    billingA?.entitlementTier === 'pro' && billingB?.entitlementTier !== 'pro',
+    JSON.stringify({ billingA, billingB }),
   )
+  record(
+    'admin users: a manually granted tier is reported as an exception, not as Stripe-backed',
+    billingA?.provenance === 'manual_exception' && billingA?.hasActiveSubscription === false,
+    JSON.stringify(billingA),
+  )
+
+  /*
+   * `admin plan-requests: approving B's request sets B's plan, not A's` was here and is gone with the route
+   * (2026-08-03). The queue could not be fed — every self-service request was refused while billing was
+   * enabled — so the probe was exercising an approval flow that no user could ever reach.
+   */
 }
 
 async function checkDashboardStatsAndRecent() {
@@ -1231,7 +1216,7 @@ async function main() {
   await checkSprints()
   await checkEnrichmentAndEvidence()
   await checkBuilderClaim()
-  await checkPlansAndPlanChanges()
+  await checkPlansMe()
   await checkExportBuilders()
   await checkOrganizationTeamAndMembers()
   await checkDashboardStatsAndRecent()
@@ -1240,9 +1225,8 @@ async function main() {
   await checkWorkerIsolation()
   await checkCreditLedgerInvariantsUnderWorkerRole()
   await checkAbuseConsoleAndSessionsRoutes()
-  // Run last: checkAdminContentManagement approves a plan-request for B
-  // (legitimately recording admin A's id in B's own plan-change history) and
-  // checkMeSubjectRoutes requests/cancels a real account deletion — both
+  // Run last: checkAdminContentManagement grants an entitlement (legitimately recording admin A's id against
+  // the organization it moved on) and checkMeSubjectRoutes requests/cancels a real account deletion — both
   // would otherwise trip checkAccountExportPrivacy's blunt
   // never-mentions-the-other-user's-id assertion, which was written
   // assuming no such legitimate cross-reference exists yet.

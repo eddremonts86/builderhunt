@@ -64,6 +64,13 @@
     `api.hashnode.com` endpoint (zero-impact, degrades to `[]`) rather than paying for the
     new offering or removing the integration outright. Revisit if Hashnode's pricing
     changes or the free tier reopens — no further action needed now.
+  - **Re-checked live 2026-08-04, still closed.** `POST https://gql.hashnode.com` continues to
+    301 to `https://hashnode.com/announcements/graphql-api` ("GraphQL API is moving to a paid
+    offering"). `api.hashnode.com` has degraded further and now answers **404** rather than the
+    301 it returned in July — the old host no longer even points at the announcement. Nothing
+    changed that would unblock this; the decision above stands, and the connector's own header
+    comment already records the dead end. Re-verified rather than assumed, since a "paid API"
+    situation is exactly the kind that can quietly reopen.
 
 - [x] **Fix `hn-` id prefix collision with the Hacker News source**
   - Files: `src/lib/sources/hashnode.ts`

@@ -359,6 +359,44 @@ Also worth recording: a production deploy would fail at orchestrator **step 2**
 not at `0102`. The `function uuidv7() does not exist` error is what CI sees, because CI runs
 `drizzle-kit migrate` directly rather than through the orchestrator.
 
+## Note 2026-08-04 — most of Phases 3 and 4 is ceremony for data this project does not have
+
+**Not acted on. This is a recommendation, because it changes a written plan's risk posture and it
+touches production, which is Edd's call.**
+
+Phases 3 and 4 are built around one premise: there is production data whose loss or corruption would
+be unacceptable, so the cutover must be rehearsed on a copy, measured for a write-freeze budget, and
+made reversible up to a named point of no return. That premise is currently false. The MVP/beta policy
+in force is explicit that there are no real users and that wiping the production database entirely is
+acceptable.
+
+Under that policy the cheap path is: provision a PG18 resource, run migrations from `0000` to latest
+against an empty database, verify roles/RLS/grants on the target, repoint, redeploy. No dump, no
+restore, no row-count diff, no freeze window, no point of no return — because there is nothing to
+freeze and nothing to lose. That collapses "Rehearse on a scratch copy of real production data",
+"Compare a real semantic-search result set before and after", "Freeze writes", "Take the pre-cutover
+dump and record parity input" and "Restore into the standing PG18 resource" into a single provision
+step.
+
+**What stays necessary even then**, because these are correctness facts about the target rather than
+insurance about the data:
+
+- **The image must be `pgvector/pgvector:pg18`**, not a plain `postgres:18`. A plain image makes
+  `CREATE EXTENSION vector` fail inside migration 0013, which rolls back *every* migration in the same
+  transaction — the visible symptom is that the organization tables never exist and login answers 500.
+  This has already happened once on this project with pg16.
+- **Roles, GRANTs and RLS must be verified on the target as the real roles** (`pnpm test:rls:local`
+  and `pnpm test:api-isolation:local` against it), because they live only in hand-written migrations
+  and a superuser connection cannot see whether they took.
+- **Migrations must apply from zero**, which is the same gate `ci:local` already runs — a fresh
+  install is now the *only* path, so it stops being one scenario among several and becomes the whole
+  cutover.
+- **Backup and restore capability** still matters (plan 02's cron, off-site copy) — just not as a
+  cutover gate. It protects the future, not this migration.
+
+If the data does become worth protecting before this runs, revert to the phases as written. Until
+then, the rehearsal measures a freeze budget for a freeze nobody needs.
+
 ## Phase 3 — Full-fidelity rehearsal against production data
 
 - [ ] **Rehearse on a scratch copy of real production data**

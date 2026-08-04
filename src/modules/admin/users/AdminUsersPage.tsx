@@ -18,25 +18,25 @@ interface UserBillingSummary {
   hasActiveSubscription: boolean
 }
 
+/**
+ * `plan`, `status` and `planEndsAt` were fields on this interface until 2026-08-04, read from the per-user
+ * `plans` table. The API stopped sending them when that table was retired, and **nothing caught it**: this is a
+ * hand-written DTO and `load()` parses the response as `any`, so TypeScript had no way to see the divergence.
+ * The failure surfaced as `startEdit` seeding the form with `plan: undefined`, which `JSON.stringify` drops,
+ * which the route's schema rejects — every manual grant answered 400 with "Failed: 400" in the banner.
+ *
+ * Everything the operator needs is in `billing`, together with the provenance saying whether Stripe or an
+ * operator put it there. Two sources for one question is what produced this.
+ */
 interface UserRow {
   userId: string
   name: string
   email: string
   createdAt: string
-  plan: PlanTier
-  status: string
-  planEndsAt: string | null
   billing: UserBillingSummary | null
 }
 
-const PLAN_COLORS: Record<PlanTier, string> = {
-  free: 'text-bh-text-dim bg-bh-surface/40 border-bh-border',
-  pro: 'text-bh-accent bg-bh-accent-soft border-bh-accent/30',
-  team: 'text-bh-cyan-text bg-bh-cyan/10 border-bh-cyan/30',
-}
-
-/** Canonical entitlement tier badge — includes Pro Max, which the legacy `PLAN_COLORS` above (a
- * pre-Pro-Max, per-user grant concept) has no entry for. */
+/** Canonical entitlement tier badge — includes Pro Max, which a manual grant can never produce. */
 const ENTITLEMENT_TIER_COLORS: Record<string, string> = {
   free: 'text-bh-text-dim bg-bh-surface/40 border-bh-border',
   pro: 'text-bh-accent bg-bh-accent-soft border-bh-accent/30',
@@ -120,8 +120,15 @@ export function AdminUsersPage() {
 
   const startEdit = (u: UserRow) => {
     setEditingId(u.userId)
-    const endsAt = u.planEndsAt ? new Date(u.planEndsAt).toISOString().slice(0, 10) : ''
-    setForm({ plan: u.plan, planEndsAt: endsAt, reason: '' })
+    // Seeded from the canonical entitlement. `pro_max` is deliberately not offered — only a real Stripe
+    // subscription can produce it — so an organization already on it starts the form at `free` rather than at a
+    // tier this control cannot express; the Stripe badge next to it is what tells the operator why.
+    const currentTier = u.billing?.entitlementTier
+    const plan: PlanTier = currentTier === 'pro' || currentTier === 'team' ? currentTier : 'free'
+    // The grant's own expiry, not Stripe's period end: `planEndsAt` maps to `trial_ends_at`, which is the only
+    // date a manual grant sets.
+    const endsAt = u.billing?.trialEndsAt ? new Date(u.billing.trialEndsAt).toISOString().slice(0, 10) : ''
+    setForm({ plan, planEndsAt: endsAt, reason: '' })
     setError(null)
     setSuccess(null)
   }
@@ -206,7 +213,6 @@ export function AdminUsersPage() {
             <tr className="border-b border-bh-border text-left text-xs uppercase tracking-wider text-bh-text-dim">
               <th className="px-3 py-2">User</th>
               <th className="px-3 py-2">Organization &amp; entitlement</th>
-              <th className="px-3 py-2">Manual grant</th>
               <th className="px-3 py-2">Ends at</th>
               <th className="px-3 py-2">Joined</th>
               <th className="px-3 py-2"></th>
@@ -214,9 +220,9 @@ export function AdminUsersPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="text-center py-6 text-bh-text-muted">Loading…</td></tr>
+              <tr><td colSpan={5} className="text-center py-6 text-bh-text-muted">Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-6 text-bh-text-muted">No users found.</td></tr>
+              <tr><td colSpan={5} className="text-center py-6 text-bh-text-muted">No users found.</td></tr>
             ) : (
               filtered.map((u) => (
                 <tr key={u.userId} className="border-b border-bh-border/40" data-testid={`admin-user-row-${u.userId}`}>
@@ -227,6 +233,8 @@ export function AdminUsersPage() {
                         <p className="text-xs text-bh-text-dim">{u.email}</p>
                       </td>
                       <td className="px-3 py-2"><BillingCell billing={u.billing} /></td>
+                      {/* Tier, expiry and reason share one cell: the row now has five columns, matching the
+                          header, since the duplicate per-user "Manual grant" column is gone. */}
                       <td className="px-3 py-2">
                         <Select
                           value={form.plan}
@@ -242,12 +250,11 @@ export function AdminUsersPage() {
                           </SelectContent>
                         </Select>
                         <p className="text-[10px] text-bh-text-dim mt-1">Pro Max is Stripe-only — never manually grantable.</p>
-                      </td>
-                      <td className="px-3 py-2">
                         <Input
                           type="date"
                           value={form.planEndsAt}
                           onChange={(e) => setForm({ ...form, planEndsAt: e.target.value })}
+                          className="mt-1"
                           data-testid="admin-user-ends-at"
                         />
                         <Input
@@ -292,14 +299,12 @@ export function AdminUsersPage() {
                         <p className="text-xs text-bh-text-dim">{u.email}</p>
                       </td>
                       <td className="px-3 py-2"><BillingCell billing={u.billing} /></td>
-                      <td className="px-3 py-2">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${PLAN_COLORS[u.plan]}`} data-testid={`admin-user-manual-grant-${u.userId}`}>
-                          {u.plan}
-                        </span>
-                        <p className="text-[10px] text-bh-text-dim mt-0.5">{u.status}</p>
-                      </td>
-                      <td className="px-3 py-2 text-bh-text-muted text-xs">
-                        {u.planEndsAt ? new Date(u.planEndsAt).toLocaleDateString() : '—'}
+                      <td className="px-3 py-2 text-bh-text-muted text-xs" data-testid={`admin-user-ends-at-${u.userId}`}>
+                        {u.billing?.trialEndsAt
+                          ? <span title="Expiry set on a manual grant">{new Date(u.billing.trialEndsAt).toLocaleDateString()}</span>
+                          : u.billing?.currentPeriodEnd
+                            ? <span title="End of the current Stripe billing period">{new Date(u.billing.currentPeriodEnd).toLocaleDateString()}</span>
+                            : '—'}
                       </td>
                       <td className="px-3 py-2 text-bh-text-dim text-xs">
                         {new Date(u.createdAt).toLocaleDateString()}

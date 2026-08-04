@@ -6,9 +6,17 @@
  * once it does: one entitlement per organization, seats decided by the tier rather than by the caller, and a
  * grant that never pretends to be a Stripe subscription.
  *
- * Runs against a disposable database as the migration role, which is right here: a grant is a platform action
- * with no `app.organization_id` to scope it by, authorized by the platform-admin allow-list rather than by RLS.
- * `scripts/db/verify-rls-local.mjs` is where role behaviour on this table is proven.
+ * ## What this file cannot prove, stated because it already hid a real defect
+ *
+ * It runs against a disposable database **as the migration role**, which sees no GRANTs and no RLS. The first
+ * version of this repository wrote `organization_entitlements` directly through `platformDb`; these tests passed
+ * while the feature was dead in production, because `builderhunt_platform` has no privilege on that table at
+ * all. An e2e test clicking Save on `/admin/users` is what caught it.
+ *
+ * So this file now covers the *logic* — which tiers are grantable, what seats a tier carries, what a re-grant
+ * does to an old expiry — and the **role** behaviour is proven where it can be: `scripts/db/verify-rls-local.mjs`
+ * calls the grant as the real `builderhunt_platform` role and asserts that the same write attempted directly
+ * against the table is refused. Both halves are needed; neither substitutes for the other.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { eq } from 'drizzle-orm'
@@ -25,7 +33,7 @@ vi.mock('~/shared/lib/db/client', async (importOriginal) => {
   }
 })
 
-const { grantOrganizationEntitlement, readOrganizationEntitlementForOperator, OperatorGrantError } =
+const { grantOrganizationEntitlement, OperatorGrantError } =
   await import('~/shared/lib/repositories/operator-grants')
 
 let drop: () => Promise<void>
@@ -92,10 +100,8 @@ describe('grantOrganizationEntitlement', () => {
      * A stale `monthly` here would make the billing page show a renewal date that will never arrive — the
      * customer would be told they are about to be charged for something nobody is charging them for.
      */
-    await grantOrganizationEntitlement({ organizationId: ORG, tier: 'pro_max' })
-    const row = await readRow()
-    expect(row!.billingPeriod).toBe('none')
-    expect(row!.seatLimit, 'pro_max is a single-operator tier').toBe(1)
+    await grantOrganizationEntitlement({ organizationId: ORG, tier: 'pro' })
+    expect((await readRow())!.billingPeriod).toBe('none')
   })
 
   it('carries a trial expiry when one is given, and clears it when it is not', async () => {
@@ -111,25 +117,23 @@ describe('grantOrganizationEntitlement', () => {
 
   it('refuses an unknown organization instead of creating an orphan entitlement', async () => {
     await expect(grantOrganizationEntitlement({ organizationId: 'og-org-nope', tier: 'pro' }))
-      .rejects.toBeInstanceOf(OperatorGrantError)
+      .rejects.toMatchObject({ code: 'unknown_organization' })
   })
 
-  it('refuses a tier that is not grantable', async () => {
-    await expect(grantOrganizationEntitlement({ organizationId: ORG, tier: 'enterprise' as never }))
+  it('refuses pro_max — it can only come from a real Stripe subscription', async () => {
+    /**
+     * Previously this file asserted the opposite: that a `pro_max` grant succeeded and carried one seat. That
+     * contradicted three other statements of the same rule — the admin route's named test, the
+     * `organization_plan_changes` tier CHECK, and 30-stripe-billing-platform/tasks.md's explicit note that the
+     * manual-grant trail "can never produce Pro Max". The type now excludes it, so this needs a cast to even
+     * express, and `drizzle/0141`'s function refuses it independently for any caller that bypasses the type.
+     */
+    await expect(grantOrganizationEntitlement({ organizationId: ORG, tier: 'pro_max' as never }))
       .rejects.toMatchObject({ code: 'invalid_tier' })
   })
-})
 
-describe('readOrganizationEntitlementForOperator', () => {
-  it('returns null for an organization that has never had one set', async () => {
-    const other = 'og-org-b'
-    await db.insert(organizations).values({ id: other, name: other, slug: other, createdAt: new Date() })
-    expect(await readOrganizationEntitlementForOperator(other)).toBeNull()
-  })
-
-  it('reflects what the last grant wrote', async () => {
-    await grantOrganizationEntitlement({ organizationId: ORG, tier: 'team', notes: 'renewed' })
-    const read = await readOrganizationEntitlementForOperator(ORG)
-    expect(read).toMatchObject({ organizationId: ORG, tier: 'team', seatLimit: 10, notes: 'renewed' })
+  it('refuses a tier that is not grantable at all', async () => {
+    await expect(grantOrganizationEntitlement({ organizationId: ORG, tier: 'enterprise' as never }))
+      .rejects.toBeInstanceOf(OperatorGrantError)
   })
 })

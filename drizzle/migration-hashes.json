@@ -564,6 +564,10 @@
     "0140_invitation_race_and_security_audit": {
       "sql": "79467a7961ae93c29eecb66dd4516f9c3e55c232c41df8f6b0788ea0112da76e",
       "snapshot": "f8b36d715f928339a745b43bf2972f585e3a19e681b781ece4579d67a22a2b89"
+    },
+    "0141_platform_admin_grant_entitlement": {
+      "sql": "dfbff45874205602d60a1a476bb6a9bb6a0c3062098ed1fe825e3f0ae895318e",
+      "snapshot": "fc8e37b540198499f4ea433c5caca828da2cc559b3766c9aad80875e428dda27"
     }
   }
 }

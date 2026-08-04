@@ -11,18 +11,18 @@ import { getPlatformUserBillingSummary } from '~/shared/lib/repositories/platfor
 import { grantOrganizationEntitlement, OperatorGrantError } from '~/shared/lib/repositories/operator-grants'
 
 /**
- * `pro_max` stays out, deliberately — and this was nearly changed by mistake.
+ * `pro_max` stays out, and the reason is not what an earlier version of this comment guessed.
  *
- * The canonical grant path *can* write it (`EntitlementTier` includes it, unlike the legacy `PlanTier`), so the
- * first version of this route added it, reasoning that the omission was an artefact of the old type rather than
- * a decision. `tests/unit/routes/api/admin/users/$userId.test.ts` says otherwise, by name: "never accepts
- * pro_max — Stripe-only, not manually grantable". A named assertion is a policy until someone changes it on
- * purpose, so it stands.
+ * That version recorded the exclusion as possibly accidental, on the grounds that `team` carries more monthly
+ * credits (2100 against `pro_max`'s 700) and *is* grantable — so "too much value to hand out" could not be the
+ * rationale. It isn't the rationale, but the exclusion is deliberate, and the plans say so outright:
+ * 30-stripe-billing-platform/tasks.md records that the manual-grant audit trail "can never produce Pro Max
+ * (only a real Stripe subscription can)", which is why `organization_plan_changes`'s tier CHECK was left at
+ * `free`/`pro`/`team` when `organization_entitlements` was widened for it.
  *
- * **Recorded because the policy looks inconsistent and may be worth revisiting:** the plans do not state a
- * rationale anywhere, and if the reason were "too much value to hand out", `team` should be excluded first — it
- * carries 2100 monthly credits against `pro_max`'s 700, and `team` *is* grantable. So the exclusion may be
- * accidental. That is a pricing decision, not a refactor, and it is not this change's to make.
+ * So the rule is about provenance, not generosity: `pro_max` is a Stripe-only tier, and a hand-granted
+ * `pro_max` would claim a subscription that does not exist. Three other places now enforce it — the
+ * `GrantableTier` type, `drizzle/0141`'s function, and this schema — so no single caller has to remember.
  */
 const UpdateBody = z.object({
   plan: z.enum(['free', 'pro', 'team']),

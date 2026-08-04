@@ -188,8 +188,8 @@ const ROUTES: Array<{ file: string; method: Method; path: string }> = [
   { file: 'operations/index.ts', method: 'GET', path: '/api/admin/operations' },
   { file: 'operations/sync-schedules.ts', method: 'GET', path: '/api/admin/operations/sync-schedules' },
   { file: 'operations/sync-schedules.ts', method: 'POST', path: '/api/admin/operations/sync-schedules' },
-  { file: 'plan-requests/index.ts', method: 'GET', path: '/api/admin/plan-requests' },
-  { file: 'plan-requests/index.ts', method: 'POST', path: '/api/admin/plan-requests' },
+  // `plan-requests/index.ts` was here and is gone (2026-08-03) with the legacy self-service upgrade queue —
+  // every request was refused while billing was enabled, so the screen reviewed an empty list by construction.
   { file: 'roadmap/$id.ts', method: 'PATCH', path: '/api/admin/roadmap/absent-id' },
   { file: 'roadmap/$id.ts', method: 'DELETE', path: '/api/admin/roadmap/absent-id' },
   { file: 'roadmap/index.ts', method: 'GET', path: '/api/admin/roadmap' },

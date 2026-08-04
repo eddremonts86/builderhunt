@@ -126,9 +126,11 @@ test.describe('anonymous access', () => {
     { method: 'DELETE' as const, path: '/api/me/delete-account' },
     { method: 'GET' as const, path: '/api/me/builder' },
     { method: 'GET' as const, path: '/api/me/builders' },
-    { method: 'GET' as const, path: '/api/me/plan-changes' },
     { method: 'GET' as const, path: '/api/plans/me' },
-    { method: 'POST' as const, path: '/api/plans/request-upgrade' },
+    // `/api/me/plan-changes` and `/api/plans/request-upgrade` were probed here until 2026-08-03. Both routes
+    // went away with the legacy per-user plan surface, so both now answer 404 to everyone — which is not a
+    // refusal this list can assert, and asserting it anyway is how a deleted route keeps a test green by
+    // accident.
   ]
 
   for (const route of ROUTES) {
@@ -310,9 +312,10 @@ test.describe('plan routes', () => {
     expect(body).not.toContain(harness.other.userId!)
   })
 
-  test('GET /api/me/plan-changes lists only the caller’s own history', async () => {
-    const response = await harness.other.api!.get('/api/me/plan-changes')
-    expect(response.status(), await response.text()).toBe(200)
-    expect(await response.text()).not.toContain(harness.solo.userId!)
-  })
+  /*
+   * `GET /api/me/plan-changes lists only the caller's own history` was here. The route is gone, and so is the
+   * `plan_changes` table it read — which had no writer at all, so the history it isolated was always empty and
+   * the test could not have failed. The manual-grant trail now lives in `security_audit_events`, asserted in
+   * `admin-users.spec.ts` where the grant is actually made.
+   */
 })

@@ -208,6 +208,18 @@ test.describe('admin users — organization-owned billing', () => {
       await row.getByTestId('admin-user-edit').click()
       await expect(page.getByTestId('admin-user-save')).toBeDisabled()
 
+      /**
+       * Pick a tier explicitly, so this is a real upgrade rather than a grant of the tier the workspace already
+       * holds. The organization is seeded `free`, and the form now seeds the select from the canonical
+       * entitlement — so saving without touching it would grant free→free and the assertions below would be
+       * checking that nothing happened.
+       *
+       * A Radix Select (the testid sits on the trigger button, `AdminUsersPage.tsx`), driven the way a user
+       * does: open the trigger, click the option. `selectOption` only works on a native `<select>`.
+       */
+      await page.getByTestId('admin-user-plan-select').click()
+      await page.getByRole('option', { name: 'Pro', exact: true }).click()
+
       await page.getByTestId('admin-user-reason').fill('Paid via invoice, confirmed manually.')
       await expect(page.getByTestId('admin-user-save')).toBeEnabled()
       await page.getByTestId('admin-user-save').click()
@@ -219,14 +231,42 @@ test.describe('admin users — organization-owned billing', () => {
       await context.close()
     }
 
-    // Checked before cleanup — `plan_changes.user_id` cascades on the user's deletion below, so the
-    // audit row must be read first or it's gone by the time this assertion runs.
-    const [change] = await harness.sql<{ reason: string | null; changed_by: string }[]>`
-      select reason, changed_by from plan_changes where user_id = ${userId} order by created_at desc limit 1
+    /**
+     * The audit row moved, and the move is the substance.
+     *
+     * This read `plan_changes`, keyed by the granted **user**. Entitlement is enforced per organization, so a row
+     * naming a user recorded something no enforcement check ever reads — it could not answer "which workspace got
+     * upgraded", the only question an auditor actually has. `plan_changes` also had no writer at all by the end,
+     * so this assertion was reading a table nothing filled.
+     *
+     * The trail is now `security_audit_events`, written durably through the worker role: it targets the
+     * organization and carries `onBehalfOfUserId` so both ends of the indirection survive — the operator clicked
+     * a user, the entitlement moved on a workspace.
+     *
+     * Still read before cleanup: the row references the organization, which the cleanup below deletes.
+     */
+    const [audit] = await harness.sql<{
+      action: string
+      target_type: string
+      target_id: string
+      actor_user_id: string
+      result: string
+      details: { from?: string; to?: string; onBehalfOfUserId?: string }
+    }[]>`
+      select action, target_type, target_id, actor_user_id, result, details
+      from security_audit_events
+      where action = 'admin.user.entitlement-grant' and target_id = ${orgId}
+      order by created_at desc limit 1
     `
     await cleanupUserWithOrg(userId, orgId)
-    expect(change?.reason).toContain('Paid via invoice')
-    expect(change?.changed_by).toBe(harness.admin.userId)
+
+    expect(audit, 'the grant must leave a durable audit row, not just a log line').toBeTruthy()
+    expect(audit!.target_type).toBe('organization')
+    expect(audit!.result).toBe('allowed')
+    expect(audit!.actor_user_id).toBe(harness.admin.userId)
+    expect(audit!.details.from).toBe('free')
+    expect(audit!.details.to).toBe('pro')
+    expect(audit!.details.onBehalfOfUserId, 'the user the operator clicked must stay recoverable').toBe(userId)
   })
 
   test('links to Billing Operations', async ({ browser }) => {

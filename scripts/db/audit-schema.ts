@@ -37,9 +37,16 @@ const classifications: Classification[] = [
   account('user_consents', 'user_id', ['legal-and-compliance']),
   account('data_export_requests', 'user_id', ['legal-and-compliance', 'security-and-multitenancy']),
   account('deletion_requests', 'user_id', ['legal-and-compliance', 'security-and-multitenancy']),
-  account('plans', 'user_id (legacy)', ['pricing-and-billing', 'security-and-multitenancy'], 'compatibility window; migrate to organization entitlement'),
-  operational('plan_changes', 'affected user + admin actor', ['pricing-and-billing', 'security-and-multitenancy']),
-  account('plan_requests', 'user_id (legacy)', ['pricing-and-billing', 'security-and-multitenancy'], 'support retention; migrate to organization ownership'),
+  /*
+   * `plans`, `plan_changes` and `plan_requests` were classified here and are gone (2026-08-03), removed from
+   * `schema.ts` with the rest of the legacy per-user plan surface. This audit is generated *from* `schema.ts`,
+   * so a classification for a table it no longer declares fails the run — which is how this list stays honest
+   * in both directions.
+   *
+   * The tables themselves still exist in the database until the contraction migration drops them. Nothing reads
+   * or writes them: all three held zero rows, `plan_changes` never had a writer, and `plan_requests` refused
+   * every new request while billing was enabled. Entitlement lives on `organization_entitlements` below.
+   */
   tenant('organization_entitlements', 'organization_id', ['security-and-multitenancy', 'pricing-and-billing'], { organizationColumn: true }),
   tenant('organization_plan_changes', 'organization_id', ['security-and-multitenancy', 'pricing-and-billing'], { organizationColumn: true }),
   global('builder_identities', ['id', 'source', 'source_id', 'username', 'display_name', 'avatar_url', 'bio', 'profile_url'], ['security-and-multitenancy', 'shared-resources']),

@@ -166,7 +166,17 @@ tracking table.
 **Known dead-ish surfaces** (exist in schema, effectively unused at runtime — check before
 building on them): `builder_source_snapshots` has **no runtime writer** (its only writer is
 the one-shot backfill `scripts/db/backfills/builders.ts`) and no `builderhunt_app` grant;
-`organization_plan_changes` has no writer. `builder_identities.first_seen_at` is written only
+`organization_plan_changes` has no writer — and, checked 2026-08-04, **cannot get one cheaply**:
+`drizzle/0008_tenant_rls.sql` grants `SELECT, INSERT` on it to `builderhunt_app` only, with both
+policies scoped by `app.organization_id`. That makes it a *customer-facing* history table (the
+workspace owner reading their own plan changes), but the only thing that changes an entitlement by
+hand is the operator grant, which runs as `builderhunt_platform` with no `app.organization_id` to
+scope by. Giving it a writer therefore needs a SECURITY DEFINER function (the pattern
+`platform_admin_user_billing_summary` already uses) plus the customer-facing surface to read it —
+a product decision, not a wiring fix. Meanwhile the *auditor's* view of the same event is not
+missing: `grantOrganizationEntitlement` writes `security_audit_events` durably as
+`admin.user.entitlement-grant` with `from`/`to`/`organizationName`/`onBehalfOfUserId`.
+`builder_identities.first_seen_at` is written only
 by `trackOrganizationBuilder`, so it measures *when a tenant tracked someone*, not when the
 person was first observed — it is not a market time series.
 
@@ -176,11 +186,17 @@ person was first observed — it is not a market time series.
 
 **Privacy/legal**: `user_consents`, `data_export_requests`, `deletion_requests`.
 
-**Billing (legacy, per-user, still live for existing manual customers)**: `plans` (PK =
-`user_id`), `plan_changes`, `plan_requests`.
+**Billing (legacy, per-user — RETIRED from the code 2026-08-03)**: `plans` (PK = `user_id`),
+`plan_changes`, `plan_requests`. All three held **0 rows**, `plan_changes` had no writer at all, and
+`plan_requests` refused every new request while billing was enabled. Removed from `schema.ts` along
+with their routes, the admin queue and the `LegacyPlanMutationDisabledError` gate that guarded them.
+The tables themselves are still in the database until the contraction migration runs; nothing reads
+them. Granting a tier by hand now lives in `repositories/operator-grants.ts`, against the
+organization.
 
 **Billing (canonical, per-organization)**: `organization_entitlements`, `organization_plan_changes`
-(schema exists but is currently dead code — nothing writes to it yet).
+(schema exists but is currently dead code — nothing writes to it yet; see the dead-ish surfaces note
+above for why wiring it up is a product decision rather than a one-liner).
 
 **Billing (Stripe platform, 19 tables — ALL EXIST)**: `billing_customers`,
 `billing_subscriptions`, `billing_checkout_attempts`, `billing_credit_grants`,

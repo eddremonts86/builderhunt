@@ -319,6 +319,53 @@ try {
   }
   if (!platformBillingDenied) throw new Error('Platform role accessed tenant billing customer data')
 
+  /**
+   * The operator grant, as the role that actually performs it.
+   *
+   * This exists because its absence hid a real defect. `grantOrganizationEntitlement` originally wrote
+   * `organization_entitlements` straight through `platformDb`, and `builderhunt_platform` has no privilege on
+   * that table at all — the owner-facing grant was dead in production while its unit tests passed, because they
+   * connect as the migration superuser. `drizzle/0141` added the narrow SECURITY DEFINER function; these three
+   * checks are the part no unit test can make.
+   *
+   * All three matter together: the function must work, and the two direct routes to the same table must stay
+   * shut. A passing first check with a passing second would mean the migration had simply granted the table.
+   */
+  const grantOrgId = 'org-a'
+  const [grantedByPlatform] = await platform`
+    select tier, seat_limit from platform_admin_grant_organization_entitlement(
+      ${grantOrgId}, 'team', 'active', 10, 'rls verifier grant', null
+    )
+  `
+  if (grantedByPlatform?.tier !== 'team' || Number(grantedByPlatform?.seat_limit) !== 10) {
+    throw new Error('Platform role could not perform the operator grant through its SECURITY DEFINER function')
+  }
+
+  let platformEntitlementWriteDenied = false
+  try {
+    await platform`
+      insert into organization_entitlements (
+        organization_id, tier, status, billing_period, seat_limit, created_at, updated_at
+      ) values (${grantOrgId}, 'team', 'active', 'none', 10, now(), now())
+      on conflict (organization_id) do update set tier = 'team'
+    `
+  } catch (error) {
+    platformEntitlementWriteDenied = error?.code === '42501'
+  }
+  if (!platformEntitlementWriteDenied) {
+    throw new Error('Platform role wrote organization_entitlements directly — the grant function is not the only path')
+  }
+
+  let platformEntitlementReadDenied = false
+  try {
+    await platform`select tier from organization_entitlements where organization_id = ${grantOrgId}`
+  } catch (error) {
+    platformEntitlementReadDenied = error?.code === '42501'
+  }
+  if (!platformEntitlementReadDenied) {
+    throw new Error('Platform role read organization_entitlements directly — it must go through platform_admin_user_billing_summary')
+  }
+
   // user_devices — account-subject (app.user_id). App role is scoped read/write for its own
   // user_id (request-path device-cookie upsert); worker role got an unscoped, SELECT-only grant in
   // 0045 for cross-user linked-account clustering (there's no single user_id to scope a clustering
@@ -1691,6 +1738,9 @@ try {
     workerBillingTenantIsolation: workerBillingA.map((row) => row.id),
     workerBillingCrossTenantUpdate: 'denied',
     platformBillingAccess: 'denied',
+    platformOperatorGrant: `${grantedByPlatform.tier}/${grantedByPlatform.seat_limit} seats`,
+    platformEntitlementDirectWrite: 'denied',
+    platformEntitlementDirectRead: 'denied',
     userDevicesA: devicesA.map((row) => row.id),
     userDevicesB: devicesB.map((row) => row.id),
     crossSubjectDeviceInsert: 'denied',
