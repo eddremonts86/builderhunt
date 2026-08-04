@@ -63,6 +63,18 @@ const fail = (message) => {
   failed = true
 }
 
+/**
+ * Field failures are collected instead of printed one by one.
+ *
+ * A plan authored in a different task format produces one failure per task — `phase-2/07` alone emitted 83
+ * identical lines, which read as 83 separate defects and buried the single actionable fact: that one file uses
+ * a compact `**N.M** — description` shape rather than the Files/Do/Verify triple. A check nobody can act on is
+ * a check that gets ignored, so a file past the threshold is reported once, by file, with its line numbers.
+ */
+const fieldFailuresByFile = new Map()
+const openTaskCountByFile = new Map()
+const FIELD_FAILURE_DIGEST_THRESHOLD = 5
+
 function walk(dir) {
   for (const entry of readdirSync(dir)) {
     const p = join(dir, entry)
@@ -102,14 +114,19 @@ function check(file) {
   const lines = readFileSync(file, 'utf8').split('\n')
 
   if (/(^|\/)tasks?\.md$/.test(rel)) {
-    for (const task of openTasks(lines)) {
+    const openTaskList = openTasks(lines)
+    openTaskCountByFile.set(rel, openTaskList.length)
+    for (const task of openTaskList) {
       const body = task.body.join('\n')
       const missing = ['Files', 'Do', 'Verif(?:y|ication)'].filter((f) => !hasField(body, f))
       if (missing.length) {
         const names = missing.map((f) => (f.startsWith('Verif') ? 'Verify' : f)).join(', ')
-        fail(
-          `${rel}:${task.line} open task is missing ${names} — "${task.title.replace(/\*\*/g, '').slice(0, 60)}"`,
-        )
+        if (!fieldFailuresByFile.has(rel)) fieldFailuresByFile.set(rel, [])
+        fieldFailuresByFile.get(rel).push({
+          line: task.line,
+          names,
+          title: task.title.replace(/\*\*/g, '').slice(0, 60),
+        })
       }
     }
     // A checkbox under a "future work" heading reads as pending work to every reader, human or
@@ -144,6 +161,29 @@ function check(file) {
 }
 
 walk(PLANS)
+
+// One line per task while a file has only a few, one digest per file once it clearly has a format problem
+// rather than a handful of oversights.
+for (const [rel, entries] of fieldFailuresByFile) {
+  if (entries.length < FIELD_FAILURE_DIGEST_THRESHOLD) {
+    for (const e of entries) fail(`${rel}:${e.line} open task is missing ${e.names} — "${e.title}"`)
+    continue
+  }
+  const allSame = new Set(entries.map((e) => e.names)).size === 1
+  const total = openTaskCountByFile.get(rel)
+  // Only claim "every open task" when it is actually every one of them. A digest that overstates is a digest
+  // the next reader stops trusting.
+  const scope = entries.length === total
+    ? `That is every open task in the file, so this is a format mismatch rather than a set of oversights — the `
+      + `plan uses a compact one-line task shape. Converting it is plan authorship: the Verify lines do not `
+      + `exist anywhere and cannot be inferred from the task text.`
+    : `${entries.length} of ${total} open tasks in the file, so the rest do carry the fields — treat these as `
+      + `individual omissions, not a format decision.`
+  fail(
+    `${rel} — ${entries.length} open tasks are missing ${allSame ? entries[0].names : 'Files/Do/Verify fields'}. `
+      + `${scope}\n      lines: ${entries.map((e) => e.line).join(', ')}`,
+  )
+}
 
 if (failed) {
   console.error(
