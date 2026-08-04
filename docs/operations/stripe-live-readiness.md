@@ -74,4 +74,6 @@ secret value, so this is always safe to paste into an incident channel or a rele
 - **The Denmark canary** (one real voluntary customer, one successful charge/refund/reconciliation
   cycle) is inherently something that can only happen after live mode is already partially enabled,
   so it is explicitly out of scope for a pre-flight gate — track it as the final launch-register item
-  it already is.
+  it already is. **Narrowed 2026-08-04**: seven of its nine observations turned out not to need live
+  mode at all and are now certified against real test-mode Stripe — see `stripe-live-rollout.md` for
+  the split and the evidence. Only the real charge and the payout/FX facts remain live-only.

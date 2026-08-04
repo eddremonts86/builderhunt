@@ -77,13 +77,30 @@ instead of through `changeSubscription` on a fabricated id.
 ## CI wiring
 
 `.github/workflows/quality.yml` has a second, independent job — `stripe-sandbox-certification` —
-that runs `real-provider.test.ts` against the real Stripe test-mode API. It is genuinely additive,
-never a replacement for the `quality` job (which never talks to Stripe): gated on a
-`STRIPE_SANDBOX_SECRET_KEY` repo/org secret being configured (`if: secrets.STRIPE_SANDBOX_SECRET_KEY
-!= ''`), so it's silently skipped — not failed — on forks or for contributors without Stripe
-credentials, and `continue-on-error: true` since a live third-party API's network flakiness or an
-outage on Stripe's side must never block a merge. Set the `STRIPE_SANDBOX_SECRET_KEY` secret (a
-real `sk_test_...` key, never `sk_live_...`) in the repo's Actions secrets to turn this job on.
+running three suites against the real Stripe test-mode API, each as its own step so a failure names
+which certification broke:
+
+| Step | Suite | What it certifies |
+| --- | --- | --- |
+| 1 | `real-provider.test.ts` | 14 of the adapter's 15 provider methods |
+| 2 | `canary-certification.test.ts` | the Denmark canary's test-mode-provable observations — see `stripe-live-rollout.md` |
+| 3 | `test-clock-lifecycle.test.ts` | real subscription time behaviour (renewal, proration, month-end, declined renewal) |
+
+It is genuinely additive, never a replacement for the `quality` job (which never talks to Stripe).
+Every step is gated on the key being present, so with no key configured the job claims a runner, skips
+everything, and finishes in seconds — skipped, not failed, on forks and for contributors without
+Stripe credentials. `continue-on-error: true`, since a live third-party API's flakiness must never
+block a merge. Set `STRIPE_SANDBOX_SECRET_KEY` (a real `sk_test_...` key, never `sk_live_...`) in the
+repo's Actions secrets to turn the job on.
+
+**Two corrections, 2026-08-04.** This section said the job was gated with
+`if: secrets.STRIPE_SANDBOX_SECRET_KEY != ''`. It is not, and must not be: `secrets` is unavailable in
+`jobs.<id>.if`, and referencing it there is a workflow *validation* error that kills every job in the
+file — which is what happened between 2026-07-24 and 2026-07-27, taking `deploy.yml` down with it. The
+gate lives on the steps, against `env`. Separately, the job exported the secret only as
+`STRIPE_SECRET_KEY`, while steps 2 and 3's suites read `STRIPE_SANDBOX_SECRET_KEY` — both would have
+`describe.skipIf`'d themselves into a green no-op, reporting a certification that never ran. The job
+now exports the one secret under both names.
 
 ## Not yet certified
 

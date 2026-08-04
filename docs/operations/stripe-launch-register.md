@@ -135,8 +135,15 @@ pipeline.
       found via the webhook-recovery backstop, real restore rehearsal with a bug found and fixed);
       outage and wrong-tax-country scenarios were walked on paper only. Incident/kill-switch and
       secret-rotation owners are still unnamed — see "Support and operations" above.
-- [ ] Denmark canary: one real voluntary customer, one successful charge + refund + reconciliation
-      cycle observed before any percentage rollout.
+- [~] Denmark canary: one real voluntary customer, one successful charge + refund + reconciliation
+      cycle observed before any percentage rollout. 2026-08-04: **split** — see
+      `stripe-live-rollout.md`. Seven of the canary's nine observations are now certified against real
+      test-mode Stripe (`canary-certification.test.ts`, 7/7: charge, invoice, tax calculation, refund,
+      reconciliation, account identity, plus the grant and rollback owned by `webhook-handlers.test.ts`
+      and `stripe-provider.test.ts`). What remains is genuinely live-only: one real customer, one real
+      charge, and one payout observed with its FX line — test mode produces no payout objects at all,
+      and the catalog's USD pricing against this DKK-settling account means every payout involves a
+      conversion no test object carries.
 
 ## Change log
 

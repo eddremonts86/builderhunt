@@ -344,6 +344,14 @@ jobs:
     continue-on-error: true
     env:
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
+      # The same secret under its other name, because the three certification suites do not agree on
+      # which variable to read: `real-provider.test.ts` reads STRIPE_SECRET_KEY, while
+      # `test-clock-lifecycle.test.ts` and `canary-certification.test.ts` read STRIPE_SANDBOX_SECRET_KEY
+      # (deliberately — locally those two create and destroy sandbox objects and should not share an
+      # idempotency namespace with the running app's key). With only the first exported, the other two
+      # suites `describe.skipIf` themselves into a green no-op and CI would report a certification it
+      # never ran. Two names, one secret, all three actually execute.
+      STRIPE_SANDBOX_SECRET_KEY: ${{ secrets.STRIPE_SANDBOX_SECRET_KEY }}
       STRIPE_API_VERSION: '2026-06-24.dahlia'
       RUN_STRIPE_INTEGRATION_TESTS: '1'
     steps:
@@ -368,5 +376,15 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
         if: env.STRIPE_SECRET_KEY != ''
-      - run: pnpm vitest run tests/unit/shared/lib/billing/real-provider.test.ts
+      - name: Certify the real Stripe adapter (14 provider methods)
+        run: pnpm vitest run tests/unit/shared/lib/billing/real-provider.test.ts
+        if: env.STRIPE_SECRET_KEY != ''
+      # Separate steps rather than one vitest invocation, so a failure names which certification broke.
+      - name: Certify the Denmark canary observations test mode can prove
+        run: pnpm vitest run tests/unit/shared/lib/billing/canary-certification.test.ts
+        if: env.STRIPE_SECRET_KEY != ''
+      - name: Certify the Test Clock subscription lifecycle
+        # Last because it is by far the slowest — it advances real Stripe test clocks and waits for
+        # Stripe to process each jump asynchronously.
+        run: pnpm vitest run tests/unit/shared/lib/billing/test-clock-lifecycle.test.ts
         if: env.STRIPE_SECRET_KEY != ''
