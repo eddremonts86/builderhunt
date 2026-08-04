@@ -356,6 +356,25 @@ try {
     throw new Error('Platform role wrote organization_entitlements directly — the grant function is not the only path')
   }
 
+  /**
+   * The cross-organization worker loop's very first query.
+   *
+   * `repositories/billing-worker.ts` and `repositories/sprints-worker.ts` both start their per-organization loop
+   * with `listWorkerOrganizationIds()` — an unscoped `select id from organizations` as the worker role, which
+   * `billing-worker.ts`'s own comment describes as "an unscoped read of the (non-tenant-private) organizations
+   * table". Every billing worker sweep, reconciliation run and sprint run depends on it.
+   *
+   * Added 2026-08-04 because that assumption could not be confirmed from outside: `organizations`'s ACL grants
+   * SELECT to `builderhunt_app` and `builderhunt_auth` and names no worker, yet an ad-hoc `SET ROLE` probe read
+   * a row anyway, and the two could not be reconciled with ad-hoc tooling. This is the connection that settles
+   * it — a real `builderhunt_worker` login against a real migrated database. If it throws 42501, the worker
+   * loops are dead and this is where that gets said out loud instead of at 03:00 on a cron.
+   */
+  const workerOrganizationIds = await worker`select id from organizations order by id`
+  if (workerOrganizationIds.length === 0) {
+    throw new Error('Worker role read no organizations — the cross-organization worker loop would process nothing')
+  }
+
   let platformEntitlementReadDenied = false
   try {
     await platform`select tier from organization_entitlements where organization_id = ${grantOrgId}`
@@ -1738,6 +1757,7 @@ try {
     workerBillingTenantIsolation: workerBillingA.map((row) => row.id),
     workerBillingCrossTenantUpdate: 'denied',
     platformBillingAccess: 'denied',
+    workerOrganizationLoop: workerOrganizationIds.map((row) => row.id),
     platformOperatorGrant: `${grantedByPlatform.tier}/${grantedByPlatform.seat_limit} seats`,
     platformEntitlementDirectWrite: 'denied',
     platformEntitlementDirectRead: 'denied',
