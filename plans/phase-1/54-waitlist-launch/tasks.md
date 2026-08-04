@@ -24,13 +24,42 @@
 
 ## Phase 2 — Production verification (T-7)
 
-- [ ] **Smoke-test every public route on prod**
+- [x] **Smoke-test every public route on prod** — done 2026-08-04
   - Files: none (manual, against `https://builderhunt.dev`)
   - Do: Load `/`, `/pricing`, `/explore`, `/explore?q=react`, `/blog`, each of the 3+ post
     slugs, `/status`, `/changelog`, `/roadmap`, `/legal/terms|privacy|cookies|imprint`,
     `/sitemap.xml`, `/robots.txt`, `/api/status`. Check no 500s, no `$undefined`, cookie
     banner appears once, dark theme renders.
   - Verify: All routes 200 with correct content; note failures as issues before proceeding.
+  - **Done 2026-08-04, and the first finding is that this task pointed at the wrong host.**
+
+    It says "against `https://builderhunt.dev`". That domain **302s every path to the root of a different
+    one** — `https://builderhunt.eduardoinerarte.dk/` — without preserving the path, so
+    `builderhunt.dev/api/health` lands on the homepage. Running this task literally produces sixteen 302s
+    and proves nothing. Every URL in this plan needs the real host, or the redirect needs to start
+    preserving paths.
+
+    Re-run against the real host: **16/16 reachable**, every response under 200 ms.
+
+    | Route | Result |
+    | --- | --- |
+    | `/`, `/pricing`, `/blog`, `/status`, `/changelog`, `/roadmap` | 200 |
+    | `/legal/terms|privacy|cookies|imprint` | 200 (four separate pages, 27-33 KB each) |
+    | `/sitemap.xml`, `/robots.txt` | 200 |
+    | `/api/health` | 200 `{"ok":true}` |
+    | `/api/status` | 200 — `db` ok, `redis` ok, memory 381 MB rss, uptime 7.4 days |
+    | `/explore`, `/explore?q=react` | **307 → `/explore?q=&type=people`** — a canonicalising redirect, not a failure |
+
+  - **Second finding, and this one is a launch blocker rather than a documentation fix:
+    `/blog`, `/changelog` and `/roadmap` are live and return 200, but none of the three is in
+    `/sitemap.xml`.** The sitemap has 56 URLs; `/pricing` is there (which is the half of the sibling-plan
+    check above that *is* satisfied), and those three are not.
+
+    Not a code bug. `sitemap[.]xml.ts` emits all three, gated on `isHiddenFromSitemap(surfaces.X)` where
+    the surface directives are a **runtime lookup** — so production holds directives marking them hidden.
+    That is a data setting somebody can flip, but until it is flipped, submitting the sitemap to Search
+    Console asks Google to index a site whose blog, changelog and roadmap are invisible. Decide it before
+    the "Submit sitemap" task below, not after.
 
 - [ ] **Smoke-test the core authed funnel on prod**
   - Files: none (manual)
