@@ -8,7 +8,6 @@ import { searchNpm } from '~/lib/sources/npm'
 import { searchHuggingFace } from '~/lib/sources/huggingface'
 import { searchGitLab } from '~/lib/sources/gitlab'
 import { searchCodeberg } from '~/lib/sources/codeberg'
-import { searchHashnode } from '~/lib/sources/hashnode'
 import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
@@ -257,7 +256,9 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   if (want('huggingface')) connectors.push({ source: 'huggingface', run: () => searchHuggingFace(keywords, paged) })
   if (want('gitlab')) connectors.push({ source: 'gitlab', run: () => searchGitLab(keywords, paged) })
   if (want('codeberg')) connectors.push({ source: 'codeberg', run: () => searchCodeberg(keywords, paged) })
-  if (want('hashnode')) connectors.push({ source: 'hashnode', run: () => searchHashnode(keywords, paged) })
+  // `hashnode` was here and is retired (drizzle/0144), for a plainer reason than sourcehut's: Hashnode moved
+  // its public GraphQL API behind a paid plan, so every query answered `[]` regardless of the key — which was
+  // documented as optional, meaning nothing in the behaviour revealed the source had stopped working.
   // `sourcehut` was here and is retired (drizzle/0143). sr.ht's own robots.txt disallows "anything used to feed
   // a machine learning model", which is what this product does, so no token could make the connector legitimate
   // — and the API offered no user or repository search to begin with. The registry row stays, disabled, and

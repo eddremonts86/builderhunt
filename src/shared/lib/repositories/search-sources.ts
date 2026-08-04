@@ -46,12 +46,13 @@ export interface SearchSourceRow {
  * assertion to keep honest.
  */
 export const IMPLEMENTED_SEARCH_CONNECTORS = [
-  // `sourcehut` left this list on 2026-08-04 with the connector itself (drizzle/0143): sr.ht's robots.txt
-  // disallows "anything used to feed a machine learning model", which is what this product does, so no token
-  // could make the connector legitimate. `search_sources.connector_implemented` is false to match, and
-  // `assertSearchConnectorRegistryMatchesDatabase` is what proves the two agree.
+  // Two keys left this list on 2026-08-04 with their connectors, and `search_sources.connector_implemented` is
+  // false for both to match — `assertSearchConnectorRegistryMatchesDatabase` is what proves the two agree:
+  //   * `sourcehut` (drizzle/0143) — sr.ht's robots.txt disallows "anything used to feed a machine learning
+  //     model", which is what this product does, so no token could make the connector legitimate.
+  //   * `hashnode` (drizzle/0144) — Hashnode moved its public GraphQL API behind a paid plan.
   'github', 'hn', 'devto', 'reddit', 'lobsters', 'stackoverflow', 'npm', 'huggingface',
-  'gitlab', 'codeberg', 'hashnode', 'devpost', 'producthunt', 'bluesky',
+  'gitlab', 'codeberg', 'devpost', 'producthunt', 'bluesky',
 ] as const
 
 export type ImplementedSearchConnector = (typeof IMPLEMENTED_SEARCH_CONNECTORS)[number]

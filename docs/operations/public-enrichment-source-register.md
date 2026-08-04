@@ -103,8 +103,24 @@
   even that.
 - **Review date**: 2026-08-04
 
+## hashnode
+
+- **Acquisition mode**: `official_api` (retired 2026-08-04 — `drizzle/0144_retire_hashnode_source.sql`)
+- **Status**: `retired`. `search_sources` holds `enabled = false, connector_implemented = false` and the
+  connector is deleted, same mechanism as `sourcehut` above.
+- **Permission reference**: <https://hashnode.com/announcements/graphql-api> — "GraphQL API is moving to a paid
+  offering."
+- **Lawful basis**: none needed; nothing is fetched. Re-verified live 2026-08-04:
+  `POST https://gql.hashnode.com` answers `301` to that announcement, and the older `api.hashnode.com` answers
+  `404` (in July it still redirected).
+- **Approved fields**: none.
+- **Why it went unnoticed**: `HASHNODE_API_KEY` was documented as *optional*, so a source returning `[]` with no
+  key looked identical to a source returning `[]` because the API had closed. Worth remembering when adding any
+  future source whose key is optional.
+- **Review date**: 2026-08-04
+
 ## Other existing BuilderHunt sources (reddit, hn, devto, npm, huggingface, gitlab,
-## codeberg, hashnode, lobsters, stackoverflow)
+## codeberg, lobsters, stackoverflow)
 
 Not yet registered in `policies.ts` — per spec §4 "missing policy means disabled." Each
 needs its own exact-profile adapter review (does the source's existing federated-search

@@ -65,7 +65,10 @@ const zodEnv = z.object({
   GITLAB_TOKEN: z.string().optional(),
   CODEBERG_API_URL: z.string().optional(),
   CODEBERG_TOKEN: z.string().optional(),
-  HASHNODE_API_KEY: z.string().optional(),
+  // HASHNODE_API_KEY was here and is gone (drizzle/0144): Hashnode moved its public GraphQL API behind a
+  // paid plan, so the source is retired. It was documented as *optional*, which is precisely why nobody
+  // noticed the connector had stopped returning anything — an optional key that changes nothing looks the
+  // same whether it works or not.
   // SOURCEHUT_TOKEN was here and is gone (drizzle/0143): the SourceHut source is retired because sr.ht's
   // robots.txt disallows feeding a machine learning model, so no token could make the connector legitimate.
   // Leaving it in `.env` is harmless — nothing reads it — but nothing here will validate it either.

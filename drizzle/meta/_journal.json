@@ -1009,6 +1009,13 @@
       "when": 1785843359434,
       "tag": "0143_retire_sourcehut_source",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1785849299275,
+      "tag": "0144_retire_hashnode_source",
+      "breakpoints": true
     }
   ]
 }

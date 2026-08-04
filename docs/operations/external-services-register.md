@@ -72,7 +72,7 @@ GitHub rate-limit headroom and no Tier-2 AI, which is a *local* gap, not a produ
 | Sentry / PostHog / Datadog / PagerDuty | **No paid observability for v1.** Structured stdout logs + `/api/admin/metrics` + `/status` are the launch answer. `VITE_SENTRY_DSN` is a phantom var wired to nothing — delete it, don't fill it. (`02-production-infrastructure/spec.md`) |
 | Cloudflare R2 | Replaced by self-hosted MinIO. Env vars keep the `INTERVIEW_R2_*` prefix so switching back is config-only. |
 | Self-hosted GPU (Hetzner GEX44, €184/mo) | Break-even is 150–335 interviews/month. Revisit then. |
-| Hashnode API key | Hashnode moved its public GraphQL API to a paid offering (2026-07-25); the connector returns `[]` either way. Don't pay for it. |
+| Hashnode API key | **Source retired 2026-08-04** (`drizzle/0144`). Hashnode moved its public GraphQL API to a paid offering; re-verified live that day — `gql.hashnode.com` 301s to the announcement and `api.hashnode.com` now 404s. The connector is deleted, so there is nothing a key could enable. |
 | LinkedIn (any form) | Hard-blocked in `src/lib/enrichment/policies.ts`. No account, no host permission, no exception. |
 | Apple Developer Program ($99/yr) | Only needed for a Safari extension — Phase 6 of `browser-extension-overlay`, not now. |
 | Google Calendar / Microsoft Graph sync | Explicit non-goal of the calendar program. No OAuth app needed. |
@@ -663,7 +663,7 @@ measurably widens coverage.
 | **Codeberg** | `CODEBERG_TOKEN` | optional | Settings → Applications | Raises rate limits. `CODEBERG_API_URL` can also point at any Gitea/Forgejo instance. |
 
 No token needed, working today: Bluesky (`public.api.bsky.app`), Hacker News (Algolia), dev.to,
-npm registry, Lobsters. Skip: Hashnode (paid API, connector returns `[]` regardless).
+npm registry, Lobsters. Skip: Hashnode — **source retired 2026-08-04**, connector deleted (`drizzle/0144`).
 
 ### Rules for all eight
 

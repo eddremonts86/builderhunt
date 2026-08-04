@@ -28,7 +28,6 @@ const CREDENTIAL_ENV_VARS: Partial<Record<SourceName, Array<keyof typeof env>>> 
   gitlab: ['GITLAB_TOKEN'],
   codeberg: ['CODEBERG_TOKEN'],
   reddit: ['REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET'],
-  hashnode: ['HASHNODE_API_KEY'],
   stackoverflow: ['STACKOVERFLOW_API_KEY'],
   huggingface: ['HUGGINGFACE_TOKEN'],
   producthunt: ['PRODUCTHUNT_TOKEN'],

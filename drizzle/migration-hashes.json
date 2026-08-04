@@ -576,6 +576,10 @@
     "0143_retire_sourcehut_source": {
       "sql": "43fa648d7d77496ae7c4f3c11708a5860595c0fe28fce98124bd96e67e5fafd6",
       "snapshot": "c7da275adea6483f52a0cb6aeec2dc5ac2e6acd5fce406212235ea2a40ac116e"
+    },
+    "0144_retire_hashnode_source": {
+      "sql": "77e4a831f8ba2e398857a61b4ea0436f88ad19d46b0067d7116d18e2a7e0c533",
+      "snapshot": "5913cd189c50546551d1b55cb6ad25706986aed3cdfc6aac38b68f453be292d3"
     }
   }
 }

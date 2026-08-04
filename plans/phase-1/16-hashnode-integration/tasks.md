@@ -1,18 +1,17 @@
 # Tasks: Hashnode Integration
 
-> **Status**: `partially-implemented` — executable. The legacy endpoint is dead and the task below
-> states the replacement in full: the new API has no `searchUsers`, so discovery goes through post
-> search plus author aggregation. No vendor decision gates that; the paid-API question was about a
-> *different*, richer integration that this plan does not scope.
+> **Status**: `retired` (2026-08-04)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped; id-prefix fix and env docs delivered
-> 2026-07-25. The endpoint-migration task is genuinely blocked, not just unimplemented:
-> Hashnode has closed free public GraphQL API access entirely (confirmed live 2026-07-25 —
-> both the old and the task's proposed replacement endpoint now redirect to a "moving to a
-> paid offering" page). The source stays wired in and degrades to `[]`, zero impact on the
-> rest of the app; flagged for the user to decide whether to pay for API access, accept the
-> source stays dark, or deprioritize this integration.
+> **Reality check**: the connector shipped and then **stopped working silently**. Hashnode closed free
+> public GraphQL access — `gql.hashnode.com` 301s to a "moving to a paid offering" page and
+> `api.hashnode.com` now 404s, both re-verified live on 2026-08-04. The maintainer chose retirement over
+> paying. `drizzle/0144` disables the `search_sources` row and the connector is deleted, so the
+> `Delivered` list below describes what was built, not what works. Reversing it is one migration.
+>
+> The header's earlier claim that this was "executable" and that "no vendor decision gates that" was
+> wrong on both counts, and is left visible here rather than quietly edited: the replacement endpoint it
+> pointed at is the one that redirects to the paywall.
 
 ## Delivered
 
@@ -31,7 +30,7 @@
 
 ## Remaining
 
-- [ ] **Migrate the connector to `https://gql.hashnode.com`**
+- [x] **Migrate the connector to `https://gql.hashnode.com`** — closed by retiring the source, see the decision below
   - Files: `src/lib/sources/hashnode.ts`
   - Do: replace `HN_GQL` with `https://gql.hashnode.com`. The new API has no `searchUsers`;
     implement discovery as: query posts by the search term/tag (new-API post search),
@@ -71,6 +70,25 @@
     changed that would unblock this; the decision above stands, and the connector's own header
     comment already records the dead end. Re-verified rather than assumed, since a "paid API"
     situation is exactly the kind that can quietly reopen.
+
+  ### Decision executed 2026-08-04 — retired
+
+  The maintainer chose retirement over paying, and authorised acting on it directly.
+
+  `drizzle/0144_retire_hashnode_source.sql` sets `enabled = false, connector_implemented = false` on the
+  `search_sources` row with the reason in `register_notes` — the same mechanism `0143` used for SourceHut, and the
+  same reasoning: the table's `CHECK ("enabled" = false OR "connector_implemented" = true)` makes an accidental
+  re-enable impossible while a deliberate reversal stays one migration away.
+
+  Removed: `src/lib/sources/hashnode.ts` and its wiring in `search.ts`; `hashnode` from `ALL_SOURCES` and from
+  `IMPLEMENTED_SEARCH_CONNECTORS`; `HASHNODE_API_KEY` from `env.ts`, `.env.example` and
+  `api/admin/integrations`. Kept: the `SourceName` union member, the icon, the badge and the scoring branch, so a
+  result stored before the retirement still renders.
+
+  **One thing worth carrying forward.** `HASHNODE_API_KEY` was documented as *optional*, and that is why nobody
+  noticed: a source returning `[]` with no key set looks exactly like a source returning `[]` because the API
+  closed. Any future connector whose key is optional needs a way to tell those two apart — otherwise it can stop
+  working for months in plain sight, which is what happened here.
 
 - [x] **Fix `hn-` id prefix collision with the Hacker News source**
   - Files: `src/lib/sources/hashnode.ts`

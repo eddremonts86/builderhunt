@@ -66,9 +66,10 @@ type SortBy = 'score' | 'recency' | 'followers'
 type ResultTab = 'people' | 'resources'
 
 /** All supported sources. Visible in the source-pills UI. */
-// `sourcehut` is deliberately absent: retired in drizzle/0143, so `resolveRequestedSources` refuses the key.
-// The `Source` union above keeps it, because a stored result from before the retirement must still render.
-const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'devpost', 'producthunt', 'bluesky']
+// `sourcehut` (drizzle/0143) and `hashnode` (drizzle/0144) are deliberately absent: both retired, so
+// `resolveRequestedSources` refuses either key. The `Source` union above keeps them, because a stored result
+// from before the retirement must still render.
+const ALL_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow', 'npm', 'huggingface', 'gitlab', 'codeberg', 'devpost', 'producthunt', 'bluesky']
 /** Sources that are ON by default. Niche sources are opt-in. */
 const DEFAULT_ACTIVE_SOURCES: Source[] = ['github', 'reddit', 'hn', 'devto', 'lobsters']
 

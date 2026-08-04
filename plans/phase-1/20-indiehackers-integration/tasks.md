@@ -21,8 +21,8 @@ own `builders.metadata`, so a namespaced `metadata.userTags` key plus a search f
 the founder-filter idea with zero scraping — but only build it if that demand is actually
 demonstrated. See `plan.md` for the pointer.
 
-- [ ] **(Only under option (a), and only if founder-filter demand exists) Spec the
-      "builder tags + founder filter" mini-plan**
+- [~] **(Only under option (a), and only if founder-filter demand exists) Spec the
+      "builder tags + founder filter" mini-plan** — closed as won't-do 2026-08-04
   - Files: `plans/` (new directory, e.g. `plans/builder-tags/`)
   - Do: write spec/plan/tasks per `plans/_meta/conventions.md` for user-applied tags on
     tracked builders (namespaced `builders.metadata.userTags` key, filter UI in the search
@@ -30,3 +30,18 @@ demonstrated. See `plan.md` for the pointer.
     "find founders" answer with zero scraping.
   - Verify: the new plan passes the conventions checklist (three files, status headers,
     Files/Do/Verify tasks) and is referenced from this directory's spec.
+  - **Closed as won't-do, 2026-08-04.** Approved by the product owner.
+
+    The task gates itself on a condition its own title states: *"only if founder-filter demand exists."* That
+    condition is not merely unmet — it is currently **unmeetable**. There are no users, so no usage signal can
+    exist to demonstrate demand, and the plan header already records that the founder signal itself is covered by
+    `producthunt-integration` through an official API.
+
+    Writing the spec anyway would produce a plan for a feature nobody has asked for, which is exactly what the
+    conditional was put there to prevent. Left as `[~]` rather than `[x]`: nothing was built, and a checked box
+    would read as delivery.
+
+    **What would reopen it:** a real request for "show me only founders" from someone using the product, or
+    aggregate search data showing people filtering for it by hand. At that point the shape is already decided and
+    cheap — a namespaced `builders.metadata.userTags` key plus a filter in the search and tracked-builders views,
+    with no scraping and no new source.
