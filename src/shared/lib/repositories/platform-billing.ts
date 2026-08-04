@@ -1,37 +1,23 @@
 import { and, count, desc, eq, gte, ne, sql } from 'drizzle-orm'
-import { randomId } from '~/lib/utils'
-import { env } from '../env'
-import { PLAN_SEAT_LIMITS, type PlanStatus, type PlanTier, type UserPlan } from '../billing-shared'
 import { platformDb } from '../db/client'
 import { authUsers, onboardingProgress } from '../db/schema'
 import { DELETED_USER_SENTINEL_ID } from './account-privacy'
 
-/**
- * Thrown by the self-service plan-request path once the canonical Stripe billing system is live
- * (plans/phase-1/30-stripe-billing-platform/tasks.md §10 "Retire legacy billing mutations after canonical
- * cutover"). `STRIPE_BILLING_ENABLED` is the same flag that gates the real Stripe adapter itself
- * (`stripe-client.ts`) — reused here rather than inventing a second flag, since "the canonical
- * system is live" is exactly the condition this class exists to react to. Deliberately does NOT gate
- * `setPlatformUserPlan` (the operator grant path) or any read (`getPlatformUserPlan`,
- * `listPlatformUsersWithPlans`, `listPlatformPlanRequests`, `findPlatformPlanRequest`) — spec.md's
- * "preserve an audited operator grant path separate from paid Stripe state" and "keep historical
- * reads" both require those to keep working unconditionally.
+/*
+ * `LegacyPlanMutationDisabledError` / `shouldBlockLegacyPlanMutations` / `assertLegacyPlanMutationsEnabled`
+ * lived here and are gone (2026-08-04).
+ *
+ * They were a flag-driven gate (`STRIPE_BILLING_ENABLED === 'true'`) in front of the two self-service
+ * plan-request mutations. Both of those entry points, their routes and the admin queue that reviewed them were
+ * removed with the `plans`/`plan_requests` tables, so the gate guarded nothing: `assertLegacyPlanMutationsEnabled`
+ * had no callers, and the exported error was reachable only through a re-export nobody threw.
+ *
+ * Kept as a note rather than deleted silently because the flag's *other* direction is documented as a kill
+ * switch: `docs/operations/stripe-incident-response.md` said flipping `STRIPE_BILLING_ENABLED` back to `false`
+ * would "re-open the legacy manual plan-request path". It no longer can — there is no such path. The operator
+ * grant (`repositories/operator-grants.ts`, reached from `/admin/users`) is what remains, and it never consulted
+ * this flag, so the kill switch's real behaviour is unchanged.
  */
-export class LegacyPlanMutationDisabledError extends Error {
-  constructor() {
-    super('Self-service plan requests are no longer accepted — subscribe through Checkout instead.')
-    this.name = 'LegacyPlanMutationDisabledError'
-  }
-}
-
-/** Pure decision, exported for direct unit testing — `env` is a frozen singleton read at import time and is never mocked in this codebase's tests (see `stripe-provider.test.ts`'s own note on this), so the actual gate logic is kept testable independent of reading it. */
-export function shouldBlockLegacyPlanMutations(billingEnabledFlag: string): boolean {
-  return billingEnabledFlag === 'true'
-}
-
-function assertLegacyPlanMutationsEnabled(): void {
-  if (shouldBlockLegacyPlanMutations(env.STRIPE_BILLING_ENABLED)) throw new LegacyPlanMutationDisabledError()
-}
 
 /**
  * Every account, newest first — with no plan columns.

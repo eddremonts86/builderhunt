@@ -15,10 +15,21 @@ provider.** The flag itself is the entire go/no-go switch for real money; see
 `stripe-live-readiness.md`'s `billingFlagEnabledInLiveMode` gate before ever setting it to `true` in
 production.
 
-The kill switch is exactly `STRIPE_BILLING_ENABLED=false` + redeploy — this is deliberately the SAME
-flag `platform-billing.ts`'s `LegacyPlanMutationDisabledError` reacts to in the opposite direction, so
-flipping it back to `false` in an emergency simultaneously stops new Stripe activity AND re-opens the
-legacy manual plan-request path, so existing customers aren't left with no way to get support.
+The kill switch is exactly `STRIPE_BILLING_ENABLED=false` + redeploy.
+
+**Corrected 2026-08-04 — the previous version of this paragraph promised something the code no longer
+does.** It said the same flag also drove `platform-billing.ts`'s `LegacyPlanMutationDisabledError` in
+the opposite direction, so flipping it off would "re-open the legacy manual plan-request path" and
+leave customers a way to get support. That path is gone: the `plans`/`plan_requests` tables, the two
+self-service mutation entry points, `/api/plans/request-upgrade`, `/admin/plan-requests` and the gate
+class itself were all removed (the queue held no rows and could not be fed while billing was enabled).
+Flipping the flag off now does exactly one thing — it stops new Stripe activity.
+
+**The support path during an incident is the operator grant**, and it is unaffected by the flag because
+it never consulted it: a platform admin opens `/admin/users`, selects the account, and grants the tier
+against the organization that user owns (`repositories/operator-grants.ts`, audited to
+`security_audit_events` as `admin.user.entitlement-grant`). Requires recent re-authentication. Use it
+to keep a paying customer whole while Stripe is switched off.
 
 **What flipping it off will NOT do**: it will not cancel in-flight Stripe subscriptions, will not stop
 Stripe's own retry/dunning timers, and will not un-verify already-received webhook events sitting in

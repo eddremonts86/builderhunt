@@ -11,11 +11,9 @@
  *   entitlement together with its provenance (Stripe-backed / manually granted / expired);
  * - self-service upgrade requests → Checkout. `LegacyPlanMutationDisabledError` already refused them whenever
  *   `STRIPE_BILLING_ENABLED` was true, so the request queue could not be fed and managing it was dead surface.
+ *   That error class is itself gone now (2026-08-04) — with nothing left to refuse, it had no thrower.
  */
-export {
-  LegacyPlanMutationDisabledError,
-  listPlatformUsersWithBilling as listAllUsersWithBilling,
-} from '~/shared/lib/repositories/platform-billing'
+export { listPlatformUsersWithBilling as listAllUsersWithBilling } from '~/shared/lib/repositories/platform-billing'
 
 export {
   PLAN_LIMITS,

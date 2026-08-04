@@ -111,7 +111,11 @@ export async function grantOrganizationEntitlement(input: OperatorGrantInput): P
   }
 
   const status: PlanStatus = input.status ?? 'active'
-  const seatLimit = PLAN_SEAT_LIMITS[input.tier as keyof typeof PLAN_SEAT_LIMITS] ?? 1
+  // `GRANT_SEAT_LIMITS`, not `PLAN_SEAT_LIMITS[tier] ?? 1` — which is what this line did, and is precisely the
+  // accident the map above was written to prevent: `pro_max` is absent from `PLAN_SEAT_LIMITS`, so it reached its
+  // one seat through the fallback rather than through a stated value, and the next tier added would have done
+  // the same silently.
+  const seatLimit = GRANT_SEAT_LIMITS[input.tier]
 
   const [row] = await platformDb
     .insert(organizationEntitlements)
