@@ -27,7 +27,6 @@ const CREDENTIAL_ENV_VARS: Partial<Record<SourceName, Array<keyof typeof env>>> 
   github: ['GITHUB_TOKEN'],
   gitlab: ['GITLAB_TOKEN'],
   codeberg: ['CODEBERG_TOKEN'],
-  sourcehut: ['SOURCEHUT_TOKEN'],
   reddit: ['REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET'],
   hashnode: ['HASHNODE_API_KEY'],
   stackoverflow: ['STACKOVERFLOW_API_KEY'],

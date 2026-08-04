@@ -66,7 +66,9 @@ const zodEnv = z.object({
   CODEBERG_API_URL: z.string().optional(),
   CODEBERG_TOKEN: z.string().optional(),
   HASHNODE_API_KEY: z.string().optional(),
-  SOURCEHUT_TOKEN: z.string().optional(),
+  // SOURCEHUT_TOKEN was here and is gone (drizzle/0143): the SourceHut source is retired because sr.ht's
+  // robots.txt disallows feeding a machine learning model, so no token could make the connector legitimate.
+  // Leaving it in `.env` is harmless — nothing reads it — but nothing here will validate it either.
   PRODUCTHUNT_TOKEN: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
   MINIMAX_API_KEY: z.string().optional(),

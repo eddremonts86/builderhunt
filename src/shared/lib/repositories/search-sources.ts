@@ -46,8 +46,12 @@ export interface SearchSourceRow {
  * assertion to keep honest.
  */
 export const IMPLEMENTED_SEARCH_CONNECTORS = [
+  // `sourcehut` left this list on 2026-08-04 with the connector itself (drizzle/0143): sr.ht's robots.txt
+  // disallows "anything used to feed a machine learning model", which is what this product does, so no token
+  // could make the connector legitimate. `search_sources.connector_implemented` is false to match, and
+  // `assertSearchConnectorRegistryMatchesDatabase` is what proves the two agree.
   'github', 'hn', 'devto', 'reddit', 'lobsters', 'stackoverflow', 'npm', 'huggingface',
-  'gitlab', 'codeberg', 'hashnode', 'sourcehut', 'devpost', 'producthunt', 'bluesky',
+  'gitlab', 'codeberg', 'hashnode', 'devpost', 'producthunt', 'bluesky',
 ] as const
 
 export type ImplementedSearchConnector = (typeof IMPLEMENTED_SEARCH_CONNECTORS)[number]

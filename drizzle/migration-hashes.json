@@ -572,6 +572,10 @@
     "0142_retire_legacy_plan_tables": {
       "sql": "c877d5c8474f69597633d7d9e6c3612821ccff582580f8dd9334ee18cf10aafe",
       "snapshot": "cac3d540e44b8a0b72a47927d39f4c59dc36db0130be382889cef56bb8d7e3d9"
+    },
+    "0143_retire_sourcehut_source": {
+      "sql": "43fa648d7d77496ae7c4f3c11708a5860595c0fe28fce98124bd96e67e5fafd6",
+      "snapshot": "c7da275adea6483f52a0cb6aeec2dc5ac2e6acd5fce406212235ea2a40ac116e"
     }
   }
 }

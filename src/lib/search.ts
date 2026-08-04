@@ -9,7 +9,6 @@ import { searchHuggingFace } from '~/lib/sources/huggingface'
 import { searchGitLab } from '~/lib/sources/gitlab'
 import { searchCodeberg } from '~/lib/sources/codeberg'
 import { searchHashnode } from '~/lib/sources/hashnode'
-import { searchSourceHut } from '~/lib/sources/sourcehut'
 import { searchDevpost } from '~/lib/sources/devpost'
 import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
@@ -259,7 +258,10 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   if (want('gitlab')) connectors.push({ source: 'gitlab', run: () => searchGitLab(keywords, paged) })
   if (want('codeberg')) connectors.push({ source: 'codeberg', run: () => searchCodeberg(keywords, paged) })
   if (want('hashnode')) connectors.push({ source: 'hashnode', run: () => searchHashnode(keywords, paged) })
-  if (want('sourcehut')) connectors.push({ source: 'sourcehut', run: () => searchSourceHut(keywords, paged) })
+  // `sourcehut` was here and is retired (drizzle/0143). sr.ht's own robots.txt disallows "anything used to feed
+  // a machine learning model", which is what this product does, so no token could make the connector legitimate
+  // — and the API offered no user or repository search to begin with. The registry row stays, disabled, and
+  // `resolveRequestedSources` refuses the key, so nothing here needs to know the reason.
   if (want('devpost')) connectors.push({ source: 'devpost', run: () => searchDevpost(keywords, paged) })
   if (want('producthunt')) connectors.push({ source: 'producthunt', run: () => searchProductHunt(keywords, paged) })
   if (want('bluesky')) connectors.push({ source: 'bluesky', run: () => searchBluesky(keywords, paged) })

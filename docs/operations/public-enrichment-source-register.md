@@ -77,8 +77,12 @@
 
 ## sourcehut (git.sr.ht / meta.sr.ht)
 
-- **Acquisition mode**: `official_api` (wired, has never returned a result)
-- **Status**: `blocked` — on the operator's stated purpose policy, not on a technical limit
+- **Acquisition mode**: `official_api` (retired 2026-08-04 — `drizzle/0143_retire_sourcehut_source.sql`)
+- **Status**: `retired`. `search_sources` now holds `enabled = false, connector_implemented = false`, and the
+  connector is deleted. The table's `CHECK ("enabled" = false OR "connector_implemented" = true)` means the
+  source cannot be switched back on until a connector exists again, and `setSearchSourceEnabled` answers
+  `no_connector` rather than a constraint error if anyone tries. The row is kept rather than deleted so this
+  register still has something to point at; reversing it is one migration flipping both booleans.
 - **Permission reference**: <https://git.sr.ht/robots.txt> (identical at meta.sr.ht), read
   2026-08-04. The file opens with a prose policy, not just directives:
 

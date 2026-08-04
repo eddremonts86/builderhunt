@@ -1,11 +1,15 @@
 # Tasks: SourceHut Integration
 
-> **Status**: `partially-implemented` (only the explicitly-optional item remains)
+> **Status**: `retired` (2026-08-04)
 > **Depends on**: nothing
 > **Blocks**: nothing
-> **Reality check**: Connector + wiring shipped. `.env.example` docs delivered 2026-07-25.
-> Remaining: an optional repo-search extension (nice-to-have, not required for the plan to
-> be considered done).
+> **Reality check**: the connector shipped and **never returned a single result** — meta.sr.ht has no
+> `users(search:)` field and git.sr.ht has no repository keyword search, so it always degraded to `[]`,
+> indistinguishable from "no token configured". Retired rather than repaired: sr.ht's own robots.txt
+> disallows "anything used to feed a machine learning model", which is what this product does, so no
+> token could make the use permitted. `drizzle/0143` disables the `search_sources` row and the
+> connector is deleted; the `Delivered` list below describes what was built, not what works. Reversing
+> it is one migration — see the decision at the end.
 
 ## Delivered
 
@@ -32,7 +36,7 @@
   - Verify: `grep SOURCEHUT_TOKEN .env.example` prints the documented line.
   - **Done.**
 
-- [ ] **(Optional) Emit repo results from git.sr.ht**
+- [x] **(Optional) Emit repo results from git.sr.ht** — closed by retiring the source, see the decision below
   - Files: `src/lib/sources/sourcehut.ts`
   - Do: with the same token, POST to `https://git.sr.ht/query` searching public
     repositories by keyword; map to `kind: 'repo'` (`id: sh-repo-{id}`,
@@ -124,3 +128,30 @@
 
   **No token is needed any more to close this.** The blocker was never the token; it was this question, and the
   question is now answered.
+
+  ### Decision executed 2026-08-04 — retired
+
+  Approved by the maintainer, who authorised acting on recommendations for anything reversible. Option 1.
+
+  `drizzle/0143_retire_sourcehut_source.sql` sets `enabled = false, connector_implemented = false` on the
+  `search_sources` row and records why in `register_notes`. That is the retirement mechanism the schema already
+  had, and it is better than deleting anything:
+
+  * `CHECK ("enabled" = false OR "connector_implemented" = true)` means the database itself refuses to let the
+    source be enabled while no connector exists;
+  * `setSearchSourceEnabled` answers `no_connector` instead of surfacing a constraint error, so the admin toggle
+    explains itself;
+  * `resolveRequestedSources` already refuses any key that is not enabled, so the search fan-out stopped
+    offering it without needing to know the reason;
+  * the row survives, so this register still has something to point at — and reversing the whole decision is one
+    migration flipping both booleans, once a connector exists that sr.ht's policy permits.
+
+  Removed: `src/lib/sources/sourcehut.ts` and its wiring in `search.ts` (`connector_implemented = false` has to
+  be true in fact, not just in the table), `sourcehut` from `ALL_SOURCES` so no pill offers a source the resolver
+  will refuse, and `SOURCEHUT_TOKEN` from `env.ts`, `.env.example` and `api/admin/integrations` — nothing reads
+  it now.
+
+  Kept on purpose: the `SourceName` union member, the icon, the `.badge-sourcehut` class and the scoring branch.
+  A result stored before the retirement must still render, and the three unit tests that name `sourcehut` assert
+  exactly that (it is unsupported for claiming and proof, and its repo-style handles build a safe profile URL) —
+  they pass unchanged, which is the check that this was the right seam.

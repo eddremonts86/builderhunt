@@ -48,7 +48,7 @@
 | 5 | ~~**Deepgram**~~ | transcription, PAYG | usage only; $200 credit **expires ~2027-07-26** | ✅ **done** — EU endpoint, `nova-3`, diarization and 2-channel all verified against this account; synced to Coolify |
 | 6 | ~~**Azure OpenAI**~~ → **Mistral** | sensitive AI, PAYG | usage only | ✅ **done** — provider switched, see the interview register §4. Mistral key + pinned `mistral-medium-2604` live. Azure kept as fallback; quota case `2607260050000678` open |
 | 7 | **Hetzner Storage Box** | off-box backup | **~€4/mo** | ⬜ **outstanding** — needed before real candidate data; the gate is a completed restore, not the order |
-| 8 | **7 source API tokens** | free developer tokens | €0 | ⬜ **outstanding** — SourceHut and Product Hunt return **zero results in production today**; GitLab degraded, Stack Overflow throttled |
+| 8 | **6 source API tokens** | free developer tokens | €0 | ⬜ **outstanding** — Product Hunt returns **zero results in production today**; GitLab degraded, Stack Overflow throttled. SourceHut is **retired** (2026-08-04, drizzle/0143) and no longer needs a token — sr.ht's robots.txt disallows feeding a machine learning model, so no token could have made it legitimate |
 | 9 | **MinIO + ClamAV** | self-hosted containers | €0 | ⬜ **outstanding** — no account needed; Phase 6 (8 tasks) is implementable as soon as these run |
 
 **Everything with a recurring cost is now contracted except one €4/month Storage Box.** The two
@@ -653,7 +653,7 @@ measurably widens coverage.
 
 | Source | Env var | Required? | Where | Effect |
 | --- | --- | --- | --- | --- |
-| **SourceHut** | `SOURCEHUT_TOKEN` | **REQUIRED** | meta.sr.ht → OAuth → personal access token | API 401s unauthenticated — the source returns nothing without it. Account is free; sr.ht only charges for hosting your own projects. |
+| ~~**SourceHut**~~ | ~~`SOURCEHUT_TOKEN`~~ | **retired** | — | **Retired 2026-08-04** (drizzle/0143). Do not create this token. sr.ht's robots.txt prose policy disallows "anything used to feed a machine learning model", which is what this product does, so the token would not have made the use permitted — and the API offered no user or repository search regardless. |
 | **Product Hunt** | `PRODUCTHUNT_TOKEN` | **REQUIRED** | api.producthunt.com/v2/docs → Developer Token | v2 GraphQL mandates auth — nothing without it. |
 | **GitHub** | `GITHUB_TOKEN` | strongly | Settings → Developer settings → PAT (fine-grained, **public read only, no scopes needed**) | 60 req/h → 5,000 req/h. GitHub is the primary source; unauthenticated is unusable at any real volume. |
 | **GitLab** | `GITLAB_TOKEN` | strongly | gitlab.com → Settings → Access Tokens, `read_api` | 2,000/h → 6,000/h **and** unlocks real user/project search. Unauthenticated search is 401, so without it GitLab degrades to sampling the top 500 starred public projects. |
@@ -677,7 +677,7 @@ npm registry, Lobsters. Skip: Hashnode (paid API, connector returns `[]` regardl
 
 | Token | Created | Scope | Expires | Set in Coolify |
 | --- | --- | --- | --- | --- |
-| `SOURCEHUT_TOKEN` | _(pending)_ | | | |
+| ~~`SOURCEHUT_TOKEN`~~ | **not needed** | — | — | — (source retired 2026-08-04) |
 | `PRODUCTHUNT_TOKEN` | _(pending)_ | | | |
 | `GITHUB_TOKEN` | _(pending)_ | | | |
 | `GITLAB_TOKEN` | _(pending)_ | | | |
