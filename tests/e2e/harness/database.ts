@@ -197,6 +197,11 @@ export async function dropWorkerDatabase(workerIndex: number, databaseName?: str
   // finished), still try to drop the database by name. The failure mode
   // here is a leaked E2E database, which the harness promises to clean
   // up — so we always attempt the drop.
+  //
+  // What this cannot cover is a run that never reaches `afterAll` at all: Ctrl-C, a kill, a crashed worker.
+  // `playwright.config.ts` has no `globalTeardown`, so nothing sweeps afterwards either — 28 orphans, about
+  // 433 MB, had accumulated by 2026-08-04. `pnpm e2e:sweep-orphans` drops E2E databases with no active
+  // backend connections; it is a command rather than a hook on purpose (see that script's header).
   if (databaseName) {
     const adminUrl = e2eEnv().DATABASE_MIGRATION_URL
     const admin = postgres(adminUrl, { max: 1, prepare: false })
