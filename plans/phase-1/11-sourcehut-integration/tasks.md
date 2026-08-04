@@ -89,3 +89,38 @@
 
   A token is still needed to verify whichever option is chosen (every endpoint 401s unauthenticated, confirmed
   live), so this cannot be closed without one being created at meta.sr.ht > OAuth > personal access token.
+
+  ### Update 2026-08-04 — the decision is narrower than the three options above, and option 3 is out
+
+  Option 3 (enrichment) was going to be the recommendation. Before implementing it, two things were checked live
+  rather than assumed: whether anything works **without** a token, and what sr.ht's own policy says.
+
+  **`https://git.sr.ht/robots.txt`** (identical at meta.sr.ht) opens with a prose policy, not just directives:
+
+  > Allowed: search engine indexers, archival services. **Disallowed: marketing or SEO crawlers; anything used
+  > to feed a machine learning model**; bots which are too aggressive by default.
+
+  BuilderHunt indexes profiles into `builder_embeddings` (pgvector) and feeds AI ranking and grounded
+  explanation. It is the case that sentence names. Crucially, that is a statement about the **use**, so a
+  `SOURCEHUT_TOKEN` does not resolve it — the token would only record that a person accepted terms while the use
+  itself stays excluded. Option 3 is therefore not a scope change to weigh against the others; it is off the
+  table.
+
+  **The unauthenticated surface, probed directly:** `https://git.sr.ht/~user` answers 200 with a bare list of
+  repository names and is *not* in the machine-readable `Disallow` list. Everything that carries signal is:
+  `/*/*/log/*` (including the per-repo `log/rss.xml`, which does return 200 `application/rss+xml`), plus
+  `blame`, `commit`, `tree`, `item`, `*/raw`, and any URL with a query string. So even setting the purpose
+  policy aside, the crawlable surface is repository names with no dates, no activity and no profile fields —
+  nothing worth building on.
+
+  **Recommendation, changed by this finding: option 1, retire the source.** Previously the argument was "the API
+  cannot do it", which invites "then find another way". The real argument is that the operator has said in
+  writing that this use is unwelcome, and a source pill that can never return a result is a claim the UI cannot
+  keep. Retiring means removing the pill, icon, badge and scoring entry — user-visible product surface, so it is
+  left for the maintainer to approve rather than done unilaterally.
+
+  Recorded in `docs/operations/public-enrichment-source-register.md` under a new `sourcehut` entry, which is the
+  document that exists to hold lawful-basis facts per source, and in the connector's own header.
+
+  **No token is needed any more to close this.** The blocker was never the token; it was this question, and the
+  question is now answered.

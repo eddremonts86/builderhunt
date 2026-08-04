@@ -31,8 +31,32 @@ import type { RawBuilder } from '~/lib/sources/types'
  *
  * **What is actually possible** is exact resolution, not search: `userByEmail`/`userByID` on meta.sr.ht and
  * `user(username) { repositories }` on git.sr.ht. That would make SourceHut an enrichment/verification source
- * (the shape `profile-proof.ts` implements for other forges) rather than a discovery source. It is a product
- * decision, not a code fix — see the plan for the three options.
+ * (the shape `profile-proof.ts` implements for other forges) rather than a discovery source.
+ *
+ * ## ⚠ Verified 2026-08-04: sr.ht's own policy excludes this product's use, token or not
+ *
+ * The enrichment option above was going to be recommended. Then `https://git.sr.ht/robots.txt` was actually
+ * read (identical at meta.sr.ht). It opens with a prose policy rather than only directives:
+ *
+ *   > Allowed: search engine indexers, archival services. **Disallowed: marketing or SEO crawlers; anything
+ *   > used to feed a machine learning model**; bots which are too aggressive.
+ *
+ * BuilderHunt indexes profiles into `builder_embeddings` (pgvector) and feeds AI ranking and explanation. It is
+ * the named case. That is a statement about the *use*, so authenticating with a `SOURCEHUT_TOKEN` does not
+ * change it — the token would only mean a person had agreed to terms while the use stays excluded.
+ *
+ * The unauthenticated surface was probed rather than assumed: `https://git.sr.ht/~user` answers 200 with a bare
+ * list of repository names and is not in the `Disallow` list, but every path carrying real signal is: the
+ * per-repo log (including its `log/rss.xml` feed, which does return 200), blame, commit, tree, item and raw
+ * views, and any URL with a query string. So the only crawlable surface is repository names with no dates, no
+ * activity and no profile fields. (Written out in prose because the literal glob patterns would close this
+ * comment block.)
+ *
+ * **Recommendation, changed by this finding: retire the connector.** Not because the API is inconvenient, but
+ * because the operator has said in writing that this use is unwelcome, and a source pill that can never return
+ * a result is a claim the UI cannot keep. Recorded in `docs/operations/public-enrichment-source-register.md`
+ * under `sourcehut`, whose whole purpose is to hold facts like this one. Still a product decision, so the
+ * connector is left in place and honest rather than removed unilaterally.
  *
  * Left pointed at the non-existent field rather than silently rewritten, because every rewrite still returns
  * `[]` and a wrong query that is honestly documented is easier to act on than a different wrong query that

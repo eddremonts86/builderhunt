@@ -75,8 +75,32 @@
 - **Approved fields**: none.
 - **Review date**: 2026-07-20
 
+## sourcehut (git.sr.ht / meta.sr.ht)
+
+- **Acquisition mode**: `official_api` (wired, has never returned a result)
+- **Status**: `blocked` — on the operator's stated purpose policy, not on a technical limit
+- **Permission reference**: <https://git.sr.ht/robots.txt> (identical at meta.sr.ht), read
+  2026-08-04. The file opens with a prose policy, not just directives:
+
+  > Allowed: search engine indexers, archival services. **Disallowed: marketing or SEO
+  > crawlers; anything used to feed a machine learning model**; bots which are too aggressive.
+
+- **Lawful basis**: none. BuilderHunt indexes profiles into `builder_embeddings` (pgvector) and
+  feeds AI ranking and explanation — it *is* the "used to feed a machine learning model" case the
+  policy names. That excludes the use regardless of authentication, so a `SOURCEHUT_TOKEN` would not
+  change the answer.
+- **Approved fields**: none.
+- **Also checked, 2026-08-04**: the unauthenticated surface was probed directly rather than assumed.
+  `https://git.sr.ht/~user` answers 200 with a bare list of repository names, and is not in the
+  machine-readable `Disallow` list. Everything that carries actual signal **is**: `/*/*/log/*`
+  (including the per-repo `log/rss.xml` feed that returns 200), plus `blame`, `commit`, `tree`,
+  `item`, `*/raw`, and any URL with a query string. So the only crawlable surface is a list of
+  repository names with no activity, no dates and no profile fields — and the purpose policy excludes
+  even that.
+- **Review date**: 2026-08-04
+
 ## Other existing BuilderHunt sources (reddit, hn, devto, npm, huggingface, gitlab,
-## codeberg, hashnode, sourcehut, lobsters, stackoverflow)
+## codeberg, hashnode, lobsters, stackoverflow)
 
 Not yet registered in `policies.ts` — per spec §4 "missing policy means disabled." Each
 needs its own exact-profile adapter review (does the source's existing federated-search
