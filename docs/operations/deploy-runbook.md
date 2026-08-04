@@ -379,6 +379,39 @@ What is **not** skippable, because none of it is about preserving data:
   visible symptom is that the organization tables never exist and login answers 500. This has already
   taken production down once on pg16. Orchestrator step 3 only *warns*, so the mistake surfaces a step
   later, after everything has been undone.
+- **`PGDATA=/var/lib/postgresql/data/pgdata` on the resource — and this one is not optional either.**
+  Found the hard way on 2026-08-04, provisioning the real thing: **a Coolify Postgres 18 resource does not
+  start at all without it.** Coolify writes
+  `/data/coolify/databases/<uuid>/docker-compose.yml` with the volume pinned to
+  `/var/lib/postgresql/data`, which is the pre-18 convention. Postgres 18+ images expect a single mount at
+  `/var/lib/postgresql` with data in a major-version subdirectory (so `pg_upgrade --link` never crosses a
+  mount boundary), and on finding a mount at the old path they **refuse to boot** rather than guess:
+
+  ```
+  Error: in 18+, these Docker images are configured to store database data in a
+         format which is compatible with "pg_ctlcluster" …
+         Counter to that, there appears to be PostgreSQL data in:
+           /var/lib/postgresql/data (unused mount/volume)
+  ```
+
+  The container crash-loops (`Restarting (1)`). Setting `PGDATA` to a subdirectory of the mount Coolify
+  already made resolves it: verified `18.4`, `vector 0.8.5`, `uuidv7()` returning true.
+
+  **And `PGDATA` is doing a second job that is easy to miss: it is what keeps the data durable.** The pg18
+  image also declares `VOLUME /var/lib/postgresql`, so Docker attaches an *anonymous* volume there — and
+  that volume gets a new identity on every recreation (observed: `416a531f…` → `de9b0c41…` across one
+  redeploy). Data written to the image's default location would therefore be discarded on each deploy,
+  silently. `PGDATA` puts it in the named `postgres-data-<uuid>` volume instead. Proven rather than
+  reasoned: wrote a marker row, forced a Coolify deploy, confirmed the container ID changed
+  (`fffbf18941bd` → `c5b737533b6b`) and the row was still there.
+
+  Editing the generated compose by hand is not a fix — Coolify rewrites that file on every deploy. The
+  API exposes no volume field for a database resource, only `custom_docker_run_options`, and Docker cannot
+  retarget an existing mount anyway.
+
+  **The cost, stated so nobody is surprised later:** this keeps the pre-18 layout, so the *next* major
+  upgrade meets the same wall and needs the same second-resource dance rather than `pg_upgrade --link`.
+  That is no worse than the 16 → 18 move being performed here, and the alternative is patching Coolify.
 - **Migrations applying from zero.** In this mode a fresh install is the only path, so it stops being
   one scenario among several and becomes the entire cutover. `pnpm ci:local` already proves it on every
   run — `migrations-local` reports `firstRun: ok, secondRun: ok` — but confirm the count on the target:

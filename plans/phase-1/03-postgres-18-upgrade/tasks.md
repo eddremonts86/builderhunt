@@ -307,7 +307,7 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     `grep -c '0.8.5-pg18' docs/operations/deploy-runbook.md` returns ≥ 1 and the section contains
     no `NNNN` or `<fill in>` placeholders.
 
-- [ ] **Create and provision the standing production PG18 resource**
+- [x] **Create and provision the standing production PG18 resource** — done 2026-08-04
   - Files: none (Coolify operator work)
   - Do: create the resource on `pgvector/pgvector:0.8.5-pg18` with a named persistent volume,
     confirm redeploying the app does not recreate it, then run `pnpm deploy:db` against it with the
@@ -319,6 +319,55 @@ unearned claim, and never skip the task because the reasoning "is obviously righ
     on the migration connection. `select extversion from pg_extension where extname='vector'` is
     `0.8.5`. The resource holds the full schema and zero application rows
     (`node scripts/db/pg18/row-counts.mjs "$PG18_URL"` shows 0 for every table).
+
+  - **Done 2026-08-04.** `builderhunt-db-pg18`, uuid `ekq4rkiqtyl5nzzb3cc32kkg`, `running:healthy`, alongside an
+    untouched `builderhunt-db` on pg16. Executed via the Coolify API plus SSH; production was not repointed and
+    nothing was destroyed.
+
+    | Verify line | Result |
+    | --- | --- |
+    | all orchestrator steps pass, no warning at step 3 | **9/9** (the plan said 8 — step 9 syncs `content/`, added since) |
+    | `server_version` | `18.4 (Debian 18.4-1.pgdg12+1)` |
+    | `extversion` of `vector` | `0.8.5` |
+    | `rolsuper` on the migration connection | `t` |
+    | `count(*) from drizzle.__drizzle_migrations` == `ls drizzle/*.sql \| wc -l` | **145 == 145** |
+    | forced tables with zero policies | **0** |
+    | the seven `builderhunt_*` roles | all present, `rolbypassrls = false`, `rolsuper = false` |
+    | `uuidv7()` | returns non-null — the whole reason this cutover exists |
+
+    Orchestrator step 2 is the satisfying line: `✓ PostgreSQL 180004 (major 18) — floor 18 met`. That is the
+    same assertion that fatally stops a deploy against pg16.
+
+  ### The blocker this uncovered, which was not in any plan or runbook
+
+  **A Coolify Postgres 18 resource does not start at all out of the box.** Coolify generates
+  `/data/coolify/databases/<uuid>/docker-compose.yml` with the volume pinned to `/var/lib/postgresql/data` —
+  the pre-18 convention. Postgres 18+ images want a single mount at `/var/lib/postgresql` with data in a
+  major-version subdirectory so `pg_upgrade --link` never crosses a mount boundary, and on finding a mount at
+  the old path they **refuse to boot** rather than guess. The container crash-looped on `Restarting (1)`.
+
+  Diagnosed in an isolated throwaway container before touching the real resource, and the fix is one
+  environment variable: `PGDATA=/var/lib/postgresql/data/pgdata`.
+
+  **`PGDATA` turns out to be load-bearing twice, and the second reason is the dangerous one.** The image also
+  declares `VOLUME /var/lib/postgresql`, so Docker attaches an *anonymous* volume there — and that volume is
+  recreated with a new identity on every deploy (observed `416a531f…` → `de9b0c41…` across one). Without
+  `PGDATA`, data written to the image's default location would be discarded on each deploy **silently**,
+  which is far worse than a crash loop. Proven rather than argued: wrote a marker row, forced a Coolify
+  deploy, confirmed the container ID changed (`fffbf18941bd` → `c5b737533b6b`) and the row survived.
+
+  Hand-editing the generated compose is not a fix — Coolify rewrites it every deploy. The API exposes no
+  volume field for a database resource, only `custom_docker_run_options`, and Docker cannot retarget an
+  existing mount regardless. Recorded in `deploy-runbook.md` §0 as a non-negotiable, with the cost named: this
+  keeps the pre-18 layout, so the *next* major upgrade meets the same wall instead of using
+  `pg_upgrade --link`. No worse than the 16 → 18 move being done here, and the alternative is patching
+  Coolify.
+
+  **One number to disregard if you compare against a dev box.** The target reports 122 tables / 283 policies
+  while a local working database showed 124 / 278. The target is the correct one: the local database had only
+  **106 of 145** migrations recorded, still carrying `plans`, `plan_requests` and `plan_changes` (dropped by
+  the legacy-plan contraction) and missing `security_audit_events`. A dev database with drift is not the
+  baseline; 145-from-zero is.
 
 - [ ] **Announce the window and pre-stage the freeze**
   - Files: `docs/operations/deploy-runbook.md`
