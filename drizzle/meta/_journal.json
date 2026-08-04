@@ -995,6 +995,13 @@
       "when": 1785833165514,
       "tag": "0141_platform_admin_grant_entitlement",
       "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1785835073394,
+      "tag": "0142_retire_legacy_plan_tables",
+      "breakpoints": true
     }
   ]
 }

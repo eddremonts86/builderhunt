@@ -568,6 +568,10 @@
     "0141_platform_admin_grant_entitlement": {
       "sql": "dfbff45874205602d60a1a476bb6a9bb6a0c3062098ed1fe825e3f0ae895318e",
       "snapshot": "fc8e37b540198499f4ea433c5caca828da2cc559b3766c9aad80875e428dda27"
+    },
+    "0142_retire_legacy_plan_tables": {
+      "sql": "c877d5c8474f69597633d7d9e6c3612821ccff582580f8dd9334ee18cf10aafe",
+      "snapshot": "cac3d540e44b8a0b72a47927d39f4c59dc36db0130be382889cef56bb8d7e3d9"
     }
   }
 }
