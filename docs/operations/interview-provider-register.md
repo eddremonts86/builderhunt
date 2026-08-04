@@ -567,9 +567,9 @@ on the developer's own machine.
 
 | Item | Who | Notes |
 | --- | --- | --- |
-| **DPIA** | You + data-protection advisor | Before production **voice**. Narrower than first written: storage and scanning are first-party, so only Deepgram and Mistral are third-country transfers. |
-| **Deepgram no-training/no-retention statement** | Deepgram | Currently accepted without a written vendor statement — see §2. The claim made to candidates is unbacked until this exists. |
-| **Mistral Zero Data Retention** | Mistral support | Not self-serve; a support request. |
+| **DPIA** | You + data-protection advisor | Before production **voice**. Narrower than first written: storage and scanning are first-party, so only Deepgram and Mistral are third-country transfers. **A draft now exists** — [`interview-dpia-draft.md`](./interview-dpia-draft.md), assembled 2026-08-04 from this register and the code. It is an input for the advisor, not an assessment: every risk rating in it is a proposal, and it says plainly that it cannot be signed while the two rows below are open. |
+| **Deepgram no-training/no-retention statement** | Deepgram | Currently accepted without a written vendor statement — see §2. The claim made to candidates is unbacked until this exists. **Draft request ready to send**: [`interview-vendor-requests.md`](./interview-vendor-requests.md) §1. |
+| **Mistral Zero Data Retention** | Mistral support | Not self-serve; a support request. **Draft request ready to send**: [`interview-vendor-requests.md`](./interview-vendor-requests.md) §2. |
 
 ### Gates general availability only — explicitly NOT development or MVP blockers
 

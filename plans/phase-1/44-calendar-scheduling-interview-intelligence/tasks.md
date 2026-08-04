@@ -75,6 +75,36 @@
     no-training/no-retention, Mistral Zero Data Retention — a support request, not self-serve). All three
     gate production **voice**, not development, and the register says so.
 
+    **Drafted 2026-08-04, which is as far as engineering can take these three.**
+
+    `docs/operations/interview-dpia-draft.md` — structured to Article 35, built only from facts already in this
+    repository: the real data categories (`candidate_*`, `interview_*`, `transcript_segments`), the retention
+    ceilings enforced as `max()` bounds in `env.ts` (90-day transcripts, 180-day documents, 24-month consent),
+    the verified EU endpoints, and the per-provider 503 flags. Not legal advice, and every risk rating is
+    explicitly a proposal for the advisor to overwrite.
+
+    Three things in it are worth knowing without reading it:
+
+    - **The highest-rated risk has no technical control.** An interview is unstructured speech, so a verbatim
+      transcript will capture special-category data — a disability, a pregnancy, a union role — that nobody
+      asked for. Rated high/high, and nothing in the current design detects or redacts it. Four options are
+      offered in §6.3, the most protective being "generate reports from interviewer-selected excerpts rather
+      than raw transcripts", which is a product change rather than a fix.
+    - **It argues against its own proposed lawful basis.** Consent from a job candidate is not freely given in
+      any strong sense — they want the job. The draft says so, and turns it into two design requirements
+      (refusing must be visibly costless; withdrawal must delete for real) rather than wording changes.
+    - **It cannot be signed today**, and says which rows block it: the unsigned Deepgram DPA, the
+      non-existent no-training statement, and pending Mistral ZDR.
+
+    `docs/operations/interview-vendor-requests.md` — the two vendor asks written out to send. Both request
+    something **quotable** rather than reassurance, because the register's own finding is that Deepgram's
+    compliance page is silent on exactly these points, so "we take privacy seriously" would leave the position
+    unchanged. Each records what to do with the answer, including the unwelcome one: if Deepgram confirms audio
+    *is* retained or used for training, that changes what the consent text may claim rather than being filed.
+
+    **What no vendor reply fixes:** the special-category risk above. Kept separate on purpose, so two good
+    replies do not read as the DPIA being finished.
+
   - **Evidence, superseding the 2026-07-26 morning note that said "accounts NOT provisioned"**
     (re-checked 2026-07-27 against `.env` and the register):
     - **Deepgram**: account provisioned 2026-07-26, and the EU endpoint verified *against that
