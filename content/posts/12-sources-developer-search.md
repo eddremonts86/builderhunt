@@ -9,6 +9,18 @@ author: edd
 
 # The 12 sources I use to find developers in 30 seconds
 
+> **Correction, 2026-08-04.** Two sources named below are no longer searched by BuilderHunt, and the
+> product now covers **13**:
+>
+> - **Hashnode** moved its public GraphQL API behind a paid plan, so the connector returned nothing.
+> - **SourceHut** was retired on its operator's own terms, not a technical limit: sr.ht's `robots.txt`
+>   disallows "anything used to feed a machine learning model", which is what this product does. No access
+>   token changes that, because it is a statement about the use.
+>
+> The descriptions are kept below rather than deleted — they are still accurate about those platforms, and
+> both remain good places to look by hand. They are simply not part of the search any more. The title and
+> URL are unchanged on purpose: breaking a link to fix a count trades one inaccuracy for another.
+
 When you need to find a developer — for a hire, for a project, for an OSS contribution — you have 12 free, public sources to look at. Each one has a different shape of signal. Here's what each is good for, and when to use it.
 
 ## 1. GitHub

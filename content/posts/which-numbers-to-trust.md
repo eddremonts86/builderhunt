@@ -19,8 +19,8 @@ evidence.
 
 **Recency.** When the source says an account last did something, that is the
 source's own timestamp. It is the single most load-bearing input to the score and
-it is real for GitHub, GitLab, Codeberg, SourceHut, Reddit, DEV.to, Hashnode,
-Lobsters, npm and Hugging Face.
+it is real for GitHub, GitLab, Codeberg, Reddit, DEV.to, Lobsters, npm and
+Hugging Face.
 
 **The match explanation.** "matches postgres, performance in topic" is derived
 directly from the query and the fields it hit. If you cannot see why a result is

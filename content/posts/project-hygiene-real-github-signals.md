@@ -85,7 +85,7 @@ does not surface "the data is 23 hours old" — but the
 "last analyzed" timestamp is rendered in the card's detail
 view so a curious reader can check.
 
-For non-GitHub builders — GitLab, Codeberg, SourceHut — the
+For non-GitHub builders — GitLab, Codeberg — the
 adapter-specific fetcher is not yet wired, and the card
 collapses to the "not enough data" state with a small note
 explaining why. This is the deterministic fallback. The

@@ -12,7 +12,7 @@ author: edd
 This is the technical companion to ["Why I built BuilderHunt"](/blog/why-i-built-builderhunt) —
 how the search actually works, for anyone building something similar. BuilderHunt fans a single
 query out across GitHub, Hacker News, dev.to, Reddit, Stack Overflow, npm, Hugging Face, GitLab,
-Codeberg, Hashnode, SourceHut, Devpost, Product Hunt and Bluesky, merges the results, dedupes
+Codeberg, Devpost, Product Hunt and Bluesky, merges the results, dedupes
 people who show up more than once, and ranks what's left. Here's the shape of it.
 
 ## One module per source, one shared contract

@@ -17,6 +17,18 @@ Here is what each one is for.
 
 ## Code hosts — where the work itself lives
 
+> **Correction, 2026-08-04.** Two sources named below are no longer searched by BuilderHunt, and the
+> product now covers **13**:
+>
+> - **Hashnode** moved its public GraphQL API behind a paid plan, so the connector returned nothing.
+> - **SourceHut** was retired on its operator's own terms, not a technical limit: sr.ht's `robots.txt`
+>   disallows "anything used to feed a machine learning model", which is what this product does. No access
+>   token changes that, because it is a statement about the use.
+>
+> The descriptions are kept below rather than deleted — they are still accurate about those platforms, and
+> both remain good places to look by hand. They are simply not part of the search any more. The title and
+> URL are unchanged on purpose: breaking a link to fix a count trades one inaccuracy for another.
+
 **GitHub** is the default and the deepest. Best for: almost any engineering role.
 Caveat worth knowing: repository results use the repository's description as the
 bio, because a repository is not a person.
