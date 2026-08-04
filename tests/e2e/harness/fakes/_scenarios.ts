@@ -34,6 +34,23 @@ export type E2EDiscoveryScenario = (typeof E2E_DISCOVERY_SCENARIOS)[number]
 export const E2E_AI_TASK_SCENARIOS = ['success', 'disabled', 'budget_exceeded', 'unsupported'] as const
 export type E2EAITaskScenario = (typeof E2E_AI_TASK_SCENARIOS)[number]
 
+/**
+ * Claim-proof scenarios — the seam in `src/shared/lib/claim-sources/index.ts`.
+ *
+ * This list is `ClaimProofFailureReason` plus `success`, deliberately: a fake that could answer something no
+ * real adapter can answer would be a source of fiction rather than a stand-in. If `ClaimProofFailureReason`
+ * gains a member, add it here too.
+ */
+export const E2E_CLAIM_PROOF_SCENARIOS = [
+  'success',
+  'not_found',
+  'challenge_missing',
+  'rate_limited',
+  'timeout',
+  'unsupported',
+] as const
+export type E2EClaimProofScenario = (typeof E2E_CLAIM_PROOF_SCENARIOS)[number]
+
 export function assertScenario<T extends string>(value: string, allowed: readonly T[], envVar: string): T {
   if (!(allowed as readonly string[]).includes(value)) {
     throw new Error(`Unknown ${envVar} "${value}" — expected one of: ${allowed.join(', ')}`)

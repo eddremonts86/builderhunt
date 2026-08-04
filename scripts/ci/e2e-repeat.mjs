@@ -14,15 +14,35 @@
  * tests/e2e/onboarding.spec.ts` narrows both runs the same way.
  */
 import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const forwarded = process.argv.slice(2)
 
+// The report goes to a FILE, not stdout, and that is a fix rather than a preference.
+//
+// This used to `JSON.parse(result.stdout)`, which could never work: the env loader prints
+// `◇ injected env (67) from .env // tip: ⌘ override existing { override: true }` to stdout before Playwright
+// writes a byte, so the parse always threw and every invocation died with "produced no parseable JSON report"
+// — the script had never once completed a comparison, which is why nothing ever caught a flaky spec with it.
+// Slicing from the first `{` would not have rescued it either: the first `{` is inside that banner.
+//
+// `PLAYWRIGHT_JSON_OUTPUT_NAME` is the documented way to get the report intact, and it is immune to anything
+// else that decides to write to stdout later.
+const reportDir = mkdtempSync(join(tmpdir(), 'e2e-repeat-'))
+
 /** @param {number} attempt */
 function runOnce(attempt) {
+  const reportFile = join(reportDir, `run-${attempt}.json`)
   const result = spawnSync(
     'pnpm',
     ['exec', 'playwright', 'test', '--reporter=json', ...forwarded],
-    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, env: { ...process.env, E2E_RUN_ID: `repeat-${attempt}` } },
+    {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+      env: { ...process.env, E2E_RUN_ID: `repeat-${attempt}`, PLAYWRIGHT_JSON_OUTPUT_NAME: reportFile },
+    },
   )
 
   // Playwright exits non-zero when tests fail, which is not itself an error
@@ -30,9 +50,9 @@ function runOnce(attempt) {
   // is a real failure: it means the runner never got far enough to produce one.
   let report
   try {
-    report = JSON.parse(result.stdout)
-  } catch {
-    console.error(`Run ${attempt} produced no parseable JSON report.`)
+    report = JSON.parse(readFileSync(reportFile, 'utf8'))
+  } catch (error) {
+    console.error(`Run ${attempt} produced no parseable JSON report at ${reportFile}: ${error.message}`)
     console.error(result.stdout.slice(-4000))
     console.error(result.stderr.slice(-4000))
     process.exit(1)
@@ -81,4 +101,5 @@ if (failed.length > 0) {
   process.exit(1)
 }
 
+rmSync(reportDir, { recursive: true, force: true })
 console.log(`\nBoth runs agree across ${names.size} tests.`)

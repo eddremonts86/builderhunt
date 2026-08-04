@@ -41,11 +41,26 @@
 > Every path below is the real one: the file paths in this plan were corrected on 2026-07-28 to the
 > unified `tests/{unit,e2e,regression}` layout, so they can be followed literally.
 
-- [x] **Add the repeatability script the harness still lacks** — done (2026-07-27)
+- [x] **Add the repeatability script the harness still lacks** — written 2026-07-27, **actually working
+      2026-08-04**
   - Files: `package.json`, `scripts/ci/e2e-repeat.mjs`
   - `pnpm test:e2e:repeat` runs the suite twice and compares per-test outcomes, failing on any
     divergence in either direction — a test that starts passing on the second run is as much a bug
     as one that starts failing. Arguments are forwarded, so it can narrow both runs the same way.
+  - **It had never run to completion, found 2026-08-04 while using it as plan 36's Verify.** The script did
+    `JSON.parse(result.stdout)`, but the env loader prints
+    `◇ injected env (67) from .env // tip: ⌘ override existing { override: true }` to stdout before Playwright
+    writes a byte. So the parse always threw and *every* invocation exited 1 with "produced no parseable JSON
+    report" — the comparison this script exists to perform had never once happened. Slicing from the first `{`
+    would not have rescued it: that `{` is inside the banner text.
+
+    Fixed to write the report to a file via `PLAYWRIGHT_JSON_OUTPUT_NAME`, which is immune to anything else
+    writing to stdout. Now verified working: narrowing to one spec reports "Both runs agree across 4 tests."
+
+    **Why it stayed hidden for a week is the part worth keeping.** This script is in neither `pnpm ci:local`
+    nor the CI workflow — it is a tool someone runs by hand — so its failure was never anyone's red build. Two
+    plans cite it as their flakiness guard, and both citations were worthless for that week. A guard that is
+    not in a gate needs to be exercised deliberately, or it rots exactly this quietly.
   - **Known flake this immediately matters for**: `sign-in via the UI lands on the dashboard and
     the session survives a reload` failed once in a full-suite run with one `403` beyond the two
     `/api/admin/incidents` probes it allows, and passed both in isolation and with its own file

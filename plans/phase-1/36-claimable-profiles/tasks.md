@@ -107,11 +107,39 @@
     - `pnpm test` is green (4435 passed, 12 pre-existing skips; the
       7 new cases are the profile-views additions).
 
-- [ ] **Exercise the complete runtime claim flow** — explicitly out of scope for this session
+- [x] **Exercise the complete runtime claim flow** — done 2026-08-04
   - Files: `tests/e2e/claimable-profiles.spec.ts` (new), `playwright.config.ts`
   - Do: Write one Playwright spec covering the full claim lifecycle against the running app: start a claim, receive the challenge, satisfy it against a real external profile, verify, then revoke — asserting after revocation that the public profile no longer reports a verified claim. Use the existing `tests/e2e/harness` fixtures for the disposable database and seeded roles rather than a new bootstrap.
   - Verify: `pnpm exec playwright test tests/e2e/claimable-profiles.spec.ts` passes twice consecutively from a clean state (`pnpm test:e2e:repeat` is the repo's own guard against a flaky new spec).
   - Reason still open: the standing instruction at the time forbade creating new Playwright files. The same flow was live-verified by hand instead — real HTTP against the dev server, real Postgres rows, and a real unmodified public GitHub profile, not a mock — so the behavior is proven; what is missing is the regression guard.
+  - **Done 2026-08-04** — `tests/e2e/claimable-profiles.spec.ts`, 4 tests: challenge issuance (and that re-reading
+    returns the *same* challenge, not a fresh one), the refusal path with its exact reason, the transition to
+    verified, and revocation. Passes twice consecutively: `pnpm test:e2e:repeat` reports "Both runs agree across
+    4 tests."
+
+    **Two things had to be built first, and both are worth reading before trusting this spec.**
+
+    *1. The external proof needed a seam, because the verified state was unreachable otherwise.* Every claim
+    adapter fetches a live profile page, and two independent things block that in a test: the harness egress
+    guard rejects all non-local hosts under `E2E_MODE` (the adapters catch it and honestly report `not_found`),
+    and the challenge is minted per claim, so no real profile's bio can contain a string that did not exist when
+    the test started. Added the same seam shape `embeddings.ts` and `enrichment.ts` already use — gated on
+    `E2E_MODE=true` **and** an explicit scenario, production path byte-identical otherwise — reading the worker's
+    Redis namespace first and the env var second, exactly as `stripe-provider.ts` does, so success and failure
+    can both be exercised in one file. Its vocabulary is `ClaimProofFailureReason` plus `success` and nothing
+    else, so the fake cannot answer something no real adapter could.
+
+    What this costs is stated in the spec's own header rather than left implicit: **the HTTP call to GitHub is
+    not exercised.** Everything the product owns is — issuance, refusal, transition, projection, revocation —
+    and the adapters' parsing stays covered by `tests/unit/lib/sources/profile-proof.test.ts`.
+
+    *2. `pnpm test:e2e:repeat` had never worked, so the Verify line above could not be satisfied as written.*
+    It did `JSON.parse(result.stdout)`, and the env loader prints
+    `◇ injected env (67) from .env // tip: ⌘ override existing { override: true }` before Playwright writes a
+    byte — so the parse always threw and every invocation exited 1 with "produced no parseable JSON report".
+    Slicing from the first `{` would not have helped either; that `{` is inside the banner. Fixed to write the
+    report to a file via `PLAYWRIGHT_JSON_OUTPUT_NAME`. Recorded in plan 53, which lists this script as
+    delivered.
 
 ## What wasn't written (and why)
 
