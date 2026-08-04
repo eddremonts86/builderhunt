@@ -397,6 +397,22 @@ insurance about the data:
 If the data does become worth protecting before this runs, revert to the phases as written. Until
 then, the rehearsal measures a freeze budget for a freeze nobody needs.
 
+**Written up 2026-08-04 as `docs/operations/deploy-runbook.md` §2b, "The MVP path".** It sits beside the
+long procedure rather than replacing it, and §3 now opens with a pointer to it, so an operator meets both
+and can tell which applies. The section states what is *not* skippable (the `pgvector` image, migrations
+applying from zero, role/policy verification on the target, repointing the backups) and carries an
+explicit "do not use this path once there are real customer rows".
+
+One correction found while writing it, and worth recording because the first draft would not have run:
+**`pnpm test:rls:local` and `pnpm test:api-isolation:local` cannot be aimed at the new database.** Both
+refuse unless the database name matches `builderhunt_security_test_*` —
+`RLS verifier refuses to run outside a named builderhunt_security_test database` — and that guard is
+right, since they seed fixture tenants and delete rows. They are the pre-cutover proof, run by
+`ci:local` against the same `0000`→head chain the target receives. What §2b tells the operator to run on
+the target instead are §4's three read-only checks, verified against a real migrated database while
+writing: 0 forced-tables-without-policy, 278 policies, and all seven `builderhunt_*` roles present with
+`rolbypassrls = false` and `rolsuper = false`.
+
 ## Phase 3 — Full-fidelity rehearsal against production data
 
 - [ ] **Rehearse on a scratch copy of real production data**

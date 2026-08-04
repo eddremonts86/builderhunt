@@ -348,7 +348,91 @@ Also repoint, or the new database has no backups at all:
 - The **03:30 `scripts/ops/builderhunt-backup-sync.sh`** roles capture (`pg_dumpall --roles-only
   --no-role-passwords`).
 
+### 2b. The MVP path — skip §3 entirely while there is nothing to preserve
+
+**This is the shorter procedure, and today it is the applicable one.** Added 2026-08-04.
+
+Everything in §3 through §7 exists to move rows without losing or corrupting them: dump, restore,
+row-count parity, a write freeze measured against a rehearsed budget, a named point of no return, a
+rollback. All of it is insurance on data. This project has **no real users**, and the standing
+maintainer instruction is that wiping the production database is acceptable until phase-5 ships. Buying
+insurance on something you have decided is expendable is not caution, it is ceremony.
+
+So while that holds, the cutover is §1 plus §2 plus a redeploy:
+
+1. **§1 unchanged** — create the second resource on `pgvector/pgvector:0.8.5-pg18` with a named volume
+   and run `pnpm deploy:db` against it. This applies every migration `0000`→head to an empty database,
+   which *is* the whole cutover in this mode.
+2. **Verify roles, GRANTs and RLS on the target as the real roles** — see the checklist below. Not
+   optional, and not covered by anything in §1.
+3. **§2 unchanged** — repoint all six `DATABASE_*_URL` values, plus Coolify's 03:00 backup and the
+   03:30 roles capture.
+4. **Redeploy the app.** No freeze: there is nothing whose loss would matter, and every background job
+   is HTTP-triggered and idempotent.
+5. **Leave the pg16 resource running and un-repointed** for at least one backup cycle. It costs nothing
+   and it is the only undo.
+
+What is **not** skippable, because none of it is about preserving data:
+
+- **The `pgvector/pgvector:0.8.5-pg18` image.** On a plain `postgres:18*`, `drizzle/0013`'s
+  `CREATE EXTENSION vector` fails inside `drizzle-kit migrate` and rolls back the entire chain. The
+  visible symptom is that the organization tables never exist and login answers 500. This has already
+  taken production down once on pg16. Orchestrator step 3 only *warns*, so the mistake surfaces a step
+  later, after everything has been undone.
+- **Migrations applying from zero.** In this mode a fresh install is the only path, so it stops being
+  one scenario among several and becomes the entire cutover. `pnpm ci:local` already proves it on every
+  run — `migrations-local` reports `firstRun: ok, secondRun: ok` — but confirm the count on the target:
+  `select count(*) from drizzle.__drizzle_migrations` must equal `ls drizzle/*.sql | wc -l`.
+- **Role and policy verification on the target.** GRANTs, RLS policies and every SECURITY DEFINER
+  function live *only* in hand-written migrations, and a superuser connection cannot see whether they
+  took — it bypasses all of them. This is the class of defect that has actually bitten this project: an
+  operator grant answering 42501 for its own role passed every unit test, because those connect as the
+  migration superuser.
+
+  **`pnpm test:rls:local` and `pnpm test:api-isolation:local` cannot be pointed at this database, and
+  should not be.** Both refuse to run unless the database name matches
+  `builderhunt_security_test_*` — checked, not assumed:
+
+  ```
+  RLS verifier refuses to run outside a named builderhunt_security_test database
+  ```
+
+  That guard is correct. They seed fixture tenants and delete rows; aiming them at a production target
+  would be the accident the guard exists to prevent. They are the *pre-cutover* proof, and `pnpm
+  ci:local` runs both against a database migrated from the same `0000`→head chain the target gets — so
+  on a freshly-migrated target, a green `ci:local` on the shipping commit already establishes that the
+  policies and grants this chain creates are correct.
+
+  What to check on the target itself is that the chain actually took, which is §4's queries — run them
+  against the new database with no source to compare against:
+
+  ```sh
+  # Every forced table must have at least one policy. MUST return zero rows.
+  psql "$PG18_URL" -tAc "select c.relname from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relrowsecurity and not exists (select 1 from pg_policies p where p.schemaname='public' and p.tablename=c.relname)"
+
+  # Policy count. Compare against the same query on a database ci:local just built from the same commit.
+  psql "$PG18_URL" -tAc "select count(*) from pg_policies where schemaname='public'"
+
+  # All seven roles exist and none can bypass RLS.
+  psql "$PG18_URL" -tAc "select rolname, rolbypassrls, rolsuper from pg_roles where rolname like 'builderhunt%' order by rolname"
+  ```
+
+  The first query is the one that would have caught the 2026-07-26 defect, where 192 policies were
+  silently not created and 54 tables were left forced-with-no-policy while row and table counts both
+  looked perfect.
+- **Repointing the backups.** A new resource with no backup schedule is a worse position than the one
+  you started from, data or no data.
+
+**Do not use this path once there are real customer rows.** The moment that changes, §3–§7 stop being
+ceremony and become the procedure — and the rehearsal in §3 has already been executed once
+(2026-08-01), so it is ready rather than theoretical. The plan note at
+`plans/phase-1/03-postgres-18-upgrade/tasks.md` ("most of Phases 3 and 4 is ceremony for data this
+project does not have") is the same decision recorded from the plan's side.
+
 ### 3. The pipeline
+
+> Applies when there is data worth moving. See §2b first — while production holds no real users, this
+> section and everything after it is insurance on something the maintainer has declared expendable.
 
 Reproduced end to end on 2026-08-01 against two freshly-provisioned PG18 databases: restore exit 0,
 row-count parity identical, zero forced-tables-without-policy. Every flag has a reason.
