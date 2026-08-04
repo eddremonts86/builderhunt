@@ -1854,7 +1854,7 @@ migration, dunning/recovery) implemented, tested, and committed.
 
 ## Phase 11 — retire the legacy plan tables (moved here 2026-07-29)
 
-- [ ] **Contract legacy schema only after the compatibility window**
+- [x] **Contract legacy schema only after the compatibility window**
   - Files: a new `drizzle/00XX_tenant_contract.sql` (the plan's original `0008` name is stale — numbering is past `0081`), `src/shared/lib/db/schema.ts`, `src/shared/lib/db/index.ts`, `src/shared/lib/migration/*`, `docs/operations/database-migrations.md`
   - Do: In a separate release remove legacy per-user builder/tracking columns, user-keyed plan paths, redundant JSON relationship fields, and obsolete repositories only after fresh backup/restore, zero legacy access telemetry, and explicit maintainer approval. Use a new forward recovery migration for any failure; never edit applied migrations or restore owner credentials to runtime.
   - Note (2026-07-27): the "dual-write/shadow code" half of this item is already done — `shadow-read.ts`, `dual-write.ts` and `migration-metrics.ts` were deleted with the cutover above. What remains is dropping the legacy `user_id` columns themselves, which stays blocked on the compatibility window and on production actually running in canonical read mode.
@@ -1863,3 +1863,23 @@ migration, dunning/recovery) implemented, tested, and committed.
     stops reading and writing `plans`/`plan_requests`; dropping the columns is the last step of that
     retirement, not a separate schema exercise. Run it after this plan's other tasks, so the code no
     longer touches the tables when they disappear.
+  - Progress (2026-08-04): **done for the plan tables**, which is what this task's own note scoped it to. Two
+    steps. First (2026-08-03) the code stopped touching them: `plans`, `plan_changes` and `plan_requests` left
+    `schema.ts`, along with `/api/plans/request-upgrade`, `/api/me/plan-changes`, `/admin/plan-requests`, the
+    `planRequests` nav badge, seven `platform-billing` functions and the `LegacyPlanMutationDisabledError` gate
+    that guarded them. Granting a tier by hand moved to `organization_entitlements` via
+    `repositories/operator-grants.ts`. Then (2026-08-04) `drizzle/0142_retire_legacy_plan_tables.sql` dropped
+    the tables. `CASCADE` was checked rather than trusted — against the live database: 0 rows in all three, no
+    incoming FKs, no views, no functions (`sync_personal_organization_entitlement` reads `organization_members`),
+    no triggers, and a dry-run `DROP TABLE ... CASCADE` of all three inside a rolled-back transaction raising no
+    dependency error. `plan_changes` never had a writer at all, so nothing was discarded: the operator-grant
+    trail lives in `security_audit_events` as `admin.user.entitlement-grant`, targeting the organization and
+    carrying `onBehalfOfUserId`. **Also corrected a claim that had blocked this for a day**: `drizzle-kit
+    generate` does not always need a TTY — the prompt is for ambiguous diffs (a rename), which a
+    drops-only migration never produces; it generated cleanly with stdin closed. Verified: `pnpm ci:local`
+    24/24, EXIT=0 — `drizzle-kit check` clean, migrations-local first *and* second run ok at 143,
+    restore-rehearsal `rlsMissing: 0`, 5672 unit tests, 872 e2e.
+    **Still open, and deliberately not claimed by this checkbox**: the legacy per-user *builder/tracking columns*
+    and "redundant JSON relationship fields" in the Do line above. Those belong to
+    `01-security-and-multitenancy`'s own cutover, are independent of billing, and nothing in this plan reads
+    them — folding them in here would hide unfinished work behind a billing task.
