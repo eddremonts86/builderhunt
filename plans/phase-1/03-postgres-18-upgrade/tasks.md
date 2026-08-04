@@ -597,6 +597,42 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     The single-column `conversion_events_server_day_idx` is **redundant**
     on PG18 — the composite `(name, server_day)` index answers the
     same range query via a skip scan. Task 6 follows.
+  - **Correction (2026-08-04): the conclusion holds, the evidence above does not.** Found while tracing
+    why `builderhunt_security_test_local_pg18_skip` had grown to **9.5 GB**. Three independent defects in
+    `explain-skip-scan.mjs`, each enough on its own to void the run:
+    1. **It seeded 28,000,000 rows, not 500k.** The loop said "500 batches of 1000" about a
+       `generate_series(1, 1000)` sitting inside three CROSS JOINs — 7 names × 4 surfaces × 2 variants =
+       56 rows per series value, so 500 × 56,000 = 28M. The table held exactly 28,000,376. Plan choice is
+       volume-dependent, which is the entire reason this task specified a row count.
+    2. **The query window matched almost nothing, by accident.** The seed writes
+       `now() - random() * interval '30 days'` while the EXPLAIN filtered a hardcoded
+       `between '2026-06-01' and '2026-06-30'`. Run on 2026-07-29 those overlap by about two days — hence
+       "660118 rows", a 2.4% sliver of the tail rather than a representative range. Re-run on 2026-08-04
+       the same query matched **zero rows**: both plans printed `rows=0.00` in 0.06 ms.
+    3. **The script drops the index and never recreates it**, so every run after the first compared
+       "dropped" against "dropped". The first EXPLAIN emitted `index ... does not exist, skipping`.
+    - **And the deepest one: it EXPLAINed a query the product does not issue.** The header claimed to
+      mirror `conversion-events.ts`, whose `countConversionSessions` runs
+      `where name = $1 and variant = $2 and server_day between $3 and $4` with
+      `count(distinct session_id), count(*)`. The script omitted **both equality predicates** and added a
+      `GROUP BY name` that exists nowhere in the repository. That omission is the question itself: with
+      `name` pinned, `(name, server_day)` is an exact prefix match and no skip scan is involved. Dropping
+      the predicate manufactured the skip-scan scenario production never runs — which is where
+      `Index Searches: 8` came from.
+    - **Re-measured with all four fixed** (501,200 rows, window derived from the seeded data, index
+      recreated before the first arm, the repository's real query): both arms produce an identical
+      `Bitmap Index Scan on conversion_events_name_server_day_idx`,
+      `Index Cond: (name = ... AND server_day >= ... AND server_day <= ...)`, `Index Searches: **1**`,
+      10.9 ms vs 8.7 ms. `conversion_events_server_day_idx` is **not chosen even when present**.
+    - So task 6's drop is justified — on firmer ground than before, and for a different reason. Not "a
+      PG18 skip scan replaces it" but "every read that filters `server_day` also pins `name`, so the
+      composite index serves them all". No PG18 feature is required for that, which also means this
+      finding is not contingent on the upgrade.
+    - **One access path remains unmeasured and it is the only candidate left:**
+      `deleteExpiredConversionEvents` (`conversion-events.ts:40`) runs
+      `delete ... where server_day < cutoff` with **no** `name` predicate — the one query a single-column
+      `(server_day)` index could serve. Measure that before dropping, or accept that a retention sweep
+      deleting everything older than 30 days will seq-scan regardless of index.
 
 - [x] **Drop the redundant index — or record the negative result**
   - Files: `src/shared/lib/db/schema.ts` (`conversion_events_server_day_idx`, line 1771 at
