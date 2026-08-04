@@ -102,9 +102,25 @@ cleanup() {
   psql "$MIGRATION_URL" -q -c "DROP DATABASE IF EXISTS ${RESTORE_DB} WITH (FORCE)" >/dev/null 2>&1
   # Per-run roles outlive their database, so drop them explicitly. Named for this run only; the
   # shared base roles are never touched.
-  for base in app auth worker platform; do
+  #
+  # `capability` was missing from this list until 2026-08-04, so every run since the capability role
+  # was introduced leaked one: the database counted 100 orphaned
+  # `builderhunt_capability_rls_local*` roles against 6 of each other kind (those six are runs killed
+  # before the trap could fire — ordinary noise, not a leak). Keep this list in step with the roles
+  # the setup step creates; it is not derived from anything, so nothing else will notice a new one.
+  for base in app auth worker platform capability; do
     psql "$MIGRATION_URL" -q -c "DROP ROLE IF EXISTS builderhunt_${base}_rls_${RUN_ID}" >/dev/null 2>&1
   done
+  # And the same list read from the fixture's own output, so a role added there is dropped even if
+  # nobody remembers to add it above. This is the half that would have prevented the leak.
+  if [ -f "/tmp/ci-local-roles-${RUN_ID}.sh" ]; then
+    for role in $(sed -n 's|.*postgresql://\([^:]*\):.*|\1|p' "/tmp/ci-local-roles-${RUN_ID}.sh" | sort -u); do
+      psql "$MIGRATION_URL" -q -c "DROP ROLE IF EXISTS \"${role}\"" >/dev/null 2>&1
+    done
+  fi
+  # These two hold the per-run roles' passwords in plaintext. They are throwaway local test roles, but
+  # a file of credentials with no owner and no expiry is not something to leave in /tmp for weeks.
+  rm -f "/tmp/ci-local-roles-${RUN_ID}.sh" "/tmp/ci-local-fixture-${RUN_ID}.json"
 }
 trap cleanup EXIT
 
