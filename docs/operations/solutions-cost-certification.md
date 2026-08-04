@@ -147,11 +147,60 @@ Both properties are asserted against a real disposable Postgres in
 `tests/unit/modules/solutions/billing.test.ts` ("resolves a historical run against its own rate-card version
 after a price change").
 
+## The account is on a flat plan, which changes what needs certifying
+
+**Recorded 2026-08-04, from the maintainer.** Everything above is computed against MiniMax's *published list
+price*. That is the right basis for "are the fixed prices obviously mispriced", and it stays. But it is not
+what this account pays: the plan is **$25/month for 1.7B tokens**, a flat subscription rather than
+pay-per-token.
+
+Stated as its provenance deserves: this comes from the maintainer's own description, not from an invoice I
+have seen. Item 1 below still stands.
+
+### What the flat plan does to the arithmetic
+
+$25 over 1.7B tokens is **0.001471¢ per 1,000 tokens**, blended — a flat plan does not distinguish input from
+output. Against list price:
+
+| | List | Flat plan | List is dearer by |
+| --- | --- | --- | --- |
+| Input, per 1K | 0.03¢ | 0.001471¢ | **20×** |
+| Output, per 1K | 0.12¢ | 0.001471¢ | **82×** |
+
+So every margin in the table above is **conservative by one to two orders of magnitude**. The worst-case
+generate line — 1.674¢ of provider cost against 45¢ charged — costs somewhere between **0.021¢ and 0.082¢**
+under the flat plan, depending on the input/output mix. The 27× break-even multiple is really somewhere north
+of 500×. Nothing here is at risk of being underpriced.
+
+### And it moves the risk somewhere else entirely
+
+**The exposure is quota exhaustion, not unit cost.** A flat plan has no marginal price and a hard ceiling, so
+the question "does each call pay for itself" is close to meaningless while "what happens at 1.7B tokens" has
+no answer written down anywhere. Working from the worst-case figures above, one generate consumes between
+about 14,000 and 56,000 tokens, which puts the monthly ceiling at roughly **30,000 to 120,000 worst-case
+generates**. Comfortable — and irrelevant if nobody notices the month running out.
+
+What that implies, and none of it is done:
+
+1. **Track tokens against the monthly cap, not spend.** The cost model meters cents. Under this plan the
+   number that matters is cumulative tokens versus 1.7B, and it resets monthly.
+2. **Decide the behaviour at the ceiling before reaching it.** Does generation fail closed, degrade to the
+   deterministic composer, or overflow into paid usage? `AI_DISABLED` and `AI_DISABLED_TASKS` are the switches
+   that exist; nothing turns them automatically.
+3. **Re-derive this section if the plan changes.** A move to pay-per-token puts the list-price table back in
+   force, and it is the one already computed above — which is why that analysis is kept rather than replaced.
+
+Neither of the first two is engineering-blocked; both are decisions about what should happen when a
+subscription runs out, which is a product call.
+
 ## Before this can be signed
 
 1. **A real invoice.** The constants now match MiniMax's published list price, which is a much stronger footing
-   than the original guess — but list price is not what an account pays. One month of real billing, reconciled
-   against `billing_credit_reservations`, is what turns this from computed to certified.
+   than the original guess — but list price is not what an account pays, and as of 2026-08-04 we know it
+   specifically is not: the account is on a $25/month flat plan (see the section above). One month of real
+   billing, reconciled against `billing_credit_reservations`, is what turns this from computed to certified —
+   and under a flat plan that reconciliation should compare **token consumption against the 1.7B cap**, not
+   cents against cents.
 2. **A measured benchmark, not a budget ceiling.** These figures assume every call uses its entire token budget.
    Real distributions are what spec.md means by "a provider-cost benchmark validates the rate card" — run the
    60-brief suite from Phase 9 with usage capture and record p50/p95 alongside the worst case.

@@ -61,6 +61,30 @@
     Console asks Google to index a site whose blog, changelog and roadmap are invisible. Decide it before
     the "Submit sitemap" task below, not after.
 
+    **Traced to the exact switch, 2026-08-04 — it is two clicks, not a code change.**
+
+    Confirmed from production's own HTML rather than inferred: `/blog`, `/changelog` and `/roadmap` each
+    serve `<meta name="robots" content="noindex, nofollow">`, while `/pricing` serves
+    `index, follow, max-image-preview:large, …`. So rows exist in `public_surface_indexing` with
+    `noindex = true` for those three. It is deliberate configuration, not a fault: a *failed* lookup would
+    have hidden `/pricing` too, because `getSurfaceDirectives` fails closed to noindex defaults
+    (`public-surface-indexing.ts`), and with no row at all the default is `{ noindex: false }` — indexable.
+    Somebody set them.
+
+    **Where to change it:** `/admin/content` → the Indexing panel (`IndexingPanel.tsx`, which PATCHes
+    `/api/admin/seo`; platform-admin only). Flip the three surfaces to indexable.
+
+    **Why the order matters, restated because it is the whole point of recording this:** the sitemap
+    currently lists 56 URLs and none of those three, while all three return 200 and hold real content — the
+    23 changelog entries and 32 roadmap items reconciled above. Submitting the sitemap first asks Google to
+    index a site whose blog, changelog and roadmap are marked `noindex`, which wastes the crawl and teaches
+    the wrong thing about the site. Flip the directives, re-check `/sitemap.xml` contains the three, *then*
+    submit.
+
+    Left as the maintainer's call rather than flipped: `noindex` on a public surface is a deliberate
+    marketing decision, and these may be hidden on purpose until the launch post is ready. What is not
+    defensible is submitting a sitemap without deciding.
+
 - [ ] **Smoke-test the core authed funnel on prod**
   - Files: none (manual)
   - Do: Fresh email → sign up → land on `/onboarding/welcome` → complete the 3-step tour →
