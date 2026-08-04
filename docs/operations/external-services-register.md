@@ -47,12 +47,12 @@
 | 4 | ~~**MiniMax**~~ | AI, PAYG | usage only | ✅ **already contracted** — found set in Coolify during the audit; empty locally, so Tier-2 AI is off for dev only |
 | 5 | ~~**Deepgram**~~ | transcription, PAYG | usage only; $200 credit **expires ~2027-07-26** | ✅ **done** — EU endpoint, `nova-3`, diarization and 2-channel all verified against this account; synced to Coolify |
 | 6 | ~~**Azure OpenAI**~~ → **Mistral** | sensitive AI, PAYG | usage only | ✅ **done** — provider switched, see the interview register §4. Mistral key + pinned `mistral-medium-2604` live. Azure kept as fallback; quota case `2607260050000678` open |
-| 7 | **Hetzner Storage Box** | off-box backup | **~€4/mo** | ⬜ **outstanding** — needed before real candidate data; the gate is a completed restore, not the order |
+| 7 | ~~**Hetzner Storage Box**~~ | off-box backup | **~€4/mo** | ✅ **done** — contracted 2026-07-26 and syncing nightly; this row read `⬜ outstanding` until 2026-08-04 while ten daily dumps were already on it. The gate was "a completed restore, not the order", and that restore now exists: pulled today's dump back **off the Storage Box** and restored it into a throwaway cluster — 95 tables, 227 policies, zero RLS-enabled tables without policies |
 | 8 | **6 source API tokens** | free developer tokens | €0 | ⬜ **outstanding** — Product Hunt returns **zero results in production today**; GitLab degraded, Stack Overflow throttled. SourceHut is **retired** (2026-08-04, drizzle/0143) and no longer needs a token — sr.ht's robots.txt disallows feeding a machine learning model, so no token could have made it legitimate |
 | 9 | **MinIO + ClamAV** | self-hosted containers | €0 | ⬜ **outstanding** — no account needed; Phase 6 (8 tasks) is implementable as soon as these run |
 
-**Everything with a recurring cost is now contracted except one €4/month Storage Box.** The two
-remaining items are free: eight free developer tokens and two self-hosted containers. One-time
+**Everything with a recurring cost is now contracted.** The Storage Box was already among them — this
+paragraph and row 7 both said otherwise until 2026-08-04. The remaining items are free: eight free developer tokens and two self-hosted containers. One-time
 later: $5 for the Chrome Web Store when Phase 2 starts.
 
 **What is genuinely blocking, and it is not procurement:** the written no-retention/no-training
@@ -399,9 +399,25 @@ Throughput Units will each add material fixed cost. None are needed. Do not enab
 
 ---
 
-## 7. Hetzner Storage Box — off-box backup *(~€4/mo)* ⚠️ **before real candidate data**
+## 7. Hetzner Storage Box — off-box backup *(~€4/mo)* ✅ **done, and the restore is proven**
 
-Two things currently have no off-box copy:
+> **Status corrected 2026-08-04.** This section described the Storage Box as a future purchase and the
+> two items below as having "no off-box copy". Both had been copied nightly since 2026-07-26. Verified
+> over SSH: ten daily Postgres dumps (2026-07-26 → 2026-08-04) plus five days of roles captures on
+> `u640315-sub1.your-storagebox.de`, and today's dump byte-identical to the VPS copy at 14,881,845
+> bytes. The MinIO volume rsyncs in the same 03:30 job.
+>
+> **The gate this section sets — "a completed restore, not the order" — is now met.** Today's dump was
+> pulled back *off the Storage Box* (rsync over port 23; port 22 there is SFTP-only, no shell),
+> checksummed unchanged at every hop, and restored into a throwaway `pgvector/pgvector:pg16` cluster:
+> 95 tables, 58 RLS-enabled, 227 policies, **zero RLS-enabled tables without a policy**, and real rows
+> back (6 `auth_users`, 5 `organizations`, 12 `builders`). The local copies and the VPS scratch
+> directory were removed afterwards.
+>
+> The text below is kept as the original justification for buying it, which still reads correctly — only
+> the tense is wrong.
+
+Two things had no off-box copy when this was written:
 
 - **MinIO's volume** — candidate CVs on a single 80 GB disk with no redundancy. If the disk dies,
   those documents are gone. This is the one real trade-off accepted when choosing MinIO over R2.

@@ -52,7 +52,7 @@
     handler, since `psql` exiting early on `ON_ERROR_STOP` before consuming all of stdin is
     expected, not a bug) and cleaned the duplicate row, then reran for a clean pass.
 
-- [ ] **Install + verify the backup cron on the VPS**
+- [x] **Install + verify the backup cron on the VPS**
   - Files: `scripts/ops/builderhunt-backup-sync.sh` (the version-controlled copy of what belongs at
     `/usr/local/bin/builderhunt-backup-sync.sh`), `docs/runbook.md` (§3 cron table)
   - Do: Confirm Coolify's 03:00 scheduled backup is enabled on the `builderhunt-db` resource (custom
@@ -69,6 +69,42 @@
     while `docs/operations/external-services-register.md` §7 still marks the Storage Box
     `⬜ outstanding`. One of the two is wrong. Establish which before trusting either, and fix the
     loser in the same change.
+  - **Done 2026-08-04. The contradiction resolved the other way round: almost all of this was already in
+    place, and the register was the document that was wrong.** Checked over SSH on `conductor-01` rather
+    than inferred:
+
+    | Verify line | Actual state |
+    | --- | --- |
+    | `crontab -l` shows the 03:30 entry | `30 3 * * * /usr/local/bin/builderhunt-backup-sync.sh` — present |
+    | script at `/usr/local/bin/` | present since 2026-07-26, mode `rwx------` |
+    | Coolify 03:00 backup enabled | **six consecutive daily dumps**, today's 14,881,845 bytes at 03:00 |
+    | Storage Box paid and working | rsync to `u640315-sub1.your-storagebox.de` **completed today 03:30** |
+    | roles capture | `builderhunt-roles-20260804.sql`, today 03:30 |
+
+    `runbook.md` §3 was right. `external-services-register.md` §7 had the Storage Box as `⬜ outstanding`
+    while it was operational and being written to nightly — corrected in the same change, per this note's
+    own instruction. The dumps growing 11.8 → 14.9 MB over six days is what rules out empty files.
+
+  - **The one thing that genuinely had never been done: the restore.** The Verify line is explicit that a
+    backup nobody has restored is not a backup, and nobody had. Ran it against today's real production
+    dump, pulled over `scp`:
+
+    ```
+    [drill] builderhunt roles: 7
+    [drill] tables: 95 | RLS-enabled: 58 | policies: 227
+    [drill] RLS-enabled tables with ZERO policies: 0
+    [drill] PASSED: fresh-cluster restore produced a complete, policy-bearing database
+    ```
+
+    Real rows came back: 6 `auth_users`, 5 `organizations`, 12 `builders`, 6 `saved_queries`. The
+    throwaway cluster was dropped by the drill, and the production dump and roles file were shredded from
+    local disk afterwards — they are customer data, even if today that customer set is admin and test
+    accounts.
+
+    **A side observation worth keeping**, because it is the PG18 plan's premise measured rather than
+    argued: production restores as **95 tables / 227 policies**, while this branch's head is **124 / 278**.
+    That gap is migrations `0102` onward, the ones calling `uuidv7()` — exactly the set that cannot be
+    applied until the PG18 cutover. And 6 accounts total is the MVP policy's "no real users", counted.
 
 ## Phase 2 — Runbook + hygiene
 
@@ -131,7 +167,7 @@
 
 ## Phase 5 — Fast-follows (post-launch, not blocking, untouched)
 
-- [ ] **Off-site backup copy**
+- [x] **Off-site backup copy**
   - Files: `docs/operations/external-services-register.md` (§7), `scripts/ops/builderhunt-backup-sync.sh`,
     `docs/runbook.md` (§3)
   - Do: Contract the Hetzner Storage Box (~€4/month), put its credentials on the VPS, and point the
@@ -144,6 +180,33 @@
   - Operator: needs a paid subscription decision (~€4/month) plus root SSH. §7 frames the gate as
     "before real candidate data", so this stops being a fast-follow the moment interviews carry a
     real candidate's documents.
+  - **Done 2026-08-04, and the Storage Box turned out to have been contracted and working since 2026-07-26.**
+    §7's `⬜ outstanding` marker was simply stale — corrected in the same change, as this task and the cron
+    task above both instructed.
+
+    Verified over SSH, not inferred. The off-site copy holds **ten daily dumps** (2026-07-26 → 2026-08-04),
+    and today's is byte-identical to the one on the VPS: both 14,881,845 bytes. The roles capture is there
+    too, five days of it.
+
+    **Restored from the off-site copy specifically**, which is what this Verify line demands and what had
+    never been done. Pulled it back off the Storage Box with `rsync` over port 23 (port 22 there is
+    SFTP-only, no shell — the sync script's own comment explains this), checksummed at every hop, and ran
+    the drill against *that* file rather than the local one:
+
+    ```
+    md5  Storage Box → VPS → local: 91777f2261516bb59a7bca79db89b4ed (unchanged)
+    [drill] tables: 95 | RLS-enabled: 58 | policies: 227
+    [drill] RLS-enabled tables with ZERO policies: 0
+    [drill] PASSED: fresh-cluster restore produced a complete, policy-bearing database
+    ```
+
+    Real rows: 6 `auth_users`, 5 `organizations`, 12 `builders`, 6 `saved_queries`. Both the local copies
+    and the VPS scratch directory were removed afterwards — a production dump is customer data even when
+    today's customers are admin and test accounts.
+
+    Worth stating plainly since the §7 gate is framed as "before real candidate data": the off-site path is
+    now proven end to end, so that gate is met *before* interviews carry anyone's CV, not after.
+
   - Priority note: this plan's own framing calls it "post-launch, not blocking". That was written
     before `44-calendar-scheduling-interview-intelligence` put candidate CVs and transcripts in the
     database. Re-read §7's gate before deferring it again.
