@@ -32,6 +32,53 @@ try {
   assertIds(tenantA, ['tracked-a'], 'org-a isolation')
   assertIds(tenantB, ['tracked-b'], 'org-b isolation')
 
+  // ── Tables carrying a `*_public_select` policy get their own A/B, and they need one ────────────────
+  //
+  // Added 2026-08-04 after finding that `saved_queries_public_select` and `feed_capabilities_public_select`
+  // were `USING (id IS NOT NULL)` — true for every row. Both are PERMISSIVE and both target
+  // `builderhunt_app`, and Postgres ORs permissive policies, so each one silently made its table's tenant
+  // policy irrelevant. `drizzle/0145` narrowed them.
+  //
+  // Nothing here would have caught it: the A/B above only covers `organization_builders`, and the
+  // api-isolation suite passes because it goes through the query layer, which filters `organization_id` in
+  // SQL regardless of what RLS permits. So a table is only actually covered if *this* file scopes it as the
+  // app role and asserts the negative half. Any future `*_public_select` policy belongs in this block.
+  const scopedSaved = (organizationId) => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    return transaction`select id from saved_queries order by id`
+  })
+  const [savedA, savedB] = await Promise.all([scopedSaved('org-a'), scopedSaved('org-b')])
+  assertIds(savedA, ['query-a'], 'saved_queries org-a isolation')
+  assertIds(savedB, ['query-b'], 'saved_queries org-b isolation')
+
+  const scopedFeeds = (organizationId) => app.begin(async (transaction) => {
+    await transaction`select set_config('app.organization_id', ${organizationId}, true)`
+    return transaction`select id from feed_capabilities order by id`
+  })
+  const [feedsA, feedsB] = await Promise.all([scopedFeeds('org-a'), scopedFeeds('org-b')])
+  assertIds(feedsA, ['feed-a'], 'feed_capabilities org-a isolation')
+  assertIds(feedsB, ['feed-b'], 'feed_capabilities org-b isolation')
+
+  // The narrowed policy still has to let the anonymous feed read work — that is the whole reason it exists.
+  // No tenant context at all here, which is the anonymous subscriber's situation.
+  const publicFeedRead = await app`select id from saved_queries where id = 'query-a'`
+  if (publicFeedRead.length !== 1) {
+    throw new Error('Narrowed saved_queries_public_select broke the anonymous feed read (live capability)')
+  }
+  // And revocation must cut it off at the row level, not merely in the route's own branching.
+  //
+  // Revoked as `worker`, not as `app`: `feed_capabilities_app_update` is scoped by
+  // `organization_id = current_setting('app.organization_id')`, so an `app` UPDATE with no tenant context
+  // matches zero rows and silently changes nothing — the first version of this check did exactly that and
+  // then "failed" because the capability was still live. `feed_capabilities_worker_all` is `ALL … USING
+  // (true)`, which is the connection that legitimately owns this write.
+  await worker`update feed_capabilities set revoked_at = now() where id = 'feed-a'`
+  const revokedFeedRead = await app`select id from saved_queries where id = 'query-a'`
+  await worker`update feed_capabilities set revoked_at = null where id = 'feed-a'`
+  if (revokedFeedRead.length !== 0) {
+    throw new Error('A revoked feed capability still exposed its saved query')
+  }
+
   let crossTenantInsertDenied = false
   try {
     await app.begin(async (transaction) => {
@@ -1793,6 +1840,14 @@ try {
     solutionBriefUpdate: renamedBriefA.title,
     appBuilderListUpdate: renamedListA.name,
     appBuilderListCrossTenantUpdate: 'no-op (0 rows under RLS)',
+    // Reported, not merely asserted: these four checks throw on failure and were otherwise silent, which
+    // makes a passing check invisible. The `*_public_select` gap they exist to catch went unnoticed for a
+    // week precisely because nothing printed anything about those tables.
+    savedQueriesTenantA: savedA.map((row) => row.id),
+    savedQueriesTenantB: savedB.map((row) => row.id),
+    feedCapabilitiesTenantA: feedsA.map((row) => row.id),
+    publicFeedReadWithLiveCapability: publicFeedRead.length === 1 ? 'allowed' : 'BROKEN',
+    publicFeedReadAfterRevocation: revokedFeedRead.length === 0 ? 'denied' : 'LEAKED',
     globalIngestionGrants: globalIngestionGrantReport, vectorOperators: vectorOperatorReport,
   }))
 } finally {

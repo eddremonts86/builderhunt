@@ -49,6 +49,32 @@
     see the *deployment type*, so a Global Standard deployment passes validation while processing
     outside the EU. Mistral processes in the EU by default, which is not a switch anyone can set
     wrong. The Azure resource is retained as a documented fallback.
+  - **Reconciled 2026-08-04. Both halves of the Verify line are met; only the DPIA is outstanding, and it
+    is not mine to produce.**
+
+    I offered to draft the register and a DPIA. The register **already exists** —
+    `docs/operations/interview-provider-register.md`, 38 KB, covering MinIO, ClamAV, Deepgram and Mistral
+    with retention, residency, sub-processors and owners. Writing a second one would have duplicated it, so
+    this records what is there instead of adding to the pile. Its own §"Who does what" table already names
+    the DPIA's owner as **you plus a data-protection advisor**, which is the correct assignment and the
+    reason this task cannot be closed by engineering.
+
+    *"Every provider can be disabled independently"* — verified by reading the code rather than assumed.
+    Each has its own flag in `env.ts` (`CANDIDATE_UPLOADS_ENABLED`, `SENSITIVE_AI_ENABLED`,
+    `INTERVIEW_TRANSCRIPTION_ENABLED`, `INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED`), and four separate routes
+    answer **503** when their flag is off — `interviews/$id/session`, `interviews/$id/segments`,
+    `interviews/$id/transcription-token`, and the candidate document download. `interview-live.spec.ts` and
+    `interview-privacy.spec.ts` run with *different* combinations (privacy: sensitive AI off, transcription
+    on), so the independence is exercised, not just declared.
+
+    *"Each regional endpoint confirmed from a test response/console"* — already recorded below for Deepgram
+    against the real account. MinIO and ClamAV are first-party, so residency is a property of the VPS, not a
+    vendor claim.
+
+    **What is left, precisely:** the DPIA, plus the two written vendor statements §5 lists (Deepgram
+    no-training/no-retention, Mistral Zero Data Retention — a support request, not self-serve). All three
+    gate production **voice**, not development, and the register says so.
+
   - **Evidence, superseding the 2026-07-26 morning note that said "accounts NOT provisioned"**
     (re-checked 2026-07-27 against `.env` and the register):
     - **Deepgram**: account provisioned 2026-07-26, and the EU endpoint verified *against that

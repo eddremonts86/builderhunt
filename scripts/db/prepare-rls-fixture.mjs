@@ -97,6 +97,24 @@ try {
       ('tracked-b', 'org-b', 'identity-b', 'user-b', 'private', 'tracked', '{}', now(), now())
     on conflict (organization_id, builder_identity_id) do nothing
   `
+
+  // One saved query and one live feed capability per tenant, so the verifier can A/B the two tables that
+  // carry a `*_public_select` policy. Added 2026-08-04: those policies were `USING (id IS NOT NULL)` and
+  // defeated tenant isolation, and nothing detected it because these rows did not exist to be checked.
+  // `feed-a` points at `query-a`, which is what makes the narrowed policy's EXISTS subquery meaningful —
+  // `query-b` deliberately has no capability, so it must stay invisible without tenant context.
+  await owner`
+    insert into saved_queries (id, user_id, name, keywords, organization_id) values
+      ('query-a', 'user-a', 'RLS fixture query A', '["rls"]'::jsonb, 'org-a'),
+      ('query-b', 'user-b', 'RLS fixture query B', '["rls"]'::jsonb, 'org-b')
+    on conflict (id) do nothing
+  `
+  await owner`
+    insert into feed_capabilities (id, organization_id, query_id, capability_hash) values
+      ('feed-a', 'org-a', 'query-a', 'rls-fixture-hash-a'),
+      ('feed-b', 'org-b', 'query-b', 'rls-fixture-hash-b')
+    on conflict (id) do nothing
+  `
   await owner`
     insert into builder_lists (
       id, organization_id, created_by_user_id, name, description, visibility, version, created_at, updated_at

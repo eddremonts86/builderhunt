@@ -580,6 +580,10 @@
     "0144_retire_hashnode_source": {
       "sql": "77e4a831f8ba2e398857a61b4ea0436f88ad19d46b0067d7116d18e2a7e0c533",
       "snapshot": "5913cd189c50546551d1b55cb6ad25706986aed3cdfc6aac38b68f453be292d3"
+    },
+    "0145_narrow_public_select_policies": {
+      "sql": "4a51a480637fee34c2b859eef9968e4f36f93ec179574f2288eabfbbef4b7656",
+      "snapshot": "940bb4a7b581503520533387f5e652c2da0c339edfb9fc8ecbceb7e10bf74794"
     }
   }
 }

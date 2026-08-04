@@ -39,6 +39,16 @@
     → verify it appears in `/admin/plan-requests` → delete the test account from
     `/settings/privacy` and cancel the deletion.
   - Verify: Every step succeeds; the plan request and deletion request rows appear and behave.
+  - ⚠️ **Stale as written, found 2026-08-04. Two of its steps go through a surface that no longer exists.**
+    "request upgrade on `/pricing` → verify it appears in `/admin/plan-requests`" cannot be performed: the
+    legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04 (commits `8c4b1e2` and its two
+    predecessors), the route is gone, and `src/` holds zero references to `plan_requests`. Upgrades now go
+    through Stripe Checkout and the billing surfaces.
+
+    Rewrite those two steps before running this: the equivalent verification is a Checkout session reaching
+    `active` and the organization's entitlement changing, which the billing E2E already covers in test mode.
+    Everything else in this task — sign-up, onboarding, search, tracking, CSV export, account deletion and
+    its cancellation — is still exactly right.
 
 - [ ] **Submit sitemap and verify OG previews**
   - Files: none (external tools)
@@ -50,19 +60,31 @@
 
 ## Phase 3 — Content freeze (T-2)
 
-- [ ] **Seed changelog with real shipped history**
+- [x] **Seed changelog with real shipped history** — done, by a different (better) mechanism
   - Files: none (via `/admin/changelog` UI → `src/routes/api/admin/changelog/index.ts`)
   - Do: Create 6-10 entries from real git history (federated search, tracking + exports,
     smart alerts, claimable profiles, onboarding, billing, legal/GDPR, status page, landing
     redesign), dated to when they shipped.
   - Verify: `/changelog` lists them newest-first; each `/changelog/$slug` renders.
+  - **Already satisfied, reconciled 2026-08-04. 23 entries exist** in `content/changelog/*.md`, and 23 rows
+    are in the `changelog` table — comfortably past the 6-10 this asked for.
 
-- [ ] **Seed public roadmap**
+    The route changed on purpose and this task was never updated. It says "Files: none (via
+    `/admin/changelog` UI)", but entries now live as committed markdown under `content/` and orchestrator
+    **step 9** (`scripts/db/sync-platform-content.ts`) upserts them on every deploy. The reason is recorded in
+    `deploy-runbook.md`: an entry typed into the admin panel lived in exactly one environment and did not
+    survive a restore onto a fresh volume. Writing more entries through the UI would have re-created that
+    problem. The admin UI still works and still owns anything drafted there — the sync only touches ids it
+    generates (`content-changelog-<slug>`).
+
+- [x] **Seed public roadmap** — done, same mechanism as the changelog above
   - Files: none (via `/admin/roadmap` UI → `src/routes/api/admin/roadmap/index.ts`)
   - Do: Add 5-8 public-friendly items from `plans/` (semantic search, AI outreach drafts,
     team accounts, more sources, portfolio pages) in planned/in-progress columns. No internal
     jargon, no dates promised.
   - Verify: `/roadmap` renders the items; vote button works signed-in.
+  - **Already satisfied, reconciled 2026-08-04: 32 items** in `content/roadmap/*.md` and 32 rows in
+    `roadmap_items`, against the 5-8 requested. Same `content/` + step-9 mechanism, same reason.
 
 ## Phase 4 — Distribution (T-0, one channel per day)
 
