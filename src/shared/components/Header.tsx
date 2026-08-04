@@ -9,6 +9,7 @@ import { PublicNavDrawer, type PublicNavGroup } from '~/shared/components/Public
 import { ICON_TRANSITION, useSlidingIndicator, SlidingIndicator } from '~/shared/lib/useSlidingIndicator'
 import { useScrollSpy } from '~/shared/lib/useScrollSpy'
 import { ThemeToggle } from '~/shared/components/ThemeToggle'
+import { DESKTOP_NAV_VISIBLE, MOBILE_TRIGGER_VISIBLE } from '~/shared/components/publicNavBreakpoint'
 
 const NAV_LINKS = [
   { id: 'how-it-works', label: 'How it works' },
@@ -17,6 +18,8 @@ const NAV_LINKS = [
   { id: 'faq', label: 'FAQ' },
 ] as const
 const NAV_SECTION_IDS = NAV_LINKS.map((l) => l.id)
+
+// Breakpoint classes live in `publicNavBreakpoint.ts` — see that file for why 1280 and why one source. 
 
 // Every non-home public destination, grouped the way a first-time visitor
 // would look for it — what the product does, how to learn about it, and why
@@ -33,7 +36,7 @@ function NavGroupMenu({ group }: { group: PublicNavGroup }) {
       <DropdownMenuPrimitive.Trigger asChild>
         <button
           type="button"
-          className={`relative flex items-center gap-1 rounded-full px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} text-bh-text-muted hover:text-bh-text data-[state=open]:text-bh-text`}
+          className={`relative flex items-center gap-1 whitespace-nowrap rounded-full px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} text-bh-text-muted hover:text-bh-text data-[state=open]:text-bh-text`}
         >
           {group.label}
           <ChevronDown className="size-3.5" aria-hidden="true" />
@@ -95,7 +98,7 @@ export function Header() {
         <span className="font-bold text-base tracking-tight hidden sm:inline">BuilderHunt</span>
       </Link>
 
-      <div className="relative hidden md:flex items-center gap-1">
+      <div className={`relative ${DESKTOP_NAV_VISIBLE} items-center gap-1`}>
         <ul ref={pillRowRef} className="relative flex items-center gap-1">
           {isHome && <SlidingIndicator rect={indicator} />}
           {NAV_LINKS.map((l) => {
@@ -106,7 +109,7 @@ export function Header() {
                   <a
                     href={`#${l.id}`}
                     data-active={active || undefined}
-                    className={`relative rounded-full flex items-center px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} ${
+                    className={`relative rounded-full flex items-center whitespace-nowrap px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} ${
                       active ? 'text-white' : 'text-bh-text-muted hover:text-bh-text'
                     }`}
                   >
@@ -120,7 +123,7 @@ export function Header() {
                   <Link
                     to="/"
                     hash={l.id}
-                    className={`relative rounded-full flex items-center px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} text-bh-text-muted hover:text-bh-text`}
+                    className={`relative rounded-full flex items-center whitespace-nowrap px-3.5 h-9 text-sm font-medium ${ICON_TRANSITION} text-bh-text-muted hover:text-bh-text`}
                   >
                     {l.label}
                   </Link>
@@ -135,18 +138,18 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-2 shrink-0">
-        <ThemeToggle />
+        <ThemeToggle compact />
         <button
           ref={menuTriggerRef}
           type="button"
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
-          className="grid md:hidden h-9 w-9 place-items-center rounded-full text-bh-text-muted hover:bg-bh-bg-alt hover:text-bh-text"
+          className={`${MOBILE_TRIGGER_VISIBLE} h-9 w-9 place-items-center rounded-full text-bh-text-muted hover:bg-bh-bg-alt hover:text-bh-text`}
         >
           <Menu className="w-4 h-4" aria-hidden="true" />
         </button>
         {isAuthed ? (
-          <div className="hidden md:flex items-center gap-2">
+          <div className={`${DESKTOP_NAV_VISIBLE} items-center gap-2`}>
             <LinkButton to="/dashboard" variant="secondary" size="sm">
               <LayoutDashboard className="w-4 h-4" /> Dashboard
             </LinkButton>
@@ -167,7 +170,7 @@ export function Header() {
             </Button>
           </div>
         ) : (
-          <div className="hidden md:flex items-center gap-2">
+          <div className={`${DESKTOP_NAV_VISIBLE} items-center gap-2`}>
             <LinkButton to="/auth/sign-in" variant="ghost">Sign in</LinkButton>
             <LinkButton to="/auth/sign-up" variant="primary" size="sm">Get started</LinkButton>
           </div>

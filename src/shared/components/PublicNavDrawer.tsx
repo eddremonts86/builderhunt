@@ -1,5 +1,6 @@
 import * as React from 'react'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
+import { MOBILE_DRAWER_VISIBLE } from '~/shared/components/publicNavBreakpoint'
 import { Link } from '@tanstack/react-router'
 import { LayoutDashboard, LogOut, X } from 'lucide-react'
 import { cn } from '~/shared/lib/utils'
@@ -44,14 +45,18 @@ export function PublicNavDrawer({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-bh-text/25 backdrop-blur-sm animate-fade-in md:hidden" />
+        <DialogPrimitive.Overlay className={`fixed inset-0 z-50 bg-bh-text/25 backdrop-blur-sm animate-fade-in ${MOBILE_DRAWER_VISIBLE}`} />
         <DialogPrimitive.Content
+          // A stable hook for the responsive guard. Radix names this dialog via `aria-labelledby` pointing at
+          // its Title, but that name does not resolve reliably at every viewport — `getByRole('dialog',
+          // { name: 'Menu' })` found it at 1024px+ and not at 375px, and a test that flaky is worse than none.
+          data-testid="public-nav-drawer"
           aria-describedby={undefined}
           onCloseAutoFocus={(event) => {
             event.preventDefault()
             triggerRef.current?.focus()
           }}
-          className="fixed inset-y-0 right-0 z-50 flex w-[85vw] max-w-[320px] flex-col bg-bh-surface shadow-2xl outline-none animate-slide-in-right md:hidden"
+          className={`fixed inset-y-0 right-0 z-50 flex w-[85vw] max-w-[320px] flex-col bg-bh-surface shadow-2xl outline-none animate-slide-in-right ${MOBILE_DRAWER_VISIBLE}`}
         >
           <div className="flex min-h-[57px] items-center justify-between border-b border-bh-border px-4">
             <DialogPrimitive.Title className="text-[0.9375rem] font-bold tracking-tight">Menu</DialogPrimitive.Title>

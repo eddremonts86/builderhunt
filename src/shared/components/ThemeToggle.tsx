@@ -4,8 +4,18 @@ import { ICON_TRANSITION } from '~/shared/lib/useSlidingIndicator'
 
 /** Segmented Light/Dark switch, always visible in the topbar (not tucked behind a menu).
  * Shared by the dashboard shell and the public/landing header — both mount their own
- * ThemeProvider, so this only ever needs `useTheme()`. */
-export function ThemeToggle() {
+ * ThemeProvider, so this only ever needs `useTheme()`.
+ *
+ * `compact` drops the "Light"/"Dark" words and keeps the sun/moon icons, which reclaims roughly 90px.
+ * Nothing is lost for assistive technology: each button already carries `aria-label={option}`, and the
+ * icons are the conventional signal for this control.
+ *
+ * It exists because the public header genuinely could not fit otherwise. `.topbar-shell` is capped at
+ * `--page-max` minus gutters — about 1158px **at every viewport**, deliberately, so the pill lines up with
+ * the landing's content column — and the full nav plus a labelled toggle measured 1176px. That is wider
+ * than the container's design maximum, so no screen was ever wide enough and no breakpoint could fix it.
+ * Default stays `false` so the five other call sites are untouched. */
+export function ThemeToggle({ compact = false }: { compact?: boolean } = {}) {
   const { theme, setTheme } = useTheme()
 
   return (
@@ -32,7 +42,7 @@ export function ThemeToggle() {
             }`}
           >
             <Icon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-            <span className="hidden sm:inline">{option}</span>
+            {!compact && <span className="hidden sm:inline">{option}</span>}
           </button>
         )
       })}
