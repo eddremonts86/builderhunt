@@ -13,7 +13,7 @@
 
 ## Phase 1 — Prerequisite gate
 
-- [ ] **Verify launch-blocking fixes from sibling plans are merged**
+- [x] **Verify launch-blocking fixes from sibling plans are merged**
   - **Checked against production 2026-08-05 (`builderhunt.eduardoinerarte.dk`, not the `.dev` host —
     see the note on the task below). Four of the five pass; one is a decision, not a defect.**
 
@@ -28,10 +28,14 @@
     `/blog` is absent from `/sitemap.xml` because `/blog`, `/changelog` and `/roadmap` are all
     `noindex, nofollow` and `Disallow`ed in `robots.txt`. That is not a bug — `robots.txt` says the
     per-surface rules come from the admin panel's indexing settings, and the sitemap correctly omits
-    what is marked noindex. **It is Edd's marketing decision**, and this checkbox cannot close until
-    it is made: either flip those three surfaces to indexable (then `/blog` appears and the gate
-    passes), or amend this task to stop requiring `/blog` in the sitemap. Submitting a sitemap
-    without deciding is the one option that is not defensible.
+    what is marked noindex.
+
+    **The decision moved to
+    [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+    on 2026-08-05, on Edd's instruction** — it is a marketing call that needs a live launch to make
+    sense, and it was the only thing keeping this gate open. So this checkbox now means the four
+    verifiable items, and it is checked. The sitemap and the robots directives already agree with each
+    other; what is deliberately not done is submitting a sitemap before the posture is chosen.
 
   - Files: none (review task)
   - Do: Confirm merged: pricing price-field fix (`pricing-and-billing` Phase 1), deletion

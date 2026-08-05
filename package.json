@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "dev:all": "pnpm db:up && pnpm db:migrate && pnpm db:seed:admin && pnpm dev",
+    "dev:enrichment": "ENRICHMENT_ENABLED=true ENRICHMENT_ALLOWED_CONNECTORS=github ENRICHMENT_USER_AGENT='BuilderHuntBot/1.0 (+https://builderhunt.dev/crawler)' vite dev --port 3000",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",

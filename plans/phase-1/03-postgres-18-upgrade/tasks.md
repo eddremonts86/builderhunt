@@ -647,7 +647,7 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     completion; the next 03:00 Coolify backup lands from the **pg18** resource.
 
 - [ ] **Retire the pg16 resource on a schedule, not immediately**
-  - **Open 2026-08-05.** **Blocked**: the retention clock must not start until a successful pg18 backup exists (tonight at the earliest), and the retention date itself is Edd's call. pg16 is intentionally still running.
+  - **Open 2026-08-05.** **Blocked on one fact, no longer on a decision.** Edd set the retention window on 2026-08-05: **stop (do not delete) pg16 seven days after the first successful pg18 backup lands**. That backup is the 03:00 schedule created on the PG18 resource the same day; it has not fired yet and there is no v1 API to trigger one, so the clock starts tomorrow at the earliest. When it does: stop the resource and its volume, write the delete-after date into the runbook, and confirm the volume still exists until then. pg16 is intentionally still running as the rollback.
   - Files: `docs/operations/deploy-runbook.md`
   - Do: stop (do not delete) the pg16 resource and its volume; record the retention date after
     which it is deleted, and update the image line at `:87` to the pinned pg18 tag. Do not start

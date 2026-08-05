@@ -265,6 +265,38 @@
     blocked-host requests appear in the contacted-host list.
 
 - [ ] **Deploy dark**
+  - ⚠️ **Found 2026-08-05: this was not dark. `ENRICHMENT_ENABLED` was `true` in the production
+    Coolify env, while the two tasks the plan puts *before* enabling — the legally-reviewed copy and
+    the runtime adversarial matrix — are both still unchecked.**
+
+    Measured before saying anything stronger, because the flag being on does not by itself mean data
+    was collected:
+
+    | Signal | Value |
+    | --- | --- |
+    | `job_runs` with an `enrichment%` key | 614, 2026-07-27 10:20 → 2026-08-05 10:20, all `succeeded` |
+    | sum of `processed_count` across them | **0** |
+    | `enrichment_evidence` rows | **0** |
+    | `enrichment_jobs` rows | 1, status `failed`, created 2026-07-23 — before the window |
+
+    So the worker has been waking on schedule for nine days and finding nothing to process. On this
+    evidence no enrichment fetch has happened and no evidence row exists: a configuration divergence
+    from the plan, not an unapproved crawl.
+
+    **Set to `false` on the production row on Edd's instruction (2026-08-05), leaving the preview row
+    `true`** — preview is the non-production environment the adversarial-matrix task requires. The
+    running container was redeployed so the value is actually in effect rather than only stored.
+
+    **Local development stays enabled, but not through `.env`.** Setting `ENRICHMENT_ENABLED=true`
+    there breaks `tests/unit/lib/enrichment/worker.test.ts` *by design*: its second test calls the
+    real `runEnrichmentWorker()` and asserts a no-op shape, and the first test pins the flag to
+    `false` precisely so the suite fails loudly instead of doing real DB and network work. Weakening
+    that guard to carry a dev convenience would be the wrong trade, so the convenience is a script
+    instead — `pnpm dev:enrichment`, which sets the flag, the allowlist and the contact user agent for
+    that one process.
+
+    **What still gates enabling it in production**: the two unchecked tasks above this one.
+
   - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
   - Operator: needs a production deploy plus the Coolify environment. An agent must not enable this.
   - Do: deploy migration/code with `ENRICHMENT_ENABLED=false`; validate exact runtime

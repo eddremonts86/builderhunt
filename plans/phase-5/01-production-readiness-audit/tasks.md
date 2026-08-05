@@ -106,6 +106,26 @@ parallel deliberately: queued, they add three weeks for no reason.
   - Moved from `plans/phase-1/52-audit-trust` on 2026-07-29 — it waits on production, not on work.
 
 
+- [ ] **Decide the public indexing posture for /blog, /changelog and /roadmap**
+  - Files: none in the repo — the per-surface directives come from the admin panel's indexing
+    settings, which is what `public/robots.txt`'s own header comment says. Recording the outcome
+    belongs in `plans/phase-1/54-waitlist-launch/tasks.md` Phase 1.
+  - Do: choose whether those three surfaces are indexable at launch. Today all three are
+    `noindex, nofollow` and `Disallow`ed for `*`, `GPTBot`, `ClaudeBot`, `PerplexityBot` and
+    `Google-Extended`, so `/sitemap.xml` correctly omits `/blog` — 30 published posts that no search
+    engine or AI crawler can see. Then submit `/sitemap.xml` in Google Search Console and Bing
+    Webmaster Tools.
+  - Verify: `curl -s $APP_URL/sitemap.xml | grep -c '<loc>.*/blog'` matches the decision;
+    `curl -s $APP_URL/blog | grep -o 'name="robots" content="[^"]*"'` agrees with it; GSC reports the
+    sitemap as "Success".
+  - **Moved here from `plans/phase-1/54-waitlist-launch` on 2026-08-05, on Edd's instruction
+    ("dejalo como esta, ya lo cambio yo en el futuro, pasa esa tarea a la phase-5, cuando vayamos
+    live").** It is a marketing decision that needs a live launch to make sense, and it is the last
+    thing keeping plan 54's prerequisite gate open. The other four items in that gate pass. Nothing
+    is broken: the sitemap and the robots directives already agree with each other, and the only
+    defensible failure mode — submitting a sitemap without having decided — is avoided by leaving it
+    unsubmitted.
+
 ## Phase 5 — close the gate
 
 - [ ] **Drop the Beta label**
