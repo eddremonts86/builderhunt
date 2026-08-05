@@ -15,6 +15,7 @@ import {
   getDashboardSummary,
 } from '~/shared/lib/repositories/dashboard-overview'
 import {
+  DASHBOARD_ROW_LIMITS,
   DASHBOARD_SCHEMA_VERSION,
   DEFAULT_DASHBOARD_RANGE,
   dashboardOverviewSchema,
@@ -22,6 +23,12 @@ import {
   type DashboardOverview,
   type DashboardUsage,
 } from '~/shared/lib/dashboard/contracts'
+import { buildActionQueue } from '~/shared/lib/dashboard/action-rules'
+import { getOnboardingStatus } from '~/shared/lib/onboarding'
+import { listOrganizationTriggers } from '~/shared/lib/repositories/organization-alerts'
+import { listSprints } from '~/lib/sprints/service'
+import { listInvitationsForEmail } from '~/shared/lib/organizations/contracts'
+import { auth } from '~/shared/lib/auth/better-auth'
 
 /**
  * The one core dashboard read (plans/ui-dashboard Wave 1, "Implement `GET /api/dashboard/overview`").
@@ -64,18 +71,47 @@ import {
  * Bounded, and short. The projection is cheap and mostly counts; a long TTL would trade a few
  * milliseconds for a dashboard that disagrees with the page a user just navigated from.
  *
- * The key carries the organization, the **role class**, the range and the schema version. Role class
- * rather than user id: two owners see the same projection, and keying by user would multiply the
- * cache by the size of the team for no difference in content. Omitting the role would be the actual
- * hazard — a member's cached response served to an owner would silently drop `usage`, and an owner's
- * served to a member would disclose it.
+ * ## The key is per **user**, and that is a correction
+ *
+ * The plan specifies "organization, role class, range, and schema version", and that was right while
+ * every section was an organization aggregate. The action queue is not: `getOnboardingStatus` is
+ * keyed by `(organizationId, userId)`, and pending membership invitations are addressed to a person
+ * and can point at an organization this one has nothing to do with.
+ *
+ * Under an organization-scoped key, the first teammate to load the dashboard would have written
+ * *their* onboarding progress and *their* invitations into an entry the next teammate reads. That is
+ * a cross-user disclosure inside a correctly isolated tenant — the same shape as the two-rows-per-key
+ * mistake that once wrote a preview database URL over production, and as `search.ts` serving a
+ * timed-out source's empty result as a success. A cache indexed by too little.
+ *
+ * The cost is a cache multiplied by team size at a 30-second TTL, which is nothing. The role class
+ * stays in the key anyway: it is what stops an owner's `usage` reaching a member if the two ever
+ * shared an entry.
  */
 const CACHE_TTL_SECONDS = 30
 
 type RoleClass = 'billing-reader' | 'member'
 
-function cacheKey(organizationId: string, roleClass: RoleClass, range: string): string {
-  return `dashboard:overview:v${DASHBOARD_SCHEMA_VERSION}:${organizationId}:${roleClass}:${range}`
+export function cacheKey(organizationId: string, userId: string, roleClass: RoleClass, range: string): string {
+  /*
+   * Segments are percent-encoded, not interpolated raw.
+   *
+   * The key is colon-delimited, so raw interpolation makes `('org-1:user-9', 'user-1')` and
+   * `('org-1', 'user-9:user-1')` produce the *same string* — two different callers reading one
+   * entry. Ids here come from the session rather than from a request, so this is defence in depth
+   * rather than a live hole; it is fixed because "not reachable today" is a property of the current
+   * call sites, and a delimiter ambiguity is a property of the function. Encoding removes the
+   * ambiguity at the only place that can.
+   */
+  const segment = (value: string) => encodeURIComponent(value)
+  return [
+    'dashboard:overview',
+    `v${DASHBOARD_SCHEMA_VERSION}`,
+    segment(organizationId),
+    segment(userId),
+    roleClass,
+    range,
+  ].join(':')
 }
 
 /**
@@ -128,7 +164,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
           const range = parsedRange.data
 
           const roleClass: RoleClass = canReadBillingSummary(principal) ? 'billing-reader' : 'member'
-          const key = cacheKey(principal.organizationId, roleClass, range)
+          const key = cacheKey(principal.organizationId, principal.userId, roleClass, range)
 
           const redis = await import('~/shared/lib/redis').then((module) => module.getRedis()).catch(() => null)
           if (redis) {
@@ -193,6 +229,77 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             }
           }, () => false)
 
+          /*
+           * The action queue reads a snapshot the route assembles, and the rules are a pure function
+           * of it (`action-rules.ts`). Assembled *after* the sections above so `usage` can be fed in
+           * only when the role produced one — a member's snapshot has `usage: null`, so the usage
+           * rules cannot fire for them structurally rather than by checking a role a second time.
+           *
+           * Every input is bounded and already redacted: ids, counts, statuses and timestamps. No
+           * note text, candidate email, transcript or provider metadata is fetched at all, so no
+           * rule can leak one.
+           */
+          const actionQueue = await section('actionQueue', generatedAt, async () => {
+            const snapshot = await withTenantContext(principal, async (transaction) => {
+              const [onboarding, triggers, sprints] = await Promise.all([
+                getOnboardingStatus(transaction, principal.organizationId, principal.userId),
+                listOrganizationTriggers(transaction, principal.organizationId, DASHBOARD_ROW_LIMITS.alerts),
+                listSprints(transaction, principal.organizationId),
+              ])
+              return { onboarding, triggers, sprints }
+            })
+
+            /*
+             * Invitations are addressed to a *person*, not to the active tenant, so they come from
+             * the auth store and are keyed by the caller's own session email — never a value from
+             * the request, or any authenticated user could enumerate who has been invited where.
+             * `TenantPrincipal` deliberately carries no email, which is why the session is read
+             * again here rather than threaded through.
+             *
+             * An unverified email yields nothing, matching `/api/organizations/invitations/mine`:
+             * acceptance already requires a verified matching address, so telling an unverified
+             * account that an invitation is waiting leaks something it cannot act on.
+             */
+            const session = await auth.api.getSession({ headers: request.headers }).catch(() => null)
+            const invitations = session?.user?.emailVerified && session.user.email
+              ? await listInvitationsForEmail(session.user.email).catch(() => [])
+              : []
+
+            return {
+              items: buildActionQueue({
+                now,
+                onboarding: { complete: snapshot.onboarding.completed || snapshot.onboarding.skipped },
+                membershipInvitations: invitations
+                  .filter((invitation) => invitation.status === 'pending')
+                  .map((invitation) => ({ id: invitation.id })),
+                unreadAlerts: snapshot.triggers
+                  .filter((trigger) => trigger.readAt === null)
+                  .map((trigger) => ({
+                    id: trigger.id,
+                    // Every unread trigger is high value today: the product only writes one when an
+                    // alert's criteria matched. A cheaper class of trigger would set this false.
+                    highValue: true,
+                    triggeredAt: new Date(trigger.matchedAt),
+                  })),
+                sprints: snapshot.sprints.map((sprint) => ({
+                  id: sprint.id,
+                  name: sprint.name,
+                  status: sprint.status,
+                  resultCount: sprint.resultCount,
+                  lastRunAt: sprint.lastRunAt,
+                })),
+                usage: usage.status === 'ready'
+                  ? {
+                      seatsUsed: usage.data.seats?.used ?? 0,
+                      seatsAllowed: usage.data.seats?.allowed ?? 0,
+                      creditBalanceUnits: usage.data.creditBalanceUnits ?? 0,
+                      paidActionsAllowed: usage.data.paidActionsAllowed,
+                    }
+                  : null,
+              }).items,
+            }
+          }, (value) => value.items.length === 0)
+
           const payload: DashboardOverview = {
             schemaVersion: DASHBOARD_SCHEMA_VERSION,
             organizationId: principal.organizationId,
@@ -201,7 +308,7 @@ export const Route = createFileRoute('/api/dashboard/overview')({
             sections: {
               summary,
               recency,
-              actionQueue: { status: 'empty', generatedAt },
+              actionQueue,
               sourceCoverage,
               ...(roleClass === 'billing-reader' ? { usage } : {}),
             },

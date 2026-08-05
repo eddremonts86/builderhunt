@@ -1061,3 +1061,48 @@ Wave 4. Marked `[~]` rather than `[x]` for that reason.
 **Evidence:** 8 new API specs in `dashboard-and-navigation.spec.ts` (owner, member, signed-out,
 unsupported range, per-tenant cache keys, freshness on a cache hit, method seal), 23 specs in
 that file passing, 161 dashboard unit tests, and a manual browser check of both migrated widgets.
+
+### Wave 2 — the action queue
+
+Three of five tasks. The rules, their exposure through the projection, and the widget.
+
+**The rules are a pure function of a snapshot**, so the order is a table row in a test rather than a
+fixture-heavy integration. The clock is an argument, which makes the stall boundary exact instead of
+approximately reproducible. And a rule cannot widen its own authorization: a member's snapshot has
+`usage: null`, so the usage rules cannot fire for one — not because they check a role, but because
+they have nothing to read.
+
+`priority` and `severity` are separate, and the tests pin why. An unread alert is `info` and a seat
+limit is a `warning`, yet the alert ranks above it: one is a person to look at now, the other is a
+purchase decision that will still be there tomorrow. Sorting by severity would invert that and turn
+a ranked queue into a notification feed sorted by colour.
+
+**Two corrections the real page forced:**
+
+1. **Five identical rows.** The first version emitted one item per unread trigger, and the dev
+   workspace rendered five consecutive "An alert matched someone worth looking at" — same text, same
+   action, same destination — pushing both billing warnings to the bottom. There is no per-trigger
+   route for them to differ by, so it was five copies of one decision. Now aggregated, dated by the
+   oldest trigger so the time column says how long this has waited.
+2. **The cache key was indexed by too little.** The plan specified organization + role + range, which
+   was right until the queue carried per-user facts: `getOnboardingStatus` is keyed by
+   `(organizationId, userId)`, and invitations are addressed to a person. Under the original key the
+   first teammate to load the dashboard would write their onboarding progress into an entry the next
+   teammate reads — a cross-user disclosure inside a correctly isolated tenant. Now per user, and a
+   unit test enumerates the collisions. That test also found a live delimiter ambiguity:
+   `('org-1:user-9', 'user-1')` and `('org-1', 'user-9:user-1')` produced the same string. Segments
+   are percent-encoded now. Not reachable from a request today, since ids come from the session —
+   fixed because "not reachable" is a property of the call sites and the ambiguity is a property of
+   the function.
+
+**Onboarding and invitations stay out of the queue for now,** and the reasoning is in
+`action-rules.ts` where the rules would go. Both banners do something a queue row cannot — skip, and
+accept/decline in place. Shipping the rules while the banners render would double each notice, which
+is the duplication the unification task exists to remove; deleting the banners would drop skip and
+inline accept, which the same task requires be preserved and which `onboarding.spec.ts` covers in
+four cases. The order is: give the row a secondary affordance, then move them, then delete the
+banners.
+
+**Evidence:** 39 unit tests across the rules and the contract, 6 on the cache key, 25 e2e in
+`dashboard-and-navigation.spec.ts`, and a browser check of the rendered queue — three rows, alerts
+above billing, one action each.

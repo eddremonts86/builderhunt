@@ -77,6 +77,24 @@ let toreDown = false
 const minted: Principal[] = []
 const seededCacheKeys: string[] = []
 
+/**
+ * A second owner, created once and shared by the projection specs below.
+ *
+ * Sign-ups in this file are rate-limited by the product itself, and each spec that mints its own
+ * principal brings the file closer to a 429 that has nothing to do with what it is testing. One
+ * extra tenant is enough for every case here as long as each spec picks a `range` no earlier one
+ * used for it — the projection caches per (organization, user, role, range), so a fresh range is a
+ * fresh computation without a fresh account.
+ */
+let secondTenant: { principal: Principal; organization: OrganizationFixture } | null = null
+
+async function ensureSecondTenant(): Promise<{ principal: Principal; organization: OrganizationFixture }> {
+  if (secondTenant) return secondTenant
+  secondTenant = await createOwnerPrincipal(harness.ctx, { tier: 'pro', seatLimit: 3, clock: fixedClockFromEnv() })
+  minted.push(secondTenant.principal)
+  return secondTenant
+}
+
 test.describe.configure({ mode: 'serial' })
 
 // Cold on-demand vite compiles of a route tree can exceed the 30s default
@@ -1091,8 +1109,7 @@ test.describe('GET /api/dashboard/overview', () => {
      * success for five minutes. A projection cache missing the organization would be the same mistake
      * with tenant data in it.
      */
-    const second = await createOwnerPrincipal(harness.ctx, { tier: 'pro', seatLimit: 3, clock: fixedClockFromEnv() })
-    minted.push(second.principal)
+    const second = await ensureSecondTenant()
 
     const first = await harness.owner.api!.get('/api/dashboard/overview')
     const other = await second.principal.api!.get('/api/dashboard/overview')
@@ -1128,4 +1145,65 @@ test.describe('GET /api/dashboard/overview', () => {
     expect(response.status()).toBe(405)
     expect(response.headers()['allow']).toContain('GET')
   })
+})
+
+test.describe('the action queue', () => {
+  /**
+   * plans/ui-dashboard Wave 2 — the queue is the surface whose *order* is the product, so these
+   * assert placement and continuation rather than only presence.
+   */
+  test('a paused sprint reaches the queue with one action that resolves to its own page', async () => {
+    /**
+     * A dedicated owner, seeded *before* their first request. The projection caches for 30 seconds
+     * per user, so reusing `harness.owner` here would read an entry an earlier test in this file had
+     * already warmed — the assertion would fail for a reason that is the cache working correctly.
+     */
+    const { principal, organization } = await ensureSecondTenant()
+
+    const sprintId = uniqueId('queue-sprint').toLowerCase()
+    await harness.sql`
+      insert into sourcing_sprints (id, organization_id, creator_user_id, name, criteria, variants, status, quota, cursor)
+      values (${sprintId}, ${organization.organizationId}, ${principal.userId}, 'Paused hiring sprint',
+              '{}'::jsonb, '[]'::jsonb, 'paused', 10, '{}'::jsonb)
+    `
+
+    // `range=30d` because this tenant already read `7d` in the cache spec above; a range it has not
+    // requested is a cache miss, which is what makes the freshly-seeded sprint visible.
+    const response = await principal.api!.get('/api/dashboard/overview?range=30d')
+    expect(response.status(), await response.text()).toBe(200)
+    const body = await response.json() as {
+      sections: { actionQueue: { status: string; data?: { items: Array<{ title: string; severity: string; action: { kind: string; resourceId: string | null } }> } } }
+    }
+
+    expect(body.sections.actionQueue.status).toBe('ready')
+    const item = body.sections.actionQueue.data?.items.find((entry) => entry.action.resourceId === sprintId)
+    expect(item, `the paused sprint never reached the queue: ${JSON.stringify(body.sections.actionQueue)}`).toBeTruthy()
+    expect(item!.severity).toBe('warning')
+    expect(item!.action.kind).toBe('open-sprint')
+    // One action per row is the whole contract; the item carries exactly one.
+    expect(Object.keys(item!.action).sort()).toEqual(['kind', 'resourceId'])
+  })
+
+  test('the queue never carries a URL, only a kind and an opaque id', async () => {
+    /**
+     * The property that makes "the server never sends a link" structural. A `href` assembled from
+     * tenant data and rendered into an anchor is an open redirect waiting for one repository to
+     * select the wrong column; the contract's id pattern refuses anything path-shaped, and the
+     * client's own route map is the only thing that turns a kind into a destination.
+     */
+    const response = await harness.owner.api!.get('/api/dashboard/overview')
+    const body = await response.json() as {
+      sections: { actionQueue: { data?: { items: Array<{ action: { resourceId: string | null } }> } } }
+    }
+
+    const serialized = JSON.stringify(body.sections.actionQueue)
+    expect(serialized).not.toMatch(/"https?:\/\//)
+    expect(serialized).not.toMatch(/"href"|"url"|"path"/)
+    for (const item of body.sections.actionQueue.data?.items ?? []) {
+      if (item.action.resourceId !== null) {
+        expect(item.action.resourceId).toMatch(/^[A-Za-z0-9_-]{1,64}$/)
+      }
+    }
+  })
+
 })

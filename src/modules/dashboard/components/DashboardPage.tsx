@@ -7,13 +7,14 @@ import { Link } from '@tanstack/react-router'
 import {
   Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
-  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock,
+  MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock, TriangleAlert,
 } from 'lucide-react'
 import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
 import { Button, LinkButton } from '~/components/ui'
 import { BentoRegion, BentoTileHeader, BentoTileList } from '~/modules/dashboard/ui/bento/Bento'
 import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
+import { ActionQueueWidget } from './ActionQueueWidget'
 import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useBentoDensity } from '~/modules/dashboard/ui/bento/useBentoDensity'
@@ -143,6 +144,33 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
           Start your first hunt <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
         </LinkButton>
       </div>
+    ),
+  },
+
+  /*
+   * The action queue is first, and that is the product's whole thesis: the dashboard answers "what
+   * needs my attention now?" before it answers anything else. It renders nothing when the queue is
+   * empty (`whenEmpty: 'hide'`) rather than occupying the top of the page with a reassurance —
+   * "nothing needs attention" is worth exactly one glance and then becomes furniture.
+   */
+  {
+    id: 'action-queue',
+    span: 'full',
+    isEmpty: (ctx) => {
+      const state = ctx.overview.section('actionQueue')
+      return state.kind === 'empty'
+    },
+    whenEmpty: 'hide',
+    render: (ctx) => (
+      <WidgetFrame
+        title="Needs your attention"
+        icon={TriangleAlert}
+        tone="warning"
+        state={ctx.overview.section('actionQueue')}
+        onRetry={ctx.overview.refetch}
+      >
+        {(queue) => <ActionQueueWidget items={queue.items} />}
+      </WidgetFrame>
     ),
   },
 

@@ -71,17 +71,17 @@
 
 ## Wave 2 — Action queue
 
-- [ ] **Implement the deterministic action-rule registry**
+- [x] **Implement the deterministic action-rule registry**
   - Files: `src/shared/lib/dashboard/action-rules.ts`, rule tests
   - Do: Model priority, eligibility, reason code, due time, resource type/ID, expiry, dismissibility, and deduplication. Start with onboarding, pending membership invitations, unread high-value alerts, paused/completed sprints, and role-safe usage thresholds.
   - Verify: table-driven tests cover priority ties, expiry, duplicate underlying resources, unauthorized fields, and clock boundaries.
 
-- [ ] **Expose action items through the overview projection**
+- [x] **Expose action items through the overview projection**
   - Files: dashboard overview repository/route/contracts, API tests
   - Do: Return a bounded ordered list of action kinds and resource IDs. Never return arbitrary URLs; never include note text, transcript content, candidate email, payment details, or raw provider metadata.
   - Verify: DTO redaction snapshot and tenant/role negative tests pass; each resource is re-authorized on its destination route.
 
-- [ ] **Build the Action Queue widget**
+- [x] **Build the Action Queue widget**
   - Files: `src/modules/dashboard/components/ActionQueueWidget.tsx`, typed dashboard route mapper, component tests
   - Do: Render why, severity text, due/age context, and one primary action. Resolve only allowlisted route kinds; render unknown kinds safely as unavailable. Add loading/empty/stale/error states.
   - Verify: keyboard, screen-reader, touch-target, 320 px, long localization, and unknown-action fixtures pass.
