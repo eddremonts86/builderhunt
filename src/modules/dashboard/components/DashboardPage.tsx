@@ -13,6 +13,8 @@ import { formatDistanceToNow } from '~/shared/lib/format'
 import { fadeInUp } from '~/shared/lib/motion/tokens'
 import { Button, LinkButton } from '~/components/ui'
 import { BentoRegion, BentoTileHeader, BentoTileList } from '~/modules/dashboard/ui/bento/Bento'
+import { WidgetFrame } from '~/modules/dashboard/ui/WidgetFrame'
+import { useDashboardOverview, type DashboardOverviewResult } from '~/modules/dashboard/lib/use-dashboard-overview'
 import { DensityToggle } from '~/modules/dashboard/ui/bento/DensityToggle'
 import { useBentoDensity } from '~/modules/dashboard/ui/bento/useBentoDensity'
 import type { BentoWidget } from '~/modules/dashboard/ui/bento/layout'
@@ -89,6 +91,12 @@ interface HomeContext {
   statsData: MetricWidgetProps[]
   onQueriesChanged: () => void
   currentUserId: string
+  /**
+   * The versioned core projection. Widgets read a *section* from it and get a `WidgetState`, so a
+   * failed section renders as a failure rather than as an empty list — which is the difference the
+   * seven-fetch version could not express.
+   */
+  overview: DashboardOverviewResult
 }
 
 /**
@@ -104,12 +112,15 @@ interface HomeContext {
  * truncated to "free…". Each entry now also declares `minSpan`, the width below
  * which it stops being readable, and the resolver refuses to go under it.
  *
- * Column budget at `xl` (grid is 12 wide, so each row must total 12):
- *   row 1   activity 4 + four metrics 2 each        = 12
- *   row 2   recommendations 8 + recent builders 4   = 12
- *   row 3   saved searches 12                       = 12
- * `xlColumnsUsed` in layout.test.ts checks this after a change; a total that is
- * not a multiple of 12 means a trailing gap on the last row.
+ * Column budget at `xl` (grid is 12 wide, so each band must total 12):
+ *   band 1  three metrics 4 each                    = 12
+ *   band 2  recency 6 + sprints 6                   = 12
+ *   band 3  recommendations 8 + alerts 4            = 12
+ *   band 4  saved searches 8 + recent builders 4    = 12
+ *   band 5  plan usage 6 + source coverage 6        = 12
+ * `xlColumnsUsed` in layout.test.ts checks this after a change. Since placement
+ * became sparse a short band leaves a real gap rather than pulling a later tile
+ * up into it — which is the trade that bought a stable reading order.
  */
 const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   {
@@ -156,7 +167,28 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     id: 'activity',
     span: 'half',
     minSpan: 'third',
-    render: (ctx) => <ActivityWidget points={ctx.stats?.lastSeenByDay ?? []} generatedAt={ctx.stats?.generatedAt} />,
+    render: (ctx) => (
+      <WidgetFrame
+        title="Builder recency"
+        icon={Activity}
+        state={ctx.overview.section('recency')}
+        onRetry={ctx.overview.refetch}
+        emptyMessage="No tracked builder has been seen active by a source in the last 7 days."
+      >
+        {(recency) => (
+          <ActivityWidget
+            points={recency.buckets.map((bucket) => ({
+              date: bucket.date,
+              // Weekday label built here, in UTC, to match the bucket boundary the server used. A
+              // label formatted in the viewer's zone would name a different day than the key.
+              label: new Date(`${bucket.date}T00:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
+              count: bucket.count,
+            }))}
+            generatedAt={ctx.overview.overview?.generatedAt}
+          />
+        )}
+      </WidgetFrame>
+    ),
   },
   {
     id: 'sprints',
@@ -262,7 +294,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   // left beside an 8-column tile rather than starting a band of their own.
   {
     id: 'plan-usage',
-    span: 'third',
+    span: 'half',
     minSpan: 'quarter',
     // Hidden rather than shrunk: without a tier from /api/plans/me there is no
     // limit to measure against, and a usage meter with no limit says nothing.
@@ -272,17 +304,29 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
   },
   {
     id: 'source-mix',
-    span: 'third',
+    span: 'half',
     minSpan: 'quarter',
-    isEmpty: (ctx) => ctx.recent.length === 0,
-    whenEmpty: 'hide',
-    render: (ctx) => <SourceMixWidget builders={ctx.recent} />,
+    render: (ctx) => (
+      <WidgetFrame
+        title="Source coverage"
+        icon={Radio}
+        tone="cyan"
+        state={ctx.overview.section('sourceCoverage')}
+        onRetry={ctx.overview.refetch}
+        emptyMessage="Track a builder and this shows which platforms your pipeline comes from."
+      >
+        {(coverage) => <SourceMixWidget sources={coverage.sources} totalTracked={coverage.totalTracked} />}
+      </WidgetFrame>
+    ),
   },
 ]
 
 export function DashboardPage() {
   const reduceMotion = useReducedMotion()
   const [density, setDensity] = useBentoDensity()
+  // The versioned core projection. Sections it owns (recency, source coverage) read their state
+  // from here; the remaining endpoints migrate in Wave 4.
+  const overview = useDashboardOverview()
   const [stats, setStats] = React.useState<Stats | null>(null)
   const [queries, setQueries] = React.useState<SavedQuery[]>([])
   const [recent, setRecent] = React.useState<RecentBuilder[]>([])
@@ -319,6 +363,14 @@ export function DashboardPage() {
     const { signal } = controller
 
     Promise.all([
+      /*
+       * `/api/dashboard/stats` still supplies the three headline counts and the saved-search badge.
+       * The recency chart and source coverage have moved to `useDashboardOverview` below, which is
+       * where the section states, the freshness stamps and the whole-workspace coverage figure come
+       * from (plans/ui-dashboard Wave 1). The remaining counts move with Wave 4; the two endpoints
+       * read the same columns with the same predicates, and the overview's `summary` section is
+       * asserted against these numbers in `dashboard-and-navigation.spec.ts`.
+       */
       fetch('/api/dashboard/stats', { credentials: 'include', signal }).then(async (r) => {
         if (!r.ok) throw new Error(`stats: ${r.status}`)
         return r.json()
@@ -429,8 +481,9 @@ export function DashboardPage() {
         : null,
       onQueriesChanged: refetchQueries,
       currentUserId: currentUserId ?? '',
+      overview,
     }),
-    [stats, queries, recent, sprints, triggers, planTier, error, statsData, refetchQueries, currentUserId],
+    [stats, queries, recent, sprints, triggers, planTier, error, statsData, refetchQueries, currentUserId, overview],
   )
 
   React.useEffect(() => {

@@ -1021,3 +1021,43 @@ shared band the earlier one is to the left — rather than sorting by rounded po
 sorted version needed a tolerance, and any tolerance is wrong: a 2px masonry offset straddling
 a rounding bucket produced a false failure, which is how the real y=2171/2173 divergence was
 found in the first place.
+
+### Wave 1 — the core projection
+
+`GET /api/dashboard/overview` now exists, and two widgets already read it.
+
+**What it replaces.** Seven parallel fetches in `DashboardPage`, four ending in `.catch(() => [])`.
+That is the mechanism behind the spec's second structural problem: a caught error became an
+empty array, and every widget renders an empty array as "nothing here yet". Neither a user nor
+an operator could tell a quiet workspace from a broken one, because nothing was counted either.
+
+**Sections fail independently, and that has a cost worth naming.** Each section computes in its
+own `try` and answers `{status: 'unavailable'}` on failure, so one broken aggregate cannot take
+the page down. The flip side is that a section dead for every tenant leaves the endpoint looking
+healthy — the identical shape of the bug this project keeps finding — so
+`dashboardOverviewSectionFailures` counts it. There is no other trace.
+
+**Role minimization is server-side and absolute.** A member's payload has no `usage` key at all:
+not `null`, not `{status: 'forbidden'}`. Either would confirm the workspace has billing and that
+they are outside it.
+
+**Validated on the way out as well as in.** The row caps and the resource-id pattern in
+`contracts.ts` are only a guarantee if the producer is held to them too. The id pattern is what
+makes "the server never sends a URL" structural rather than a convention: an action is
+`{kind, resourceId}` from a closed allowlist, and a value shaped like a path cannot pass the
+schema even if a repository one day selects the wrong column.
+
+**Two widgets migrated, and one of them changed its answer.** Source mix counted the most recent
+page of tracked builders while inviting a question about the whole workspace — an organization
+with 400 builders from six sources and 20 recent GitHub adds read as 100% GitHub. It is now
+"Source coverage", aggregated over every tracked builder, and it says its denominator in words.
+The recency chart moved too and now renders through `WidgetFrame`, so a failed section shows a
+retry instead of an empty chart.
+
+**Open:** the remaining counts still come from `/api/dashboard/stats`. Both endpoints read the
+same columns with the same predicates and the e2e asserts they agree; the migration finishes in
+Wave 4. Marked `[~]` rather than `[x]` for that reason.
+
+**Evidence:** 8 new API specs in `dashboard-and-navigation.spec.ts` (owner, member, signed-out,
+unsupported range, per-tenant cache keys, freshness on a cache hit, method seal), 23 specs in
+that file passing, 161 dashboard unit tests, and a manual browser check of both migrated widgets.

@@ -1,0 +1,256 @@
+import { z } from 'zod'
+
+/**
+ * The wire contract for `GET /api/dashboard/overview` (plans/ui-dashboard Wave 1, "Define versioned
+ * dashboard overview contracts").
+ *
+ * One module, parsed on both sides. The route validates what it is about to send and the browser
+ * validates what it received, against the same schemas — so a section that drifts is caught at the
+ * boundary rather than three components deep, and a client built against an older shape refuses the
+ * payload instead of rendering a plausible guess from it.
+ *
+ * ## Four properties this shape exists to guarantee
+ *
+ * **1. Sections fail independently.** Every section is an envelope with its own status and its own
+ * `generatedAt`. The page it replaces made seven fetches, four of them ending in `.catch(() => [])`,
+ * so a failed request became an empty array and an empty array became "nothing here yet". A reader
+ * could not tell a quiet workspace from a broken one. Here there is no way to express "this section
+ * failed" as data: `unavailable` carries no rows at all.
+ *
+ * **2. Freshness is mandatory, not optional.** `generatedAt` is required on every section that
+ * carries data. An aggregate rendered without a time is a claim about *now*, and a cached projection
+ * silently makes that claim false. Parsing fails when it is missing rather than defaulting to the
+ * current time, because a default would manufacture exactly the reassurance that is wrong.
+ *
+ * **3. The server never sends a URL.** An action is `{ kind, resourceId }` drawn from a closed
+ * allowlist, and the browser maps the kind through its own typed route registry. A server-supplied
+ * `href` rendered into an anchor is one injection away from being an open redirect, and this
+ * projection assembles rows from tenant data.
+ *
+ * **4. Rows are bounded at the schema.** Every list has a maximum length and exceeding it is a parse
+ * error, not a truncation. A truncating parser turns "this organization has 40 000 alerts and the
+ * query forgot its LIMIT" into a page that looks fine.
+ */
+
+/**
+ * Bumped when a change would make an older client misread a payload — a removed field, a narrowed
+ * enum, a changed unit. Adding an optional field does not qualify.
+ *
+ * The client compares exactly and refuses a mismatch. Not "greater than or equal": a *newer* server
+ * is the case where a removed field would be silently absent, which is precisely the mismatch worth
+ * refusing.
+ */
+export const DASHBOARD_SCHEMA_VERSION = 1
+
+export const DASHBOARD_RANGES = ['24h', '7d', '30d'] as const
+export type DashboardRange = (typeof DASHBOARD_RANGES)[number]
+export const DEFAULT_DASHBOARD_RANGE: DashboardRange = '7d'
+
+/** Rejects an unknown range rather than silently falling back — a wrong window is a wrong number. */
+export const dashboardRangeSchema = z.enum(DASHBOARD_RANGES)
+
+/**
+ * Every action the queue may ask the browser to offer.
+ *
+ * Closed on purpose. Adding a kind means adding a route mapping in the same commit, so a server that
+ * learns a new action before the client can render it degrades to "no action" rather than to a dead
+ * control or an arbitrary link.
+ */
+export const DASHBOARD_ACTION_KINDS = [
+  'open-billing',
+  'open-interview',
+  'open-calendar',
+  'open-availability',
+  'open-invitation',
+  'open-alert',
+  'open-sprint',
+  'open-saved-search',
+  'open-builder',
+  'open-team',
+  'open-onboarding',
+  'open-search',
+] as const
+export type DashboardActionKind = (typeof DASHBOARD_ACTION_KINDS)[number]
+
+/**
+ * A continuation, as a kind plus an opaque id. Never a path, never a query string.
+ *
+ * `resourceId` is constrained to the shape of the ids this product mints — `randomId()` output, a
+ * UUID, or a slug — so a value that could traverse a path or carry a scheme cannot reach the route
+ * builder even if a repository is one day careless about what it selects.
+ */
+export const dashboardActionSchema = z.object({
+  kind: z.enum(DASHBOARD_ACTION_KINDS),
+  resourceId: z.string().min(1).max(64).regex(/^[A-Za-z0-9_-]+$/).nullable(),
+})
+export type DashboardAction = z.infer<typeof dashboardActionSchema>
+
+/** Ordering severity for anything the user is being asked to deal with. */
+export const DASHBOARD_SEVERITIES = ['critical', 'warning', 'info'] as const
+export type DashboardSeverity = (typeof DASHBOARD_SEVERITIES)[number]
+
+/**
+ * Why a section carries no data.
+ *
+ * `forbidden` is deliberately indistinguishable from an omitted section on the wire — the key is
+ * simply absent, and the client's registry already knows the role is ineligible. Sending
+ * `{status: 'forbidden'}` for Billing would confirm to a member that the workspace has billing,
+ * which is the disclosure omitting it was meant to prevent.
+ */
+export const DASHBOARD_SECTION_UNAVAILABLE_CODES = [
+  'section_failed',
+  'dependency_unavailable',
+  'range_unsupported',
+] as const
+
+const generatedAt = z.iso.datetime()
+
+/**
+ * Wraps one section's payload.
+ *
+ * `empty` still carries `generatedAt`: "we looked at 03:14 and there was nothing" is a different and
+ * more useful statement than "there is nothing", and it is what lets a stale cache be labelled.
+ */
+function sectionEnvelope<T extends z.ZodType>(data: T) {
+  return z.discriminatedUnion('status', [
+    z.object({ status: z.literal('ready'), generatedAt, data }),
+    z.object({ status: z.literal('empty'), generatedAt }),
+    z.object({
+      status: z.literal('unavailable'),
+      code: z.enum(DASHBOARD_SECTION_UNAVAILABLE_CODES),
+    }),
+  ])
+}
+
+/** Caps, applied at parse time. Exceeding one is a contract violation, not something to trim. */
+export const DASHBOARD_ROW_LIMITS = {
+  actionQueue: 12,
+  savedSearches: 10,
+  recentBuilders: 12,
+  sprints: 8,
+  alerts: 10,
+  sourceCoverage: 16,
+  recencyBuckets: 31,
+} as const
+
+// ── Sections ──────────────────────────────────────────────────────────────────────────────────
+
+export const dashboardSummarySchema = z.object({
+  /** Everything the workspace tracks, all time. */
+  trackedBuilders: z.number().int().nonnegative(),
+  /**
+   * Tracked builders a connector last observed inside the range. A recency fact — it counts people,
+   * not events, which is what the column supports and what the copy must say.
+   */
+  seenActiveInRange: z.number().int().nonnegative(),
+  /** Tracked for the first time inside the range. Disjoint from the above by definition. */
+  newlyTrackedInRange: z.number().int().nonnegative(),
+  savedSearches: z.number().int().nonnegative(),
+})
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>
+
+export const dashboardRecencySchema = z.object({
+  /** One bucket per day of the range. Each tracked builder falls in exactly one. */
+  buckets: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    count: z.number().int().nonnegative(),
+  })).max(DASHBOARD_ROW_LIMITS.recencyBuckets),
+  /** Stated rather than inferred from the bucket keys, which say nothing about the boundary rule. */
+  timezone: z.literal('UTC'),
+})
+export type DashboardRecency = z.infer<typeof dashboardRecencySchema>
+
+export const dashboardActionItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  severity: z.enum(DASHBOARD_SEVERITIES),
+  /** Short, already-resolved text. Never a template the client has to fill from other fields. */
+  title: z.string().min(1).max(120),
+  detail: z.string().max(200).nullable(),
+  /** When the thing is due or started, so the queue can order by time within a severity. */
+  dueAt: z.iso.datetime().nullable(),
+  action: dashboardActionSchema,
+})
+export type DashboardActionItem = z.infer<typeof dashboardActionItemSchema>
+
+export const dashboardSourceCoverageSchema = z.object({
+  /** Counted across every tracked builder, not a recent sample. That distinction is the widget. */
+  sources: z.array(z.object({
+    source: z.string().min(1).max(32),
+    count: z.number().int().nonnegative(),
+  })).max(DASHBOARD_ROW_LIMITS.sourceCoverage),
+  /** The denominator, sent explicitly so no client has to sum the rows and get it subtly wrong. */
+  totalTracked: z.number().int().nonnegative(),
+})
+export type DashboardSourceCoverage = z.infer<typeof dashboardSourceCoverageSchema>
+
+/**
+ * The role-minimized usage view.
+ *
+ * Minimized by the **server**, from the principal's role — never by the client hiding fields it was
+ * sent. `seats` and `credits` are present only for a role the canonical billing policy allows to see
+ * them, so a member's payload does not contain the numbers at all.
+ */
+export const dashboardUsageSchema = z.object({
+  tier: z.string().min(1).max(32),
+  paidActionsAllowed: z.boolean(),
+  seats: z.object({
+    used: z.number().int().nonnegative(),
+    allowed: z.number().int().nonnegative(),
+  }).nullable(),
+  creditBalanceUnits: z.number().int().nullable(),
+  /** A dated, already-evaluated warning. The client does not re-derive thresholds. */
+  warning: z.object({
+    severity: z.enum(DASHBOARD_SEVERITIES),
+    message: z.string().min(1).max(160),
+  }).nullable(),
+})
+export type DashboardUsage = z.infer<typeof dashboardUsageSchema>
+
+// ── The response ──────────────────────────────────────────────────────────────────────────────
+
+export const dashboardOverviewSchema = z.object({
+  schemaVersion: z.literal(DASHBOARD_SCHEMA_VERSION),
+  /**
+   * Which tenant these numbers describe. The client asserts it against the session's active
+   * organization before rendering: an organization switch that races a slow response must never
+   * paint the previous tenant's figures under the new tenant's name.
+   */
+  organizationId: z.string().min(1).max(64),
+  range: dashboardRangeSchema,
+  /** When the response as a whole was assembled. Per-section times may be older on a cache hit. */
+  generatedAt,
+  sections: z.object({
+    summary: sectionEnvelope(dashboardSummarySchema),
+    recency: sectionEnvelope(dashboardRecencySchema),
+    actionQueue: sectionEnvelope(
+      z.object({ items: z.array(dashboardActionItemSchema).max(DASHBOARD_ROW_LIMITS.actionQueue) }),
+    ),
+    sourceCoverage: sectionEnvelope(dashboardSourceCoverageSchema),
+    // Absent entirely for a role that may not see it — see the note on `forbidden` above.
+    usage: sectionEnvelope(dashboardUsageSchema).optional(),
+  }),
+})
+export type DashboardOverview = z.infer<typeof dashboardOverviewSchema>
+export type DashboardSections = DashboardOverview['sections']
+export type DashboardSectionId = keyof DashboardSections
+
+/**
+ * Parses a response, refusing anything it cannot read exactly.
+ *
+ * Returns a discriminated result rather than throwing: the caller has to render *something*, and the
+ * something for "the server sent a shape I do not understand" is an error state on the whole page —
+ * not a crash, and definitely not a partially-populated dashboard assembled from whichever fields
+ * happened to survive.
+ */
+export function parseDashboardOverview(
+  input: unknown,
+): { ok: true; overview: DashboardOverview } | { ok: false; reason: 'schema' | 'version' } {
+  // Checked before full validation so an incompatible deploy reports the actual cause rather than a
+  // pile of field errors that all descend from it.
+  if (typeof input === 'object' && input !== null && 'schemaVersion' in input) {
+    const version = (input as { schemaVersion: unknown }).schemaVersion
+    if (version !== DASHBOARD_SCHEMA_VERSION) return { ok: false, reason: 'version' }
+  }
+  const parsed = dashboardOverviewSchema.safeParse(input)
+  return parsed.success ? { ok: true, overview: parsed.data } : { ok: false, reason: 'schema' }
+}

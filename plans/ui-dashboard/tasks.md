@@ -44,27 +44,27 @@
 
 ## Wave 1 — Core data projection
 
-- [ ] **Define versioned dashboard overview contracts**
+- [x] **Define versioned dashboard overview contracts**
   - Files: `src/shared/lib/dashboard/contracts.ts`, contract tests
   - Do: Define range enum, section IDs/states, generated/freshness fields, bounded row schemas, role-minimized usage summary, and allowlisted action/resource kinds. Share parsing between route and client.
   - Verify: invalid range, unknown action, arbitrary URL, excessive rows, missing freshness, and incompatible schema version fail closed.
 
-- [ ] **Build bounded dashboard aggregate repositories**
+- [x] **Build bounded dashboard aggregate repositories**
   - Files: `src/shared/lib/repositories/dashboard-overview.ts`, repository tests
   - Do: Add tenant-scoped aggregates for summary, newly tracked builders, alert volume, source coverage, active sprints, shortlists, and other current-data sections. Use indexed predicates, explicit timezones, top-N bounds, and stable ordering.
   - Verify: query-plan/SQL tests cover large representative data, shared timestamps, empty organizations, DST boundaries, and cross-tenant isolation.
 
-- [ ] **Implement `GET /api/dashboard/overview`**
+- [x] **Implement `GET /api/dashboard/overview`**
   - Files: `src/routes/api/dashboard/overview.ts`, route registry, API/security tests
   - Do: Compose the core projection, return independent section states, `schemaVersion`, scope, range, and `generatedAt`; minimize billing and team fields by server-authorized role. Do not fail the whole response for an optional section.
   - Verify: member, owner/admin, signed-out, suspended, cross-tenant, partial repository failure, stale cache, and unsupported range tests pass.
 
-- [ ] **Add cache and observability boundaries**
+- [x] **Add cache and observability boundaries**
   - Files: dashboard overview repository/route, metrics/logging configuration, tests
   - Do: Cache by organization, role class, range, and schema version with a bounded TTL; emit duration, cache, and section-status metrics without organization names, candidate identifiers, or content.
   - Verify: cache keys cannot collide across organizations/roles; invalidation/freshness labels agree; logs and metrics pass a sensitive-field snapshot.
 
-- [ ] **Refactor the page into core and lazy section queries**
+- [~] **Refactor the page into core and lazy section queries**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, dashboard query hooks, page tests
   - Do: Fetch the core overview once; keep genuinely heavy optional widgets lazy with query keys scoped by session organization and range. Render shell/critical actions independently from lower-section failures.
   - Verify: one failed lazy request leaves the queue/navigation usable; organization switch cancels/invalidates old queries and never flashes prior-tenant content.

@@ -22,6 +22,20 @@ interface Counters {
   /** `checkAndConsumeBudget` (`ai/budget.ts`) denials with `reason: 'budget'` — a tier that ran out of its daily allowance, not one with a zero allowance (`reason: 'plan'`, not counted here). */
   aiBudgetDenials: number
 
+  // ── Dashboard overview projection (plans/ui-dashboard Wave 1) ───────────────────────────────────
+  //
+  // Counts only, and deliberately nothing that identifies a workspace. `GET /api/dashboard/overview`
+  // returns per-section states so one failing section cannot fail the page — which means a section
+  // that is broken for every tenant is invisible from the outside, exactly like a search connector
+  // catching its own 403. These are the signal that it happened.
+  /** Responses served from the projection cache rather than recomputed. */
+  dashboardOverviewCacheHits: number
+  /** Responses assembled from live queries. Hits over hits+misses is the cache's real hit rate. */
+  dashboardOverviewCacheMisses: number
+  /** One per section that answered `unavailable`, summed across responses. A rising value with a
+   * flat `apiErrors` is the specific shape of "the page still renders and one section is dead". */
+  dashboardOverviewSectionFailures: number
+
   // ── Interviews (plan: calendar-scheduling-interview-intelligence, Phase 11) ──────────────────────
   //
   // Counters and IDs only, never content. Every one of these is a number a dashboard can show without a
@@ -77,6 +91,9 @@ const counters: Counters = {
   signins: 0,
   checkoutCountryGateRejections: 0,
   aiBudgetDenials: 0,
+  dashboardOverviewCacheHits: 0,
+  dashboardOverviewCacheMisses: 0,
+  dashboardOverviewSectionFailures: 0,
   interviewBookingConflicts: 0,
   interviewDocumentBacklog: 0,
   interviewDocumentFailures: 0,

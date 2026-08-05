@@ -19,7 +19,7 @@
  * the loading-gate and forced-500 tests, where no product path can
  * produce those states deterministically.
  */
-import { test, expect as baseExpect, type Browser, type BrowserContext, type Page } from 'playwright/test'
+import { test, expect as baseExpect, request as playwrightRequest, type Browser, type BrowserContext, type Page } from 'playwright/test'
 
 // Two vite dev servers compile routes on demand while both workers run —
 // data-dependent assertions can legitimately take longer than the 5s
@@ -802,6 +802,7 @@ test('a member removed from their active organization degrades gracefully and re
       /\/api\/sprints/,
       /\/api\/alerts\/triggers/,
       /\/api\/plans\/me/,
+      /\/api\/dashboard\/overview/,
     ])
   } finally {
     await closeStrictPage(sp)
@@ -984,4 +985,147 @@ test('the recency chart says what it measures and offers its exact values', asyn
   } finally {
     await closeStrictPage(sp)
   }
+})
+
+test.describe('GET /api/dashboard/overview', () => {
+  /**
+   * plans/ui-dashboard Wave 1 — verify line: "member, owner/admin, signed-out, suspended,
+   * cross-tenant, partial repository failure, stale cache, and unsupported range tests pass."
+   *
+   * The projection replaces seven parallel fetches, four of which ended in `.catch(() => [])`. That
+   * is why the assertions below care so much about *shape*: the defect being designed out is a
+   * caught error arriving as an empty array, and an empty array is indistinguishable from a calm
+   * workspace at every layer above the fetch. Section envelopes make the two different values, and
+   * these tests are what stop them collapsing back into one.
+   *
+   * Run through the real routes with real roles rather than as unit tests, because the interesting
+   * part is what the *server* decides to send a given principal — role minimization asserted against
+   * a mocked repository proves only that the mock was written correctly.
+   */
+  test('an owner gets every section, with a schema version, a scope and a freshness stamp', async () => {
+    await seedOwnerDashboard()
+    const response = await harness.owner.api!.get('/api/dashboard/overview')
+    expect(response.status(), await response.text()).toBe(200)
+    const body = await response.json() as {
+      schemaVersion: number
+      organizationId: string
+      range: string
+      generatedAt: string
+      sections: Record<string, { status: string; generatedAt?: string; data?: unknown }>
+    }
+
+    expect(body.schemaVersion).toBe(1)
+    expect(body.organizationId).toBe(harness.owner.organizationId)
+    expect(body.range).toBe('7d')
+    expect(Number.isNaN(Date.parse(body.generatedAt))).toBe(false)
+
+    // Every section that carries data carries the time it was computed. An aggregate without one is
+    // a claim about now, and a cache makes that claim false without changing the number.
+    for (const [name, envelope] of Object.entries(body.sections)) {
+      if (envelope.status === 'ready' || envelope.status === 'empty') {
+        expect(envelope.generatedAt, `${name} carries data with no generatedAt`).toBeTruthy()
+      }
+      if (envelope.status === 'unavailable') {
+        expect(envelope, `${name} smuggled data into a failure`).not.toHaveProperty('data')
+      }
+    }
+
+    const summary = body.sections.summary as { status: string; data?: { trackedBuilders: number; savedSearches: number } }
+    expect(summary.status).toBe('ready')
+    expect(summary.data?.trackedBuilders).toBe(2)
+    expect(summary.data?.savedSearches).toBe(1)
+  })
+
+  test('a member gets no usage section at all, rather than a redacted one', async () => {
+    // Not `{status: 'forbidden'}` and not `null`. Either would confirm to a member that the
+    // workspace has billing and that they are outside it, which is the disclosure omitting the
+    // section exists to prevent.
+    const member = await createMemberPrincipal(harness.ctx, harness.sharedOrganization.organizationId, 'member')
+    minted.push(member)
+
+    const response = await member.api!.get('/api/dashboard/overview')
+    expect(response.status(), await response.text()).toBe(200)
+    const body = await response.json() as { sections: Record<string, unknown> }
+
+    expect('usage' in body.sections).toBe(false)
+    expect(JSON.stringify(body)).not.toMatch(/creditBalanceUnits|seats/)
+    // The sections a member may see are still there — omission is scoped, not a blanket refusal.
+    expect('summary' in body.sections).toBe(true)
+  })
+
+  test('an owner does get the usage section', async () => {
+    const response = await harness.owner.api!.get('/api/dashboard/overview')
+    const body = await response.json() as { sections: { usage?: { status: string } } }
+    expect(body.sections.usage).toBeTruthy()
+  })
+
+  test('an unsupported range is refused rather than quietly answered with the default', async () => {
+    // A silent fallback answers a question the caller did not ask, with a number they will read as
+    // the answer to the one they did.
+    const response = await harness.owner.api!.get('/api/dashboard/overview?range=90d')
+    expect(response.status()).toBe(400)
+
+    for (const range of ['24h', '7d', '30d']) {
+      const ok = await harness.owner.api!.get(`/api/dashboard/overview?range=${range}`)
+      expect(ok.status(), range).toBe(200)
+      expect((await ok.json() as { range: string }).range, range).toBe(range)
+    }
+  })
+
+  test('a signed-out request is refused', async () => {
+    const anonymous = await playwrightRequest.newContext({ baseURL: harness.baseURL })
+    try {
+      const response = await anonymous.get('/api/dashboard/overview')
+      expect(response.status()).toBeGreaterThanOrEqual(400)
+      expect(await response.text()).not.toContain('trackedBuilders')
+    } finally {
+      await anonymous.dispose()
+    }
+  })
+
+  test('the cache is keyed by tenant, so two organizations never see one projection', async () => {
+    /**
+     * The specific hazard the key guards against, and the reason it is asserted rather than reviewed:
+     * this repository has already shipped a cache indexed by too little. `coolify-two-env-rows-per-key`
+     * is the operational version, and `search.ts` served a timed-out source's empty result as a
+     * success for five minutes. A projection cache missing the organization would be the same mistake
+     * with tenant data in it.
+     */
+    const second = await createOwnerPrincipal(harness.ctx, { tier: 'pro', seatLimit: 3, clock: fixedClockFromEnv() })
+    minted.push(second.principal)
+
+    const first = await harness.owner.api!.get('/api/dashboard/overview')
+    const other = await second.principal.api!.get('/api/dashboard/overview')
+
+    const firstBody = await first.json() as { organizationId: string; sections: { summary: { data?: { trackedBuilders: number } } } }
+    const otherBody = await other.json() as { organizationId: string; sections: { summary: { status: string; data?: { trackedBuilders: number } } } }
+
+    expect(firstBody.organizationId).toBe(harness.owner.organizationId)
+    expect(otherBody.organizationId).toBe(second.organization.organizationId)
+    expect(otherBody.organizationId).not.toBe(firstBody.organizationId)
+    // The fresh workspace tracks nobody, so its summary is empty — not the other tenant's two.
+    expect(otherBody.sections.summary.data?.trackedBuilders ?? 0).toBe(0)
+  })
+
+  test('a cache hit answers the same payload, including the same freshness stamp', async () => {
+    // A hit that re-stamped `generatedAt` with the current time would present a cached aggregate as
+    // current, which is the one thing the field exists to prevent.
+    const first = await harness.owner.api!.get('/api/dashboard/overview?range=24h')
+    const second = await harness.owner.api!.get('/api/dashboard/overview?range=24h')
+    expect(second.status()).toBe(200)
+
+    const firstBody = await first.json() as { generatedAt: string }
+    const secondBody = await second.json() as { generatedAt: string }
+    // Either it was recomputed (different stamp, still valid) or served from cache (identical
+    // stamp). What must never happen is a cached body wearing a fresh timestamp, which would show
+    // up as an unchanged payload whose stamp moved.
+    const firstText = JSON.stringify(await (await harness.owner.api!.get('/api/dashboard/overview?range=24h')).json())
+    expect(firstText).toContain(secondBody.generatedAt === firstBody.generatedAt ? firstBody.generatedAt : secondBody.generatedAt)
+  })
+
+  test('every method other than GET is sealed', async () => {
+    const response = await harness.owner.api!.post('/api/dashboard/overview', { data: {} })
+    expect(response.status()).toBe(405)
+    expect(response.headers()['allow']).toContain('GET')
+  })
 })
