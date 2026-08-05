@@ -216,9 +216,21 @@ async function verifyRlsIntegrity(url: string): Promise<boolean> {
                           where p.schemaname = 'public' and p.tablename = c.relname)
        order by c.relname
     `
+    // The `builderhunt%` prefix is not a complete test. A managed Postgres
+    // resource owns its own superuser under whatever name the provider picked
+    // (Coolify calls ours `bhuser`), and that role legitimately holds
+    // SUPERUSER — it is the migration identity. What must never be privileged
+    // is the role the *application* connects as, and that one is only knowable
+    // from DATABASE_URL, not from a name pattern. So check both: the prefixed
+    // roles, plus the runtime role by name.
+    let runtimeRole = ''
+    try {
+      runtimeRole = decodeURIComponent(new URL(DATABASE_URL.replace(/^postgres:\/\//, 'postgresql://')).username)
+    } catch { /* unparseable DATABASE_URL — the prefix check still runs */ }
     const bypass = await sql<{ rolname: string }[]>`
       select rolname from pg_roles
-       where rolname like 'builderhunt%' and (rolbypassrls or rolsuper)
+       where (rolname like 'builderhunt%' or rolname = ${runtimeRole})
+         and (rolbypassrls or rolsuper)
        order by rolname
     `
 

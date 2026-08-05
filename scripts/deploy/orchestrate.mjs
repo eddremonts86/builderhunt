@@ -215,6 +215,64 @@ async function assertPostgresMajor(migrationUrl) {
   }
 }
 
+/**
+ * The runtime role must not be able to ignore Row-Level Security.
+ *
+ * `src/shared/lib/env.ts` already guards this, but only by *name*: it rejects
+ * `postgres` and `builderhunt_owner`. That is not a privilege check. A managed
+ * Postgres resource names its owner whatever it likes — Coolify calls ours
+ * `bhuser` — so a superuser can pass a name blocklist and every one of the
+ * ~283 policies becomes decoration, silently, with no error anywhere.
+ *
+ * This asks the database instead of guessing from the string, so it holds for
+ * any role name. It runs on the migration connection because that identity can
+ * read `pg_roles`, and after role provisioning because the runtime role does
+ * not exist before it on a fresh database.
+ *
+ * Also compares the two roles directly: `env.ts` compares whole URLs, so
+ * `bhuser@host/db` as both runtime and migration identity is caught there, but
+ * only when every other URL component matches too.
+ */
+async function assertRuntimeRoleUnprivileged(migrationUrl, migrationRole) {
+  step('Verifying the runtime role cannot bypass RLS')
+  const runtimeUrl = process.env.DATABASE_URL
+  if (!runtimeUrl) {
+    fail('DATABASE_URL is not set — cannot verify the runtime role')
+  }
+  const runtimeRole = parseConn(runtimeUrl).role
+  if (DRY_RUN) {
+    info(`would require rolsuper=false and rolbypassrls=false for "${runtimeRole}"`)
+    return
+  }
+  if (runtimeRole === migrationRole) {
+    fail(
+      `DATABASE_URL and DATABASE_MIGRATION_URL both connect as "${runtimeRole}". The migration identity owns ` +
+        'the schema; using it at runtime gives every request the owner\'s privileges. Point DATABASE_URL at the ' +
+        'application role (builderhunt_app).',
+    )
+  }
+  const sql = postgres(migrationUrl, { max: 1, prepare: false })
+  try {
+    const [row] = await sql`
+      select rolsuper, rolbypassrls from pg_roles where rolname = ${runtimeRole}
+    `
+    if (!row) {
+      fail(`runtime role "${runtimeRole}" does not exist on the target database`)
+    }
+    if (row.rolsuper || row.rolbypassrls) {
+      fail(
+        `runtime role "${runtimeRole}" has ${row.rolsuper ? 'SUPERUSER' : ''}` +
+          `${row.rolsuper && row.rolbypassrls ? ' and ' : ''}${row.rolbypassrls ? 'BYPASSRLS' : ''}. ` +
+          'Every Row-Level Security policy is inert for this connection, so one tenant can read another\'s ' +
+          'rows. Point DATABASE_URL at builderhunt_app, or remove the attribute from the role.',
+      )
+    }
+    ok(`runtime role "${runtimeRole}": rolsuper=false, rolbypassrls=false — policies apply`)
+  } finally {
+    await sql.end({ timeout: 5 })
+  }
+}
+
 async function ensureExtensions(migrationUrl) {
   step('Ensuring required Postgres extensions')
   const extensions = ['vector'] // pgvector — required by builder_embeddings (semantic search)
@@ -404,6 +462,7 @@ async function main() {
   runMigrations()
   const provisioned = await provisionRolePasswords(migrationUrl, migrationRole)
   await verifyRoleLogins(provisioned)
+  await assertRuntimeRoleUnprivileged(migrationUrl, migrationRole)
   seedAdmin()
   syncPlatformContent()
 

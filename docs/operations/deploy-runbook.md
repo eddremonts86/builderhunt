@@ -51,13 +51,22 @@ every deploy; it never drops, resets, or `push`es — existing data is preserved
 | 5 migrate | `drizzle-kit migrate` (creates roles/tables/RLS/grants) | fatal |
 | 6 provision roles | `ALTER ROLE builderhunt_* … PASSWORD` from each set `DATABASE_*_URL` | fatal |
 | 7 verify logins | connects as each provisioned role, `SELECT 1` | fatal (catches password/env mismatch before users do) |
-| 8 seed admin | `scripts/db/seed-admin.ts` (idempotent upsert) | **soft** — warns; deploy stays healthy |
-| 9 sync content | `scripts/db/sync-platform-content.ts` — upserts `content/changelog/*.md` and `content/roadmap/*.md` into the `changelog` / `roadmap_items` tables | **soft** — warns; the public pages keep the rows they already had |
+| 8 runtime-role privileges | asks `pg_roles` whether the role in `DATABASE_URL` has `rolsuper` or `rolbypassrls`, and that it is not the migration role | fatal — a privileged runtime role makes every RLS policy inert with no other symptom |
+| 9 seed admin | `scripts/db/seed-admin.ts` (idempotent upsert) | **soft** — warns; deploy stays healthy |
+| 10 sync content | `scripts/db/sync-platform-content.ts` — upserts `content/changelog/*.md` and `content/roadmap/*.md` into the `changelog` / `roadmap_items` tables | **soft** — warns; the public pages keep the rows they already had |
 
 Flags: `--dry-run` (print the plan, no mutations, no connections), `--skip-seed`,
 `--skip-content`. Secrets (role passwords) are never printed.
 
-Step 8 exists because the public `/changelog` and `/roadmap` read the database, and the
+Step 8 was added 2026-08-05, after a scripted repoint pointed production's `DATABASE_URL` at the
+managed resource's own superuser (see "Coolify stores TWO rows per variable" below). `env.ts` already
+guarded this, but only by name — it rejects `postgres` and `builderhunt_owner`, and a provider is free
+to call its owner anything, so the check passed and tenant isolation would have been off with nothing
+logged. Names cannot express this property; only the database can answer it, which is why the check
+lives here rather than in env validation. It runs after step 6 because the runtime role does not exist
+before provisioning on a fresh database.
+
+Step 10 exists because the public `/changelog` and `/roadmap` read the database, and the
 database is not in git — an entry typed into the admin panel lived in exactly one
 environment and did not survive a restore onto a fresh volume. The files under `content/`
 are the committed copy and this step is what makes a deploy publish them. It connects as
@@ -347,6 +356,32 @@ Also repoint, or the new database has no backups at all:
 - Coolify's **03:00 scheduled backup** — retarget it at the new resource.
 - The **03:30 `scripts/ops/builderhunt-backup-sync.sh`** roles capture (`pg_dumpall --roles-only
   --no-role-passwords`).
+
+#### Coolify stores TWO rows per variable — never index its env list by key alone
+
+`GET /api/v1/applications/{uuid}/envs` returns one row per `(key, is_preview)` pair. Every
+`DATABASE_*` key therefore appears **twice**: the production value and the preview-deployment value.
+They hold different roles and different passwords.
+
+Building a lookup with `{e['key']: e for e in envs}` silently keeps whichever row happens to come
+last. On 2026-08-05 that collapsed `DATABASE_URL` to its **preview** row and PATCHed the value onto
+the production row, which:
+
+1. changed production's runtime role from `builderhunt_app` to `bhuser` — the resource owner, a
+   superuser with `BYPASSRLS`, so all ~283 RLS policies would have stopped applying; and
+2. made `DATABASE_URL` byte-identical to `DATABASE_MIGRATION_URL`, which `env.ts` rejects, so the
+   next deploy would have crash-looped instead of booting.
+
+Neither was visible in the API response, because both rows read back exactly as written. What caught
+it was `docker inspect` on the **running** container: it was started before the bad PATCH, so its env
+is the pre-damage truth and the only recoverable copy of production's real values.
+
+So, when scripting against this API:
+
+- select rows by `(key, is_preview=False)`, never by key;
+- read the running container's env first and treat it as the source of truth;
+- after writing, read the rows back and assert the **role name** in each, not just that the PATCH
+  returned 200.
 
 ### 2b. The MVP path — skip §3 entirely while there is nothing to preserve
 

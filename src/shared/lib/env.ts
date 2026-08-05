@@ -451,6 +451,35 @@ const zodEnv = z.object({
       message: 'Production DATABASE_URL must use the non-owner application role',
     })
   }
+
+  // The list above is a name blocklist, which cannot see a managed resource's
+  // own owner: Coolify names ours `bhuser`, so a superuser with BYPASSRLS
+  // passes it and every RLS policy silently stops applying. Comparing *roles*
+  // catches that whatever the owner is called. The URL comparison further down
+  // does not: it needs host, password and database to match as well, so two
+  // URLs for the same role but different hosts slip through it.
+  //
+  // This stays a string check on purpose — validation happens before any
+  // connection exists. `scripts/deploy/orchestrate.mjs` asks the database for
+  // rolsuper/rolbypassrls, which is the check that actually holds.
+  let migrationUsername = ''
+  if (data.DATABASE_MIGRATION_URL) {
+    try {
+      migrationUsername = decodeURIComponent(new URL(data.DATABASE_MIGRATION_URL).username).toLowerCase()
+    } catch {
+      context.addIssue({ code: 'custom', path: ['DATABASE_MIGRATION_URL'], message: 'DATABASE_MIGRATION_URL must be a valid PostgreSQL URL' })
+    }
+  }
+  if (runtimeUsername && migrationUsername && runtimeUsername === migrationUsername) {
+    context.addIssue({
+      code: 'custom',
+      path: ['DATABASE_URL'],
+      message:
+        `Production DATABASE_URL and DATABASE_MIGRATION_URL both connect as "${runtimeUsername}". The migration `
+        + 'role owns the schema, so serving requests with it gives every request owner privileges and makes '
+        + 'Row-Level Security inert. Point DATABASE_URL at the application role.',
+    })
+  }
   // Only enforce "must be different" once a role URL is actually set — an
   // unset var (undefined) must never be compared as equal to another unset
   // var, or every optional role URL falsely collides with every other one.

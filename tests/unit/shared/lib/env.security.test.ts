@@ -37,6 +37,40 @@ describe('production environment security', () => {
     expect(() => parseEnvironment({ ...productionEnvironment, ...override })).toThrow()
   })
 
+  /**
+   * The runtime and migration identities must differ as *roles*, not merely as URLs.
+   *
+   * This is the shape that got through in production on 2026-08-05: `DATABASE_URL` was rewritten to the
+   * managed resource's own owner (`bhuser` — a superuser with BYPASSRLS), which the
+   * `['postgres', 'builderhunt_owner']` name blocklist does not contain. Every one of the ~283 policies
+   * became decoration, with no error raised anywhere.
+   *
+   * The "shared migration URL" case above does not catch it, because that compares whole URL strings: a
+   * different host, port, password or database is enough to slip past while the privileged role stays.
+   */
+  it.each([
+    ['same owner role, different host', 'postgresql://migration_operator:owner-secret@replica:5432/builderhunt'],
+    ['same owner role, different password', 'postgresql://migration_operator:other-secret@db:5432/builderhunt'],
+    ['same owner role, different database', 'postgresql://migration_operator:owner-secret@db:5432/builderhunt_replica'],
+  ])('rejects the migration role reused at runtime — %s', (_label, runtimeUrl) => {
+    expect(() => parseEnvironment({ ...productionEnvironment, DATABASE_URL: runtimeUrl }))
+      .toThrow(/both connect as .{0,2}migration_operator/)
+  })
+
+  it('rejects a provider-named superuser as the runtime role when it is also the migration role', () => {
+    // Coolify names the resource owner `bhuser`, so no name blocklist can enumerate it.
+    expect(() => parseEnvironment({
+      ...productionEnvironment,
+      DATABASE_URL: 'postgresql://bhuser:app-secret@pg18-host:5432/builderhunt',
+      DATABASE_MIGRATION_URL: 'postgresql://bhuser:owner-secret@pg18-host:5432/builderhunt',
+    })).toThrow(/both connect as .{0,2}bhuser/)
+  })
+
+  it('still accepts distinct roles that share a host and database', () => {
+    // The check must be about identity, not topology: one Postgres serving both roles is the normal setup.
+    expect(() => parseEnvironment(productionEnvironment)).not.toThrow()
+  })
+
   // DATABASE_AUTH_URL/WORKER_URL/PLATFORM_URL are optional in production: the
   // role-separation cutover is a deliberate, sign-off-gated step that has not
   // happened yet. src/shared/lib/db/{auth-db,worker-db,client}.ts fall back
