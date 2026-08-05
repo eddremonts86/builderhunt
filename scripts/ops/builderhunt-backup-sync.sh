@@ -87,14 +87,38 @@ capture_roles() {
     # literally `rhxnxwo8bnvbndyuvx56m00k`). Identify it by what it actually is instead —
     # the running Postgres whose POSTGRES_DB is `builderhunt` — which also survives Coolify
     # recreating the resource under a new uuid.
-    local c
+    local c candidates=''
     for c in $(docker ps --format '{{.Names}}'); do
       if docker inspect "$c" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
            | grep -qx "POSTGRES_DB=${DB_NAME}"; then
-        container="$c"
-        break
+        candidates="${candidates}${c} "
       fi
     done
+    set -- $candidates
+    if [ "$#" -gt 1 ]; then
+      # More than one cluster answers to POSTGRES_DB=builderhunt. This is the normal state during
+      # a major-version cutover (2026-08-05: pg16 kept running as the rollback while PG18 took
+      # over), and taking the first match would have silently captured the roles of whichever
+      # container `docker ps` happened to list first — the wrong cluster, in a file named
+      # "latest", with no error. Ask the application which one it actually uses.
+      local app_host=''
+      for c in $(docker ps --format '{{.Names}}'); do
+        app_host=$(docker inspect "$c" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \
+                   | sed -n 's#^DATABASE_URL=postgres\(ql\)\?://[^@]*@\([^:/]*\).*#\2#p' | head -1)
+        [ -n "$app_host" ] && break
+      done
+      for c in "$@"; do
+        [ "$c" = "$app_host" ] && container="$c" && break
+      done
+      if [ -n "$container" ]; then
+        log "multiple Postgres containers match POSTGRES_DB=${DB_NAME} ($*) — using ${container}, the one DATABASE_URL points at"
+      else
+        fail "multiple Postgres containers match POSTGRES_DB=${DB_NAME} ($*) and none matches the application's DATABASE_URL host ('${app_host:-not found}') — roles NOT captured. Set DB_CONTAINER explicitly rather than letting this guess."
+        return 1
+      fi
+    else
+      container="$1"
+    fi
   fi
   if [ -z "$container" ]; then
     fail "no running Postgres container with POSTGRES_DB=${DB_NAME} — roles NOT captured. A restore into a fresh cluster will lose every RLS policy unless scripts/db/roles.sql is applied first."

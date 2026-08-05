@@ -357,6 +357,22 @@ Also repoint, or the new database has no backups at all:
 - The **03:30 `scripts/ops/builderhunt-backup-sync.sh`** roles capture (`pg_dumpall --roles-only
   --no-role-passwords`).
 
+Both were done on 2026-08-05, and each had a trap worth recording.
+
+- **The 03:00 Coolify backup does not follow the app.** It is attached to a *database resource*, so
+  repointing the app's env left the schedule dumping pg16 — the rollback copy — while PG18 served
+  production with **no scheduled backup at all**. The API does expose this:
+  `GET /api/v1/databases/{uuid}/backups` returned `[]` for PG18 and the full schedule for pg16, and
+  `POST` to the same path creates one (`description` is rejected as "not allowed"; omit it). There is
+  no v1 endpoint to run a backup on demand, so a newly created schedule stays unproven until it
+  first fires — dump the target by hand if you need the assurance sooner.
+- **`builderhunt-backup-sync.sh` became ambiguous.** It finds the cluster by
+  `POSTGRES_DB=builderhunt` rather than by uuid, which is what makes it survive a resource being
+  recreated — but during a cutover *two* containers answer to that, and it took whichever
+  `docker ps` listed first. It would have written the wrong cluster's roles into a file named
+  `-latest`, with no error. It now resolves the tie against the host in the application's
+  `DATABASE_URL` and fails loudly if that does not match a candidate.
+
 #### Coolify stores TWO rows per variable — never index its env list by key alone
 
 `GET /api/v1/applications/{uuid}/envs` returns one row per `(key, is_preview)` pair. Every
