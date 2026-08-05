@@ -1,8 +1,13 @@
 # Public Profile Enrichment — Implementation Tasks
 
-> **Status:** `code-complete-dark` — Phases 0-6 checkboxes below are real (verified, not
-> assumed). Phase 7's first item (quality gates) is done; canary/rollout items remain
-> unchecked and require a human decision + elapsed time, not more code.
+> **Status:** `engineering-complete, shipped dark` — every checkbox below is real (verified, not
+> assumed), including the runtime adversarial matrix, which closed 2026-08-05 at 20/20 and found five
+> defects on the way. The two items that remain are a signed legal review and a production deploy; both
+> moved to `plans/phase-5/` on 2026-08-05, because the product launches when phase-5 finishes and legal
+> is not build-phase work.
+>
+> **Phase-1 scope closed 2026-08-05.** Prose pointers below name the phase-5 plan that owns each moved
+> item; they are deliberately not checkboxes, because a box reads as pending engineering.
 > **Spec:** [`spec.md`](./spec.md)
 > **Plan:** [`implementation_plan.md`](./implementation_plan.md)
 > Check a task only after its listed verification passes. Preserve the user's existing
@@ -222,46 +227,20 @@
   - Do: card near `PersonaCard`; active tenant role; no anonymous/public DTO change.
   - Verify: authenticated browser member/admin flows and anonymous profile inspection.
 
-- [ ] **Update legal and product copy**
-  - **Drafted 2026-08-05, not published:
-    [`docs/operations/public-enrichment-privacy-copy-draft.md`](../../../docs/operations/public-enrichment-privacy-copy-draft.md).**
-    Paste-ready text for `/legal/privacy` (a new §1 bullet plus a full section on lawful basis,
-    retention and rights) and one line for `/crawler`.
+**Moved to [`plans/phase-5/02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it needs a legal review signed by a person, and Edd's
+instruction is that the product launches when phase-5 finishes, so legal does not belong in the build
+phase. An agent may draft the wording; it must never record the approval.
 
-    It is a doc rather than an edit to the route on purpose: on this repository a commit to `master`
-    deploys, so writing legal copy into the page **is** publishing it, and this task requires a signed
-    human review first. Review there, then paste.
+The draft is paste-ready: [`docs/operations/public-enrichment-privacy-copy-draft.md`](../../../docs/operations/public-enrichment-privacy-copy-draft.md)
+(2026-08-05), covering a new §1 bullet plus a full section on lawful basis, retention and rights, and one
+line for `/crawler`. It is a doc rather than an edit to the route on purpose: on this repository a commit to
+`master` deploys, so writing legal copy into the page **is** publishing it.
 
-    **The gap it fills is real, not cosmetic.** `/legal/privacy` §1 lists seven categories — account,
-    workspace, claim, usage, device, interview, cookies — and every one is about a *user*. Nothing
-    discloses the public developer profiles the product indexes, which are personal data belonging to
-    people who never signed up and mostly do not know the product exists. That is the category a
-    supervisory authority looks at first. `/crawler` covers it well already, but not in the document
-    that carries legal weight.
-
-    Two smaller findings recorded in the draft: the policy has **duplicate section numbers** (two
-    sections numbered 9 and two numbered 10, so citing "section 9" is ambiguous), and the copy has to
-    stay tense-honest now that `ENRICHMENT_ENABLED` is `false` — it describes a capability that is
-    built and disabled.
-
-    **Still yours**: the legitimate-interests balancing test, whether to commit publicly to the 180/30
-    day retention numbers, and recording the approval in the source register. An agent must not record
-    that approval.
-
-  - Files: `src/routes/_landing/legal/privacy.tsx`, `src/routes/_landing/legal/terms.tsx`,
-    `src/routes/_landing/crawler.tsx` (new — the public page the crawler's user agent points at),
-    `README.md`, `src/shared/lib/legal-versions.ts` (only if the approved legal review requires a
-    consent-version bump), `docs/operations/public-enrichment-source-register.md`
-  - Do: State on the privacy page the categories collected, the purpose, the lawful basis, the
-    source, the retention period, the data-subject rights and the contact route. Publish the crawler
-    page naming the exact user agent and how to request exclusion. Correct any README or product
-    claim that implies more than public-data collection. Use the precise public-data wording from the
-    approved review — never "stealth", evasion, or guaranteed access.
-  - Verify: every legal page renders and its links resolve (`pnpm exec playwright test tests/e2e/public-content.spec.ts`
-    covers the legal surface); the crawler page is reachable anonymously; and the written approval is
-    recorded in `docs/operations/public-enrichment-source-register.md`.
-  - Operator: the wording needs a legal review signed off by a person; an agent may draft it but must
-    not record the approval.
+**The gap it fills is real, not cosmetic.** `/legal/privacy` §1 lists seven categories and every one is
+about a *user*. Nothing discloses the public developer profiles the product indexes — personal data
+belonging to people who never signed up and mostly do not know the product exists. That is the category a
+supervisory authority looks at first.
 
 ## Phase 7 — Final verification and rollout
 
@@ -278,7 +257,8 @@
     enrichment_jobs/enrichment_evidence/builder_processing_restrictions — none exist yet).
 
 - [x] **Run runtime adversarial matrix**
-  - **Done 2026-08-05. 17/17 checks across all twelve cases, exit 0.** Evidence in
+  - **Done 2026-08-05. 20/20 checks across all twelve cases, exit 0** (17/17 on the first pass, plus one
+    regression assertion per defect this exercise found and Edd then had fixed).** Evidence in
     [`docs/operations/public-enrichment-source-register.md`](../../../docs/operations/public-enrichment-source-register.md)
     §"Runtime adversarial matrix — run 2026-08-05": one table row per case with its job id, first log
     event and the hosts it contacted, plus the run's complete contacted-host list.
@@ -324,6 +304,16 @@
     - A privacy cancellation incremented `failed`, which the route maps to `job_runs.state='failed'` —
       correct behaviour closing a run as a failure. Split into its own `cancelled` counter.
 
+    **A fifth defect turned up on a last pass over the same foreign-key family, and it is the worst of
+    them** because it is a route a user presses: `DELETE /api/builders/:id` (untrack) deletes only the
+    `organization_builders` row, so `ON DELETE NO ACTION` on the two composite FKs pointing at it raised
+    `23503` — "stop following this person" answered 500 for exactly the people the product had enriched,
+    and the evidence row survived the attempt. Deleting a whole organization was never affected, because
+    both cascades fire in one statement; that is why organization deletion tested clean earlier and this
+    did not. Fixed by `drizzle/0150_enrichment_untrack_cascade.sql`, which cascades both — the
+    evidence → job FK stays NO ACTION for the retention reason above. Verified on the applied migration
+    (`confdeltype` = `c`, `c`, `a`) and pinned at the constraint level in the worker repository test.
+
     Only one note stays open, and it is not a defect: `log.ts` mints no per-event id, so the register
     cites `event@ts` rather than inventing one.
 
@@ -338,59 +328,26 @@
     event IDs, and the list of hosts actually contacted) attached to the source register. Zero
     blocked-host requests appear in the contacted-host list.
 
-- [ ] **Deploy dark**
-  - ⚠️ **Found 2026-08-05: this was not dark. `ENRICHMENT_ENABLED` was `true` in the production
-    Coolify env, while the two tasks the plan puts *before* enabling — the legally-reviewed copy and
-    the runtime adversarial matrix — are both still unchecked.**
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it needs a production deploy and the Coolify environment,
+and it is gated on the legal review that moved to
+[`02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md). Its other
+precondition, the runtime adversarial matrix, closed 2026-08-05 at 20/20.
 
-    Measured before saying anything stronger, because the flag being on does not by itself mean data
-    was collected:
+**One finding stays recorded here, because it happened to this plan.** On 2026-08-05 `ENRICHMENT_ENABLED`
+was found `true` in the production Coolify env while both gating tasks were open. Measured before saying
+anything stronger: 614 `job_runs` with an `enrichment%` key over nine days, all `succeeded`, with
+`processed_count` summing to **0**, zero `enrichment_evidence` rows, and one `enrichment_jobs` row from
+before the window. The worker had been waking on schedule and finding nothing to process — a configuration
+divergence from the plan, not an unapproved crawl. Set to `false` on the production row on Edd's
+instruction and the container redeployed so the value is in effect rather than only stored; the preview row
+stays `true`, since preview is the non-production environment the adversarial matrix requires.
 
-    | Signal | Value |
-    | --- | --- |
-    | `job_runs` with an `enrichment%` key | 614, 2026-07-27 10:20 → 2026-08-05 10:20, all `succeeded` |
-    | sum of `processed_count` across them | **0** |
-    | `enrichment_evidence` rows | **0** |
-    | `enrichment_jobs` rows | 1, status `failed`, created 2026-07-23 — before the window |
-
-    So the worker has been waking on schedule for nine days and finding nothing to process. On this
-    evidence no enrichment fetch has happened and no evidence row exists: a configuration divergence
-    from the plan, not an unapproved crawl.
-
-    **Set to `false` on the production row on Edd's instruction (2026-08-05), leaving the preview row
-    `true`** — preview is the non-production environment the adversarial-matrix task requires. The
-    running container was redeployed so the value is actually in effect rather than only stored.
-
-    **Local development stays enabled, but not through `.env`.** Setting `ENRICHMENT_ENABLED=true`
-    there breaks `tests/unit/lib/enrichment/worker.test.ts` *by design*: its second test calls the
-    real `runEnrichmentWorker()` and asserts a no-op shape, and the first test pins the flag to
-    `false` precisely so the suite fails loudly instead of doing real DB and network work. Weakening
-    that guard to carry a dev convenience would be the wrong trade, so the convenience is a script
-    instead — `pnpm dev:enrichment`, which sets the flag, the allowlist and the contact user agent for
-    that one process.
-
-    **What still gates enabling it in production**: one task, not two. The runtime adversarial matrix
-    above was closed 2026-08-05 (17/17, evidence in the source register), so the remaining gate is the
-    legally-reviewed copy — which needs a person, and is drafted and waiting in
-    `docs/operations/public-enrichment-privacy-copy-draft.md`.
-
-  - Files: `.env.production.example` (`ENRICHMENT_ENABLED`), `docs/operations/public-enrichment-source-register.md`
-  - Operator: needs a production deploy plus the Coolify environment. An agent must not enable this.
-  - Do: deploy migration/code with `ENRICHMENT_ENABLED=false`; validate exact runtime
-    roles, indexes, RLS, health, and zero enrichment network traffic.
-  - Verify: production smoke without enabling customer behavior.
-
-Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
-on 2026-07-29, deliberately not as a checkbox: a human approval plus seven days of elapsed time. It waits on a live
-deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
-work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
-
-
-Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
-on 2026-07-29, deliberately not as a checkbox: the canary's approval, which is a product decision. It waits on a live
-deployment and on time passing, so keeping it here made this plan permanently unfinishable while the
-work it describes was complete. Phase 5 is the MVP/Beta-to-production gate and is where it belongs.
-
+**Local development stays enabled, but not through `.env`.** Setting `ENRICHMENT_ENABLED=true` there breaks
+`tests/unit/lib/enrichment/worker.test.ts` *by design*: its second test calls the real
+`runEnrichmentWorker()` and asserts a no-op shape, and the first pins the flag to `false` precisely so the
+suite fails loudly instead of doing real DB and network work. Weakening that guard to carry a dev
+convenience would be the wrong trade, so the convenience is a script instead — `pnpm dev:enrichment`.
 
 ## Future work — not part of this implementation
 

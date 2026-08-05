@@ -1,6 +1,9 @@
 # PostgreSQL 18 Upgrade (tasks)
 
-> **Status**: `in progress — Phase 5 ran ahead of its gate; Phases 2-4 are now on the critical path`
+> **Status**: `implemented` — the cutover ran 2026-08-05; the three remaining items are a clock and a
+> browser pass, and moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+>
+> **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
 
 > **Depends on**: nothing — but see [`spec.md`](./spec.md) §1: tasks in Phase 5 and 6 must not be executed before Phase 4 is complete and observed.
 > **Blocks**: nothing today; Phase 4 is the gate for any other plan's use of PG18-only SQL.
@@ -546,15 +549,16 @@ lives. Either freeze, or do not restore until you are ready to repoint in the sa
     scratch target and its `pg_policies` count matches production's; the total wall time is
     recorded in the runbook as the write-freeze budget.
 
-- [ ] **Exercise the app against the rehearsed database**
-  - **Open 2026-08-05.** **Blocked on a person.** The app *is* running against pg18 in production and all 13 public routes return 200 with `db: ok`, but the authenticated half — login, dashboard, search, alerts, exports, an admin page — requires signing in, which the agent cannot do.
-  - Files: none
-  - Do: point a local production-mode build at the scratch PG18 database and walk login,
-    dashboard, keyword search, `POST /api/search/semantic`, alerts, exports, and one admin page.
-  - Verify: no 500s; semantic search returns results (not `503 semantic_unavailable`); a
-    tenant-scoped read returns rows through RLS as `builderhunt_app`, proving grants and policies
-    survived provisioning; `pnpm test:api-isolation:local` against this database prints
-    `"failed": 0` with the same `total` as the pg16 baseline run.
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it needs a person to sign in on the live site, which an
+agent must not do, and a box here reads as pending engineering to everyone walking this file. It is also
+the same browser pass as plan 54's authenticated funnel smoke; one walk closes both.
+
+The unauthenticated half was verified instead: all 13 public routes return 200 and `/api/status` reports
+`db: ok, redis: ok`. And semantic ordering was compared at the SQL level rather than through
+`POST /api/search/semantic` (which needs a session) — the same anchor embedding over the same
+`ORDER BY embedding <=> $vec` shape the HNSW index serves returned the **30 nearest neighbours identical
+in order and distance to 8 decimals** on pg16 and pg18.
 
 - [x] **Compare a real semantic-search result set before and after**
   - **Resolved 2026-08-05.** Done 2026-08-05 at the SQL level rather than through `POST /api/search/semantic`, which needs a session. Same anchor embedding, same `ORDER BY embedding <=> $vec` shape the HNSW index serves: the 30 nearest neighbours are **identical in order and distance to 8 decimals** on pg16 and pg18. The 3 rows that drifted after the restore were excluded so like was compared with like.
@@ -637,31 +641,26 @@ and deleting nothing. The point of no return is the redeploy in the "repoint and
     `pg_restore` — the policies need the roles first); repoint every `DATABASE_*_URL` and both
     backup jobs back; redeploy; accept the loss of everything written to pg18 after the cutover.
 
-- [ ] **Unfreeze and soak**
-  - **Open 2026-08-05.** Nothing was frozen, so there is nothing to unfreeze. What remains is the observation: one soak period of error rate / `/api/health` / semantic p95 / worker ticks, **and** the first 03:00 backup landing from the pg18 resource. The schedule was created 2026-08-05 08:5x and has not fired yet; there is no v1 API endpoint to trigger one, so this cannot be closed before tomorrow.
-  - Files: none
-  - Do: unpause the scheduled jobs. Watch for one soak period: error rate, `/api/health`,
-    semantic-search p95, `pg_stat_io` deltas, and that each HTTP-cron worker completes one tick.
-  - Verify: p95 of `POST /api/search/semantic` no worse than the pre-cutover baseline, measured the
-    same way; no role-authentication errors in the logs; every worker's next tick logs a normal
-    completion; the next 03:00 Coolify backup lands from the **pg18** resource.
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it is a clock, not work. Nothing was frozen (§2b: no
+users), so there is nothing to unfreeze; what remains is one soak period of error rate, `/api/health`,
+semantic p95 and worker ticks, plus the first 03:00 backup landing from the pg18 resource. That schedule
+was created on 2026-08-05 and there is no v1 API endpoint to trigger a backup, so the first one cannot
+exist before the following morning.
 
-- [ ] **Retire the pg16 resource on a schedule, not immediately**
-  - **Open 2026-08-05.** **Blocked on one fact, no longer on a decision.** Edd set the retention window on 2026-08-05: **stop (do not delete) pg16 seven days after the first successful pg18 backup lands**. That backup is the 03:00 schedule created on the PG18 resource the same day; it has not fired yet and there is no v1 API to trigger one, so the clock starts tomorrow at the earliest. When it does: stop the resource and its volume, write the delete-after date into the runbook, and confirm the volume still exists until then. pg16 is intentionally still running as the rollback.
-  - **Doc half done 2026-08-05.** The image line and the two "production runs pg16 / status: not
-    executed" statements in `deploy-runbook.md` were still describing the pre-cutover world, which is
-    the version someone provisioning a resource would have copied. They now name
-    `pgvector/pgvector:0.8.5-pg18` and point at §2b's executed record — including the troubleshooting
-    row that told a reader to switch the resource to `pg16`, an image that cannot start on a pg18 data
-    volume. What remains is not doc work: stopping the resource and writing a retention **date**,
-    which needs the first pg18 backup to exist.
-  - Files: `docs/operations/deploy-runbook.md`
-  - Do: stop (do not delete) the pg16 resource and its volume; record the retention date after
-    which it is deleted, and update the image line at `:87` to the pinned pg18 tag. Do not start
-    the retention clock until the first successful backup from pg18 exists.
-  - Verify: the runbook states the retention date and that the volume still exists until then;
-    `grep -n 'pgvector/pgvector:0.8.5-pg18' docs/operations/deploy-runbook.md` matches the
-    "Image **must** be" line.
+The cost of the one thing that *was* skipped is measured rather than assumed: 64 `job_runs` and 3
+`builder_embeddings` rows were written to pg16 in the 11½ hours between restore and repoint. No
+user-owned data.
+
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — a decision already made plus seven days of waiting. Edd
+set the window on 2026-08-05: stop (do not delete) pg16 seven days after the first successful pg18 backup
+lands. pg16 is intentionally still running, un-repointed, as the only rollback.
+
+The documentation half is done here: `deploy-runbook.md`'s image line, its "status: not executed" block and
+its troubleshooting row all still named `pg16` after the cutover had happened — including a row telling a
+reader to switch the resource to an image that cannot start on a pg18 data volume. All three corrected
+2026-08-05.
 
 ## Phase 5 — Feature adoption (only after Phase 4 is observed)
 

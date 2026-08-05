@@ -1,6 +1,7 @@
 # Tasks: Calendar, Scheduling, and Interview Intelligence
 
-> **Status**: `pending`
+> **Status**: `engineering-complete` (77 of 81 tasks; the four that remain are a DPIA, a finance sign-off,
+> a staged production rollout and dated evidence from live use — all moved to `plans/phase-5/`)
 > **Depends on**: [`security-and-multitenancy`](../01-security-and-multitenancy/spec.md),
 > [`ai-expansion`](../21-ai-expansion/spec.md), and
 > [`stripe-billing-platform`](../30-stripe-billing-platform/spec.md)
@@ -10,6 +11,8 @@
 > worker-role, migration integrity, and dashboard shell. Do not import the global database into a
 > tenant repository or route. Generate migrations from the current journal; do not renumber or edit
 > unrelated pending migrations.
+>
+> **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
 
 ## Phase 0 — Prerequisites and configuration
 
@@ -28,101 +31,23 @@
     `test:rls:local` plus the two-tenant API/worker/privacy isolation matrix pass under the exact
     non-owner roles — all four green inside a full `pnpm ci:local`, and again in CI.
 
-- [ ] **Create provider accounts and approve data controls**
-  - Files: `docs/operations/interview-provider-register.md` (new),
-    `docs/architecture/data-classification.md`, `docs/architecture/threat-model.md`
-  - Do: Record Cloudflare R2 EU jurisdiction, Deepgram EU endpoint, Azure regional EU deployment,
-    DPA links/status, retention, training opt-out, deletion, subprocessors, region, account owner,
-    and annual review date. Reference the billing platform's independent Stripe provider register;
-    do not duplicate it. Complete a DPIA before production voice enablement. Store no secret values.
-  - Verify: each regional endpoint is confirmed from a test response/console and every provider can
-    be disabled independently.
-  - **The reviewer signature is deliberately NOT part of this task's Verify line** (product-owner
-    decision 2026-07-28). It is a general-availability gate, recorded as such in the register's
-    "Gates general availability only" table. A countersignature on an artifact does not change what
-    the software does, and blocking a storage adapter on it stalls work it has no bearing on.
-  - ⚠️ **The task text above is stale in two places.** The provider set changed on 2026-07-26,
-    after it was written: storage is **MinIO, self-hosted** — not Cloudflare R2 (commit `cb642d5`,
-    which also widened `env.ts` to accept a private endpoint) — and sensitive AI is **Mistral (La
-    Plateforme)**, not Azure. Azure was provisioned, hit a zero-quota wall, and was found to have a
-    residency hole `env.ts` structurally cannot close: it validates the resource region but cannot
-    see the *deployment type*, so a Global Standard deployment passes validation while processing
-    outside the EU. Mistral processes in the EU by default, which is not a switch anyone can set
-    wrong. The Azure resource is retained as a documented fallback.
-  - **Reconciled 2026-08-04. Both halves of the Verify line are met; only the DPIA is outstanding, and it
-    is not mine to produce.**
+**Moved to [`plans/phase-5/02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — only the DPIA is outstanding, and it is not
+engineering's to produce.
 
-    I offered to draft the register and a DPIA. The register **already exists** —
-    `docs/operations/interview-provider-register.md`, 38 KB, covering MinIO, ClamAV, Deepgram and Mistral
-    with retention, residency, sub-processors and owners. Writing a second one would have duplicated it, so
-    this records what is there instead of adding to the pile. Its own §"Who does what" table already names
-    the DPIA's owner as **you plus a data-protection advisor**, which is the correct assignment and the
-    reason this task cannot be closed by engineering.
+Both halves of the original Verify line are met (reconciled 2026-08-04): the register exists —
+[`docs/operations/interview-provider-register.md`](../../../docs/operations/interview-provider-register.md),
+38 KB, covering MinIO, ClamAV, Deepgram and Mistral with retention, residency, sub-processors and owners.
+Its own "who does what" table already names the DPIA's owner as the maintainer plus a data-protection
+advisor, which is the correct assignment and the reason this cannot be closed here.
 
-    *"Every provider can be disabled independently"* — verified by reading the code rather than assumed.
-    Each has its own flag in `env.ts` (`CANDIDATE_UPLOADS_ENABLED`, `SENSITIVE_AI_ENABLED`,
-    `INTERVIEW_TRANSCRIPTION_ENABLED`, `INTERVIEW_CONTEXTUAL_QUESTIONS_ENABLED`), and four separate routes
-    answer **503** when their flag is off — `interviews/$id/session`, `interviews/$id/segments`,
-    `interviews/$id/transcription-token`, and the candidate document download. `interview-live.spec.ts` and
-    `interview-privacy.spec.ts` run with *different* combinations (privacy: sensitive AI off, transcription
-    on), so the independence is exercised, not just declared.
-
-    *"Each regional endpoint confirmed from a test response/console"* — already recorded below for Deepgram
-    against the real account. MinIO and ClamAV are first-party, so residency is a property of the VPS, not a
-    vendor claim.
-
-    **What is left, precisely:** the DPIA, plus the two written vendor statements §5 lists (Deepgram
-    no-training/no-retention, Mistral Zero Data Retention — a support request, not self-serve). All three
-    gate production **voice**, not development, and the register says so.
-
-    **Drafted 2026-08-04, which is as far as engineering can take these three.**
-
-    `docs/operations/interview-dpia-draft.md` — structured to Article 35, built only from facts already in this
-    repository: the real data categories (`candidate_*`, `interview_*`, `transcript_segments`), the retention
-    ceilings enforced as `max()` bounds in `env.ts` (90-day transcripts, 180-day documents, 24-month consent),
-    the verified EU endpoints, and the per-provider 503 flags. Not legal advice, and every risk rating is
-    explicitly a proposal for the advisor to overwrite.
-
-    Three things in it are worth knowing without reading it:
-
-    - **The highest-rated risk has no technical control.** An interview is unstructured speech, so a verbatim
-      transcript will capture special-category data — a disability, a pregnancy, a union role — that nobody
-      asked for. Rated high/high, and nothing in the current design detects or redacts it. Four options are
-      offered in §6.3, the most protective being "generate reports from interviewer-selected excerpts rather
-      than raw transcripts", which is a product change rather than a fix.
-    - **It argues against its own proposed lawful basis.** Consent from a job candidate is not freely given in
-      any strong sense — they want the job. The draft says so, and turns it into two design requirements
-      (refusing must be visibly costless; withdrawal must delete for real) rather than wording changes.
-    - **It cannot be signed today**, and says which rows block it: the unsigned Deepgram DPA, the
-      non-existent no-training statement, and pending Mistral ZDR.
-
-    `docs/operations/interview-vendor-requests.md` — the two vendor asks written out to send. Both request
-    something **quotable** rather than reassurance, because the register's own finding is that Deepgram's
-    compliance page is silent on exactly these points, so "we take privacy seriously" would leave the position
-    unchanged. Each records what to do with the answer, including the unwelcome one: if Deepgram confirms audio
-    *is* retained or used for training, that changes what the consent text may claim rather than being filed.
-
-    **What no vendor reply fixes:** the special-category risk above. Kept separate on purpose, so two good
-    replies do not read as the DPIA being finished.
-
-  - **Evidence, superseding the 2026-07-26 morning note that said "accounts NOT provisioned"**
-    (re-checked 2026-07-27 against `.env` and the register):
-    - **Deepgram**: account provisioned 2026-07-26, and the EU endpoint verified *against that
-      account* rather than the vendor blog — `nova-3` returns 200 on `api.eu.deepgram.com`,
-      `diarize` accepted, `multichannel` returns two separate channels (the spec's hard requirement
-      for remote interviews). `DEEPGRAM_API_KEY` and the EU base URL are configured.
-    - **Mistral**: `MISTRAL_API_KEY`, `MISTRAL_BASE_URL=https://api.mistral.ai`,
-      `MISTRAL_MODEL=mistral-medium-2604` and `SENSITIVE_AI_PROVIDER=mistral` configured.
-    - **Stripe**: secret key and webhook secret configured.
-    - **MinIO / ClamAV**: self-hosted, so there is no account, DPA or sub-processor entry to obtain.
-  - **What actually remains**, and it is wiring rather than credentials: MinIO and ClamAV are not in
-    `docker-compose` and the register has no deployment target recorded; `SENSITIVE_AI_ENABLED`,
-    `CANDIDATE_UPLOADS_ENABLED` and `INTERVIEW_TRANSCRIPTION_ENABLED` are all unset, so every path
-    is dark despite the credentials being present; the register flags a **missing bucket backup
-    target before real candidate data lands**; and the DPIA is a human step nobody can do for you
-    before production voice. The reviewer signature and the legal review of consent/retention are
-    **general-availability gates, not development or MVP blockers** — see the register's three-way
-    split. Nothing in this plan may list them as a dependency.
+**The provider set is not what the original task text said.** Storage is **MinIO, self-hosted**, not
+Cloudflare R2 (commit `cb642d5`, which also widened `env.ts` to accept a private endpoint). Sensitive AI is
+**Mistral (La Plateforme)**, not Azure: Azure was provisioned, hit a zero-quota wall, and was found to have
+a residency hole `env.ts` structurally cannot close — it validates the resource region but cannot see the
+*deployment type*, so a Global Standard deployment passes validation while processing outside the EU.
+Mistral processes in the EU by default, which is not a switch anyone can set wrong. The Azure resource is
+retained as a documented fallback.
 
 - [x] **Verify the billing platform certification dependency** — recorded 2026-08-03
   - Files: `plans/phase-1/30-stripe-billing-platform/tasks.md`, `docs/operations/stripe-sandbox-certification.md`,
@@ -2589,35 +2514,19 @@ Not fixed here — it predates this program and deserves its own work.
   `routeTree.gen.ts` under the live per-worker Vite servers and collapsed all 10 tests in
   `tests/e2e/harness/browser.spec.ts`. The gate needs a quiet tree.
 
-- [ ] **Verify unit economics in test and limited live mode**
-  - Files: `docs/operations/interview-runtime-verification.md`,
-    `plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`
-  - Do: Run representative 30/60/90-minute sessions and brief/report workloads; capture billed
-    Deepgram minutes, Azure tokens, Stripe fees, R2 bytes/operations, internal credits, revenue, and
-    gross margin. Adjust configurable catalog before public launch; do not rewrite ledger history.
-  - Verify: no uncovered provider session, ledger/provider variance <1%, no negative margin pack at
-    approved cost budget, and finance sign-off recorded.
+**Moved to [`plans/phase-5/02-legal-and-commercial-approvals`](../../phase-5/02-legal-and-commercial-approvals/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it needs real billed provider usage and a finance
+sign-off, both facts about money. A margin computed against placeholder cost constants is a number with a
+decimal point and no content.
 
-- [ ] **Roll out flags in dependency order**
-  - Files: `docs/operations/interview-runtime-verification.md`,
-    `.env.production.example`, production deployment configuration (external, no secrets in repo)
-  - Do: Enable internal calendar; then projections; scheduling; uploads; Stripe/credits; brief;
-    closed Chrome transcription; contextual questions/report. Hold each stage through its agreed
-    observation window and rollback on privacy/cost/correctness threshold breach.
-  - Verify: production synthetic monitor and a consented internal workflow pass per stage; dashboards,
-    alerts, disable path, backup/restore, purge, and provider-region checks remain green.
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — a staged production rollout with an observation window per
+stage is elapsed time plus a maintainer's judgement at each gate, not work a session can perform.
 
-- [ ] **Close Definition of Done with runtime evidence**
-  - Files: `docs/operations/interview-runtime-verification.md`,
-    `plans/phase-1/44-calendar-scheduling-interview-intelligence/spec.md`,
-    `plans/phase-1/44-calendar-scheduling-interview-intelligence/plan.md`,
-    `plans/phase-1/44-calendar-scheduling-interview-intelligence/tasks.md`
-  - Do: Attach dated evidence for email-to-booking, DST, race safety, scan/extraction/brief, real
-    30-minute bilingual live interview, reconnect/correction/report, credits/payment/refund/
-    reconciliation, purge/export/delete, tenant/private-user isolation, restore, dashboards, and
-    rollback. Mark tasks/status implemented only from evidence.
-  - Verify: no unchecked task, no waived acceptance criterion, no unresolved high/critical finding,
-    and all production flags intended for general availability are enabled intentionally.
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+on 2026-08-05, deliberately not as a checkbox** — it requires dated evidence from real consented use of the
+live product, including an actual 30-minute bilingual interview. It is the last item of this plan by
+construction, so leaving it open here made a 77-of-81 plan read as unfinished engineering.
 
 ## Phase 13 — the interview-material access model (found 2026-07-29 by running the suite as the real roles)
 

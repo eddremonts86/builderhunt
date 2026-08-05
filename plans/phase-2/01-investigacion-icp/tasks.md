@@ -2,7 +2,12 @@
 
 > **Status**: `pending`
 > **Depends on**: nothing
-> **Blocks**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md), [`06-landing-segmentada`](../06-landing-segmentada/spec.md)
+> **Blocks**: nothing — **el bloqueo se levantó el 2026-08-05.** Este plan declaraba bloquear
+> `02-segmentacion-usuarios` y `06-landing-segmentada`, y `02` bloquea a su vez `03` y `04`: cinco de los
+> siete planes de la fase esperaban quince entrevistas con desconocidos. Se invierte el orden — se
+> implementa la taxonomía documentada en [`../README.md`](../README.md) como hipótesis y la investigación
+> la corrige después del lanzamiento, en
+> [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md).
 > **Reality check**: No hay un artefacto de research de ICP en `plans/`; esta tarea produce
 > decisiones y evidencia, no código de producto.
 
@@ -18,31 +23,39 @@
     retención disponibles; marcar métricas no instrumentadas.
   - Verify: cada cifra incluye consulta, rango temporal y fuente; ninguna se estima.
 
-- [ ] **Entrevistar cinco perfiles de hiring**
-  - Files: `docs/research/phase-2/findings-hiring.es.md`
-  - Do: anonimizar participantes y sintetizar comportamientos, alternativas, objeciones y compromisos.
-  - Verify: cinco scorecards completos y conclusiones enlazadas a evidencia anonimizada.
+### Entrevistar cinco perfiles de hiring
 
-- [ ] **Entrevistar cinco perfiles de investing**
-  - Files: `docs/research/phase-2/findings-investing.es.md`
-  - Do: validar específicamente si señales de builders sirven para sourcing de inversión o si falta
-    información empresarial esencial.
-  - Verify: decisión preliminar `go / experiment / no-go` con razones.
+**Movida a [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md) el 2026-08-05**, deliberadamente no como
+casilla: requiere cinco profesionales reales que dediquen una hora, y no se recluta a nadie antes de tener
+producto que mostrar.
 
-- [ ] **Entrevistar cinco perfiles de building**
-  - Files: `docs/research/phase-2/findings-building.es.md`
-  - Do: separar motivación por visibilidad, control de identidad, portfolio y oportunidades.
-  - Verify: distinguir claramente usuario de red y buyer.
+### Entrevistar cinco perfiles de investing
 
-- [ ] **Contrastar la síntesis con Claude**
-  - Files: `docs/research/phase-2/claude-critique.es.md`
-  - Do: después de restaurar autenticación de Claude, proporcionar solo hallazgos anonimizados y
-    pedir contradicciones, segmentos solapados y preguntas omitidas. Etiquetar la salida como crítica LLM.
-  - Verify: el documento no contiene PII y ninguna salida de Claude se presenta como evidencia.
+**Movida a [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md) el 2026-08-05**, deliberadamente no como
+casilla: requiere cinco profesionales reales que dediquen una hora, y no se recluta a nadie antes de tener
+producto que mostrar.
 
-- [ ] **Cerrar la decisión de ICP**
-  - Files: `docs/research/phase-2/icp-decision.es.md`
-  - Do: definir segmento primario, secundarios, buyer, usuario, pagador, JTBD, activación, mensaje,
-    CTA, objeciones y preguntas abiertas.
-  - Verify: aprobación explícita de producto y marketing.
+### Entrevistar cinco perfiles de building
+
+**Movida a [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md) el 2026-08-05**, deliberadamente no como
+casilla: requiere cinco profesionales reales que dediquen una hora, y no se recluta a nadie antes de tener
+producto que mostrar.
+
+### Contrastar la síntesis con Claude
+
+**Movida a [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md) el 2026-08-05.** Toma como entrada los tres
+documentos de hallazgos, así que no puede ejecutarse antes que ellos — se mueve por esa dependencia, no
+porque la crítica en sí necesite una persona.
+
+### Cerrar la decisión de ICP
+
+**Movida a [`plans/phase-5/04-post-launch-discovery`](../../phase-5/04-post-launch-discovery/tasks.md) el 2026-08-05.** Su criterio de aceptación es
+una aprobación explícita de producto y marketing sobre una afirmación de posicionamiento, que un agente no
+debe registrar.
+
+**Y su papel cambia de requisito a corrección.** La taxonomía (`hiring | investing | building | other`) se
+implementa primero como hipótesis documentada — está en [`../README.md`](../README.md) con su razonamiento
+— y esta tarea cierra el bucle sobre si era correcta. Es seguro invertir el orden precisamente aquí porque
+el primer principio no negociable de esta fase dice que `user_segment` personaliza mensajes y prioridades y
+**nunca concede permisos**: equivocarse cuesta un titular mal dirigido, no un límite de seguridad.
 

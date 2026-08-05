@@ -642,6 +642,22 @@ that was engineering work nobody had done.
   written-and-hidden; and a privacy cancellation moved out of `failed` into its own `cancelled`
   counter, so honouring a restriction no longer closes `job_runs` as failed. One note stays open and
   is not a defect: `log.ts` mints no per-event id, so evidence cites `event@ts`.
+- **A fifth defect, found on a last pass, and the worst of the set** because unlike the others it is a
+  route a user presses: untracking a builder (`DELETE /api/builders/:id`) deletes only the
+  `organization_builders` row, so `ON DELETE NO ACTION` on the two composite FKs pointing at it raised
+  `23503` — "stop following this person" answered 500 for exactly the people the product had enriched,
+  and the evidence row survived. Deleting a whole *organization* was never affected, because both
+  cascades from `organizations` fire in one statement and a NO ACTION check runs at end-of-statement —
+  which is precisely why organization deletion tested clean earlier in the session while this did not.
+  Worth remembering as a testing lesson: passing the cascade case says nothing about the single-parent
+  case. Fixed by `drizzle/0150_enrichment_untrack_cascade.sql` (Edd chose the migration over a
+  worker-role purge), applied to the dev database and verified as `confdeltype` `c`/`c`/`a`. Matrix
+  closed at **20/20**.
+  That migration also carries two `access_requests_status_check` statements it did not intend: 0148 wrote
+  that CHECK as hand-authored SQL, so drizzle's snapshot never recorded it and every generate since
+  re-emits it. The redefinition is identical to the live constraint. Left in, with the reason in the
+  migration's header, because stripping the SQL while the snapshot claims the constraint exists is how a
+  snapshot quietly stops describing the database.
 - `46-content-marketing` — **the three missing screenshots for the hiring-radar draft were taken.**
   The prior note said they needed a signed-in session the agent must not create; that prohibition is
   about the live site, and `pnpm content:screenshots` is this repository's sanctioned local mechanism.
@@ -670,3 +686,85 @@ that was engineering work nobody had done.
   channels (54), the DPIA and finance sign-off (44), real provider pricing and human gold judgments
   (43), the legal review and the production Coolify env (42), publishing and cross-posting (46), and
   two elapsed-time waits (03).
+
+## Session 2026-08-05 (close) — phase-1 reaches zero, by moving the launch out of it
+
+Edd's instruction: *the product launches when phase-5 is finished, so there is no point starting to worry
+about legal here — move every task of that kind to phase-5, and things that need time too. In general,
+review those tasks and move anything that stops us implementing features.*
+
+Applied to all 21 open phase-1 tasks. **Every one of them qualified**, which is the same finding as the
+count earlier in the day stated differently: none was engineering. Phase 1 now has **0 open tasks**
+against 759 done.
+
+- New: [`plans/phase-5/02-legal-and-commercial-approvals`](../phase-5/02-legal-and-commercial-approvals/spec.md)
+  (4 items) — the enrichment legal copy, the interview DPIA, interview unit economics, the Solutions
+  quality/cost gates. Split out from plan 01 because "production readiness audit" is not what a signature
+  is, and mixing them hides which ones a maintainer can actually act on today.
+- New: [`plans/phase-5/03-launch-and-distribution`](../phase-5/03-launch-and-distribution/spec.md)
+  (9 items) — publishing the four written drafts, sitemap submission, Show HN, cross-posting, launch-week
+  monitoring, the monthly content review.
+- Added to [`plans/phase-5/01-production-readiness-audit`](../phase-5/01-production-readiness-audit/tasks.md)
+  (7 items) — the pg18 soak and pg16 retirement clocks, the authenticated production walk, the authed funnel
+  smoke, enrichment deploy-dark, the interview flag rollout and its DoD.
+- 21 left phase-1 and 20 arrived: plan 54's "dev.to cross-post + X thread + …" and plan 46's "Cross-post +
+  distribute posts 1-5" were the same work written twice, once as a launch action and once as a per-post
+  routine, and are one task now.
+- **Mechanism, following the 2026-07-29 precedent**: each moved task's checkbox became a prose pointer in
+  its phase-1 plan, never another `- [ ]`. A box reads as pending engineering to anyone walking the file,
+  which is the whole failure being fixed. The *evidence* gathered while verifying prerequisites stayed in
+  phase-1, because that part was real work — OG tags, the 13 public routes, semantic-ordering parity across
+  the cutover, the provider register, the adversarial matrix.
+- Six plan status headers reconciled to match: `03` and `46` to `implemented`, `42` to
+  `engineering-complete, shipped dark`, `43` and `44` to `engineering-complete`, `54` to `moved to phase-5`.
+- **Two index files were actively misleading and were cut rather than annotated.** `phase-1-queue.md` still
+  carried a section headed *"Actionable queue (work these in order)"* listing five plans with open counts,
+  under a preamble saying the numbers were stale — and the preamble is the part people skip. Removed; the
+  durable ordering rationale lives in `phase-1-order.md`. `operator-queue.md` is marked superseded, keeping
+  its rule (an `Operator:` task is skipped and reported, never checked because "the code part is done")
+  because that applies to every future plan, and retiring its five-item table.
+- Verification: `pnpm plans:check-order` OK, `pnpm plans:check-tasks` clean for every phase-1 and phase-5
+  file (its one remaining failure is `plans/phase-2/07-perfiles-autogestionados`, pre-existing and
+  untouched — 83 tasks in a compact one-line format the checker cannot read).
+
+## Session 2026-08-05 (close, part 2) — phases 2-4 reviewed for blockers
+
+Second instruction: *review phases 1-4 again and move anything that stops me developing the app I want to
+phase 5. It is always better to have the feature and disable it for legal reasons than not to have it — same
+for the scrapers, they all must work.*
+
+- **The real blocker was `plans/phase-2/01-investigacion-icp`.** Its `Blocks:` header named
+  `02-segmentacion-usuarios` and `06-landing-segmentada`, and `02` blocks `03` and `04` — so **five of
+  phase-2's seven plans waited on fifteen interviews with strangers** who cannot be recruited before there
+  is a product to show them. Five tasks moved to the new
+  [`phase-5/04-post-launch-discovery`](../phase-5/04-post-launch-discovery/tasks.md); the two a founder can
+  do today (write the interview guide, record the measurable baseline) stayed.
+- **The dependency headers were lifted**, which is the change that actually unblocks work: `02` now depends
+  on nothing and `06` only on `02`. Both build against the taxonomy already documented in
+  `phase-2/README.md` (`hiring | investing | building | other`) as an explicit hypothesis, behind a flag.
+  Phase 2 was written *research → decide → build*; it now runs *build the hypothesis → launch → learn →
+  correct*, which is the only order available to a product with no users.
+- **Why that inversion is safe here specifically**, recorded because it would not be safe everywhere: phase
+  2's own first non-negotiable principle is that `user_segment` personalises messages and priorities and
+  **never grants permissions**. A wrong segment costs a mistargeted headline, not a security boundary. The
+  same inversion applied to authorization would be reckless.
+- **`phase-2/07` task 8.5 split.** Building the `self_managed_profiles_enabled` flag and documenting its
+  kill switch stayed in phase 2; the 5% → 25% → 100% rollout in seven-day cohorts moved to phase-5 plan 01.
+  21 days of clock is not engineering. Left as an open task rather than checked — the flag work is not done.
+- **Phase 3 is clean.** Thirteen plans of read-path, pagination, virtualization and CI-gate engineering, and
+  not one approval, legal or elapsed-time gate in any of them.
+- **Phase 4 is clean.** No `Operator:` task in the whole phase; every dependency header points at a
+  completed phase-1 plan or a sibling. The browser extension's legal surface — host register, `extension`
+  consent document, `/legal/extension` page — is implementable work, and the four blocked hosts it mirrors
+  are enforced in code rather than waiting on a review.
+- **The scrapers instruction produced a policy clarification, not a task move.** The source register's
+  closing section said nine unregistered sources "each need their own source-policy review before it can be
+  added", which had been read as a gate on the *engineering* and left them with no adapter at all. Rewritten:
+  the review gates **enabling** a connector, not **building** one. Build the exact-profile adapter, register
+  the source `status: 'approval_required'` so `resolveExecutableConnectorIds` keeps it disabled whatever the
+  runtime allowlist says, and let the review decide whether it flips to `enabled`.
+- **One boundary held, and stated once rather than argued.** `linkedin`, `x`, `facebook` and `instagram`
+  stay in `HARD_BLOCKED_CONNECTOR_IDS`. That is not a phase gate waiting on a review — their terms prohibit
+  automated collection without written permission that is not on file, and no flag makes it lawful. A URL
+  for one of them is still storable as `user-submitted` evidence and never fetched, which spec §5.3 allows
+  and case 02 of the adversarial matrix verifies.

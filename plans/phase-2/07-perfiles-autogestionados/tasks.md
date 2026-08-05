@@ -388,9 +388,13 @@ para que sobreviva a futuras superficies no anticipadas.
 - [ ] **8.4** — Performance: el endpoint público `/u/$handle` debe responder
   en < 200 ms p95 con caché de 60 s. Medir antes y después con
   `bench/calendar-feed.mjs`-style script.
-- [ ] **8.5** — Deploy detrás de feature flag `self_managed_profiles_enabled`
-  con rollout gradual (5% → 25% → 100% en cohorts de 7 días). Kill switch
-  documentado en `docs/operations/`.
+- [ ] **8.5** — Construir la bandera `self_managed_profiles_enabled` y su kill switch documentado en
+  `docs/operations/` es trabajo de esta fase y sigue aquí. **El rollout gradual (5% → 25% → 100% en
+  cohorts de 7 días) se movió a
+  [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md)
+  el 2026-08-05**: son 21 días de reloj en producción, y ninguna cantidad de ingeniería los acorta. La
+  bandera se implementa y se despliega apagada, que es exactamente el principio — tener el feature y
+  desactivarlo, no dejar de tenerlo.
 - [ ] **8.6** — Actualizar `docs/operations/public-enrichment-source-register.md`
   con la nueva entrada `self-managed` y su lawful basis
   (legitimate interest cuando `visibility = 'public'`).

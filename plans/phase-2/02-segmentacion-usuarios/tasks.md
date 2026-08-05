@@ -1,7 +1,11 @@
 # Tareas — fundamento de segmentación de usuarios
 
 > **Status**: `pending`
-> **Depends on**: [`01-investigacion-icp`](../01-investigacion-icp/spec.md)
+> **Depends on**: nothing — **dependencia levantada el 2026-08-05.** Dependía de `01-investigacion-icp`,
+> cuyas entrevistas se movieron a phase-5 porque necesitan usuarios reales. Se construye contra la
+> taxonomía documentada en [`../README.md`](../README.md) (`hiring | investing | building | other`) como
+> hipótesis explícita, detrás de bandera; la investigación posterior la corrige. Es seguro porque
+> `user_segment` nunca concede permisos.
 > **Blocks**: [`03-onboarding-segmentado`](../03-onboarding-segmentado/spec.md), [`04-dashboard-personalizado`](../04-dashboard-personalizado/spec.md), [`06-landing-segmentada`](../06-landing-segmentada/spec.md)
 > **Reality check**: No hay tabla ni endpoints de preferencias; `/me` es el punto de integración
 > existente.

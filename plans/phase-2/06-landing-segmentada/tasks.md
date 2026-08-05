@@ -1,7 +1,10 @@
 # Tareas — landing segmentada
 
 > **Status**: `pending`
-> **Depends on**: [`01-investigacion-icp`](../01-investigacion-icp/spec.md), [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md)
+> **Depends on**: [`02-segmentacion-usuarios`](../02-segmentacion-usuarios/spec.md) — la dependencia de
+> `01-investigacion-icp` se levantó el 2026-08-05 (sus entrevistas están en phase-5). El message matrix se
+> escribe contra la taxonomía documentada; cada claim sigue obligado a enlazar a un feature real o a
+> eliminarse, que es la verificación que de verdad protege la landing.
 > **Blocks**: nothing
 > **Reality check**: `HomePage.tsx`, sitemap y layouts públicos ya existen.
 

@@ -600,6 +600,10 @@
     "0149_access_requests_platform_insert": {
       "sql": "df53d3399a29bca0eb62219df0bf7a3a9846afed1bae60272932d00b062054c3",
       "snapshot": "4aa3ee9aeffbb1574f87a2f0734aed0525a92e03ef5d783e7e47701d0408ec91"
+    },
+    "0150_enrichment_untrack_cascade": {
+      "sql": "60ebbf06488c243ad8dcca7b84b812d84df91fb55793c8135a1a556afbb3c8d8",
+      "snapshot": "1306688f254d3a4ff7db58cdddda6d19bb71a510a07a8cee03d30ed9c4c7eef0"
     }
   }
 }

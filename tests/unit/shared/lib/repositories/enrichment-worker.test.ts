@@ -143,48 +143,49 @@ describe('claimDueEnrichmentJobs is atomic', () => {
  * Found 2026-08-05 by scripts/ops/verify-enrichment-adversarial-local.mjs (case 10 of the runtime
  * adversarial matrix), against real rows rather than fixtures shaped to pass.
  */
-describe('runEnrichmentRetentionPass', () => {
-  async function seedFinishedJobWithEvidence(suffix: string, evidence: Array<{ resolution: string; observedAt: Date; expiresAt: Date }>) {
-    const source = `ewr-ret-${suffix}`
-    await db.insert(builderIdentities).values({
-      id: `ewr-ret-identity-${suffix}`, source: 'github', sourceId: source, username: source, profileUrl: `https://github.com/${source}`,
-    })
-    await db.insert(organizationBuilders).values({
-      id: `ewr-ret-tracked-${suffix}`, organizationId: ORG, builderIdentityId: `ewr-ret-identity-${suffix}`, creatorUserId: OWNER,
-    })
-    await db.insert(enrichmentJobs).values({
-      id: `ewr-ret-job-${suffix}`,
+async function seedFinishedJobWithEvidence(suffix: string, evidence: Array<{ resolution: string; observedAt: Date; expiresAt: Date }>) {
+  const source = `ewr-ret-${suffix}`
+  await db.insert(builderIdentities).values({
+    id: `ewr-ret-identity-${suffix}`, source: 'github', sourceId: source, username: source, profileUrl: `https://github.com/${source}`,
+  })
+  await db.insert(organizationBuilders).values({
+    id: `ewr-ret-tracked-${suffix}`, organizationId: ORG, builderIdentityId: `ewr-ret-identity-${suffix}`, creatorUserId: OWNER,
+  })
+  await db.insert(enrichmentJobs).values({
+    id: `ewr-ret-job-${suffix}`,
+    organizationId: ORG,
+    builderIdentityId: `ewr-ret-identity-${suffix}`,
+    requestedConnectors: ['github'],
+    submittedUrls: [],
+    status: 'succeeded',
+    finishedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+  })
+  for (const [index, row] of evidence.entries()) {
+    await db.insert(enrichmentEvidence).values({
       organizationId: ORG,
+      jobId: `ewr-ret-job-${suffix}`,
       builderIdentityId: `ewr-ret-identity-${suffix}`,
-      requestedConnectors: ['github'],
-      submittedUrls: [],
-      status: 'succeeded',
-      finishedAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000),
+      connector: 'github',
+      acquisitionMode: 'official_api',
+      sourceUrl: `https://github.com/${source}`,
+      contentHash: `ewr-ret-hash-${suffix}-${index}`,
+      payload: { profileUrl: `https://github.com/${source}`, topics: [] },
+      confidenceBps: 7500,
+      resolverVersion: 1,
+      scoreComponents: {},
+      matchSignals: [],
+      contradictions: [],
+      resolution: row.resolution,
+      observedAt: row.observedAt,
+      expiresAt: row.expiresAt,
     })
-    for (const [index, row] of evidence.entries()) {
-      await db.insert(enrichmentEvidence).values({
-        organizationId: ORG,
-        jobId: `ewr-ret-job-${suffix}`,
-        builderIdentityId: `ewr-ret-identity-${suffix}`,
-        connector: 'github',
-        acquisitionMode: 'official_api',
-        sourceUrl: `https://github.com/${source}`,
-        contentHash: `ewr-ret-hash-${suffix}-${index}`,
-        payload: { profileUrl: `https://github.com/${source}`, topics: [] },
-        confidenceBps: 7500,
-        resolverVersion: 1,
-        scoreComponents: {},
-        matchSignals: [],
-        contradictions: [],
-        resolution: row.resolution,
-        observedAt: row.observedAt,
-        expiresAt: row.expiresAt,
-      })
-    }
   }
+}
 
-  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
-  const daysAhead = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+const daysAhead = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+
+describe('runEnrichmentRetentionPass', () => {
 
   it('keeps a 90-day-old job alive while it still holds unexpired accepted evidence, instead of failing', async () => {
     await seedFinishedJobWithEvidence('live', [{ resolution: 'accepted', observedAt: daysAgo(1), expiresAt: daysAhead(179) }])
@@ -209,5 +210,32 @@ describe('runEnrichmentRetentionPass', () => {
     expect(result.evidenceDeleted).toBe(3)
     expect(result.jobsDeleted).toBe(1)
     expect(await db.select().from(enrichmentJobs).where(eq(enrichmentJobs.id, 'ewr-ret-job-expired'))).toHaveLength(0)
+  })
+})
+
+/**
+ * The second door the same foreign-key family opened, found 2026-08-05 by case 11 of the runtime
+ * adversarial matrix: `DELETE /api/builders/:id` (untrack) deletes only the `organization_builders` row,
+ * and with `ON DELETE NO ACTION` on the two composite FKs that pointed at it, the statement raised
+ * 23503 for any builder the organization had enriched — the route answered 500 for exactly the people
+ * the product had enriched. Deleting a whole organization was always fine, because both cascades from
+ * `organizations` fire in one statement and a NO ACTION check runs at end-of-statement.
+ *
+ * `drizzle/0150_enrichment_untrack_cascade.sql` cascades both. Pinned at the constraint level rather
+ * than through the route: what regressed would be the FK's ON DELETE action, and that is enforced
+ * against the table owner too, unlike a grant or a policy.
+ */
+describe('untracking a builder with enrichment data (drizzle/0150)', () => {
+  it('takes the organization\'s jobs and evidence with it instead of raising 23503', async () => {
+    await seedFinishedJobWithEvidence('untrack', [
+      { resolution: 'accepted', observedAt: daysAgo(1), expiresAt: daysAhead(179) },
+    ])
+
+    await expect(
+      db.delete(organizationBuilders).where(eq(organizationBuilders.id, 'ewr-ret-tracked-untrack')),
+    ).resolves.toBeDefined()
+
+    expect(await db.select().from(enrichmentEvidence).where(eq(enrichmentEvidence.jobId, 'ewr-ret-job-untrack'))).toHaveLength(0)
+    expect(await db.select().from(enrichmentJobs).where(eq(enrichmentJobs.id, 'ewr-ret-job-untrack'))).toHaveLength(0)
   })
 })

@@ -1,6 +1,7 @@
 # Tasks: Content Marketing
 
-> **Status**: `phase-1-implemented`
+> **Status**: `implemented` — the blog engine, nine posts and four further drafts are delivered; publishing
+> and distribution moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md)
 > **Depends on**: [`public-landing-pages`](../45-public-landing-pages/spec.md)
 > **Blocks**: [`waitlist-launch`](../54-waitlist-launch/spec.md)
 > **Reality check**: Blog engine + 5 posts + authoring template delivered (2026-07-26). Phase 2
@@ -8,6 +9,8 @@
 > manual, recurring, external-platform work — not one-shot coding tasks — same category as
 > `waitlist-launch`'s founder GTM runbook. Left unchecked below for the user to run personally;
 > not part of an autonomous coding session's scope.
+>
+> **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
 
 ## Phase 0 — Delivered (audited against src, 2026-07-19)
 
@@ -76,66 +79,62 @@
 
 ## Phase 2 — Distribution routine (run per post, starting at launch)
 
-- [ ] **Cross-post + distribute posts 1-5** (repeat for each future post)
-  - Files: none (external platforms)
-  - Do: dev.to and Hashnode: paste markdown, set `canonical_url` to the builderhunt.dev URL,
-    same tags. X: 5-8 tweet thread summarizing the post. LinkedIn: 150-word excerpt + link.
-    Add `?utm_source=devto|hashnode|x|linkedin` to links.
-  - Verify: Both mirrors show `rel=canonical` to builderhunt.dev (view-source); UTM referrers
-    appear in server logs after clicks.
+**Moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — and **merged** there with plan 54's "dev.to cross-post + X thread + LinkedIn + one subreddit
++ Indie Hackers", because the two were the same task written twice: once as a launch action and once as a
+per-post routine. Cross-posting before the product is live reads as spam on every channel it touches.
 
 ## Phase 3 — Steady state (2 posts/month; one task per brief from the spec table)
 
-- [ ] **Write "The solo founder's guide to technical sourcing"**
-  - **Drafted, not published.** `content/posts/_draft-technical-sourcing-guide.md` (2026-08-04). Tool-agnostic process piece; the two BuilderHunt mentions are worked examples of a trade-off and both map to `src/lib/score.ts` and `src/lib/dedup.ts`.
-    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
-  - Files: `content/posts/technical-sourcing-guide.md`
-  - Do: Target "technical sourcing guide" with a tool-agnostic process piece using the
-    validated post template and only evidence-backed BuilderHunt examples.
-  - Verify: Post builds, renders at its slug, and completes the Phase 2 distribution check.
+### "The solo founder's guide to technical sourcing"
 
-- [ ] **Write "What I learned indexing 10,000 developer profiles"**
-  - **Drafted, not published.** `content/posts/_draft-lessons-indexing-developers.md` (2026-08-04). Note the title: it does **not** claim 10,000 profiles, because the corpus is nowhere near that and the brief says not to invent scale metrics. Dedup and scoring trade-offs cite real decisions.
-    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
-  - Files: `content/posts/lessons-indexing-10k-developers.md`
-  - Do: Target "developer data aggregation" and explain dedup/scoring trade-offs by citing
-    real decisions in `src/lib/dedup.ts` and `src/lib/score.ts`; do not invent scale metrics.
-  - Verify: Post builds, every quantitative statement has evidence, and Phase 2 distribution completes.
+**Written. Publication moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05.**
+The draft is `content/posts/_draft-technical-sourcing-guide.md` (2026-08-04) — a tool-agnostic process
+piece whose two BuilderHunt mentions are worked examples of a trade-off, both mapping to `src/lib/score.ts`
+and `src/lib/dedup.ts`. Publishing is renaming off the `_` prefix after your edit; `blog.ts` filters
+`_`-prefixed files and ignores a `draft:` frontmatter key entirely.
 
-- [ ] **Write "Saved searches as a hiring radar: a setup tutorial"**
-  - ✅ **All three screenshots taken 2026-08-05 and placed in the draft.** `search-save-search.webp`,
-    `alerts-new-radar.webp` and `alerts-radar-with-matches.webp`, one per tutorial step, captured
-    against the local dev server through `pnpm content:screenshots` as the seeded admin — the
-    repository's existing sanctioned mechanism for exactly this, which the earlier note ("requires a
-    signed-in session, which the agent must not create") had overlooked; the prohibition is about the
-    live site. The three shot definitions were added to `scripts/dev/capture-app-screenshots.ts`, so a
-    redesign refreshes them with every other blog image.
+The writing was the engineering-adjacent half and it is done. What is left is the decision to publish,
+which belongs to the launch.
 
-    **Nothing in the third one is seeded.** The radar was created through the real form (which needed a
-    Pro entitlement granted through the platform-admin endpoint — creation answers 402 on free) and its
-    five matches are rows the alerts worker produced by re-running the saved search against the live
-    sources: two Lobsters, two Hacker News, one dev.to. Hand-inserting `alert_triggers` to fill the
-    frame would have been the fabricated evidence `project-hygiene` removed.
+### "What I learned indexing developer profiles"
 
-    **What is left is yours**: read it, decide whether real public handles belong in a launch post
-    (same standard as the existing search/explore images), and publish by renaming off the `_` prefix.
-  - **Drafted, not published.** `content/posts/_draft-saved-search-hiring-radar.md` (2026-08-05). Every route, field label and dropdown option read out of `SearchPage.tsx` and `alerts.tsx` rather than remembered — and writing it is what surfaced the radar dropdown labelling four *events the product never detects*, fixed the same day. The post now describes the radar as the standing search it actually is.
-    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
-  - Files: `content/posts/saved-search-hiring-radar.md`
-  - Do: Target "developer hiring alerts" with current screenshots of search → save → alert;
-    ensure every route and control label matches the running app.
-  - Verify: Follow the published tutorial in a seeded account end to end, then complete Phase 2 distribution.
+**Written. Publication moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05.**
+The draft is `content/posts/_draft-lessons-indexing-developers.md` (2026-08-04). Note the title: it does
+**not** claim 10,000 profiles, because the corpus is nowhere near that and this brief's own rule was not to
+invent scale metrics. Dedup and scoring trade-offs cite real decisions in `src/lib/dedup.ts` and
+`src/lib/score.ts`.
 
-- [ ] **Write "How the BuilderHunt activity score works"**
-  - **Drafted, not published.** `content/posts/_draft-how-activity-score-works.md` (2026-08-04). Every scoring statement maps to `src/lib/score.ts`; presented as a heuristic with named limitations, never as objective ability.
-    Publishing is renaming off the `_` prefix after your edit — `blog.ts` filters `_`-prefixed files and ignores a `draft:` frontmatter key entirely.
-  - Files: `content/posts/how-activity-score-works.md`, `src/lib/score.ts`
-  - Do: Target "measure developer activity" and explain the current scoring heuristics,
-    limitations, and source differences without presenting the score as objective ability.
-  - Verify: A reviewer maps every scoring statement to `src/lib/score.ts`; post builds and completes Phase 2 distribution.
-- [ ] **Monthly content review**
-  - Files: none
-  - Do: Check Search Console queries/impressions per post; double down on the best-performing
-    topic in the next brief; kill formats that consistently take >6h to write.
-  - Verify: A one-paragraph note per month appended to this plan's spec (or the repo journal)
-    with the decision taken.
+### "Saved searches as a hiring radar: a setup tutorial"
+
+**Written, screenshots taken. Publication moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md)
+on 2026-08-05.** The draft is `content/posts/_draft-saved-search-hiring-radar.md` (2026-08-05), with all
+three screenshots embedded: `search-save-search.webp`, `alerts-new-radar.webp` and
+`alerts-radar-with-matches.webp`, captured through `pnpm content:screenshots` against the local dev server
+as the seeded admin. Their shot definitions are in `scripts/dev/capture-app-screenshots.ts`, so a redesign
+refreshes them with every other blog image.
+
+**Nothing in the third shot is seeded.** The radar was created through the real form (which needed a Pro
+entitlement granted via the platform-admin endpoint — creation answers 402 on free) and its five matches are
+rows the alerts worker produced by re-running the saved search against the live sources: two Lobsters, two
+Hacker News, one dev.to. Hand-inserting `alert_triggers` to fill the frame would have been the fabricated
+evidence `project-hygiene` spent a plan removing.
+
+Every route, field label and dropdown option in the post is read out of `SearchPage.tsx` and `alerts.tsx`
+rather than remembered — and writing it is what surfaced the radar dropdown labelling four *events the
+product never detects*, fixed the same day. One thing to decide before publishing: the screenshots show
+real people's public handles, the same standard as the existing search/explore images.
+
+### "How the BuilderHunt activity score works"
+
+**Written. Publication moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05.**
+The draft is `content/posts/_draft-how-activity-score-works.md` (2026-08-04). Every scoring statement maps
+to `src/lib/score.ts`, and the score is presented as a heuristic with named limitations, never as objective
+ability.
+
+### Monthly content review
+
+**Moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — it reads Search Console queries and impressions per post, which requires the sitemap submitted,
+the posts indexed, and months of accumulated data. It is the last item of that plan for exactly that reason.
+

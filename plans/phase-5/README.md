@@ -5,7 +5,29 @@ has been deployed and has been running for a while — and nothing else.
 
 | # | Plan | Open | What it waits on |
 |--:|------|-----:|------------------|
-| 01 | [`production-readiness-audit`](./01-production-readiness-audit/spec.md) | 8 | a live deployment, then elapsed time and three human decisions |
+| 01 | [`production-readiness-audit`](./01-production-readiness-audit/spec.md) | 17 | a live deployment, then elapsed time and the decisions the waiting was for |
+| 02 | [`legal-and-commercial-approvals`](./02-legal-and-commercial-approvals/spec.md) | 4 | a signature, a licensed opinion, and prices a vendor has not quoted |
+| 03 | [`launch-and-distribution`](./03-launch-and-distribution/spec.md) | 9 | the launch itself, then 30 days of it |
+| 04 | [`post-launch-discovery`](./04-post-launch-discovery/spec.md) | 5 | fifteen real users willing to be interviewed |
+
+**Phase-1 reached zero open tasks on 2026-08-05.** Plans 02 and 03 were created that day, and seven
+further items were added to plan 01, when Edd's instruction — *the product launches when phase-5
+finishes, so there is no point worrying about legal in phase-1* — was applied to all 21 tasks phase-1
+still carried. Not one of them was engineering; the split into three plans is by **who owns the missing
+input**: production evidence and clocks (01), signatures and prices (02), the launch (03).
+
+**Phases 2-4 were reviewed the same day** under a second instruction — *move anything that stops me
+building the app; it is always better to have the feature and disable it for legal reasons than not to have
+it.* Six more items moved: five from `phase-2/01-investigacion-icp`, whose `Blocks:` header made fifteen
+interviews with strangers a prerequisite for **five of phase-2's seven plans**, and one 21-day cohort
+rollout from `phase-2/07`. Phase 3 was clean — thirteen plans of read-path and pagination engineering with
+no approval gate in any of them. Phase 4 was clean too: no `Operator:` task anywhere in it, and the browser
+extension's legal surface (host register, consent document, `/legal/extension` page) is implementable work
+rather than a gate.
+
+21 tasks left phase-1 and 20 arrived here: plan 54's "dev.to cross-post + X thread + LinkedIn + one
+subreddit + Indie Hackers" and plan 46's "Cross-post + distribute posts 1-5" were the same work written
+twice — once as a launch action, once as a per-post routine — and are one task now.
 
 ## Why this phase exists
 

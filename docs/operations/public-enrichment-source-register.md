@@ -125,9 +125,9 @@ Evidence for `plans/phase-1/42-stealth-scraping/task.md` Phase 7, "Run runtime a
 Reproduce with `pnpm test:enrichment-matrix:local`
 ([`scripts/ops/run-enrichment-matrix-local.sh`](../../scripts/ops/run-enrichment-matrix-local.sh) →
 [`scripts/ops/verify-enrichment-adversarial-local.mjs`](../../scripts/ops/verify-enrichment-adversarial-local.mjs)).
-**Result: 19/19 checks across all twelve cases, exit 0** (latest run 2026-08-05T16:09Z; the first run
-that day was 17/17, and the two extra checks are regressions added for defects this exercise found and
-the maintainer then had fixed — see Findings).
+**Result: 20/20 checks across all twelve cases, exit 0.** The count grew with the run: 17/17 on the
+first pass, then a regression assertion added for each defect the exercise found and the maintainer then
+had fixed. Every one of those assertions failed before its fix and passes after — see Findings.
 
 **Environment.** A disposable `builderhunt_security_test_*` Postgres 18 database with the full
 migration chain applied, connected through per-run login roles inheriting `builderhunt_app`, `_auth`,
@@ -167,7 +167,7 @@ host's DNS before a scripted response is returned.
 | 08 | worker crash + reclaim | job left `running` with a live lease; next run reclaimed 1 lease and drove it to `succeeded` at attempt 2 with one evidence row | `6d6d611eed441ef7f79a5d5a` | `enrichment_worker_run@2026-08-05T16:09:13.137Z` |
 | 09 | restriction mid-flight | restriction 200 → 1 job cancelled, 1 evidence row purged cross-org; a job enqueued *after* the restriction was cancelled with `processing_restricted` having contacted **0 hosts**; refresh route answers 409; and the run closed `job_runs` as **`succeeded`**, counting the stop as `cancelled: 1, failed: 0` | `f6cd4a820ef1b62137aa285b`, `adv-job-post-restriction` | `enrichment_subject_restriction@2026-08-05T16:09Z` |
 | 10 | retention expiry | pass 1: 3 expired rows deleted, live `accepted` row kept, 200-day-old job **kept** (see finding 1); pass 2 after that row expired: row deleted and job retired. Tenant API showed exactly the 1 live row | `adv-job-retention` | `enrichment_retention_run@2026-08-05T16:09:13.235Z` |
-| 11 | export and delete | subject provenance 200 with 1 entry, **field names only, no payload values**; the tenant read returned its row through the app role; an app-role `delete` on `enrichment_evidence` **refused `42501`** by the grant (see finding 2); deleting the organization row cascaded its enrichment jobs and evidence to zero | n/a | n/a |
+| 11 | export and delete | subject provenance 200 with 1 entry, **field names only, no payload values**; the tenant read returned its row through the app role; an app-role `delete` on `enrichment_evidence` **refused `42501`** by the grant (see finding 2); deleting the organization row cascaded its enrichment jobs and evidence to zero; and untracking a single builder that holds evidence now returns `true` with its rows gone, where it used to raise 23503 (see finding 7) | n/a | n/a |
 | 12 | kill switch | separate process with `ENRICHMENT_ENABLED=false`: worker returned `disabled`, claimed 0, enqueue route answered 503 `enrichment_disabled`, **0 requests made**, and the queued job was still `queued` afterwards | `adv-job-killswitch` | n/a |
 
 ### Findings
@@ -221,7 +221,24 @@ host's DNS before a scripted response is returned.
    failure and would have tripped any alert on failed runs. `EnrichmentWorkerResult` gained a
    `cancelled` counter; case 09 now asserts `cancelled: 1, failed: 0` and `job_runs.state = 'succeeded'`
    for a run whose only work was honouring a restriction.
-6. **Noted — the structured logger mints no event id.** `log.ts` writes `ts` + `event` per line and
+6. **Fixed 2026-08-05 — untracking a builder with enrichment data answered 500.** The same foreign-key
+   family as finding 1, through a user-facing door. `DELETE /api/builders/:id` deletes only the
+   `organization_builders` row, and with `ON DELETE NO ACTION` on
+   `enrichment_evidence_organization_builder_fk` and `enrichment_jobs_organization_builder_fk` (0016)
+   that raised `23503` for any builder the organization had enriched — so "stop following this person"
+   failed for exactly the people the product had enriched, and the evidence row survived the attempt.
+   Deleting a whole organization was never affected: both cascades from `organizations` fire in one
+   statement, and a NO ACTION check runs at end-of-statement.
+
+   `drizzle/0150_enrichment_untrack_cascade.sql` cascades both. That is the right answer on its own
+   terms and not merely the convenient one: the lawful basis recorded above is a recruiter's legitimate
+   interest in a candidate they track, and it ends when the tracking ends — so an organization's copy of
+   the evidence going with the untrack is what this register already promises. The third FK on this pair
+   of tables, evidence → job, deliberately stays NO ACTION for the reason in finding 1. Verified on the
+   applied migration: `confdeltype` is `c`, `c`, `a` respectively. Regression pinned at the constraint
+   level in `tests/unit/shared/lib/repositories/enrichment-worker.test.ts`, because what would regress is
+   the FK's ON DELETE action and that binds the table owner too, unlike a grant or a policy.
+7. **Noted — the structured logger mints no event id.** `log.ts` writes `ts` + `event` per line and
    nothing that identifies one emission. The task asked for a "log event ID" per case; this register
    records `event@ts`, which is unique in a log stream, rather than inventing an id the code does not
    produce.
@@ -239,9 +256,24 @@ host's DNS before a scripted response is returned.
 ## Other existing BuilderHunt sources (reddit, hn, devto, npm, huggingface, gitlab,
 ## codeberg, lobsters, stackoverflow)
 
-Not yet registered in `policies.ts` — per spec §4 "missing policy means disabled." Each
-needs its own exact-profile adapter review (does the source's existing federated-search
-endpoint support fetching one known profile by ID, without broad search?) before it can be
-added with `status: 'approval_required'` or `'enabled'`. Tracked as future work in
-`plans/phase-1/42-stealth-scraping/task.md` ("Additional official API adapters after individual
-source-policy review").
+Not yet registered in `policies.ts` — per spec §4, "missing policy means disabled."
+
+**Clarified 2026-08-05 on the maintainer's instruction: the review gates *enabling* a connector, not
+*building* one.** The earlier wording — "each needs its own source-policy review before it can be added" —
+was read as a gate on the engineering, which left nine sources with no adapter at all. The order is now the
+other way round: build the exact-profile adapter, register the source with `status: 'approval_required'` so
+`resolveExecutableConnectorIds` keeps it disabled no matter what the runtime allowlist says, and let the
+review decide whether it ever flips to `enabled`. Having the adapter and switching it off is strictly better
+than not having it — a disabled adapter costs nothing and a missing one costs a rebuild.
+
+The review question itself is unchanged, and it is a real one: does the source's existing federated-search
+endpoint support fetching **one known profile by ID**, without broad search? A source that only supports
+broad search does not get an adapter, because the adapter would then be the thing this whole plan exists to
+avoid.
+
+**The four hard-blocked platforms are a different category and do not move.** `linkedin`, `x`, `facebook`
+and `instagram` are in `HARD_BLOCKED_CONNECTOR_IDS` (`src/lib/enrichment/policies.ts:28`) because their
+terms prohibit automated collection without written permission that is not on file — that is not a phase
+gate waiting on a review, and no flag makes it lawful. A URL for one of them can still be stored as
+`user-submitted` evidence and is never fetched, which is the shape the spec §5.3 already allows and case 02
+of the adversarial matrix verifies.

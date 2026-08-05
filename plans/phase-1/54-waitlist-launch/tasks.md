@@ -1,6 +1,9 @@
 # Tasks: Launch Checklist
 
-> **Status**: `non-actionable for an autonomous coding session` — every task here is a manual
+> **Status**: `moved to phase-5` — this plan *is* the launch, and the launch happens when phase-5 closes.
+> Its five remaining items moved to `plans/phase-5/{01-production-readiness-audit,03-launch-and-distribution}`
+> on 2026-08-05. What stays here is the evidence gathered while verifying their prerequisites.
+> **Historic status**: `non-actionable for an autonomous coding session` — every task here is a manual
 > go-to-market action (posting to Show HN/Reddit/X/LinkedIn/Indie Hackers as the founder,
 > submitting to Google Search Console/Bing Webmaster Tools under the founder's own account,
 > monitoring prod analytics day-to-day). None of it is code. Reviewed 2026-07-25 and left
@@ -10,6 +13,8 @@
 > **Blocks**: nothing
 > **Reality check**: No waitlist is built or planned. These are execution/verification tasks
 > against the already-deployed app; the only "Files" entries are checklists run against prod.
+>
+> **Phase-1 scope closed 2026-08-05.** Every remaining item moved to `plans/phase-5/` on Edd's instruction — the product launches when phase-5 finishes, so a task that waits on a signature, a clock, a live deployment or a launch is not build-phase work. Prose pointers below name the phase-5 plan that owns each one; they are deliberately not checkboxes, because a box reads as pending engineering.
 
 ## Phase 1 — Prerequisite gate
 
@@ -108,82 +113,37 @@
     marketing decision, and these may be hidden on purpose until the launch post is ready. What is not
     defensible is submitting a sitemap without deciding.
 
-- [ ] **Smoke-test the core authed funnel on prod**
-  - Files: none (manual)
-  - Do: Fresh email → sign up → land on `/onboarding/welcome` → complete the 3-step tour →
-    run a search → track 3 builders → `/exports` CSV download → request upgrade on `/pricing`
-    → verify it appears in `/admin/plan-requests` → delete the test account from
-    `/settings/privacy` and cancel the deletion.
-  - Verify: Every step succeeds; the plan request and deletion request rows appear and behave.
-  - ⚠️ **Rewritten 2026-08-05. Two steps went through a surface that no longer exists; the
-    replacement is below and this task is now runnable as written.**
+### Smoke-test the core authenticated funnel on prod
 
-    **Run this, in order.** Steps 1–5 and 8–9 are unchanged; 6–7 are the rewrite.
+**Moved to [`plans/phase-5/01-production-readiness-audit`](../../phase-5/01-production-readiness-audit/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — step 1 requires creating an account and entering a password on the live site, which an agent
+must not do. It is also the same browser pass as plan 03's PG18 authenticated walk; one walk closes both.
 
-    1. Fresh email → sign up.
-    2. Land on `/onboarding/welcome`; complete the 3-step tour.
-    3. Run a search.
-    4. Track 3 builders.
-    5. `/exports` → download a CSV.
-    6. **`/pricing` → "Subscribe to Pro" → tick the disclosure → Stripe Checkout opens.** Complete it
-       with a Stripe *test* card if the deployment is in test mode; otherwise cancel and stop at the
-       Checkout page. What is being verified is that a Checkout session is created and the return
-       lands on `/settings/billing/return`.
-    7. **`/settings/billing` shows the subscription as `active` and the organization's entitlement
-       changed** (plan tier and the monthly credit grant). There is no admin approval step any more.
-    8. `/settings/privacy` → request account deletion.
-    9. Cancel the deletion; confirm the account is usable again.
+The runnable version of the steps lives there, rewritten 2026-08-05: two of them went through a surface
+that no longer exists. The legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04 (commit
+`8c4b1e2` and its two predecessors), `/admin/plan-requests` is gone, and `src/` holds zero references to
+`plan_requests` — so "request upgrade → verify it appears in `/admin/plan-requests`" could not be performed
+at all. Upgrades go through Stripe Checkout and the billing surfaces.
 
-    **Why 6–7 changed:** the legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04
-    (commit `8c4b1e2` and its two predecessors). `/admin/plan-requests` is gone and `src/` holds zero
-    references to `plan_requests`, so "request upgrade → verify it appears in `/admin/plan-requests`"
-    cannot be performed at all. Upgrades go through Stripe Checkout and the billing surfaces, which
-    the billing E2E suite already covers in test mode — this task's value is the *human* pass over
-    the same path on the real deployment.
+The unauthenticated precursors were verified instead: all 13 public routes return 200 and `/api/status`
+reports `db: ok, redis: ok`.
 
-    **Operator: this one needs a person, not the agent.** Step 1 requires creating an account and
-    entering a password on the live site, which the agent must not do. The unauthenticated
-    precursors were verified instead: all 13 public routes 200, `/api/status` reports
-    `db: ok, redis: ok`.
+### Submit sitemap and verify OG previews
 
-  - ⚠️ **Original 2026-08-04 finding, kept for the record:**
-    "request upgrade on `/pricing` → verify it appears in `/admin/plan-requests`" cannot be performed: the
-    legacy `plans`/`plan_requests` surface was retired on 2026-08-03/04 (commits `8c4b1e2` and its two
-    predecessors), the route is gone, and `src/` holds zero references to `plan_requests`. Upgrades now go
-    through Stripe Checkout and the billing surfaces.
+**The OG half is done. The submission half moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md)
+on 2026-08-05**, deliberately not as a checkbox: it needs Search Console and Bing account access, and it is
+gated on the indexing decision that moved to phase-5 the same day.
 
-    Rewrite those two steps before running this: the equivalent verification is a Checkout session reaching
-    `active` and the organization's entitlement changing, which the billing E2E already covers in test mode.
-    Everything else in this task — sign-up, onboarding, search, tracking, CSV export, account deletion and
-    its cancellation — is still exactly right.
+The four URLs were fetched and their tags read directly rather than pasted into a validator, which is the
+same evidence a validator reports: `/api/og/explore` and `/api/og/explore?q=react` both return **200,
+`image/png`, 1200×630**, and the bytes differ per query, so the renderer really is query-aware; `/`,
+`/pricing`, `/explore?q=…` and a blog URL each carry `og:title`, `og:description`, `og:image`, `og:url` and
+`twitter:card: summary_large_image`.
 
-- [ ] **Submit sitemap and verify OG previews**
-  - **OG half done 2026-08-05; submission half needs you.**
-
-    The four URLs were fetched and their tags read directly rather than pasted into a validator,
-    which is the same evidence a validator reports:
-
-    - `/api/og/explore` and `/api/og/explore?q=react` both return **200, `image/png`, 1200×630**, and
-      the bytes differ per query, so the renderer really is query-aware.
-    - `/`, `/pricing`, `/explore?q=…` and a blog URL each carry `og:title`, `og:description`,
-      `og:image`, `og:url` and `twitter:card: summary_large_image`.
-
-    **Two defects were found and fixed in the process** (commit `fix(seo)`): `/pricing` and ten other
-    public routes were serving the *homepage's* `og:title`/`og:description`, so every shared link
-    previewed as the homepage; and the canonical URL dropped the query string, which made all ~50
-    `/explore?q=…` sitemap entries declare themselves duplicates of one page.
-
-    **Still yours:** adding the property in Google Search Console and Bing Webmaster Tools and
-    submitting the sitemap. That needs account access, and it is gated on the `/blog` indexing
-    decision in the Phase 1 task above — submitting a sitemap that omits `/blog` while `/blog` is
-    `noindex` is consistent, but it is a choice worth making deliberately.
-
-  - Files: none (external tools)
-  - Do: Add the property in Google Search Console + Bing Webmaster Tools, submit
-    `/sitemap.xml`. Paste `/`, `/pricing`, `/explore?q=react`, and one blog URL into the
-    X card validator / LinkedIn post inspector / a Slack DM; confirm the PNG OG image renders
-    (endpoint: `src/routes/api/og/explore.tsx`).
-  - Verify: GSC shows sitemap "Success"; all 4 URLs show image + title + description previews.
+**Two defects were found and fixed in the process** (commit `fix(seo)`): `/pricing` and ten other public
+routes were serving the *homepage's* `og:title`/`og:description`, so every shared link previewed as the
+homepage; and the canonical URL dropped the query string, which made all ~50 `/explore?q=…` sitemap entries
+declare themselves duplicates of one page.
 
 ## Phase 3 — Content freeze (T-2)
 
@@ -215,30 +175,22 @@
 
 ## Phase 4 — Distribution (T-0, one channel per day)
 
-- [ ] **Show HN post**
-  - Files: none
-  - Do: "Show HN: BuilderHunt – find active developers across 12 sources (GitHub, HN,
-    Stack Overflow…)". First comment: honest write-up — what it does, stack (TanStack Start +
-    Postgres, single Hetzner VPS), what feedback is wanted (search relevance, sources to add).
-    Post morning US time, stay available all day to reply.
-  - Verify: Post live; every top-level comment answered within 2h; feedback captured as issues.
+### Show HN post
 
-- [ ] **dev.to cross-post + X thread + LinkedIn + one subreddit + Indie Hackers**
-  - Files: none
-  - Do: dev.to: cross-post "Why I built BuilderHunt" (`content/posts/why-i-built-builderhunt.md`)
-    with `canonical_url` set to the builderhunt.dev URL. X: 6-8 tweet thread (problem → 12
-    sources screenshot → tracking/alerts → link). LinkedIn: recruiter-angle summary. Reddit:
-    r/ExperiencedDevs or r/webdev per sub self-promo rules. Indie Hackers: launch milestone.
-    Stagger one per day after HN.
-  - Verify: Each post live with working links; UTM-tagged links (`?utm_source=devto` etc.) so
-    referrers show in analytics/server logs.
+**Moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — it is the launch itself, in the maintainer's voice, and it cannot be performed before a launch.
+
+### dev.to cross-post + X thread + LinkedIn + one subreddit + Indie Hackers
+
+**Moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — and **merged** there with plan 46's "Cross-post + distribute posts 1-5", which described the
+same work as a per-post routine.
 
 ## Phase 5 — Monitoring (T+1..30)
 
-- [ ] **Daily launch-week monitoring, then weekly**
-  - Files: none
-  - Do: Check `/admin/metrics` (signups, searches, errors), `/status`, Search Console
-    impressions; reply to every feedback comment; file real bugs/requests into `plans/` or
-    issues; publish a weekly changelog entry.
-  - Verify: 30-day review written up: signups vs 200 target, activation rate
-    (`onboarding_progress.completed` / signups), top 3 feedback themes, next-plan decision.
+### Daily launch-week monitoring, then weekly
+
+**Moved to [`plans/phase-5/03-launch-and-distribution`](../../phase-5/03-launch-and-distribution/tasks.md) on 2026-08-05, deliberately not as a
+checkbox** — it needs 30 days of elapsed time and real traffic, and its deliverable is the 30-day review
+that decides what gets built next.
+

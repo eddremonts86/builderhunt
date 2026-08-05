@@ -1297,11 +1297,22 @@ export const enrichmentJobs = pgTable(
   },
   (table) => [
     uniqueIndex('enrichment_jobs_organization_id_id_unique').on(table.organizationId, table.id),
+    // CASCADE, added 2026-08-05: untracking one builder deletes only the `organization_builders` row,
+    // and with NO ACTION here that raised 23503 for any builder the organization had enriched — so
+    // `DELETE /api/builders/:id` answered 500 for exactly the people the product had enriched.
+    // (Deleting the whole organization was always safe: both cascades fire in one statement, and a NO
+    // ACTION check runs at end-of-statement, by which time the children are gone.)
+    //
+    // Cascading is also the right answer on its own terms, not just the convenient one: the lawful
+    // basis for holding this evidence is a recruiter's legitimate interest in a candidate they track,
+    // and it ends when the tracking ends. Note the *other* FK on this pair of tables — evidence → job —
+    // deliberately stays NO ACTION, because cascading that one would delete accepted evidence at the
+    // 90-day job-retirement mark and silently shorten the 180-day window the source register promises.
     foreignKey({
       columns: [table.organizationId, table.builderIdentityId],
       foreignColumns: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
       name: 'enrichment_jobs_organization_builder_fk',
-    }),
+    }).onDelete('cascade'),
     uniqueIndex('enrichment_jobs_active_unique')
       .on(table.organizationId, table.builderIdentityId)
       .where(sql`${table.status} in ('queued', 'running')`),
@@ -1340,11 +1351,13 @@ export const enrichmentEvidence = pgTable(
   },
   (table) => [
     uniqueIndex('enrichment_evidence_organization_id_id_unique').on(table.organizationId, table.id),
+    // CASCADE for the same reason as `enrichment_jobs_organization_builder_fk` above — see that comment
+    // for why this one cascades and the job FK below does not.
     foreignKey({
       columns: [table.organizationId, table.builderIdentityId],
       foreignColumns: [organizationBuilders.organizationId, organizationBuilders.builderIdentityId],
       name: 'enrichment_evidence_organization_builder_fk',
-    }),
+    }).onDelete('cascade'),
     foreignKey({
       columns: [table.organizationId, table.jobId],
       foreignColumns: [enrichmentJobs.organizationId, enrichmentJobs.id],

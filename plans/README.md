@@ -10,6 +10,13 @@ performed before the product has been deployed and has run for a while. A task b
 amount of engineering can close it sooner — it needs production to exist, clock time to pass, or a
 person to decide. "Hard" is not the criterion.
 
+> **Phase 1 reached zero open tasks on 2026-08-05.** The 21 that were still listed that morning all moved
+> to `phase-5/`, applying the rule above to its conclusion: the product launches when phase-5 finishes, so
+> legal reviews, go-to-market, soak windows and production sign-offs were never build-phase work. Phase 5
+> now has three plans — production evidence and clocks, signatures and prices, and the launch — and each
+> moved item left a prose pointer in its phase-1 plan rather than a checkbox. **A session looking for
+> phase-1 code should find none; start from `phase-2/`.**
+
 Every directory in [`phase-1/`](./phase-1/) is prefixed with its position in the canonical
 build order, `01`–`54`. That number is the answer to "in what sequence would these plans be
 built from an empty repository, so no plan starts before its dependencies exist" — and it is
