@@ -229,3 +229,62 @@ test.describe('GET /api/interviews/shared', () => {
     expect(body.interviews).toHaveLength(0)
   })
 })
+
+test.describe('POST /api/builders/track — retired sources', () => {
+  /**
+   * Tracking is the one path that *persists* a person: `organization_builders`, then
+   * `upsertEmbeddingStubs` into `builder_embeddings` (pgvector) and `recordIngestedSourceObservations`
+   * into `public_source_observations`. Searching only caches, five minutes, in memory and Redis.
+   *
+   * `sourcehut` and `hashnode` were retired on 2026-08-04 with their connectors deleted (drizzle/0143,
+   * 0144), and this route's zod enum went on accepting both for a further day — so a source the product
+   * could no longer read was still a source it would index a person from, on nothing but a
+   * client-supplied payload. For `sourcehut` that is the sharper edge: sr.ht's robots policy disallows
+   * "anything used to feed a machine learning model", and this route is exactly how a sr.ht profile
+   * would have reached the vector index.
+   *
+   * End-to-end rather than a unit assertion on the schema, because what is being pinned is that the
+   * *deployed route* refuses the payload — a zod enum is easy to widen and nothing else would notice.
+   */
+  for (const retired of ['sourcehut', 'hashnode'] as const) {
+    test(`refuses a ${retired} payload`, async () => {
+      const sourceId = `e2e-${retired}-${randomUUID().slice(0, 8)}`
+      const response = await harness.a.principal.api!.post('/api/builders/track', {
+        data: {
+          source: retired,
+          sourceId,
+          username: sourceId,
+          displayName: `E2E ${retired}`,
+          profileUrl: retired === 'sourcehut' ? `https://sr.ht/~${sourceId}` : `https://hashnode.com/@${sourceId}`,
+          topics: [],
+        },
+      })
+      expect(response.status(), await response.text()).toBe(400)
+
+      // And nothing was written on the way to the rejection.
+      const identities = await harness.sql<{ count: string }[]>`
+        select count(*)::text as count from builder_identities where source_id = ${sourceId}
+      `
+      expect(identities[0]?.count, `a rejected ${retired} track still created an identity`).toBe('0')
+      const embedded = await harness.sql<{ count: string }[]>`
+        select count(*)::text as count from builder_embeddings where source_id = ${sourceId}
+      `
+      expect(embedded[0]?.count, `a rejected ${retired} track still reached the vector index`).toBe('0')
+    })
+  }
+
+  test('still accepts a live source, so the enum was narrowed and not broken', async () => {
+    const sourceId = `e2e-live-${randomUUID().slice(0, 8)}`.toLowerCase()
+    const response = await harness.a.principal.api!.post('/api/builders/track', {
+      data: {
+        source: 'github',
+        sourceId,
+        username: sourceId,
+        displayName: 'E2E Live',
+        profileUrl: `https://github.com/${sourceId}`,
+        topics: [],
+      },
+    })
+    expect(response.status(), await response.text()).toBeLessThan(400)
+  })
+})

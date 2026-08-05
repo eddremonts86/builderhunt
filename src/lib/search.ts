@@ -13,7 +13,9 @@ import { searchProductHunt } from '~/lib/sources/producthunt'
 import { searchBluesky } from '~/lib/sources/bluesky'
 import { deduplicateBuilders } from '~/lib/dedup'
 import { fuseByRank, scoreBuilders, type FusedBuilder } from '~/lib/score'
-import type { RawBuilder } from '~/lib/sources/types'
+import type { RawBuilder, SourceName } from '~/lib/sources/types'
+import { env } from '~/shared/lib/env'
+import { CREDENTIAL_ENV_VARS, CREDENTIAL_MANDATORY_SOURCES } from '~/shared/lib/source-credentials'
 import { log } from '~/shared/lib/log'
 import { metrics } from '~/shared/lib/metrics'
 import { filterSuppressed } from '~/shared/lib/profile-suppression'
@@ -41,8 +43,16 @@ export const CONNECTOR_TIMEOUT_MS = 8000
  * `search_sources`, so it was never contacted. It exists as its own value because folding it into
  * `ok, 0 results` would tell a user the source had nothing to say, and folding it into `failed` would
  * tell them something is broken. Neither is true.
+ *
+ * `unconfigured` is the same argument one step further in. The source is enabled in the register and
+ * its connector exists, but the credential its upstream refuses to work without is absent from this
+ * deployment — so it was not contacted either, and for a reason an operator can fix rather than a
+ * developer. Before this value existed, `reddit` reported `ok, 0 results` on every search: its
+ * connector caught a 403 and returned `[]`, which is indistinguishable from "nobody matched". That is
+ * the failure mode that let `hashnode` sit enabled and dead for months
+ * (docs/operations/public-enrichment-source-register.md#hashnode), reproduced on a live source.
  */
-export type SourceHealth = 'ok' | 'failed' | 'timeout' | 'disabled'
+export type SourceHealth = 'ok' | 'failed' | 'timeout' | 'disabled' | 'unconfigured'
 
 /** Per-source outcome, so a caller can tell "this source found nothing" from "this source broke". */
 export interface SourceStatus {
@@ -156,18 +166,39 @@ function restrictToSources(rows: RawBuilder[], allowed: string[]): RawBuilder[] 
  * the entry records: the source was asked at write time and contributed nothing. `durationMs` is 0
  * for the same reason; no request was made now.
  */
-function statusFromCachedRows(rows: RawBuilder[], requested: string[]): SourceStatus[] {
+function statusFromCachedRows(rows: RawBuilder[], requested: string[], recorded?: SourceStatus[]): SourceStatus[] {
   const counts = new Map<string, number>()
   for (const row of rows) counts.set(row.source, (counts.get(row.source) ?? 0) + 1)
-  return requested.map((source) => ({
-    source,
-    health: 'ok' as const,
-    resultCount: counts.get(source) ?? 0,
-    durationMs: 0,
-  }))
+  const bySource = new Map((recorded ?? []).map((status) => [status.source, status]))
+  return requested.map((source) => {
+    // The recorded health wins where it exists: a source that timed out at write time did not
+    // become healthy by being read from a cache. `durationMs` is still 0 — no request was made now
+    // — and the recorded `detail` travels so the UI can say why.
+    const written = bySource.get(source)
+    if (written && written.health !== 'ok') {
+      return { source, health: written.health, resultCount: 0, durationMs: 0, detail: written.detail }
+    }
+    return { source, health: 'ok' as const, resultCount: counts.get(source) ?? 0, durationMs: 0 }
+  })
 }
 
-const cache = new Map<string, { results: RawBuilder[]; timestamp: number }>()
+/**
+ * A cache entry carries the per-source health of the fan-out that produced it, not just its rows.
+ *
+ * Without that, a cache hit reconstructed health from the rows alone (`statusFromCachedRows`) and a
+ * source with none was reported `ok, 0 results`. So a connector that timed out was written into the
+ * cache as a success and served that way for the next five minutes — one slow moment became five
+ * minutes of a source that looked healthy and had nothing to say. Found 2026-08-05 when a GitLab
+ * timeout re-probed as `ok, 0 results, 48ms`: the second run never contacted GitLab at all.
+ */
+interface CacheEntry {
+  results: RawBuilder[]
+  /** Health of each contacted source at write time. Absent on entries written before this field existed. */
+  statuses?: SourceStatus[]
+  timestamp: number
+}
+
+const cache = new Map<string, CacheEntry>()
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
 function cacheKey(opts: SearchOptions): string {
@@ -197,7 +228,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   // that the client bundle pulls in, and the repository imports `publicDb`, which constructs a real
   // `postgres()` client at module-evaluation time.
   const { partitionRequestedSources } = await import('~/shared/lib/repositories/search-sources')
-  const { allowed: sources, refused } = await partitionRequestedSources(requestedSources)
+  const { allowed: permitted, refused } = await partitionRequestedSources(requestedSources)
   const disabledStatuses: SourceStatus[] = refused.map((source) => ({
     source,
     health: 'disabled' as const,
@@ -206,8 +237,38 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
     detail: 'Switched off in the source register',
   }))
   if (refused.length > 0) log.info('search_sources_refused', { refused })
+
+  /*
+   * Second reason not to contact a source: the register permits it, but the credential its upstream
+   * refuses to work without is absent here. Only the two sources that degrade to *nothing* are
+   * filtered — see `CREDENTIAL_MANDATORY_SOURCES`. GitHub and friends drop to a smaller anonymous
+   * quota without their tokens and still belong in the search.
+   *
+   * Skipping the request is the smaller half of this. The point is the status: `searchReddit` used to
+   * catch its own 403 and return `[]`, which `runConnector` correctly reports as `ok` with zero
+   * results, so an unauthenticated deployment showed Reddit as a healthy source that simply never
+   * matched anyone. Same shape as the hashnode retirement, on a source still switched on. That
+   * connector now throws instead, so a Reddit outage *with* credentials reports `failed`; this branch
+   * covers the case where there are no credentials to fail with.
+   */
+  const unconfigured = permitted.filter((source) => {
+    if (!CREDENTIAL_MANDATORY_SOURCES.includes(source as SourceName)) return false
+    return !(CREDENTIAL_ENV_VARS[source as SourceName] ?? []).every((name) => Boolean(env[name]))
+  })
+  const unconfiguredStatuses: SourceStatus[] = unconfigured.map((source) => ({
+    source,
+    health: 'unconfigured' as const,
+    resultCount: 0,
+    durationMs: 0,
+    // Names the variable, never a value. This string reaches the search UI.
+    detail: `Not contacted — ${(CREDENTIAL_ENV_VARS[source as SourceName] ?? []).join(' and ')} not set`,
+  }))
+  if (unconfigured.length > 0) log.warn('search_sources_unconfigured', { unconfigured })
+
+  const sources = permitted.filter((source) => !unconfigured.includes(source))
+  const notContacted = [...disabledStatuses, ...unconfiguredStatuses]
   if (sources.length === 0) {
-    return { builders: [], sources: disabledStatuses }
+    return { builders: [], sources: notContacted }
   }
 
   // Check in-memory cache first
@@ -216,7 +277,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
     const visible = restrictToSources(await filterSuppressed(cached.results), sources)
     metrics.increment('searchCacheHits')
     log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'memory' })
-    return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources), ...disabledStatuses] }
+    return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources, cached.statuses), ...notContacted] }
   }
 
   // Check Redis cache (if available)
@@ -227,12 +288,17 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
       const redisKey = `search:${cacheKeyStr}`
       const cachedRaw = await redis.get(redisKey)
       if (cachedRaw) {
-        const parsed = JSON.parse(cachedRaw) as RawBuilder[]
-        cache.set(cacheKeyStr, { results: parsed, timestamp: Date.now() })
+        // Two shapes live under this key: a bare row array (every entry written before health was
+        // recorded, and any still inside its five-minute TTL during a deploy) and the tagged object.
+        // An untagged entry simply has no recorded health, which is the pre-existing behaviour.
+        const decoded = JSON.parse(cachedRaw) as RawBuilder[] | { results: RawBuilder[]; statuses?: SourceStatus[] }
+        const parsed = Array.isArray(decoded) ? decoded : decoded.results
+        const statuses = Array.isArray(decoded) ? undefined : decoded.statuses
+        cache.set(cacheKeyStr, { results: parsed, statuses, timestamp: Date.now() })
         const visible = restrictToSources(await filterSuppressed(parsed), sources)
         metrics.increment('searchCacheHits')
         log.info('search_executed', { keywords, sources, resultsCount: visible.length, durationMs: Date.now() - start, cache: 'redis' })
-        return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources), ...disabledStatuses] }
+        return { builders: fuseByRank(scoreBuilders(visible)), sources: [...statusFromCachedRows(visible, sources, statuses), ...notContacted] }
       }
     }
   } catch {
@@ -280,7 +346,8 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   })
 
   const deduped = deduplicateBuilders(filtered)
-  cache.set(cacheKeyStr, { results: deduped, timestamp: Date.now() })
+  const liveStatuses = outcomes.map(({ builders: _builders, ...status }) => status)
+  cache.set(cacheKeyStr, { results: deduped, statuses: liveStatuses, timestamp: Date.now() })
 
   // Write-through to Redis (best-effort, fire-and-forget)
   try {
@@ -289,7 +356,7 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
     if (redis) {
       const redisKey = `search:${cacheKeyStr}`
       // 5 minute TTL — matches in-memory CACHE_TTL
-      await redis.set(redisKey, JSON.stringify(deduped), 'EX', 300).catch(() => null)
+      await redis.set(redisKey, JSON.stringify({ results: deduped, statuses: liveStatuses }), 'EX', 300).catch(() => null)
     }
   } catch {
     // Redis unavailable — in-memory cache is enough
@@ -308,6 +375,6 @@ export async function searchBuildersWithStatus(opts: SearchOptions): Promise<Sea
   })
   return {
     builders: fuseByRank(scoreBuilders(visible)),
-    sources: [...outcomes.map(({ builders: _builders, ...status }) => status), ...disabledStatuses],
+    sources: [...liveStatuses, ...notContacted],
   }
 }

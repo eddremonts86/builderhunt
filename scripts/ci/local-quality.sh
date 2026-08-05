@@ -279,6 +279,13 @@ else
   step dependency-audit pnpm security:dependencies
   step build pnpm build
 
+  # Only meaningful after `build`, and it is the only step that runs the entrypoint that actually ships.
+  # `server/security.mjs` had 22 unit cases and nothing proved the server *sent* the headers — the e2e
+  # harness runs `vite dev` and the accessibility gate runs `vite preview`, neither of which applies one.
+  # Its first run found a duplicated `Referrer-Policy` that no unit test could have seen, because the
+  # collision only exists once a real response and the security set are merged.
+  step prod-headers pnpm security:prod-headers
+
   accessibility_gate() {
     pnpm exec drizzle-kit migrate >/dev/null || return 1
     pnpm db:seed:admin >/dev/null || return 1

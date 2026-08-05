@@ -17,9 +17,27 @@ import { isAllowedBuilderProfileUrl } from '~/shared/lib/security/url-policy'
 import { isSuppressed } from '~/shared/lib/profile-suppression'
 
 const TrackBody = z.object({
+  /*
+   * The authorization boundary for tracking, and the reason it is a literal list rather than
+   * `SourceName`: tracking a builder is the one path that *persists* a person. It writes
+   * `organization_builders`, then `upsertEmbeddingStubs` puts them in `builder_embeddings` (pgvector)
+   * and `recordIngestedSourceObservations` in `public_source_observations`. Searching only caches, for
+   * five minutes, in memory and Redis.
+   *
+   * `hashnode` and `sourcehut` were removed on 2026-08-05. Both were retired on 2026-08-04 with their
+   * connectors deleted (drizzle/0143, 0144), and this enum kept accepting them — so a source the product
+   * can no longer read was still a source it would happily index a person from, on nothing but a
+   * client-supplied payload. For `sourcehut` that is the sharper edge: sr.ht's robots policy disallows
+   * "anything used to feed a machine learning model", and this route is precisely how a sr.ht profile
+   * would have reached the vector index.
+   *
+   * `devpost`, `producthunt` and `bluesky` have never been here — they are searchable, not trackable —
+   * and `SOURCE_PRESENTATION[…].trackable` mirrors that so the UI renders a disabled control instead of
+   * one that 400s.
+   */
   source: z.enum([
     'github', 'reddit', 'hn', 'devto', 'lobsters', 'stackoverflow',
-    'npm', 'huggingface', 'gitlab', 'codeberg', 'hashnode', 'sourcehut',
+    'npm', 'huggingface', 'gitlab', 'codeberg',
   ]),
   sourceId: z.string().min(1),
   username: z.string().min(1),

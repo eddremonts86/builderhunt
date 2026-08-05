@@ -160,11 +160,24 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  // The security posture wins over anything the app set, and it has to win by *replacing* the app's
+  // header rather than being assigned alongside it.
+  //
+  // `webResponse.headers.entries()` yields lowercased names (`referrer-policy`) while this set uses
+  // canonical casing (`Referrer-Policy`) — two distinct object keys, so a plain `Object.assign` left
+  // both in place and node emitted the header twice. A client joins those: the candidate scheduling
+  // routes, which set `Referrer-Policy: no-referrer` themselves, started answering
+  // `no-referrer, no-referrer`. Found 2026-08-05 by scripts/ci/verify-production-headers.mjs on its
+  // first run — no unit test could have, because the collision only exists once a real response and
+  // this set are merged.
+  const security = securityHeaders(url.pathname);
+  const securityKeys = new Set(Object.keys(security).map((key) => key.toLowerCase()));
   const resHeaders = {};
   for (const [k, v] of webResponse.headers.entries()) {
+    if (securityKeys.has(k.toLowerCase())) continue;
     resHeaders[k] = v;
   }
-  Object.assign(resHeaders, securityHeaders(url.pathname));
+  Object.assign(resHeaders, security);
   res.writeHead(webResponse.status, resHeaders);
 
   if (webResponse.body) {

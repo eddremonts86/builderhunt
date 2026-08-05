@@ -242,6 +242,72 @@ test('a confirmed interview moves to a new time, and the old appointment stops h
   expect(live[0]?.count).toBe('1')
 })
 
+/**
+ * The delivery ledger across a move and a cancellation.
+ *
+ * Two things only a real move can prove, both found by writing this:
+ *
+ * 1. **A reschedule creates a replacement event**, so the notice must be keyed on the event id and not
+ *    only its version — a version-only key repeats across successive moves of one invitation and the
+ *    second candidate is never told.
+ * 2. **A cancellation must carry `kind = 'cancellation'`**, which is what makes the outbound ICS a
+ *    CANCEL and removes the entry from both calendars rather than leaving it there forever.
+ */
+async function deliveriesFor(invitationId: string) {
+  return harness.sql<{ kind: string; state: string; idempotency_key: string; event_id: string; error_code: string | null }[]>`
+    select kind, state, idempotency_key, event_id, error_code
+    from calendar_notification_deliveries
+    where invitation_id = ${invitationId} order by created_at, idempotency_key
+  `
+}
+
+test('each move notifies both parties again, keyed on the replacement appointment', async () => {
+  const booked = await bookOne('E2E reschedule notices')
+
+  const bookingNotices = await deliveriesFor(booked.invitationId)
+  expect(bookingNotices.length, 'the booking itself notified both parties').toBe(2)
+
+  async function moveTo(index: number, key: string) {
+    const available = await readSlots(booked.context, booked.invitationId)
+    const target = available.find((slot) => slot.startsAt !== booked.chosen.startsAt)
+    expect(target, `a free slot for move ${index}`).toBeTruthy()
+    const response = await booked.context.post(`/api/public/scheduling/${booked.invitationId}/reschedule`, {
+      data: {
+        slotId: target!.slotId,
+        slotStartsAt: target!.startsAt,
+        submissionVersion: booked.submissionVersion,
+        consentReceiptIds: booked.receiptIds,
+        idempotencyKey: key,
+      },
+    })
+    expect(response.status(), await response.text()).toBe(200)
+    return (await response.json() as { eventId: string }).eventId
+  }
+
+  const firstMoveEvent = await moveTo(1, `reschedule-1-${booked.invitationId}`)
+
+  const afterFirst = (await deliveriesFor(booked.invitationId)).filter((row) => row.kind === 'reschedule')
+  expect(afterFirst.length, 'the move notified both parties').toBe(2)
+  expect(afterFirst.map((row) => row.state)).toEqual(['sent', 'sent'])
+  expect(afterFirst.map((row) => row.error_code)).toEqual([null, null])
+  // Keyed on the replacement event, which is the whole point: the move did not edit the original.
+  expect(afterFirst.every((row) => row.event_id === firstMoveEvent)).toBe(true)
+  expect(afterFirst.every((row) => row.idempotency_key.includes(firstMoveEvent))).toBe(true)
+  expect(firstMoveEvent).not.toBe(booked.eventId)
+})
+
+test('a cancellation is recorded as a cancellation, which is what sends a CANCEL', async () => {
+  const booked = await bookOne('E2E cancellation notice')
+
+  const cancelled = await booked.context.post(`/api/public/scheduling/${booked.invitationId}/cancel`, { data: {} })
+  expect(cancelled.status(), await cancelled.text()).toBe(200)
+
+  const notices = (await deliveriesFor(booked.invitationId)).filter((row) => row.kind === 'cancellation')
+  expect(notices.length, 'both parties are told the interview is off').toBe(2)
+  expect(notices.map((row) => row.state)).toEqual(['sent', 'sent'])
+  expect(notices.every((row) => row.idempotency_key.includes(':cancellation:'))).toBe(true)
+})
+
 test('a move onto a time that is gone is refused, and the original appointment survives it', async () => {
   const booked = await bookOne('E2E reschedule conflict')
 

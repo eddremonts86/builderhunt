@@ -7,6 +7,8 @@ import { AI_TASKS, isTaskDisabled } from '~/shared/lib/ai/tasks'
 import { env } from '~/shared/lib/env'
 import { metrics } from '~/shared/lib/metrics'
 import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
+import { listSearchSources } from '~/shared/lib/repositories/search-sources'
+import { CREDENTIAL_ENV_VARS } from '~/shared/lib/source-credentials'
 
 /**
  * Redacted integration and AI health API (plans/UI/tasks.md Wave 5 "Add a redacted integration and
@@ -22,16 +24,10 @@ import { getDiscoveryState } from '~/shared/lib/repositories/discovery-state'
  * number; the honest gap is the correct value until that tracking is built.
  */
 
-/** Env var(s) whose presence means this source's connector can authenticate. Absent from this map = no credential is required (a public, keyless API, or — `devpost` — a headless-browser worker). */
-const CREDENTIAL_ENV_VARS: Partial<Record<SourceName, Array<keyof typeof env>>> = {
-  github: ['GITHUB_TOKEN'],
-  gitlab: ['GITLAB_TOKEN'],
-  codeberg: ['CODEBERG_TOKEN'],
-  reddit: ['REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET'],
-  stackoverflow: ['STACKOVERFLOW_API_KEY'],
-  huggingface: ['HUGGINGFACE_TOKEN'],
-  producthunt: ['PRODUCTHUNT_TOKEN'],
-}
+// Moved to `~/shared/lib/source-credentials` on 2026-08-05 so `~/lib/search` can read the same table
+// and report a source `unconfigured` rather than contacting an upstream that is certain to refuse.
+// Two copies of this map would drift, which is the same argument that put `search_sources` in the
+// join below instead of a hand-mirrored registry.
 
 /** Sources with their own dedicated kill switch. Absent = always on unless dormant (see `SOURCE_PRESENTATION[source].trackable`). */
 const KILL_SWITCH_ENV_VARS: Partial<Record<SourceName, keyof typeof env>> = {
@@ -49,15 +45,42 @@ export const Route = createFileRoute('/api/admin/integrations/')({
         try {
           await requirePlatformAdminPrincipal(request)
 
+          /*
+           * The database's own view of each source, joined in because this projection was wrong without it.
+           *
+           * `search_sources.enabled` / `connector_implemented` is the real kill switch: `sourcehut` and
+           * `hashnode` were retired on 2026-08-04 (drizzle/0143, 0144), **their connector files were
+           * deleted**, and both rows read `false, false`. This endpoint built its rows from
+           * `SOURCE_PRESENTATION` alone — a compile-time registry that nobody updated — so
+           * `/admin/integrations` showed both as **ACTIVE**, for sources whose code no longer exists.
+           * Found 2026-08-05 when Edd read the page and it disagreed with reality.
+           *
+           * Joining the table rather than editing two entries in the registry is the point: a hand-patched
+           * registry goes stale again at the next retirement, which is exactly how this happened.
+           */
+          const registered = new Map((await listSearchSources().catch(() => [])).map((row) => [row.key, row]))
+
           const sources = SOURCE_NAMES.map((source) => {
             const presentation = SOURCE_PRESENTATION[source]
             const requiredVars = CREDENTIAL_ENV_VARS[source] ?? []
             const killSwitchVar = KILL_SWITCH_ENV_VARS[source]
+            const row = registered.get(source)
+            // Absent from the table is not the same as disabled in it: a source with no row has never been
+            // registered, and reporting that as "retired" would invent a decision nobody made.
+            const registryEnabled = row ? row.enabled : null
+            const connectorImplemented = row ? row.connectorImplemented : null
+            const retired = row ? !row.enabled && !row.connectorImplemented : false
             return {
               source,
               label: presentation.label,
-              trackable: presentation.trackable,
-              dormantReason: presentation.dormantReason,
+              // A retired source is not trackable whatever the compile-time registry still says.
+              trackable: presentation.trackable && !retired,
+              dormantReason: retired
+                ? `Retired — the connector was removed and ${source === 'sourcehut' ? "sr.ht's robots policy excludes this use" : 'its API moved behind a paid plan'}`
+                : presentation.dormantReason,
+              registryEnabled,
+              connectorImplemented,
+              retired,
               credentialRequired: requiredVars.length > 0,
               credentialPresent: requiredVars.length === 0 || requiredVars.every((name) => Boolean(env[name])),
               killSwitchEnabled: killSwitchVar ? env[killSwitchVar] === 'true' : null,

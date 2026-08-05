@@ -822,6 +822,14 @@ export async function insertDeliveryIfAbsent(
     organizationId: string
     eventId: string
     reminderId?: string | null
+    /**
+     * The scheduling invitation this notice belongs to, when it has one.
+     *
+     * The column has existed since the table was created and nothing wrote it until 2026-08-05, so
+     * every delivery row was attributable to an event but not to the invitation that produced it —
+     * which is the join an organizer's "was this candidate told?" view needs.
+     */
+    invitationId?: string | null
     kind: string
     recipientUserId?: string | null
     externalRecipientHash?: string | null
@@ -834,6 +842,7 @@ export async function insertDeliveryIfAbsent(
       organizationId: input.organizationId,
       eventId: input.eventId,
       reminderId: input.reminderId ?? null,
+      invitationId: input.invitationId ?? null,
       kind: input.kind,
       recipientUserId: input.recipientUserId ?? null,
       externalRecipientHash: input.externalRecipientHash ?? null,

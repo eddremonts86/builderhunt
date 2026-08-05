@@ -233,6 +233,86 @@ test('a candidate books a slot, and the booking creates the interview event', as
   expect(row?.status).toBe('booked')
 })
 
+/**
+ * The delivery ledger after a booking (plan: calendar-scheduling-interview-intelligence, Phase 5
+ * "Add calendar invitation email and ICS generation").
+ *
+ * This is the assertion the unit tests cannot make. `notifyAppointmentChange` is mocked at the
+ * repository boundary there, so nothing in that suite touches a role, a grant or a CHECK — and both of
+ * those bit on the way in: the notice runs in a worker-role transaction because the candidate route
+ * authorizes as `builderhunt_capability` (SELECT only), and its first version wrote a `kind` the
+ * ledger's CHECK rejects, which the module's own catch swallowed while bookings kept succeeding.
+ *
+ * Reading the ledger rather than the outbox is deliberate: the app runs in a child process, so the
+ * in-process outbox is unreachable from here. The rows are also the stronger evidence — they prove the
+ * write happened under the real role.
+ */
+test('a booking writes one delivery per party, and booking again does not notify twice', async () => {
+  const invitation = await createInvitation(harness)
+  const sent = await sendInvitation(harness, invitation.invitationId)
+  const context = await candidateContext(harness, invitation.invitationId, sent.secret)
+
+  const slots = await readSlots(context, invitation.invitationId)
+  const submission = await submitCandidate(context, invitation.invitationId)
+  const chosen = slots[0]
+  const bookBody = {
+    slotId: chosen.slotId,
+    slotStartsAt: chosen.startsAt,
+    submissionVersion: submission.submissionVersion,
+    consentReceiptIds: submission.consentReceipts.map((receipt) => receipt.id),
+    idempotencyKey: `book-${invitation.invitationId}`,
+  }
+
+  const booking = await context.post(`/api/public/scheduling/${invitation.invitationId}/book`, { data: bookBody })
+  expect(booking.status(), await booking.text()).toBe(200)
+  const { eventId } = await booking.json() as { eventId: string }
+
+  const deliveries = await harness.sql<{
+    kind: string
+    state: string
+    idempotency_key: string
+    recipient_user_id: string | null
+    external_recipient_hash: string | null
+    invitation_id: string | null
+    error_code: string | null
+  }[]>`
+    select kind, state, idempotency_key, recipient_user_id, external_recipient_hash, invitation_id, error_code
+    from calendar_notification_deliveries
+    where event_id = ${eventId} order by idempotency_key
+  `
+
+  expect(deliveries.length, 'one notice for the candidate and one for the organizer').toBe(2)
+  // `sent`, not `pending`: the send really ran. A `failed` row here would mean the notice was attempted
+  // and rejected, which is the state the first version of this code produced on every booking.
+  expect(deliveries.map((row) => row.state)).toEqual(['sent', 'sent'])
+  expect(deliveries.map((row) => row.error_code)).toEqual([null, null])
+  // The bare kind the CHECK allows. A prefixed one aborts the insert with 23514.
+  expect(new Set(deliveries.map((row) => row.kind))).toEqual(new Set(['invitation']))
+  expect(deliveries.every((row) => row.invitation_id === invitation.invitationId)).toBe(true)
+
+  // Exactly one recipient identifier per row — `calendar_notification_deliveries_recipient_check`
+  // enforces it, and it is what separates the organizer (a user) from the candidate (an address).
+  const organizer = deliveries.find((row) => row.recipient_user_id !== null)
+  const candidate = deliveries.find((row) => row.external_recipient_hash !== null)
+  expect(organizer, 'the organizer is recorded as a user').toBeTruthy()
+  expect(candidate?.external_recipient_hash, 'the candidate is recorded by address').toBe(invitation.candidateEmail)
+  expect(candidate?.recipient_user_id).toBeNull()
+
+  // The event version is in the key, which is what makes a reschedule a new notice instead of a
+  // duplicate. Read the real version rather than assuming 1.
+  const [event] = await harness.sql<{ version: number }[]>`select version from calendar_events where id = ${eventId}`
+  expect(candidate?.idempotency_key).toBe(`scheduling:${invitation.invitationId}:invitation:${eventId}:${event.version}:candidate`)
+  expect(organizer?.idempotency_key).toBe(`scheduling:${invitation.invitationId}:invitation:${eventId}:${event.version}:organizer`)
+
+  // Re-POSTing the same idempotency key returns the same booking, and must not notify again.
+  const repeat = await context.post(`/api/public/scheduling/${invitation.invitationId}/book`, { data: bookBody })
+  expect(repeat.status(), await repeat.text()).toBe(200)
+  const [{ count }] = await harness.sql<{ count: number }[]>`
+    select count(*)::int as count from calendar_notification_deliveries where event_id = ${eventId}
+  `
+  expect(count, 'a repeated booking adds no delivery rows').toBe(2)
+})
+
 test('the same idempotency key books once; a different key on a taken slot loses', async () => {
   const invitation = await createInvitation(harness)
   const sent = await sendInvitation(harness, invitation.invitationId)

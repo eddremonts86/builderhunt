@@ -26,11 +26,17 @@
  * caller. The candidate's booking is real whether or not the email arrived — the opposite arrangement
  * would let a mail outage refuse interviews.
  *
- * **4. Idempotency includes the event version.** The key is
- * `scheduling:<invitationId>:<kind>:<eventVersion>:<recipient>`, so a retried POST cannot double-send,
- * while a reschedule — which bumps `calendar_events.version` — is a genuinely new notice and does send.
- * Keying on the invitation alone would suppress the reschedule notice; keying without the version would
- * make a double-click look like a second appointment.
+ * **4. Idempotency is keyed on the appointment, not just the invitation.** The key is
+ * `scheduling:<invitationId>:<kind>:<eventId>:<eventVersion>:<recipient>`, so a retried POST cannot
+ * double-send while a genuinely new appointment does.
+ *
+ * Both halves of that key earn their place, and the first version had only one of them. **A reschedule
+ * does not edit the event in place — it creates a replacement** and repoints
+ * `scheduling_invitations.booked_event_id` at it (see `tests/e2e/scheduling-reschedule.spec.ts`, "the
+ * move creates a replacement event"). The new event's `version` starts at 1, so a key built from the
+ * version alone is *identical* for the first and second reschedule of one invitation, and the second
+ * candidate would never be told their interview moved. The event id distinguishes replacements; the
+ * version still distinguishes an in-place edit of one event. Found 2026-08-05 while writing the e2e.
  */
 
 import { log } from '~/shared/lib/log'
@@ -105,11 +111,24 @@ export async function notifyAppointmentChange(input: {
           continue
         }
 
-        const idempotencyKey = `scheduling:${input.invitationId}:${input.kind}:${context.eventVersion}:${recipient.role}`
+        // The key still carries the `scheduling:` namespace — it is a free-text column with no CHECK,
+        // and it keeps these apart from the reminder worker's keys for the same event.
+        const idempotencyKey = `scheduling:${input.invitationId}:${input.kind}:${context.eventId}:${context.eventVersion}:${recipient.role}`
         const claimed = await insertDeliveryIfAbsent(transaction, {
           organizationId: input.organizationId,
           eventId: context.eventId,
-          kind: `scheduling_${input.kind}`,
+          /*
+           * The bare kind, not a `scheduling_`-prefixed one.
+           * `calendar_notification_deliveries_kind_check` allows exactly
+           * `reminder | invitation | reschedule | cancellation`, and those three are precisely the
+           * transitions this module handles — the prefix was invented and every insert violated the
+           * constraint with 23514. The module's own catch swallowed it and logged
+           * `scheduling_notification_failed`, so bookings kept working and nobody was ever notified.
+           * Found 2026-08-05 while writing the e2e; the unit tests mock this repository and could not
+           * see a CHECK.
+           */
+          kind: input.kind,
+          invitationId: input.invitationId,
           recipientUserId: recipient.userId,
           // Same convention as the reminder worker: an external recipient is recorded by address,
           // because a hash we would have to reverse later is not an identifier.

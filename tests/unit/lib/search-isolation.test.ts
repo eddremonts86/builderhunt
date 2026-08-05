@@ -47,6 +47,23 @@ vi.mock('~/shared/lib/repositories/search-sources', () => ({
   partitionRequestedSources: (requested: readonly string[]) =>
     Promise.resolve({ allowed: [...requested], refused: [] }),
 }))
+/**
+ * The credential table, for the same reason as the register above: `searchBuildersWithStatus` skips a
+ * source whose mandatory credential is absent, and this machine's `.env` decides which those are. Left
+ * unmocked, whether `reddit` participates in an aggregation test would depend on whether the developer
+ * running it happens to hold Reddit API keys.
+ *
+ * Both exports are **mutated in place, never reassigned** — `src/lib/search.ts` holds a live binding to
+ * each, so a case can add an entry and the next call sees it.
+ */
+const credentials = vi.hoisted(() => ({
+  mandatory: [] as string[],
+  vars: {} as Record<string, string[]>,
+}))
+vi.mock('~/shared/lib/source-credentials', () => ({
+  CREDENTIAL_MANDATORY_SOURCES: credentials.mandatory,
+  CREDENTIAL_ENV_VARS: credentials.vars,
+}))
 
 const { CONNECTOR_TIMEOUT_MS, searchBuildersWithStatus } = await import('~/lib/search')
 
@@ -74,6 +91,8 @@ const ALL_FIVE = ['github', 'hn', 'devto', 'reddit', 'lobsters']
 
 beforeEach(() => {
   vi.clearAllMocks()
+  credentials.mandatory.length = 0
+  for (const key of Object.keys(credentials.vars)) delete credentials.vars[key]
   // Healthy baseline; each case overrides only the connectors it cares about.
   mocks.github.mockResolvedValue([builder('github', 'gh-1')])
   mocks.hn.mockResolvedValue([builder('hn', 'hn-1')])
@@ -168,6 +187,78 @@ describe('connector isolation', () => {
     // "Found nothing" and "broke" are different facts, and the old flat response could express neither.
     expect(devto?.health).toBe('ok')
     expect(devto?.resultCount).toBe(0)
+  })
+})
+
+describe('missing credentials', () => {
+  /**
+   * The distinction these two cases pin apart is the one that hid a dead source in production.
+   *
+   * `searchReddit` used to catch its own 403 and return `[]`, so an unauthenticated deployment reported
+   * Reddit as `ok, 0 results` on every search — identical to the case directly above, where a source
+   * genuinely had nothing to say. Verified live 2026-08-05: without credentials Reddit answers 403 on
+   * both `oauth.reddit.com` and the `www.reddit.com/*.json` fallback the connector then tried. That is
+   * the shape of the `hashnode` retirement, on a source still switched on.
+   *
+   * `NEVER_SET_IN_ANY_ENVIRONMENT` rather than `REDDIT_CLIENT_ID`: the real variable's absence is a
+   * property of whoever runs the suite, and this assertion must not start passing or failing because
+   * someone added Reddit keys to their `.env`.
+   */
+  it('does not contact a source whose mandatory credential is absent, and says so', async () => {
+    credentials.mandatory.push('reddit')
+    credentials.vars.reddit = ['NEVER_SET_IN_ANY_ENVIRONMENT']
+
+    const { builders, sources } = await searchBuildersWithStatus({ keywords: freshKeywords(), sources: ALL_FIVE })
+
+    const reddit = sources.find((s) => s.source === 'reddit')
+    expect(reddit?.health).toBe('unconfigured')
+    expect(reddit?.health).not.toBe('ok')
+    expect(mocks.reddit).not.toHaveBeenCalled()
+    expect(reddit?.detail).toContain('NEVER_SET_IN_ANY_ENVIRONMENT')
+    // Every other source still answers — a missing key is one source's problem.
+    expect(builders).toHaveLength(4)
+    expect(sources.filter((s) => s.health === 'ok')).toHaveLength(4)
+  })
+
+  it('leaves a source alone when its credential is only an optional quota boost', async () => {
+    // `github`, `gitlab`, `codeberg`, `stackoverflow` and `huggingface` all answer anonymously at a
+    // smaller quota, so they are in `CREDENTIAL_ENV_VARS` but not in `CREDENTIAL_MANDATORY_SOURCES`.
+    // A degraded source still belongs in a search.
+    credentials.vars.github = ['NEVER_SET_IN_ANY_ENVIRONMENT']
+
+    const { sources } = await searchBuildersWithStatus({ keywords: freshKeywords(), sources: ALL_FIVE })
+
+    expect(sources.find((s) => s.source === 'github')?.health).toBe('ok')
+    expect(mocks.github).toHaveBeenCalled()
+  })
+})
+
+describe('cached health', () => {
+  it('does not relabel a timed-out source as healthy on the next request', async () => {
+    /**
+     * The cache stores rows; health used to be re-derived from them, and a source with no rows was
+     * reported `ok, 0 results`. So one timeout was written into the cache as a success and served that
+     * way for the whole five-minute TTL. Found 2026-08-05 when a GitLab timeout re-probed as
+     * `ok, 0 results, 48ms` — a second run that never contacted GitLab at all and said it was fine.
+     */
+    vi.useFakeTimers()
+    const keywords = freshKeywords()
+    try {
+      mocks.github.mockReturnValue(new Promise<RawBuilder[]>(() => {}))
+      const pending = searchBuildersWithStatus({ keywords, sources: ALL_FIVE })
+      await vi.advanceTimersByTimeAsync(CONNECTOR_TIMEOUT_MS + 1)
+      expect((await pending).sources.find((s) => s.source === 'github')?.health).toBe('timeout')
+    } finally {
+      vi.useRealTimers()
+    }
+
+    // Same keywords, so this is served from the entry the timed-out run wrote.
+    const { sources } = await searchBuildersWithStatus({ keywords, sources: ALL_FIVE })
+    const github = sources.find((s) => s.source === 'github')
+    expect(github?.health).toBe('timeout')
+    expect(github?.durationMs).toBe(0)  // nothing was contacted now, and the status says so
+    // The connector was not re-run to produce that answer.
+    expect(mocks.github).toHaveBeenCalledTimes(1)
   })
 })
 

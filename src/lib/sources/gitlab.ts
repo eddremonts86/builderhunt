@@ -80,15 +80,37 @@ function absoluteAvatar(url: string | null | undefined): string | undefined {
   return url
 }
 
+/**
+ * How long one star-sampling page may take before it is abandoned.
+ *
+ * `/projects?order_by=star_count&per_page=100&simple=false` is the slowest thing this connector does
+ * by an order of magnitude — measured 2026-08-05 against gitlab.com: 3.9 s, 4.0 s, 4.3 s, 5.9 s and
+ * **7.2 s** for the five pages, while `search?scope=users` answered in 0.4 s and
+ * `search?scope=projects` in 2.4 s. The pages run concurrently, so the slowest one sets the
+ * connector's duration, and `CONNECTOR_TIMEOUT_MS` is 8 s — which is why GitLab intermittently
+ * reported `timeout, 0 results` and contributed nothing at all to a search.
+ *
+ * Abandoning a slow page costs a slice of the star sample and keeps the four that answered plus both
+ * authenticated searches. Letting it run costs the entire source. The budget sits under the
+ * connector's own so the failure is attributable here rather than surfacing as a whole-source
+ * timeout — deliberately not imported from `~/lib/search`, which would make this module reach back
+ * into its caller.
+ */
+const PROJECT_PAGE_TIMEOUT_MS = 4000
+
 async function fetchProjectsPage(page: number, perPage: number): Promise<GLProject[]> {
   try {
     const url = `${GL_BASE}/projects?visibility=public&order_by=star_count&simple=false&per_page=${perPage}&page=${page}`
     const res = await fetch(url, {
       headers: { 'User-Agent': 'BuilderHunt/1.0 (gitlab source)', ...authHeaders() },
+      // A real abort, not a race: the socket is closed, so a slow page stops consuming GitLab's
+      // rate budget as well as ours.
+      signal: AbortSignal.timeout(PROJECT_PAGE_TIMEOUT_MS),
     })
     if (!res.ok) return []
     return (await res.json()) as GLProject[]
   } catch {
+    // Includes the abort. A missing page is a smaller sample, never a failed search.
     return []
   }
 }

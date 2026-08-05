@@ -123,8 +123,12 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     label: 'SourceHut',
     Icon: SourceHutIcon,
     badgeClassName: 'badge-sourcehut',
-    trackable: true,
-    dormantReason: null,
+    // Retired 2026-08-04 (drizzle/0143) and removed from `POST /api/builders/track` on 2026-08-05, so a
+    // live Track control here would render a button that 400s. `/api/admin/integrations` also derives
+    // `retired` from `search_sources` and overrides this — belt and braces, because that projection
+    // reads the database and this table is what the search UI renders from.
+    trackable: false,
+    dormantReason: "Retired — the connector was removed and sr.ht's robots policy excludes this use",
     buildProfileUrl: profileUrlBuilder('sr.ht', (h) => `https://sr.ht/~${h}`, { allowSlash: true }),
   },
   hn: {
@@ -159,8 +163,10 @@ export const SOURCE_PRESENTATION: Record<SourceName, SourcePresentation> = {
     label: 'Hashnode',
     Icon: HashnodeIcon,
     badgeClassName: 'badge-hashnode',
-    trackable: true,
-    dormantReason: null,
+    // Retired 2026-08-04 (drizzle/0144) — Hashnode's public GraphQL API moved behind a paid plan. Same
+    // reasoning as `sourcehut` above.
+    trackable: false,
+    dormantReason: 'Retired — the connector was removed and its API moved behind a paid plan',
     buildProfileUrl: profileUrlBuilder('hashnode.com', (h) => `https://hashnode.com/@${h}`),
   },
   stackoverflow: {

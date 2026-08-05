@@ -883,3 +883,64 @@ against a max of 200** — and the next full run reported 104 failed files. None
 were `53300 too many clients` and `drop is not a function` from workers that died before cleanup. Terminated
 188 leaked idle connections, dropped 13 orphaned test databases, re-ran clean at 5762. Worth remembering
 before diagnosing a sudden mass failure: check `pg_stat_activity` first.
+
+## Session 2026-08-05 (close, part 5) — the e2e Edd asked for, and the two bugs they found
+
+Asked for "all the e2e needed to be sure it works". The exercise justified itself twice over: writing the
+tests found two defects in code that had already passed 12 unit tests and a full `pnpm ci:local`.
+
+### First, a gap found before writing a single test
+
+`securityHeaderEntries` is consumed by **`server.prod.mjs` alone**, and that entrypoint runs in exactly one
+place: `start.sh` / the Dockerfile `CMD`. **No test, no e2e spec and no `ci:local` step ever started it** —
+the e2e harness spawns `vite dev`, the accessibility gate uses `vite preview`, and neither applies a single
+security header. So the whole posture (CSP, HSTS, X-Frame-Options, Referrer-Policy, Permissions-Policy,
+COOP/CORP) and the CSRF mutation-origin gate were unit-tested and never served. That is the same shape as
+the duplication this repo already fixed once — "a tested copy nothing imported and an untested inline copy
+that shipped" — except the *serving* stayed unverified, which a unit test cannot distinguish.
+
+New `scripts/ci/verify-production-headers.mjs` boots the real entrypoint on a free port, makes real
+requests and reads real headers: **27 checks**, wired into `ci:local` as `prod-headers` after `build`
+(the only point at which it is meaningful, since it needs `dist/`).
+
+**Its first run found a defect in that day's own CSP work.** `Referrer-Policy: no-referrer, no-referrer` —
+duplicated, because `server.prod.mjs` copied the app's headers lowercased (`referrer-policy`) and then
+`Object.assign`ed the canonical-cased set (`Referrer-Policy`) over them. Two distinct object keys, so node
+emitted both and the client joined them. Fixed by removing any case-variant before assigning. The gate was
+then tightened from `includes` to exact equality, because `"no-referrer, no-referrer".includes('no-referrer')`
+is true — the loose form nearly let it through.
+
+### The scheduling notification e2e, and the two bugs it caught
+
+Three specs added against the real database — `tests/e2e/scheduling.spec.ts` (booking) and
+`tests/e2e/scheduling-reschedule.spec.ts` (move, cancel). They read `calendar_notification_deliveries`
+rather than the outbox: the app runs in a child process so the in-process outbox is unreachable, and the
+rows are the stronger evidence anyway because they prove the write happened under the real worker role.
+
+1. **The `kind` violated a CHECK, and the module's own catch hid it.**
+   `calendar_notification_deliveries_kind_check` allows exactly `reminder|invitation|reschedule|cancellation`;
+   the module wrote `scheduling_invitation`. Every insert failed 23514, the best-effort `catch` logged
+   `scheduling_notification_failed`, and bookings kept succeeding — **nobody would ever have been notified,
+   and nothing would have gone red.** The three allowed kinds were exactly the three this module handles; the
+   prefix was invented. Plant-tested: reintroducing it turns the e2e red with 0 delivery rows instead of 2.
+2. **A reschedule creates a replacement event, it does not bump the version.** The idempotency key was
+   `…:<kind>:<eventVersion>:<recipient>`, documented on the false premise that a move bumps `version`. The
+   replacement event starts at version 1, so two successive moves of one invitation produced the *same* key
+   and the second candidate would never learn their interview moved. The key now carries the event id too.
+
+Also wired `calendar_notification_deliveries.invitation_id`, a column that had existed unwritten since the
+table was created — it is the join an organizer's "was this candidate told?" view needs.
+
+### Verification
+
+**`pnpm ci:local` 25/25, one clean run, zero skips** — 24 previous steps plus `prod-headers`. e2e **892
+passed** (the 3 new ones included), unit 5772+, and the earlier 24/24 run is what established the baseline
+this is measured against.
+
+### One stale e2e literal fixed on the way
+
+`onboarding.spec.ts` asserted the heading `'12 sources, one search'`. `welcome.tsx` renders
+`${SEARCH_SOURCE_COUNT} sources, one search` and that constant became **13** when `sourcehut` and `hashnode`
+were retired on 2026-08-04. Nine product surfaces were converted to read the constant in that change and
+this assertion was missed — it was the last hardcoded `12` in the repository, and it was failing `ci:local`'s
+e2e step before any of today's work touched it. Fixed by deriving it, not by writing `13`.

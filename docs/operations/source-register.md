@@ -70,12 +70,117 @@ the repository, so it changes in a migration alongside the connector that lands 
 | `timeout` | no response within `CONNECTOR_TIMEOUT_MS` (8s) |
 | `failed` | errored or returned an unexpected shape |
 | `disabled` | **never contacted** — switched off in the register |
+| `unconfigured` | **never contacted** — enabled, but a credential its upstream requires is absent |
 
 `disabled` is its own value because folding it into `ok, 0 results` would tell a user the source had
 nothing to say, and folding it into `failed` would tell them something is broken. Neither is true.
 
+`unconfigured` is the same argument for the credential case, and it was added on 2026-08-05 because the
+alternative had already produced a dead source nobody could see. `searchReddit` catches its own 403 and
+returns `[]`, so an unauthenticated deployment reported Reddit as `ok, 0 results` on every search — the
+same shape as the `hashnode` retirement, on a source still switched on. Which sources are affected lives
+in [`src/shared/lib/source-credentials.ts`](../../src/shared/lib/source-credentials.ts):
+`CREDENTIAL_MANDATORY_SOURCES` is deliberately narrower than `CREDENTIAL_ENV_VARS`, because GitHub,
+GitLab, Codeberg, Stack Overflow and Hugging Face all answer anonymously at a smaller quota and a
+degraded source still belongs in a search.
+
 Switching a source off also drops its rows from any warm cache entry. Otherwise the kill switch would
 have a five-minute tail during which the product still showed data from a withdrawn source.
+
+**A cache entry records the health of the fan-out that wrote it**, not just its rows. Health used to be
+re-derived from the cached rows alone, so a source with none was reported `ok, 0 results` — meaning one
+timeout was written into the cache as a success and served that way for the whole five-minute TTL. Found
+2026-08-05 when a GitLab timeout re-probed as `ok, 0 results, 48ms`: a second run that never contacted
+GitLab and said it was fine.
+
+## Proving a source still answers
+
+```bash
+pnpm sources:probe
+```
+
+[`scripts/ops/verify-search-sources-live.ts`](../../scripts/ops/verify-search-sources-live.ts) asks every
+implemented connector a keyword it should be able to answer and prints health, result count and duration
+per source. `enabled` says an operator wants a source on and `IMPLEMENTED_SEARCH_CONNECTORS` says its code
+exists; **neither says the upstream still answers**, and only a probe with a matching keyword separates
+"found nothing" from "has been dead for months".
+
+It is **not** a CI gate and must not become one: it spends third-party quota (Stack Exchange allows 300
+requests/day per IP without a key) and a brief outage upstream is not a defect in this repository. Run it
+when credentials change, when a source is added or retired, and before claiming every source works.
+
+Baseline, 2026-08-05 — 11 of 13 answering:
+
+| Result | Sources |
+|---|---|
+| answered | github, hn, devto, lobsters, stackoverflow, npm, huggingface, gitlab, codeberg, devpost, bluesky |
+| `unconfigured` | reddit (`REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET`), producthunt (`PRODUCTHUNT_TOKEN`) |
+
+Those two are the only sources whose upstream returns **nothing at all** unauthenticated. The other five
+credentials in `CREDENTIAL_ENV_VARS` buy quota rather than access, and were measured rather than assumed:
+
+| Credential | What it actually buys |
+|---|---|
+| `STACKOVERFLOW_API_KEY` | 300 → **10 000** requests/day per IP (`quota_max` confirms it). App 39934, read-only anonymous key, no OAuth secret issued. |
+| `GITLAB_TOKEN` | `/search?scope=users` and `?scope=projects`, which are **401** without it. The only one of the five that unlocks endpoints. |
+| `CODEBERG_TOKEN` | **Nothing measurable.** Authenticated `ratelimit: "baseline";r=1971;t=600` against anonymous `r=1970;t=600` — the same bucket. |
+| `GITHUB_TOKEN` | The documented 60 → 5 000 requests/hour. |
+| `HUGGINGFACE_TOKEN` | Higher rate limits, plus the user-search endpoint the connector currently does not use. Absent, and the source answers anyway. |
+
+Three findings from that first run, all since fixed:
+
+1. **reddit was dead, not quiet.** 403 on `oauth.reddit.com` *and* on the `www.reddit.com/*.json`
+   fallback the connector still tries — the fallback now returns an HTML block page, so the comment
+   describing it as an unauthenticated path is no longer true.
+2. **gitlab timed out.** `/projects?order_by=star_count&per_page=100&simple=false` took 3.9–7.2 s per
+   page against an 8 s connector budget, so the source intermittently contributed nothing. Each page now
+   carries its own 4 s `AbortSignal.timeout`: a slow page costs a slice of the star sample instead of the
+   whole source. Measured after the fix: 4.1 s, 5 results.
+3. **devpost was empty.** `DEVPOST_ENABLED` was `false` and `devpost_profiles` held 0 rows, so the
+   connector read an empty table and reported `ok`. Enabled locally and seeded with three worker passes
+   (22 profiles).
+
+## SourceHut: why reviving it is not a policy question
+
+Re-examined 2026-08-05 at the maintainer's request, who asked for it back on the grounds that its data
+would only feed ranking and would never be stored.
+
+**Two corrections, in order of how much they matter.**
+
+**1. The API has no search, so there is no search connector to build.** This was recorded on 2026-08-04
+from a schema reading; it is now confirmed against SourceHut's own published API reference at
+`docs.sourcehut.org`, which needs no token to read:
+
+- `meta.sr.ht` query fields for users are `user`, `userByEmail`, `userByID`, `userByName`. Every one is
+  an **exact lookup**. There is no search field, and `userByName` is documented as "Returns a specific
+  user".
+- `git.sr.ht` has `repositories`, documented as "Returns repositories that the **authenticated user**
+  has access to… only repositories owned by the authenticated user are returned". So it cannot even
+  enumerate another person's public repositories, let alone match a keyword.
+
+A federated search connector answers "who works on Rust?". SourceHut's API can only answer "tell me about
+the user named X". That is a missing capability, not a permissions problem — no token, no scope and no
+policy decision changes it. It is also why the retired connector had never returned a result.
+
+Every sr.ht GraphQL endpoint additionally refuses unauthenticated requests outright, including
+introspection: `POST https://meta.sr.ht/query` and `https://git.sr.ht/query` both answer
+`ERR_UNAUTHORIZED, "Authorization header is required"`.
+
+**2. "We store nothing from it" is not true of any source.** `POST /api/builders/track` calls
+`upsertEmbeddingStubs` and `recordIngestedSourceObservations`, so tracking a builder writes them into
+`builder_embeddings` (pgvector) and `public_source_observations`. `sourcehut` is still in that route's
+`TrackBody` enum today despite being retired. Search results themselves are only cached — in memory and
+in Redis, 5-minute TTL, never in Postgres — so the premise holds for search and fails at the moment a
+recruiter tracks someone.
+
+That distinction is what sr.ht's `robots.txt` prose policy turns on ("Disallowed: … anything used to feed
+a machine learning model"), and it is decidable in code rather than by promise: removing `sourcehut` from
+the `TrackBody` enum would make the source structurally incapable of reaching the vector index.
+
+**What is actually buildable, if a `SOURCEHUT_TOKEN` ever exists:** an exact-username profile lookup via
+`userByName`, which is the "one known profile by ID, without broad search" shape the enrichment register
+requires of any new adapter. That serves declared-link verification, not discovery. The row stays
+`enabled = false, connector_implemented = false` until someone builds it.
 
 ## The four platforms that are registered and permanently unavailable
 

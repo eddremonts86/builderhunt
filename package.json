@@ -64,6 +64,7 @@
     "deploy:db": "node scripts/deploy/orchestrate.mjs",
     "deploy:db:dry": "node scripts/deploy/orchestrate.mjs --dry-run",
     "ci:local": "bash scripts/ci/local-quality.sh",
+    "security:prod-headers": "node scripts/ci/verify-production-headers.mjs",
     "deploy:preflight": "node scripts/deploy/preflight.mjs",
     "stripe:provision": "tsx --env-file=.env scripts/billing/provision-stripe-catalog.ts",
     "billing:check-readiness": "tsx --env-file=.env scripts/billing/check-live-readiness.ts",
@@ -77,7 +78,8 @@
     "bench:interviews": "pnpm bench:calendar && pnpm bench:booking && pnpm bench:segments",
     "solutions:project": "node --env-file=.env --import tsx scripts/solutions/project-components.ts",
     "solutions:evaluate": "node --env-file=.env --import tsx scripts/evaluate-solutions.ts",
-    "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts"
+    "identity:verify": "node --env-file=.env --import tsx scripts/identity/verify-reciprocity.ts",
+    "sources:probe": "node --env-file=.env --import tsx scripts/ops/verify-search-sources-live.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1095.0",

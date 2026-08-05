@@ -35,66 +35,60 @@ export async function searchReddit(keywords: string[], options: { page?: number;
   // because reddit returns roughly consistent results for short windows)
   const after = page > 1 ? `t3_after_${(page - 1) * perPage}` : ''
 
-  let accessToken = ''
-  try {
-    if (clientId && clientSecret) {
-      const res = await fetch('https://www.reddit.com/api/v1/access_token', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
-        },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          username: '',
-          password: '',
-        }),
-      })
-      const data = await res.json() as { access_token?: string }
-      accessToken = data.access_token ?? ''
-    }
-  } catch {
-    // continue without auth
+  /*
+   * Reddit is one of the two connectors with no unauthenticated mode at all — see
+   * `CREDENTIAL_MANDATORY_SOURCES`, which is why `~/lib/search` reports it `unconfigured` and never
+   * calls this function when the keys are absent.
+   *
+   * There used to be a fallback here to `https://www.reddit.com/search/users.json`, described as the
+   * public path. **It stopped being one.** Verified 2026-08-05: that URL answers **403 with an HTML
+   * block page**, as does `oauth.reddit.com` without a token. So the fallback could only ever fail,
+   * and because both failures ended in `return []`, the source reported `ok, 0 results` on every
+   * search — a dead connector that looked like a quiet one, which is exactly how `hashnode` went
+   * unnoticed for months. Removed rather than repaired: a fallback that cannot succeed is worse than
+   * none, because it reads as a working degraded path.
+   *
+   * What replaces it is throwing. `runConnector` turns a rejection into `health: 'failed'` with a
+   * generic detail and leaves every other source untouched, so a Reddit outage is now visible instead
+   * of silent.
+   */
+  if (!clientId || !clientSecret) {
+    throw new Error('reddit_credentials_absent')
   }
 
-  try {
-    const headers: HeadersInit = {
+  const tokenRes = await fetch('https://www.reddit.com/api/v1/access_token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+    },
+    body: new URLSearchParams({ grant_type: 'client_credentials' }),
+  })
+  if (!tokenRes.ok) throw new Error(`reddit_token_${tokenRes.status}`)
+  const accessToken = ((await tokenRes.json()) as { access_token?: string }).access_token ?? ''
+  if (!accessToken) throw new Error('reddit_token_empty')
+
+  const url = new URL('https://oauth.reddit.com/search/users')
+  url.searchParams.set('q', query)
+  url.searchParams.set('restrict_sr', 'false')
+  url.searchParams.set('include_overlap', 'false')
+  url.searchParams.set('sort', 'relevance')
+  url.searchParams.set('t', 'month')
+  url.searchParams.set('limit', String(perPage))
+  if (after) url.searchParams.set('after', after)
+
+  const res = await fetch(url.toString(), {
+    headers: {
       Accept: 'application/json',
       'User-Agent': 'BuilderHunt/1.0',
-      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-    }
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  // Status only. Reddit's error bodies are HTML and can carry the request's own parameters.
+  if (!res.ok) throw new Error(`reddit_search_${res.status}`)
 
-    const url = new URL(`https://oauth.reddit.com/search/users`)
-    url.searchParams.set('q', query)
-    url.searchParams.set('restrict_sr', 'false')
-    url.searchParams.set('include_overlap', 'false')
-    url.searchParams.set('sort', 'relevance')
-    url.searchParams.set('t', 'month')
-    url.searchParams.set('limit', String(perPage))
-    if (after) url.searchParams.set('after', after)
-
-    const res = await fetch(url.toString(), { headers })
-    if (!res.ok) {
-      const publicUrl = new URL('https://www.reddit.com/search/users.json')
-      publicUrl.searchParams.set('q', query)
-      publicUrl.searchParams.set('restrict_sr', 'false')
-      publicUrl.searchParams.set('sort', 'relevance')
-      publicUrl.searchParams.set('t', 'month')
-      publicUrl.searchParams.set('limit', String(perPage))
-      if (after) publicUrl.searchParams.set('after', after)
-      const publicRes = await fetch(publicUrl.toString(), {
-        headers: { 'User-Agent': 'BuilderHunt/1.0' },
-      })
-      if (!publicRes.ok) return []
-      const publicData = await publicRes.json() as { data: RedditListing }
-      return normalizeResults(publicData.data)
-    }
-
-    const data = await res.json() as { data: RedditListing }
-    return normalizeResults(data.data)
-  } catch {
-    return []
-  }
+  const data = await res.json() as { data: RedditListing }
+  return normalizeResults(data.data)
 }
 
 function normalizeResults(data: RedditListing): RawBuilder[] {

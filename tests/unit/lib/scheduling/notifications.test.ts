@@ -82,14 +82,62 @@ describe('notifyAppointmentChange', () => {
     ])
   })
 
-  it('keys idempotency on the event version, so a reschedule is a new notice and a retry is not', async () => {
+  it('writes a kind the ledger CHECK accepts, not a prefixed one', async () => {
+    // Regression. This module first wrote `scheduling_invitation`, which
+    // `calendar_notification_deliveries_kind_check` rejects (`reminder|invitation|reschedule|cancellation`),
+    // so every insert failed 23514, the module's own catch swallowed it, and nobody was ever notified while
+    // bookings kept succeeding. A mocked repository cannot fail a CHECK — hence this asserts the value.
+    for (const kind of ['invitation', 'reschedule', 'cancellation'] as const) {
+      vi.clearAllMocks()
+      findSchedulingNotificationContext.mockResolvedValue(CONTEXT)
+      findUserEmail.mockResolvedValue('organizer@test.invalid')
+      insertDeliveryIfAbsent.mockResolvedValue({ id: 'delivery-x' })
+      sendCalendarEventEmail.mockResolvedValue({ ok: true })
+
+      await notifyAppointmentChange({ organizationId: 'org-1', invitationId: 'inv-1', kind })
+
+      for (const call of insertDeliveryIfAbsent.mock.calls) {
+        const row = call[1] as { kind: string; invitationId: string | null }
+        expect(['reminder', 'invitation', 'reschedule', 'cancellation']).toContain(row.kind)
+        expect(row.kind).toBe(kind)
+        // The invitation id travels too: the column existed unwritten and it is the join an
+        // organizer's "was this candidate told?" view needs.
+        expect(row.invitationId).toBe('inv-1')
+      }
+    }
+  })
+
+  it('keys idempotency on the appointment, so a retry is suppressed and a replacement is not', async () => {
     await notifyAppointmentChange({ organizationId: 'org-1', invitationId: 'inv-1', kind: 'reschedule' })
 
     const keys = insertDeliveryIfAbsent.mock.calls.map((call) => (call[1] as { idempotencyKey: string }).idempotencyKey)
     expect(keys).toEqual([
-      'scheduling:inv-1:reschedule:3:candidate',
-      'scheduling:inv-1:reschedule:3:organizer',
+      `scheduling:inv-1:reschedule:${CONTEXT.eventId}:3:candidate`,
+      `scheduling:inv-1:reschedule:${CONTEXT.eventId}:3:organizer`,
     ])
+  })
+
+  it('gives a replacement appointment its own key, so a second reschedule still notifies', async () => {
+    // The regression this pins: a reschedule creates a *replacement* event whose `version` starts at 1,
+    // so a key built from the version alone repeats across successive reschedules of one invitation and
+    // the second candidate is never told their interview moved.
+    await notifyAppointmentChange({ organizationId: 'org-1', invitationId: 'inv-1', kind: 'reschedule' })
+    const first = (insertDeliveryIfAbsent.mock.calls[0][1] as { idempotencyKey: string }).idempotencyKey
+
+    vi.clearAllMocks()
+    findSchedulingNotificationContext.mockResolvedValue({
+      ...CONTEXT,
+      eventId: '22222222-2222-4222-8222-222222222222',
+      eventVersion: 1,
+    })
+    findUserEmail.mockResolvedValue('organizer@test.invalid')
+    insertDeliveryIfAbsent.mockResolvedValue({ id: 'delivery-y' })
+    sendCalendarEventEmail.mockResolvedValue({ ok: true })
+
+    await notifyAppointmentChange({ organizationId: 'org-1', invitationId: 'inv-1', kind: 'reschedule' })
+    const second = (insertDeliveryIfAbsent.mock.calls[0][1] as { idempotencyKey: string }).idempotencyKey
+
+    expect(second).not.toBe(first)
   })
 
   it('sends a CANCEL for a cancellation and a REQUEST otherwise', async () => {
