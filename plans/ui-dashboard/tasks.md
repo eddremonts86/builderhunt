@@ -17,27 +17,27 @@
   - Do: Record request count, transferred bytes, core endpoint/server timings, layout shift, accessible-name snapshot, and screenshots at desktop, 320 px, 400% zoom, reduced motion, and forced colors.
   - Verify: the baseline is reproducible against the deterministic active-recruiter fixture and fails clearly when the fixture is unavailable.
 
-- [ ] **Make widget visual order equal DOM and focus order**
+- [x] **Make widget visual order equal DOM and focus order**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, dashboard bento layout tests
   - Do: Remove dense placement for interactive widgets; render from one ordered registry and use spans that never visually promote a later DOM sibling. Preserve the same sequence in single-column layouts.
   - Verify: keyboard order equals bounding-box visual order at desktop/tablet/mobile before and after density changes; automated test covers all registered interactive widgets.
 
-- [ ] **Define a stable typed widget registry**
+- [x] **Define a stable typed widget registry**
   - Files: `src/modules/dashboard/lib/widget-registry.ts`, `src/modules/dashboard/lib/contracts.ts`, registry unit tests
   - Do: Give every widget a stable ID, criticality, role eligibility, dependency gate, default order, default visibility, allowed spans, and state capabilities. Reject duplicate IDs and unsafe arbitrary component registration.
   - Verify: table-driven tests cover each persona, missing dependency, new workspace, and unknown/retired widget ID.
 
-- [ ] **Correct the current activity visualization**
+- [x] **Correct the current activity visualization**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, `src/routes/api/dashboard/stats.ts`, activity widget tests
   - Do: Either rename the existing `lastSeenAt` grouping to “Tracked builders last seen active” with exact scope, or replace it with newly tracked builders by `createdAt`. Add exact daily values, generated time, summary, and accessible data disclosure.
   - Verify: a builder contributes according to the chosen definition exactly once; timezone boundaries and empty days pass; no copy says “shipped” or implies event volume.
 
-- [ ] **Correct source-mix and top-metric semantics**
+- [x] **Correct source-mix and top-metric semantics**
   - Files: `src/modules/dashboard/components/DashboardPage.tsx`, dashboard stats contract/tests
   - Do: Label the current source sample explicitly or hide it until the coverage projection ships. Remove Private notes from the default metrics and resolve duplicate Search/New hunt actions. Define “active” in code and copy.
   - Verify: every visible top metric has a denominator or time window, an action, and a fixture proving its calculation.
 
-- [ ] **Distinguish every widget state**
+- [x] **Distinguish every widget state**
   - Files: `src/modules/dashboard/components/WidgetFrame.tsx`, `src/modules/dashboard/lib/contracts.ts`, widget-frame tests
   - Do: Implement loading, ready, empty, partial, stale, unavailable, retryable error, and forbidden/omitted semantics with consistent actions and screen-reader text. Never translate a failed fetch into an empty array.
   - Verify: component snapshots and accessibility tests cover every state; forbidden omits capability details and unavailable never reveals secret/config values.

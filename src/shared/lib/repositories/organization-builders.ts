@@ -680,25 +680,43 @@ export async function getOrganizationDashboardStats(
       .where(eq(savedQueries.organizationId, organizationId)),
     transaction.select({ value: count() }).from(builderNotes)
       .where(eq(builderNotes.organizationId, organizationId)),
-    // Real per-day breakdown of activity in the window, used to render the
-    // dashboard's weekly activity chart without resorting to mock data.
+    /*
+     * Tracked builders grouped by the **day we last saw them active**, which is what this is and
+     * what the dashboard now says it is.
+     *
+     * It is a recency histogram, not a time series: `lastSeenAt` is one timestamp per identity, so
+     * every builder in the window falls in exactly one bucket and the seven buckets sum to
+     * `activeThisWeek`. The chart used to be captioned "Weekly Activity … Builders active per day"
+     * with an empty state reading "No tracked builders have **shipped**", all three of which
+     * described event volume this data cannot express (plans/ui-dashboard, structural problem 4).
+     *
+     * `at time zone 'UTC'` is not decoration. `date_trunc` on a `timestamptz` uses the session's
+     * TimeZone, while the loop below builds its keys in UTC — so on any server not set to UTC the two
+     * disagreed near midnight and a day's count silently landed in no bucket at all.
+     */
     transaction.select({
-      day: sql<string>`to_char(date_trunc('day', ${builderIdentities.lastSeenAt}), 'YYYY-MM-DD')`,
+      day: sql<string>`to_char(date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC'), 'YYYY-MM-DD')`,
       value: sql<number>`count(*)::int`,
     }).from(organizationBuilders)
       .innerJoin(builderIdentities, eq(builderIdentities.id, organizationBuilders.builderIdentityId))
       .where(and(eq(organizationBuilders.organizationId, organizationId), gte(builderIdentities.lastSeenAt, activeSince)))
-      .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt})`),
+      .groupBy(sql`date_trunc('day', ${builderIdentities.lastSeenAt} at time zone 'UTC')`),
   ])
 
   const dailyCounts = new Map(dailyRows.map((row) => [row.day, row.value]))
-  const dailyActivity = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date()
-    date.setDate(date.getDate() - (6 - i))
+  const generatedAt = new Date()
+  const lastSeenByDay = Array.from({ length: 7 }, (_, index) => {
+    // UTC arithmetic throughout. `setDate` mutates in local time, so a server west of UTC building
+    // keys with `toISOString` could produce the same ISO day twice and drop another entirely.
+    const date = new Date(Date.UTC(
+      generatedAt.getUTCFullYear(),
+      generatedAt.getUTCMonth(),
+      generatedAt.getUTCDate() - (6 - index),
+    ))
     const iso = date.toISOString().slice(0, 10)
     return {
       date: iso,
-      label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      label: date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }),
       count: dailyCounts.get(iso) ?? 0,
     }
   })
@@ -708,7 +726,13 @@ export async function getOrganizationDashboardStats(
     activeThisWeek: Number(active?.value ?? 0),
     savedQueries: Number(queries?.value ?? 0),
     totalNotes: Number(notes?.value ?? 0),
-    dailyActivity,
+    /**
+     * Named for what it holds. The old key was `dailyActivity`, which is how the widget came to be
+     * captioned as activity; a field name is a claim like any other.
+     */
+    lastSeenByDay,
+    /** So a widget can caption its numbers rather than implying they are current by omission. */
+    generatedAt: generatedAt.toISOString(),
   }
 }
 

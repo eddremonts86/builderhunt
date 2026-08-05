@@ -5,7 +5,7 @@ import { OnboardingBanner } from './OnboardingBanner'
 import { PendingInvitationsBanner } from './PendingInvitationsBanner'
 import { Link } from '@tanstack/react-router'
 import {
-  Users, TrendingUp, Bookmark, StickyNote, ExternalLink, Plus,
+  Users, TrendingUp, Bookmark, ExternalLink,
   Search, ArrowRight, Sparkles, Activity, Download, Rss, Trash2,
   MoreVertical, Loader2, Check, X, Clock, Radio, Link2, Lock,
 } from 'lucide-react'
@@ -28,10 +28,17 @@ import { SourceMixWidget } from '~/modules/dashboard/ui/home/SourceMixWidget'
 
 interface Stats {
   totalBuilders: number
+  /**
+   * Tracked builders whose identity was last observed by a connector inside the window — a recency
+   * fact, not a count of things they did. The dashboard copy says "Seen active" for exactly that
+   * reason; it used to say "Shipped something in the last 7 days", which this column cannot support.
+   */
   activeThisWeek: number
   savedQueries: number
   totalNotes: number
-  dailyActivity?: Array<{ date: string; label: string; count: number }>
+  /** Renamed from `dailyActivity`: it is one bucket per tracked builder by last-seen day. */
+  lastSeenByDay?: Array<{ date: string; label: string; count: number }>
+  generatedAt?: string
 }
 
 interface SavedQuery {
@@ -128,12 +135,15 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     ),
   },
 
-  // Widths only. Every tile is as tall as its content and the grid backfills, so
-  // the bands below describe how widths tile the field, not fixed heights.
-  // Band 1 — four quarters. 4 x 3 = 12.
-  ...(['builders', 'active', 'searches', 'notes'] as const).map((key, index) => ({
+  // Widths only. Every tile is as tall as its content, so the bands below describe how widths tile
+  // the field, not fixed heights. Placement is sparse (see `BentoGrid`), so a band that does not
+  // total 12 now leaves a real trailing gap instead of pulling a later tile up into it.
+  //
+  // Band 1 — three thirds. 3 x 4 = 12. It was four quarters until Private notes was retired for
+  // answering no question; the survivors widen rather than leaving a quarter-width hole.
+  ...(['builders', 'active', 'searches'] as const).map((key, index) => ({
     id: `stat-${key}`,
-    span: 'quarter' as const,
+    span: 'third' as const,
     minSpan: 'quarter' as const,
     // `MetricWidget` reveals its hint and badge only when the tile can hold
     // them, so a quarter is genuinely its floor rather than a squeeze.
@@ -146,7 +156,7 @@ const HOME_WIDGETS: ReadonlyArray<BentoWidget<HomeContext>> = [
     id: 'activity',
     span: 'half',
     minSpan: 'third',
-    render: (ctx) => <ActivityWidget points={ctx.stats?.dailyActivity ?? []} />,
+    render: (ctx) => <ActivityWidget points={ctx.stats?.lastSeenByDay ?? []} generatedAt={ctx.stats?.generatedAt} />,
   },
   {
     id: 'sprints',
@@ -357,10 +367,19 @@ export function DashboardPage() {
     const activeSharePct = stats && stats.totalBuilders > 0
       ? Math.round((stats.activeThisWeek / stats.totalBuilders) * 100)
       : null
-    const notesPerBuilder = stats && stats.totalBuilders > 0 && stats.totalNotes > 0
-      ? (stats.totalNotes / stats.totalBuilders).toFixed(1)
-      : null
 
+    /*
+     * Three metrics, not four, and each one carries its own denominator or window
+     * (plans/ui-dashboard Wave 0, "Correct source-mix and top-metric semantics").
+     *
+     * **Private notes is gone.** A count of notes answers no question and continues nowhere: knowing
+     * the workspace holds 47 notes changes nothing a recruiter would do next. Its id is in
+     * `RETIRED_WIDGET_IDS` so a saved preference for it cannot later attach to a different widget.
+     *
+     * **"Active this week" is now "Seen active", and its hint no longer says "shipped".** The
+     * underlying column is `builder_identities.lastSeenAt` — the last time any connector observed
+     * that person publicly. It is not a count of things they did, and the old copy claimed it was.
+     */
     return [
     {
       label: 'Builders tracked',
@@ -368,15 +387,15 @@ export function DashboardPage() {
       icon: Users,
       tone: 'accent' as const,
       hint: 'People saved to your lists',
-      badge: stats && stats.activeThisWeek > 0 ? `${stats.activeThisWeek} active now` : undefined,
+      badge: activeSharePct !== null ? `${activeSharePct}% seen active` : undefined,
     },
     {
-      label: 'Active this week',
+      label: 'Seen active',
       value: stats?.activeThisWeek ?? 0,
       icon: TrendingUp,
       tone: 'success' as const,
-      hint: 'Shipped something in the last 7 days',
-      badge: activeSharePct !== null ? `${activeSharePct}% of tracked` : undefined,
+      hint: 'Last seen by a source in the past 7 days',
+      badge: stats && stats.totalBuilders > 0 ? `of ${stats.totalBuilders} tracked` : undefined,
     },
     {
       label: 'Saved searches',
@@ -390,14 +409,6 @@ export function DashboardPage() {
       tone: 'warning' as const,
       hint: 'Hunts you can re-run anytime',
       badge: latestQuery ? `Latest: ${truncate(latestQuery.name, 16)}` : undefined,
-    },
-    {
-      label: 'Private notes',
-      value: stats?.totalNotes ?? 0,
-      icon: StickyNote,
-      tone: 'cyan' as const,
-      hint: 'Context you\'ve attached to builders',
-      badge: notesPerBuilder !== null ? `${notesPerBuilder}/builder` : undefined,
     },
     ]
   }, [stats, queries])
@@ -480,16 +491,21 @@ export function DashboardPage() {
             </h1>
             <p className="text-bh-text-muted text-sm font-light">
               Here's what your hunts turned up.
-              {stats?.activeThisWeek ? ` ${stats.activeThisWeek} builder${stats.activeThisWeek === 1 ? '' : 's'} active this week.` : ''}
+              {stats?.activeThisWeek
+                ? ` ${stats.activeThisWeek} tracked builder${stats.activeThisWeek === 1 ? ' was' : 's were'} seen active in the last 7 days.`
+                : ''}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <DensityToggle density={density} onChange={setDensity} />
-            <LinkButton to="/search" variant="secondary" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
-              <Search className="w-4 h-4" aria-hidden="true" /> Search
-            </LinkButton>
+            {/*
+              One primary action, not two. "Search" and "New hunt" were separate buttons pointing at
+              the same `/search` route — a choice with no consequence, which costs a reader a decision
+              and teaches them the labels mean nothing (plans/ui-dashboard, structural problem 7).
+              The empty-workspace CTA above uses the same destination and the same verb.
+            */}
             <LinkButton to="/search" variant="primary" className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-bh-accent focus-visible:ring-offset-2">
-              <Plus className="w-4 h-4" aria-hidden="true" /> New hunt
+              <Search className="w-4 h-4" aria-hidden="true" /> New hunt
             </LinkButton>
           </div>
         </div>

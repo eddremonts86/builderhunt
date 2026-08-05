@@ -944,3 +944,80 @@ this is measured against.
 were retired on 2026-08-04. Nine product surfaces were converted to read the constant in that change and
 this assertion was missed — it was the last hardcoded `12` in the repository, and it was failing `ci:local`'s
 e2e step before any of today's work touched it. Fixed by deriving it, not by writing `13`.
+
+## Session 2026-08-06 — ui-dashboard Wave 0, and a layout decision reversed
+
+Edd asked for `plans/ui-dashboard` to be implemented, with two rulings: the missing
+`/admin` index **is** the Metrics page rather than a new Command Center destination, and
+"delete what we don't use". Fourteen dashboard screenshots came with it as visual
+reference. Those references are consumer-fintech surfaces built on gauges, donuts and
+concentric bubbles, and the spec forbids all three by name ("Exact progress meters; **no
+gauge**", "no decorative visualization"). Read as a **stylistic** reference — card rhythm,
+chip treatment, typographic hierarchy, restrained use of the accent — which the repo's
+`#e07338` already matches. Information architecture follows the spec.
+
+### Closed (5 of 7 Wave 0 tasks)
+
+- **Widget visual order equals DOM and focus order.** Two mechanisms had to go, not one.
+  `grid-flow-row-dense` reorders openly; the JS masonry (4px rows + a ResizeObserver
+  writing `grid-row-end: span N`) reorders subtly, and that was the one nobody had seen.
+  Measured on the real page: `plan-usage` painted in the left column at y=2171 while
+  `recent-builders`, which precedes it in the DOM, sat in the right column at y=2173 — a
+  later widget read first. The grid is now plain CSS Grid with content-height rows.
+
+  **This reverses a documented decision**, and the cost is real: tiles in a band share the
+  band's height, which is the dead space the masonry existed to reclaim. It is still much
+  less than the pre-masonry version, which padded every tile to a multiple of a 176px row
+  unit. The trade is deliberate — the dashboard is ordered by urgency, so order is the
+  product's central claim, and a runtime cascade that quietly reorders it is not a layout
+  detail. `Bento.tsx` carries the whole argument.
+
+- **A stable typed widget registry** (`lib/contracts.ts`, `lib/widget-registry.ts`, 20
+  tests). Stable ids, criticality, role eligibility, dependency gates, one ordering number,
+  allowed spans. Construction throws on the mistakes that are otherwise silent: a duplicate
+  id (two widgets sharing one preference key), a reused retired id (an old hide attaching to
+  new content), a `minSpan` wider than `span`, a critical widget defaulting to hidden, two
+  widgets sharing an order. Role/dependency/preference omissions are reported with distinct
+  reasons, because offering a member the chance to "restore" Billing would confirm it exists.
+
+- **Every widget state distinguished** (`ui/WidgetFrame.tsx`, 11 tests). A `WidgetState<T>`
+  union with no plain-array member: only `ready`, `stale` and `partial` carry data, so a
+  widget body cannot run on a caught error. This is the same defect class as the search
+  connectors reporting `ok, 0 results` for a 403 — the dashboard's version was catching a
+  failed fetch into `[]` and rendering seven "nothing here yet" states. `forbidden` renders
+  literally nothing, since a "no access" placeholder is itself a disclosure.
+
+- **The activity chart corrected.** It was titled "Weekly Activity", captioned "Builders
+  active per day", with an empty state reading "No tracked builders have **shipped**". The
+  data is `builder_identities.lastSeenAt` — one timestamp per tracked identity — so it is a
+  recency histogram in which each builder appears exactly once and the seven bars sum to the
+  metric beside them. Now "Builder recency", every bar carries its exact count, and the
+  series is repeated as a real `<table>` for the accessible equivalent the spec asks for.
+
+  A timezone bug fell out of the rewrite: `date_trunc('day', lastSeenAt)` uses the session
+  TimeZone while the loop built its keys in UTC, so on any non-UTC server the two disagreed
+  near midnight and a day's count landed in no bucket. Both sides are explicit UTC now.
+
+- **Top-metric semantics.** Private notes removed from the defaults (a note count answers no
+  question and continues nowhere); its id is in `RETIRED_WIDGET_IDS` so a saved preference
+  cannot later attach to a different widget. "Active this week / Shipped something in the
+  last 7 days" is now "Seen active / Last seen by a source in the past 7 days", which is what
+  the column supports. The duplicate Search and New hunt buttons pointed at the same route;
+  one remains. Source mix states its denominator in words and shows raw counts beside the
+  percentages, pending the real coverage projection in Wave 5.
+
+- Deleted `DashboardPage.tsx.bak` (22 KB, untracked, 15 July).
+
+### Open in Wave 0
+
+- Persona fixtures and the performance/a11y baseline. Both are e2e-harness work that later
+  waves consume; neither blocks Wave 1.
+
+### Evidence
+
+`tests/e2e/dashboard-and-navigation.spec.ts` gained two specs. The ordering one states the
+property geometrically — no later widget painted entirely above an earlier one, and within a
+shared band the earlier one is to the left — rather than sorting by rounded position. The
+sorted version needed a tolerance, and any tolerance is wrong: a 2px masonry offset straddling
+a rounding bucket produced a false failure, which is how the real y=2171/2173 divergence was
+found in the first place.

@@ -392,7 +392,9 @@ test('an empty workspace shows zeroed stats, empty panels, and the onboarding ba
     await expect(page.getByText('Run your first hunt')).toBeVisible()
     await expect(page.getByText('No saved searches yet')).toBeVisible()
     await expect(page.getByText('No builders tracked yet')).toBeVisible()
-    await expect(page.getByText('No tracked builders have shipped in the last 7 days yet.')).toBeVisible()
+    // "shipped" until 2026-08-06, which this data cannot support: the column is `lastSeenAt`, one
+    // timestamp per tracked identity, so it says a source observed them — not that they did anything.
+    await expect(page.getByText('No tracked builder has been seen active by a source in the last 7 days.')).toBeVisible()
 
     // Recommendations: the no-saved-searches entry state with starter chips.
     await expect(page.getByRole('heading', { name: 'For you' })).toBeVisible()
@@ -822,6 +824,163 @@ test('signing out from the account menu ends the session for real', async ({ bro
     await go(page, '/dashboard')
     expect(new URL(page.url()).pathname).toBe('/auth/sign-in')
     assertStrictClean(sp)
+  } finally {
+    await closeStrictPage(sp)
+  }
+})
+
+test('widget visual order equals DOM order, which equals focus order, at three widths', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard Wave 0, "Make widget visual order equal DOM and focus order".
+   *
+   * The grid used `grid-flow-row-dense`, which backfills a gap by promoting a later tile into it.
+   * `Bento.tsx` argued that was fine "because every tile is an independent, separately-labelled
+   * region rather than a step in a sequence" — true of a mosaic of read-only cards, false of a
+   * surface whose whole premise is that the order encodes urgency. A keyboard user reaching the
+   * third-most-urgent thing first is a reordering of the product's central claim.
+   *
+   * Comparing painted position against DOM position is the only way to catch a regression here: both
+   * a re-added `dense`, and a hand-edited span that leaves a band short of 12 columns, reintroduce
+   * the promotion, and neither shows up in a screenshot a reviewer would question.
+   */
+  test.setTimeout(180_000)
+  await seedOwnerDashboard()
+  const sp = await openStrictPage(browser, harness.owner)
+  const { page } = sp
+  try {
+    for (const viewport of [
+      { width: 1440, height: 1000, name: 'desktop' },
+      { width: 900, height: 1000, name: 'tablet' },
+      { width: 390, height: 900, name: 'mobile' },
+    ]) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height })
+      await go(page, '/dashboard')
+      await dismissOverlays(page)
+      await page.locator('[data-dashboard-state="ready"]').waitFor()
+
+      /*
+       * Wait for the masonry to settle before measuring, or this test flakes for a reason that has
+       * nothing to do with ordering. `useMasonrySpan` writes each tile's `grid-row-end` from a
+       * ResizeObserver, and until the first measurement lands the tile spans `auto` — so a snapshot
+       * taken between "fetches finished" and "heights measured" reads positions from a layout the
+       * user never sees. `data-dashboard-state` reports the fetches, not the paint.
+       */
+      await page.waitForFunction(() => {
+        const tiles = Array.from(document.querySelectorAll('[data-widget]'))
+        if (tiles.length === 0) return false
+        return tiles.every((tile) => {
+          const item = tile.closest('[style*="grid-row-end"]') as HTMLElement | null
+          // A merged `sections`-density tile has several `[data-widget]` children inside one grid
+          // item, so an inner one legitimately has no grid ancestor of its own.
+          return item === null || item.style.gridRowEnd.startsWith('span')
+        })
+      })
+
+      const widgets = await page.locator('[data-widget]').evaluateAll((nodes) =>
+        nodes.map((node, domIndex) => {
+          const rect = node.getBoundingClientRect()
+          return {
+            id: node.getAttribute('data-widget') ?? `unknown-${domIndex}`,
+            domIndex,
+            top: Math.round(rect.top + window.scrollY),
+            bottom: Math.round(rect.bottom + window.scrollY),
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+          }
+        }),
+      )
+      expect(widgets.length, `no widgets rendered at ${viewport.name}`).toBeGreaterThan(2)
+
+      /*
+       * Stated as two geometric properties rather than as a sorted-order comparison.
+       *
+       * The sorted version needed a tolerance to decide whether two tiles share a band, and any
+       * tolerance is wrong here: masonry places tiles on a 4px row grid, so two side-by-side widgets
+       * routinely differ by a couple of pixels at the top. A 2px difference straddling a rounding
+       * bucket reported `plan-usage` as "promoted above" `recent-builders` when the two are plainly
+       * side by side and read left-to-right in DOM order. The properties below have no threshold.
+       */
+      const at = (id: string) => `${id}@(${widgets.find((w) => w.id === id)?.top})`
+      for (let earlier = 0; earlier < widgets.length; earlier += 1) {
+        for (let later = earlier + 1; later < widgets.length; later += 1) {
+          const a = widgets[earlier]
+          const b = widgets[later]
+
+          // 1. A later widget may never be painted entirely above an earlier one. This is the
+          //    promotion that `grid-flow-row-dense` produced and that sparse placement forbids.
+          expect(
+            b.bottom > a.top,
+            `${viewport.name}: ${b.id} is painted entirely above ${a.id}, which precedes it in the DOM (${at(a.id)} vs ${at(b.id)})`,
+          ).toBe(true)
+
+          // 2. When two widgets share a band, the earlier one is to the left. Vertical overlap is
+          //    what "same band" means; no pixel tolerance is involved.
+          const sharesBand = b.top < a.bottom && a.top < b.bottom
+          if (sharesBand) {
+            expect(
+              a.left <= b.left,
+              `${viewport.name}: ${b.id} sits left of ${a.id} in the same band, so it is read first despite coming later in the DOM`,
+            ).toBe(true)
+          }
+        }
+      }
+    }
+
+    // Focus order follows the DOM, so proving DOM order above proves it — but only if the tiles are
+    // actually in the tab sequence. This is the check that would fail if a widget's links were moved
+    // into a portal or given a negative tabindex, which would silently break the equality.
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await go(page, '/dashboard')
+    await dismissOverlays(page)
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+    const focusableWidgets = await page.locator('[data-widget]').evaluateAll((nodes) =>
+      nodes.filter((node) => node.querySelector('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])')).length,
+    )
+    expect(focusableWidgets, 'no dashboard widget contains a focusable control').toBeGreaterThan(0)
+  } finally {
+    await closeStrictPage(sp)
+  }
+})
+
+test('the recency chart says what it measures and offers its exact values', async ({ browser }) => {
+  /**
+   * plans/ui-dashboard Wave 0, "Correct the current activity visualization" and structural
+   * problem 9.
+   *
+   * The chart was titled "Weekly Activity", captioned "Builders active per day", and its empty state
+   * said no builders had "shipped". The data is `builder_identities.lastSeenAt` — one timestamp per
+   * tracked person — so it is a recency histogram in which each builder appears exactly once. Anyone
+   * reading the old copy literally would conclude a builder shown on Tuesday shipped on Tuesday.
+   *
+   * The verify line also requires an accessible equivalent, so this asserts the data table exists
+   * with one row per day, which no visual regression test would notice missing.
+   */
+  test.setTimeout(120_000)
+  await seedOwnerDashboard()
+  const sp = await openStrictPage(browser, harness.owner)
+  const { page } = sp
+  try {
+    await go(page, '/dashboard')
+    await dismissOverlays(page)
+    await page.locator('[data-dashboard-state="ready"]').waitFor()
+
+    const widget = page.locator('[data-widget="activity"]')
+    await expect(widget.getByRole('heading', { name: 'Builder recency' })).toBeVisible()
+    await expect(widget).toContainText('Each builder counts once')
+
+    // No copy may imply event volume. "shipped" is the specific word the old empty state used.
+    await expect(widget).not.toContainText(/shipped/i)
+    await expect(widget).not.toContainText(/Weekly Activity/i)
+
+    // The accessible equivalent: a real table, one row per day of the window.
+    const table = widget.locator('table')
+    await expect(table).toHaveCount(1)
+    await expect(table.locator('tbody tr')).toHaveCount(7)
+    await expect(table.locator('caption')).toContainText('last saw them active')
+
+    // And the metric that summarises the same column agrees with it.
+    await expect(statCard(page, 'Seen active')).toBeVisible()
+    await expect(page.getByText('Private notes')).toHaveCount(0)
   } finally {
     await closeStrictPage(sp)
   }

@@ -18,80 +18,47 @@ import {
  */
 
 /**
- * Vertical resolution of the masonry field, in pixels. Tiles span a whole number
- * of these, so a smaller number means a tighter fit and more rows for the browser
- * to lay out. 4px is under one line of leading, which is close enough to exact.
- */
-const ROW_UNIT = 4
-
-/** Gutter between tiles, in pixels. Must match the `gap-4` used horizontally. */
-const GUTTER = 16
-
-/**
- * Makes a tile span exactly as many row units as its content occupies.
+ * The field: 1 column on phones, 6 at `md`, 12 at `xl`. Rows are as tall as their
+ * tallest tile, and tiles stretch to fill them.
  *
- * Plain CSS Grid cannot do this. Items sharing a grid row share that row's
- * height, so a short tile beside a tall one is padded to match and the padding
- * belongs to the row, not the item: no neighbour can move up into it. That is why
- * the earlier `rows: 2 | 3` version reserved visible dead space inside almost
- * every tile.
+ * ## Two mechanisms were removed here on 2026-08-06, for one reason
  *
- * The fix is the standard grid-masonry technique: rows of `ROW_UNIT` with no row
- * gap, and each tile spanning `ceil((its height + gutter) / unit)` of them. The
- * gutter is part of the span rather than a `row-gap`, because a row gap would be
- * applied between every one of the hundreds of implicit rows.
+ * This grid used to combine `grid-flow-row-dense` with a JS masonry: rows of 4px,
+ * no row gap, and a ResizeObserver writing `grid-row-end: span N` per tile. Both
+ * exist to pack tiles tightly, and **both reorder the page.**
  *
- * `useLayoutEffect` writes the span before paint, so the first frame the user
- * sees is already packed. Content that changes height afterwards (a list loading,
- * a widget switching to its empty state, a font finishing swap) is picked up by
- * the ResizeObserver.
- */
-function useMasonrySpan<T extends HTMLElement>(ref: React.RefObject<T | null>) {
-  const [span, setSpan] = React.useState<number | null>(null)
-
-  React.useLayoutEffect(() => {
-    const element = ref.current
-    if (!element) return
-
-    const measure = () => {
-      // `getBoundingClientRect` rather than offsetHeight: the tile is inside a
-      // motion component whose enter animation writes a transform, and a
-      // transformed box still reports its untransformed layout height here only
-      // because scale is not animated. Height comes from the border box.
-      const height = element.getBoundingClientRect().height
-      if (height > 0) setSpan(Math.ceil((height + GUTTER) / ROW_UNIT))
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [ref])
-
-  return span
-}
-
-/**
- * The field: 1 column on phones, 6 at `md`, 12 at `xl`.
+ * `dense` does it openly — it backfills a gap by promoting a later tile into it.
+ * The masonry does it subtly, and that was the harder one to see: with tiles
+ * placed on a 4px row grid, a short tile beside a tall one leaves its column free
+ * further down, and the *next* tile cascades into that space. Measured on the real
+ * dashboard, `plan-usage` landed in the left column at y=2171 while
+ * `recent-builders`, which precedes it in the DOM, sat in the right column at
+ * y=2173. Read left-to-right, the later widget came first.
  *
- * `grid-flow-row-dense` backfills. Without it, a tile too wide for the space left
- * on the current row jumps past the gap and abandons it; with it, the next tile
- * that fits moves up. Combined with content-sized heights, that is what makes the
- * result a mosaic rather than a set of bands.
+ * The old comment argued the divergence was "acceptable here because every tile is
+ * an independent, separately-labelled region rather than a step in a sequence".
+ * That was true of a mosaic of read-only cards. It stopped being true when the
+ * dashboard became an urgency-ordered command surface: the tiles carry links and
+ * controls, and the order is the product's central claim
+ * (plans/ui-dashboard, structural problem 3).
  *
- * `dense` can place a tile earlier than its DOM position, so visual order and tab
- * order can differ. Acceptable here because every tile is an independent,
- * separately-labelled region rather than a step in a sequence.
+ * So the layout is now plain CSS Grid with content-height rows. DOM order, focus
+ * order and visual order are one sequence at every width, with no tolerance and no
+ * measurement involved.
+ *
+ * **What this costs, stated plainly:** tiles in a band now share the band's height,
+ * so a short tile beside a tall one is padded. That is the dead space the masonry
+ * was built to reclaim. It is a smaller cost than it was for the version *before*
+ * the masonry, which padded every tile to a multiple of a 176px row unit whether or
+ * not it had content — here the row is exactly as tall as its tallest member. The
+ * remedy is to band widgets of similar height together in the registry, which is a
+ * choice an author can make and a reader can see, unlike a runtime cascade.
  */
 export function BentoGrid({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   const reduceMotion = useReducedMotion()
   return (
     <motion.div
-      className={`grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 grid-flow-row-dense gap-x-4 ${className}`}
-      // Row height and the absence of a row gap are the two halves of the
-      // masonry maths in `useMasonrySpan`; they belong together, and inline is
-      // the only place that stays next to the constants they mirror.
-      style={{ gridAutoRows: `${ROW_UNIT}px`, rowGap: 0 }}
+      className={`grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12 gap-4 items-stretch ${className}`}
       variants={staggerContainer()}
       initial={reduceMotion ? false : 'hidden'}
       animate="visible"
@@ -128,22 +95,22 @@ export function BentoTile({
   span, glow = false, bare = false, className = '', children, widgetId,
 }: BentoTileProps) {
   const reduceMotion = useReducedMotion()
-  const innerRef = React.useRef<HTMLDivElement>(null)
-  const rowSpan = useMasonrySpan(innerRef)
   const surface = bare ? '' : glow ? 'card-glow p-6' : 'card card-hover'
 
   return (
     <motion.div
       variants={reduceMotion ? undefined : fadeInUpVariants}
       className={`${SPAN_CLASS[span]} min-w-0`}
-      // Until the first measurement lands the tile spans nothing, which would
-      // collapse it; `auto` lets the browser size it normally for that one frame.
-      style={{ gridRowEnd: rowSpan ? `span ${rowSpan}` : 'auto' }}
     >
+      {/*
+        `h-full` so the bubble fills the band rather than floating at the top of a
+        row sized by a taller neighbour — the padding belongs inside the card,
+        where it reads as breathing room, not between cards, where it reads as a
+        rendering fault.
+      */}
       <div
-        ref={innerRef}
         data-widget={widgetId}
-        className={`@container ${surface} flex flex-col min-w-0 ${className}`}
+        className={`@container ${surface} flex h-full flex-col min-w-0 ${className}`}
       >
         {children}
       </div>
