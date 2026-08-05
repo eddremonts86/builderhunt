@@ -631,9 +631,17 @@ that was engineering work nobody had done.
   Fixed by retiring only jobs nothing references, **not** by cascading the FK (which would silently
   shorten accepted retention to 90 days). Regression in
   `tests/unit/shared/lib/repositories/enrichment-worker.test.ts` against a real database, since the
-  bug is a foreign key. Four further findings recorded open in the register, each a decision rather
-  than a typo — including that `deleteOrganizationEnrichmentData` has no caller and is refused
-  `42501` as the app role.
+  bug is a foreign key.
+- **Four further findings, decided by Edd the same day and all four applied** — the matrix ended at
+  19/19 with a regression assertion behind each: the organization-level delete/export helpers (no
+  caller anywhere in `src/`, and refused `42501` as the app role) were **removed** rather than wired,
+  leaving the organization cascade and the subject's own purge/provenance routes as the real paths;
+  the worker now passes `candidateSourceRecordId`, so an exact stable-id match auto-accepts instead of
+  every candidate queuing for human review forever; the resolver's new `isOperatorSubmitted` input
+  floors a pasted link at `review` while granting **no** confidence, so it is visible rather than
+  written-and-hidden; and a privacy cancellation moved out of `failed` into its own `cancelled`
+  counter, so honouring a restriction no longer closes `job_runs` as failed. One note stays open and
+  is not a defect: `log.ts` mints no per-event id, so evidence cites `event@ts`.
 - `46-content-marketing` — **the three missing screenshots for the hiring-radar draft were taken.**
   The prior note said they needed a signed-in session the agent must not create; that prohibition is
   about the live site, and `pnpm content:screenshots` is this repository's sanctioned local mechanism.
@@ -645,12 +653,19 @@ that was engineering work nobody had done.
   its troubleshooting table told a reader to switch the resource to `pg16` — an image that cannot start
   on a pg18 volume. All three corrected. The two open tasks there are waits (one soak period, then
   seven days), not work.
-- Verification: `pnpm test` 5733 passed / 23 skipped, `type-check` 0, `lint` 0 errors (114 pre-existing
-  warnings), `security:boundaries`/`route-methods`/`route-client-boundary`/`provider-metering` and
-  `test:migration-integrity` all 0, matrix reproduced twice at 17/17. **A full `pnpm ci:local` was not
-  run**: a concurrent session was editing `src/` throughout (landing/FAQ/onboarding/search-connectors,
-  mtimes 17:24–17:44), and ci:local's e2e and accessibility steps cannot be trusted while source moves
-  underneath them.
+- Verification: `pnpm test` **5737 passed** / 23 skipped, `type-check` 0, `lint` 0 errors (114
+  pre-existing warnings), `security:boundaries`/`route-coverage`/`route-methods`/
+  `route-client-boundary`/`auth-before-validate`/`provider-metering` and `test:migration-integrity` all
+  0, matrix reproduced at **19/19** after every change. **A full `pnpm ci:local` was not run**: a
+  concurrent session was editing `src/` throughout (landing/FAQ/onboarding/search-connectors, then
+  billing/usage components), and ci:local's e2e and accessibility steps cannot be trusted while source
+  moves underneath them.
+- **Commit provenance, recorded because it is misleading on its face**: the repository's sweep
+  automation committed this session's work mixed with that concurrent session's as
+  `a170d054d "feat: add FaqPanel component and search connectors definition"` — a message describing
+  someone else's two files while the commit also carries the enrichment retention fix, the adversarial
+  matrix, three blog screenshots and eight plan/doc updates. Nobody chose that message and it is not a
+  useful record of either change. Anyone bisecting the retention fix should look for it there.
 - Skipped, with the reason: every other open task in phase-1. Google Search Console and the launch
   channels (54), the DPIA and finance sign-off (44), real provider pricing and human gold judgments
   (43), the legal review and the production Coolify env (42), publishing and cross-posting (46), and

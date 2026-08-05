@@ -34,6 +34,15 @@ export interface EnrichmentWorkerResult {
   succeeded: number
   partial: number
   failed: number
+  /**
+   * Jobs the worker deliberately stopped: a subject restriction landed before the connectors ran.
+   *
+   * Separate from `failed` because the run-worker route maps `failedCount > 0` to
+   * `job_runs.state = 'failed'` — so honouring a privacy restriction, the most correct thing this
+   * worker can do, closed the run as a failure and would trip any alert on failed runs. Found
+   * 2026-08-05 by the runtime adversarial matrix, case 09.
+   */
+  cancelled: number
   leasesReclaimed: number
   evidenceAccepted: number
   evidenceReview: number
@@ -50,6 +59,7 @@ export async function runEnrichmentWorker(): Promise<EnrichmentWorkerResult> {
       succeeded: 0,
       partial: 0,
       failed: 0,
+      cancelled: 0,
       leasesReclaimed: 0,
       evidenceAccepted: 0,
       evidenceReview: 0,
@@ -69,6 +79,7 @@ export async function runEnrichmentWorker(): Promise<EnrichmentWorkerResult> {
     succeeded: 0,
     partial: 0,
     failed: 0,
+    cancelled: 0,
     leasesReclaimed,
     evidenceAccepted: 0,
     evidenceReview: 0,
@@ -101,7 +112,9 @@ async function processEnrichmentJob(job: ClaimedEnrichmentJob, result: Enrichmen
   if (await isBuilderProcessingRestrictedForWorker(job.builderIdentityId)) {
     await withWorkerOrganization(job.organizationId, (tx) =>
       finishEnrichmentJob(tx, job.id, { status: 'cancelled', lastErrorCode: 'processing_restricted' }))
-    result.failed++
+    // `cancelled`, not `failed`: the job row already says `cancelled`, and counting it as a failure
+    // is what made a correct privacy stop close the whole run as failed. See the field's comment.
+    result.cancelled++
     return
   }
 
@@ -138,7 +151,25 @@ async function processEnrichmentJob(job: ClaimedEnrichmentJob, result: Enrichmen
 
       if (outcomeForConnector.kind === 'evidence') {
         for (const candidate of outcomeForConnector.candidates) {
-          const resolved = resolveEnrichmentCandidate({ target: fullTarget, candidate: candidate.payload })
+          const resolved = resolveEnrichmentCandidate({
+            target: fullTarget,
+            candidate: candidate.payload,
+            // Both of these were omitted, and each omission silently disabled a resolver branch.
+            //
+            // `candidateSourceRecordId` is what scores `exact_stable_source_id` (10 000 bps) — the
+            // signal that exists precisely so an exact ID match from the source's own API does not
+            // need a human. Without it a github candidate topped out at 7 500 and *nothing was ever
+            // auto-accepted*, however well it matched. The connector fetches by the tracked
+            // identity's own username through the official API, so the ID it returns is the strongest
+            // evidence available, not a guess.
+            //
+            // `isOperatorSubmitted` keeps a pasted link visible instead of resolving it to `rejected`
+            // and hiding it. See the resolver input's own comment for why it grants no confidence.
+            //
+            // Both found 2026-08-05 by the runtime adversarial matrix (cases 01a and 02).
+            candidateSourceRecordId: candidate.sourceRecordId,
+            isOperatorSubmitted: candidate.acquisitionMode === 'user_submitted',
+          })
           const contentHash = computeEvidenceContentHash({
             connector: candidate.connector,
             sourceRecordId: candidate.sourceRecordId,

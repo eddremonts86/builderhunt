@@ -49,6 +49,7 @@
 // anyone cares about.
 
 import postgres from 'postgres'
+import { sql as rawSql } from 'drizzle-orm'
 import { createHmac } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
@@ -340,8 +341,7 @@ async function loadRoutes() {
     getSourcePolicy: policies.getSourcePolicy,
     withTenantContext: tenantContext.withTenantContext,
     requireTenantPrincipal: principal.requireTenantPrincipal,
-    deleteOrganizationEnrichmentData: repo.deleteOrganizationEnrichmentData,
-    listEnrichmentEvidenceForExport: repo.listEnrichmentEvidenceForExport,
+    listEnrichmentEvidence: repo.listEnrichmentEvidence,
   }
 }
 
@@ -396,7 +396,7 @@ async function case01ScriptedSuccess() {
   closeCase({
     id,
     title: 'allowlisted host succeeds (scripted transport)',
-    expected: '202 enqueue; job succeeded; one evidence row; api.github.com the only host contacted',
+    expected: '202 enqueue; job succeeded; one accepted evidence row at 10000 bps (the stable source id matches); api.github.com the only host contacted',
     observed: JSON.stringify({
       enqueueStatus: enqueued.status,
       runStatus: run.status,
@@ -413,16 +413,29 @@ async function case01ScriptedSuccess() {
       && only.length === 1 && only[0] === 'api.github.com',
   })
 
-  // Recorded as its own row rather than folded into the pass above: the worker calls
-  // resolveEnrichmentCandidate without `candidateSourceRecordId`, so the stable-id signal that
-  // exists precisely to auto-accept an exact match never fires, and every github candidate lands in
-  // `review` no matter how well it matches. Asserted as the *observed* behaviour, with the finding
-  // written up in the register — changing an auto-accept threshold is a policy decision.
+  // Retention follows the resolution, so an accepted row must carry the 180-day window rather than the
+  // 30-day raw one. Checked here because the accept path only started producing accepted rows once the
+  // worker began passing `candidateSourceRecordId`, and an accepted row on a 30-day expiry would be a
+  // silent retention bug rather than a visible one.
+  const acceptedDays = evidence[0] ? Math.round((new Date(evidence[0].expires_at) - Date.now()) / 86_400_000) : null
+  record(
+    '01a accepted evidence carries the 180-day accepted-retention window, not the 30-day raw one',
+    evidence[0]?.resolution === 'accepted' && acceptedDays > 170 && acceptedDays <= 180,
+    JSON.stringify({ resolution: evidence[0]?.resolution, expiresInDays: acceptedDays }),
+  )
+
+  // Regression, and the reason this row exists: until 2026-08-05 the worker called
+  // resolveEnrichmentCandidate without `candidateSourceRecordId`, so the 10 000-bps stable-id signal
+  // that exists precisely to auto-accept an exact match never fired — the candidate's
+  // `source_record_id` equalled the target's `source_id` and the row still resolved to `review` at
+  // 7 500. Nothing was ever auto-accepted. This matrix found that; the assertion below is what keeps
+  // it found.
   const row = evidence[0]
   record(
-    '01a finding: stable source id matches yet contributes no signal (worker omits candidateSourceRecordId)',
-    Boolean(row) && row.source_record_id === SUBJECTS.scripted.sourceId && !row.match_signals.includes('exact_stable_source_id') && row.resolution === 'review',
-    JSON.stringify({ sourceRecordId: row?.source_record_id, targetSourceId: SUBJECTS.scripted.sourceId, signals: row?.match_signals, resolution: row?.resolution }),
+    '01a regression: an exact stable-source-id match scores exact_stable_source_id and auto-accepts',
+    Boolean(row) && row.source_record_id === SUBJECTS.scripted.sourceId
+      && row.match_signals.includes('exact_stable_source_id') && row.confidence_bps === 10000 && row.resolution === 'accepted',
+    JSON.stringify({ sourceRecordId: row?.source_record_id, targetSourceId: SUBJECTS.scripted.sourceId, signals: row?.match_signals, confidenceBps: row?.confidence_bps, resolution: row?.resolution }),
   )
 }
 
@@ -441,12 +454,13 @@ async function case01LiveSuccess() {
 
   // What a live case can prove is that the *transport* worked: the request left the process, the
   // response passed the safeFetch envelope (HTTPS, allowlisted host, content type, size cap) and
-  // parsed into a persisted evidence row. What it deliberately does not assert is the resolver's
-  // verdict. This fixture is intentionally dissimilar to the real public profile it fetches — a
-  // different display name and location — so the resolver scores `exact_username` alone and rejects
-  // it. That is the correct answer to a weak match, and pinning it to `accepted` would mean editing
-  // the fixture until it agreed with whatever GitHub happens to serve today. Case 01a owns the
-  // accept path, against a fixture whose expected values are known because they are scripted.
+  // parsed into a persisted evidence row. What it deliberately does not pin is the resolver's verdict,
+  // because that depends on what GitHub serves today. The fixture's `sourceId` is octocat's real
+  // GitHub id, so as of 2026-08-05 the stable-id signal fires against the live API and the row is
+  // `accepted` at 10 000 bps — real evidence that the strongest signal works end to end against a real
+  // upstream. If GitHub ever renumbered that account the row would drop to `review` or `rejected`, and
+  // this case should still pass: it is a transport check. Case 01a owns the accept path with values
+  // that are known because they are scripted.
   const noNetworkFailure = job?.last_error_code !== 'rate_limited' && job?.last_error_code !== 'upstream_unavailable'
   closeCase({
     id,
@@ -457,7 +471,7 @@ async function case01LiveSuccess() {
       jobStatus: job?.status,
       lastErrorCode: job?.last_error_code,
       evidence: evidence.map((row) => ({ connector: row.connector, mode: row.acquisition_mode, resolution: row.resolution, confidenceBps: row.confidence_bps, signals: row.match_signals })),
-      resolverNote: 'rejected is the resolver refusing a deliberately dissimilar fixture, not a transport failure',
+      resolverNote: 'the resolution is whatever the live profile scores against the fixture; this case pins the transport, not the verdict',
       transport: contacted.filter((entry) => entry.case === id).map((entry) => entry.transport),
     }),
     jobIds: [enqueued.body.jobId],
@@ -498,7 +512,7 @@ async function case02BlockedHost() {
   closeCase({
     id,
     title: 'blocked host is recorded but never contacted',
-    expected: 'linkedin dropped from acceptedConnectors; URL stored as user_submitted evidence; safeFetch refuses host_not_allowed with no request; zero blocked-host requests',
+    expected: 'linkedin dropped from acceptedConnectors; the pasted URL stored as user_submitted evidence and resolved to `review` so the tenant can actually see it; safeFetch refuses host_not_allowed with no request; zero blocked-host requests',
     observed: JSON.stringify({
       acceptedConnectors: enqueued.body.acceptedConnectors,
       blockedConnectors: enqueued.body.blockedConnectors,
@@ -512,9 +526,23 @@ async function case02BlockedHost() {
     logEvents: logEventsIn(id, 'enrichment'),
     pass: Array.isArray(enqueued.body.blockedConnectors) && enqueued.body.blockedConnectors.includes('linkedin')
       && !enqueued.body.acceptedConnectors.includes('linkedin')
-      && evidence.some((row) => row.acquisition_mode === 'user_submitted' && row.source_url.includes('linkedin.com'))
+      && evidence.some((row) => row.acquisition_mode === 'user_submitted' && row.source_url.includes('linkedin.com') && row.resolution === 'review')
       && directOutcome === 'host_not_allowed' && !openedSocket && !blockedHostContacted,
   })
+
+  // Regression: the pasted link used to resolve `rejected`, and the tenant read only returns
+  // accepted/review — so it was written, invisible, and deleted after seven days. Asserted through the
+  // real route the UI calls, not the table, because "visible" is a property of the read path.
+  const visibleToTenant = await (await routes.evidenceGET({
+    request: sessionRequest(sessionToken('blocked'), 'https://adv.test/api/builders/x/evidence'),
+    params: { builderId: identityId('blocked') },
+  })).json()
+  record(
+    '02 regression: an operator-pasted URL is visible through the tenant evidence read, at zero confidence',
+    Array.isArray(visibleToTenant.evidence)
+      && visibleToTenant.evidence.some((row) => row.acquisitionMode === 'user_submitted' && row.confidenceBps === 0 && row.resolution === 'review'),
+    JSON.stringify(visibleToTenant.evidence?.map((row) => ({ mode: row.acquisitionMode, resolution: row.resolution, confidenceBps: row.confidenceBps }))),
+  )
 }
 
 async function case03RobotsDenial() {
@@ -719,7 +747,8 @@ async function case09RestrictionMidFlight() {
       requestsDuringGuardedRun,
       refreshStatus: refreshWhileRestricted.status,
       refreshBody: refreshWhileRestricted.body.error,
-      workerFailedCounter: run.body.failed,
+      workerCounters: { failed: run.body.failed, cancelled: run.body.cancelled },
+      jobRunState: (await lastJobRunId())?.state,
     }),
     jobIds: [firstJob.body.jobId, queuedJob.body.jobId, 'adv-job-post-restriction'],
     logEvents: logEventsIn(id, 'enrichment'),
@@ -728,7 +757,11 @@ async function case09RestrictionMidFlight() {
       && cancelled?.status === 'cancelled' && evidenceAfter.length === 0
       && postRestriction?.status === 'cancelled' && postRestriction?.last_error_code === 'processing_restricted'
       && requestsDuringGuardedRun === 0
-      && refreshWhileRestricted.status === 409 && refreshWhileRestricted.body.error === 'processing_restricted',
+      && refreshWhileRestricted.status === 409 && refreshWhileRestricted.body.error === 'processing_restricted'
+      // Regression: a privacy cancellation used to increment `failed`, which the run-worker route maps
+      // to `job_runs.state = 'failed'` — so the most correct thing this worker does closed the run as a
+      // failure and would trip any alert on failed runs.
+      && run.body.cancelled === 1 && run.body.failed === 0,
   })
 }
 
@@ -807,17 +840,21 @@ async function case11ExportAndDelete() {
   })
   const provenanceBody = await provenance.json()
 
-  // Organization-side export of the same data, through the app role, in tenant context.
+  // Organization-side read of the same data, through the app role, in tenant context — the live read
+  // the tenant actually has.
   const principal = await routes.requireTenantPrincipal(sessionRequest(IDS.sessionToken, 'https://adv.test/api/builders/x/evidence'))
-  const exported = await routes.withTenantContext(principal, (tx) => routes.listEnrichmentEvidenceForExport(tx, IDS.org))
+  const exported = await routes.withTenantContext(principal, (tx) => routes.listEnrichmentEvidence(tx, IDS.org, identityId('scripted')))
 
-  // Organization-side delete of the same data, the same way. builderhunt_app holds SELECT+UPDATE on
-  // enrichment_evidence and SELECT+INSERT on enrichment_jobs (drizzle/0017), so this is expected to
-  // be refused by the grant — recorded as the outcome, because the alternative to recording it is
-  // widening a grant to make a test pass.
+  // Organization-side *delete* through the app role: `builderhunt_app` holds SELECT+UPDATE on
+  // enrichment_evidence and SELECT+INSERT on enrichment_jobs (drizzle/0017), so the role cannot
+  // delete either table. Asserted directly against the grant rather than through a repository
+  // helper: the two helpers that used to wrap this (`deleteOrganizationEnrichmentData`,
+  // `listEnrichmentEvidenceForExport`) had no caller and were refused 42501 when this matrix first
+  // called them, and were removed 2026-08-05 by decision. The grant is the thing worth pinning —
+  // whatever code sits on top of it, an app-role delete must keep failing.
   let deleteOutcome = 'succeeded'
   try {
-    await routes.withTenantContext(principal, (tx) => routes.deleteOrganizationEnrichmentData(tx, IDS.org))
+    await routes.withTenantContext(principal, (tx) => tx.execute(rawSql`delete from enrichment_evidence where organization_id = ${IDS.org}`))
   } catch (error) {
     // Drizzle wraps driver errors in DrizzleQueryError, so the SQLSTATE lives on `.cause`. Reading
     // `.code` alone reports the wrapper's message and loses the one fact worth recording.
@@ -856,11 +893,30 @@ async function case11ExportAndDelete() {
       (select count(*)::int from enrichment_jobs where organization_id = 'adv-org-doomed') as jobs
   `)[0]
 
+  // Untracking one builder, through the real tenant repository. Same FK family as finding 1: both
+  // `enrichment_evidence_organization_builder_fk` and `enrichment_jobs_organization_builder_fk`
+  // (drizzle/0016) are ON DELETE NO ACTION, and this path deletes the `organization_builders` row the
+  // pair points at. Organization *deletion* is safe because the cascade fires on both child tables in
+  // the same statement; untracking a single builder deletes only the parent, which is exactly the shape
+  // that broke the retention sweep. Checked here rather than assumed.
+  const { deleteOrganizationBuilder } = await import('../../src/shared/lib/repositories/organization-builders.ts')
+  let untrackOutcome
+  try {
+    const removed = await routes.withTenantContext(principal, (tx) => deleteOrganizationBuilder(tx, IDS.org, trackedId('scripted')))
+    untrackOutcome = `returned:${removed}`
+  } catch (error) {
+    untrackOutcome = `threw:${error?.cause?.code ?? error?.code ?? error?.message}`
+  }
+  const evidenceAfterUntrack = (await owner`
+    select count(*)::int as count from enrichment_evidence
+    where organization_id = ${IDS.org} and builder_identity_id = ${identityId('scripted')}
+  `)[0].count
+
   const leaksValues = JSON.stringify(provenanceBody).includes('Public profile fixture')
   closeCase({
     id,
     title: 'export and delete requests',
-    expected: 'subject provenance exports field names only; organization export reads through the app role; organization delete is refused by the grant; organization deletion cascades the data away',
+    expected: 'subject provenance exports field names only; the tenant read works through the app role; an app-role delete is refused 42501 by the grant; deleting the organization cascades the data away',
     observed: JSON.stringify({
       provenanceStatus: provenance.status,
       provenanceEntries: Array.isArray(provenanceBody.provenance) ? provenanceBody.provenance.length : provenanceBody,
@@ -869,12 +925,20 @@ async function case11ExportAndDelete() {
       organizationDelete: deleteOutcome,
       rowsSurvivingAppDelete: survivingAfterAppDelete,
       afterOrganizationCascade: afterCascade,
+      untrackBuilderWithEvidence: untrackOutcome,
+      evidenceAfterUntrack,
     }),
     logEvents: logEventsIn(id),
     pass: provenance.status === 200 && !leaksValues && exported.length >= 1
       && deleteOutcome.startsWith('refused:42501')
       && afterCascade.evidence === 0 && afterCascade.jobs === 0,
   })
+
+  record(
+    '11 untracking a builder that has enrichment evidence does not blow up on the composite FK',
+    untrackOutcome === 'returned:true',
+    JSON.stringify({ untrackOutcome, evidenceAfterUntrack }),
+  )
 }
 
 async function case12KillSwitch() {

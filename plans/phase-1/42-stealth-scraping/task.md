@@ -308,13 +308,24 @@
     `tests/unit/shared/lib/repositories/enrichment-worker.test.ts` (real database, because the bug is
     a foreign key and a mock cannot hold one).
 
-    **Four findings left open on purpose**, all recorded in the register with their rationale: the
-    organization-level delete/export helpers have no caller and are refused `42501` as the app role
-    (the fix is a worker-role path, not a wider grant); the worker never passes
-    `candidateSourceRecordId`, so nothing is ever auto-accepted; an organization-submitted URL is
-    stored `rejected` and therefore never surfaces; and a privacy cancellation is counted as a worker
-    failure, so any alert on failed runs fires on correct behaviour. None of the four is a blocker for
-    the two tasks around this one, and each is a decision rather than a typo.
+    **Four further findings, all resolved the same day after Edd decided each one** (the register
+    carries the full reasoning; the matrix now asserts every fix, at 19/19):
+
+    - The organization-level delete/export helpers had no caller and were refused `42501` as the app
+      role — **removed**, with the reasoning left where the code was. The paths that work are the
+      organization cascade and the subject's own purge/provenance routes; a per-organization purge, if
+      ever wanted, needs a worker-role write path rather than a wider grant.
+    - The worker never passed `candidateSourceRecordId`, so the 10 000-bps stable-id signal never fired
+      and **nothing was ever auto-accepted** — every candidate queued for human review however well it
+      matched. Now passed; an exact ID match accepts and carries the 180-day window.
+    - An operator-pasted URL resolved `rejected` and the tenant read returns only accepted/review, so
+      the link was written, invisible, and deleted after seven days. The resolver's new
+      `isOperatorSubmitted` input floors the *resolution* at `review` while awarding **no** confidence.
+    - A privacy cancellation incremented `failed`, which the route maps to `job_runs.state='failed'` —
+      correct behaviour closing a run as a failure. Split into its own `cancelled` counter.
+
+    Only one note stays open, and it is not a defect: `log.ts` mints no per-event id, so the register
+    cites `event@ts` rather than inventing one.
 
   - Files: `docs/operations/public-enrichment-source-register.md` (where the evidence is recorded —
     this task produces evidence, not code)

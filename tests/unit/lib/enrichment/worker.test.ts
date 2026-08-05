@@ -18,6 +18,7 @@ describe('runEnrichmentWorker — disabled mode (spec §12 kill switch)', () => 
       succeeded: 0,
       partial: 0,
       failed: 0,
+      cancelled: 0,
       leasesReclaimed: 0,
       evidenceAccepted: 0,
       evidenceReview: 0,

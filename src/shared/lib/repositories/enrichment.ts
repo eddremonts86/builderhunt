@@ -189,24 +189,30 @@ export async function isBuilderProcessingRestricted(
   return Boolean(row?.restricted)
 }
 
-/** Used by account/organization export (Phase 5). */
-export async function listEnrichmentEvidenceForExport(
-  transaction: TenantTransaction,
-  organizationId: string,
-): Promise<EnrichmentEvidenceRecord[]> {
-  const rows = await transaction.select().from(enrichmentEvidence)
-    .where(eq(enrichmentEvidence.organizationId, organizationId))
-  return rows.map(toEvidenceRecord)
-}
-
-/** Used by account/organization deletion (Phase 5). Deletes this org's rows only. */
-export async function deleteOrganizationEnrichmentData(
-  transaction: TenantTransaction,
-  organizationId: string,
-): Promise<void> {
-  await transaction.delete(enrichmentEvidence).where(eq(enrichmentEvidence.organizationId, organizationId))
-  await transaction.delete(enrichmentJobs).where(eq(enrichmentJobs.organizationId, organizationId))
-}
+/*
+ * `listEnrichmentEvidenceForExport` and `deleteOrganizationEnrichmentData` lived here, labelled "used
+ * by account/organization export (Phase 5)". Removed 2026-08-05, by decision, because neither was
+ * true and both were worse than absent:
+ *
+ *   * Neither had a single caller anywhere in `src/`.
+ *   * Both take a `TenantTransaction`, i.e. the `builderhunt_app` role — which holds `SELECT, UPDATE`
+ *     on `enrichment_evidence` and `SELECT, INSERT` on `enrichment_jobs` (drizzle/0017). The delete
+ *     was therefore refused `42501` at runtime, confirmed by the runtime adversarial matrix
+ *     (scripts/ops/verify-enrichment-adversarial-local.mjs case 11). A helper that cannot execute is
+ *     a trap for the next person who assumes the deletion path exists because the function does.
+ *
+ * The paths that do work, and are exercised by that same case:
+ *
+ *   * Deleting the organization row removes its enrichment jobs and evidence — both tables declare
+ *     `ON DELETE CASCADE` on `organization_id` (schema.ts).
+ *   * The data subject's own route: `POST /api/me/builder/:id/restrict-processing` purges their
+ *     evidence across every organization, and `GET …/evidence-provenance` is their export.
+ *
+ * If a per-organization purge or export is wanted without deleting the organization, it needs a
+ * worker-role write path (authorize as the tenant, write in a `withWorkerOrganization` transaction —
+ * the pattern the candidate-facing writes already use). It does not need a wider grant on the app
+ * role, and adding one to make a helper work would be the wrong repair.
+ */
 
 function toJobRecord(row: typeof enrichmentJobs.$inferSelect): EnrichmentJobRecord {
   return {

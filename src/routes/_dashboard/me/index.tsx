@@ -8,6 +8,7 @@ import { LinkButton } from '~/components/ui/link'
 import { PortfolioSettings } from '~/modules/builder-profile/components/PortfolioSettings'
 import { EvidenceProvenancePanel } from '~/modules/builder-profile/components/EvidenceProvenancePanel'
 import { ProfileViewAnalytics } from '~/modules/builder-profile/components/ProfileViewAnalytics'
+import { AccountSummaryCard } from '~/modules/dashboard/components/AccountSummaryCard'
 
 interface ClaimedBuilder {
   id: string
@@ -45,11 +46,16 @@ export const Route = createFileRoute('/_dashboard/me/')({
     }
     return { user }
   },
-  loader: async () => ({}),
+  // Passes `beforeLoad`'s already-resolved session through to the component instead of re-fetching
+  // it — same pattern as `/pricing`. The auth gate above had to resolve it anyway.
+  loader: async ({ context }) => context,
   component: MePage,
 })
 
 function MePage() {
+  const { user } = Route.useLoaderData() as {
+    user: { name: string | null; email: string | null; image: string | null }
+  }
   const [builders, setBuilders] = React.useState<ClaimedBuilder[]>([])
   const [loading, setLoading] = React.useState(true)
   const [editing, setEditing] = React.useState<string | null>(null)
@@ -130,17 +136,6 @@ function MePage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div>
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 w-48 bg-bh-surface rounded" />
-          <div className="h-32 bg-bh-surface rounded" />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div>
       <header className="mb-8">
@@ -149,11 +144,21 @@ function MePage() {
           <Sparkles className="w-6 h-6 text-bh-accent" aria-hidden="true" />
         </h1>
         <p className="text-bh-text-muted">
-          Manage the profiles you've claimed and how others see you.
+          Your account, your plan, and the profiles you've claimed.
         </p>
       </header>
 
-      {builders.length === 0 ? (
+      {/* Above the claimed-profile list, and outside its loading branch: this page used to render a
+          bare skeleton and then a single "No claimed profiles yet" card, so an account with real
+          identity, plan and usage behind it looked empty. None of that depends on the claim fetch. */}
+      <AccountSummaryCard identity={user} />
+
+      {loading ? (
+        <div className="animate-pulse space-y-4" data-testid="me-claims-loading">
+          <div className="h-8 w-48 bg-bh-surface rounded" />
+          <div className="h-32 bg-bh-surface rounded" />
+        </div>
+      ) : builders.length === 0 ? (
         <div className="card text-center py-12">
           <BadgeCheck className="w-10 h-10 text-bh-text-muted mx-auto mb-3" aria-hidden="true" />
           <h2 className="text-lg font-semibold text-bh-text mb-2">No claimed profiles yet</h2>

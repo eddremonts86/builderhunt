@@ -6,6 +6,7 @@ import { organizationQueryKey } from '~/shared/lib/query-keys'
 import { useActiveOrganizationId } from '~/shared/components/TenantQueryProvider'
 import { Button } from '~/components/ui'
 import { LoadingState } from '~/shared/components/LoadingState'
+import { UsageMeters, type UsageCounts, type UsageLimits } from '~/shared/components/UsageMeters'
 import { listActiveSubscriptionCatalog, TIER_PRESENTATION, type CatalogTier } from '~/shared/lib/billing/catalog'
 import { AutoRechargeSettings } from './AutoRechargeSettings'
 import { BillingContact } from './BillingContact'
@@ -352,14 +353,7 @@ function PlanPicker({ currentTier, currentBillingPeriod, onSelect }: {
   )
 }
 
-function UsageSection({ usage, limits }: {
-  usage: { savedSearches: number; savedBuilders: number }
-  limits: { savedSearches: number | null; savedBuilders: number | null; rssSubscriptions: number | null }
-}) {
-  const rows = [
-    { key: 'savedSearches' as const, label: 'Saved searches', description: 'Search alerts that notify you when new builders match your criteria.' },
-    { key: 'savedBuilders' as const, label: 'Saved builders', description: "Builders you've added to your pipeline for tracking and outreach." },
-  ]
+function UsageSection({ usage, limits }: { usage: UsageCounts; limits: UsageLimits }) {
   return (
     <section className="card p-5" data-testid="usage-section">
       <h2 className="font-semibold mb-1">Usage</h2>
@@ -367,37 +361,9 @@ function UsageSection({ usage, limits }: {
         These are limits on how much you can keep saved at once, not a monthly quota — delete old items anytime to
         free up room, or upgrade for more capacity.
       </p>
-      <div className="space-y-4">
-        {rows.map((row) => {
-          const limit = limits[row.key]
-          const current = usage[row.key]
-          const isUnlimited = limit === null
-          const pct = isUnlimited ? 0 : Math.min(100, Math.round((current / limit) * 100))
-          return (
-            <div key={row.key} data-testid={`usage-${row.key}`}>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span>{row.label}</span>
-                <span className="text-bh-text-muted">{current} / {isUnlimited ? '∞' : limit}</span>
-              </div>
-              <p className="text-xs text-bh-text-dim mb-1.5">{row.description}</p>
-              <div className="h-1.5 rounded-full bg-bh-surface overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${
-                    isUnlimited ? 'bg-bh-cyan/30' : pct >= 90 ? 'bg-bh-danger' : pct >= 70 ? 'bg-bh-warning' : 'bg-bh-accent'
-                  }`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              {!isUnlimited && pct >= 90 && (
-                <p className="text-xs text-bh-danger mt-1">
-                  You're almost at your {row.label.toLowerCase()} limit. Delete unused items or{' '}
-                  <Link to="/pricing" className="underline">upgrade for more room</Link>.
-                </p>
-              )}
-            </div>
-          )
-        })}
-      </div>
+      {/* The bars themselves live in `~/shared/components/UsageMeters` so the copy of them on `/me`
+          cannot drift from this one — same limits, same API, so the same rendering. */}
+      <UsageMeters usage={usage} limits={limits} />
     </section>
   )
 }

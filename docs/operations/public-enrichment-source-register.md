@@ -125,7 +125,9 @@ Evidence for `plans/phase-1/42-stealth-scraping/task.md` Phase 7, "Run runtime a
 Reproduce with `pnpm test:enrichment-matrix:local`
 ([`scripts/ops/run-enrichment-matrix-local.sh`](../../scripts/ops/run-enrichment-matrix-local.sh) →
 [`scripts/ops/verify-enrichment-adversarial-local.mjs`](../../scripts/ops/verify-enrichment-adversarial-local.mjs)).
-**Result: 17/17 checks across all twelve cases, exit 0.**
+**Result: 19/19 checks across all twelve cases, exit 0** (latest run 2026-08-05T16:09Z; the first run
+that day was 17/17, and the two extra checks are regressions added for defects this exercise found and
+the maintainer then had fixed — see Findings).
 
 **Environment.** A disposable `builderhunt_security_test_*` Postgres 18 database with the full
 migration chain applied, connected through per-run login roles inheriting `builderhunt_app`, `_auth`,
@@ -154,18 +156,18 @@ host's DNS before a scripted response is returned.
 
 | # | Case | Outcome | Job / run id | First log event |
 |---|------|---------|--------------|-----------------|
-| 01a | allowlisted host succeeds (scripted) | 202 enqueue → job `succeeded`, one `review` evidence row at 7500 bps (`exact_username`, `exact_full_name`, `location_agreement`) | `03d6c7d29e930c00b3efdd49`, `job_runs:231c64e1-f800-46bd-a70a-9a99f41c985d` (`succeeded`, processed 1) | `enrichment_worker_run@2026-08-05T15:36:27.820Z` |
-| 01b | allowlisted host succeeds (real network) | real GET to `api.github.com/users/octocat`; response passed the envelope and persisted one evidence row; resolver `rejected` it at 4000 bps because the fixture is deliberately dissimilar — a resolver verdict, not a transport failure | `68698333da833a22441d345d` | `enrichment_worker_run@2026-08-05T15:36:27.863Z` |
-| 02 | blocked host | `linkedin` dropped into `blockedConnectors`; the pasted LinkedIn URL stored as `user_submitted` evidence; direct `safeFetch` refused `host_not_allowed` **without opening a socket**; zero blocked-host requests | `e8e77642b4375bb9783535bc` | `enrichment_worker_run@2026-08-05T15:36:28.092Z` |
+| 01a | allowlisted host succeeds (scripted) | 202 enqueue → job `succeeded`, one **`accepted`** evidence row at 10 000 bps (`exact_stable_source_id`, `exact_username`, `exact_full_name`, `location_agreement`) carrying the 180-day accepted-retention window | `babd20da695e40dc559d4835`, `job_runs:36912576-9d07-4ef6-940a-f8768494858d` (`succeeded`, processed 1) | `enrichment_worker_run@2026-08-05T16:09:02.650Z` |
+| 01b | allowlisted host succeeds (real network) | real GET to `api.github.com/users/octocat`; response passed the envelope and persisted one evidence row, `accepted` at 10 000 bps — the stable-id signal firing against the live API, not a stub. The case pins the transport, not the verdict | `8472a688a26018cd4ca5c3c3` | `enrichment_worker_run@2026-08-05T16:09:02.693Z` |
+| 02 | blocked host | `linkedin` dropped into `blockedConnectors`; the pasted LinkedIn URL stored as `user_submitted` evidence resolved **`review` at 0 bps and visible through the tenant read**; direct `safeFetch` refused `host_not_allowed` **without opening a socket**; zero blocked-host requests | `92a5cd9282b31e33515bbbcd` | `enrichment_worker_run@2026-08-05T16:09:02.956Z` |
 | 03 | robots.txt denial | `Disallow` → `disallowed`; longest-match `Allow` → `allowed`; 4xx → `no_robots_file` (RFC 9309 §2.3.1.3); 5xx → `unavailable` | n/a (library-level) | n/a |
-| 04 | challenge / auth wall | 403 → connector `stop`; job `failed` with `all_connectors_failed`, one attempt, zero evidence, no retry scheduled | `d76d65525a0f756ba5daea50` | `enrichment_worker_run@2026-08-05T15:36:28.135Z` |
-| 05 | 429 | requeued to `queued`, `last_error_code=rate_limited`, `available_at` +120s from the upstream `Retry-After`, lease released | `0ee7a00b235beaac713b2dd0` | `enrichment_worker_run@2026-08-05T15:36:28.159Z` |
-| 06 | timeout | hung upstream aborted after **10 031 ms**; requeued with `upstream_unavailable` | `191e5c6a9959f42fbfb4ef7e` | `enrichment_worker_run@2026-08-05T15:36:28.181Z` |
-| 07 | two overlapping jobs | first 202, second **200 with the same jobId**; exactly one job row | `4c7d406686306d6eb0363d50` | n/a (no connector ran) |
-| 08 | worker crash + reclaim | job left `running` with a live lease; next run reclaimed 1 lease and drove it to `succeeded` at attempt 2 with one evidence row | `0e043656cb2e5445fdfe46d8` | `enrichment_worker_run@2026-08-05T15:36:38.276Z` |
-| 09 | restriction mid-flight | restriction 200 → 1 job cancelled, 1 evidence row purged cross-org; a job enqueued *after* the restriction was cancelled with `processing_restricted` having contacted **0 hosts**; refresh route answers 409 `processing_restricted` | `9a237f1dfb71f1ef9cd8cab6`, `7deb9fd29d82c29367e4db05`, `adv-job-post-restriction` | `enrichment_subject_restriction@2026-08-05T15:36:38.347Z` |
-| 10 | retention expiry | pass 1: 3 expired rows deleted, live `accepted` row kept, 200-day-old job **kept** (see finding 1); pass 2 after that row expired: row deleted and job retired. Tenant API showed exactly the 1 live row | `adv-job-retention` | `enrichment_retention_run@2026-08-05T15:36:38.375Z` |
-| 11 | export and delete | subject provenance 200 with 1 entry, **field names only, no payload values**; organization export read 5 rows through the app role; organization delete **refused `42501`** (see finding 2); deleting the organization row cascaded its enrichment jobs and evidence to zero | n/a | n/a |
+| 04 | challenge / auth wall | 403 → connector `stop`; job `failed` with `all_connectors_failed`, one attempt, zero evidence, no retry scheduled | `560ce0eeb0bf77dc208eda9b` | `enrichment_worker_run@2026-08-05T16:09:03.011Z` |
+| 05 | 429 | requeued to `queued`, `last_error_code=rate_limited`, `available_at` +120s from the upstream `Retry-After`, lease released | `0462d2f747a87cc8dd378080` | `enrichment_worker_run@2026-08-05T16:09:03.039Z` |
+| 06 | timeout | hung upstream aborted after **~10 030 ms**; requeued with `upstream_unavailable` | `3ad55cc635163d60fdd70793` | `enrichment_worker_run@2026-08-05T16:09:03.068Z` |
+| 07 | two overlapping jobs | first 202, second **200 with the same jobId**; exactly one job row | `346c51339efb9550c12c4580` | n/a (no connector ran) |
+| 08 | worker crash + reclaim | job left `running` with a live lease; next run reclaimed 1 lease and drove it to `succeeded` at attempt 2 with one evidence row | `6d6d611eed441ef7f79a5d5a` | `enrichment_worker_run@2026-08-05T16:09:13.137Z` |
+| 09 | restriction mid-flight | restriction 200 → 1 job cancelled, 1 evidence row purged cross-org; a job enqueued *after* the restriction was cancelled with `processing_restricted` having contacted **0 hosts**; refresh route answers 409; and the run closed `job_runs` as **`succeeded`**, counting the stop as `cancelled: 1, failed: 0` | `f6cd4a820ef1b62137aa285b`, `adv-job-post-restriction` | `enrichment_subject_restriction@2026-08-05T16:09Z` |
+| 10 | retention expiry | pass 1: 3 expired rows deleted, live `accepted` row kept, 200-day-old job **kept** (see finding 1); pass 2 after that row expired: row deleted and job retired. Tenant API showed exactly the 1 live row | `adv-job-retention` | `enrichment_retention_run@2026-08-05T16:09:13.235Z` |
+| 11 | export and delete | subject provenance 200 with 1 entry, **field names only, no payload values**; the tenant read returned its row through the app role; an app-role `delete` on `enrichment_evidence` **refused `42501`** by the grant (see finding 2); deleting the organization row cascaded its enrichment jobs and evidence to zero | n/a | n/a |
 | 12 | kill switch | separate process with `ENRICHMENT_ENABLED=false`: worker returned `disabled`, claimed 0, enqueue route answered 503 `enrichment_disabled`, **0 requests made**, and the queued job was still `queued` afterwards | `adv-job-killswitch` | n/a |
 
 ### Findings
@@ -181,30 +183,44 @@ host's DNS before a scripted response is returned.
    above. Regression pinned in `tests/unit/shared/lib/repositories/enrichment-worker.test.ts`.
    No production data was affected: `ENRICHMENT_ENABLED` was `false` and no evidence row has ever
    existed there.
-2. **Open, for a decision — the organization-level enrichment delete path does not work.**
-   `deleteOrganizationEnrichmentData` has **no caller anywhere in `src/`**, and calling it as the app
-   role is refused `42501`: `builderhunt_app` holds `SELECT, UPDATE` on `enrichment_evidence` and
-   `SELECT, INSERT` on `enrichment_jobs` (drizzle/0017). The same is true of
-   `listEnrichmentEvidenceForExport`. What does work today is the cascade — deleting the organization
-   removes both tables' rows — and the subject's own provenance/restriction path. The fix is a
-   worker-role deletion path, not a widened grant.
-3. **Open, minor — the strongest resolver signal can never fire.** `runEnrichmentWorker` calls
+2. **Resolved 2026-08-05 by decision — the organization-level delete/export helpers were removed.**
+   `deleteOrganizationEnrichmentData` and `listEnrichmentEvidenceForExport` had **no caller anywhere in
+   `src/`**, and both took the app-role transaction: `builderhunt_app` holds `SELECT, UPDATE` on
+   `enrichment_evidence` and `SELECT, INSERT` on `enrichment_jobs` (drizzle/0017), so the delete was
+   refused `42501` when this matrix first called it. A helper that cannot execute is worse than an
+   absent one — it reads as proof that the deletion path exists. Both deleted, with the reasoning left
+   in place of the code in `src/shared/lib/repositories/enrichment.ts`.
+
+   The grant itself is now pinned directly by case 11: an app-role `delete from enrichment_evidence`
+   must keep failing `42501`. The paths that do work and are exercised in the same case: deleting the
+   organization row cascades its jobs and evidence away, and the subject's own
+   `restrict-processing` / `evidence-provenance` routes purge and export their data across every
+   organization. **If a per-organization purge is ever wanted without deleting the organization, it
+   needs a worker-role write path — not a wider grant on the app role.**
+3. **Fixed 2026-08-05 — nothing was ever auto-accepted.** `runEnrichmentWorker` called
    `resolveEnrichmentCandidate` without `candidateSourceRecordId`, so `exact_stable_source_id`
-   (10 000 bps, the signal that exists to auto-accept an exact ID match) is never scored. Case 01a
-   shows the candidate's `source_record_id` equal to the target's `source_id` and the row still
-   resolving to `review` at 7500 bps. Consequence: at this configuration nothing is ever
-   auto-accepted, everything queues for human review. That is the safe direction, which is why it is
-   recorded rather than changed — flipping it is a policy decision.
-4. **Open, minor — an organization-submitted URL is stored but never surfaces.** Case 02's LinkedIn
-   URL resolves to `rejected` (0 bps: `isVerifiedOwnerSubmitted` is only set for the verified profile
-   owner, and the worker has no way to set it), and `listEnrichmentEvidence` returns only
-   `accepted`/`review`. So the row is written, invisible, and deleted after 7 days. Spec §5.3 says
-   such a URL "may still be stored"; whether it should be *visible* to the submitting organization is
-   unresolved.
-5. **Open, minor observability — a privacy cancellation is counted as a worker failure.** A job
-   cancelled with `processing_restricted` increments `result.failed`, which the run-worker route maps
-   to `job_runs.state = 'failed'`. Case 09's otherwise-perfect run closed as failed. Any alert on
-   failed runs will fire on correct privacy behaviour.
+   (10 000 bps, the signal whose entire purpose is to auto-accept an exact ID match from the source's
+   own API) never scored. Case 01a showed the candidate's `source_record_id` equal to the target's
+   `source_id` and the row still resolving to `review` at 7 500: every candidate queued for human
+   review, however well it matched. The worker now passes it. Case 01a asserts the accept path,
+   including that an accepted row carries the **180-day** window and not the 30-day raw one, and case
+   01b shows the same signal firing against the live GitHub API. The connector fetches by the tracked
+   identity's own username through the official API, so the id it returns is the strongest evidence
+   available rather than an inference.
+4. **Fixed 2026-08-05 — an operator-submitted URL is now visible.** A LinkedIn URL a recruiter pasted
+   resolved to `rejected` at 0 bps, and the tenant read returns only `accepted`/`review`: the row was
+   written, never shown to the person who typed it, and deleted after seven days. The resolver gained an
+   `isOperatorSubmitted` input that floors the **resolution** at `review` while awarding **no
+   confidence** — an attributed link awaiting a human's decision, which is what it is. No
+   `RESOLVER_VERSION` bump: the input defaults false, so every previously-scored candidate resolves
+   bit-identically. A forced reject (conflicting stable id, verified-owner rejection) still wins, and
+   case 02 asserts visibility through the real route the UI calls, not the table.
+5. **Fixed 2026-08-05 — a privacy cancellation is no longer counted as a worker failure.** A job
+   cancelled with `processing_restricted` incremented `result.failed`, which the run-worker route maps
+   to `job_runs.state = 'failed'` — so the most correct thing this worker does closed the run as a
+   failure and would have tripped any alert on failed runs. `EnrichmentWorkerResult` gained a
+   `cancelled` counter; case 09 now asserts `cancelled: 1, failed: 0` and `job_runs.state = 'succeeded'`
+   for a run whose only work was honouring a restriction.
 6. **Noted — the structured logger mints no event id.** `log.ts` writes `ts` + `event` per line and
    nothing that identifies one emission. The task asked for a "log event ID" per case; this register
    records `event@ts`, which is unique in a log stream, rather than inventing an id the code does not

@@ -158,3 +158,48 @@ describe('resolveEnrichmentCandidate — determinism and versioning', () => {
     expect(result.resolverVersion).toBe(RESOLVER_VERSION)
   })
 })
+
+/**
+ * `isOperatorSubmitted` (added 2026-08-05). A URL an organization member pastes in is never fetched
+ * and has nothing to match against, so it scores 0 bps — and 0 bps resolved to `rejected` while the
+ * tenant read only returns accepted/review. The link was written to the database, never shown to the
+ * person who typed it, and deleted seven days later: the feature did nothing. Found by the runtime
+ * adversarial matrix, case 02.
+ */
+describe('resolveEnrichmentCandidate — operator-submitted links', () => {
+  it('floors a zero-confidence pasted link at review, without inventing confidence', () => {
+    const result = resolveEnrichmentCandidate(baseInput({
+      candidate: { profileUrl: 'https://www.linkedin.com/in/someone', topics: [] },
+      isOperatorSubmitted: true,
+    }))
+    expect(result.resolution).toBe('review')
+    expect(result.confidenceBps, 'no points are awarded — only the resolution changes').toBe(0)
+    expect(result.matchSignals).toEqual([])
+  })
+
+  it('still rejects one the verified owner disowned, however it arrived', () => {
+    const result = resolveEnrichmentCandidate(baseInput({
+      candidate: { profileUrl: 'https://www.linkedin.com/in/someone', topics: [] },
+      isOperatorSubmitted: true,
+      verifiedOwnerRejected: true,
+    }))
+    expect(result.resolution).toBe('rejected')
+    expect(result.contradictions).toContain('verified_owner_rejected')
+  })
+
+  it('does not cap a strong match down to review', () => {
+    const result = resolveEnrichmentCandidate(baseInput({
+      candidateSourceRecordId: 'gh-123',
+      candidate: { profileUrl: 'https://github.com/octocat', username: 'octocat', topics: [] },
+      isOperatorSubmitted: true,
+    }))
+    expect(result.resolution).toBe('accepted')
+  })
+
+  it('changes nothing when absent — every previously-scored candidate resolves identically', () => {
+    const without = resolveEnrichmentCandidate(baseInput({
+      candidate: { profileUrl: 'https://www.linkedin.com/in/someone', topics: [] },
+    }))
+    expect(without.resolution, 'which is why RESOLVER_VERSION did not need a bump').toBe('rejected')
+  })
+})

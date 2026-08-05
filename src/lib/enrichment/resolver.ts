@@ -19,6 +19,21 @@ export interface ResolverInput {
   contradictsStableId?: boolean
   /** The verified profile owner rejected this candidate as not them. */
   verifiedOwnerRejected?: boolean
+  /**
+   * An organization member pasted this URL in themselves — the `user-submitted` acquisition mode,
+   * where nothing was fetched and there is nothing to match against.
+   *
+   * Such a candidate scores 0 bps, because there is genuinely no evidence that it is the same person;
+   * that is honest and stays. But 0 bps mapped to `rejected`, and the tenant read only returns
+   * `accepted`/`review` — so a link a recruiter typed was written to the database, never shown to
+   * them, and deleted seven days later. The feature did nothing. This floors the *resolution* at
+   * `review` without inventing confidence: an attributed link awaiting a human's confirmation, which
+   * is exactly what it is. Found 2026-08-05 by the runtime adversarial matrix, case 02.
+   *
+   * No `RESOLVER_VERSION` bump: the input defaults false, so every previously-scored candidate
+   * resolves bit-identically. A forced reject (conflicting stable id, owner rejection) still wins.
+   */
+  isOperatorSubmitted?: boolean
 }
 
 export interface ResolverOutput {
@@ -124,6 +139,10 @@ export function resolveEnrichmentCandidate(input: ResolverInput): ResolverOutput
   let resolution: EnrichmentResolution
   if (forcedReject) {
     resolution = 'rejected'
+  } else if (input.isOperatorSubmitted && totalBps < REVIEW_THRESHOLD) {
+    // See `isOperatorSubmitted`: a pasted link is worth a human's decision, not a silent discard. It
+    // keeps its real (usually zero) confidence — only where it lands changes.
+    resolution = 'review'
   } else if (totalBps >= ACCEPT_THRESHOLD && (matchSignals.length >= 2 || input.isVerifiedOwnerSubmitted)) {
     // spec §9/§5.3: a verified-owner-submitted URL "may be accepted
     // automatically" even as the sole signal — every other single signal
